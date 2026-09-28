@@ -1,3 +1,8 @@
+import type {
+    AttentionKind,
+    AttentionSource,
+} from "@/lib/customer-workspace/attention";
+
 /**
  * The one read of an order that Order Detail renders (ADR-008, U6, U14):
  * `GET /organizations/:org/orders/:id`. Types only, so the client screen and
@@ -179,8 +184,9 @@ export interface OrderRead extends FulfilmentFields {
     customer: {
         id: string;
         name: string | null;
+        /** Their own phone: null without `contact:read` (review #19). */
         phone: string | null;
-        /** Only with `order:read`. */
+        /** Only with `order:read` and `contact:read`. */
         email?: string;
         /** The contact this customer is confirmed as, if linked. */
         contactId: string | null;
@@ -206,6 +212,30 @@ export interface OrderRead extends FulfilmentFields {
     money: OrderReadMoney | null;
     /** Null for a role without `invoice:read`. */
     invoices: OrderReadInvoice[] | null;
+    /**
+     * The customer's Needs attention this viewer may see (B15). Null when
+     * the API couldn't read it; absent from an API before B15.
+     */
+    attention?: OrderAttention | null;
+}
+
+/** One Needs attention entry, as the order read carries it (B15). */
+export interface OrderAttentionEntry {
+    id: string;
+    kind: AttentionKind;
+    label: string;
+    detail: string | null;
+    sensitive: boolean;
+    allergen: AllergenRef | null;
+    /** Every allergen of the entry's name in the business, to match lines. */
+    matchAllergens: AllergenRef[];
+    source: AttentionSource;
+}
+
+export interface OrderAttention {
+    entries: OrderAttentionEntry[];
+    /** Entries on the person this viewer may not see. */
+    hiddenSensitiveCount: number;
 }
 
 /** A customer note that names allergens, from the contact's detail read. */

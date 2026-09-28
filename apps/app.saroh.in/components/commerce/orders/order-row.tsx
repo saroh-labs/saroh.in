@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import type { RowAttention } from "@/lib/orders/attention";
+import { rowAttention } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
 import { orderHref } from "@/lib/orders/links";
 import {
@@ -28,6 +30,11 @@ import { AgeText, StepBar, StepPill } from "./step-pill";
  *
  * Money shows only when the API sent it (`order:read`); the kitchen's view
  * keeps the pill, the bar and the age.
+ *
+ * The customer's Needs attention (B15) is a red tag beside their name at the
+ * desk and in the card's meta line on a phone: "Allergy: Sesame", "+1" for
+ * more, named in full for a screen reader. The API sends only what the
+ * viewer may see; "Not available" when it couldn't be read.
  */
 
 /** The desk grid: Order · Status · Placed · Total · the row menu (B5). */
@@ -74,7 +81,28 @@ function rowView(row: OrderRow, showStore: boolean) {
         progress: rowProgress(row),
         age: rowAge(row),
         money: rowMoney(row),
+        attention: rowAttention(row),
     };
+}
+
+/** The design's Needs attention tag; words, never colour alone. */
+function AttentionTag({ attention }: { attention: RowAttention }) {
+    if (attention.state === "none") return null;
+    return (
+        <span
+            role="img"
+            aria-label={attention.name}
+            title={attention.state === "shown" ? attention.title : undefined}
+            className={cn(
+                "max-w-[180px] flex-none truncate rounded-full px-1.5 py-px text-[11px] font-bold",
+                attention.state === "shown"
+                    ? "bg-destructive-subtle text-destructive-subtle-foreground"
+                    : "bg-muted text-muted-foreground",
+            )}
+        >
+            {attention.text}
+        </span>
+    );
 }
 
 /** A link whose hit area is the whole (relative) row around it. */
@@ -108,32 +136,35 @@ export function OrderGridRow({
         >
             <div className="flex min-w-0 items-center gap-[11px] pr-3.5">
                 <Avatar row={row} />
-                <div className="min-w-0">
-                    {onOpen ? (
-                        // The whole row opens the quick view, as the design
-                        // has it; "Open full page" is in the row menu.
-                        <button
-                            type="button"
-                            aria-haspopup="dialog"
-                            onClick={onOpen}
-                            className={cn(
-                                ROW_LINK,
-                                "block w-full cursor-pointer truncate text-left text-[13.5px] font-medium text-foreground",
-                            )}
-                        >
-                            {v.customer}
-                        </button>
-                    ) : (
-                        <Link
-                            href={v.href}
-                            className={cn(
-                                ROW_LINK,
-                                "block truncate text-[13.5px] font-medium text-foreground",
-                            )}
-                        >
-                            {v.customer}
-                        </Link>
-                    )}
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                        {onOpen ? (
+                            // The whole row opens the quick view, as the design
+                            // has it; "Open full page" is in the row menu.
+                            <button
+                                type="button"
+                                aria-haspopup="dialog"
+                                onClick={onOpen}
+                                className={cn(
+                                    ROW_LINK,
+                                    "block min-w-0 cursor-pointer truncate text-left text-[13.5px] font-medium text-foreground",
+                                )}
+                            >
+                                {v.customer}
+                            </button>
+                        ) : (
+                            <Link
+                                href={v.href}
+                                className={cn(
+                                    ROW_LINK,
+                                    "block min-w-0 truncate text-[13.5px] font-medium text-foreground",
+                                )}
+                            >
+                                {v.customer}
+                            </Link>
+                        )}
+                        <AttentionTag attention={v.attention} />
+                    </div>
                     <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
                         <span className="font-mono">{v.ref}</span>
                         {` · ${v.subline}`}
@@ -196,6 +227,7 @@ export function OrderCard({
                 <StepPill progress={v.progress} />
                 <span>{row.fulfilmentLabel}</span>
                 {v.age ? <AgeText age={v.age} /> : null}
+                <AttentionTag attention={v.attention} />
             </div>
             {v.money.unpaid ? (
                 <div className="text-[12px] font-bold text-destructive-subtle-foreground">
