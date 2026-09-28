@@ -26,6 +26,12 @@ export interface BookingService {
      * older than the page: no deposit.
      */
     depositCents?: number | null;
+    /**
+     * How many visits one booking of it is (E10). More than one is a
+     * treatment: sold whole, with visit 1 booked here and the rest booked
+     * with the business. Absent from an API older than the page: one.
+     */
+    visits?: number;
     /** Online only. */
     online: boolean;
     /**
@@ -135,6 +141,7 @@ function isService(v: unknown): v is BookingService {
         numOrNull(v.priceCents) &&
         strOrNull(v.currency) &&
         (v.depositCents === undefined || numOrNull(v.depositCents)) &&
+        (v.visits === undefined || isNum(v.visits)) &&
         typeof v.online === "boolean" &&
         (v.where === undefined ||
             v.where === "IN_PERSON" ||
@@ -387,9 +394,14 @@ export function payChoices(
     if (!price || !service.priceCents || service.priceCents <= 0) return [];
     const isClass = service.kind === "class";
     const place = isClass ? "place" : "appointment";
+    // A treatment is paid for whole (E10): "for all 3 visits".
+    const visits = visitsOf(service);
+    const forAll = visits > 1 ? ` for all ${visits} visits` : "";
     const payNow: PayChoice = {
         pay: "NOW",
-        label: isClass ? `Pay ${price} for this class` : `Pay ${price} now`,
+        label: isClass
+            ? `Pay ${price} for this class`
+            : `Pay ${price}${forAll} now`,
         sub: `Online — your ${place} is confirmed straight away`,
         amount: price,
     };
@@ -408,7 +420,7 @@ export function payChoices(
             },
             {
                 ...payNow,
-                label: `Pay the full ${price} now`,
+                label: `Pay the full ${price}${forAll} now`,
                 sub: "Online, in one payment",
             },
         ];
@@ -477,13 +489,49 @@ export function orList(names: string[]): string {
     return `${names.slice(0, -1).join(", ")} or ${names.at(-1) ?? ""}`;
 }
 
-/** "60 min · one-to-one · with Karan or Vikram". */
+// ── Visits (E10) ─────────────────────────────────────────────────────────
+
+/** How many visits one booking of the service is: 1 unless a treatment. */
+export function visitsOf(service: BookingService | null): number {
+    const n = service?.visits ?? 1;
+    return Number.isInteger(n) && n > 1 ? n : 1;
+}
+
+/**
+ * The summary's "Then" for a treatment (the Kavi Dental design): "We'll
+ * book visits 2 and 3 with you at the first appointment". Null for one
+ * visit.
+ */
+export function laterVisitsText(visits: number): string | null {
+    if (visits <= 1) return null;
+    const which =
+        visits === 2
+            ? "visit 2"
+            : visits === 3
+              ? "visits 2 and 3"
+              : `visits 2 to ${visits}`;
+    return `We'll book ${which} with you at the first appointment`;
+}
+
+/** The confirmation's word on a treatment: "Visit 1 of 3. We'll book the rest with you then". */
+export function firstVisitText(visits: number): string | null {
+    return visits > 1
+        ? `Visit 1 of ${visits}. We'll book the rest with you then`
+        : null;
+}
+
+/** "60 min · one-to-one · with Karan or Vikram"; "3 visits of 60 min · …". */
 export function serviceLine(service: BookingService): string {
     const kind =
         service.kind === "class"
             ? `class of ${service.capacity}`
             : "one-to-one";
-    const parts = [`${service.durationMinutes} min`, kind];
+    const visits = visitsOf(service);
+    const length =
+        visits > 1
+            ? `${visits} visits of ${service.durationMinutes} min`
+            : `${service.durationMinutes} min`;
+    const parts = [length, kind];
     if (service.staff.length > 0) parts.push(`with ${orList(service.staff)}`);
     return parts.join(" · ");
 }
