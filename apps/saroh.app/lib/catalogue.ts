@@ -61,8 +61,8 @@ async function shopFetch(path: string): Promise<Response | null> {
 
 /**
  * Everything the site's storefront sells. `cache` shares one read within a
- * request: the header asks whether to offer "Order" and `/shop` then draws
- * the same list.
+ * request: once the header asks whether to offer "Order" (G13), `/shop`
+ * draws the same list without a second read.
  */
 export const getCatalogue = cache(async function getCatalogue(
     siteId: string,
