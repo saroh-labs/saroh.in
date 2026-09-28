@@ -2,7 +2,8 @@
  * New order v2 (plan B, B13) against a real Postgres: a walk-in paid in
  * cash, a known customer picked from the search, someone new by email, a
  * pay link made with the order, the refusals, and how a walk-in's order
- * reads everywhere an order's customer is named (deploy 1's readers).
+ * reads everywhere an order's customer is named (deploy 1's readers). And
+ * B13b: a walk-in who gives a phone is a customer, found or made by it.
  *
  * Only the app env is stubbed (for the credential key); the provider is the
  * network-free fake. Runs in the integration project (TEST_DATABASE_URL).
@@ -24,6 +25,8 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
+import { isReservedContactEmail } from "../contacts/contact-email";
+import { PrivacyRemovalService } from "../customer-workspace/privacy-removal.service";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { hashPayToken } from "../invoices/pay-token";
@@ -203,14 +206,14 @@ beforeAll(async () => {
 describe("a walk-in (B13)", () => {
     it("paid in cash: ₹500 for ₹430, paid, and invoiced to them by name", async () => {
         const made = await place({
-            walkIn: { name: "Asha", phone: "+91 98450 00002" },
+            walkIn: { name: "Asha" },
             payment: { kind: "CASH", received: "500" },
         });
         const order = await stored(made.id);
         expect(order).toMatchObject({
             customerId: null,
             walkInName: "Asha",
-            walkInPhone: "+91 98450 00002",
+            walkInPhone: null,
             paymentStatus: "PAID",
         });
         expect(order.total.toString()).toBe("430");
@@ -231,13 +234,13 @@ describe("a walk-in (B13)", () => {
         ]);
     });
 
-    it("makes no customer and no contact", async () => {
+    it("with only a name, makes no customer and no contact", async () => {
         const [customers, contacts] = await Promise.all([
             prisma.customer.count({ where: { storeId } }),
             prisma.contact.count({ where: { organizationId: orgId } }),
         ]);
         await place({
-            walkIn: { name: "Ravi", phone: "+91 90000 11111" },
+            walkIn: { name: "Ravi", phone: "   " },
             payment: { kind: "UPI" },
         });
         expect(await prisma.customer.count({ where: { storeId } })).toBe(
@@ -453,10 +456,15 @@ describe("a walk-in's order, read everywhere (B13 deploy 1)", () => {
     beforeAll(async () => {
         id = (
             await place({
-                walkIn: { name: "Zoya", phone: "+91 97000 55555" },
+                walkIn: { name: "Zoya" },
                 payment: { kind: "CASH" },
             })
         ).id;
+        // A walk-in taken before B13b kept the phone they gave on the order.
+        await prisma.order.update({
+            where: { id },
+            data: { walkInPhone: "+91 97000 55555" },
+        });
     });
 
     it("the Orders list names them, and finds them by name and phone", async () => {
@@ -514,5 +522,257 @@ describe("a walk-in's order, read everywhere (B13 deploy 1)", () => {
         expect(offered.map((o) => o.id)).not.toContain(id);
         const [result] = await reviews.invite(owner, [id]);
         expect(result).toMatchObject({ status: "skipped", reason: "no-email" });
+    });
+});
+
+describe("a walk-in who gives a phone is a customer (B13b)", () => {
+    const customersHere = () => prisma.customer.count({ where: { storeId } });
+    const contactsHere = () =>
+        prisma.contact.count({ where: { organizationId: orgId } });
+    const linkOf = (customerId: string) =>
+        prisma.customerIdentityLink.findMany({
+            where: { customerId },
+            select: { contactId: true, reason: true, linkedByUserId: true },
+        });
+
+    it("matches the business's contact by phone, +91 or not, spaces or not", async () => {
+        const contact = await prisma.contact.create({
+            data: {
+                organizationId: orgId,
+                email: `meera-${tag}@example.in`,
+                firstName: "Meera",
+                lastName: "Iyer",
+                phone: "+91 98450 12345",
+            },
+        });
+        const before = await contactsHere();
+        const first = await place({
+            walkIn: { name: "Meera", phone: "9845012345" },
+        });
+        const made = await stored(first.id);
+        expect(made).toMatchObject({ walkInName: null, walkInPhone: null });
+        expect(await linkOf(made.customerId!)).toEqual([
+            {
+                contactId: contact.id,
+                reason: "MANUAL",
+                linkedByUserId: ownerId,
+            },
+        ]);
+        // Their real email, not a placeholder: as if picked.
+        expect(
+            await prisma.customer.findUniqueOrThrow({
+                where: { id: made.customerId! },
+                select: { email: true },
+            }),
+        ).toEqual({ email: `meera-${tag}@example.in` });
+        // Typed another way: the same customer, and no new contact.
+        const again = await place({
+            walkIn: { name: "Meera I", phone: "+91-98450 123 45" },
+        });
+        expect((await stored(again.id)).customerId).toBe(made.customerId);
+        expect(await contactsHere()).toBe(before);
+    });
+
+    it("matches the storefront's customer by phone when no contact holds it, and links them", async () => {
+        const existing = await prisma.customer.create({
+            data: {
+                storeId,
+                organizationId: orgId,
+                email: `tara-${tag}@example.in`,
+                firstName: "Tara",
+                phone: "98451 22222",
+            },
+        });
+        const made = await place({
+            walkIn: { name: "Tara S", phone: "+91 9845122222" },
+        });
+        expect((await stored(made.id)).customerId).toBe(existing.id);
+        const [link] = await linkOf(existing.id);
+        expect(link).toMatchObject({
+            reason: "MANUAL",
+            linkedByUserId: ownerId,
+        });
+        expect(
+            await prisma.contact.findUniqueOrThrow({
+                where: { id: link.contactId },
+                select: { email: true, firstName: true, phone: true },
+            }),
+        ).toEqual({
+            email: `tara-${tag}@example.in`,
+            firstName: "Tara",
+            phone: "+91 9845122222",
+        });
+    });
+
+    it("a new phone makes one customer and one contact, and a second order reuses them", async () => {
+        const [customers, contacts] = await Promise.all([
+            customersHere(),
+            contactsHere(),
+        ]);
+        const first = await place({
+            walkIn: { name: "Farah Khan", phone: "+91 90000 77777" },
+            payment: { kind: "CASH" },
+        });
+        const made = await stored(first.id);
+        expect(made).toMatchObject({ walkInName: null, walkInPhone: null });
+        expect(await customersHere()).toBe(customers + 1);
+        expect(await contactsHere()).toBe(contacts + 1);
+        const customer = await prisma.customer.findUniqueOrThrow({
+            where: { id: made.customerId! },
+            select: {
+                email: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+            },
+        });
+        expect(customer).toMatchObject({
+            firstName: "Farah",
+            lastName: "Khan",
+            phone: "+91 90000 77777",
+        });
+        expect(isReservedContactEmail(customer.email)).toBe(true);
+        const [link] = await linkOf(made.customerId!);
+        expect(link).toMatchObject({
+            reason: "MANUAL",
+            linkedByUserId: ownerId,
+        });
+        const contact = await prisma.contact.findUniqueOrThrow({
+            where: { id: link.contactId },
+            select: { email: true, firstName: true, phone: true },
+        });
+        expect(contact).toMatchObject({
+            firstName: "Farah",
+            phone: "+91 90000 77777",
+        });
+        expect(isReservedContactEmail(contact.email)).toBe(true);
+        // Paid, and C2 found them linked already: still one contact.
+        expect(made.paymentStatus).toBe("PAID");
+
+        const second = await place({
+            walkIn: { name: "Farah", phone: "9000077777" },
+        });
+        expect((await stored(second.id)).customerId).toBe(made.customerId);
+        expect(await customersHere()).toBe(customers + 1);
+        expect(await contactsHere()).toBe(contacts + 1);
+
+        // Picked from the search by that contact: the same customer.
+        const picked = await place({ contactId: link.contactId });
+        expect((await stored(picked.id)).customerId).toBe(made.customerId);
+    });
+
+    it("two orders for the same new phone at once make one customer", async () => {
+        const customers = await customersHere();
+        const [a, b] = await Promise.all([
+            place({ walkIn: { name: "Ivy", phone: "+91 90000 66666" } }),
+            place({ walkIn: { name: "Ivy", phone: "90000 66666" } }),
+        ]);
+        expect((await stored(a.id)).customerId).toBe(
+            (await stored(b.id)).customerId,
+        );
+        expect(await customersHere()).toBe(customers + 1);
+    });
+
+    it("never matches a contact removed for privacy", async () => {
+        const ctx: OrganizationContext = owner;
+        const gone = await prisma.contact.create({
+            data: {
+                organizationId: orgId,
+                email: `gone-${tag}@example.in`,
+                firstName: "Gone",
+                phone: "+91 90000 44444",
+            },
+        });
+        await new PrivacyRemovalService().remove(ctx, gone.id);
+        // A removal clears the phone; a row that kept it still never matches.
+        await prisma.contact.update({
+            where: { id: gone.id },
+            data: { phone: "+91 90000 44444" },
+        });
+        const made = await place({
+            walkIn: { name: "Neha", phone: "+91 90000 44444" },
+        });
+        const [link] = await linkOf((await stored(made.id)).customerId!);
+        expect(link.contactId).not.toBe(gone.id);
+        expect(
+            await prisma.customerIdentityLink.count({
+                where: { contactId: gone.id },
+            }),
+        ).toBe(0);
+    });
+
+    it("a privacy removal reaches the customer a phone made", async () => {
+        const made = await place({
+            walkIn: { name: "Leela", phone: "+91 90000 33333" },
+            payment: { kind: "CASH" },
+        });
+        // Their order counts as theirs: an open one holds the removal back.
+        await prisma.order.update({
+            where: { id: made.id },
+            data: { status: "DELIVERED" },
+        });
+        const customerId = (await stored(made.id)).customerId!;
+        const [link] = await linkOf(customerId);
+        await new PrivacyRemovalService().remove(owner, link.contactId);
+        expect(
+            await prisma.customer.findUniqueOrThrow({
+                where: { id: customerId },
+                select: { firstName: true, phone: true },
+            }),
+        ).toEqual({ firstName: null, phone: null });
+    });
+
+    it("answers the same whether or not someone was found", async () => {
+        await place({ walkIn: { name: "Omar", phone: "+91 90000 22222" } });
+        const found = await place({
+            walkIn: { name: "Omar", phone: "+91 90000 22222" },
+        });
+        const fresh = await place({
+            walkIn: { name: "Omar", phone: "+91 90000 22223" },
+        });
+        expect(Object.keys(found).sort()).toEqual(Object.keys(fresh).sort());
+    });
+
+    it("refuses a phone too short to keep them by, and makes no order", async () => {
+        const before = await prisma.order.count({ where: { storeId } });
+        await expect(
+            place({ walkIn: { name: "Sam", phone: "12345" } }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(await prisma.order.count({ where: { storeId } })).toBe(before);
+    });
+
+    it("reads as their customer, never with a placeholder email", async () => {
+        const made = await place({
+            walkIn: { name: "Ritu", phone: "+91 90000 11112" },
+            payment: { kind: "CASH" },
+        });
+        const read = await kitchen.read(owner, made.id);
+        expect(read.walkIn).toBeNull();
+        expect(read.customer).toMatchObject({
+            name: "Ritu",
+            phone: "+91 90000 11112",
+        });
+        expect(JSON.stringify(read)).not.toContain(".invalid");
+        const page = await listOrderRows(
+            orgId,
+            { q: "Ritu" },
+            { money: true, contact: true },
+        );
+        expect(page.rows.map((r) => r.id)).toContain(made.id);
+        expect(JSON.stringify(page.rows)).not.toContain(".invalid");
+        const { invoices } = await stored(made.id);
+        expect(invoices).toEqual([
+            expect.objectContaining({ billToName: "Ritu", billToEmail: null }),
+        ]);
+        await prisma.order.update({
+            where: { id: made.id },
+            data: { status: "DELIVERED" },
+        });
+        const reviews = new ProductReviewsService(
+            { record: jest.fn() } as unknown as AuditService,
+            new FixedWindowRateLimiter(100, 60_000),
+        );
+        const offered = await reviews.invitableOrders(orgId);
+        expect(offered.map((o) => o.id)).not.toContain(made.id);
     });
 });

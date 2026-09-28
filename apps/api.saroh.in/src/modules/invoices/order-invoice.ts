@@ -1,3 +1,4 @@
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
 import { orderPartyName } from "../orders/walk-in";
 import type { GstLine, GstLineInput, TaxType } from "./gst";
@@ -9,7 +10,6 @@ import {
     taxTypeFor,
 } from "./gst";
 import { stateCode } from "./gst-states";
-import { contactName } from "./serialize";
 import { toCents } from "./totals";
 
 /**
@@ -139,9 +139,12 @@ export function orderBillTo(order: OrderForInvoice): BillTo {
             state: null,
         };
     }
+    // A walk-in kept by their phone (B13b) has a placeholder email: no
+    // email to print or send to.
+    const email = contactEmailForDisplay(order.customer.email);
     return {
-        name: contactName(order.customer),
-        email: order.customer.email,
+        name: orderPartyName(order),
+        email,
         address,
         state: null,
     };

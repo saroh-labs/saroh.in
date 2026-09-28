@@ -268,7 +268,26 @@ export function findSellables<T extends { name: string }>(
     return products.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
 }
 
-/** What the API is sent for who the order is for. */
+/**
+ * The line under the picked customer's name: how to reach them. A walk-in
+ * with only a name says so; one with a phone is kept as a customer by it
+ * (B13b), and says that.
+ */
+export function pickMeta(pick: CustomerPick): string {
+    if (pick.kind === "walk-in") {
+        const phone = pick.phone.trim();
+        return phone ? `${phone} · kept as a customer` : "Walk-in";
+    }
+    return (
+        [pick.phone, pick.email].filter(Boolean).join(" · ") ||
+        "No contact details"
+    );
+}
+
+/**
+ * What the API is sent for who the order is for. A walk-in's phone is sent
+ * when given, and the API keeps them as a customer by it (B13b).
+ */
 export function partyOf(
     pick: CustomerPick,
 ):

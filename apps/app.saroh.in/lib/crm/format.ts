@@ -5,11 +5,19 @@ import { DISPLAY_LOCALE } from "@/lib/format/locale";
  * they are safe in both server and client components.
  */
 
+/** The API's reserved placeholder domains (`contacts/contact-email.ts`). */
+const PLACEHOLDER_DOMAINS = new Set([
+    "account.invalid",
+    "removed.invalid",
+    "phone.invalid",
+]);
+
 /**
  * A contact's email as the page may show it: null for the reserved,
  * undeliverable placeholders the API gives a contact that holds no real
- * address (`…@account.invalid`, `…@removed.invalid`: a site account's
- * separate contact, a merge's tombstone, a privacy removal).
+ * address (`…@account.invalid`, `…@removed.invalid`, `…@phone.invalid`: a
+ * site account's separate contact, a merge's tombstone, a privacy removal,
+ * a walk-in kept by their phone alone).
  */
 export function contactEmail(email: string | null | undefined): string | null {
     if (!email) return null;
@@ -17,9 +25,7 @@ export function contactEmail(email: string | null | undefined): string | null {
         .slice(email.lastIndexOf("@") + 1)
         .trim()
         .toLowerCase();
-    return domain === "account.invalid" || domain === "removed.invalid"
-        ? null
-        : email;
+    return PLACEHOLDER_DOMAINS.has(domain) ? null : email;
 }
 
 /** Whose details were removed for a privacy request (C11). */

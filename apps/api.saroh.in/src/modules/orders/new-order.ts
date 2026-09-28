@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
 import { isReservedContactEmail } from "../contacts/contact-email";
+import { normalisePhone } from "../customer-workspace/duplicates";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { ensureOrderInvoice } from "../invoices/order-invoicing";
 import { feeCents } from "./checkout-quote";
@@ -17,6 +18,13 @@ import {
 } from "./fulfilment";
 import type { CounterPayment } from "./new-order.dto";
 import { COUNTER_PAYMENTS } from "./new-order.dto";
+import {
+    contactByPhone,
+    lockWalkInPhone,
+    storeCustomerByPhone,
+    walkInCustomerInTx,
+    walkInPhoneKey,
+} from "./walk-in-customer";
 
 /**
  * New order v2 (plan B, B13): who an order taken by hand is for, how it is
@@ -71,8 +79,13 @@ export function assertOneParty(dto: PartyFields): void {
  * - someone new, by email: the storefront customer with that email, else a
  *   new one. A contact is linked once it is paid (C2's
  *   `ensureContactForPaidOrder`), never made here;
- * - a walk-in: no customer and no contact, only the name and phone on the
- *   order.
+ * - a walk-in with only a name: no customer and no contact, the name on
+ *   the order;
+ * - a walk-in with a phone (B13b): a customer, as a picked person is. The
+ *   business's contact with that phone when there is one (never one
+ *   removed for privacy); else the storefront's customer with it, else a
+ *   new one, given a contact of its own (`walk-in-customer.ts`). The phone
+ *   goes on the customer, never on the order.
  *
  * Emails are matched whatever their case, oldest customer first, so no
  * second customer is ever made for an email the storefront already has.
@@ -96,10 +109,20 @@ export async function orderPartyInTx(
                 details: { field: "walkIn.name" },
             });
         }
+        const phone = blankToNull(dto.walkIn.phone);
+        if (!phone) {
+            return { customerId: null, walkInName: name, walkInPhone: null };
+        }
         return {
-            customerId: null,
-            walkInName: name,
-            walkInPhone: blankToNull(dto.walkIn.phone),
+            customerId: await walkInWithPhone(tx, {
+                storeId,
+                organizationId,
+                userId,
+                name,
+                phone,
+            }),
+            walkInName: null,
+            walkInPhone: null,
         };
     }
     const party = (customerId: string): OrderParty => ({
@@ -148,6 +171,38 @@ export async function orderPartyInTx(
     );
 }
 
+/**
+ * A walk-in who gave their phone (B13b): the contact with it, as if picked,
+ * else the storefront's customer by it (`walk-in-customer.ts`). One phone at
+ * a time, so two orders for a new number make one customer.
+ */
+async function walkInWithPhone(
+    tx: Tx,
+    input: {
+        storeId: string;
+        organizationId: string | null;
+        userId: string;
+        name: string;
+        phone: string;
+    },
+): Promise<string> {
+    const { storeId, organizationId, userId } = input;
+    const key = walkInPhoneKey(input.phone);
+    await lockWalkInPhone(tx, organizationId ?? storeId, key);
+    const contactId = organizationId
+        ? await contactByPhone(tx, organizationId, key)
+        : null;
+    if (organizationId && contactId) {
+        return storeCustomerForContact(tx, {
+            storeId,
+            organizationId,
+            userId,
+            contactId,
+        });
+    }
+    return walkInCustomerInTx(tx, { ...input, key });
+}
+
 async function storeCustomerForContact(
     tx: Tx,
     input: {
@@ -185,6 +240,31 @@ async function storeCustomerForContact(
         select: { email: true, firstName: true, lastName: true, phone: true },
     });
     const email = contact?.email.trim().toLowerCase() ?? "";
+    const name = contact
+        ? [contact.firstName, contact.lastName].filter(Boolean).join(" ")
+        : "";
+    // Known by their phone alone (a walk-in kept as a customer, B13b): the
+    // storefront's customer is found or made by that phone instead.
+    const phoneKey = normalisePhone(contact?.phone);
+    const byPhone =
+        contact?.phone && phoneKey && (!email || isReservedContactEmail(email))
+            ? await storeCustomerByPhone(tx, {
+                  storeId,
+                  organizationId,
+                  key: phoneKey,
+                  name,
+                  phone: contact.phone,
+              })
+            : null;
+    if (byPhone) {
+        await linkIfUnlinked(tx, {
+            organizationId,
+            contactId: resolved.id,
+            customerId: byPhone.id,
+            userId,
+        });
+        return byPhone.id;
+    }
     if (!contact || !email || isReservedContactEmail(email)) {
         throw new ConflictException({
             message:
@@ -196,27 +276,45 @@ async function storeCustomerForContact(
         storeId,
         organizationId,
         email,
-        name: [contact.firstName, contact.lastName].filter(Boolean).join(" "),
+        name,
         phone: contact.phone,
     });
-    // Staff picked who it is: the storefront customer is theirs, unless it
-    // is already someone's (a link is never moved on an email alone).
-    const links = await tx.customerIdentityLink.count({
-        where: { customerId },
+    await linkIfUnlinked(tx, {
+        organizationId,
+        contactId: resolved.id,
+        customerId,
+        userId,
     });
-    if (links === 0) {
-        await tx.customerIdentityLink.create({
-            data: {
-                organizationId,
-                contactId: resolved.id,
-                customerId,
-                reason: "MANUAL",
-                linkedByUserId: userId,
-            },
-            select: { id: true },
-        });
-    }
     return customerId;
+}
+
+/**
+ * Staff picked who it is: the storefront customer is theirs, unless it is
+ * already someone's (a link is never moved on an email or a phone alone).
+ */
+async function linkIfUnlinked(
+    tx: Tx,
+    input: {
+        organizationId: string;
+        contactId: string;
+        customerId: string;
+        userId: string;
+    },
+): Promise<void> {
+    const links = await tx.customerIdentityLink.count({
+        where: { customerId: input.customerId },
+    });
+    if (links > 0) return;
+    await tx.customerIdentityLink.create({
+        data: {
+            organizationId: input.organizationId,
+            contactId: input.contactId,
+            customerId: input.customerId,
+            reason: "MANUAL",
+            linkedByUserId: input.userId,
+        },
+        select: { id: true },
+    });
 }
 
 async function storeCustomerByEmail(

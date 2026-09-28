@@ -54,6 +54,7 @@ describe("contactEmail", () => {
         expect(contactEmail("removed+c1@removed.invalid")).toBeNull();
         expect(contactEmail("merged+c1@Removed.Invalid")).toBeNull();
         expect(contactEmail("account+c1@account.invalid")).toBeNull();
+        expect(contactEmail("phone+c1@phone.invalid")).toBeNull();
         expect(contactEmail("asha@example.in")).toBe("asha@example.in");
         expect(contactEmail(null)).toBeNull();
     });

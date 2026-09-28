@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import { orderPartyName } from "../orders/walk-in";
 import { allows } from "../organizations/organization-policy";
 
@@ -86,7 +87,7 @@ function personName(person: {
         .join(" ")
         .trim();
     if (full) return full;
-    return person.email?.trim() ?? "Unknown";
+    return contactEmailForDisplay(person.email)?.trim() ?? "Unknown";
 }
 
 @Injectable()
@@ -151,7 +152,8 @@ export class SearchService {
             title: personName(row),
             // The email, not the company: two people at the same company are
             // exactly the pair this line has to tell apart.
-            subtitle: row.email,
+            // Never a placeholder (a walk-in kept by phone, B13b).
+            subtitle: contactEmailForDisplay(row.email) ?? "",
             href: `/contacts/${row.id}`,
         }));
     }

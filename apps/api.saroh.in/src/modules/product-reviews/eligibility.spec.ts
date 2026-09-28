@@ -36,4 +36,13 @@ describe("orderIneligibility", () => {
             }),
         ).toBe("not-paid");
     });
+
+    it("a walk-in kept by their phone (B13b) has no email to send the link to", () => {
+        expect(
+            orderIneligibility({
+                ...paidAndDelivered,
+                customerEmail: "phone+0f3c@phone.invalid",
+            }),
+        ).toBe("no-email");
+    });
 });

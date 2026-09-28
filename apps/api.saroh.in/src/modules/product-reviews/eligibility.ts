@@ -1,3 +1,5 @@
+import { contactEmailForDisplay } from "../contacts/contact-email";
+
 /**
  * Whether an order can be asked for — or still accept — reviews (R1): paid,
  * shipped or delivered, part of a business, with somewhere to send the link.
@@ -32,7 +34,8 @@ export function orderIneligibility(order: {
     if (order.status !== "SHIPPED" && order.status !== "DELIVERED") {
         return "not-shipped";
     }
-    if (!order.customerEmail?.trim()) return "no-email";
+    // A walk-in kept by their phone (B13b) holds a placeholder: no email.
+    if (!contactEmailForDisplay(order.customerEmail)) return "no-email";
     if (order.productLines === 0) return "no-products";
     return null;
 }

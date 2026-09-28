@@ -12,6 +12,7 @@ import {
     partyOf,
     payNote,
     payOptions,
+    pickMeta,
     reachOf,
     roomFor,
     sheetProblem,
@@ -245,5 +246,31 @@ describe("who the API is told it is for", () => {
                 phone: "",
             }),
         ).toEqual({ customer: { email: "nisha@example.in", name: "Nisha" } });
+    });
+});
+
+describe("the line under who it is for (B13b)", () => {
+    it("a walk-in with only a name says walk-in", () => {
+        expect(pickMeta(walkIn())).toBe("Walk-in");
+        expect(pickMeta(walkIn("   "))).toBe("Walk-in");
+    });
+
+    it("a walk-in with a phone is kept as a customer by it", () => {
+        expect(pickMeta(walkIn("+91 90000 11111"))).toBe(
+            "+91 90000 11111 · kept as a customer",
+        );
+    });
+
+    it("anyone else by how to reach them", () => {
+        expect(pickMeta(known)).toContain("priya@example.in");
+        expect(
+            pickMeta({
+                kind: "contact",
+                id: "k2",
+                name: "Ravi",
+                email: null,
+                phone: null,
+            }),
+        ).toBe("No contact details");
     });
 });

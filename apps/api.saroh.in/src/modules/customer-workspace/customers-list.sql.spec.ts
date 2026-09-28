@@ -98,7 +98,11 @@ describe("customers list SQL", () => {
     });
 
     it("scopes the unlinked store customers to the business and, when asked, a storefront", () => {
-        const placeholders = ["%@account.invalid", "%@removed.invalid"];
+        const placeholders = [
+            "%@account.invalid",
+            "%@removed.invalid",
+            "%@phone.invalid",
+        ];
         expect(unlinkedCte("org").values).toEqual(["org", placeholders, "org"]);
         expect(unlinkedCte("org", "store_1").values).toEqual([
             "org",

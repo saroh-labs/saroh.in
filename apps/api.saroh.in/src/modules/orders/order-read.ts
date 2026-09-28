@@ -1,4 +1,5 @@
 import { toMoneyString } from "../../common/money";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import {
     isRemovedStoreCustomer,
     REMOVED_CUSTOMER_NAME,
@@ -453,6 +454,7 @@ export function serializeOrderRead(
     const hasAddress = Object.values(address).some((v) => v !== null);
     // Their details were removed for a privacy request (C11).
     const removed = isRemovedStoreCustomer(order.customer);
+    const shownEmail = contactEmailForDisplay(order.customer?.email);
     const name = removed
         ? REMOVED_CUSTOMER_NAME
         : order.customer
@@ -499,8 +501,10 @@ export function serializeOrderRead(
                   id: order.customer.id,
                   name: name || null,
                   phone: opts.contact ? order.customer.phone : null,
-                  ...(opts.contact && !removed
-                      ? { email: order.customer.email }
+                  // Never a placeholder: a walk-in kept by their phone
+                  // (B13b) has no email to show.
+                  ...(opts.contact && !removed && shownEmail
+                      ? { email: shownEmail }
                       : {}),
                   contactId:
                       order.customer.identityLinks?.[0]?.contactId ?? null,
