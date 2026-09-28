@@ -52,14 +52,14 @@ import {
  *   archived) and listed at the site's sells-from storefront, with only the
  *   variants listed there (ADR-010). No storefront chosen, a closed one, the
  *   shop not open for the business (`SITE_SHOP`, off until checkout ships)
- *   or Commerce switched off: 404, like a site with no shop.
+ *   or Commerce switched off or not rolled out (DEC-057): 404, like a site
+ *   with no shop.
  * - **An explicit allow-list** (`public-catalogue.serialize.ts`).
  * - **Limited per visitor.** Keyed on the visitor's address: the signed
  *   relay's when saroh.app relays the call, otherwise the caller's own.
  * - **The Product grid (G12)** asks the same list for the newest, one
  *   collection's or hand-picked products, and a count. Same gates, same
- *   allow-list, same per-visitor limit; it also needs Commerce rolled out
- *   for the business (DEC-057). An empty grid is an empty list, not a 404:
+ *   allow-list, same per-visitor limit. An empty grid is an empty list, not a 404:
  *   the shop is open, there is just nothing to show in that block.
  */
 
@@ -210,9 +210,6 @@ export class PublicCatalogueService {
     ): Promise<PublicCatalogue> {
         return this.inShop(siteId, callerHash, async (scope) => {
             if (grid) {
-                if (!(await commerceRolledOut(scope.organizationId))) {
-                    notFound();
-                }
                 return {
                     storefront: { name: scope.storefront.name },
                     products: await this.grid(scope, grid),
@@ -548,7 +545,11 @@ export class PublicCatalogueService {
         if (!(await shopRolloutOn(organizationId))) notFound();
 
         return runInOrgContext(organizationId, async () => {
+            // Commerce switched on and rolled out (DEC-057): a module whose
+            // rollout is off is shown nowhere, so no shop, product page or
+            // Product grid.
             if (!(await commerceOpen(prisma, organizationId))) notFound();
+            if (!(await commerceRolledOut(organizationId))) notFound();
             const storefront = await effectiveStorefront(prisma, site);
             if (!storefront) notFound();
             return fn({ organizationId, storefront });
