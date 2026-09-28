@@ -8,6 +8,7 @@ import {
     getJournalFeed,
     getSiteForHost,
 } from "@/lib/publication";
+import { getPlansFeed } from "@/lib/site-plans";
 
 /**
  * Tenant site home (S2-006).
@@ -36,12 +37,12 @@ export default async function SiteHomePage({
         notFound();
     }
 
-    // The Journal's posts (G10), read only when the page draws one.
-    const journal = await getJournalFeed(
-        home.sections,
-        resolved.snapshot,
-        resolved.siteId,
-    );
+    // The Journal's posts (G10) and the plans on sale (G9), each read only
+    // when the page draws its block.
+    const [journal, plans] = await Promise.all([
+        getJournalFeed(home.sections, resolved.snapshot, resolved.siteId),
+        getPlansFeed(home.sections, resolved.snapshot, resolved.siteId),
+    ]);
 
     return (
         <PageSections
@@ -50,6 +51,7 @@ export default async function SiteHomePage({
             bookHref="/book"
             siteId={resolved.siteId}
             journal={journal}
+            plans={plans}
         />
     );
 }

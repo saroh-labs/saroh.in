@@ -16,13 +16,21 @@ import { actionButton } from "./add-to-bag";
  * nothing is drawn: a button that goes nowhere is worse than none.
  */
 
-/** Where the enquiry form is, with the product named for its message. */
-export function askAboutHref(enquiryHref: string, about: string): string {
+/**
+ * Where the enquiry form is, with the product named for its message. `key`
+ * says what the visitor is asking: `about` (ordering a product, G13) or
+ * `join` (joining a plan, G9); the form words its message to match.
+ */
+export function askAboutHref(
+    enquiryHref: string,
+    about: string,
+    key: "about" | "join" = "about",
+): string {
     const at = enquiryHref.indexOf("#");
     const path = at >= 0 ? enquiryHref.slice(0, at) : enquiryHref;
     const hash = at >= 0 ? enquiryHref.slice(at + 1) : "enquiry";
     const join = path.includes("?") ? "&" : "?";
-    return `${path}${join}about=${encodeURIComponent(about)}#${hash}`;
+    return `${path}${join}${key}=${encodeURIComponent(about)}#${hash}`;
 }
 
 export function AskAboutOrdering({

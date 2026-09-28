@@ -33,12 +33,24 @@ type SubmitState =
     | { kind: "success" }
     | { kind: "error"; message: string };
 
-/** The product "Ask about ordering" named (G13), from `?about=`. */
-function aboutFromUrl(): string | null {
+/**
+ * The message a link asked for: `?about=` names a product "Ask about
+ * ordering" sent (G13), `?join=` a plan "Ask about joining" sent (G9).
+ */
+export function askedFromSearch(search: string): string | null {
+    const read = (key: string) => {
+        const value = new URLSearchParams(search).get(key)?.trim() ?? "";
+        return value.length > 0 ? value.slice(0, 200) : null;
+    };
+    const plan = read("join");
+    if (plan) return `I'd like to join ${plan}. `;
+    const product = read("about");
+    return product ? `I'd like to order ${product}. ` : null;
+}
+
+function askedFromUrl(): string | null {
     try {
-        const about = new URLSearchParams(window.location.search).get("about");
-        const product = about?.trim().slice(0, 200) ?? "";
-        return product.length > 0 ? product : null;
+        return askedFromSearch(window.location.search);
     } catch {
         return null;
     }
@@ -78,24 +90,20 @@ export default function EnquirySection({
     const [state, setState] = useState<SubmitState>({ kind: "idle" });
 
     // "Ask about ordering" on a product page (G13) links here with
-    // `?about=<product>`: the message starts with it, and the visitor
-    // finishes it. Read after mount, so the server's markup stays the same
-    // for everyone.
+    // `?about=<product>`, and "Ask about joining" on a Plans block (G9) with
+    // `?join=<plan>`: the message starts with it, and the visitor finishes
+    // it. Read after mount, so the server's markup stays the same for
+    // everyone.
     const messageField =
         content.fields.find((f) => f.type === "textarea")?.name ?? null;
     useEffect(() => {
         if (!messageField) return;
-        const product = aboutFromUrl();
-        if (!product) return;
+        const asked = askedFromUrl();
+        if (!asked) return;
         // After this render, as an answer from the address bar.
         const timer = setTimeout(() => {
             setValues((prev) =>
-                prev[messageField]
-                    ? prev
-                    : {
-                          ...prev,
-                          [messageField]: `I'd like to order ${product}. `,
-                      },
+                prev[messageField] ? prev : { ...prev, [messageField]: asked },
             );
         }, 0);
         return () => clearTimeout(timer);
