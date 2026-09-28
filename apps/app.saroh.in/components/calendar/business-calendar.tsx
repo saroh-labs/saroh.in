@@ -1,21 +1,16 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Sheet, SheetContent, SheetTitle } from "@saroh/ui/sheet";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
+import { CalendarMissing } from "@/components/calendar/calendar-missing";
 import { CalendarNothing } from "@/components/calendar/calendar-nothing";
+import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { DayPanel } from "@/components/calendar/day-panel";
-import { LayerSwitches } from "@/components/calendar/layer-switches";
+import { DaySheet } from "@/components/calendar/day-sheet";
 import { dayButton, MonthGrid } from "@/components/calendar/month-grid";
-import { MonthStep } from "@/components/calendar/month-step";
 import { MonthStrip } from "@/components/calendar/month-strip";
-import { TeamFilter } from "@/components/calendar/team-filter";
 import { cellOff, dayOffLine } from "@/lib/calendar/days-off";
 import { askedDay } from "@/lib/calendar/grid-keys";
 import type { Off } from "@/lib/calendar/layers";
@@ -46,6 +41,7 @@ import {
     teamOptions,
 } from "@/lib/calendar/team";
 import type { CalendarMonth } from "@/lib/calendar/types";
+import { weekHref } from "@/lib/calendar/week";
 
 /** Between the phone and the full rail the day opens as a sheet. */
 const SHEET_WIDTHS = "(min-width: 760px) and (max-width: 1099px)";
@@ -62,11 +58,6 @@ function useDaySheet(): boolean {
         () => false,
     );
 }
-
-const listed = (labels: string[]) =>
-    labels.length < 2
-        ? (labels[0] ?? "")
-        : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 
 /**
  * Home › Calendar, after the "Saroh Business Calendar" design: the month, a
@@ -125,8 +116,6 @@ export function BusinessCalendar({
     const currency = mainCurrency(data);
     const day = shown.days.find((d) => d.date === selected) ?? shown.days.at(0);
     const failed = new Set(data.unavailable.map((u) => u.source));
-    const missing = data.unavailable.map((u) => u.label);
-    const money = data.takings !== undefined;
     // In, out and due (E23): only for `payment:read`, whom the API sent them.
     // The person picked narrows what is drawn; the file stays the month's.
     const narrowed = calendarCash(shown, off, currency);
@@ -180,8 +169,6 @@ export function BusinessCalendar({
         ) : null;
 
     const edges = monthEdges(data.month, range);
-    const edgeNote = edges.before?.note ?? edges.after?.note;
-    const isThisMonth = data.month === thisMonth;
 
     return (
         <>
@@ -205,73 +192,43 @@ export function BusinessCalendar({
                 }
             />
 
-            <div className="!mt-0.5 flex flex-wrap items-center gap-1.5">
-                <div className="flex gap-1">
-                    <MonthStep
-                        href={hrefFor(shiftMonth(data.month, -1))}
-                        label="Previous month"
-                        edge={edges.before}
-                    >
-                        <ChevronLeft className="size-4" />
-                    </MonthStep>
-                    {isThisMonth ? (
-                        // Already here: the design greys it and it does
-                        // nothing, rather than reloading the same month.
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled
-                            aria-current="date"
-                            className="px-[11px] text-[12.5px] disabled:text-muted-foreground disabled:opacity-100"
-                        >
-                            This month
-                        </Button>
-                    ) : (
-                        <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="px-[11px] text-[12.5px]"
-                        >
-                            <Link href={hrefFor(thisMonth)}>This month</Link>
-                        </Button>
-                    )}
-                    <MonthStep
-                        href={hrefFor(shiftMonth(data.month, 1))}
-                        label="Next month"
-                        edge={edges.after}
-                    >
-                        <ChevronRight className="size-4" />
-                    </MonthStep>
-                </div>
-                {edgeNote ? (
-                    // Said on the page as well as on the button: a reason
-                    // only on hover is one a phone never shows.
-                    <span
-                        id="calendar-edge"
-                        className="text-[12px] text-muted-foreground"
-                    >
-                        {edgeNote}
-                    </span>
-                ) : null}
-                <span className="flex-1" />
-                {people.length > 0 ? (
-                    <TeamFilter
-                        options={people}
-                        value={person}
-                        onChange={pickPerson}
-                    />
-                ) : null}
-                <LayerSwitches
-                    layers={layers}
-                    off={off}
-                    totals={shown.totals}
-                    failed={failed}
-                    onToggle={(key) =>
-                        setOff((o) => ({ ...o, [key]: !o[key] }))
-                    }
-                />
-            </div>
+            <CalendarToolbar
+                prev={{
+                    href: hrefFor(shiftMonth(data.month, -1)),
+                    label: "Previous month",
+                    edge: edges.before,
+                }}
+                next={{
+                    href: hrefFor(shiftMonth(data.month, 1)),
+                    label: "Next month",
+                    edge: edges.after,
+                }}
+                current={{
+                    label: "This month",
+                    href: hrefFor(thisMonth),
+                    here: data.month === thisMonth,
+                }}
+                view={{
+                    value: "month",
+                    hrefs: {
+                        month: hrefFor(data.month),
+                        // The week holding the day picked (E25).
+                        week: weekHref({
+                            day: day?.date ?? today,
+                            today,
+                            team: person,
+                        }),
+                    },
+                }}
+                people={people}
+                person={person}
+                onPerson={pickPerson}
+                layers={layers}
+                off={off}
+                totals={shown.totals}
+                failed={failed}
+                onToggle={(key) => setOff((o) => ({ ...o, [key]: !o[key] }))}
+            />
 
             {cash ? (
                 <MonthStrip
@@ -283,27 +240,7 @@ export function BusinessCalendar({
                 />
             ) : null}
 
-            {missing.length > 0 ? (
-                <PartialNotice
-                    action={
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.refresh()}
-                        >
-                            Try again
-                        </Button>
-                    }
-                >
-                    {listed(missing)} couldn&apos;t be loaded, so{" "}
-                    {missing.length === 1 ? "it is" : "they are"} missing from
-                    this month — everything else is here.
-                    {data.money?.total === null ||
-                    (money && data.takings?.total === null)
-                        ? " Money is left out while part of it is missing."
-                        : ""}
-                </PartialNotice>
-            ) : null}
+            <CalendarMissing data={data} span="month" />
 
             <div className="!mt-3.5 flex flex-wrap items-start gap-4">
                 <MonthGrid
@@ -354,35 +291,14 @@ export function BusinessCalendar({
                 ) : null}
             </p>
 
-            <Sheet open={sheetOpen && sheetWidths} onOpenChange={setSheetOpen}>
-                {/* A dialog: Tab stays inside, Esc closes it. It opens on
-                    the day's title, and closing it puts focus back on the day
-                    in the grid rather than at the top of the page (E28). */}
-                <SheetContent
-                    side="right"
-                    className="w-[380px] max-w-full overflow-y-auto px-[18px] py-4 sm:max-w-[380px]"
-                    onOpenAutoFocus={(e) => {
-                        e.preventDefault();
-                        document
-                            .getElementById("calendar-sheet-title")
-                            ?.focus();
-                    }}
-                    onCloseAutoFocus={(e) => {
-                        e.preventDefault();
-                        if (day) dayButton(day.date)?.focus();
-                    }}
-                >
-                    {panel((title) => (
-                        <SheetTitle
-                            id="calendar-sheet-title"
-                            tabIndex={-1}
-                            className="pr-10 font-display text-[16px] font-semibold tracking-[-0.02em] outline-none"
-                        >
-                            {title}
-                        </SheetTitle>
-                    ))}
-                </SheetContent>
-            </Sheet>
+            <DaySheet
+                open={sheetOpen && sheetWidths}
+                onOpenChange={setSheetOpen}
+                // Back on the day in the grid (E28).
+                returnTo={() => (day ? dayButton(day.date) : null)}
+            >
+                {panel}
+            </DaySheet>
         </>
     );
 }

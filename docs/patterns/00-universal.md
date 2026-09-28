@@ -135,7 +135,16 @@ each with why it stops there:
   month strip to `month-strip.tsx`; E24 (388) moved the ‹ › month steps
   to `month-step.tsx` to make room for the team filter, whose select is
   `team-filter.tsx`. `calendar/calendar.service.ts` is unchanged by E24,
-  which needed nothing new from the API.
+  which needed nothing new from the API. E25 (the Week's card columns)
+  left `layers.ts` and the API untouched too — the week is one E20
+  `from`/`to` read — and brought `business-calendar.tsx` down to 304: the
+  row under the title (‹ › , Month | Week, the team filter, the switches)
+  went to `calendar-toolbar.tsx` and `view-switch.tsx`, the missing-layer
+  notice to `calendar-missing.tsx` and the day's sheet to `day-sheet.tsx`,
+  which the Week shares. The Week itself is `business-week.tsx`, its
+  columns `week-columns.tsx`, and its rules `lib/calendar/week.ts` (dates,
+  title, edges, address) and `lib/calendar/week-columns.ts` (what each
+  column and card says).
 - `organizations/organization-settings-form.tsx` (1,321 after F10, F20 and
   F12) — one form holds
   every Business card (profile, tax and invoices, address, number format)
