@@ -2,6 +2,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
@@ -11,6 +12,12 @@ import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
+import {
+    autopayRefusal,
+    cancelAutopayFirst,
+    openMandatesWhere,
+} from "../payments/mandate-gate";
+import { MandatesService } from "../payments/mandates.service";
 import { emailHeldBy, planContactEdit } from "./contact-edit";
 import type { ContactSearchResult } from "./contact-search";
 import { SEARCH_LIMIT, searchContacts } from "./contact-search";
@@ -98,6 +105,13 @@ export interface ContactRemoval {
 @Injectable()
 export class ContactsService {
     /**
+     * D20's mandates, so a hard delete cancels their autopay at the
+     * provider first. Optional: built by hand (a unit), an open mandate
+     * refuses the delete instead.
+     */
+    constructor(@Optional() private readonly mandates?: MandatesService) {}
+
+    /**
      * The org's contacts, newest first, each carrying the rollup that makes the
      * row worth reading — see {@link ContactListItem}.
      *
@@ -112,8 +126,13 @@ export class ContactsService {
         authorize(ctx, "contact:read");
 
         const contacts = await prisma.contact.findMany({
-            // A merge's tombstone is never a row (C9): its survivor is.
-            where: { organizationId: ctx.organizationId, mergedIntoId: null },
+            // A merge's tombstone is never a row (C9): its survivor is. Nor
+            // is someone whose details were removed (C11).
+            where: {
+                organizationId: ctx.organizationId,
+                mergedIntoId: null,
+                removedAt: null,
+            },
             orderBy: { createdAt: "desc" },
         });
         if (contacts.length === 0) return [];
@@ -531,8 +550,37 @@ export class ContactsService {
     ): Promise<ContactRemoval> {
         authorize(ctx, "contact:write");
         await this.requireOwned(ctx, contactId);
+        // Their autopay ends at the provider before the rows that say who
+        // authorised it cascade away (D20): after the delete, the
+        // `mandate.cancel` job would find nothing left to ask about.
+        const autopay = await cancelAutopayFirst(
+            prisma,
+            this.mandates,
+            { organizationId: ctx.organizationId, contactId },
+            "STAFF",
+        );
+        if (!autopay.ok) {
+            throw new ConflictException({
+                message: autopayRefusal(autopay.provider, "deleted"),
+                details: { reason: "autopay" },
+            });
+        }
         const now = new Date();
         return prisma.$transaction(async (tx) => {
+            // Under the contact's lock, nothing set up since: checked again.
+            await tx.$queryRaw`SELECT id FROM "Contact"
+                WHERE id = ${contactId} AND "organizationId" = ${ctx.organizationId}
+                FOR UPDATE`;
+            const stillOpen = await tx.paymentMandate.findFirst({
+                where: openMandatesWhere(ctx.organizationId, contactId),
+                select: { provider: true },
+            });
+            if (stillOpen) {
+                throw new ConflictException({
+                    message: autopayRefusal(stillOpen.provider, "deleted"),
+                    details: { reason: "autopay" },
+                });
+            }
             const leads = await tx.lead.count({ where: { contactId } });
             const subscriptions = await tx.customerSubscription.count({
                 where: { contactId, status: { in: ["ACTIVE", "PAUSED"] } },
@@ -625,6 +673,11 @@ export class ContactsService {
                 message: "This contact was merged into another",
                 details: { mergedInto: contact.mergedIntoId },
             });
+        }
+        // Removed for a privacy request (C11): nothing is left to read or
+        // edit, and an edit would put details back.
+        if (contact.removedAt) {
+            throw new NotFoundException("This contact's details were removed");
         }
         return contact;
     }
