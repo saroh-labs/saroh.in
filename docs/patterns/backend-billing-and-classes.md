@@ -280,6 +280,14 @@
   currency and interval — a new interval starts its chain where the old
   period ended. Undo clears it; cancelling now drops it; archived plans are
   refused.
+- **Only an ACTIVE plan is on sale** (round-2 D21). A plan's `status` is a
+  String, and a DRAFT (D5) isn't published yet. Every path that sells a plan
+  — subscribe, a plan change, and a sign-up from the site — calls
+  `assertPlanOnSale` (`subscriptions/plan-on-sale.ts`: a DRAFT is a 409
+  "This plan isn't published yet", ARCHIVED stays a 400). Every read that
+  lists plans for sale — the site's plan lists and blocks — filters by
+  `PLANS_ON_SALE`. "Sell again" and Archive refuse a DRAFT; a draft goes on
+  sale only by being published.
 - **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
   write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
   KEY UPDATE, after the name lock), reads what it was, and writes one
