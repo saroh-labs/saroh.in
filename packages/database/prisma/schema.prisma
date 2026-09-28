@@ -294,6 +294,8 @@ model Organization {
   packExtensions PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
   customerNotices CustomerNotice[]
+  // Places in line for full classes (round-2 A12).
+  classWaitlistEntries ClassWaitlistEntry[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -3423,6 +3425,9 @@ model Contact {
   // Detail leave it out, and `resolveContact` writers refuse it.
   removedAt DateTime?
 
+  // Their places in line for full classes (round-2 A12).
+  classWaitlistEntries ClassWaitlistEntry[]
+
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
   // forking a duplicate. NOT globally unique — two orgs may each hold the same
@@ -3781,6 +3786,9 @@ model Service {
 
   // The order lines that bill it: a treatment sold as an order (E9).
   orderItems OrderItem[]
+
+  // Who is waiting for a place in its full sessions (round-2 A12).
+  waitlistEntries ClassWaitlistEntry[]
 
   @@index([organizationId])
   @@index([siteId])
@@ -5666,6 +5674,9 @@ model CustomerAccount {
   // Messages the customer wrote to the business from this account (A13).
   threadMessages CustomerThreadMessage[]
 
+  // Places in line the customer joined from this account (A12).
+  waitlistEntries ClassWaitlistEntry[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5903,4 +5914,77 @@ model CustomerNotice {
   @@unique([organizationId, eventKey])
   @@index([organizationId])
   @@index([messageId])
+}
+
+/// Where a place in line for a full class stands (round-2 A12).
+enum ClassWaitlistStatus {
+  // In line.
+  WAITING
+  // A freed place is held for them until `offeredUntil`.
+  OFFERED
+  // They took the place: `bookingId` is the booking.
+  ACCEPTED
+  // The held place ran out unanswered, and went to the next in line.
+  EXPIRED
+  // They left the line themselves.
+  LEFT
+  // The class was cancelled, or its service taken off sale.
+  CLOSED
+}
+
+/// A place in line for one session of a full class (round-2 A12, R13,
+/// default 9). A session is a service and its start: classes have no row of
+/// their own. When a place frees (a cancel, a move away, a hold let go or
+/// run out), `waitlist.offer` holds it for the first WAITING entry until
+/// the earlier of 2 hours from then and 1 hour before the class, and tells
+/// them (`customer.notify`, WAITLIST_OFFER). A held place counts as taken
+/// in every capacity count (`bookings/held-seats.ts`) except that person's
+/// own booking of it, which accepts the offer. Expiry offers the next.
+///
+/// Rooted on the Contact: a merge keeps the better place of two in one
+/// class (C9), and a removal deletes them (C11).
+model ClassWaitlistEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  // The session: the class's start and end.
+  startAt   DateTime
+  endAt     DateTime
+
+  contactId String
+  contact   Contact @relation(fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // The account that joined, from the business's site. "This isn't them"
+  // moves the entries the account made since it linked (unlink-plan.ts).
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
+  // Their place in the session's line: first come, first offered.
+  position Int
+  status   ClassWaitlistStatus @default(WAITING)
+
+  // While OFFERED: when the place was held for them, and until when.
+  offeredAt    DateTime?
+  offeredUntil DateTime?
+  // When it stopped being live (accepted, expired, left or closed); the
+  // cleanup deletes it 30 days on (default 74).
+  closedAt     DateTime?
+  // The booking that took the place (ACCEPTED). Informational, no FK.
+  bookingId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One live place per person per session; one who left or let an offer
+  // run out may join again, at the back.
+  @@unique([serviceId, startAt, contactId], map: "ClassWaitlistEntry_one_live_per_session", where: raw("status IN ('WAITING', 'OFFERED')"))
+  @@index([organizationId])
+  @@index([serviceId, startAt, status, position])
+  @@index([status, offeredUntil])
+  @@index([contactId, status])
+  @@index([customerAccountId, createdAt])
+  @@index([closedAt])
 }
