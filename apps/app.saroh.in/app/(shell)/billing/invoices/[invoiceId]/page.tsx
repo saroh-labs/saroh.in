@@ -7,9 +7,11 @@ import {
 import { InvoiceDetail } from "@/components/invoices/invoice-detail";
 import { InvoicePaper } from "@/components/invoices/invoice-paper";
 import { PaymentsToRefund } from "@/components/invoices/pay-link";
+import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { canSend } from "@/lib/invoices/send";
 import type { Invoice } from "@/lib/invoices/service";
 import { getInvoice, listInvoicesFor } from "@/lib/invoices/service";
@@ -38,10 +40,19 @@ export default async function InvoicePage({
     params: Promise<{ invoiceId: string }>;
 }) {
     await requireSession();
-    const { invoiceId } = await params;
-    const [invoice, organization, business] = await Promise.all([
-        getInvoice(invoiceId),
+    const [{ invoiceId }, organization] = await Promise.all([
+        params,
         resolveActiveOrganization(),
+    ]);
+    // A role without the read gets the design's locked card before the
+    // invoice is read (D18), rather than the generic denial its 403 brings.
+    if (organization && !mayRead(organization, "invoice:read")) {
+        return (
+            <PaymentsLocked {...paymentsLockedCopy(organization, "invoices")} />
+        );
+    }
+    const [invoice, business] = await Promise.all([
+        getInvoice(invoiceId),
         getInvoiceBusiness(),
     ]);
     if (!invoice) notFound();

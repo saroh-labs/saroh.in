@@ -294,6 +294,86 @@ test("someone who can't read or stage orders sees the locked card", async ({
     await expect(page.getByText("You can't open orders")).toHaveCount(0);
 });
 
+test("a Member opening Payments sees the locked card, in the design's words (D18)", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "MEMBER");
+    // Every Payments screen, deep links included.
+    for (const path of [
+        "/billing/invoices",
+        "/billing/invoices?pack=pk_1",
+        "/billing/invoices/inv_1",
+        "/billing/subscriptions",
+    ]) {
+        await page.goto(path);
+        await expect(
+            page.getByRole("heading", {
+                name: "Only owners and admins see payments",
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByText(
+                "Your role is Member — money stays with owners and admins. An owner or admin can change that in Team.",
+            ),
+        ).toBeVisible();
+        const back = page.getByRole("link", {
+            name: "Back to Home",
+            exact: true,
+        });
+        await expect(back).toBeVisible();
+        await expect(back).toHaveCSS("cursor", "pointer");
+        // A denial, not a failure: nothing to retry, and no code.
+        await expect(
+            page.getByRole("button", { name: /try again/i }),
+        ).toHaveCount(0);
+        await expect(page.getByText(/UNAUTHORIZED|invoice:read/)).toHaveCount(
+            0,
+        );
+        await expect(page.getByRole("radiogroup")).toHaveCount(0);
+    }
+});
+
+test("a Reviewer opening Invoices is told what their role covers (D18)", async ({
+    page,
+    context,
+}) => {
+    await scenario(context, "REVIEWER");
+    await page.goto("/billing/invoices");
+    await expect(
+        page.getByRole("heading", {
+            name: "You can't open payments",
+            exact: true,
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            "Your role is Reviewer, which can see the website but not payments. An owner or admin can change that in Team.",
+        ),
+    ).toBeVisible();
+});
+
+test("a role the business made without invoices is named (D18)", async ({
+    page,
+    context,
+}) => {
+    // "Front desk": orders and bookings, no money.
+    await scenario(context, "NOREAD");
+    await page.goto("/billing/invoices");
+    await expect(
+        page.getByRole("heading", {
+            name: "You can't open invoices",
+            exact: true,
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            "Your role is Front desk, which doesn't include invoices. An owner or admin can change that in Team.",
+        ),
+    ).toBeVisible();
+});
+
 test("a failed Orders read says so, and is never an empty list", async ({
     page,
     context,
