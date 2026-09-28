@@ -46,8 +46,10 @@ const COMMON_COUNTRIES = [
 
 /**
  * Setup asks only whether the business is registered; Settings › Business
- * offers the six types (F10). Registered is sent as `company`, which reads
- * as Private limited company there and can be changed.
+ * offers the six types (F10). Registered saves no type: "registered" is this
+ * form's own value and never reaches the API, so a Pvt Ltd, LLP or
+ * partnership isn't guessed at. They pick the real one in Settings before
+ * they go live.
  */
 const TYPES = [
     {
@@ -56,7 +58,7 @@ const TYPES = [
         note: "Sole trader, freelancer, side project",
     },
     {
-        value: "company",
+        value: "registered",
         label: "Registered",
         note: "Pvt Ltd, LLP, partnership",
     },
@@ -67,7 +69,7 @@ const formSchema = z.object({
     address: z
         .string()
         .min(3, { message: "An address needs at least 3 characters" }),
-    type: z.enum(["individual", "company"]).optional(),
+    type: z.enum(["individual", "registered"]).optional(),
     country: z.string().length(2),
 });
 
@@ -168,7 +170,8 @@ export function BusinessSetupForm({
             name: values.name.trim(),
             address: values.address,
             profile: {
-                ...(values.type ? { type: values.type } : {}),
+                // Registered leaves the type unset (see TYPES).
+                ...(values.type === "individual" ? { type: "individual" } : {}),
                 country: values.country,
             },
         });
