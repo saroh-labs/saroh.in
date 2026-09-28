@@ -86,11 +86,42 @@ function holder(over: Partial<PackHolder> = {}): PackHolder {
 }
 
 describe("tabs", () => {
-    it("draws Overview and Who has it; E17's tabs wait for their panels", () => {
-        expect(BUILT_TABS).toEqual(["overview", "who"]);
+    it("draws all five tabs; an unknown tab opens Overview", () => {
+        expect(BUILT_TABS).toEqual([
+            "overview",
+            "who",
+            "used",
+            "sales",
+            "activity",
+        ]);
         expect(tabFromQuery("who")).toBe("who");
-        expect(tabFromQuery("sales")).toBe("overview");
+        expect(tabFromQuery("sales")).toBe("sales");
+        expect(tabFromQuery("activity")).toBe("activity");
+        expect(tabFromQuery("nope")).toBe("overview");
         expect(tabFromQuery(undefined)).toBe("overview");
+    });
+
+    it("Used this week and Activity count their own reads; a failure shows none", () => {
+        const o = pack().overview;
+        expect(tabMeta("used", o, { used: 4, activity: null })).toEqual({
+            text: "4",
+            tone: "off",
+        });
+        expect(tabMeta("used", o, { used: 0, activity: null })).toBeNull();
+        expect(tabMeta("used", o)).toBeNull();
+        expect(
+            tabMeta("activity", o, {
+                used: null,
+                activity: { n: 100, more: true },
+            }),
+        ).toEqual({ text: "100+", tone: "off" });
+        expect(
+            tabMeta("activity", o, {
+                used: null,
+                activity: { n: 3, more: false },
+            }),
+        ).toEqual({ text: "3", tone: "off" });
+        expect(tabMeta("activity", o)).toBeNull();
     });
 
     it("Who has it counts holders, or says who is running out", () => {
@@ -239,7 +270,11 @@ describe("overview", () => {
             "Ravi: 2 run out 6 Oct",
             "2 classes ran out unused",
         ]);
-        expect(cards[2]).toMatchObject({ v: "1 receipt" });
+        // Open goes to the Invoices list narrowed to this pack (D18).
+        expect(cards[2]).toMatchObject({
+            v: "1 receipt",
+            open: { href: "/billing/invoices?pack=pk_1" },
+        });
         expect(cards[2].lines[0]).toEqual({
             text: "Ravi · 20 Sep",
             href: "/billing/invoices/inv_2",
@@ -287,6 +322,19 @@ describe("overview", () => {
             timeZone: ZONE,
         });
         expect(unread[1].some((r) => r.k === "Cancelling")).toBe(false);
+        // Price history sits after Created, only when it was read (E17).
+        expect(unread[1].some((r) => r.k === "Price history")).toBe(false);
+        const priced = aboutRows(pack(), {
+            freeCancelHours: undefined,
+            timeZone: ZONE,
+            priceHistory: "₹1,200 until 20 Aug",
+        });
+        expect(priced[1].map((r) => r.k)).toEqual([
+            "Who can buy it",
+            "Created",
+            "Price history",
+            "Unused credits",
+        ]);
     });
 
     it("the customer view names the pack's terms and today's use-by", () => {

@@ -7,6 +7,7 @@ import { useRef, useState, useTransition } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { setPackArchived } from "@/lib/class-packs/actions";
+import { usedEmptyText, usedRows } from "@/lib/class-packs/pack-activity";
 import { packKind, unitWord } from "@/lib/class-packs/pack-cards";
 import type { PackDetailTab } from "@/lib/class-packs/pack-detail";
 import {
@@ -17,7 +18,10 @@ import {
 } from "@/lib/class-packs/pack-detail";
 import type {
     PackDetail as Pack,
+    PackEventsPage,
     PackHolder,
+    PackSale,
+    PackUsedPage,
     PartRead,
 } from "@/lib/class-packs/pack-detail-data";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
@@ -29,14 +33,22 @@ import {
 import type { DropIn, ReceiptSource } from "@/lib/class-packs/pack-overview";
 import {
     aboutRows,
+    coverLines,
     customerPreview,
     linkedCards,
     overviewTiles,
 } from "@/lib/class-packs/pack-overview";
+import {
+    priceHistory,
+    saleRow,
+    salesByMonth,
+} from "@/lib/class-packs/pack-sales";
 import type { HeldPack } from "@/lib/class-packs/sell-words";
+import { invoicesHref } from "@/lib/invoices/links";
 
 import type { SellablePack } from "../sell-pack-dialog";
 import { SellPackDialog } from "../sell-pack-dialog";
+import { ActivityTab } from "./activity-tab";
 import { CustomerView } from "./customer-view";
 import { GUTTER } from "./detail-crumbs";
 import type { Lens } from "./detail-header";
@@ -45,6 +57,8 @@ import type { ExtendTarget } from "./extend-dialog";
 import { ExtendDialog } from "./extend-dialog";
 import { HoldersTab } from "./holders-tab";
 import { PackOverviewTab } from "./overview";
+import { SalesTab } from "./sales-tab";
+import { UsedTab } from "./used-tab";
 
 /** An Undo toast lasts ten seconds (round-2 default 136). */
 const UNDO_MS = 10_000;
@@ -58,18 +72,23 @@ export interface SellContext {
 }
 
 /**
- * Bookings › Packs › one pack (round-2 E16, after "Saroh Pack Detail"): the
- * header with Sell at the desk and Edit pack, a Team and a Customer view,
- * and the tabs — Overview and Who has it here; Used this week, Sales and
- * Activity are E17's and join `PACK_DETAIL_TABS` as they are built.
+ * Bookings › Packs › one pack (round-2 E16 and E17, after "Saroh Pack
+ * Detail"): the header with Sell at the desk and Edit pack, a Team and a
+ * Customer view, and the tabs — Overview, Who has it (E16), Used this week,
+ * Sales and Activity (E17).
  *
- * The pack is the page's one required read. Who has it is read on its own,
- * so its failing costs that tab and the Overview's lines about it, nothing
- * else. Extend is `pack:write`, as the API asks.
+ * The pack is the page's one required read. Who has it, the week's uses,
+ * the sales and the activity are each read on their own, so one failing
+ * costs its tab (and the lines built from it), nothing else. Extend is
+ * `pack:write`, as the API asks.
  */
 export function PackDetailScreen({
     pack,
     holders,
+    used,
+    sales,
+    events,
+    invoices,
     receipts,
     dropIns,
     freeCancelHours,
@@ -82,6 +101,11 @@ export function PackDetailScreen({
 }: {
     pack: Pack;
     holders: PartRead<PackHolder[]>;
+    used: PartRead<PackUsedPage>;
+    sales: PartRead<PackSale[]>;
+    events: PartRead<PackEventsPage>;
+    /** This person may open invoices and Payments is on: receipts link. */
+    invoices: boolean;
     /** Its purchases with their invoice; null when not this person's to see. */
     receipts: ReceiptSource[] | null;
     dropIns: DropIn[] | null;
@@ -115,6 +139,22 @@ export function PackDetailScreen({
         : null;
     const tabs = PACK_DETAIL_TABS.filter((t) => t.built);
     const sellable = canSell && head.onSale && sell !== null;
+    const saleList = sales.state === "ok" ? sales.data : null;
+    const byMonth = salesByMonth(saleList ?? [], pack.currency, now, timeZone);
+    const history =
+        events.state === "ok"
+            ? priceHistory(pack, events.data, saleList, timeZone)
+            : null;
+    const counts = {
+        used: used.state === "ok" ? used.data.uses.length : null,
+        activity:
+            events.state === "ok"
+                ? {
+                      n: events.data.events.length,
+                      more: events.data.nextCursor !== null,
+                  }
+                : null,
+    };
 
     function pick(next: PackDetailTab) {
         setTab(next);
@@ -211,7 +251,7 @@ export function PackDetailScreen({
                     >
                         {tabs.map((t) => {
                             const on = t.key === tab;
-                            const meta = tabMeta(t.key, pack.overview);
+                            const meta = tabMeta(t.key, pack.overview, counts);
                             return (
                                 <button
                                     key={t.key}
@@ -264,9 +304,52 @@ export function PackDetailScreen({
                                 onExtend={extend}
                                 onRetry={() => router.refresh()}
                             />
+                        ) : tab === "used" ? (
+                            <UsedTab
+                                rows={
+                                    used.state === "ok"
+                                        ? usedRows(used.data, timeZone)
+                                        : null
+                                }
+                                denied={used.state === "denied"}
+                                chips={coverLines(pack, dropIns)}
+                                emptyText={usedEmptyText(kind)}
+                                onRetry={() => router.refresh()}
+                            />
+                        ) : tab === "sales" ? (
+                            <SalesTab
+                                sales={
+                                    saleList?.map((s) =>
+                                        saleRow(s, pack, {
+                                            timeZone,
+                                            invoices,
+                                        }),
+                                    ) ?? null
+                                }
+                                denied={sales.state === "denied"}
+                                months={byMonth.months}
+                                monthsNote={byMonth.note}
+                                history={history}
+                                allReceiptsHref={
+                                    invoices
+                                        ? invoicesHref({ pack: pack.id })
+                                        : null
+                                }
+                                onRetry={() => router.refresh()}
+                            />
+                        ) : tab === "activity" ? (
+                            <ActivityTab
+                                packId={pack.id}
+                                first={
+                                    events.state === "ok" ? events.data : null
+                                }
+                                denied={events.state === "denied"}
+                                pack={pack}
+                                kind={kind}
+                                timeZone={timeZone}
+                                onRetry={() => router.refresh()}
+                            />
                         ) : (
-                            // E17 adds Used this week, Sales and Activity
-                            // here, one panel per tab it builds.
                             <PackOverviewTab
                                 tiles={overviewTiles(pack)}
                                 linked={linkedCards(pack, {
@@ -279,6 +362,7 @@ export function PackDetailScreen({
                                 about={aboutRows(pack, {
                                     freeCancelHours,
                                     timeZone,
+                                    priceHistory: history?.about ?? null,
                                 })}
                                 editHref={canWrite ? head.editHref : null}
                                 onTab={pick}

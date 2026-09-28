@@ -1,3 +1,5 @@
+import { invoiceHref, invoicesHref } from "@/lib/invoices/links";
+
 import { money, packKind, unitWord } from "./pack-cards";
 import type { PackDetailTab } from "./pack-detail";
 import {
@@ -95,6 +97,25 @@ export interface ReceiptSource {
 }
 
 /**
+ * Each service the pack pays for, with its drop-in price when read:
+ * "HIIT · drop-in ₹500". The Overview's card and Used this week's chips.
+ */
+export function coverLines(
+    pack: Pick<PackDetail, "services">,
+    dropIns: readonly DropIn[] | null,
+): string[] {
+    const priceOf = new Map((dropIns ?? []).map((d) => [d.id, d] as const));
+    return pack.services.map((s) => {
+        const d = priceOf.get(s.id);
+        const cents = d?.priceCents;
+        const currency = d?.currency;
+        return typeof cents === "number" && currency
+            ? `${s.name} · drop-in ${money(cents / 100, currency)}`
+            : s.name;
+    });
+}
+
+/**
  * "Linked to this pack": what it covers, who has it, its receipts (only
  * when the page could read them) and how the booking page shows it.
  */
@@ -112,24 +133,11 @@ export function linkedCards(
     const units = unitWord(kind, 2);
     const o = pack.overview;
     const header = detailHeader(pack);
-    const priceOf = new Map(
-        (opts.dropIns ?? []).map((d) => [d.id, d] as const),
-    );
     const covers: LinkedCard = {
         key: "covers",
         k: kind === "ONE_TO_ONE" ? "Sessions it covers" : "Classes it covers",
         v: pack.services.map((s) => s.name).join(", ") || "None chosen yet",
-        lines: pack.services.map((s) => {
-            const d = priceOf.get(s.id);
-            const cents = d?.priceCents;
-            const currency = d?.currency;
-            return {
-                text:
-                    typeof cents === "number" && currency
-                        ? `${s.name} · drop-in ${money(cents / 100, currency)}`
-                        : s.name,
-            };
-        }),
+        lines: coverLines(pack, opts.dropIns).map((text) => ({ text })),
         open: { href: "/services" },
     };
 
@@ -172,14 +180,15 @@ export function linkedCards(
                 issued.length > 0
                     ? issued.slice(0, 2).map((r) => ({
                           text: `${r.contact.name} · ${day(r.createdAt, opts.timeZone)}`,
-                          href: `/billing/invoices/${encodeURIComponent(r.invoiceId ?? "")}`,
+                          href: invoiceHref(r.invoiceId ?? ""),
                       }))
                     : [
                           {
                               text: "A sale makes a receipt while Payments is on.",
                           },
                       ],
-            open: { href: "/billing/invoices" },
+            // The Invoices list narrowed to this pack's sales (D18).
+            open: { href: invoicesHref({ pack: pack.id }) },
         });
     }
     cards.push({
@@ -216,7 +225,12 @@ export interface AboutRow {
  */
 export function aboutRows(
     pack: PackDetail,
-    opts: { freeCancelHours: number | null | undefined; timeZone: string },
+    opts: {
+        freeCancelHours: number | null | undefined;
+        timeZone: string;
+        /** Its prices over time (`priceHistory`); null when unread, left out. */
+        priceHistory?: string | null;
+    },
 ): AboutRow[][] {
     const kind = packKind(pack);
     const unit = unitWord(kind, 1);
@@ -248,6 +262,9 @@ export function aboutRows(
             v: pack.firstPackOnly ? "First pack only (intro offer)" : "Anyone",
         },
         { k: "Created", v: day(pack.createdAt, opts.timeZone) },
+        ...(opts.priceHistory
+            ? [{ k: "Price history", v: opts.priceHistory }]
+            : []),
         {
             k: "Unused credits",
             v: `End with the pack; you can extend a use-by by up to ${MAX_EXTEND_DAYS} days at a time`,

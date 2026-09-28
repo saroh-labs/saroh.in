@@ -70,6 +70,78 @@ export interface PackHolder {
     extensions: PackExtension[];
 }
 
+/** Who did something, as the API names them (`event-actors.ts`). */
+export interface PackActor {
+    kind: "TEAM" | "CUSTOMER" | "JOB" | "OPERATOR";
+    userId: string | null;
+    /** A teammate's name; "Saroh support", "Saroh"; null for a customer. */
+    name: string | null;
+}
+
+/** What became of a class spent from the pack (E13). */
+export type PackUseState =
+    "BOOKED" | "CAME" | "NO_SHOW" | "CREDIT_BACK" | "LATE_CANCEL";
+
+/** One class (or session) paid for with this pack (Used this week). */
+export interface PackUse {
+    bookingId: string;
+    purchaseId: string;
+    startAt: string;
+    service: { id: string; name: string };
+    contact: { id: string; name: string };
+    state: PackUseState;
+}
+
+/** The week asked for, [from, to), and what was spent in it. */
+export interface PackUsedPage {
+    from: string;
+    to: string;
+    /** Earliest first. */
+    uses: PackUse[];
+}
+
+/** One sale of the pack, newest first (Sales). */
+export interface PackSale {
+    purchaseId: string;
+    contact: { id: string; name: string };
+    soldAt: string;
+    credits: number;
+    price: string;
+    currency: string;
+    /** A record of how the desk was paid (DEC-059); null when not recorded. */
+    paidBy: PackPurchase["paidBy"];
+    soldBy: PackActor | null;
+    /** Its invoice, only for someone who may open invoices. */
+    invoiceId: string | null;
+}
+
+export type PackEventKind =
+    | "CREATED"
+    | "PUBLISHED"
+    | "CHANGED"
+    | "SOLD"
+    | "EXTENDED"
+    | "ARCHIVED"
+    | "RESTORED";
+
+/** One thing done to the pack (Activity). `details` follows the kind. */
+export interface PackEvent {
+    id: string;
+    kind: PackEventKind;
+    details: Record<string, unknown>;
+    holder: { purchaseId: string; contactId: string; name: string } | null;
+    actor: PackActor;
+    createdAt: string;
+}
+
+export interface PackEventsPage {
+    /** Newest first. */
+    events: PackEvent[];
+    nextCursor: string | null;
+    /** Made before its history was kept: the oldest event isn't its creation. */
+    earlierUnrecorded: boolean;
+}
+
 /** A read one part of the page can do without: said so there, never the page. */
 export type PartRead<T> =
     { state: "ok"; data: T } | { state: "denied" } | { state: "failed" };
@@ -103,6 +175,31 @@ export async function getPackDetail(id: string): Promise<PackDetail | null> {
 /** Everyone who has bought it, live purchases first (Who has it). */
 export function readPackHolders(id: string): Promise<PartRead<PackHolder[]>> {
     return partRead<PackHolder[]>(`${packPath(id)}/holders`);
+}
+
+/** What was spent from it this week, in the business's zone (E17). */
+export function readPackUsed(id: string): Promise<PartRead<PackUsedPage>> {
+    return partRead<PackUsedPage>(`${packPath(id)}/used`);
+}
+
+/** Every sale, newest first, with its method and who sold it (E17). */
+export function readPackSales(id: string): Promise<PartRead<PackSale[]>> {
+    return partRead<PackSale[]>(`${packPath(id)}/sales`);
+}
+
+/** The most Activity asks for at once (the API's page cap). */
+export const EVENTS_PAGE = 100;
+
+/** A page of its history, newest first; `cursor` asks for older (E17). */
+export function readPackEvents(
+    id: string,
+    cursor?: string,
+): Promise<PartRead<PackEventsPage>> {
+    const query = new URLSearchParams({ limit: String(EVENTS_PAGE) });
+    if (cursor) query.set("cursor", cursor);
+    return partRead<PackEventsPage>(
+        `${packPath(id)}/events?${query.toString()}`,
+    );
 }
 
 /**

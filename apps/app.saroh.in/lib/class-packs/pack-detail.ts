@@ -38,10 +38,9 @@ export type Tone = "ok" | "accent" | "bad" | "off";
 export type PackDetailTab = "overview" | "who" | "used" | "sales" | "activity";
 
 /**
- * The tabs in the design's order, with the unit that draws each. E16 draws
- * Overview and Who has it; Used this week, Sales and Activity are E17's,
- * and each stays out of the tab bar until its panel exists (no control
- * ships before the unit that makes it work).
+ * The tabs in the design's order. E16 drew Overview and Who has it; E17
+ * Used this week, Sales and Activity. A tab stays out of the bar while
+ * `built` is false (no control ships before the unit that makes it work).
  */
 export const PACK_DETAIL_TABS: readonly {
     key: PackDetailTab;
@@ -50,9 +49,9 @@ export const PACK_DETAIL_TABS: readonly {
 }[] = [
     { key: "overview", label: "Overview", built: true },
     { key: "who", label: "Who has it", built: true },
-    { key: "used", label: "Used this week", built: false },
-    { key: "sales", label: "Sales", built: false },
-    { key: "activity", label: "Activity", built: false },
+    { key: "used", label: "Used this week", built: true },
+    { key: "sales", label: "Sales", built: true },
+    { key: "activity", label: "Activity", built: true },
 ];
 
 /** The tabs this build draws. */
@@ -65,11 +64,31 @@ export function tabFromQuery(tab: string | undefined): PackDetailTab {
     return BUILT_TABS.find((t) => t === tab) ?? "overview";
 }
 
+/**
+ * The counts a tab shows that come from its own read: null when that read
+ * failed, so a failure never shows as a zero.
+ */
+export interface TabCounts {
+    used: number | null;
+    /** Events on the first page; `more` when older ones are still to read. */
+    activity: { n: number; more: boolean } | null;
+}
+
 /** A tab's count beside its name, or "2 running out" in the accent. */
 export function tabMeta(
     tab: PackDetailTab,
     overview: PackOverview,
+    counts: TabCounts = { used: null, activity: null },
 ): { text: string; tone: "off" | "accent" } | null {
+    if (tab === "used") {
+        return counts.used ? { text: String(counts.used), tone: "off" } : null;
+    }
+    if (tab === "activity") {
+        const a = counts.activity;
+        return a && a.n > 0
+            ? { text: `${a.n}${a.more ? "+" : ""}`, tone: "off" }
+            : null;
+    }
     if (tab === "who") {
         if (overview.runningOut > 0) {
             return {
