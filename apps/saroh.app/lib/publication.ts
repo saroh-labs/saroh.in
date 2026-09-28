@@ -349,6 +349,14 @@ export type PreviewLookup =
           siteId: string | null;
           /** ISO date-time after which the link stops working. */
           expiresAt: string;
+          /**
+           * Whether each module page shows now (G19), read live as the
+           * live site reads it (G15), so the preview's menu and module
+           * pages match what publishing would show. Null for a draft
+           * without module pages, or from an API that predates it: every
+           * page then shows, as before.
+           */
+          modules: ModulePageStates | null;
       }
     | { ok: false; reason: "expired" | "revoked" | "missing" };
 
@@ -391,6 +399,7 @@ export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
         site?: { name?: string };
         siteId?: string;
         expiresAt?: string;
+        modules?: unknown;
     } | null;
     if (!body?.snapshot || !body.expiresAt) {
         return { ok: false, reason: "missing" };
@@ -401,6 +410,7 @@ export async function getPreviewByToken(token: string): Promise<PreviewLookup> {
         siteName: body.site?.name ?? body.snapshot.site.name,
         siteId: body.siteId ?? null,
         expiresAt: body.expiresAt,
+        modules: modulePageStatesOf(body.modules),
     };
 }
 

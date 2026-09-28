@@ -20,10 +20,14 @@ jest.mock("@saroh/database", () => {
     };
 });
 
+// Module states are read live (G15); stubbed so a test says which is on.
+jest.mock("./module-pages", () => ({ publicModulePageStates: jest.fn() }));
+
 import { GoneException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { publicModulePageStates } from "./module-pages";
 import {
     hashPreviewToken,
     previewLinkState,
@@ -39,6 +43,7 @@ const linkFindUnique = prisma.sitePreviewLink.findUnique as jest.Mock;
 const linkUpdate = prisma.sitePreviewLink.update as jest.Mock;
 const postFindMany = prisma.post.findMany as jest.Mock;
 const postFindFirst = prisma.post.findFirst as jest.Mock;
+const moduleStates = publicModulePageStates as jest.Mock;
 
 const OWNER: OrganizationContext = {
     organizationId: "org_1",
@@ -68,6 +73,7 @@ const row = (over: Partial<Record<string, unknown>> = {}) => ({
 beforeEach(() => {
     jest.clearAllMocks();
     siteFindFirst.mockResolvedValue({ id: "site_1" });
+    moduleStates.mockResolvedValue(null);
 });
 
 describe("previewLinkState", () => {
@@ -233,6 +239,47 @@ describe("SitePreviewLinksService.resolve (public)", () => {
         expect(linkUpdate.mock.calls[0][0].data.lastUsedAt).toBeInstanceOf(
             Date,
         );
+    });
+
+    it("says which module pages show now, as the live site does (G19)", async () => {
+        linkFindUnique.mockResolvedValue({
+            id: "link_1",
+            siteId: "site_1",
+            organizationId: "org_1",
+            expiresAt: new Date(Date.now() + DAY),
+            revokedAt: null,
+        });
+        const snapshot = {
+            site: { name: "Acme" },
+            pages: [{ path: "/shop", kind: "SHOP" }],
+        };
+        loadDraftSite.mockResolvedValue({ id: "site_1", name: "Acme" });
+        buildSnapshot.mockReturnValue(snapshot);
+        linkUpdate.mockResolvedValue({ id: "link_1" });
+        moduleStates.mockResolvedValue({ SHOP: "off" });
+
+        const view = await service.resolve("tok");
+
+        // Asked of the draft being shown, for the link's own organization.
+        expect(moduleStates).toHaveBeenCalledWith(snapshot, "org_1");
+        expect(view.modules).toEqual({ SHOP: "off" });
+    });
+
+    it("carries no module states for a draft without module pages", async () => {
+        linkFindUnique.mockResolvedValue({
+            id: "link_1",
+            siteId: "site_1",
+            organizationId: "org_1",
+            expiresAt: new Date(Date.now() + DAY),
+            revokedAt: null,
+        });
+        loadDraftSite.mockResolvedValue({ id: "site_1", name: "Acme" });
+        buildSnapshot.mockReturnValue({ site: { name: "Acme" }, pages: [] });
+        linkUpdate.mockResolvedValue({ id: "link_1" });
+
+        const view = await service.resolve("tok");
+
+        expect(view).not.toHaveProperty("modules");
     });
 
     it("is 410 with the reason once expired", async () => {
