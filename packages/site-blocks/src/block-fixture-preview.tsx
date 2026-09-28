@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 import type {
     RenderedBooking,
     RenderedJournal,
+    RenderedPacks,
     RenderedPlans,
     RenderedProductGrid,
     RenderedServicesList,
@@ -17,6 +18,8 @@ import type { Slot } from "./blocks/booking";
 import BookingSection from "./blocks/booking";
 import type { JournalPost } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
+import type { PublicPack } from "./blocks/packs";
+import PacksSection from "./blocks/packs";
 import type { PublicPlan } from "./blocks/plans";
 import PlansSection from "./blocks/plans";
 import ProductGridSection from "./blocks/product-grid";
@@ -153,6 +156,36 @@ export const SAMPLE_PLANS: PublicPlan[] = [
 ];
 
 /**
+ * Packs for previewing `packs` where there are no real ones: the catalog and
+ * the Add-section picker (G20). The first compares with a single class; the
+ * second is one-to-one sessions with no single price to compare.
+ */
+export const SAMPLE_PACKS: PublicPack[] = [
+    {
+        id: "sample-ten",
+        name: "10 classes",
+        description: "Any group class, mat or reformer.",
+        credits: 10,
+        validityDays: 60,
+        price: "4500.00",
+        currency: "INR",
+        kind: "CLASSES",
+        singlePrice: "600.00",
+    },
+    {
+        id: "sample-pt",
+        name: "5 personal training sessions",
+        description: null,
+        credits: 5,
+        validityDays: 90,
+        price: "7500.00",
+        currency: "INR",
+        kind: "ONE_TO_ONE",
+        singlePrice: null,
+    },
+];
+
+/**
  * Products for previewing `productGrid` where there are none: the catalog
  * and the Add-section picker (G12). One comes in sizes and one has sold
  * out, so both lines show; none has a photo, so nothing is fetched.
@@ -283,6 +316,16 @@ const LIVE_DATA_PREVIEWS: Partial<
         <PlansSection
             content={content as RenderedPlans}
             feed={{ plans: SAMPLE_PLANS, joinHref: "/contact#enquiry" }}
+        />
+    ),
+    packs: (content) => (
+        <PacksSection
+            content={content as RenderedPacks}
+            feed={{
+                packs: SAMPLE_PACKS,
+                payOnline: false,
+                askHref: "/contact#enquiry",
+            }}
         />
     ),
     productGrid: (content) => (

@@ -450,7 +450,10 @@ describe("CustomerDetailService", () => {
         // The list: billed to the contact, or an order of a linked customer —
         // never a pay-now hold's unnumbered draft (U19).
         expect(calls).toContainEqual({
-            NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
+            NOT: {
+                source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
+                number: null,
+            },
             organizationId: "org_1",
             OR: [
                 { contactId: "c1" },

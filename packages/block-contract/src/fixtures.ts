@@ -543,6 +543,27 @@ export const BLOCK_META = {
             },
         },
     },
+    packs: {
+        label: "Class packs",
+        description:
+            "The business's class packs on sale, with how many classes, how long they last and the price, read live.",
+        variants: soleVariant(
+            "Cards with how many classes and for how long, the pack's name, its price per class and price, and a button.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component sample packs.
+            default: { variant: "default", title: "Class packs" },
+        },
+        cases: {
+            // No descriptions, the merchant's own button.
+            plain: {
+                variant: "default",
+                title: "Packs",
+                buttonLabel: "Get this pack",
+                showDescriptions: false,
+            },
+        },
+    },
 } satisfies { [K in SectionType]: BlockMeta<K> };
 
 /** Every block's catalog entry, for a picker or the catalog index. */
