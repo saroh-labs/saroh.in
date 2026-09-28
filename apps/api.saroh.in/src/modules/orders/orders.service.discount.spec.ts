@@ -100,6 +100,8 @@ beforeEach(() => {
         price: "20.00",
         currency: "INR",
         categoryId: "cat_1",
+        // No list of its own (B12): any way.
+        fulfilmentTypes: [],
         variants: [],
     });
     db.inventory!.findUnique!.mockResolvedValue(null);

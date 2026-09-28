@@ -271,12 +271,28 @@ describe("each section's values and patch", () => {
             materials: "",
             showHowToUse: true,
             showMaterials: false,
+            // An API before B12 sends no list: none of its own.
+            fulfilmentTypes: [],
         });
         expect(detailsPatch({ ...values, howToUse: "   " })).toEqual({
             howToUse: null,
             materials: null,
             shopFields: { howToUse: true, materials: false },
+            fulfilmentTypes: [],
         });
+    });
+
+    it("details: how it's fulfilled is read and sent in table order (B12)", () => {
+        const values = detailsFrom(
+            product({ fulfilmentTypes: ["SHIPPING", "PICKUP"] }),
+        );
+        expect(values.fulfilmentTypes).toEqual(["PICKUP", "SHIPPING"]);
+        expect(
+            detailsPatch({
+                ...values,
+                fulfilmentTypes: ["DIGITAL", "LOCAL_DELIVERY", "DIGITAL"],
+            }).fulfilmentTypes,
+        ).toEqual(["LOCAL_DELIVERY", "DIGITAL"]);
     });
 
     it("made by: the maker and where are cleared when it is made here", () => {

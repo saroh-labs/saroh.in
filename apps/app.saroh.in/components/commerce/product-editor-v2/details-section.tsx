@@ -17,7 +17,14 @@ import {
     firstProblem,
     LIMITS,
 } from "@/lib/products/editor-sections";
-import type { ProductDetail } from "@/lib/products/service";
+import {
+    FULFILMENT_CHOICES,
+    inTableOrder,
+} from "@/lib/products/fulfilment-types";
+import type {
+    ProductDetail,
+    ProductFulfilmentType,
+} from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
 import { useEditor, useSection } from "./editor-state";
@@ -29,6 +36,7 @@ const EMPTY: DetailsValues = {
     materials: "",
     showHowToUse: true,
     showMaterials: true,
+    fulfilmentTypes: [],
 };
 
 /**
@@ -211,7 +219,79 @@ export function DetailsSection({
                     }}
                 />
             ) : null}
+            <FulfilmentChips
+                picked={v.fulfilmentTypes}
+                disabled={ro}
+                onChange={(types) =>
+                    form.setValue("fulfilmentTypes", types, {
+                        shouldDirty: true,
+                    })
+                }
+            />
         </SectionCard>
+    );
+}
+
+/**
+ * How it's fulfilled (B12): the ways an order with it may leave. None
+ * picked is every way its storefronts offer; the API refuses an order in a
+ * way a picked list leaves out.
+ */
+function FulfilmentChips({
+    picked,
+    disabled,
+    onChange,
+}: {
+    picked: ProductFulfilmentType[];
+    disabled: boolean;
+    onChange: (types: ProductFulfilmentType[]) => void;
+}) {
+    return (
+        <>
+            <p
+                id="pe-fulfilment"
+                className="mb-[7px] mt-3.5 text-[12.5px] font-medium"
+            >
+                How it&apos;s fulfilled
+            </p>
+            <div
+                role="group"
+                aria-labelledby="pe-fulfilment"
+                className="flex flex-wrap gap-1.5"
+            >
+                {FULFILMENT_CHOICES.map((c) => {
+                    const on = picked.includes(c.value);
+                    return (
+                        <button
+                            key={c.value}
+                            type="button"
+                            aria-pressed={on}
+                            disabled={disabled}
+                            onClick={() =>
+                                onChange(
+                                    on
+                                        ? picked.filter((t) => t !== c.value)
+                                        : inTableOrder([...picked, c.value]),
+                                )
+                            }
+                            className={cn(
+                                "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
+                                on
+                                    ? "border-foreground bg-foreground font-semibold text-background"
+                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
+                            )}
+                        >
+                            {c.label}
+                        </button>
+                    );
+                })}
+            </div>
+            <FieldHelp className="mt-[9px]">
+                {picked.length
+                    ? "An order with it offers only these ways."
+                    : "Pick none and it goes every way its storefronts offer."}
+            </FieldHelp>
+        </>
     );
 }
 

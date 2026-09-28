@@ -8,6 +8,8 @@
 
 import { toMoneyString } from "../../common/money";
 import { bpsToRate, rateToBps } from "../invoices/gst";
+import type { ProductFulfilmentType } from "../orders/fulfilment";
+import { productTypesOf } from "../orders/fulfilment";
 import { sanitizeRichHtml } from "../sites/sanitize";
 import { asCounts, firstRow } from "./stock-levels";
 
@@ -94,6 +96,11 @@ export interface ProductDto {
     seoDescription: string | null;
     seoImageId: string | null;
     optionId: string | null;
+    /**
+     * How it can be fulfilled (B12), in table order; empty means every way
+     * its storefronts offer.
+     */
+    fulfilmentTypes: ProductFulfilmentType[];
     /** Track stock, the product's own switch (#515); it counts only while the business tracks stock too. */
     stockTracked: boolean;
     createdAt: Date;
@@ -240,6 +247,8 @@ interface RawProduct {
     seoDescription: string | null;
     seoImageId: string | null;
     optionId: string | null;
+    /** Absent in an older fixture: no list of its own. */
+    fulfilmentTypes?: string[];
     stockTracked: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -364,6 +373,7 @@ export function serializeProduct(
         seoDescription: product.seoDescription,
         seoImageId: product.seoImageId,
         optionId: product.optionId,
+        fulfilmentTypes: productTypesOf(product.fulfilmentTypes ?? []),
         stockTracked: product.stockTracked,
         createdAt: product.createdAt,
         updatedAt: product.updatedAt,

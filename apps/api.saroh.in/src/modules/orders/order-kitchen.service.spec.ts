@@ -60,7 +60,11 @@ jest.mock("@saroh/database", () => {
             ...o,
             items: mockDb.items.map((i) => ({
                 ...i,
-                product: { name: i.name },
+                product: {
+                    name: i.name,
+                    // How it may leave (B12); none of its own by default.
+                    fulfilmentTypes: i.fulfilmentTypes ?? [],
+                },
                 variant: null,
                 refundLines: [],
             })),
@@ -781,6 +785,41 @@ describe("editing before preparing", () => {
         await expect(
             kitchen.edit(OWNER, "order_1", { fulfilment: "DELIVERY" }),
         ).rejects.toThrow(/needs an address/);
+    });
+
+    it("refuses a way a line's product doesn't allow, naming it (B12)", async () => {
+        mockDb.items[0]!.fulfilmentTypes = ["PICKUP"];
+        const refused = await kitchen
+            .edit(OWNER, "order_1", {
+                fulfilment: "SHIPPING",
+                address: {
+                    line1: "12 MG Road",
+                    city: "Pune",
+                    state: "Maharashtra",
+                    postalCode: "411001",
+                },
+            })
+            .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(ConflictException);
+        expect((refused as ConflictException).getResponse()).toEqual({
+            message:
+                "Croissant isn't sold for Shipping. It allows Pick-up only.",
+            field: "fulfilment",
+        });
+        expect(mockDb.order.fulfilment).not.toBe("SHIPPING");
+    });
+
+    it("a line with no list of its own leaves any way open (B12)", async () => {
+        await kitchen.edit(OWNER, "order_1", {
+            fulfilment: "SHIPPING",
+            address: {
+                line1: "12 MG Road",
+                city: "Pune",
+                state: "Maharashtra",
+                postalCode: "411001",
+            },
+        });
+        expect(mockDb.order.fulfilment).toBe("SHIPPING");
     });
 
     it("a repeated itemId in lines is refused, not double-counted", async () => {

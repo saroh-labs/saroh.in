@@ -18,6 +18,9 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { ProductFulfilmentType } from "../orders/fulfilment";
+import { PRODUCT_FULFILMENT_TYPES } from "../orders/fulfilment";
+
 export const PRODUCT_STATUSES = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
@@ -231,6 +234,21 @@ class ProductSectionFields {
     @ValidateIf((_o, v) => v !== null)
     @IsString()
     optionId?: string | null;
+
+    /**
+     * How it can be fulfilled (B12): Pick-up, Local delivery, Shipping or
+     * Digital, only in their own names. Empty: every way its storefronts
+     * offer. Replaces the list; the service puts it in table order.
+     */
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(PRODUCT_FULFILMENT_TYPES.length)
+    @IsIn(PRODUCT_FULFILMENT_TYPES, {
+        each: true,
+        message:
+            "A product is fulfilled by Pick-up, Local delivery, Shipping or Digital",
+    })
+    fulfilmentTypes?: ProductFulfilmentType[];
 }
 
 export class CreateProductDto extends ProductSectionFields {

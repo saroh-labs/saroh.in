@@ -162,6 +162,13 @@ export interface ProductCustomField {
     value: string | null;
 }
 
+/**
+ * The ways a product can be set to be fulfilled (B12, DEC-045): a
+ * storefront's three, and Digital. The API is the authority.
+ */
+export type ProductFulfilmentType =
+    "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING" | "DIGITAL";
+
 export interface ProductDetail extends Product {
     /** The storefront whose shelf and listing it was read at (#531). */
     storeId: string;
@@ -193,6 +200,11 @@ export interface ProductDetail extends Product {
     seoDescription: string | null;
     seoImageId: string | null;
     optionId: string | null;
+    /**
+     * How it can be fulfilled (B12), in table order; empty means every way
+     * its storefronts offer. Absent from an API before B12.
+     */
+    fulfilmentTypes?: ProductFulfilmentType[];
     /** Track stock, the product's own switch (#515); it counts only while the business tracks stock too. */
     stockTracked: boolean;
     /** Marked sold out by hand at the storefront read from (#515). */
@@ -636,6 +648,8 @@ export interface ProductPatch {
     /** Allergen ids; each list given replaces its kind. */
     contains?: string[];
     mayContain?: string[];
+    /** How it can be fulfilled (B12); replaces the list, empty clears it. */
+    fulfilmentTypes?: ProductFulfilmentType[];
 }
 
 /** One section's save; returns the product as `storeId` sees it. */

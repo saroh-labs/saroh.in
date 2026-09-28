@@ -767,6 +767,13 @@ model Product {
   fieldValues ProductFieldValue[]
   allergens   ProductAllergen[]
 
+  // How it can be fulfilled (B12, DEC-045): PICKUP, LOCAL_DELIVERY, SHIPPING
+  // or DIGITAL — only the new names, never COLLECT or DELIVERY, so B2d's
+  // cast finds nothing to convert. Empty: every way its storefronts offer
+  // (StoreSettings.fulfilmentTypes). An order offers only the types every
+  // item allows; read it through `productTypesOf` in orders/fulfilment.ts.
+  fulfilmentTypes OrderFulfilment[] @default([])
+
   // A product's address is unique in its business (#510).
   @@unique([organizationId, slug])
   // The target of (productId, organizationId) foreign keys.
