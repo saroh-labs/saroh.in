@@ -15,7 +15,10 @@ const ORG = "seed_sc_rc_org";
 const IST_OFFSET_MS = 330 * 60_000;
 const MONTHS = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
 
-async function signIn(page: Page) {
+/** Pulse Fitness: a team of two, so its Week is an hour grid (E27). */
+const PULSE = "seed_sc_pulse_org";
+
+async function signIn(page: Page, org = ORG) {
     await page.goto(`${urls.ACCOUNTS_URL}/login`);
     await page.getByLabel("Email").fill(demoUser.email);
     await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
@@ -23,7 +26,7 @@ async function signIn(page: Page) {
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
         timeout: 30_000,
     });
-    await page.goto(`/open/${ORG}`);
+    await page.goto(`/open/${org}`);
 }
 
 /** "YYYY-MM-DD" in India, `days` from today. */
@@ -140,6 +143,44 @@ test.describe("calendar week", () => {
                 /^\/(commerce\/orders|billing\/(subscriptions|invoices)|bookings|services)\//,
             );
         }
+        const doc = await page.evaluate(() => ({
+            vw: window.innerWidth,
+            sw: document.documentElement.scrollWidth,
+        }));
+        expect(doc.sw).toBeLessThanOrEqual(doc.vw);
+    });
+});
+
+test.describe("calendar week, hour grid", () => {
+    test.beforeEach(async ({ page }) => {
+        await signIn(page, PULSE);
+    });
+
+    test("a business with a team sees its week by the hour", async ({
+        page,
+    }) => {
+        await page.goto("/calendar?view=week");
+        const grid = page.locator("#calendar-week");
+        await expect(grid.getByText("All day")).toBeVisible();
+        await expect(grid.getByText("07:00", { exact: true })).toBeVisible();
+        await expect(grid.locator("button[data-day]")).toHaveCount(7);
+        // Every block and chip opens its record.
+        const links = grid.locator("a[href]");
+        const n = await links.count();
+        for (let i = 0; i < Math.min(n, 10); i++) {
+            await expect(links.nth(i)).toHaveAttribute(
+                "href",
+                /^\/(commerce\/orders|billing\/(subscriptions|invoices)|bookings|services)\//,
+            );
+        }
+    });
+
+    test("the grid scrolls inside its frame on a phone, never the page", async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto("/calendar?view=week");
+        await expect(page.locator("#calendar-week")).toBeVisible();
         const doc = await page.evaluate(() => ({
             vw: window.innerWidth,
             sw: document.documentElement.scrollWidth,

@@ -136,6 +136,9 @@ interface Fixture {
     closures?: object[];
     timeOff?: object[];
     staff?: object[];
+    /** Weekly `StaffHours` rows and one-off `StaffExtraHours` (E27). */
+    hours?: object[];
+    extraHours?: object[];
     failDaysOff?: boolean;
     /** Paid invoices for the Payments layer (E20). */
     payments?: object[];
@@ -233,6 +236,12 @@ function build(
         },
         staffMember: {
             findMany: jest.fn().mockResolvedValue(f.staff ?? []),
+        },
+        staffHours: {
+            findMany: jest.fn().mockResolvedValue(f.hours ?? []),
+        },
+        staffExtraHours: {
+            findMany: jest.fn().mockResolvedValue(f.extraHours ?? []),
         },
         customerSubscription: {
             findMany: jest.fn(
@@ -1485,6 +1494,99 @@ describe("CalendarService.read — from/to, staff and days off (E20)", () => {
         ]);
         expect(payments.hasStaff).toBe(true);
         expect(payments).not.toHaveProperty("staff");
+    });
+
+    it("working hours (E27): weekly on their weekday, extra on their date, whose only for booking:read", async () => {
+        const { service, db } = build(["APPOINTMENTS"], {
+            staff: [PILLAI, RAO],
+            hours: [
+                // Mondays: Dr. Pillai 10:00–14:00, Dr. Rao 09:00–13:00.
+                {
+                    staffId: "st_pillai",
+                    dayOfWeek: 1,
+                    startMinute: 600,
+                    endMinute: 840,
+                },
+                {
+                    staffId: "st_rao",
+                    dayOfWeek: 1,
+                    startMinute: 540,
+                    endMinute: 780,
+                },
+            ],
+            extraHours: [
+                // Dr. Rao in on Sunday 25 October, 10:00–12:00.
+                {
+                    staffId: "st_rao",
+                    date: new Date("2026-10-25T00:00:00Z"),
+                    startMinute: 600,
+                    endMinute: 720,
+                },
+            ],
+        });
+        const range = { from: "2026-10-19", to: "2026-10-25" };
+
+        const owner = await service.read(OWNER, range, NOW);
+        expect(owner.hours).toEqual([
+            {
+                date: "2026-10-19",
+                startMinute: 540,
+                endMinute: 780,
+                staffId: "st_rao",
+            },
+            {
+                date: "2026-10-19",
+                startMinute: 600,
+                endMinute: 840,
+                staffId: "st_pillai",
+            },
+            {
+                date: "2026-10-25",
+                startMinute: 600,
+                endMinute: 720,
+                staffId: "st_rao",
+            },
+        ]);
+        // Only active people's hours, and extra hours within the days read.
+        expect(db.staffHours.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: OWNER.organizationId,
+                    staff: { status: "ACTIVE" },
+                },
+            }),
+        );
+        expect(db.staffExtraHours.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    date: {
+                        gte: new Date("2026-10-19T00:00:00Z"),
+                        lte: new Date("2026-10-25T00:00:00Z"),
+                    },
+                }),
+            }),
+        );
+
+        // Payments only: the hours, not whose.
+        const payments = await service.read(custom("payment:read"), range, NOW);
+        expect(payments.hours?.map((h) => h.staffId ?? null)).toEqual([
+            null,
+            null,
+            null,
+        ]);
+    });
+
+    it("working hours: none without Appointments, null when days off failed", async () => {
+        const shop = await build(["COMMERCE"]).service.month(
+            OWNER,
+            "2026-09",
+            NOW,
+        );
+        expect(shop.hours).toEqual([]);
+        const failed = await build(["APPOINTMENTS"], {
+            failDaysOff: true,
+        }).service.read(OWNER, { from: "2026-09-01", to: "2026-09-30" }, NOW);
+        expect(failed.hours).toBeNull();
     });
 
     it("a part-day closure is on its day alone", async () => {

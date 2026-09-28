@@ -92,6 +92,28 @@ describe("Business Calendar range, team and days off (DB, E20)", () => {
                 },
             });
         }
+        // Working hours (E27): Dr. Rao on Mondays 09:00–13:00, the
+        // archived one too; Dr. Pillai in on Sunday the 20th, 10:00–13:00.
+        for (const staffId of [raoId, gone.id]) {
+            await prisma.staffHours.create({
+                data: {
+                    organizationId: org.id,
+                    staffId,
+                    dayOfWeek: 1,
+                    startMinute: 540,
+                    endMinute: 780,
+                },
+            });
+        }
+        await prisma.staffExtraHours.create({
+            data: {
+                organizationId: org.id,
+                staffId: pillaiId,
+                date: new Date("2026-09-20T00:00:00Z"),
+                startMinute: 600,
+                endMinute: 780,
+            },
+        });
         // Closed Thursday 17 September; the other business on the 16th.
         await prisma.businessClosure.create({
             data: {
@@ -165,6 +187,8 @@ describe("Business Calendar range, team and days off (DB, E20)", () => {
         await prisma.service.deleteMany({ where });
         await prisma.businessClosure.deleteMany({ where });
         await prisma.staffTimeOff.deleteMany({ where });
+        await prisma.staffHours.deleteMany({ where });
+        await prisma.staffExtraHours.deleteMany({ where });
         await prisma.staffMember.deleteMany({ where });
         await prisma.businessProfile.deleteMany({ where });
         await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
@@ -203,6 +227,20 @@ describe("Business Calendar range, team and days off (DB, E20)", () => {
         expect(week.staff?.map((s) => s.name)).toEqual([
             "Dr. Pillai",
             "Dr. Rao",
+        ]);
+        expect(week.hours).toEqual([
+            {
+                date: "2026-09-14",
+                startMinute: 540,
+                endMinute: 780,
+                staffId: raoId,
+            },
+            {
+                date: "2026-09-20",
+                startMinute: 600,
+                endMinute: 780,
+                staffId: pillaiId,
+            },
         ]);
         expect(week.unavailable).toEqual([]);
     });

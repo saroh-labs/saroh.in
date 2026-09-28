@@ -9,6 +9,7 @@ import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { DayPanel } from "@/components/calendar/day-panel";
 import { DaySheet } from "@/components/calendar/day-sheet";
 import { WeekColumns, weekDayButton } from "@/components/calendar/week-columns";
+import { WeekHourGrid } from "@/components/calendar/week-hour-grid";
 import { dayOffLine } from "@/lib/calendar/days-off";
 import type { Off } from "@/lib/calendar/layers";
 import { layersFor, mainCurrency } from "@/lib/calendar/layers";
@@ -33,6 +34,7 @@ import {
     weekTitle,
 } from "@/lib/calendar/week";
 import { weekColumns, weekSummary } from "@/lib/calendar/week-columns";
+import { weekHours } from "@/lib/calendar/week-hours";
 
 /**
  * Home › Calendar's Week (plan 005 E25, R17), after the "Saroh Business
@@ -41,6 +43,10 @@ import { weekColumns, weekSummary } from "@/lib/calendar/week-columns";
  * (E24) — and so do its rules: named problems (E22), money only for a role
  * that reads it (E23, `payment:read`) and days off. A day's header opens
  * its panel as a sheet, at every width, since the columns take the page.
+ *
+ * A business with a team (Pulse, Kavi Dental) sees the week as an hour grid
+ * (E27): bookings and classes by start and length, working hours shaded.
+ * Any other keeps the card columns.
  *
  * `data` is the week as read (E20's `from`/`to`), which may cross into the
  * next month; its `month` is the Monday's.
@@ -175,7 +181,26 @@ export function BusinessWeek({
             <CalendarMissing data={data} span="week" />
 
             <div className="!mt-3.5 flex">
-                <WeekColumns title={title} columns={columns} onPick={pick} />
+                {data.hasStaff ? (
+                    <WeekHourGrid
+                        title={title}
+                        days={weekHours({
+                            week: shown,
+                            columns,
+                            layers,
+                            off,
+                            today,
+                            person,
+                        })}
+                        onPick={pick}
+                    />
+                ) : (
+                    <WeekColumns
+                        title={title}
+                        columns={columns}
+                        onPick={pick}
+                    />
+                )}
             </div>
 
             <p className="!mt-3 text-[11.5px] text-muted-foreground">
