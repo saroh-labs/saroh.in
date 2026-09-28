@@ -266,12 +266,29 @@ const heroV1 = z.object({
  * HTML/markdown authored in the editor. The API sanitizes it when a draft is
  * saved, when the editor loads it and at publish (#280), all driven by
  * `sanitizedFields` below.
+ *
+ * `image` and `imageSide` (G7) put one photo beside the text, on the left or
+ * the right; absent side means the right. The photo is the same shape as the
+ * hero's — the address the media library served, not an id resolved later —
+ * so the media library's "on a published site" guard already finds it in a
+ * snapshot. Both are optional, so they extend v1 in place, as `padding` did:
+ * every existing text block validates and renders exactly as before.
+ *
+ * Alt text is required, but not here. A merchant picks the photo first and
+ * describes it second, and the draft autosaves in between; refusing that save
+ * would lose the photo. The pre-publish check flags a photo with no
+ * description instead (`site-flags.ts`), as it does every other gap.
  */
+export const TEXT_IMAGE_SIDES = ["left", "right"] as const;
+export type TextImageSide = (typeof TEXT_IMAGE_SIDES)[number];
+
 const richTextV1 = z.object({
     variant,
     padding: paddingOverride,
     format: z.enum(["html", "markdown"]).default("html"),
     value: z.string(),
+    image: imageSchema.optional(),
+    imageSide: z.enum(TEXT_IMAGE_SIDES).optional(),
 });
 
 /** cta v1 — a standalone call-to-action button. */

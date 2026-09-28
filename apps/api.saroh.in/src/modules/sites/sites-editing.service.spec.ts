@@ -391,6 +391,34 @@ describe("SitesService.replaceDraftSections sanitizes on the way in (#280)", () 
         expect(created[0].content.value).toMatch(/color:\s*#b91c1c/);
     });
 
+    it("keeps a text block's photo through the save, cleaning only the text (G7)", async () => {
+        const image = {
+            src: "https://cdn.example.com/counter.jpg",
+            alt: "The counter",
+        };
+        await service.replaceDraftSections(ctx(), "site_1", "page_1", {
+            sections: [
+                {
+                    type: "richText",
+                    contractVersion: 1,
+                    content: {
+                        format: "html",
+                        value: '<p>Ours</p><img src="x" onerror="alert(1)">',
+                        image,
+                        imageSide: "right",
+                    },
+                },
+            ],
+        });
+
+        const created = sectionCreateMany.mock.calls[0][0].data as Array<{
+            content: { value: string; image: unknown; imageSide: string };
+        }>;
+        expect(created[0].content.image).toEqual(image);
+        expect(created[0].content.imageSide).toBe("right");
+        expect(created[0].content.value).not.toMatch(/onerror|alert/);
+    });
+
     it("refuses a button whose link would run script", async () => {
         await expect(
             service.replaceDraftSections(ctx(), "site_1", "page_1", {
@@ -940,6 +968,36 @@ describe("SitesService.publishSite", () => {
         });
         expect(result.currentPublicationId).toBe("pub_1");
         expect(result.publicationId).toBe("pub_1");
+    });
+
+    it("publishes a text block's photo and its side (G7)", async () => {
+        const site = siteWithRichText("<p>Our story</p>");
+        const photo = {
+            src: "https://cdn.example.com/counter.jpg",
+            alt: "The counter",
+            width: 800,
+            height: 600,
+        };
+        site.pages[0].versions[0].sections[0].content = {
+            format: "html",
+            value: "<p>Our story</p>",
+            image: photo,
+            imageSide: "left",
+        } as never;
+        siteFindFirst.mockResolvedValue(site);
+
+        await service.publishSite(ctx(), "site_1");
+
+        const data = publicationCreate.mock.calls[0][0].data as {
+            snapshot: {
+                pages: Array<{ sections: Array<{ content: unknown }> }>;
+            };
+        };
+        expect(data.snapshot.pages[0].sections[0].content).toMatchObject({
+            value: "<p>Our story</p>",
+            image: photo,
+            imageSide: "left",
+        });
     });
 
     it("returns 404 for a site in another org (cross-tenant)", async () => {

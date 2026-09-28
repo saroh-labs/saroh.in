@@ -259,6 +259,20 @@ function checkSection(
                     "value",
                 );
             }
+            /*
+             * The photo beside the text (G7) must be described. The contract
+             * lets a save through without it — the merchant picks the photo
+             * before describing it, and autosave must not lose it — so this
+             * is where it is asked for, before the site goes live.
+             */
+            const photo = obj(c.image);
+            if (str(photo.src).trim() !== "" && str(photo.alt).trim() === "") {
+                at(
+                    "emptyRequiredField",
+                    "The photo in this text section has no description, so someone using a screen reader won't know what it shows.",
+                    "image",
+                );
+            }
             break;
         }
 

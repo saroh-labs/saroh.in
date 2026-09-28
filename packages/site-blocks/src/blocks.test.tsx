@@ -109,6 +109,67 @@ describe("block rendering", () => {
         expect(container.innerHTML).toMatchSnapshot();
     });
 
+    describe("richText with a photo (G7)", () => {
+        const photo = BLOCK_META.richText.cases.photo as RenderedRichText;
+
+        it("draws the photo beside the text, stacking on phones", () => {
+            const { container } = render(<RichTextSection content={photo} />);
+            expect(container.innerHTML).toMatchSnapshot();
+            const img = screen.getByRole("img", {
+                name: "The bakery counter at opening time",
+            });
+            expect(img.getAttribute("src")).toBe(photo.image?.src);
+            // One column on a phone, two from md up.
+            expect(img.parentElement?.className).toContain("md:grid-cols-2");
+            expect(img.parentElement?.className).not.toMatch(
+                /(^|\s)grid-cols-2/,
+            );
+        });
+
+        it("puts the photo first on the left, last on the right", () => {
+            const { rerender } = render(<RichTextSection content={photo} />);
+            expect(screen.getByRole("img").className).not.toContain(
+                "md:order-last",
+            );
+            rerender(
+                <RichTextSection content={{ ...photo, imageSide: "right" }} />,
+            );
+            expect(screen.getByRole("img").className).toContain(
+                "md:order-last",
+            );
+            // No side named is the right.
+            rerender(
+                <RichTextSection
+                    content={{ ...photo, imageSide: undefined }}
+                />,
+            );
+            expect(screen.getByRole("img").className).toContain(
+                "md:order-last",
+            );
+        });
+
+        it("draws exactly the old single column without a photo", () => {
+            const plain = render(
+                <RichTextSection
+                    content={
+                        BLOCK_META.richText.fixtures.default as RenderedRichText
+                    }
+                />,
+            ).container.innerHTML;
+            const sided = render(
+                <RichTextSection
+                    content={{
+                        ...(BLOCK_META.richText.fixtures
+                            .default as RenderedRichText),
+                        imageSide: "left",
+                    }}
+                />,
+            ).container.innerHTML;
+            expect(sided).toBe(plain);
+            expect(plain).not.toContain("<img");
+        });
+    });
+
     it("cta", () => {
         const { container } = render(
             <CtaSection

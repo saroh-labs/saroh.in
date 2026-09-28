@@ -88,6 +88,10 @@ export interface HeroContent {
 export interface RichTextContent {
     format: "html" | "markdown";
     value: string;
+    /** One photo beside the text (G7). */
+    image?: ImageValue;
+    /** Which side the photo sits on; absent is the right. */
+    imageSide?: "left" | "right";
 }
 
 export type CtaContent = CtaValue;
