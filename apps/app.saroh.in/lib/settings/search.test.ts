@@ -51,6 +51,31 @@ describe("searchSettings", () => {
         );
     });
 
+    it("finds the type of business by each type's name (F10)", () => {
+        const typeOfBusiness = {
+            label: "Type of business",
+            where: "Business",
+            href: "/settings/organization?section=identity",
+        };
+        for (const query of [
+            "Individual",
+            "sole proprietor",
+            "partnership",
+            "LLP",
+            "Private limited",
+            "pvt ltd",
+            "Public limited",
+            "trust",
+            "society",
+        ]) {
+            expect(searchSettings(query, owner)).toContainEqual(typeOfBusiness);
+            expect(
+                searchSettings(query, owner, { byPage: false }),
+            ).toContainEqual(typeOfBusiness);
+        }
+        expect(searchSettings("llp", owner)).toEqual([typeOfBusiness]);
+    });
+
     it("matches the page's name as well, as the design does", () => {
         const hits = searchSettings("team", owner);
         expect(hits.map((h) => h.label)).toEqual([

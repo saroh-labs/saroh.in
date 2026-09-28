@@ -44,7 +44,11 @@ const COMMON_COUNTRIES = [
     { code: "US", name: "United States" },
 ] as const;
 
-/** The API's two business types, in the design's words. */
+/**
+ * Setup asks only whether the business is registered; Settings › Business
+ * offers the six types (F10). Registered is sent as `company`, which reads
+ * as Private limited company there and can be changed.
+ */
 const TYPES = [
     {
         value: "individual",

@@ -3,6 +3,7 @@ import {
     SETTINGS_PAGES,
     settingsPagesFor,
 } from "@/components/shared/nav-items";
+import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 
 /**
  * Search settings ("Saroh Settings" design): the things a person comes to
@@ -36,6 +37,11 @@ export interface SettingsEntry {
     action?: string;
     /** Withheld from someone who holds this; the other half of a pair. */
     unless?: string;
+    /**
+     * Other words that find it: the choices the setting offers, so "LLP"
+     * lands on the type of business.
+     */
+    words?: readonly string[];
 }
 
 const business = (label: string, value: string): SettingsEntry => ({
@@ -58,7 +64,14 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
     business("Logo", "identity"),
     business("Legal name", "identity"),
-    business("Type of business", "identity"),
+    {
+        ...business("Type of business", "identity"),
+        // Each type by its name, and Pvt Ltd as it is usually written.
+        words: [
+            ...BUSINESS_TYPE_OPTIONS.filter((o) => o.value).map((o) => o.label),
+            "Pvt Ltd",
+        ],
+    },
     business("Time zone", "identity"),
     business("Trading since", "identity"),
     business("Workspace address", "identity"),
@@ -133,7 +146,8 @@ export function settingsEntryHref(entry: SettingsEntry): string {
 /**
  * The settings this actor may see that match `query`, in index order.
  *
- * A match is the words typed appearing in the setting's name — or, with
+ * A match is the words typed appearing in the setting's name or its other
+ * `words` (a business type finds the type of business) — or, with
  * `byPage`, in the page's ("team" lists the Team settings), as the design
  * does. The ⌘K menu leaves `byPage` off: its own Settings rows already answer
  * "business", and eight more beneath them would bury everything else.
@@ -160,6 +174,7 @@ export function searchSettings(
         const found =
             !needle ||
             entry.label.toLowerCase().includes(needle) ||
+            (entry.words ?? []).some((w) => w.toLowerCase().includes(needle)) ||
             (byPage && where.toLowerCase().includes(needle));
         if (!found) continue;
         hits.push({

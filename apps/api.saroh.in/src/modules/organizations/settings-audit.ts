@@ -4,6 +4,7 @@ import { bpsToRate, rateToBps } from "../invoices/gst";
 import { stateName } from "../invoices/gst-states";
 import type { NumberRestart } from "../invoices/numbering";
 import { numberFormatFor, seriesFor } from "../invoices/numbering";
+import { businessTypeRead } from "./business-type";
 
 /**
  * A settings save as the audit stream says it (#509): each business detail
@@ -100,7 +101,8 @@ export function settingsSnapshot(
     return {
         name: row?.name ?? null,
         legalName: p.legalName ?? null,
-        type: p.type ?? null,
+        // In today's words: a `company` row reads as `pvt` (F10).
+        type: businessTypeRead(p.type),
         country: p.country ?? null,
         timezone: p.timezone ?? null,
         gstRegistered: p.gstRegistered ?? false,
