@@ -151,6 +151,12 @@ export interface OrderReadMoney {
      */
     refundsBeingConfirmed: { id: string; amount: string }[];
     /**
+     * Refunds the provider accepted and hasn't confirmed yet (B9, DEC-067):
+     * counted in `refunded`, and said "Refund on its way" until its webhook
+     * confirms it. Absent from an API before it.
+     */
+    refundsOnTheWay?: { id: string; amount: string }[];
+    /**
      * Paid on an edit's charge that a later edit replaced: not counted in
      * `paid`, and owed back to the customer until a refund for it is on
      * record. Absent from an API older than #508.

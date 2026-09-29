@@ -525,6 +525,8 @@ function home(
         ...money,
         // D8's paused-subscriptions source: Payments on, so it has nothing.
         organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
+        // B9's failed refunds: none.
+        paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
         paymentIntent: {
             count: jest.fn().mockResolvedValue(0),
             findMany: jest.fn().mockResolvedValue([]),

@@ -105,9 +105,10 @@ each with why it stops there:
   out to `orders/order-stage-write.ts`, which every batch line shares;
   the batch itself is `order-stage-batch.service.ts` and its lines'
   helpers `order-stage-batch-lines.ts`.
-- `orders/order-read.ts` (654; 638 before B14) — the one read Order Detail
-  renders and its DTOs. B14 added the `visits` and `title` fields and put
-  what fills them in their own files; the DTO interfaces are the seam.
+- `orders/order-read.ts` (696 after B9's `refundsOnTheWay`; 638 before
+  B14) — the one read Order Detail renders and its DTOs. B14 added the
+  `visits` and `title` fields and put what fills them in their own files;
+  the DTO interfaces are the seam.
 - `orders/orders.service.ts` (683 after B13) and `orders/dto.ts` (583) —
   the storefront-scoped create, its pricing, discount code and stock
   promise in one serializable write, and the order DTOs. B13 added only the
@@ -199,7 +200,8 @@ each with why it stops there:
   F4's inline actions are `HomeInlineService` in `home-inline.ts`, called
   once. F11's staff landing is `home-staff.ts` (who is narrowed to which
   storefronts and diary, and the where-helpers each source takes), and it
-  moved the schedule band to `home-schedule.ts`. The refunds-owed read (to
+  moved the schedule band to `home-schedule.ts`. B9's failed order refunds
+  (DEC-067) are `home-refunds-failed.ts`, called once. The refunds-owed read (to
   `home-money-sources.ts` once D13 has landed there) is the next seam.
 
 Added or grown past 400 by the Products and Stock release (#510–#531), each
