@@ -18,7 +18,7 @@ import { getInvoice, listInvoicesFor } from "@/lib/invoices/service";
 import {
     billedTo,
     invoicePill,
-    paidBy,
+    paidHow,
     sourceLine,
     whenLine,
 } from "@/lib/invoices/status";
@@ -173,10 +173,7 @@ function payLine(i: Invoice, who: string, canWrite: boolean) {
                     ) : (
                         "today"
                     )}
-                    {i.payment
-                        ? ` by ${paidBy(i.payment.method).toLowerCase()}`
-                        : ""}
-                    .
+                    {i.payment ? ` ${paidHow(i.payment.method)}` : ""}.
                 </>
             );
         case "CREDITED":

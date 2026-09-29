@@ -12,7 +12,6 @@ import {
     KanbanSquare,
     LayoutGrid,
     Link2,
-    ReceiptText,
     SlidersHorizontal,
     Store,
     Target,
@@ -516,7 +515,7 @@ export const NAV_GROUPS: NavGroup[] = [
                 // them. `/billing` itself redirects to Subscriptions.
                 href: "/billing",
                 label: "Payments",
-                icon: ReceiptText,
+                icon: CreditCard,
                 moduleKey: "PAYMENTS",
                 children: [
                     {

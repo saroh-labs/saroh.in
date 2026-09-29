@@ -8,6 +8,7 @@ import {
     invoiceStatus,
     isOwed,
     owedSummary,
+    paidHow,
     paidSinceRows,
     sourceLabel,
     sourceLine,
@@ -420,5 +421,15 @@ describe("spacedCode", () => {
         expect(spacedCode("19059010")).toBe("1905 90 10");
         expect(spacedCode("996813")).toBe("9968 13");
         expect(spacedCode(null)).toBe("");
+    });
+});
+
+describe("paidHow", () => {
+    it("reads inside a sentence, keeping UPI's capitals", () => {
+        expect(paidHow("ONLINE")).toBe("online");
+        expect(paidHow("UPI")).toBe("by UPI");
+        expect(paidHow("CASH")).toBe("by cash");
+        expect(paidHow("BANK_TRANSFER")).toBe("by bank transfer");
+        expect(paidHow("ORDER")).toBe("with the order");
     });
 });

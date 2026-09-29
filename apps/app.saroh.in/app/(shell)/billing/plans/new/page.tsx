@@ -1,5 +1,4 @@
 import { AccessDenied } from "@/components/shared/access-denied";
-import { PageContainer } from "@/components/shared/page-container";
 import { PlanEditor } from "@/components/subscriptions/plan-editor/plan-editor";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -36,17 +35,16 @@ export default async function NewPlanPage() {
 
     const context = await planEditorContext(null);
 
+    // The editor shell draws the page's one <main>.
     return (
-        <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-            <PlanEditor
-                initial={null}
-                figures={null}
-                takenNames={context.takenNames}
-                withClasses={context.withClasses}
-                autopayOffered={context.autopayOffered}
-                currency={context.currency}
-                canEdit
-            />
-        </PageContainer>
+        <PlanEditor
+            initial={null}
+            figures={null}
+            takenNames={context.takenNames}
+            withClasses={context.withClasses}
+            autopayOffered={context.autopayOffered}
+            currency={context.currency}
+            canEdit
+        />
     );
 }
