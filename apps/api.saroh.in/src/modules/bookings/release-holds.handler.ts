@@ -3,6 +3,7 @@ import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { discardStalePackDrafts } from "../class-packs/pack-checkout";
+import { discardStalePlanJoins } from "../subscriptions/plan-join";
 import { RELEASE_HOLDS_TYPE, releaseHoldInTx } from "./booking-hold";
 import { deleteOldEntries, expireLapsedOffers } from "./waitlist-offer";
 
@@ -18,7 +19,8 @@ export const RELEASE_BATCH = 200;
  * Releases pay-now holds nobody paid for (U19): each PENDING booking whose
  * hold ran out is cancelled and its draft invoice voided (`releaseHoldInTx`).
  * Each run also voids the online pack drafts nobody paid within 24 hours
- * (A11, `class-packs/pack-checkout.ts`), ends waitlist offers nobody
+ * (A11, `class-packs/pack-checkout.ts`) and the online plan joins nobody
+ * paid (G20, `subscriptions/plan-join.ts`), ends waitlist offers nobody
  * answered in time — offering each place to the next in line — and deletes
  * places in line closed 30 days ago (A12, `waitlist-offer.ts`).
  *
@@ -43,6 +45,7 @@ export class ReleaseHoldsHandler {
             );
         }
         await this.discardPackDrafts(new Date());
+        await this.discardPlanJoins(new Date());
         await this.tidyWaitlist(new Date());
         const next = new Date(Date.now() + (full ? 0 : RELEASE_EVERY_MS));
         if (!(await this.schedule(next))) {
@@ -67,6 +70,27 @@ export class ReleaseHoldsHandler {
         } catch (error) {
             this.logger.error(
                 `Could not discard unpaid pack drafts: ${String(error)}`,
+            );
+            return 0;
+        }
+    }
+
+    /**
+     * The same for plans joined online (G20): joins nobody paid within 24
+     * hours are voided (`discardStalePlanJoins`), so nobody is put on a
+     * plan. Never throws; a failed run is logged and the next one tries
+     * again.
+     */
+    async discardPlanJoins(now: Date): Promise<number> {
+        try {
+            const discarded = await discardStalePlanJoins(now);
+            if (discarded > 0) {
+                this.logger.log(`Discarded ${discarded} unpaid plan joins`);
+            }
+            return discarded;
+        } catch (error) {
+            this.logger.error(
+                `Could not discard unpaid plan joins: ${String(error)}`,
             );
             return 0;
         }

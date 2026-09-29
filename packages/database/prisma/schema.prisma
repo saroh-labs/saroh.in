@@ -5356,6 +5356,17 @@ model Invoice {
 
   // The sweep that discards online pack drafts nobody paid (A11).
   @@index([createdAt], map: "Invoice_open_pack_drafts_idx", where: raw("status = 'DRAFT' AND source = 'PACK'"))
+
+  // A plan joined online from the site's Prices page (round-2 G20): the plan
+  // and its terms — name, price, how often, classes a month — as they were
+  // when the customer started paying, on a source SUBSCRIPTION draft with no
+  // number. The payment's webhook numbers the invoice and starts the
+  // subscription from this, as `packTerms` does for a pack. Null on every
+  // other invoice.
+  planTerms Json?
+
+  // The sweep that discards online plan joins nobody paid (G20).
+  @@index([createdAt], map: "Invoice_open_plan_joins_idx", where: raw("status = 'DRAFT' AND source = 'SUBSCRIPTION'"))
 }
 
 model InvoiceLine {

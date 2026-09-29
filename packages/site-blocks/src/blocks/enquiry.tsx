@@ -35,7 +35,8 @@ type SubmitState =
 
 /**
  * The message a link asked for: `?about=` names a product "Ask about
- * ordering" sent (G13), `?join=` a plan "Ask about joining" sent (G9).
+ * ordering" sent (G13), `?join=` a plan "Ask about joining" sent (G9),
+ * `?pack=` a class pack "Ask about this pack" sent (G20).
  */
 export function askedFromSearch(search: string): string | null {
     const read = (key: string) => {
@@ -44,6 +45,8 @@ export function askedFromSearch(search: string): string | null {
     };
     const plan = read("join");
     if (plan) return `I'd like to join ${plan}. `;
+    const pack = read("pack");
+    if (pack) return `I'd like to buy ${pack}. `;
     const product = read("about");
     return product ? `I'd like to order ${product}. ` : null;
 }

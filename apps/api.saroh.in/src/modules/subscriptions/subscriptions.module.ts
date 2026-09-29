@@ -8,6 +8,7 @@ import { InvoicesModule } from "../invoices/invoices.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { PaymentsModule } from "../payments/payments.module";
 import { AccountPlanController } from "../site-accounts/account-plan.controller";
 import {
     AccountPlanService,
@@ -15,6 +16,8 @@ import {
     NO_AUTOPAY_YET,
 } from "../site-accounts/account-plan.service";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
+import { AccountPlanJoinController } from "./account-plan-join.controller";
+import { PublicPlanJoinService } from "./public-plan-join.service";
 import { PublicPlansController } from "./public-plans.controller";
 import { PublicPlansService } from "./public-plans.service";
 import {
@@ -48,12 +51,15 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         InvoicesModule,
         JobsModule,
         SiteAccountsModule,
+        // Joining a plan online (G20): the invoice payment path.
+        PaymentsModule,
     ],
     controllers: [
         SubscriptionPlansController,
         SubscriptionsController,
         PublicPlansController,
         AccountPlanController,
+        AccountPlanJoinController,
     ],
     providers: [
         SubscriptionsService,
@@ -61,6 +67,7 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         SubscriptionRenewHandler,
         OrganizationGuard,
         AccountPlanService,
+        PublicPlanJoinService,
         // No autopay charge is ever under way until D13 provides the check.
         { provide: AUTOPAY_CHARGE_PENDING, useValue: NO_AUTOPAY_YET },
     ],
