@@ -62,7 +62,9 @@ async function putBack(request: APIRequestContext) {
     expect(res.ok()).toBe(true);
 }
 
-test.describe("business settings", () => {
+// @serial: GST registration and the invoice prefix are Northwind's own,
+// read by every order and invoice test running beside it.
+test.describe("business settings", { tag: "@serial" }, () => {
     test("registering for GST: Save comes back once the GSTIN and address are filled", async ({
         page,
     }) => {

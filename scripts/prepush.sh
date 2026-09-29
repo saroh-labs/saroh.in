@@ -55,6 +55,12 @@
 #     or one of its worktrees, matched by command line and path) to free the
 #     CPU, and say how to start it again. PREPUSH_KEEP_DEV=1 leaves it
 #     running. The quick run never stops anything.
+#   - The browser specs run through e2e/run.mjs: fullyParallel on
+#     PW_WORKERS (default 4 here), then the `@serial` ones one at a time.
+#     One browser run per machine: a second `--e2e` waits for the first's
+#     lock (<git common dir>/prepush-e2e.lock, PREPUSH_E2E_LOCK_WAIT
+#     seconds, default 1800) instead of taking its ports, and teardown
+#     stops only the servers its own run started.
 #
 # Measured 2026-09-29 (12-core Mac, a batch 209 files ahead): the hook 3s on a
 # tree that passed, 19–32s after a code change (was 75s); --int 95s (was
@@ -317,20 +323,29 @@ e2e_stack() {
         echo "    kept as $tpl for the next run"
     fi
 
+    # Each server's PID goes in $E2E_LOGS/pids, and teardown (stop_stack)
+    # stops those and what they started — never "whatever listens on 3000",
+    # which once was another run's stack.
     echo "--- start the stack (logs in $E2E_LOGS)"
     pnpm --filter @saroh/api start >"$E2E_LOGS/api.log" 2>&1 &
+    echo $! >>"$E2E_LOGS/pids"
     pnpm --filter auth exec next start -p 3000 >"$E2E_LOGS/accounts.log" 2>&1 &
+    echo $! >>"$E2E_LOGS/pids"
     pnpm --filter application exec next start -p 3003 >"$E2E_LOGS/app.log" 2>&1 &
+    echo $! >>"$E2E_LOGS/pids"
     pnpm --filter sites exec next start -p 3005 >"$E2E_LOGS/renderer.log" 2>&1 &
+    echo $! >>"$E2E_LOGS/pids"
     wait_up api http://localhost:3333/health "200 307"
     wait_up accounts http://localhost:3000/login "200 307"
     wait_up app http://localhost:3003/ "200 307"
     wait_up renderer http://localhost:3005/preview/not-a-token "200 307 404"
 
+    # The runner (e2e/run.mjs): sign in once, then desk and phone in
+    # parallel on PW_WORKERS, then the @serial tests one at a time.
     echo "--- specs:$specs"
     cd e2e
     # shellcheck disable=SC2086
-    pnpm exec playwright test $specs --project=desk --project=phone
+    PW_WORKERS=${PW_WORKERS:-4} node run.mjs $specs
 }
 # What the seeded template depends on: the migrations and schema, the seed
 # and everything it imports (the showcase, the block contract its sections
@@ -362,12 +377,53 @@ wait_up() {
     return 1
 }
 stop_stack() {
-    # The ports were free before the stack started, so whatever listens on
-    # them now is ours.
-    local p
-    for p in 3333 3000 3003 3005; do
-        lsof -nP -tiTCP:$p -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
+    # Only what this run started: the servers' PIDs (e2e_stack writes them)
+    # and their descendants — next-server, node dist/main. Never by port: a
+    # second run on the same machine once SIGTERMed the first one's stack.
+    local all="" kids more p
+    [ -n "${E2E_LOGS:-}" ] && [ -f "$E2E_LOGS/pids" ] || return 0
+    kids=$(cat "$E2E_LOGS/pids")
+    while [ -n "$kids" ]; do
+        all="$all $kids"; more=""
+        for p in $kids; do more="$more $(pgrep -P "$p" 2>/dev/null | tr '\n' ' ' || true)"; done
+        kids=$(echo "$more" | xargs)
     done
+    # A server already gone makes kill answer 1: under the caller's `set -e`
+    # that would fail a green run from inside its EXIT trap.
+    # shellcheck disable=SC2086
+    if [ -n "$all" ]; then kill $all 2>/dev/null || true; fi
+    rm -f "$E2E_LOGS/pids"
+    return 0
+}
+
+# One browser run per machine at a time: they share CI's ports, the
+# $E2E_DIR worktree and the E2E database. `flock` isn't on macOS, so the
+# lock is a directory (mkdir is atomic) under the git common dir holding
+# the owner's PID; one whose PID is dead is stale and taken over. A second
+# `--e2e` waits up to PREPUSH_E2E_LOCK_WAIT seconds (default 1800) for the
+# first to finish, saying whose run it waits on, then fails clearly.
+E2E_LOCK=$COMMON/prepush-e2e.lock
+e2e_lock() {
+    local waited=0 limit=${PREPUSH_E2E_LOCK_WAIT:-1800} holder said=""
+    while ! mkdir "$E2E_LOCK" 2>/dev/null; do
+        holder=$(cat "$E2E_LOCK/pid" 2>/dev/null)
+        if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+            echo "--- lock: $holder is gone; taking its stale lock"
+            rm -rf "$E2E_LOCK"
+            continue
+        fi
+        if [ "$waited" -ge "$limit" ]; then
+            echo "e2e lock: another browser run (pid ${holder:-?}) has held $E2E_LOCK for ${limit}s — not starting a second one on its ports"
+            return 1
+        fi
+        [ -z "$said" ] && echo "--- lock: waiting for the browser run in pid ${holder:-?} to finish ($E2E_LOCK)" && said=1
+        sleep 5; waited=$((waited + 5))
+    done
+    echo "$1" >"$E2E_LOCK/pid"
+}
+e2e_unlock() {
+    [ "$(cat "$E2E_LOCK/pid" 2>/dev/null)" = "$1" ] && rm -rf "$E2E_LOCK"
+    return 0
 }
 
 # This repo's `pnpm dev` stack (portless), started from the main checkout or
@@ -427,7 +483,7 @@ E2E_PID=""; E2E_STATUS=""
 # and the api. A global change (schema, seed, ui, auth, tooling, CI, root
 # config) picks all of them; so does --full. CI always runs every spec.
 e2e_start() {
-    local p busy total
+    local total
     # Keyed on HEAD's tree even when files are modified: HEAD is what it tests.
     E2E_TREE=$(git rev-parse 'HEAD^{tree}')
     if [ "$FULL" = 1 ]; then E2E_STEP=e2e-desk-phone; else E2E_STEP=e2e-desk-phone:affected; fi
@@ -458,13 +514,6 @@ e2e_start() {
     else
         stop_dev_stack
     fi
-    busy=""
-    for p in 3333 3000 3003 3005; do
-        lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && busy="$busy $p"
-    done
-    if [ -n "$busy" ]; then
-        E2E_STATUS="ports:$busy"; return 0
-    fi
     [ -n "$(git status --porcelain)" ] && \
         echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
     SHA=$(git rev-parse HEAD)
@@ -472,8 +521,26 @@ e2e_start() {
     echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
     E2E_T0=$(date +%s)
     trap stop_stack EXIT
-    (e2e_stack "$E2E_DATABASE_URL" "$e2e_db" "$E2E_DIR" "$specs") \
-        >"$E2E_LOGS/run.log" 2>&1 &
+    # In the background: the lock first (waiting on another run, if one is
+    # going), then CI's ports — free, or taken by something that isn't a
+    # browser run — and only then the worktree, the database and the stack.
+    (
+        me=$(sh -c 'echo $PPID')
+        e2e_lock "$me" || exit 3
+        # The stack goes before the lock does, so the next run finds the
+        # ports free; a signal takes the same way out.
+        trap 'stop_stack; e2e_unlock "$me"' EXIT
+        trap 'exit 130' INT TERM
+        busy=""
+        for p in 3333 3000 3003 3005; do
+            lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && busy="$busy $p"
+        done
+        if [ -n "$busy" ]; then
+            echo "e2e ports taken:$busy — stop whatever listens there (a bare-port dev server?)"
+            exit 4
+        fi
+        e2e_stack "$E2E_DATABASE_URL" "$e2e_db" "$E2E_DIR" "$specs"
+    ) >"$E2E_LOGS/run.log" 2>&1 &
     E2E_PID=$!
 }
 e2e_finish() {
@@ -482,8 +549,6 @@ e2e_finish() {
         none) say e2e "no spec covers what changed (scripts/e2e-affected.mjs); CI runs them all"; return 0 ;;
         nodb) say e2e "FAIL — set E2E_DATABASE_URL to a throwaway *test* database (it is dropped and re-created)"
             FAILED="$FAILED e2e(db)"; return 0 ;;
-        ports:*) say e2e "FAIL — CI's ports are taken:${E2E_STATUS#ports:} (stop whatever listens there)"
-            FAILED="$FAILED e2e(ports)"; return 0 ;;
     esac
     [ -n "$E2E_PID" ] || return 0
     [ "$INT" = 1 ] && echo "    (waiting for the browser run)"
@@ -493,7 +558,7 @@ e2e_finish() {
         date +%s >"$PASSES/$E2E_TREE-$E2E_STEP"
     else
         say "$E2E_STEP" "FAIL ($(( $(date +%s) - E2E_T0 ))s)"
-        grep -E "✘|^\s+[0-9]+ (failed|passed|skipped|flaky)|never came up|Error:" \
+        grep -E "✘|^\s+[0-9]+ (failed|passed|skipped|flaky)|never came up|Error:|ports taken|e2e lock:|=== e2e:" \
             "$E2E_LOGS/run.log" | tail -40
         echo "    run log and server logs: $E2E_LOGS"
         FAILED="$FAILED $E2E_STEP"

@@ -28,6 +28,10 @@ import {
  * These run against the seeded stack and CHANGE it: they publish, and they
  * restore. Written to survive that — nothing asserts a count of versions or
  * which one is live at the start, only the difference the actions make.
+ *
+ * `@serial`, every one: Northwind has one site (ADR-006), and publishing,
+ * restoring or hiding its first block changes what the reviewer, the
+ * phone editor and a second copy of this file would be reading.
  */
 
 async function signIn(page: Page, who: { email: string; password: string }) {
@@ -158,7 +162,7 @@ async function publishFromEditor(page: Page): Promise<string> {
     return live.innerText();
 }
 
-test.describe("publishing past a change request", () => {
+test.describe("publishing past a change request", { tag: "@serial" }, () => {
     test("is recorded in version history, with who did it", async ({
         page,
         browser,
@@ -194,7 +198,7 @@ test.describe("publishing past a change request", () => {
     });
 });
 
-test.describe("taking a version back", () => {
+test.describe("taking a version back", { tag: "@serial" }, () => {
     test("asks first, and says what restoring would go past", async ({
         page,
         browser,
@@ -284,83 +288,89 @@ test.describe("taking a version back", () => {
     });
 });
 
-test.describe("the editor's status after a reload (G2)", () => {
-    test("says what is not published yet, and nothing once it is", async ({
-        page,
-    }) => {
-        await signIn(page, demoUser);
-        const id = await siteId(page);
-        await page.goto(`${urls.APP_URL}/sites/${id}`);
+test.describe(
+    "the editor's status after a reload (G2)",
+    { tag: "@serial" },
+    () => {
+        test("says what is not published yet, and nothing once it is", async ({
+            page,
+        }) => {
+            await signIn(page, demoUser);
+            const id = await siteId(page);
+            await page.goto(`${urls.APP_URL}/sites/${id}`);
 
-        /*
-         * Read through Publish's title rather than the pill: another test in
-         * this file can leave a change request open, and a review outranks
-         * "Not published" in the pill. The title always says what goes live.
-         */
-        // Publish's title, opening the phone's menu to read it and
-        // putting it away again.
-        const publishTitle = async () => {
-            const publish = await publishButton(page);
-            const title = await publish.getAttribute("title");
-            if (onPhone(page)) {
-                await page.keyboard.press("Escape");
-                /*
-                 * Until the menu is gone. Read while it was still closing,
-                 * the next poll saw Publish visible, skipped opening the
-                 * menu, and asked for the title of a button that then left
-                 * the page: the read waited out the whole poll, which
-                 * reported the "Saving" it had read a moment after the
-                 * toggle (the phone's failure in CI after #687).
-                 */
-                await expect(publish).toBeHidden();
+            /*
+             * Read through Publish's title rather than the pill: another test in
+             * this file can leave a change request open, and a review outranks
+             * "Not published" in the pill. The title always says what goes live.
+             */
+            // Publish's title, opening the phone's menu to read it and
+            // putting it away again.
+            const publishTitle = async () => {
+                const publish = await publishButton(page);
+                const title = await publish.getAttribute("title");
+                if (onPhone(page)) {
+                    await page.keyboard.press("Escape");
+                    /*
+                     * Until the menu is gone. Read while it was still closing,
+                     * the next poll saw Publish visible, skipped opening the
+                     * menu, and asked for the title of a button that then left
+                     * the page: the read waited out the whole poll, which
+                     * reported the "Saving" it had read a moment after the
+                     * toggle (the phone's failure in CI after #687).
+                     */
+                    await expect(publish).toBeHidden();
+                }
+                return title;
+            };
+            const NOTHING = "Nothing has changed since the last publish";
+
+            /*
+             * Start from a draft that matches what is live, with the first block
+             * showing. A run that stopped half way leaves that block hidden in
+             * the draft, and a retry that flipped it again would only put it
+             * back — "Nothing has changed", correctly — and fail for the first
+             * run's reason, not its own.
+             */
+            const first = await inspectorToggle(page);
+            // Pressed is "Hidden" (the label carries an icon, so not its text).
+            if ((await first.getAttribute("aria-pressed")) === "true") {
+                await first.click();
             }
-            return title;
-        };
-        const NOTHING = "Nothing has changed since the last publish";
+            await closeOverlays(page);
+            await expect
+                .poll(publishTitle, { timeout: 30_000 })
+                .not.toMatch(/^Saving/);
+            if ((await publishTitle()) !== NOTHING) {
+                await publishFromEditor(page);
+                await expect
+                    .poll(publishTitle, { timeout: 30_000 })
+                    .toBe(NOTHING);
+            }
 
-        /*
-         * Start from a draft that matches what is live, with the first block
-         * showing. A run that stopped half way leaves that block hidden in
-         * the draft, and a retry that flipped it again would only put it
-         * back — "Nothing has changed", correctly — and fail for the first
-         * run's reason, not its own.
-         */
-        const first = await inspectorToggle(page);
-        // Pressed is "Hidden" (the label carries an icon, so not its text).
-        if ((await first.getAttribute("aria-pressed")) === "true") {
-            await first.click();
-        }
-        await closeOverlays(page);
-        await expect
-            .poll(publishTitle, { timeout: 30_000 })
-            .not.toMatch(/^Saving/);
-        if ((await publishTitle()) !== NOTHING) {
+            // One block's visibility flips; the autosave counts it.
+            const toggle = await inspectorToggle(page);
+            await expect(toggle).toHaveAccessibleName("Visible");
+            await toggle.click();
+            await closeOverlays(page);
+            await expect
+                .poll(publishTitle, { timeout: 30_000 })
+                .toMatch(/^Put live: .*block/);
+
+            // The count is the server's, so a reload says the same.
+            await page.reload();
+            await expect
+                .poll(publishTitle, { timeout: 30_000 })
+                .toMatch(/^Put live: .*block/);
+
+            // Put it back, publish, and nothing is waiting.
+            await (await inspectorToggle(page)).click();
+            await closeOverlays(page);
+            await expect(await publishButton(page)).toBeEnabled({
+                timeout: 30_000,
+            });
             await publishFromEditor(page);
             await expect.poll(publishTitle, { timeout: 30_000 }).toBe(NOTHING);
-        }
-
-        // One block's visibility flips; the autosave counts it.
-        const toggle = await inspectorToggle(page);
-        await expect(toggle).toHaveAccessibleName("Visible");
-        await toggle.click();
-        await closeOverlays(page);
-        await expect
-            .poll(publishTitle, { timeout: 30_000 })
-            .toMatch(/^Put live: .*block/);
-
-        // The count is the server's, so a reload says the same.
-        await page.reload();
-        await expect
-            .poll(publishTitle, { timeout: 30_000 })
-            .toMatch(/^Put live: .*block/);
-
-        // Put it back, publish, and nothing is waiting.
-        await (await inspectorToggle(page)).click();
-        await closeOverlays(page);
-        await expect(await publishButton(page)).toBeEnabled({
-            timeout: 30_000,
         });
-        await publishFromEditor(page);
-        await expect.poll(publishTitle, { timeout: 30_000 }).toBe(NOTHING);
-    });
-});
+    },
+);

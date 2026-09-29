@@ -95,6 +95,8 @@ A step that passed on a tree is never re-run on it (`--no-cache` forces it);
 Locally `--int` and `--e2e` run only the specs the batch reaches (`--full`
 runs all). So every new browser spec starts with a `// @covers …` line
 (`pnpm run check:e2e-covers`).
+A new browser spec owns its data — it runs beside every other test — and
+tags a business-wide change `@serial` (`saroh-browser-tests` skill).
 
 `git push` runs the quick gate itself (`.husky/pre-push`); `--no-verify`
 is for emergencies only. CI is the last net, not the first: every CI round trip is a push, five

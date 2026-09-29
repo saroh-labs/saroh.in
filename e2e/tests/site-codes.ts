@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { Page } from "@playwright/test";
-import { expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * Signing in on a merchant's site from a browser test (round-2 plan A, A9).
@@ -32,12 +32,13 @@ function lastCode(email: string): string | null {
     }
 }
 
-/** Where this run's addresses start, so back-to-back runs rarely share one. */
+/** Where this worker's addresses start, so back-to-back runs rarely share one. */
 let visitors = Math.floor(Math.random() * 254);
 
 /**
  * Stand in for a different customer on a merchant's site: a visitor address
- * of their own (TEST-NET-3, one per call).
+ * of their own (198.18.0.0/15, the benchmarking range: one per call, and a
+ * third octet per worker, so two tests running at once never share one).
  *
  * Off the platform every visitor reaches the API as the loopback address
  * (`visitorAddress`, `apps/saroh.app/lib/site-relay.ts`), so one run's
@@ -49,7 +50,8 @@ let visitors = Math.floor(Math.random() * 254);
  */
 export async function asNewVisitor(page: Page): Promise<void> {
     visitors += 1;
-    const address = `203.0.113.${(visitors % 254) + 1}`;
+    const worker = test.info().parallelIndex % 256;
+    const address = `198.18.${worker}.${(visitors % 254) + 1}`;
     await page.setExtraHTTPHeaders({ "x-real-ip": address });
 }
 

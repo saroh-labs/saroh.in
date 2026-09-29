@@ -671,8 +671,14 @@ jobs:
           path: /tmp/*.log
           retention-days: 3
 
+      # e2e/run.mjs: sign in once, then desk and phone fullyParallel — so a
+      # shard is a quarter of the TESTS, not of the files, and the four come
+      # out even — then this shard's `@serial` tests one at a time. Two
+      # workers: the stack under test shares the runner's two vCPUs.
       - name: Run browser tests
-        run: pnpm --filter @saroh/e2e exec playwright test --shard=${{ matrix.shard }}/4
+        env:
+          PW_WORKERS: "2"
+        run: pnpm --filter @saroh/e2e test:e2e --shard=${{ matrix.shard }}/4
 
       # The trace and screenshots are the whole point of a failed browser run:
       # without them a red build says "something looked wrong" and nothing else.

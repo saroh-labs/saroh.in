@@ -32,8 +32,9 @@
  *     import it.
  *   - Anything global → every spec: the schema, migrations and seed
  *     (packages/database), packages/ui and packages/auth, tooling, root
- *     configs, the lockfile, .github, the playwright config and its sign-in
- *     setup (auth.setup.ts, fixtures/sessions.ts), the api's
+ *     configs, the lockfile, .github, the playwright config, its runner
+ *     (run.mjs) and sign-in setup (auth.setup.ts, fixtures/sessions.ts),
+ *     the api's
  *     bootstrap and common/, this script and scripts/prepush.sh. An app's
  *     own config, middleware or root layout → every spec on that app.
  *   - docs, Markdown, unit tests and apps with no browser specs → none.
@@ -79,7 +80,7 @@ const GLOBAL = [
     [/^tooling\//, "shared tooling"],
     [/^\.github\//, "CI"],
     [
-        /^e2e\/(playwright\.config\.ts|package\.json|tsconfig\.json|tests\/auth\.setup\.ts|fixtures\/sessions\.ts)$/,
+        /^e2e\/(playwright\.config\.ts|run\.mjs|package\.json|tsconfig\.json|tests\/auth\.setup\.ts|fixtures\/sessions\.ts)$/,
         "the browser harness",
     ],
     [/^scripts\/(prepush\.sh|e2e-affected\.mjs)$/, "the gate itself"],

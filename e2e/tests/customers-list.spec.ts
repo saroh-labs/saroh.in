@@ -13,6 +13,8 @@ import { urls } from "../playwright.config";
  *
  * Read-only: nothing here saves, so it runs on Northwind and reads Rye & Co.
  * (a film set) without changing either. Desk and phone run the same steps.
+ * What it picks by position — "the first customer" — it picks on Rye,
+ * which no test writes to.
  */
 
 const NORTHWIND = "seed_org";
@@ -49,13 +51,16 @@ test.describe("customers list", () => {
     test("search, a chip and a sort, then a row opens the customer", async ({
         page,
     }) => {
-        await signIn(page, NORTHWIND);
-        const api = await firstCustomers(page, NORTHWIND);
+        // Read on Rye, as its owner: Northwind's customers are made, and
+        // merged away, by the specs running beside this one, so its first
+        // row could be gone by the time it is searched for.
+        await signIn(page, RYE);
+        const api = await firstCustomers(page, RYE);
         await page.goto("/commerce/customers");
         await expect(
             page.getByRole("heading", { name: "Customers", level: 1 }),
         ).toBeVisible();
-        test.skip(api.rows.length === 0, "Northwind has no customer rows");
+        test.skip(api.rows.length === 0, "Rye has no customer rows");
 
         const someone = api.rows[0];
         const name = someone.name ?? someone.email ?? "";

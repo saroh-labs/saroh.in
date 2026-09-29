@@ -134,13 +134,22 @@ test.describe("the phone tab bar", () => {
             await expect
                 .poll(
                     async () => {
-                        const height = await page.evaluate(() => {
-                            window.scrollTo(
-                                0,
-                                document.documentElement.scrollHeight,
-                            );
-                            return document.documentElement.scrollHeight;
-                        });
+                        // A route that settles on another address (/commerce)
+                        // can still be moving on a busy machine: a look that
+                        // lands mid-navigation is not settled, so look again.
+                        const height = await page
+                            .evaluate(() => {
+                                window.scrollTo(
+                                    0,
+                                    document.documentElement.scrollHeight,
+                                );
+                                return document.documentElement.scrollHeight;
+                            })
+                            .catch(() => null);
+                        if (height === null) {
+                            last = -1;
+                            return false;
+                        }
                         const settled = height === last;
                         last = height;
                         return settled;

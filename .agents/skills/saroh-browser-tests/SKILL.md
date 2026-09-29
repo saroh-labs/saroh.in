@@ -131,15 +131,59 @@ routes. `pnpm run check:e2e-covers` fails a spec with no line or a key that
 names nothing real. To see what a diff would run:
 `node scripts/e2e-affected.mjs --base origin/development --why`.
 
+## Every test runs beside every other one
+
+The suite is `fullyParallel`: any two tests — two files, two tests in one
+file, the same test on desk and phone — may run at the same moment against
+the same database. `e2e/run.mjs` (`pnpm --filter @saroh/e2e test:e2e`, CI's
+shards, `pnpm prepush --e2e`) runs it in three phases: `setup` once, then
+`desk` and `phone` in parallel on `PW_WORKERS` (4 locally, 2 in CI), then
+the `@serial` tests one at a time. Every new spec follows these rules:
+
+- **Own your data.** A test that changes a record makes that record first,
+  through the API, and changes only it: a contact, an order, a plan and a
+  subscription, a pack, a booking. `e2e/fixtures/own-data.ts` has the
+  helpers (`makeContact`, `makeOrder`, `bookOwn`, `northwind`), and
+  `fixtures/throwaway-products.ts` the products. Never change a seeded
+  record another test reads: the seed's trolley, a named customer, "the
+  first Preparing order". An order's line is `ORDER_LINE`, an untracked
+  product the setup project makes once, so no order holds stock another
+  test counts.
+- **Unique stamps.** Names, emails and notes carry `stamp(testInfo)` —
+  project, worker, time and a random tail — never a bare `Date.now()`,
+  which desk and phone can hit in the same millisecond. A phone number is
+  `phone()`. Keep an email short where a phone screen shows it whole.
+- **No global counts.** Assert on your own records, found by their stamp
+  or id. A count, a page of a list or "the first row" is read on Rye & Co.
+  (as its owner), which no test writes to; on Northwind it moves under you.
+- **`@serial` for business-wide settings.** A test that changes what every
+  other test reads — a business setting, a storefront's ways, the allergen
+  list, a service's deposit, a module, Northwind's one site, its team —
+  gets `{ tag: "@serial" }` and runs after the parallel phase, alone. Put
+  it back afterwards too: the other project's copy runs next. Keep the tag
+  for what truly needs it; the serial phase is one worker.
+- **Writes go to Northwind.** Rye & Co., Pulse Fitness and Kavi Dental are
+  film sets and are only read (a Kavi visit is marked in CI only, @serial).
+  Leela & Loom's product-editor film still makes and deletes its own
+  product there.
+- **Times and slots are claimed, not assumed.** Two tests reading "the
+  third free time" book the same one a second apart. Take a day of your own
+  (`public-booking.spec.ts`), or try the free times in order until one is
+  yours (`bookOwn`). A visitor on a merchant's site gets an address per
+  worker (`asNewVisitor`), since the site limits bookings and codes by
+  address.
+- A click that cannot land fails after 15s (`actionTimeout`), not at the
+  test's timeout.
+
 ## Rules
 
 - `pnpm prepush --e2e` copies the seeded database from a template rather
   than seeding each run, and CI restores a cached dump
   (`docs/patterns/devops-tooling-and-deploy.md`). A seed or migration change
   rebuilds both on its own; nothing to do by hand.
-- Specs share one seeded Organization, so the config runs them serially. A spec
-  that mutates shared state (disabling a module, changing a role) must put it
-  back.
+- One browser run per machine: a second `pnpm prepush --e2e` waits for the
+  first's lock rather than taking its ports, and teardown stops only the
+  servers its own run started.
 - Keep credentials to the seeded demo user. They are fixture values for a
   throwaway database, printed by the seed itself.
 - On failure CI uploads traces and screenshots. Without them a red build says

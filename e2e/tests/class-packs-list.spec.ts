@@ -2,6 +2,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { stamp as ownStamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -29,7 +30,11 @@ async function signIn(page: Page) {
 async function aService(request: APIRequestContext): Promise<string> {
     const res = await request.get(orgApi("/services"), { headers });
     expect(res.ok()).toBe(true);
-    const services = (await res.json()) as { id: string }[];
+    // One of the seed's: an "E2E …" service is another test's, and may be
+    // deleted while this pack still names it.
+    const services = (
+        (await res.json()) as { id: string; name: string }[]
+    ).filter((s) => !s.name.startsWith("E2E "));
     expect(services.length).toBeGreaterThan(0);
     return services[0].id;
 }
@@ -43,7 +48,7 @@ test.describe("class packs list", () => {
         page,
     }) => {
         const request = page.request;
-        const stamp = Date.now();
+        const stamp = ownStamp(test.info());
         const live = `E2E pack ${stamp}`;
         const draftName = `E2E draft ${stamp}`;
         const serviceId = await aService(request);

@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { stamp as ownStamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import {
     demoReviewer,
@@ -126,18 +127,24 @@ test.describe("a reviewer", () => {
         ).toBeVisible();
     });
 
-    test("reads the page itself, not a list of page titles", async ({
-        page,
-    }) => {
-        await openTheReviewedSite(page);
+    // @serial: it reads the site's first block, which site-versions hides
+    // and puts back.
+    test(
+        "reads the page itself, not a list of page titles",
+        {
+            tag: "@serial",
+        },
+        async ({ page }) => {
+            await openTheReviewedSite(page);
 
-        // The seeded home page's own copy, rendered through the real blocks.
-        // What this replaced was a list of titles and paths, which told a
-        // reviewer a site had pages and nothing about what was on them.
-        await expect(
-            page.getByText("Packaging, storage and safety supplies"),
-        ).toBeVisible();
-    });
+            // The seeded home page's own copy, rendered through the real blocks.
+            // What this replaced was a list of titles and paths, which told a
+            // reviewer a site had pages and nothing about what was on them.
+            await expect(
+                page.getByText("Packaging, storage and safety supplies"),
+            ).toBeVisible();
+        },
+    );
 
     test("leaves a note on a section, and the note comes back", async ({
         page,
@@ -154,7 +161,7 @@ test.describe("a reviewer", () => {
         await note.focus();
         await note.click();
 
-        const body = `Opening hours look wrong — ${Date.now()}`;
+        const body = `Opening hours look wrong — ${ownStamp(test.info())}`;
         await page.getByLabel(/Your note about/i).fill(body);
         await page.getByRole("button", { name: "Add note" }).click();
 

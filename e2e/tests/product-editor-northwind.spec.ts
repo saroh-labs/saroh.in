@@ -44,86 +44,96 @@ async function allergens(request: APIRequestContext): Promise<Allergen[]> {
 }
 
 test.describe("product editor on Northwind (#525)", () => {
-    test("allergens can be set before the product is first saved", async ({
-        page,
-    }, testInfo) => {
-        test.setTimeout(120_000);
-        const name = `E2E Sesame Bun ${testInfo.project.name}`;
-        const ALLERGEN = "E2E Sesame";
+    // @serial: Northwind's allergen list is business-wide — with one, every
+    // product editor open beside it reads as a food business's.
+    test(
+        "allergens can be set before the product is first saved",
+        {
+            tag: "@serial",
+        },
+        async ({ page }, testInfo) => {
+            test.setTimeout(120_000);
+            const name = `E2E Sesame Bun ${testInfo.project.name}`;
+            const ALLERGEN = "E2E Sesame";
 
-        await signIn(page);
-        await page.goto(`/open/${NW.organizationId}`);
-        await removeProducts(page.request, NW, name);
-        const before = await allergens(page.request);
-        const added = !before.some((a) => a.name === ALLERGEN);
-
-        try {
-            if (added) {
-                const res = await page.request.post(
-                    org("/catalogue/allergens"),
-                    { headers: orgHeader, data: { names: [ALLERGEN] } },
-                );
-                expect(res.ok()).toBe(true);
-            }
-
-            await page.goto(`/commerce/products/new?storefront=${NW.storeId}`);
-            // With an allergen list, Details reads as the food fields.
-            const details = page.getByRole("region", {
-                name: "Ready time and allergens",
-            });
-            await expect(details).toBeVisible();
-            await page.locator("#pe-name").fill(name);
-            await page.locator("#pe-price").fill("60");
-            // Not greyed out while creating: it goes with the create call.
-            const chip = details
-                .getByRole("group", { name: "Contains" })
-                .getByRole("button", { name: ALLERGEN });
-            await expect(chip).toBeEnabled();
-            await chip.click();
-            await expect(chip).toHaveAttribute("aria-pressed", "true");
-            await expect(
-                details.getByText(
-                    `Customers see: Contains ${ALLERGEN.toLowerCase()}.`,
-                ),
-            ).toBeVisible();
-
-            await page.getByRole("button", { name: "Create draft" }).click();
-            await page.waitForURL(/\/commerce\/products\/[^/]+\/edit/);
-            await expect(page.getByText("All changes saved")).toBeVisible();
-
-            const id = /\/commerce\/products\/([^/]+)\/edit/.exec(
-                page.url(),
-            )?.[1];
-            expect(id).toBeTruthy();
-            const read = await page.request.get(store(`/${id}`), {
-                headers: orgHeader,
-            });
-            expect(read.ok()).toBe(true);
-            const product = (await read.json()) as {
-                allergens: { contains: Allergen[] };
-            };
-            expect(product.allergens.contains.map((a) => a.name)).toEqual([
-                ALLERGEN,
-            ]);
-            // Opened again, nothing reads as unsaved (#525): not the
-            // description, not the allergens.
-            await page.reload();
-            await expect(page.getByText("All changes saved")).toBeVisible();
-        } finally {
+            await signIn(page);
+            await page.goto(`/open/${NW.organizationId}`);
             await removeProducts(page.request, NW, name);
-            if (added) {
-                const now = await allergens(page.request);
-                const mine = now.find((a) => a.name === ALLERGEN);
-                if (mine) {
-                    const res = await page.request.delete(
-                        org(`/catalogue/allergens/${mine.id}`),
-                        { headers: orgHeader },
+            const before = await allergens(page.request);
+            const added = !before.some((a) => a.name === ALLERGEN);
+
+            try {
+                if (added) {
+                    const res = await page.request.post(
+                        org("/catalogue/allergens"),
+                        { headers: orgHeader, data: { names: [ALLERGEN] } },
                     );
                     expect(res.ok()).toBe(true);
                 }
+
+                await page.goto(
+                    `/commerce/products/new?storefront=${NW.storeId}`,
+                );
+                // With an allergen list, Details reads as the food fields.
+                const details = page.getByRole("region", {
+                    name: "Ready time and allergens",
+                });
+                await expect(details).toBeVisible();
+                await page.locator("#pe-name").fill(name);
+                await page.locator("#pe-price").fill("60");
+                // Not greyed out while creating: it goes with the create call.
+                const chip = details
+                    .getByRole("group", { name: "Contains" })
+                    .getByRole("button", { name: ALLERGEN });
+                await expect(chip).toBeEnabled();
+                await chip.click();
+                await expect(chip).toHaveAttribute("aria-pressed", "true");
+                await expect(
+                    details.getByText(
+                        `Customers see: Contains ${ALLERGEN.toLowerCase()}.`,
+                    ),
+                ).toBeVisible();
+
+                await page
+                    .getByRole("button", { name: "Create draft" })
+                    .click();
+                await page.waitForURL(/\/commerce\/products\/[^/]+\/edit/);
+                await expect(page.getByText("All changes saved")).toBeVisible();
+
+                const id = /\/commerce\/products\/([^/]+)\/edit/.exec(
+                    page.url(),
+                )?.[1];
+                expect(id).toBeTruthy();
+                const read = await page.request.get(store(`/${id}`), {
+                    headers: orgHeader,
+                });
+                expect(read.ok()).toBe(true);
+                const product = (await read.json()) as {
+                    allergens: { contains: Allergen[] };
+                };
+                expect(product.allergens.contains.map((a) => a.name)).toEqual([
+                    ALLERGEN,
+                ]);
+                // Opened again, nothing reads as unsaved (#525): not the
+                // description, not the allergens.
+                await page.reload();
+                await expect(page.getByText("All changes saved")).toBeVisible();
+            } finally {
+                await removeProducts(page.request, NW, name);
+                if (added) {
+                    const now = await allergens(page.request);
+                    const mine = now.find((a) => a.name === ALLERGEN);
+                    if (mine) {
+                        const res = await page.request.delete(
+                            org(`/catalogue/allergens/${mine.id}`),
+                            { headers: orgHeader },
+                        );
+                        expect(res.ok()).toBe(true);
+                    }
+                }
             }
-        }
-    });
+        },
+    );
 
     test("unticking a storefront for a variant takes it off that listing", async ({
         page,

@@ -34,66 +34,75 @@ async function allRows(page: Page) {
 }
 
 test.describe("Home's inline actions (F4)", () => {
-    test("Mark sent confirms in the row, and Undo puts the order back", async ({
-        page,
-    }) => {
-        test.setTimeout(90_000);
-        await signIn(page);
-        await page.goto("/");
+    // @serial: Needs you shows a handful of Northwind's open orders, late
+    // and oldest first, so an order made here would not be among them: it
+    // moves the seed's own and puts it back, while nothing else moves orders.
+    test(
+        "Mark sent confirms in the row, and Undo puts the order back",
+        {
+            tag: "@serial",
+        },
+        async ({ page }) => {
+            test.setTimeout(90_000);
+            await signIn(page);
+            await page.goto("/");
 
-        const rows = await allRows(page);
-        const row = rows
-            .filter({
-                has: page.getByRole("button", {
-                    name: "Mark sent",
-                    exact: true,
-                }),
-            })
-            .first();
-        test.skip(
-            (await row.count()) === 0,
-            "Northwind has no order ready to hand over",
-        );
-        const title = (await row.getByRole("link").first().innerText()).split(
-            "\n",
-        )[0];
+            const rows = await allRows(page);
+            const row = rows
+                .filter({
+                    has: page.getByRole("button", {
+                        name: "Mark sent",
+                        exact: true,
+                    }),
+                })
+                .first();
+            test.skip(
+                (await row.count()) === 0,
+                "Northwind has no order ready to hand over",
+            );
+            const title = (
+                await row.getByRole("link").first().innerText()
+            ).split("\n")[0];
 
-        await row
-            .getByRole("button", { name: "Mark sent", exact: true })
-            .click();
-        const confirm = row.getByRole("alertdialog");
-        await expect(confirm).toBeVisible();
-        // It says who is told, or that nobody is, before anything happens.
-        await expect(confirm).toContainText(
-            /tells|sees that the order|Nothing is sent to/,
-        );
-        // Cancel closes it and nothing moved.
-        await confirm.getByRole("button", { name: "Cancel" }).click();
-        await expect(confirm).toHaveCount(0);
+            await row
+                .getByRole("button", { name: "Mark sent", exact: true })
+                .click();
+            const confirm = row.getByRole("alertdialog");
+            await expect(confirm).toBeVisible();
+            // It says who is told, or that nobody is, before anything happens.
+            await expect(confirm).toContainText(
+                /tells|sees that the order|Nothing is sent to/,
+            );
+            // Cancel closes it and nothing moved.
+            await confirm.getByRole("button", { name: "Cancel" }).click();
+            await expect(confirm).toHaveCount(0);
 
-        await row
-            .getByRole("button", { name: "Mark sent", exact: true })
-            .click();
-        await row
-            .getByRole("alertdialog")
-            .getByRole("button", { name: /^Mark sent/ })
-            .click();
-        await expect(row.getByText(/^Marked sent/)).toBeVisible();
+            await row
+                .getByRole("button", { name: "Mark sent", exact: true })
+                .click();
+            await row
+                .getByRole("alertdialog")
+                .getByRole("button", { name: /^Mark sent/ })
+                .click();
+            await expect(row.getByText(/^Marked sent/)).toBeVisible();
 
-        // Undo within the hold: the order is back, and its button with it.
-        await row.getByRole("button", { name: "Undo" }).click();
-        await expect(
-            page
-                .getByText(/^Undone\./)
-                .locator("visible=true")
-                .first(),
-        ).toBeVisible();
-        await page.reload();
-        const again = (await allRows(page)).filter({ hasText: title }).first();
-        await expect(
-            again.getByRole("button", { name: "Mark sent", exact: true }),
-        ).toBeVisible();
-    });
+            // Undo within the hold: the order is back, and its button with it.
+            await row.getByRole("button", { name: "Undo" }).click();
+            await expect(
+                page
+                    .getByText(/^Undone\./)
+                    .locator("visible=true")
+                    .first(),
+            ).toBeVisible();
+            await page.reload();
+            const again = (await allRows(page))
+                .filter({ hasText: title })
+                .first();
+            await expect(
+                again.getByRole("button", { name: "Mark sent", exact: true }),
+            ).toBeVisible();
+        },
+    );
 
     test("Send reminder says how it reaches them, and Cancel sends nothing", async ({
         page,
