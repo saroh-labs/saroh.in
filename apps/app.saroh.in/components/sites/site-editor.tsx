@@ -61,6 +61,7 @@ export function SiteEditor({
     initialStyle,
     styleOptions,
     shopOpen = false,
+    addablePageKinds,
 }: SiteEditorProps) {
     const review = useEditorReview({
         siteId,
@@ -181,6 +182,8 @@ export function SiteEditor({
                 }}
                 {...viewport}
                 openFeedback={() => setInspector("feedback")}
+                canUpdateSite={canUpdateSite}
+                addablePageKinds={addablePageKinds}
             />
 
             <EditorPanels

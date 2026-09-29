@@ -2,7 +2,7 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { AddBlockPanel } from "@/components/sites/add-block-panel";
 import { SECTION_ICONS } from "@/components/sites/block-icons";
@@ -94,6 +94,7 @@ export function EditorRail({
      * would land on — kept apart so the source can dim while the target draws
      * its own outline, and so an abandoned drag clears both.
      */
+    const railId = useId();
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
 
@@ -226,6 +227,11 @@ export function EditorRail({
                                                 title={
                                                     SECTION_LABELS[section.type]
                                                 }
+                                                aria-describedby={
+                                                    section.hidden
+                                                        ? `${railId}-hidden-${index}`
+                                                        : undefined
+                                                }
                                                 onClick={() =>
                                                     setSelectedIndex(index)
                                                 }
@@ -304,6 +310,24 @@ export function EditorRail({
                                                     ) : null}
                                                 </span>
                                             </button>
+                                            {/*
+                                             * Said, not only struck through
+                                             * (G16): a hidden section stays
+                                             * in the list, marked, as the
+                                             * design's layers are. Beside
+                                             * the row's button, which it
+                                             * describes, so the row still
+                                             * reads as the block's name.
+                                             */}
+                                            {section.hidden ? (
+                                                <span
+                                                    id={`${railId}-hidden-${index}`}
+                                                    title="Not shown on the site"
+                                                    className="shrink-0 rounded bg-muted px-1.5 py-px text-[0.625rem] font-semibold uppercase tracking-[0.04em] text-muted-foreground"
+                                                >
+                                                    Hidden
+                                                </span>
+                                            ) : null}
                                         </div>
                                     </li>
                                 ))}

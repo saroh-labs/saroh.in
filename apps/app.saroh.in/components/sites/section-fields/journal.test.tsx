@@ -61,6 +61,19 @@ function one<T extends HTMLElement>(selector: string): T {
     return found;
 }
 
+/** One answer of a labelled choice ("Photos" › "Hide"). */
+function choice(label: string, answer: string): HTMLElement {
+    const group = Array.from(
+        host.querySelectorAll<HTMLElement>('[role="group"]'),
+    ).find((g) => g.firstElementChild?.textContent.trim() === label);
+    if (!group) throw new Error(`No "${label}" choice`);
+    const found = Array.from(group.querySelectorAll("button")).find(
+        (b) => b.textContent.trim() === answer,
+    );
+    if (!found) throw new Error(`No "${answer}" in "${label}"`);
+    return found;
+}
+
 function click(el: HTMLElement) {
     act(() => {
         el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -95,13 +108,14 @@ describe("the Journal's fields", () => {
         expect(byText("button", "Latest 3").getAttribute("data-state")).toBe(
             "on",
         );
-        const switches = Array.from(
-            host.querySelectorAll<HTMLElement>('[role="switch"]'),
-        );
-        expect(switches).toHaveLength(2);
-        for (const s of switches) {
-            expect(s.getAttribute("aria-checked")).toBe("true");
+        for (const label of ["Photos", "Descriptions"]) {
+            expect(choice(label, "Show").getAttribute("aria-pressed")).toBe(
+                "true",
+            );
         }
+        expect(choice("Show as", "Cards").getAttribute("aria-pressed")).toBe(
+            "true",
+        );
     });
 
     it("keeps six when chosen, and stores three as the default", () => {
@@ -119,14 +133,35 @@ describe("the Journal's fields", () => {
 
     it("turns photos and excerpts off, and back on as the default", () => {
         const onChange = render({});
-        click(one("#sec_journal-images"));
+        click(choice("Photos", "Hide"));
         expect(lastContent(onChange)).toEqual({ showImages: false });
 
         const excerpts = render({ showExcerpts: false });
-        const toggle = one("#sec_journal-excerpts");
-        expect(toggle.getAttribute("aria-checked")).toBe("false");
-        click(toggle);
+        expect(
+            choice("Descriptions", "Hide").getAttribute("aria-pressed"),
+        ).toBe("true");
+        click(choice("Descriptions", "Show"));
         expect(lastContent(excerpts)).toEqual({ showExcerpts: undefined });
+    });
+
+    it("lists posts one per row with the merchant's button (G16)", () => {
+        const onChange = render({});
+        click(choice("Show as", "List"));
+        expect(lastContent(onChange)).toEqual({ layout: "list" });
+
+        const words = render({ layout: "list" });
+        const button = host.querySelectorAll<HTMLInputElement>("input")[1];
+        expect(button.placeholder).toBe("Read");
+        type(button, "Read more");
+        expect(lastContent(words)).toEqual({
+            layout: "list",
+            buttonLabel: "Read more",
+        });
+        type(button, "  ");
+        expect(lastContent(words)).toEqual({
+            layout: "list",
+            buttonLabel: undefined,
+        });
     });
 
     it("writes the title, and clears it to the default when emptied", () => {
@@ -142,7 +177,7 @@ describe("the Journal's fields", () => {
         render({});
         expect(host.querySelector('[aria-label="Posts shown"]')).toBeTruthy();
         expect(host.textContent).toContain("Photos");
-        expect(host.textContent).toContain("Excerpts");
+        expect(host.textContent).toContain("Descriptions");
         expect(host.textContent).not.toMatch(/choose (a|which) post/i);
     });
 });

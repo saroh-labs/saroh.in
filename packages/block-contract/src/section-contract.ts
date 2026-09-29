@@ -468,6 +468,23 @@ const contactV1 = z
     );
 
 /**
+ * How a list section lays out its items (G16, R12): `cards` side by side, or
+ * `list`, one per row with the photo, where there is one, on the left. The
+ * Site Editor's "Show as". Each bound block says what ABSENT means, and it is
+ * always the look the block had before the option existed, so a page
+ * published before G16 draws exactly as it did.
+ */
+export const LIST_LAYOUTS = ["cards", "list"] as const;
+export type ListLayout = (typeof LIST_LAYOUTS)[number];
+const listLayout = z.enum(LIST_LAYOUTS).optional();
+
+/**
+ * A list section's button words (G16), "Leave empty to keep each item's own
+ * button". ABSENT means the block's own, and 40 characters is a button.
+ */
+const buttonLabel = z.string().trim().max(40).optional();
+
+/**
  * servicesList v1 — the merchant's real Services, read live (#255).
  *
  * The first block that shows module data. It stores only WHICH services and in
@@ -482,6 +499,10 @@ const contactV1 = z
  *
  * `cta` is the usual button (#207), typically "Book now" pointing at the page
  * with the booking block. Up to 24 services: past that it is a catalogue.
+ *
+ * Display options (G16): `layout` (ABSENT: `list`, the rows it has always
+ * drawn), `showDescriptions` (ABSENT: shown) and `buttonLabel`, the words on
+ * each service's own button (ABSENT: "Book").
  */
 const servicesListV1 = z.object({
     variant,
@@ -498,6 +519,13 @@ const servicesListV1 = z.object({
         ),
     showPrices: z.boolean().optional(),
     cta: ctaSchemaV2.optional(),
+    /**
+     * Display options (G16), each ABSENT meaning what the block drew before:
+     * one service per row (`list`), with its description, and a "Book" link.
+     */
+    layout: listLayout,
+    showDescriptions: z.boolean().optional(),
+    buttonLabel,
 });
 
 /**
@@ -540,6 +568,11 @@ const visitUsV1 = z.object({
  * `count` is 3 or 6 — a row, or two. ABSENT means 3. `showExcerpts` and
  * `showImages` default to on, so ABSENT means shown. With no posts live the
  * block renders nothing on the site; the editor's canvas says why.
+ *
+ * Display options (G16): `layout` (ABSENT: `cards`) and `buttonLabel`, words
+ * such as "Read" at the foot of each post's card (ABSENT: none, the card
+ * itself is the link). Photos are `showImages` and descriptions
+ * `showExcerpts`.
  */
 const journalV1 = z.object({
     variant,
@@ -548,6 +581,9 @@ const journalV1 = z.object({
     count: z.union([z.literal(3), z.literal(6)]).optional(),
     showExcerpts: z.boolean().optional(),
     showImages: z.boolean().optional(),
+    /** Display options (G16): ABSENT, cards and no button of their own. */
+    layout: listLayout,
+    buttonLabel,
 });
 
 /**
@@ -569,8 +605,11 @@ const plansV1 = z.object({
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
     highlight: z.enum(["first", "none"]).optional(),
-    buttonLabel: z.string().trim().max(40).optional(),
+    buttonLabel,
     showDescriptions: z.boolean().optional(),
+    /** Display options (G16): ABSENT, cards with their prices. */
+    layout: listLayout,
+    showPrices: z.boolean().optional(),
 });
 
 /**
@@ -639,6 +678,15 @@ const productGridV1 = z.object({
         .optional(),
     count: z.number().int().min(1).max(PRODUCT_GRID_MAX).optional(),
     showPrices: z.boolean().optional(),
+    /**
+     * Display options (G16), each ABSENT meaning what the grid drew before:
+     * cards, each with its photo and its line, and no button (the card
+     * itself opens the product).
+     */
+    layout: listLayout,
+    showPhotos: z.boolean().optional(),
+    showDescriptions: z.boolean().optional(),
+    buttonLabel,
 });
 
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */

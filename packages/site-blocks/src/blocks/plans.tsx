@@ -358,6 +358,7 @@ function PlanCards({
     if (feed.plans.length === 0) return null;
     const highlightFirst = content.highlight !== "none";
     const showDescriptions = content.showDescriptions !== false;
+    const showPrices = content.showPrices !== false;
     // The canvas says what the live site's button will say.
     const joinWords = joins || (canvas && feed.payOnline === true);
     const label =
@@ -373,7 +374,15 @@ function PlanCards({
             {done && prices ? (
                 <PricesDone message={done} accountHref={prices.accountHref} />
             ) : null}
-            <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]">
+            <ul
+                className={cn(
+                    "grid",
+                    // "Show as" (G16): one plan per row, or side by side.
+                    content.layout === "list"
+                        ? "grid-cols-1 gap-2.5"
+                        : "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]",
+                )}
+            >
                 {feed.plans.map((plan, index) => {
                     const highlighted = highlightFirst && index === 0;
                     const every = planEvery(plan);
@@ -410,7 +419,7 @@ function PlanCards({
                             ) : null}
                             <span className="mt-1.5 flex items-center gap-2.5">
                                 <span className="flex-1 text-base font-bold">
-                                    {planPrice(plan)}
+                                    {showPrices ? planPrice(plan) : null}
                                 </span>
                                 {canvas ? (
                                     <span className={joinButton}>{label}</span>
