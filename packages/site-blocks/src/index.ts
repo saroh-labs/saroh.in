@@ -78,12 +78,11 @@ export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
-export {
-    default as VisitUsSection,
-    directionsHref,
-    isPublicVisit,
-} from "./blocks/visit-us";
-export type { PublicVisit } from "./blocks/visit-us";
+export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
+// Server-safe (not in the "use client" block): saroh.app reads it for the
+// booking page's header on the server (E6).
+export { isPublicVisit } from "./lib/public-visit";
+export type { PublicVisit } from "./lib/public-visit";
 
 // The one rule for "Open now" (G8): Visit us, the hero's On today (G18) and
 // the booking page's header (E6) all say it through this.
