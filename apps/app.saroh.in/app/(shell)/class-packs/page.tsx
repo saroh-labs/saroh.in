@@ -1,9 +1,11 @@
 import { PacksScreen } from "@/components/class-packs/packs-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
-import { owedSummary, rulesNote } from "@/lib/class-packs/pack-cards";
+import { cardNotes } from "@/lib/class-packs/pack-card-notes";
+import { owedSummary, packKind, rulesNote } from "@/lib/class-packs/pack-cards";
 import {
     listPackCards,
+    readBusinessZone,
     readFreeCancelHours,
     readMembershipPlans,
 } from "@/lib/class-packs/packs-page";
@@ -41,17 +43,36 @@ export default async function ClassPacksPage({
     // never drawn (DEC-057). Unknown fails open, as the rail does.
     const paymentsOn =
         modules?.find((m) => m.key === "PAYMENTS")?.readiness !== "DISABLED";
-    const [contacts, terms, freeCancelHours, memberships] = await Promise.all([
-        canSell ? contactPickerOptions() : Promise.resolve([]),
-        getSellingTerms(),
-        readFreeCancelHours(),
-        paymentsOn ? readMembershipPlans() : Promise.resolve(null),
-    ]);
+    const [contacts, terms, freeCancelHours, memberships, timeZone] =
+        await Promise.all([
+            canSell ? contactPickerOptions() : Promise.resolve([]),
+            getSellingTerms(),
+            readFreeCancelHours(),
+            paymentsOn ? readMembershipPlans() : Promise.resolve(null),
+            readBusinessZone(),
+        ]);
+    const now = new Date();
 
     return (
         <PageContainer width="full">
             <PacksScreen
                 packs={packs}
+                notes={Object.fromEntries(
+                    packs.map((p) => [
+                        p.id,
+                        cardNotes(
+                            {
+                                id: p.id,
+                                kind: packKind(p),
+                                price: p.price,
+                                currency: p.currency,
+                            },
+                            purchases,
+                            now,
+                            timeZone,
+                        ),
+                    ]),
+                )}
                 contacts={contacts}
                 held={purchases.map((p) => ({
                     contactId: p.contact.id,

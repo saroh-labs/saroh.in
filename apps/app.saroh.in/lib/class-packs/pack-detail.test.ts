@@ -196,13 +196,23 @@ describe("detailHeader", () => {
 });
 
 describe("overview", () => {
-    it("tiles: sold with takings, still to use, running out, lost", () => {
+    it("tiles: can be sold now, sold with takings, still to use, running out (the design's four)", () => {
         expect(overviewTiles(pack())).toEqual([
+            {
+                k: "Can be sold now",
+                v: "Yes",
+                sub: "At the desk and on the booking page",
+            },
             { k: "Sold", v: "4", sub: "₹6,000 taken" },
             { k: "Still to use", v: "17", sub: "across 3 people" },
             { k: "Running out", v: "1", sub: "within 14 days" },
-            { k: "Lost to expiry", v: "2", sub: "classes never used" },
         ]);
+        expect(overviewTiles(pack({ status: "ARCHIVED" }))[0]).toEqual({
+            k: "Can be sold now",
+            v: "No",
+            sub: "Archived",
+        });
+        expect(overviewTiles(pack({ status: "DRAFT" }))[0].sub).toBe("Draft");
     });
 
     it("tiles for a pack nobody has bought", () => {
@@ -219,10 +229,10 @@ describe("overview", () => {
             },
         });
         expect(overviewTiles(p).map((t) => t.sub)).toEqual([
+            "At the desk and on the booking page",
             "None yet",
             "Nobody has any left",
             "Nobody close",
-            "None",
         ]);
     });
 
@@ -280,8 +290,8 @@ describe("overview", () => {
             href: "/billing/invoices/inv_2",
         });
         expect(cards[3]).toMatchObject({
-            v: "Shown when booking a class",
-            lines: [{ text: "Only to people who haven't had one" }],
+            v: "Offered when booking a class",
+            lines: [{ text: "Only to people who haven't bought one" }],
             open: { lens: "customer" },
         });
     });
@@ -311,11 +321,11 @@ describe("overview", () => {
             "10 classes",
             "₹1,500 · ₹150 a class",
             "60 days from the sale",
-            "HIIT and Yoga",
+            "HIIT, Yoga",
         ]);
         expect(second.at(-1)).toEqual({
             k: "Cancelling",
-            v: "A class cancelled 12 hours or earlier gives the credit back",
+            v: "A class cancelled 12 hours before or earlier gives the credit back",
         });
         const unread = aboutRows(pack(), {
             freeCancelHours: undefined,
