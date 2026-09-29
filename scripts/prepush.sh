@@ -11,7 +11,8 @@
 #                                branch touched, on desk AND phone (stack running)
 #   pnpm prepush --all           everything
 #
-# Integration needs TEST_DATABASE_URL naming a database with "test" in it, and
+# Integration needs TEST_DATABASE_URL naming a database with "test" in it (and a
+# changed migration needs REPLAY_DATABASE_URL, a throwaway one), and
 # PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION set for the reset. It never prints
 # either. bash 3 compatible (macOS).
 set -o pipefail
@@ -58,8 +59,17 @@ step api-unit pnpm --filter @saroh/api test:unit
 step app-vitest pnpm --filter application test
 step blocks-vitest pnpm --filter @saroh/site-blocks test
 step sites-vitest pnpm --filter sites test
+# A new migration must replay onto an empty database and match schema.prisma.
+# REPLAY_DATABASE_URL names a throwaway database (its name must contain "test").
 if echo "$CHANGED" | grep -q "^packages/database/prisma/"; then
-    step db-replay pnpm --filter @saroh/database db:verify:replay
+    case "${REPLAY_DATABASE_URL:-}" in
+        *test*)
+            step db-replay env DATABASE_URL="$REPLAY_DATABASE_URL" \
+                pnpm --filter @saroh/database db:verify:replay ;;
+        *)
+            echo "=== db-replay       SKIP — migrations changed: set REPLAY_DATABASE_URL to a throwaway *test* database"
+            [ "$INT" = 1 ] && FAILED="$FAILED db-replay(unset)" ;;
+    esac
 fi
 
 # 3. API integration, six modules at a time: one run over the whole suite can
