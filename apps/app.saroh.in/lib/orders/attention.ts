@@ -28,9 +28,11 @@ export type RowAttention =
 export const ATTENTION_UNAVAILABLE = "Not available";
 
 /**
- * The row's tag: the first entry ("Allergy: Sesame") and how many more
- * ("+1"), named in full for a screen reader; "Not available" when it
- * couldn't be read; nothing when there is none, or the API is older.
+ * The row's tag, as the design draws it (DEC-067, B15): the first entry's
+ * own words ("Sesame") and how many more ("+1"), named in full for a
+ * screen reader ("Allergy: Sesame"), so the kind is never colour alone;
+ * "Not available" when it couldn't be read; nothing when there is none, or
+ * the API is older.
  */
 export function rowAttention(row: {
     attention?: OrderAttentionTag[] | null;
@@ -50,10 +52,8 @@ export function rowAttention(row: {
     ];
     return {
         state: "shown",
-        text: rest.length
-            ? `${tagText(first)} +${rest.length}`
-            : tagText(first),
-        name: `Needs attention: ${row.attention.map(tagText).join(", ")}`,
+        text: rest.length ? `${first.label} +${rest.length}` : first.label,
+        name: row.attention.map(tagText).join(", "),
         title: row.attention.map(tagTitle).join(". "),
     };
 }

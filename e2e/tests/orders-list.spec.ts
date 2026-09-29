@@ -529,11 +529,12 @@ test.describe("orders list filters (B4)", () => {
         await page.goto(`/open/${RYE}`);
         await page.goto("/commerce/orders?attention=true");
         const tag = page
-            .getByRole("img", { name: /Needs attention: Allergy: Sesame/ })
+            .getByRole("img", { name: /^Allergy: Sesame/ })
             .locator("visible=true")
             .first();
         await expect(tag).toBeVisible();
-        await expect(tag).toHaveText(/Allergy: Sesame/);
+        // The tag reads "Sesame", as the design shows (DEC-067).
+        await expect(tag).toHaveText(/^Sesame( \+\d+)?$/);
         await expect(
             page.getByRole("img", { name: /Needs attention couldn't/ }),
         ).toHaveCount(0);

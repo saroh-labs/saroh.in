@@ -34,8 +34,9 @@ import { AgeText, StepBar, StepPill } from "./step-pill";
  * keeps the pill, the bar and the age.
  *
  * The customer's Needs attention (B15) is a red tag beside their name at the
- * desk and in the card's meta line on a phone: "Allergy: Sesame", "+1" for
- * more, named in full for a screen reader. The API sends only what the
+ * desk and in the card's meta line on a phone: "Sesame", "+1" for more, as
+ * the design draws it, named in full for a screen reader ("Allergy:
+ * Sesame", DEC-067). The API sends only what the
  * viewer may see; "Not available" when it couldn't be read.
  */
 
