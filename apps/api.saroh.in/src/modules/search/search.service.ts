@@ -234,6 +234,13 @@ export class SearchService {
                 AND: terms(query).map((term) => ({
                     OR: [
                         { orderId: { contains: term, mode: "insensitive" } },
+                        // Its number before P3 renumbered it (DEC-066).
+                        {
+                            renumberedFrom: {
+                                contains: term,
+                                mode: "insensitive",
+                            },
+                        },
                         // A walk-in (B13), by the name they gave.
                         {
                             walkInName: {
