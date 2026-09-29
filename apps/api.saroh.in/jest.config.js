@@ -243,6 +243,7 @@ module.exports = {
         // D16: the invoice's paper and its PDF, read back as text — pure
         // (invoice-pdf.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
