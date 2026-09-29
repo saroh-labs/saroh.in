@@ -5,100 +5,198 @@
 # CI round trip. Every step here exists because CI once caught it first —
 # docs/architecture/DEV_LEARNINGS.md has the stories.
 #
-#   pnpm prepush                 secrets, lint, types, checks, unit tests, vitest
-#   pnpm prepush --int           … plus API integration tests, in module groups
+#   pnpm prepush                 secrets, lint, types, checks, and the unit
+#                                tests and vitest specs the branch's changes
+#                                reach (what .husky/pre-push runs)
+#   pnpm prepush --int           … plus the full unit suites and the API
+#                                integration tests, in groups, on parallel
+#                                test databases
 #   pnpm prepush --e2e           … plus the browser specs for the screens this
 #                                branch touched, on desk AND phone, against CI's
 #                                seeded stack built from HEAD (E2E_DATABASE_URL)
-#   pnpm prepush --all           everything
+#   pnpm prepush --all           everything; the browser step runs alongside
+#                                the integration groups
+#   … --no-cache                 run every step, even ones already passed on
+#                                this tree, and bypass turbo's cache
+#
+# Fast because nothing runs twice:
+#   - A step that passes is recorded against the tree it passed on
+#     (`git rev-parse HEAD^{tree}`, only when no tracked file is modified), in
+#     <git common dir>/prepush-cache/<tree>-<step>. The next run on that tree
+#     prints "=== lint PASS (cached)". Per step, so --int reuses the quick
+#     steps' passes, and a full unit pass stands in for a changed-only one.
+#     Secrets are never cached: a leak lives in history, not in the tree. A
+#     tree that differs from a passed one only in docs/ or *.md has passed too.
+#   - lint, typecheck, the api's unit tests and every vitest suite run through
+#     turbo, for the packages changed since BASE (origin/development) and their
+#     dependents — CI's `...[base]` filter — with turbo's local cache (turbo
+#     already shares one cache between a checkout and its worktrees).
+#   - The quick run tests only what the change reaches: jest --changedSince and
+#     vitest --changed, from the newest commit whose tree passed that step, else
+#     from the merge base. --int and --all run the full suites.
+#   - Integration groups run on PREPUSH_INT_DBS (default 3) test databases at
+#     once, TEST_DATABASE_URL's name with -1, -2, … appended, created if missing
+#     and reset by the suite's own globalSetup before every group. One jest run
+#     over the whole suite can segfault, so the suite is cut into
+#     PREPUSH_INT_GROUPS (default 16) shards; a shard that crashes without a
+#     jest summary is retried once.
+#   - --e2e and --all stop this repo's `pnpm dev` stack first (next dev, nest
+#     watch and turbo dev started from this repo or one of its worktrees,
+#     matched by command line and path) to free the CPU, and say how to start
+#     it again. PREPUSH_KEEP_DEV=1 leaves it running. The quick run never stops
+#     anything.
+#
+# Measured 2026-09-29 (12-core Mac, a batch 209 files ahead): the hook 3s on a
+# tree that passed, 19–32s after a code change (was 75s); --int 95s (was
+# ~7 min); --all 10.7 min (was ~25), nearly all of it the browser specs.
 #
 # Integration needs TEST_DATABASE_URL naming a database with "test" in it (and a
 # changed migration needs REPLAY_DATABASE_URL, a throwaway one; the browser step
 # needs E2E_DATABASE_URL, another), and
 # PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION set for the reset. It never prints
-# either. bash 3 compatible (macOS).
+# any of them. bash 3 compatible (macOS): no mapfile, no associative arrays.
 set -o pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-INT=0; E2E=0
+INT=0; E2E=0; USE_CACHE=1
 for a in "$@"; do
     case "$a" in
         --int) INT=1 ;;
         --e2e) E2E=1 ;;
         --all) INT=1; E2E=1 ;;
+        --no-cache) USE_CACHE=0 ;;
         *) echo "unknown option $a"; exit 2 ;;
     esac
 done
+QUICK=1; { [ "$INT" = 1 ] || [ "$E2E" = 1 ]; } && QUICK=0
+T0=$(date +%s)
 
 BASE=${PREPUSH_BASE:-origin/development}
 git fetch -q origin development 2>/dev/null || true
-LOG=$(mktemp -t prepush)
+# Changed-since is measured from where the branch left BASE, so a BASE that
+# moved on does not count its own commits as this branch's changes.
+MB=$(git merge-base "$BASE" HEAD 2>/dev/null || echo "$BASE")
+CHANGED=$(git diff --name-only "$MB" HEAD)
+
+COMMON=$(cd "$(git rev-parse --git-common-dir)" && pwd)
+PASSES=$COMMON/prepush-cache
+mkdir -p "$PASSES"
+# A tree two weeks old is not coming back.
+find "$PASSES" -type f -mtime +14 -delete 2>/dev/null
+TURBO_FORCE=""; [ "$USE_CACHE" = 0 ] && TURBO_FORCE="--force=true"
+
+# The tree the pass cache is keyed on: HEAD's, and only when the working tree
+# holds nothing else (untracked files are ignored, as git does).
+TREE=""
+if [ -z "$(git status --porcelain --untracked-files=no)" ]; then
+    TREE=$(git rev-parse 'HEAD^{tree}')
+else
+    echo "    (tracked files are modified: nothing is read from or written to the pass cache)"
+fi
+# Trees that differ from HEAD's only in docs and Markdown, which no step reads
+# (CI's `changes` job skips its code gates on them too): a pass on one of them
+# is a pass here. HEAD's own first; then its first-parent ancestors, up to the
+# first commit that changed code.
+SAME_CODE=$TREE
+if [ -n "$TREE" ]; then
+    for c in $(git rev-list --first-parent --max-count=20 HEAD~1 2>/dev/null); do
+        git diff --name-only "$c" HEAD | grep -qvE '^(docs/|.*\.md$)' && break
+        SAME_CODE="$SAME_CODE $(git rev-parse "$c^{tree}")"
+    done
+fi
+
+W=$(mktemp -d -t prepush)
+LOG=$W/step.log
 FAILED=""
+# cached <step> [<step that also counts>…]
+cached() {
+    local s t
+    [ "$USE_CACHE" = 1 ] && [ -n "$TREE" ] || return 1
+    # Never cached: a leak lives in history, and a build is a means.
+    case "$1" in secrets | int-build | deps) return 1 ;; esac
+    for t in $SAME_CODE; do
+        for s in "$@"; do [ -f "$PASSES/$t-$s" ] && return 0; done
+    done
+    return 1
+}
+record() {
+    case "$1" in secrets | int-build | deps) return 0 ;; esac
+    [ -n "$TREE" ] && date +%s >"$PASSES/$TREE-$1"; return 0
+}
+say() { printf '=== %-16s %s\n' "$1" "$2"; }
+# step <name> <command…>: runs it unless this tree already passed it. A full
+# pass of a step counts for its changed-only form ("vitest" for
+# "vitest:changed").
 step() {
-    name=$1; shift
-    printf '=== %-16s' "$name"
-    if "$@" >"$LOG" 2>&1; then echo PASS; else
-        echo FAIL; tail -40 "$LOG"; FAILED="$FAILED $name"
+    local name=$1 s; shift
+    if cached "$name" "${name%:changed}"; then say "$name" "PASS (cached)"; return 0; fi
+    printf '=== %-16s ' "$name"
+    s=$(date +%s)
+    if "$@" >"$LOG" 2>&1; then
+        echo "PASS ($(( $(date +%s) - s ))s)"; record "$name"
+    else
+        echo "FAIL ($(( $(date +%s) - s ))s)"; tail -40 "$LOG"; FAILED="$FAILED $name"
     fi
 }
-CHANGED=$(git diff --name-only "$BASE"...HEAD)
-
-# 1. Secrets. The repo is public: a hit is a leak, not a lint.
-if command -v gitleaks >/dev/null 2>&1; then
-    step secrets gitleaks git . --redact --no-banner --exit-code 1 \
-        --log-opts="$BASE..HEAD"
-else
-    echo "=== secrets         SKIP — install gitleaks (brew install gitleaks); CI runs it"
-fi
-
-# 2. Static checks and fast tests.
-step lint pnpm run lint
-step typecheck pnpm run typecheck
-step routes pnpm run check:routes
-step blocks pnpm run check:blocks
-step cycles pnpm run check:cycles
-# As CI: unit tests mock the environment, so its zod check is skipped.
-step api-unit env SKIP_ENV_VALIDATION=1 pnpm --filter @saroh/api test:unit
-step app-vitest pnpm --filter application test
-step blocks-vitest pnpm --filter @saroh/site-blocks test
-step sites-vitest pnpm --filter sites test
-# A new migration must replay onto an empty database and match schema.prisma.
-# REPLAY_DATABASE_URL names a throwaway database (its name must contain "test").
-if echo "$CHANGED" | grep -q "^packages/database/prisma/"; then
-    case "${REPLAY_DATABASE_URL:-}" in
-        *test*)
-            rdb=$(echo "$REPLAY_DATABASE_URL" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
-            step db-replay env DATABASE_URL="$REPLAY_DATABASE_URL" \
-                DATABASE_TARGET_CONFIRM="$rdb" \
-                pnpm --filter @saroh/database db:verify:replay ;;
-        *)
-            echo "=== db-replay       SKIP — migrations changed: set REPLAY_DATABASE_URL to a throwaway *test* database"
-            [ "$INT" = 1 ] && FAILED="$FAILED db-replay(unset)" ;;
-    esac
-fi
-
-# 3. API integration, six modules at a time: one run over the whole suite can
-# crash a jest worker. One database per run — two runs on one database reset
-# each other's rows and fail at random.
-if [ "$INT" = 1 ]; then
-    case "${TEST_DATABASE_URL:-}" in
-        *test*) ;;
-        *) echo "TEST_DATABASE_URL must name a test database"; exit 1 ;;
-    esac
-    mods=(); while IFS= read -r m; do mods+=("$m"); done \
-        < <(ls apps/api.saroh.in/src/modules)
-    i=0
-    while [ $i -lt ${#mods[@]} ]; do
-        pat=$(IFS='|'; echo "${mods[*]:$i:6}")
-        step "int:${mods[$i]}+" pnpm --filter @saroh/api test:int -- \
-            --testPathPattern "src/modules/($pat)/"
-        i=$((i + 6))
+# bg_step <name> <command…>: the same, in the background; bg_report prints it.
+# Waits on its own jobs only: the browser run is in the background too.
+BG=""; BG_PIDS=""
+bg_step() {
+    local name=$1; shift
+    BG="$BG $name"
+    if cached "$name" "${name%:changed}"; then echo cached >"$W/$name.rc"; return 0; fi
+    ( s=$(date +%s); "$@" >"$W/$name.log" 2>&1; echo "$? $(( $(date +%s) - s ))" >"$W/$name.rc" ) &
+    BG_PIDS="$BG_PIDS $!"
+}
+bg_report() {
+    local name rc secs note p
+    for p in $BG_PIDS; do wait "$p"; done
+    BG_PIDS=""
+    for name in $BG; do
+        read -r rc secs note <"$W/$name.rc"
+        if [ "$rc" = cached ]; then say "$name" "PASS (cached)"
+        elif [ "$rc" = 0 ] && [ -n "$note" ]; then say "$name" "PASS ($note)"; record "$name"
+        elif [ "$rc" = 0 ]; then say "$name" "PASS (${secs}s)"; record "$name"
+        else say "$name" "FAIL (${secs}s)"; tail -40 "$W/$name.log"; FAILED="$FAILED $name"
+        fi
     done
-    step "int:common" pnpm --filter @saroh/api test:int -- \
-        --testPathPattern "src/(common|app)|test/"
-fi
+    BG=""
+}
 
-# 4. Browser specs for the screens this branch touched, on CI's stack.
+# Packages changed since the merge base, and everything that depends on them —
+# the same set CI's `...[base]` filter reaches. Asked lazily: a fully cached
+# run never starts turbo.
+AFFECTED_LIST=""
+affected() {
+    if [ -z "$AFFECTED_LIST" ]; then
+        AFFECTED_LIST=$(pnpm -s exec turbo ls --filter="...[$MB]" 2>/dev/null |
+            sed -nE 's/^  ([^ ]+) .*/\1/p')
+        [ -n "$AFFECTED_LIST" ] || AFFECTED_LIST="(none)"
+    fi
+    echo "$AFFECTED_LIST" | grep -qx "$1"
+}
+TURBO="pnpm -s exec turbo run --output-logs=errors-only $TURBO_FORCE"
+# Builds what the affected packages' tests import: the packages they depend
+# on, and @saroh/database's own build (its prisma generate) when it is one of
+# them. Done apart, and the tests then run with --only, because turbo hashes a
+# run's pass-through arguments into EVERY task in it: `-- --changed=<sha>`
+# made every ^build a cache miss, rebuilt on each commit.
+test_deps() {
+    local p f=""
+    affected x
+    for p in $AFFECTED_LIST; do
+        [ "$p" = "(none)" ] && continue
+        f="$f --filter=$p^..."
+    done
+    affected @saroh/database && f="$f --filter=@saroh/database"
+    [ -n "$f" ] || return 0
+    # shellcheck disable=SC2086
+    $TURBO build $f
+}
+
+# ---------------------------------------------------------------------------
+# 4. (defined first, started early) Browser specs for the screens this branch
+# touched, on CI's stack.
 #
 # A mirror of CI's "Browser E2E (seeded stack)" job (.github/workflows/ci.yml,
 # `browser-e2e-shard`), not of `pnpm dev`: a fresh database migrated and
@@ -109,8 +207,10 @@ fi
 #
 # It builds and runs from its own detached worktree of HEAD (committed work
 # only), so the `.next` of a running `pnpm dev` is never touched and no local
-# `.env` leaks in — a runner has none either. The portless dev stack is left
-# alone; if one of CI's ports is taken, the step says which and stops.
+# `.env` leaks in — a runner has none either. It shares nothing with the
+# integration step: its own database, CI's ports, which the integration specs
+# never bind (they listen on port 0). If one of CI's ports is taken, the step
+# says which and stops.
 #
 # Needs E2E_DATABASE_URL naming a throwaway database with "test" in its name.
 # It is dropped and re-created each run. Server logs stay in $E2E_LOGS.
@@ -157,10 +257,12 @@ e2e_stack() {
     dropdb --if-exists --force --maintenance-db="$maint" "$name"
     createdb --maintenance-db="$maint" "$name"
     pnpm --filter @saroh/database db:migrate:deploy
-    pnpm turbo run db:seed:showcase --filter=@saroh/database
 
-    echo "--- build"
-    pnpm turbo run build --filter=@saroh/api --filter=auth \
+    # As CI: the seed and the build in one turbo run, so they overlap; turbo
+    # still makes the seed wait for the builds it runs on (turbo.json).
+    echo "--- seed and build"
+    pnpm turbo run db:seed:showcase build --log-order=grouped \
+        --filter=@saroh/database --filter=@saroh/api --filter=auth \
         --filter=application --filter=sites
 
     echo "--- start the stack (logs in $E2E_LOGS)"
@@ -198,56 +300,345 @@ stop_stack() {
         lsof -nP -tiTCP:$p -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
     done
 }
-if [ "$E2E" = 1 ]; then
+
+# This repo's `pnpm dev` stack (portless), started from the main checkout or
+# any of its worktrees: turbo dev, next dev, nest watch and the portless
+# wrappers, matched by command line AND a path under one of those checkouts,
+# plus whatever they started. Never matched by a bare program name.
+stop_dev_stack() {
+    local roots r pid cmd hit tops="" kids all="" more p restart=""
+    roots=$(git worktree list --porcelain | sed -n 's/^worktree //p')
+    while read -r pid cmd; do
+        case "$cmd" in
+            *"turbo run dev"* | *"turbo dev"* | *"next dev"* | *"nest start"* | *"portless/dist/cli.js"*) ;;
+            *) continue ;;
+        esac
+        hit=""
+        for r in $roots; do
+            [ "$r" = "$E2E_DIR" ] && continue
+            case "$cmd" in *"$r/"*) hit=$r ;; esac
+        done
+        [ -n "$hit" ] || continue
+        tops="$tops $pid"
+        case "$cmd" in
+            *"turbo run dev"*)
+                restart="$restart
+    (cd $hit && pnpm turbo run dev${cmd##*turbo run dev})" ;;
+        esac
+    done <<EOF
+$(ps -axo pid=,command=)
+EOF
+    if [ -z "$tops" ]; then
+        echo "    (no dev stack of this repo is running)"
+        return 0
+    fi
+    # Their descendants too: next-server, node dist/main, package watchers.
+    all=$tops; kids=$tops
+    while [ -n "$kids" ]; do
+        more=""
+        for p in $kids; do more="$more $(pgrep -P "$p" 2>/dev/null | tr '\n' ' ')"; done
+        kids=$(echo "$more" | xargs)
+        all="$all $kids"
+    done
+    all=$(echo "$all" | tr " " "\n" | grep . | sort -un | tr "\n" " ")
+    echo "=== stop dev stack  (frees the CPU for the build and the specs)"
+    for p in $all; do
+        cmd=$(ps -o command= -p "$p" 2>/dev/null) || continue
+        echo "    stopped $p ${cmd:0:110}"
+    done
+    # shellcheck disable=SC2086
+    kill $all 2>/dev/null || true
+    echo "    start it again with \`pnpm dev\` (or \`pnpm dev:app\`) in its checkout; it was:$restart"
+}
+
+E2E_PID=""; E2E_STATUS=""
+e2e_start() {
+    local keys k f p busy
+    # Keyed on HEAD's tree even when files are modified: HEAD is what it tests.
+    E2E_TREE=$(git rev-parse 'HEAD^{tree}')
+    if [ "$USE_CACHE" = 1 ] && [ -f "$PASSES/$E2E_TREE-e2e-desk-phone" ]; then
+        E2E_STATUS=cached; return 0
+    fi
     keys=$(echo "$CHANGED" | sed -nE \
         -e 's#^apps/app\.saroh\.in/app/\(shell\)/([^/]+)/.*#\1#p' \
         -e 's#^apps/app\.saroh\.in/components/([^/]+)/.*#\1#p' \
         -e 's#^e2e/tests/([^/]+)\.spec\.ts$#\1#p' | sort -u)
     specs=""
     for k in $keys; do
-        for f in $(grep -lE "/$k[/\"'?]|$k" e2e/tests/*.spec.ts 2>/dev/null); do
+        for f in $(grep -lE "/${k}[/\"'?]|$k" e2e/tests/*.spec.ts 2>/dev/null); do
             case " $specs " in *" $f "*) ;; *) specs="$specs $f" ;; esac
         done
     done
     specs=$(echo "$specs" | sed 's#e2e/##g')
     e2e_db=$(echo "${E2E_DATABASE_URL:-}" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
+    if [ -z "$specs" ]; then
+        E2E_STATUS=none; return 0
+    elif [ -z "${E2E_DATABASE_URL:-}" ] || ! echo "$e2e_db" | grep -q test; then
+        E2E_STATUS=nodb; return 0
+    fi
     busy=""
     for p in 3333 3000 3003 3005; do
         lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && busy="$busy $p"
     done
-    if [ -z "$specs" ]; then
-        echo "=== e2e             no spec names a changed screen"
-    elif [ -z "${E2E_DATABASE_URL:-}" ] || ! echo "$e2e_db" | grep -q test; then
-        echo "=== e2e             FAIL — set E2E_DATABASE_URL to a throwaway *test* database (it is dropped and re-created)"
-        FAILED="$FAILED e2e(db)"
-    elif [ -n "$busy" ]; then
-        echo "=== e2e             FAIL — CI's ports are taken:$busy (stop whatever listens there; the portless stack does not)"
-        FAILED="$FAILED e2e(ports)"
+    if [ -n "$busy" ]; then
+        E2E_STATUS="ports:$busy"; return 0
+    fi
+    [ -n "$(git status --porcelain)" ] && \
+        echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
+    SHA=$(git rev-parse HEAD)
+    E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
+    echo "=== e2e (in the background) specs:$specs"
+    E2E_T0=$(date +%s)
+    trap stop_stack EXIT
+    (e2e_stack "$E2E_DATABASE_URL" "$e2e_db" "$E2E_DIR" "$specs") \
+        >"$E2E_LOGS/run.log" 2>&1 &
+    E2E_PID=$!
+}
+e2e_finish() {
+    case "$E2E_STATUS" in
+        cached) say e2e-desk-phone "PASS (cached)"; return 0 ;;
+        none) say e2e "no spec names a changed screen"; return 0 ;;
+        nodb) say e2e "FAIL — set E2E_DATABASE_URL to a throwaway *test* database (it is dropped and re-created)"
+            FAILED="$FAILED e2e(db)"; return 0 ;;
+        ports:*) say e2e "FAIL — CI's ports are taken:${E2E_STATUS#ports:} (stop whatever listens there)"
+            FAILED="$FAILED e2e(ports)"; return 0 ;;
+    esac
+    [ -n "$E2E_PID" ] || return 0
+    [ "$INT" = 1 ] && echo "    (waiting for the browser run)"
+    if wait "$E2E_PID"; then
+        say e2e-desk-phone "PASS ($(( $(date +%s) - E2E_T0 ))s)"
+        # It tested HEAD's tree, whatever the working tree holds.
+        date +%s >"$PASSES/$E2E_TREE-e2e-desk-phone"
     else
-        [ -n "$(git status --porcelain)" ] && \
-            echo "    (uncommitted changes are not in the run: it tests HEAD)"
-        SHA=$(git rev-parse HEAD)
-        E2E_DIR=${PREPUSH_E2E_DIR:-${TMPDIR:-/tmp}/saroh-prepush-e2e}
-        E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
-        echo "=== e2e specs:$specs"
-        started=$(date +%s)
-        trap stop_stack EXIT
-        if (e2e_stack "$E2E_DATABASE_URL" "$e2e_db" "$E2E_DIR" "$specs") \
-            >"$E2E_LOGS/run.log" 2>&1; then
-            echo "=== e2e-desk-phone  PASS ($(( $(date +%s) - started ))s)"
-        else
-            echo "=== e2e-desk-phone  FAIL ($(( $(date +%s) - started ))s)"
-            grep -E "✘|^\s+[0-9]+ (failed|passed|skipped|flaky)|never came up|Error:" \
-                "$E2E_LOGS/run.log" | tail -40
-            echo "    run log and server logs: $E2E_LOGS"
-            FAILED="$FAILED e2e-desk-phone"
+        say e2e-desk-phone "FAIL ($(( $(date +%s) - E2E_T0 ))s)"
+        grep -E "✘|^\s+[0-9]+ (failed|passed|skipped|flaky)|never came up|Error:" \
+            "$E2E_LOGS/run.log" | tail -40
+        echo "    run log and server logs: $E2E_LOGS"
+        FAILED="$FAILED e2e-desk-phone"
+    fi
+    stop_stack
+    trap - EXIT
+}
+
+# ---------------------------------------------------------------------------
+# 1. Secrets. The repo is public: a hit is a leak, not a lint. Never cached:
+# a secret committed and then deleted leaves the same tree behind.
+if [ "$INT" = 1 ]; then
+    case "${TEST_DATABASE_URL:-}" in
+        *test*) ;;
+        *) echo "TEST_DATABASE_URL must name a test database"; exit 1 ;;
+    esac
+fi
+# Ctrl-C stops everything this run started: workers, jest, the e2e stack.
+trap 'trap - INT TERM; [ -n "$E2E_PID" ] && stop_stack; kill 0' INT TERM
+if command -v gitleaks >/dev/null 2>&1; then
+    step secrets gitleaks git . --redact --no-banner --exit-code 1 \
+        --log-opts="$BASE..HEAD"
+else
+    echo "=== secrets          SKIP — install gitleaks (brew install gitleaks); CI runs it"
+fi
+
+E2E_DIR=${PREPUSH_E2E_DIR:-${TMPDIR:-/tmp}/saroh-prepush-e2e}
+if [ "$E2E" = 1 ]; then
+    if [ "${PREPUSH_KEEP_DEV:-}" = 1 ]; then
+        echo "    (PREPUSH_KEEP_DEV=1: the dev stack is left running)"
+    else
+        stop_dev_stack
+    fi
+    # Started now: it builds from its own worktree while everything else runs.
+    e2e_start
+fi
+
+# 2. Static checks and unit tests, side by side.
+#
+# The check:* scripts read sources only, so they start at once. Everything
+# that goes through turbo first waits for one build of what the affected
+# packages import (test_deps), then runs with --only, so no two turbo runs
+# ever build the same package at the same time.
+bg_step routes pnpm run check:routes
+bg_step blocks pnpm run check:blocks
+bg_step cycles pnpm run check:cycles
+
+# Unit tests. The quick run takes only the specs the change reaches; --int and
+# --all run the full suites. As CI: the api's unit tests mock the environment,
+# so its zod check is skipped.
+#
+# "Changed" is counted from the newest commit on this branch whose tree
+# already passed that step (the specs its changes reached passed there, and
+# everything before it was covered by that run's own base), else from the
+# merge base. A small commit on a branch that passed a moment ago tests only
+# what that commit reaches, not the whole branch again.
+since() {
+    local c t s
+    [ "$USE_CACHE" = 1 ] || { echo "$MB"; return 0; }
+    for c in $(git rev-list --first-parent --max-count=50 "$MB..HEAD" 2>/dev/null); do
+        t=$(git rev-parse "$c^{tree}")
+        for s in "$@"; do
+            [ -f "$PASSES/$t-$s" ] && { echo "$c"; return 0; }
+        done
+    done
+    echo "$MB"
+}
+if [ "$QUICK" = 1 ]; then
+    API_UNIT=api-unit:changed; VITEST=vitest:changed
+    JEST_ARGS="-- --changedSince=$(since api-unit:changed api-unit)"
+    VITEST_ARGS="-- --changed=$(since vitest:changed vitest) --passWithNoTests"
+else
+    API_UNIT=api-unit; VITEST=vitest
+    JEST_ARGS=""; VITEST_ARGS=""
+fi
+
+if ! cached lint || ! cached typecheck || ! cached "$API_UNIT" api-unit ||
+    ! cached "$VITEST" vitest; then
+    step deps test_deps
+fi
+# lint and typecheck over the affected packages, as CI's static job.
+bg_step lint $TURBO lint --only --filter="...[$MB]"
+bg_step typecheck $TURBO typecheck --only --filter="...[$MB]"
+if cached "$API_UNIT" api-unit; then
+    BG="$BG $API_UNIT"; echo cached >"$W/$API_UNIT.rc"
+elif ! affected @saroh/api; then
+    BG="$BG $API_UNIT"; echo "0 0 the api is not affected" >"$W/$API_UNIT.rc"
+else
+    # shellcheck disable=SC2086
+    bg_step "$API_UNIT" env SKIP_ENV_VALIDATION=1 $TURBO test:unit --only \
+        --filter=@saroh/api $JEST_ARGS
+fi
+# Every other package with a `test` script, as CI's unit job runs them.
+# shellcheck disable=SC2086
+bg_step "$VITEST" $TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
+    $VITEST_ARGS
+bg_report
+
+# A new migration must replay onto an empty database and match schema.prisma.
+# REPLAY_DATABASE_URL names a throwaway database (its name must contain "test"),
+# dropped and re-created each run: the replay must start from nothing.
+replay() {
+    local rdb rmaint
+    rdb=$(echo "$REPLAY_DATABASE_URL" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
+    rmaint=$(echo "$REPLAY_DATABASE_URL" | sed -E 's#/[^/?]+(\?.*)?$#/postgres\1#')
+    case "$rdb" in *test*) ;; *) echo "REPLAY_DATABASE_URL must name a *test* database"; return 1 ;; esac
+    dropdb --if-exists --force --maintenance-db="$rmaint" "$rdb" &&
+        createdb --maintenance-db="$rmaint" "$rdb" &&
+        DATABASE_URL="$REPLAY_DATABASE_URL" DATABASE_TARGET_CONFIRM="$rdb" \
+            pnpm --filter @saroh/database db:verify:replay
+}
+if echo "$CHANGED" | grep -q "^packages/database/prisma/"; then
+    case "${REPLAY_DATABASE_URL:-}" in
+        # Beside the integration run: its own database, mostly waiting on Postgres.
+        *test*) bg_step db-replay replay ;;
+        *)
+            if cached db-replay; then say db-replay "PASS (cached)"; else
+                say db-replay "SKIP — migrations changed: set REPLAY_DATABASE_URL to a throwaway *test* database"
+                [ "$INT" = 1 ] && FAILED="$FAILED db-replay(unset)"
+            fi ;;
+    esac
+fi
+
+# ---------------------------------------------------------------------------
+# 3. API integration, in shards on parallel databases.
+#
+# One jest run over the whole suite can crash a worker (a segfault, no
+# summary), so the suite is cut into INT_GROUPS shards (jest --shard, as CI cuts
+# it). N workers each own one database and take the next unclaimed shard until
+# none are left; every shard's globalSetup resets its worker's database
+# (`prisma db push --force-reset`), and inside a shard the specs run serially
+# with a TRUNCATE between files. Two runs on one database reset each other's
+# rows and fail at random, so no two workers ever share one. Each worker also
+# has its own TMPDIR: the fake site-code outbox is a file per email there.
+int_worker() {
+    local i=$1 url=$2 k tries rc s
+    local tmp=$W/tmp-$i
+    mkdir -p "$tmp"
+    k=1
+    while [ "$k" -le "$INT_GROUPS" ]; do
+        if mkdir "$W/claim-$k" 2>/dev/null; then
+            tries=0
+            while :; do
+                tries=$((tries + 1))
+                s=$(date +%s)
+                ( cd apps/api.saroh.in && TEST_DATABASE_URL=$url TMPDIR=$tmp \
+                    SKIP_ENV_VALIDATION=1 pnpm -s exec jest -c jest.integration.config.js \
+                    --shard="$k/$INT_GROUPS" --cacheDirectory="$JEST_CACHE" --ci ) \
+                    >"$W/int-$k.log" 2>&1
+                rc=$?
+                if [ $rc != 0 ] && [ $tries = 1 ] && ! grep -qE '^Tests:' "$W/int-$k.log"; then
+                    cp "$W/int-$k.log" "$W/int-$k.crash.log"
+                    printf '    int %s/%s crashed without a jest summary on db %s — retrying once\n' "$k" "$INT_GROUPS" "$i"
+                    continue
+                fi
+                break
+            done
+            printf '%s %s %s %s\n' "$rc" "$(( $(date +%s) - s ))" "$i" "$tries" >"$W/int-$k.rc"
+            if [ $rc = 0 ]; then
+                printf '    int %2s/%s  pass  %4ss  db %s%s\n' "$k" "$INT_GROUPS" "$(( $(date +%s) - s ))" "$i" \
+                    "$([ $tries = 2 ] && echo ' (after a retry)')"
+            else
+                printf '    int %2s/%s  FAIL  %4ss  db %s\n' "$k" "$INT_GROUPS" "$(( $(date +%s) - s ))" "$i"
+            fi
         fi
-        stop_stack
-        trap - EXIT
+        k=$((k + 1))
+    done
+}
+int_run() {
+    local n i name url maint exists k rc bad="" pids=""
+    n=${PREPUSH_INT_DBS:-3}
+    INT_GROUPS=${PREPUSH_INT_GROUPS:-16}
+    JEST_CACHE=${TMPDIR:-/tmp}/saroh-prepush-jest
+    name=$(echo "$TEST_DATABASE_URL" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
+    maint=$(echo "$TEST_DATABASE_URL" | sed -E 's#/[^/?]+(\?.*)?$#/postgres\1#')
+    i=1
+    while [ $i -le "$n" ]; do
+        case "$name-$i" in *test*) ;; *) echo "test database names must contain \"test\""; return 1 ;; esac
+        exists=$(psql "$maint" -tAc "SELECT 1 FROM pg_database WHERE datname = '$name-$i'" 2>/dev/null)
+        if [ "$exists" != 1 ]; then
+            createdb --maintenance-db="$maint" "$name-$i" >/dev/null 2>&1 ||
+                { echo "could not create test database $name-$i"; return 1; }
+            echo "    created test database $name-$i"
+        fi
+        i=$((i + 1))
+    done
+    say int "$INT_GROUPS shards on $n test databases, $name-1 to $name-$n"
+    i=1
+    while [ $i -le "$n" ]; do
+        url=$(echo "$TEST_DATABASE_URL" | sed -E "s#/([^/?]+)(\\?.*)?\$#/\\1-$i\\2#")
+        int_worker "$i" "$url" &
+        pids="$pids $!"
+        i=$((i + 1))
+    done
+    for i in $pids; do wait "$i"; done
+    k=1
+    while [ $k -le "$INT_GROUPS" ]; do
+        if [ ! -f "$W/int-$k.rc" ]; then bad="$bad $k"
+        else
+            read -r rc _ <"$W/int-$k.rc"
+            [ "$rc" = 0 ] || bad="$bad $k"
+        fi
+        k=$((k + 1))
+    done
+    for k in $bad; do
+        echo "--- int shard $k/$INT_GROUPS (log $W/int-$k.log)"
+        grep -E "^(FAIL|Tests:|Test Suites:)|●" "$W/int-$k.log" | head -30
+        grep -qE '^Tests:' "$W/int-$k.log" || tail -30 "$W/int-$k.log"
+    done
+    [ -z "$bad" ]
+}
+if [ "$INT" = 1 ]; then
+    if cached int; then say int "PASS (cached)"; else
+        # The api's workspace packages are consumed built, as in CI.
+        step int-build $TURBO build --filter='@saroh/api^...'
+        s=$(date +%s)
+        if int_run; then say int "PASS ($(( $(date +%s) - s ))s)"; record int
+        else say int "FAIL ($(( $(date +%s) - s ))s)"; FAILED="$FAILED int"
+        fi
     fi
 fi
 
-rm -f "$LOG"
+bg_report
+[ "$E2E" = 1 ] && e2e_finish
+
+[ -n "$W" ] && [ -z "$FAILED" ] && rm -rf "$W"
+echo "--- $(( $(date +%s) - T0 ))s"
 if [ -n "$FAILED" ]; then
     echo "FAILED:$FAILED"; exit 1
 fi

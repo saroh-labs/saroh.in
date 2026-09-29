@@ -120,8 +120,22 @@
         "typecheck": {
             "dependsOn": ["^build"]
         },
+        // Tests write nothing worth keeping, so a cache hit replays the log.
         "test": {
-            "dependsOn": ["^build"]
+            "dependsOn": ["^build"],
+            "outputs": []
+        },
+        // As its lint and typecheck: the package's own build runs prisma
+        // generate, which its specs import.
+        "@saroh/database#test": {
+            "dependsOn": ["^build", "build"],
+            "outputs": []
+        },
+        // The api's DB-free jest project (`scripts/prepush.sh` runs it through
+        // turbo for the cache; CI calls the script directly).
+        "test:unit": {
+            "dependsOn": ["^build"],
+            "outputs": []
         }
     }
 }
