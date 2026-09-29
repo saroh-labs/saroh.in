@@ -94,6 +94,7 @@ export default async function ServicesPage() {
                     canEdit={canEdit}
                     hasPage={hasPage}
                     alsoSell={alsoSellFeatures(modules)}
+                    modules={modules ?? []}
                 />
             </div>
         </PageContainer>

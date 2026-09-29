@@ -11,6 +11,7 @@ import { StatePill } from "@/components/bookings/calendar/parts";
 import { AlsoSell } from "@/components/services/also-sell";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { formatMoney } from "@/lib/format/money";
+import type { ModuleView } from "@/lib/modules/schema";
 import { updateService } from "@/lib/services/actions";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import type { Service } from "@/lib/services/service";
@@ -43,6 +44,7 @@ export function ServicesScreen({
     canEdit,
     hasPage,
     alsoSell,
+    modules = [],
 }: {
     services: Service[];
     /** Null when the staff read failed. */
@@ -55,6 +57,8 @@ export function ServicesScreen({
     hasPage: boolean | null;
     /** Courses and Class packs, on or off; null for no card. */
     alsoSell: AlsoSellFeature[] | null;
+    /** Every module, for what "Also sell" brings when it turns one on. */
+    modules?: ModuleView[];
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState<string | null>(null);
@@ -106,7 +110,9 @@ export function ServicesScreen({
                 number of places. Changing a price only affects bookings made
                 after.
             </p>
-            {alsoSell ? <AlsoSell features={alsoSell} /> : null}
+            {alsoSell ? (
+                <AlsoSell features={alsoSell} modules={modules} />
+            ) : null}
             {canEdit ? null : (
                 <ReadOnlyNote>
                     Your role can see these services but not change them.

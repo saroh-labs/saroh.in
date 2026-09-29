@@ -75,3 +75,16 @@ describe("which modules are shown (DEC-057)", () => {
         expect(rolledOut(views)).toEqual(views);
     });
 });
+
+describe("Automations until it has a screen (DEC-068)", () => {
+    it("is never shown, rolled out or not", () => {
+        const views = [
+            { key: "CRM", blockers: [] },
+            { key: "AUTOMATIONS", blockers: [] },
+        ];
+        expect(rolledOut(views).map((m) => m.key)).toEqual(["CRM"]);
+        expect(isHiddenByRollout({ key: "AUTOMATIONS", blockers: [] })).toBe(
+            true,
+        );
+    });
+});
