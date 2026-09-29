@@ -22,6 +22,29 @@ describe("toFailure", () => {
         });
     });
 
+    it("says which business details are missing (DEC-068)", () => {
+        expect(
+            toFailure(
+                {
+                    error: {
+                        code: "CONFLICT",
+                        message:
+                            "Add your registered address first. Every invoice prints it.",
+                        details: {
+                            reason: "BUSINESS_DETAILS_MISSING",
+                            missing: ["address"],
+                        },
+                    },
+                },
+                "Could not issue",
+            ),
+        ).toEqual({
+            ok: false,
+            error: "Add your registered address first. Every invoice prints it.",
+            missing: ["address"],
+        });
+    });
+
     it("keeps the message and sets no field when there are no details", () => {
         expect(
             toFailure({ error: { message: "Discount not found" } }, "x"),

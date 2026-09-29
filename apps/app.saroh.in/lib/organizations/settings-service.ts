@@ -139,6 +139,34 @@ export async function getOrganizationSettings(): Promise<OrganizationSettings | 
 }
 
 /**
+ * The settings read for a step outside Settings ("Add your business
+ * details", DEC-068), as a result rather than a throw: a role that may not
+ * read them (403) is told so in place, never sent to a forbidden page.
+ */
+export async function readOrganizationSettings(): Promise<
+    | { ok: true; data: OrganizationSettings }
+    | { ok: false; error: string; forbidden: boolean }
+> {
+    const base = await orgBase();
+    if (!base) {
+        return {
+            ok: false,
+            error: "No active organization.",
+            forbidden: false,
+        };
+    }
+    const res = await apiFetch(`${base}/settings`);
+    const data = (await res.json().catch(() => null)) as unknown;
+    if (!res.ok || !data) {
+        return {
+            ...toFailure(data, "Couldn't read your business details."),
+            forbidden: res.status === 403,
+        };
+    }
+    return { ok: true, data: data as OrganizationSettings };
+}
+
+/**
  * Apply a partial update. PATCH semantics all the way down: fields the caller
  * omits are left alone rather than blanked, so editing the name never clears
  * the tax id.

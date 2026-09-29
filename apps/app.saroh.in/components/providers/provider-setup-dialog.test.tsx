@@ -29,6 +29,12 @@ vi.mock("@/lib/providers/actions", () => ({
     disconnectCommsProvider: vi.fn(),
 }));
 
+// The business-details step (DEC-068) is pinned in its own test.
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    readBusinessDetails: vi.fn(),
+    saveOrganizationSettings: vi.fn(),
+}));
+
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh }),
