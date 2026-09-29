@@ -87,3 +87,29 @@ export function exemptNote(
         ? "Exempt from GST, so these are bills of supply, not tax invoices."
         : null;
 }
+
+/**
+ * What a line on the paper says about its GST (DEC-072): only where GST
+ * applies. The API's `lineGstNote` (`invoices/invoice-paper-view.ts`) says
+ * the same on the PDF.
+ *
+ * - No tax charged on the paper (an unregistered business's receipt, a
+ *   bill of supply): nothing, whatever the line holds.
+ * - A rate never set (null, like a plan renewal's line): nothing — not
+ *   "Nil-rated", not "0%". Not set is not a 0% supply.
+ * - A rate recorded as exactly 0: "Nil-rated".
+ * - Above 0: "GST 18% · taxable ₹2,400".
+ */
+export function lineGstNote(
+    taxed: boolean,
+    gst: { rate: string | null; taxableValue: string | null } | null,
+    money: (amount: string) => string,
+): string | null {
+    if (!taxed || gst?.rate == null || gst.rate.trim() === "") {
+        return null;
+    }
+    const rate = Number(gst.rate);
+    if (!Number.isFinite(rate)) return null;
+    if (rate === 0) return "Nil-rated";
+    return `GST ${rate}% · taxable ${money(gst.taxableValue ?? "0")}`;
+}

@@ -339,3 +339,40 @@ describe("the business logo on the PDF (real database)", () => {
         expect(textOf(file)).toContain("Rye & Co.");
     });
 });
+
+describe("DEC-072: a plan renewal's PDF shows no GST it does not charge (real database)", () => {
+    it("Rye's renewal, issued as the renewal job issues it: no rate, no Nil-rated", async () => {
+        const { id } = await prisma.$transaction((tx) =>
+            invoices.issueInTx(tx, rye.organizationId, {
+                contactId,
+                currency: "INR",
+                lines: [
+                    {
+                        description: "Bread club · Sep 2026",
+                        quantity: 1,
+                        unitPrice: "1200.00",
+                    },
+                ],
+                source: "SUBSCRIPTION",
+                createdByUserId: null,
+                issuedAt: new Date("2026-09-05T05:00:00Z"),
+            }),
+        );
+        // Stored as it is: a registered paper, its line's rate never set.
+        const line = await prisma.invoiceLine.findFirstOrThrow({
+            where: { invoiceId: id },
+            select: { gstRate: true, cgst: true, sgst: true },
+        });
+        expect(line.gstRate).toBeNull();
+        expect(Number(line.cgst)).toBe(0);
+        expect(Number(line.sgst)).toBe(0);
+
+        const text = textOf((await pdfs.render(rye, id)).file);
+        expect(text).toContain("Bread club · Sep 2026");
+        expect(text).toContain("TAX INVOICE");
+        expect(text).toContain(`GSTIN ${GSTIN}`);
+        expect(text).not.toContain("Nil-rated");
+        expect(text).not.toMatch(/GST \d/);
+        expect(text).not.toContain("0%");
+    });
+});

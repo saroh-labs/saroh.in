@@ -610,8 +610,8 @@ export function InvoiceForm({
                         </button>
                         {registered ? (
                             <p className="mt-1 text-[12px] text-muted-foreground">
-                                Prices include GST. A line with no rate is
-                                nil-rated (0%).
+                                Prices include GST. A line with no rate set is
+                                charged no GST.
                             </p>
                         ) : null}
                     </Card>

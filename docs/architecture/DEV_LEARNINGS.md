@@ -1048,6 +1048,7 @@ the API's sentence, else ours, else a plain line.
 module and fails when a code it can send has no merchant words, and scans
 the app for a blocker's `.code` rendered directly.
 **Category**: modules · copy · DEC-057
+
 ## E2E — a phone test said a dialog fit at 320px while its buttons were off the screen
 
 **Problem**: On a phone, "Link a commerce customer" put a long email on one
@@ -1100,3 +1101,22 @@ making a storefront) ships with its fixture, and the seed says what the
 check needs. `docs/patterns/backend-billing-and-classes.md` → Business
 details before money.
 **Category**: tests · seed · DEC-068
+
+## Invoices — a renewal line with no GST rate printed "Nil-rated" (DEC-072)
+
+**Problem**: Rye's plan renewal invoices, issued with `gstRate` null on a
+GST-registered business, read "Nil-rated" on every line in Invoice Detail's
+paper and in the PDF.
+**Root cause**: both papers tested the rate for truthiness
+(`l.gst?.rate ? … : "Nil-rated"`), so null and "not set" fell into the 0%
+branch. The title logic (D15, `isExemptRate`) already told null from 0; the
+line label did not.
+**Fix**: one rule, `lineGstNote`, in `invoices/invoice-paper-view.ts` (PDF)
+and the app's `lib/invoices/paper-title.ts` (paper): nothing when the paper
+charges no GST, nothing for a null rate, "Nil-rated" only for a rate of
+exactly 0. Tests pin null, 0 and above 0, registered and not, and a Rye
+renewal PDF against a real database.
+**Rule**: null is "not set", never 0 — test a rate with `== null` before
+reading it as a number. `docs/patterns/backend-billing-and-classes.md` → GST
+shows only when it applies.
+**Category**: invoices · GST · DEC-072

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     exemptNote,
     isExemptPaper,
+    lineGstNote,
     paperFooter,
     paperTitle,
 } from "./paper-title";
@@ -147,5 +148,33 @@ describe("exemptNote", () => {
         ).toBeNull();
         expect(exemptNote([paper({ status: "DRAFT" })])).toBeNull();
         expect(exemptNote([])).toBeNull();
+    });
+});
+
+describe("lineGstNote (DEC-072)", () => {
+    const money = (a: string) => `₹${Number(a).toLocaleString("en-IN")}`;
+    const at = (rate: string | null) => ({ rate, taxableValue: "2400.00" });
+
+    it("a registered paper: a rate above 0 names it and the taxable value", () => {
+        expect(lineGstNote(true, at("18.00"), money)).toBe(
+            "GST 18% · taxable ₹2,400",
+        );
+    });
+
+    it("a registered paper: only a rate recorded as 0 is nil-rated", () => {
+        expect(lineGstNote(true, at("0"), money)).toBe("Nil-rated");
+        expect(lineGstNote(true, at("0.00"), money)).toBe("Nil-rated");
+    });
+
+    it("a registered paper: a rate never set says nothing, not nil-rated or 0%", () => {
+        expect(lineGstNote(true, at(null), money)).toBeNull();
+        expect(lineGstNote(true, at(""), money)).toBeNull();
+        expect(lineGstNote(true, null, money)).toBeNull();
+    });
+
+    it("no tax on the paper (unregistered, bill of supply): nothing, whatever the rate", () => {
+        for (const rate of [null, "0", "18.00"]) {
+            expect(lineGstNote(false, at(rate), money)).toBeNull();
+        }
     });
 });

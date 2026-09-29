@@ -4,6 +4,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import {
     isExemptPaper,
+    lineGstNote,
     paperFooter,
     paperTitle,
 } from "@/lib/invoices/paper-title";
@@ -17,7 +18,8 @@ import type { InvoiceBusiness } from "@/lib/invoices/tax";
  * not frozen on issue: it is not a GST particular), legal name,
  * registered address (frozen on issue, like the GSTIN), GSTIN and state,
  * who it is billed to (with their GSTIN when they are registered), the place
- * of supply, HSN/SAC and rate on every line, taxable value and CGST + SGST
+ * of supply, HSN/SAC on every line and its rate where one is set (a rate
+ * never set says nothing, DEC-072), taxable value and CGST + SGST
  * or IGST — or a receipt for a business that is not registered. A
  * registered business's paper whose every line is exempt is a bill of
  * supply (D15): its GSTIN and SAC, and no place of supply or tax columns.
@@ -199,14 +201,9 @@ export function InvoicePaper({
                         <span className="text-right">Amount</span>
                     </div>
                     {(i.lines ?? []).map((l) => {
-                        const rate = l.gst?.rate ? Number(l.gst.rate) : null;
                         const discount = Number(l.discount ?? 0);
                         const sub = [
-                            taxed
-                                ? rate
-                                    ? `GST ${rate}% · taxable ${money(l.gst?.taxableValue ?? "0")}`
-                                    : "Nil-rated"
-                                : null,
+                            lineGstNote(Boolean(taxed), l.gst ?? null, money),
                             l.quantity > 1
                                 ? `${money(l.unitPrice)} each`
                                 : null,
