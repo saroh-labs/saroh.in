@@ -55,7 +55,8 @@ step typecheck pnpm run typecheck
 step routes pnpm run check:routes
 step blocks pnpm run check:blocks
 step cycles pnpm run check:cycles
-step api-unit pnpm --filter @saroh/api test:unit
+# As CI: unit tests mock the environment, so its zod check is skipped.
+step api-unit env SKIP_ENV_VALIDATION=1 pnpm --filter @saroh/api test:unit
 step app-vitest pnpm --filter application test
 step blocks-vitest pnpm --filter @saroh/site-blocks test
 step sites-vitest pnpm --filter sites test
