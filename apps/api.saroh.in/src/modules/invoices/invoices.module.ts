@@ -6,6 +6,7 @@ import { ACCOUNT_THREAD_POSTER } from "../communications/account-thread";
 import { CommunicationsModule } from "../communications/communications.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AccountThreadPosterService } from "../site-accounts/thread-poster";
+import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesController } from "./invoices.controller";
 import { InvoicesService } from "./invoices.service";
@@ -25,6 +26,7 @@ import { InvoicesService } from "./invoices.service";
     providers: [
         InvoicesService,
         InvoiceSendService,
+        InvoicePdfService,
         OrganizationGuard,
         // The account thread's poster (A13). Still offered only while the
         // ACCOUNT_THREAD flag is on, which it is not by default.

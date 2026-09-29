@@ -9,6 +9,7 @@ import {
     Patch,
     Post,
     Query,
+    StreamableFile,
     UseGuards,
 } from "@nestjs/common";
 
@@ -29,6 +30,7 @@ import {
     RecordPaymentDto,
     VoidInvoiceDto,
 } from "./dto";
+import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrl } from "./pay-link-url";
@@ -49,6 +51,7 @@ export class InvoicesController {
     constructor(
         private readonly invoices: InvoicesService,
         private readonly sending: InvoiceSendService,
+        private readonly pdfs: InvoicePdfService,
     ) {}
 
     @Get()
@@ -76,6 +79,24 @@ export class InvoicesController {
             ...invoice,
             ...(await this.sending.readFor(ctx.organizationId, id)),
         };
+    }
+
+    /**
+     * The issued paper as a PDF, named for its number (D16). Drawn on
+     * request and never stored; a draft is a 409.
+     */
+    @Get(":invoiceId/pdf")
+    @Header("Cache-Control", "no-store")
+    async pdf(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ): Promise<StreamableFile> {
+        const { file, fileName } = await this.pdfs.render(ctx, id);
+        return new StreamableFile(file, {
+            type: "application/pdf",
+            disposition: `attachment; filename="${fileName}"`,
+            length: file.length,
+        });
     }
 
     @Post()

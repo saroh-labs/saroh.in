@@ -255,7 +255,7 @@ No action is added or renamed in this plan.
 ### Deferred to Implementation
 
 - The exact Razorpay objects (Subscriptions vs recurring tokens per method) and their webhook event names: confirmed against the provider's docs and test mode in D11's spike, before D19 writes the adapter. Recorded in `backend-integrations.md`. The spike also answers how long a UPI Autopay charge stays unanswered after the pre-debit notice, which sets D13's retry spacing.
-- Which PDF library (pure JS, no native dependencies, fits the API image). Chosen in D16 by bundle size and Devanagari support (the latter needed later for Hindi).
+- Which PDF library (pure JS, no native dependencies, fits the API image). Chosen in D16 by bundle size and Devanagari support (the latter needed later for Hindi). **Resolved in D16:** pdfkit (pure JS, fontkit subsets embedded TrueType fonts) with Noto Sans Regular and Bold, OFL, committed in `apps/api.saroh.in/assets/fonts` — the standard PDF fonts have no ₹. Hindi adds Noto Sans Devanagari beside them.
 - Whether the draft module needs a per-record-type field allow-list or can read one from the DTO class. Decided in D5.
 - The retry spacing for an unanswered mandate charge (before the reconcile job exists).
 
