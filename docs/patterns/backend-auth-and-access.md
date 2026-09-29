@@ -165,7 +165,8 @@ what the API allows.
   `Membership` in the store's business, in the same transaction, in the
   narrow **"Storefront team"** role (key `storefront-team`: `org:read`,
   `member:read`, `module:read`, `media:read`, `store:read`,
-  `product-review:read` — no customers, bookings, orders or money), unless
+  `product-review:read`, and since DEC-074 `order:stage` for its own
+  storefronts — no customers, bookings or money), unless
   the person already holds a role, which is never lowered or replaced. The
   rule is `joinTeamFromStorefront` in `@saroh/database`
   (`backfill/store-members-to-memberships.ts`, shared with the one-off
@@ -176,6 +177,14 @@ what the API allows.
   their `StoreMembers` rows in that business's storefronts, in the removal's
   serializable transaction. What anyone does inside a storefront still comes
   from their storefront role.
+- **Current** (DEC-074) — **A location's team works only its storefronts'
+  orders.** Storefront team holds `order:stage` (migration
+  `20261019120000_storefront_team_orders` added it to existing roles), and
+  every order lookup spreads `orderLocationWhere(ctx)` /
+  `orderLocationSql` (`orders/order-location.ts`), keyed on the role, like
+  `reviewerScope`: another storefront's order is a 404 to read, and every
+  move asks `assertOrdersAtOwnLocation` (a 403). A new order read or move
+  spreads the same; Home, the calendar and New order alerts follow it.
 - **Current** — **The last OWNER cannot be demoted or removed.** The S1-006
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so
