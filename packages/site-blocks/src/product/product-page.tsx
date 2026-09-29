@@ -472,12 +472,17 @@ export default function ProductPage({
                         <fieldset className="mt-5">
                             <legend className="flex items-center gap-2 text-sm font-medium">
                                 <Marker n={3} show={markers} />
-                                {product.optionName ?? "Choose"}
-                                {variant ? (
-                                    <span className="text-site-muted font-normal">
-                                        : {variant.title}
-                                    </span>
-                                ) : null}
+                                {/* One run of text, so the gap between the
+                                    marker and the name never opens up
+                                    before the colon ("Size: Small"). */}
+                                <span>
+                                    {product.optionName ?? "Choose"}
+                                    {variant ? (
+                                        <span className="text-site-muted font-normal">
+                                            : {variant.title}
+                                        </span>
+                                    ) : null}
+                                </span>
                             </legend>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {product.variants.map((v) => (
