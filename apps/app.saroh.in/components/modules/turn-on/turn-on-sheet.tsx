@@ -231,6 +231,7 @@ function TurnOnBody({
                                             draft={draft}
                                             update={t.update}
                                             errors={errorsOf(k)}
+                                            suggestion={t.suggestion}
                                         />
                                     </Section>
                                 );

@@ -328,6 +328,29 @@ describe("Sell", () => {
 });
 
 describe("Website", () => {
+    it("offers the free address the API suggests for a taken one", async () => {
+        enableModuleAction.mockResolvedValueOnce({
+            ok: false,
+            error: "northwind.saroh.app belongs to another business",
+            fields: {
+                address: "northwind.saroh.app belongs to another business",
+            },
+            suggestion: "northwind-2",
+        });
+        await open(["WEBSITE"]);
+        await press(button(/^Turn on$/));
+        expect(text()).toContain(
+            "northwind.saroh.app belongs to another business",
+        );
+        act(() => button(/^Use northwind-2\.saroh\.app$/).click());
+        expect(byLabel("Web address").value).toBe("northwind-2");
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction).toHaveBeenLastCalledWith("WEBSITE", {
+            siteName: "Northwind",
+            address: "northwind-2",
+        });
+    });
+
     it("shows the address with its .saroh.app, and a taken one from the API beside it", async () => {
         enableModuleAction.mockResolvedValueOnce({
             ok: false,

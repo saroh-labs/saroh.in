@@ -16,7 +16,7 @@ import {
     turnedOnToast,
     turnOnPlan,
 } from "./turn-on";
-import { fieldErrorsOf, normalisePath } from "./turn-on-errors";
+import { fieldErrorsOf, normalisePath, suggestionOf } from "./turn-on-errors";
 import { decodeSetupDefaults, FALLBACK_SETUP } from "./turn-on-schema";
 
 const NEEDS: Record<string, string[]> = {
@@ -382,6 +382,25 @@ describe("the API's field errors (a 400 with field paths)", () => {
         ).toEqual({
             storefrontName: "setup.storefrontName should not be empty",
         });
+    });
+
+    it("reads the 409 for a taken address, and the free one it offers", () => {
+        const body = {
+            error: {
+                code: "CONFLICT",
+                message: "northwind.saroh.app belongs to another business",
+                details: {
+                    field: "setup.address",
+                    reason: "taken",
+                    suggestion: "northwind-2",
+                },
+            },
+        };
+        expect(fieldErrorsOf(body)).toEqual({
+            address: "northwind.saroh.app belongs to another business",
+        });
+        expect(suggestionOf(body)).toBe("northwind-2");
+        expect(suggestionOf({ error: { message: "No." } })).toBeNull();
     });
 
     it("finds nothing in a body with no fields", () => {

@@ -28,6 +28,7 @@ import {
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
 import type { SetupDefaults } from "@/lib/modules/turn-on-schema";
 import { decodeSetupDefaults } from "@/lib/modules/turn-on-schema";
+import type { EnableResult } from "@/lib/modules/turn-on-service";
 
 /**
  * The sheet's state: what it starts from (read from `setup-defaults` when it
@@ -52,6 +53,8 @@ export function useTurnOn({
         {},
     );
     const [failure, setFailure] = useState<string | null>(null);
+    // A free address the API offered for one that is taken (DEC-069).
+    const [suggestion, setSuggestion] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     // What is on already from an earlier press that stopped part-way: a
     // retry doesn't send it again.
@@ -131,29 +134,39 @@ export function useTurnOn({
         setSaving(true);
         for (const key of plan.order) {
             if (done.current.some((d) => d.key === key)) continue;
-            const res = await enableModuleAction(
+            const res: EnableResult = await enableModuleAction(
                 key,
                 setupFor(key, sent),
             ).catch(() => ({
                 ok: false as const,
                 error: "Saroh couldn't be reached. Try again.",
                 fields: {},
-                blockers: undefined,
             }));
             if (!res.ok) {
                 setSaving(false);
-                const drawn = Object.fromEntries(
-                    Object.entries(res.fields).filter(([p]) =>
-                        drawnField(key, p),
-                    ),
-                );
-                const loose = Object.entries(res.fields)
-                    .filter(([p]) => !drawnField(key, p))
-                    .map(([, said]) => said);
-                setErrors({ [key]: drawn });
+                // The website's address may be refused while Sell turns on,
+                // should the API make the site there (DEC-069): it still
+                // goes beside the address field.
+                const owner = (p: string) =>
+                    drawnField(key, p)
+                        ? key
+                        : plan.order.includes("WEBSITE") &&
+                            drawnField("WEBSITE", p)
+                          ? "WEBSITE"
+                          : null;
+                const next: Partial<Record<string, FieldErrors>> = {};
+                const loose: string[] = [];
+                for (const [p, said] of Object.entries(res.fields)) {
+                    const at = owner(p);
+                    if (at) next[at] = { ...(next[at] ?? {}), [p]: said };
+                    else loose.push(said);
+                }
+                const drawn = Object.values(next);
+                setErrors(next);
+                setSuggestion(res.suggestion ?? null);
                 const refused = res.blockers?.[0];
                 const why =
-                    Object.keys(drawn).length > 0 && loose.length === 0
+                    drawn.length > 0 && loose.length === 0
                         ? null
                         : refused
                           ? blockerSentence(refused)
@@ -194,6 +207,7 @@ export function useTurnOn({
         hidden,
         errors,
         failure,
+        suggestion,
         saving,
         update,
         submit,

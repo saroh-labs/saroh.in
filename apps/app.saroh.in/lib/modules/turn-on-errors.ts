@@ -1,5 +1,6 @@
 /**
- * The field errors a refused turn-on carries (DEC-068): a 400 names each
+ * The field errors a refused turn-on carries (DEC-068): a 400 (or the 409
+ * for a website address in use) names each
  * field of `setup` it is about, and the sheet puts the words beside that
  * field (`frontend-forms.md`). The API's exception filter forwards them as
  * `error.details`; this reads every shape it may take there, so the sheet
@@ -88,4 +89,22 @@ export function fieldErrorsOf(body: unknown): FieldErrors {
     }
     if (Array.isArray(inner.message)) fromItems(out, inner.message);
     return out;
+}
+
+/**
+ * The free address the API offers when the one asked for is taken
+ * (`details.suggestion` on its 409, DEC-069), or null.
+ */
+export function suggestionOf(body: unknown): string | null {
+    const b = (body ?? {}) as Record<string, unknown>;
+    const inner =
+        b.error && typeof b.error === "object"
+            ? (b.error as Record<string, unknown>)
+            : b;
+    const details = inner.details ?? b.details;
+    if (details && typeof details === "object" && !Array.isArray(details)) {
+        const said = (details as Record<string, unknown>).suggestion;
+        if (typeof said === "string" && said.trim()) return said.trim();
+    }
+    return null;
 }

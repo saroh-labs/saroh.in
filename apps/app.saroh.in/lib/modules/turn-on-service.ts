@@ -2,7 +2,7 @@ import { apiFetch, orgBase, readError } from "@/lib/api/http";
 
 import type { ModuleBlocker, ModuleView } from "./schema";
 import type { FieldErrors } from "./turn-on-errors";
-import { fieldErrorsOf } from "./turn-on-errors";
+import { fieldErrorsOf, suggestionOf } from "./turn-on-errors";
 import type { SetupDefaults } from "./turn-on-schema";
 import { decodeSetupDefaults, enableResponseSchema } from "./turn-on-schema";
 
@@ -26,6 +26,8 @@ export type EnableResult =
           /** Per field of `setup`, from a 400 (`hours.2.open`, `address`). */
           fields: FieldErrors;
           blockers?: ModuleBlocker[];
+          /** A free address, offered when the one asked for is taken. */
+          suggestion?: string;
       };
 
 /** What the sheet starts from for one module. Never throws. */
@@ -83,5 +85,6 @@ export async function enableModule(
         error: readError(body, "That couldn't be turned on. Try again."),
         fields: fieldErrorsOf(raw),
         blockers: body?.blockers,
+        suggestion: suggestionOf(raw) ?? undefined,
     };
 }

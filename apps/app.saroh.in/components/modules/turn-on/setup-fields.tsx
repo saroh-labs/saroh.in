@@ -150,10 +150,13 @@ export function WebsiteFields({
     draft,
     update,
     errors,
+    suggestion = null,
 }: {
     draft: TurnOnDraft;
     update: Update;
     errors: FieldErrors;
+    /** A free address the API offered for a taken one (DEC-069). */
+    suggestion?: string | null;
 }) {
     const id = useId();
     const w = draft.WEBSITE;
@@ -225,6 +228,21 @@ export function WebsiteFields({
                     </span>
                 </div>
             </Field>
+            {suggestion && suggestion !== w.address ? (
+                // The one asked for is taken: the API offers a free one.
+                <button
+                    type="button"
+                    onClick={() =>
+                        update((d) => ({
+                            ...d,
+                            WEBSITE: { ...d.WEBSITE, address: suggestion },
+                        }))
+                    }
+                    className="-mt-2 w-fit cursor-pointer rounded-sm text-left text-[12px] font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+                >
+                    Use {suggestion}.saroh.app
+                </button>
+            ) : null}
         </>
     );
 }
