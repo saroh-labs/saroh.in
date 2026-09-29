@@ -64,7 +64,9 @@ step sites-vitest pnpm --filter sites test
 if echo "$CHANGED" | grep -q "^packages/database/prisma/"; then
     case "${REPLAY_DATABASE_URL:-}" in
         *test*)
+            rdb=$(echo "$REPLAY_DATABASE_URL" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
             step db-replay env DATABASE_URL="$REPLAY_DATABASE_URL" \
+                DATABASE_TARGET_CONFIRM="$rdb" \
                 pnpm --filter @saroh/database db:verify:replay ;;
         *)
             echo "=== db-replay       SKIP — migrations changed: set REPLAY_DATABASE_URL to a throwaway *test* database"
