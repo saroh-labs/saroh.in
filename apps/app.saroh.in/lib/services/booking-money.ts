@@ -8,6 +8,8 @@
 
 import { formatMoney } from "@/lib/format/money";
 import type { resolveActiveOrganization } from "@/lib/organizations/service";
+import type { DeskTake } from "@/lib/services/desk-pay";
+import { methodWord } from "@/lib/services/desk-pay";
 
 /** A cancel's refund, as the provider has answered for it so far. */
 export interface BookingRefund {
@@ -42,6 +44,12 @@ export interface BookingMoney {
      * visit never refunds on its own. Absent from an API before E9.
      */
     treatmentOrderId?: string | null;
+    /** Taken at the desk and recorded (P2). Absent from an API before P2. */
+    paidAtDeskCents?: number;
+    /** How the last of it was taken: CASH, UPI, CARD… */
+    deskMethod?: string | null;
+    /** What "Take ₹X" takes now (P2); null when there's nothing to take. */
+    take?: DeskTake | null;
 }
 
 /** What a cancel did with money paid online (`DELETE bookings/:id`). */
@@ -76,26 +84,47 @@ export function canReadOrders(organization: Org): boolean {
         : organization?.role === "OWNER" || organization?.role === "ADMIN";
 }
 
+/**
+ * `booking:write` and `invoice:write`: may take payment at the desk (P2),
+ * the pair a booking's pay link needs too (permission matrix) — the
+ * booking is the desk's, the invoice it marks paid is paper.
+ */
+export function canTakeDeskPayments(organization: Org): boolean {
+    return organization?.actions
+        ? organization.actions.includes("booking:write") &&
+              organization.actions.includes("invoice:write")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+}
+
 const money = (cents: number, currency: string | null) =>
     formatMoney(cents, currency) ?? "";
 
 /**
  * The line under When: "Deposit ₹400 paid · ₹400 due at the visit",
- * "₹800 paid online", or "₹800 due at the visit". Null when there is
- * nothing to say (no price, a pack's class).
+ * "₹800 paid online", or "₹800 due at the visit" — and once the desk has
+ * taken it (P2), "₹800 paid at the desk · Cash" or "Deposit ₹400 paid ·
+ * ₹400 paid at the desk · Card". Null when there is nothing to say (no
+ * price, a pack's class).
  */
 export function paidLine(m: BookingMoney): string | null {
     const due =
         m.dueCents !== null && m.dueCents > 0
             ? `${money(m.dueCents, m.currency)} due at the visit`
             : null;
-    if (m.paidOnlineCents > 0) {
-        const paid = m.deposit
-            ? `Deposit ${money(m.paidOnlineCents, m.currency)} paid`
-            : `${money(m.paidOnlineCents, m.currency)} paid online`;
-        return due ? `${paid} · ${due}` : paid;
-    }
-    return due;
+    const deskCents = m.paidAtDeskCents ?? 0;
+    const word = methodWord(m.deskMethod);
+    const desk =
+        deskCents > 0
+            ? `${money(deskCents, m.currency)} paid at the desk${word ? ` · ${word}` : ""}`
+            : null;
+    const online =
+        m.paidOnlineCents > 0
+            ? m.deposit
+                ? `Deposit ${money(m.paidOnlineCents, m.currency)} paid`
+                : `${money(m.paidOnlineCents, m.currency)} paid online`
+            : null;
+    const parts = [online, desk, due].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
 }
 
 /** Where a cancel's refund stands, or null when there was none. */

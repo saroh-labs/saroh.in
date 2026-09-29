@@ -9,6 +9,7 @@ import { ClassWaitlist } from "@/components/bookings/class-waitlist";
 import { JoinOnline } from "@/components/bookings/join-online";
 import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
+import { TakePayment } from "@/components/bookings/take-payment";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { formatStatus } from "@/lib/format/status";
@@ -38,6 +39,7 @@ export function BookingDetailView({
     packs,
     canRefund = false,
     canReadOrder = false,
+    desk,
     waitlist,
 }: {
     booking: BookingDetail;
@@ -45,6 +47,11 @@ export function BookingDetailView({
     canRefund?: boolean;
     /** `order:read`: a treatment's visit links to its order (E9). */
     canReadOrder?: boolean;
+    /**
+     * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
+     * and whether a pay link can be sent (a provider connected).
+     */
+    desk?: { canTake: boolean; canLink: boolean };
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
     past: boolean;
     /**
@@ -198,6 +205,20 @@ export function BookingDetailView({
                                     {refund}
                                 </p>
                             ) : null}
+                        </div>
+                    ) : null}
+                    {/* "Take ₹X" (P2): what the desk takes now — the
+                        whole price, or what's left after a deposit. */}
+                    {booking.money?.take && desk?.canTake ? (
+                        <div className="mt-3">
+                            <TakePayment
+                                bookingId={booking.id}
+                                take={booking.money.take}
+                                currency={booking.money.currency}
+                                who={bookerLabel(booking)}
+                                canLink={desk.canLink}
+                                triggerClassName="h-9"
+                            />
                         </div>
                     ) : null}
                     {/* The deadline fixed at booking (DEC-051): moving the
@@ -360,6 +381,7 @@ function eventTitle(event: BookingEvent, timeZone: string): string {
     if (event.type === "CANCELLED") return "Cancelled";
     if (event.type === "ATTENDED") return "Marked as attended";
     if (event.type === "NO_SHOW") return "Marked as a no-show";
+    if (event.type === "PAID_AT_DESK") return "Paid at the desk";
     const from = event.fromStartAt
         ? shortTime(event.fromStartAt, timeZone)
         : null;
