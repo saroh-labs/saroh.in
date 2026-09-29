@@ -11,6 +11,7 @@ import {
     readModuleImpactAction,
     setModuleStatusAction,
 } from "@/lib/modules/actions";
+import { blockerSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleBlocker, ModuleView } from "@/lib/modules/schema";
 import {
     listWords,
@@ -112,8 +113,11 @@ function noteOf(modules: ModuleView[], module: ModuleView): string {
             ? `${listWords(rows)} in the rail.`
             : "Works in the background — no new menu item.");
     // "Needs Appointments." from the API's dependencies, not the copy, so
-    // it is said of every module that has one.
-    const needs = module.dependencies.map((d) => labelOf(modules, d));
+    // it is said of every module that has one — only the ones shown: a
+    // module Saroh hasn't rolled out is never named (DEC-057).
+    const needs = module.dependencies
+        .filter((d) => modules.some((m) => m.key === d))
+        .map((d) => labelOf(modules, d));
     return needs.length > 0 ? `${note} Needs ${listWords(needs)}.` : note;
 }
 
@@ -160,7 +164,9 @@ function ModuleRow({
     const label = labelOf(modules, module.key);
 
     // Off, and something it needs is off too: the switch waits for that.
-    const missing = on ? [] : missingDependencies(modules, module.key);
+    // Worked out over every module, so a hidden one that is on counts as on
+    // (a row that needs a hidden one that is off isn't shown, `rolledOut`).
+    const missing = on ? [] : missingDependencies(all, module.key);
     const blocked = missing.length > 0;
     const missingLabels = missing.map((k) => labelOf(modules, k));
     // On, and other modules need it: they go off with it, and every one is
@@ -175,8 +181,14 @@ function ModuleRow({
         navRowsForModule(k),
     );
     // The step the API says is left, for a module that is on.
+    // Setup still to do, or something that stopped: a gate that is shut
+    // (a role, a plan) is said by the tag and the switch, not as a step.
     const step =
-        on && module.readiness !== "ACTIVE" ? module.blockers[0] : undefined;
+        on &&
+        (module.readiness === "SETUP_REQUIRED" ||
+            module.readiness === "ATTENTION_REQUIRED")
+            ? module.blockers[0]
+            : undefined;
     const stepAction = step?.actionHref ? setupActionLabel(step.code) : null;
 
     /**
@@ -194,7 +206,10 @@ function ModuleRow({
                     // A refusal is the safe-guard talking (open orders, say).
                     // Say what it said — the switch springing back with no
                     // reason is the worst version of this.
-                    showError(result.blockers?.[0]?.message ?? result.error);
+                    const refused = result.blockers?.[0];
+                    showError(
+                        refused ? blockerSentence(refused) : result.error,
+                    );
                     return;
                 }
             }
@@ -312,7 +327,7 @@ function ModuleRow({
                         <p className="text-pretty text-[12.5px] leading-[1.45] text-foreground">
                             <strong>Turn off {label}?</strong>{" "}
                             {refusal
-                                ? refusals.map((r) => r.message).join(" ")
+                                ? refusals.map(blockerSentence).join(" ")
                                 : impact}
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -360,11 +375,11 @@ function ModuleRow({
                         Turn on {listWords([...missingLabels, label])}
                     </Button>
                 ) : null}
-                {step?.message ? (
+                {step ? (
                     <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
                         {/* The API's sentence, never its code (DEC-057). */}
                         <span className="text-[12.5px] text-foreground/80">
-                            {step.message}
+                            {blockerSentence(step)}
                         </span>
                         {stepAction && step.actionHref && module.canManage ? (
                             <Button asChild variant="outline" size="sm">

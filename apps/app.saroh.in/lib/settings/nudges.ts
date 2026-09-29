@@ -1,6 +1,9 @@
+import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
-import { rolledOut } from "@/lib/modules/switch-plan";
-import { businessTypeOf } from "@/lib/organizations/business-types";
+import {
+    BUSINESS_TYPE_ANCHOR,
+    businessTypeOf,
+} from "@/lib/organizations/business-types";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
@@ -71,7 +74,8 @@ function businessType(settings: Pick<OrganizationSettings, "profile">): Nudge {
         label: "Choose your business type",
         why: "Sole proprietor, partnership, LLP, private limited or another — set it before you go live.",
         cta: "Choose type",
-        href: business("identity"),
+        // Straight to the Type field, not the top of the tab.
+        href: `${business("identity")}#${BUSINESS_TYPE_ANCHOR}`,
         broken: false,
         left: businessTypeOf(settings.profile?.type) === "",
     };

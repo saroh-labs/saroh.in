@@ -502,7 +502,11 @@ export function CommandMenu({
                  * "GSTIN" goes to Business, on its tax tab.
                  */}
                 {(() => {
-                    const actor = { role, actions: permissions };
+                    const actor = {
+                        role,
+                        actions: permissions,
+                        modules: moduleKeys,
+                    };
                     const pages = settingsPagesFor(actor).filter(
                         (page) => matches("Settings") || matches(page.label),
                     );

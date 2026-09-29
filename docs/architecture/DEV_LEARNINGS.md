@@ -1028,3 +1028,22 @@ in that gap.
 or redirect, never read the page once and assert — assert through a
 web-first expectation or a poll, so a slow runner waits instead of failing.
 **Category**: e2e · `e2e/tests/four-scenes.spec.ts` · `.agents/skills/saroh-browser-tests/SKILL.md`
+## Modules — production showed `ROLLOUT_DISABLED` in Settings › Modules
+
+**Problem**: On a fresh production database every module's rollout flag was
+unset, and Settings › Modules listed each module with a raw
+`ROLLOUT_DISABLED` line under it. Other surfaces had the same hole in
+other shapes: onboarding and Home's first run offered modules Saroh hadn't
+rolled out, a hidden module's page said "turned off" with a button to a
+switch Settings no longer showed, and API refusals named `CLASS_PACKS`.
+**Root cause**: `GET /modules` lists every module, a dark one with a gate
+blocker that has no sentence; each screen filtered (or didn't) on its own,
+and a step with no message fell back to its code.
+**Fix**: DEC-057 is one function, `rolledOut` (`lib/modules/rollout.ts`),
+which every list goes through; a hidden module's route is a 404. Words for a
+blocker come only from `blockerSentence` (`lib/modules/blocker-copy.ts`):
+the API's sentence, else ours, else a plain line.
+**Guard**: `lib/modules/blocker-copy.test.ts` reads the API's capabilities
+module and fails when a code it can send has no merchant words, and scans
+the app for a blocker's `.code` rendered directly.
+**Category**: modules · copy · DEC-057

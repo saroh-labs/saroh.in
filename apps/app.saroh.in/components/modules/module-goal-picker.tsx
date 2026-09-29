@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { setModuleStatusAction } from "@/lib/modules/actions";
+import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 
 /**
@@ -112,9 +113,16 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
         [modules],
     );
 
+    /**
+     * Only what Saroh has rolled out to this business (DEC-057): the API
+     * lists every module, a dark one with ROLLOUT_DISABLED. The dependency
+     * walk below still reads every module, so a hidden one already on
+     * counts as on and is never named.
+     */
+    const shown = useMemo(() => rolledOutKeys(modules), [modules]);
     const available = useMemo(
-        () => GOALS.filter((g) => byKey.has(g.moduleKey)),
-        [byKey],
+        () => GOALS.filter((g) => shown.has(g.moduleKey)),
+        [shown],
     );
     /**
      * Only offer what this member is actually allowed to turn on. Rendering a
@@ -131,7 +139,11 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
         // question. Nothing is committed, so this is a suggestion the merchant
         // can undo in one click — not a default they are stuck with.
         const initial = new Set<string>();
-        if (byKey.has(RECOMMENDED_KEY) && !alreadyOn.has(RECOMMENDED_KEY)) {
+        if (
+            shown.has(RECOMMENDED_KEY) &&
+            !alreadyOn.has(RECOMMENDED_KEY) &&
+            byKey.get(RECOMMENDED_KEY)?.canManage
+        ) {
             initial.add(RECOMMENDED_KEY);
         }
         return initial;
@@ -297,7 +309,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                 </fieldset>
             ) : null}
 
-            {alreadyOn.size > 0 ? (
+            {available.some((g) => alreadyOn.has(g.moduleKey)) ? (
                 <div className="space-y-2">
                     <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Already on

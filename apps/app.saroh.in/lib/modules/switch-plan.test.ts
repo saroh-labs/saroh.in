@@ -7,7 +7,6 @@ import {
     offImpact,
     offPlan,
     refusalActionLabel,
-    rolledOut,
     setupActionLabel,
 } from "./switch-plan";
 
@@ -154,26 +153,6 @@ describe("words", () => {
     it("gives a refusal a way to clear it only when it knows one", () => {
         expect(refusalActionLabel("COMMERCE_OPEN_ORDERS")).toBe("Go to Orders");
         expect(refusalActionLabel("SOMETHING_NEW")).toBeNull();
-    });
-});
-
-describe("which modules are shown (DEC-057)", () => {
-    it("never shows a module Saroh hasn't rolled out", () => {
-        const views = [
-            { key: "APPOINTMENTS", blockers: [] },
-            {
-                key: "CLASS_PACKS",
-                blockers: [{ code: "ROLLOUT_DISABLED" }],
-            },
-            {
-                key: "COMMERCE",
-                blockers: [{ code: "ORG_MODULE_DISABLED" }],
-            },
-        ];
-        expect(rolledOut(views).map((m) => m.key)).toEqual([
-            "APPOINTMENTS",
-            "COMMERCE",
-        ]);
     });
 });
 

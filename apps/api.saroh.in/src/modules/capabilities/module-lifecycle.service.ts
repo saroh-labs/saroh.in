@@ -150,6 +150,16 @@ export class ModuleLifecycleService {
         // audit event).
         if ((await this.currentStatus(ctx, moduleKey)) === "ENABLED") return;
 
+        // Saroh hasn't rolled it out to this business (DEC-057): it is never
+        // shown, so it is never turned on — by the business or an operator,
+        // who meets the rules the owner does. The module's name, never the
+        // flag or a code.
+        if (!(await this.rolledOut(ctx, moduleKey))) {
+            throw new BadRequestException(
+                `${descriptor.label} isn't available for your business yet.`,
+            );
+        }
+
         // Hard dependencies must already be ENABLED.
         if (descriptor.dependencies.length > 0) {
             const deps = await this.db.organizationModule.findMany({
@@ -282,7 +292,10 @@ export class ModuleLifecycleService {
         if (blockers.length > 0) {
             throw new ConflictException({
                 error: "MODULE_DEACTIVATION_BLOCKED",
-                message: `Cannot disable ${moduleKey} yet.`,
+                // The module's name, never its key: this can reach a
+                // merchant when a refusal comes without its own sentence
+                // (DEC-057).
+                message: `${descriptor.label} can't be turned off yet.`,
                 blockers,
             });
         }
@@ -326,7 +339,7 @@ export class ModuleLifecycleService {
         moduleKey: ModuleKey,
     ): Promise<void> {
         authorize(ctx, "module:manage");
-        this.descriptor(moduleKey);
+        const { label } = this.descriptor(moduleKey);
 
         const installation = await this.db.organizationModule.findUnique({
             where: {
@@ -339,7 +352,7 @@ export class ModuleLifecycleService {
         });
         if (installation?.status === "ENABLED") {
             throw new ConflictException(
-                `Disable ${moduleKey} before archiving it.`,
+                `Turn ${label} off before archiving it.`,
             );
         }
 
@@ -377,7 +390,7 @@ export class ModuleLifecycleService {
         const descriptor = this.descriptor(moduleKey);
         if (!descriptor.projectSelectable) {
             throw new BadRequestException(
-                `${moduleKey} cannot be selected per Project.`,
+                `${descriptor.label} can't be chosen per project.`,
             );
         }
 
@@ -402,7 +415,7 @@ export class ModuleLifecycleService {
         });
         if (installation?.status !== "ENABLED") {
             throw new BadRequestException(
-                `Enable ${moduleKey} for the Organization before selecting it for a Project.`,
+                `Turn on ${descriptor.label} for the business before adding it to a project.`,
             );
         }
 
