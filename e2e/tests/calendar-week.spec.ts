@@ -244,3 +244,39 @@ test.describe("calendar orders for the kitchen (E20)", () => {
         ).toHaveCount(0);
     });
 });
+
+/**
+ * The month strip's Due counts from today, as the design shows, and what
+ * was due before today is Overdue (E23, DEC-067). Rye is only read.
+ */
+test.describe("calendar money: Due from today (E23)", () => {
+    test("Due is what's owed from today; Overdue shows only when something before today is", async ({
+        page,
+    }) => {
+        await signIn(page);
+        const today = istDay(0);
+        const from = `${today.slice(0, 7)}-01`;
+        const res = await page.request.get(
+            `${urls.API_URL}/organizations/${ORG}/calendar?from=${from}&to=${today}`,
+            { headers: { "x-organization-id": ORG, origin: urls.APP_URL } },
+        );
+        expect(res.ok()).toBe(true);
+        const month = (await res.json()) as {
+            money?: {
+                total: unknown;
+                entries: { date: string; due: number }[];
+            };
+        };
+        test.skip(!month.money?.total, "No money to read here.");
+        const overdue = (month.money?.entries ?? []).some(
+            (e) => e.due > 0 && e.date < today,
+        );
+
+        await page.goto("/calendar");
+        const strip = page.getByRole("group", { name: "This month's money" });
+        await expect(strip.getByRole("button", { name: /^Due/ })).toBeVisible();
+        await expect(
+            strip.getByRole("button", { name: /^Overdue/ }),
+        ).toHaveCount(overdue ? 1 : 0);
+    });
+});
