@@ -678,3 +678,35 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: a business's second storefront no longer starts at ORD-001. Some orders at a business with several storefronts change number once. A customer who quotes the old number is still found. Seeds align each business's counter with their fixtures.
 - **Rollout:** additive, so the API before P3 keeps working. Run the backfill after the migration, then again once the previous API image no longer serves: while it serves, it still numbers per storefront and can repeat a number. The new API steps past any number it took. **The contract step comes later:** a unique index on the business and number, added once the previous image is gone and the backfill's second run finds nothing. It is not added now because the previous image, running beside it or restored by a rollback, would fail every order at a business's second storefront.
 - Migration: `20261019100000_order_number_sequence`, additive: `OrderNumberSequence` (organizationId key, RLS, `org_isolation`) and `Order.renumberedFrom` (nullable).
+
+## DEC-067 Round 2's open questions, settled
+
+**Status: Accepted — 2026-09-29** · user ("go with your recommendations for all the decisions") · round-2 audit
+
+- Context: the round-2 audit (2026-09-29) listed product questions left open by units B5–F18. The user accepted each recommendation below as written.
+- **B5 (Orders on a phone):** Orders gets a Filters button that opens a sheet, and a row opens a quick-view sheet, instead of the stacked selects and the full page. Neither is in the design: this is a recorded deviation, following the desk quick view's content.
+- **B6:** build the design's bulk "Print tickets (N)".
+- **B9:** a cancel is done when the provider accepts the refund. The refund line reads "Refund on its way" until the webhook confirms it; a refund the provider later fails becomes a Needs attention row (DEC-026: an unsure answer holds the money).
+- **B11:** paying at the counter voids the order's outstanding pay link, so nobody can pay twice.
+- **B14:** build "Next ‹date›" on the Orders row for appointment orders.
+- **B15:** the tag reads "Sesame", as the design shows, with the accessible name "Allergy: Sesame".
+- **C7:** keep the Packs tab on Customer Detail; it shows only when Class packs is on.
+- **C14:** hand-added customers are listed, marked "Added by hand".
+- **D16:** Download PDF shows on every issued invoice, due and overdue included; a merchant sends an invoice before it is paid.
+- **E6 (DEC-052):** half-hour starts apply to one-to-one services only.
+- **E8:** confirmed as superseded by DEC-058: a refund is never more than what was received.
+- **E20:** the calendar shows orders to anyone who can stage them (`order:stage`, e.g. Members), without money.
+- **E23:** Due counts from today, as the design shows; unpaid days before today count as Overdue.
+- **F2:** a low-star review is 3 stars or fewer.
+- **F11:** takings follow `payment:read` alone.
+- **F13:** switching a module off never switches off another one without naming it in the confirmation.
+- **F17:** a Reviewer gets no extra permissions.
+- **F18:** the current Member role stays at launch; the default bundles wait for the permission matrix answers.
+- **Cashfree:** UPI and card only, for now.
+- **Flags:** switch on in this order, each after its browser specs pass on development and a check on Northwind in production:
+    1. `MODULE_CLASS_PACKS` with the next release.
+    2. `SITE_SHOP` after `site-shop.spec.ts` and the Razorpay test-mode run.
+    3. `SITE_ACCOUNT_AREA` after `site-account.spec.ts`.
+    4. `ACCOUNT_THREAD` once A13 and A14 are live.
+- **Brand v2** (H2–H11) starts after the launch-readiness work, with the plan's default pairings and palettes.
+- Consequences: B5, B6, B11, B14, B15, E20, E23 and F13 need code; the rest are recorded behaviour. DEC-052 is amended by the E6 line above.
