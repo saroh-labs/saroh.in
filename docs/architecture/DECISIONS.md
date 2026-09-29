@@ -710,3 +710,32 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     4. `ACCOUNT_THREAD` once A13 and A14 are live.
 - **Brand v2** (H2–H11) starts after the launch-readiness work, with the plan's default pairings and palettes.
 - Consequences: B5, B6, B11, B14, B15, E20, E23 and F13 need code; the rest are recorded behaviour. DEC-052 is amended by the E6 line above.
+
+## DEC-068 Turning a module on asks for its minimum first
+
+**Status: Accepted — 2026-09-29** · user · launch readiness
+
+- Context: today a module switches on at once and works out its readiness afterwards, so a merchant meets what is missing only when it fails in use ("No connected payment provider…"). Four entry points (Settings › Modules, Home's first run, `/onboarding/modules`, "Also sell") each behave differently, and some can enable a module Saroh hasn't rolled out.
+- Decision:
+    - **One "Turn on" sheet, used from every entry point.** It names what comes with the module, including the modules it needs, and asks only the minimum that makes it work.
+    - **The module switches on when that minimum is saved.** Everything else is "Finish setup", and the merchant lands on the module's first screen with the next step shown.
+    - **Sensible defaults are created and shown in the sheet, editable before saving:**
+
+        | Module         | Asked at turn-on (default)                                                 | Later ("Finish setup")          |
+        | -------------- | -------------------------------------------------------------------------- | ------------------------------- |
+        | Sell           | storefront name (the business name), how orders leave (Pick-up / Delivery) | first product, payment provider |
+        | Bookings       | opening hours (Mon–Sat 10–7), first service (name, duration, price)        | staff, deposits                 |
+        | Class packs    | (Bookings first)                                                           | first pack                      |
+        | Payments       | connect Razorpay now, or later (online payment stays off until connected)  | —                               |
+        | Contacts       | nothing: a default pipeline is created                                     | —                               |
+        | Website        | site name and address (`<name>.saroh.app`); a starter site is made         | publish                         |
+        | Communications | connect email now, or later                                                | —                               |
+        | Insights       | nothing                                                                    | —                               |
+
+    - **The registered address and GST details are asked before the first invoice or the first online payment**, where they matter, and on the take-money checklist. Turning a module on doesn't ask for them.
+    - **Automations is hidden until it has a screen**, the same way DEC-057 treats rollout.
+    - The API refuses to enable a module whose rollout is off, in merchant copy (DEC-057).
+- Consequences:
+    - Enable gains a setup payload per module, validated by the API. The minimum and the switch are saved in one transaction.
+    - Readiness still comes from the data. A module saved with its minimum is ACTIVE, or it shows its remaining "Finish setup" items.
+    - Existing businesses keep their modules as they are.
