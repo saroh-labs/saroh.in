@@ -359,5 +359,8 @@ export {
 export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
+// A module page's title and lead (DEC-073 #9).
+export { ModulePageTop, modulePageTopOf } from "./module-page-top";
+export type { ModulePageTopContent } from "./module-page-top";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";

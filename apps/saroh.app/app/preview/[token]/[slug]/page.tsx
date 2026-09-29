@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
 import { PreviewGone } from "@/components/preview-gone";
-import { ModulePageUnavailable, PageSections } from "@saroh/site-blocks";
+import {
+    modulePageTopOf,
+    ModulePageUnavailable,
+    PageSections,
+} from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
 import { moduleOff } from "@/lib/module-pages";
@@ -79,6 +83,7 @@ export default async function PreviewPage({
     return (
         <PageSections
             sections={page.sections}
+            top={modulePageTopOf(page)}
             apiUrl={publicApiUrl()}
             siteId={preview.siteId}
             journal={journal}

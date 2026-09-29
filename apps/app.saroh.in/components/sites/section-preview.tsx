@@ -2,10 +2,12 @@
 
 import { pagePathResolver, toRendered } from "@saroh/block-contract";
 import type {
+    ModulePageTopContent,
     Section as RenderedSection,
     SiteFooterContent,
 } from "@saroh/site-blocks";
 import {
+    ModulePageTop,
     PageSections,
     SiteFooter,
     SiteHeader,
@@ -94,7 +96,14 @@ export function DraftPreview({
     siteId,
     onOpenPage,
     onFormBlocked,
+    top = null,
 }: {
+    /**
+     * A module page's title (DEC-073 #9), drawn above its blocks as the
+     * live site draws it; its rich-text intro then lines up with the cards.
+     * Null on a free-form page.
+     */
+    top?: ModulePageTopContent | null;
     /**
      * The site being drawn, so blocks that read live data (Visit us, G8)
      * show the real values on the canvas. Omitted, they say where the real
@@ -218,6 +227,7 @@ export function DraftPreview({
                         // same place as the site it is drawing; unset, the
                         // block's own default (production) applies.
                         apiUrl={env.NEXT_PUBLIC_API_URL}
+                        modulePage={top !== null}
                     />
                 );
                 if (!editing) return <div key={index}>{rendered}</div>;
@@ -322,6 +332,7 @@ export function DraftPreview({
             ) : (
                 header
             )}
+            {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
             <div className="space-y-4 p-[var(--site-page-margin)]">{page}</div>
             {footer && editing && onSelectChrome ? (
                 <CanvasBlock

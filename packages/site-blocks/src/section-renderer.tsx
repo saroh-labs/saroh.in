@@ -38,6 +38,8 @@ import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 import VisitUsSection from "./blocks/visit-us";
+import type { ModulePageTopContent } from "./module-page-top";
+import { ModulePageTop } from "./module-page-top";
 import type { PricesActions } from "./prices/api";
 
 /**
@@ -78,8 +80,14 @@ export default function SectionRenderer({
     prices,
     thread,
     productGrid,
+    modulePage = false,
 }: {
     section: Section;
+    /**
+     * The section is on a module page (DEC-073 #9): a rich-text intro lines
+     * up with the cards rather than sitting in the centred reading column.
+     */
+    modulePage?: boolean;
     /**
      * Base URL of the public API, for the blocks that talk to it. Optional:
      * each defaults to production, which is what the app-level env fallback did
@@ -143,6 +151,7 @@ export default function SectionRenderer({
             return (
                 <RichTextSection
                     content={section.content as RenderedRichText}
+                    align={modulePage ? "cards" : "column"}
                 />
             );
         case "cta":
@@ -286,8 +295,23 @@ export function PageSections({
     prices,
     thread,
     productGrids,
+    top = null,
+    modulePage = top !== null,
 }: {
     sections: Section[];
+    /**
+     * A module page's title (and lead), drawn above its sections (DEC-073
+     * #9), as the design's Book, Prices and Shop pages open. The first
+     * section then starts close under it, as the design's list does,
+     * instead of a whole section's padding below.
+     */
+    top?: ModulePageTopContent | null;
+    /**
+     * Lay the sections out as a module page's (a rich-text intro on the
+     * cards' line) without drawing the top: the editor's canvas draws each
+     * section on its own and the top once above them. Follows `top`.
+     */
+    modulePage?: boolean;
     /** Passed through to the blocks that talk to the public API. */
     apiUrl?: string;
     /** The site's booking page (U19), linked from services; live sites only. */
@@ -312,8 +336,11 @@ export function PageSections({
 }) {
     return (
         <>
+            {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
             {sections.map((section, i) => {
                 const style = paddingOverride(section.content);
+                // Close under the page's title, not a section's padding away.
+                const className = top && i === 0 ? "[&>*]:!pt-5" : undefined;
                 const rendered = (
                     <SectionRenderer
                         section={section}
@@ -326,12 +353,11 @@ export function PageSections({
                         prices={prices}
                         thread={thread}
                         productGrid={productGrids?.[i]}
+                        modulePage={modulePage}
                     />
                 );
-                return style === undefined ? (
-                    <div key={i}>{rendered}</div>
-                ) : (
-                    <div key={i} style={style}>
+                return (
+                    <div key={i} className={className} style={style}>
                         {rendered}
                     </div>
                 );

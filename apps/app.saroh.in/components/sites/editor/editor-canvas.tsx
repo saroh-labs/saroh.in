@@ -1,5 +1,6 @@
 "use client";
 
+import { modulePageTopOf } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import type { RefObject, UIEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -313,6 +314,9 @@ export function EditorCanvas({
                         siteAddress={address}
                         sections={sections}
                         pages={pages}
+                        top={modulePageTopOf(
+                            pages.find((p) => p.id === pageId) ?? {},
+                        )}
                         style={style}
                         styleOptions={styleOptions}
                         chrome={canvasChrome}
