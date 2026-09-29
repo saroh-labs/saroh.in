@@ -6,14 +6,10 @@ import type { RenderedVisitUs } from "@saroh/block-contract";
 import { ctaHref } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
-import type { OpeningHoursDay } from "../lib/opening-hours";
-import {
-    isOpeningWeek,
-    openState,
-    openStateText,
-    weekSummary,
-} from "../lib/opening-hours";
+import { openState, openStateText, weekSummary } from "../lib/opening-hours";
 import { phoneText } from "../lib/phone";
+import type { PublicVisit } from "../lib/public-visit";
+import { isPublicVisit } from "../lib/public-visit";
 import { cn } from "../lib/utils";
 
 /**
@@ -42,41 +38,8 @@ import { cn } from "../lib/utils";
  * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
  */
 
-/** A place as the public visit read returns it (G8). */
-export interface PublicVisit {
-    /** `storefront` — a SHOP; `business` — the profile fallback (E6). */
-    source: "storefront" | "business";
-    storeId: string | null;
-    name: string;
-    address: string | null;
-    phone: string | null;
-    hours: OpeningHoursDay[] | null;
-    /** The business's zone (DEC-033); India when none is set. */
-    timezone: string;
-    /**
-     * Days (`YYYY-MM-DD` in the zone) the business is closed for the whole
-     * of its hours (E3) — the list the hero's line reads (review G-2).
-     * Optional: an API from before it read as no closures.
-     */
-    closedDates?: string[];
-}
-
-export function isPublicVisit(value: unknown): value is PublicVisit {
-    if (typeof value !== "object" || value === null) return false;
-    const v = value as Record<string, unknown>;
-    return (
-        (v.source === "storefront" || v.source === "business") &&
-        (v.storeId === null || typeof v.storeId === "string") &&
-        typeof v.name === "string" &&
-        (v.address === null || typeof v.address === "string") &&
-        (v.phone === null || typeof v.phone === "string") &&
-        (v.hours === null || isOpeningWeek(v.hours)) &&
-        typeof v.timezone === "string" &&
-        (v.closedDates === undefined ||
-            (Array.isArray(v.closedDates) &&
-                v.closedDates.every((d) => typeof d === "string")))
-    );
-}
+export { isPublicVisit } from "../lib/public-visit";
+export type { PublicVisit } from "../lib/public-visit";
 
 /** What the card says when the merchant left the title empty. */
 export const VISIT_US_TITLE = "Come and see us";
