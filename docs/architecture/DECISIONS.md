@@ -828,3 +828,40 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - A setting on the site.
     - Shop, booking and checkout routes in test mode, with writes refused.
     - Things that don't go through a publish stay live and outside test releases: products, prices, stock, plans and packs (they have their own publish), hours, "Sells from", posts and modules. The test release says so.
+
+## DEC-073 Round-2 design deviations, settled
+
+**Status: Accepted — 2026-09-29** · user ("go with your recommendations for the deviations") · the round-2 check against the designs
+
+- Context: the check compared every round-2 screen with its `.dc.html` design. Most mismatches were fixed on the spot. These are the ones where the build differs on purpose, or where a fix needed a call.
+- **Kept as built:**
+    - **Payments:**
+        - the Plan Editor says "Invoiced each month with a pay link", not "by UPI Autopay or card", following D14's rule that copy is honest;
+        - Publish sits in a bottom bar on a phone (D6);
+        - "Subscribe someone" is in the header;
+        - the failed-renewals banner says only what the product does ("isn't paid and needs you");
+        - Invoice Detail offers "Copy pay link" and has no pay-link box;
+        - PDF dates carry the year;
+        - the phone gutter is 16px, from the shared PageContainer.
+    - **Orders:**
+        - the phone header's actions wrap under the title (the shared PageHeader, the same on every screen);
+        - New order's customer step is the shared picker with recent customers and Walk-in (B13/E4);
+        - the row menu follows B5;
+        - Storefront Settings has no design, and DEC-069 reworks it into Locations.
+    - **Customers:**
+        - the phone list stacks rows and scrolls its chips;
+        - Import and Add customer sit in the header (DEC-056/C14);
+        - Overview's Needs attention card and the "Average order" tile stay;
+        - the Spent note says what's true ("₹x still owed" / "Including delivery");
+        - the offers wording stays honest ("Nothing recorded yet"), since customers aren't always asked at checkout;
+        - the merge dialog keeps its Stays row, close X and counts;
+        - removal asks for the name, as the design does;
+        - C15's copy is accepted.
+    - **GST:** see DEC-072. A rate shows only when one applies.
+- **Fixed to match the design, or to correct a small error:**
+    1. Order Detail's customer card reads "Needs attention: Sesame", since the card covers every kind of entry, not just allergies.
+    2. A treatment order shows Needs attention in the customer card as well as the Visits card.
+    3. The Orders quick view's close is a plain X, and the customer's name is a Saffron link.
+    4. "They asked to stop" shows only when they did ask.
+    5. A customer added by hand shows their saved address on Overview before they have an order.
+    6. C12's booking-note card uses the customer's full name, and names the roles that can see a sensitive note.
