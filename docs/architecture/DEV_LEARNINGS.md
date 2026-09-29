@@ -771,3 +771,22 @@ branch history. Internal material — prices, plan limits, anything the user
 calls internal — lives outside the repo (the user names where). Before a
 push, read the file list of what is going up.
 **Category**: repo · `AGENTS.md` → Rules that bite
+
+## Plans — a unit's named work shipped as a "Not done here" note (D13, D14)
+
+**Problem**: The round-2 audit found three things the payments plan named
+missing from production-bound code: D13's Plan Editor warning ("Autopay
+covers up to ₹X; N members will need to authorise again", its exact copy in
+the unit's Files list), Home's "Send a set-up link" on an "Autopay limit too
+low" row, and a notice to the customer when staff cancel their autopay. A
+price rise quietly produced MANDATE_LIMIT_LOW renewals.
+**Root cause**: The units shipped without them and said so only in prose —
+D14's rollout section ("Not done here: …"). Nothing tracked prose, so the
+gap surfaced only when someone read the plan against the code.
+**Fix**: Built on `r2/fix-pay` (the Plan Editor's `autopayLimits`, Home's
+row `link`, `AUTOPAY_CANCELLED`). Rule: anything a unit's plan names that
+the unit doesn't build goes in the waves plan's follow-up table with an ID
+(as DEC-063's checkout block went in as Z8), never only in a rollout note.
+Before calling a unit done, search the code for each copy string its plan
+quotes.
+**Category**: plans · `docs/plans/2026-09-28-001-round-2-phase-2-waves-plan.md` → Deferred to follow-up work
