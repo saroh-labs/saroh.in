@@ -5,7 +5,8 @@ import "reflect-metadata";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
-import { RefundOrderDto } from "./dto";
+import { ConnectProviderDto, RefundOrderDto } from "./dto";
+import { WEBHOOK_SECRET_REQUIRED } from "./webhook-secret";
 
 async function refused(body: unknown): Promise<string[]> {
     return (await validate(plainToInstance(RefundOrderDto, body)))
@@ -60,5 +61,51 @@ describe("another amount (kind goodwill)", () => {
 
     it("refuses an unknown kind", async () => {
         expect(await refused({ kind: "gift" })).toEqual(["kind"]);
+    });
+});
+
+describe("connecting a provider needs its webhook signing secret (DEC-063)", () => {
+    async function errors(body: unknown) {
+        const found = await validate(plainToInstance(ConnectProviderDto, body));
+        return found.map((e) => ({
+            property: e.property,
+            messages: Object.values(e.constraints ?? {}),
+        }));
+    }
+    const razorpay = {
+        provider: "razorpay",
+        keyId: "rzp_live_AbC123",
+        keySecret: "super-secret-value",
+    };
+
+    it("refuses Razorpay without one, or with a blank one, in words a merchant can act on", async () => {
+        for (const webhookSecret of [undefined, "", "   "]) {
+            const found = await errors({ ...razorpay, webhookSecret });
+            expect(found.map((e) => e.property)).toEqual(["webhookSecret"]);
+            expect(found[0].messages).toContain(WEBHOOK_SECRET_REQUIRED);
+        }
+        expect(WEBHOOK_SECRET_REQUIRED).toMatch(/Razorpay › Webhooks/);
+    });
+
+    it("takes Razorpay with one, trimmed", async () => {
+        expect(
+            await errors({ ...razorpay, webhookSecret: "whsec_value" }),
+        ).toEqual([]);
+        const dto = plainToInstance(ConnectProviderDto, {
+            ...razorpay,
+            webhookSecret: "  whsec_value  ",
+        });
+        expect(dto.webhookSecret).toBe("whsec_value");
+    });
+
+    it("leaves Cashfree's optional — it signs with the key secret", async () => {
+        const cashfree = {
+            provider: "CASHFREE",
+            keyId: "TEST1234app",
+            keySecret: "cfsk_secret",
+        };
+        expect(await errors(cashfree)).toEqual([]);
+        expect(await errors({ ...cashfree, webhookSecret: "" })).toEqual([]);
+        expect(await errors({ ...cashfree, webhookSecret: "w" })).toEqual([]);
     });
 });

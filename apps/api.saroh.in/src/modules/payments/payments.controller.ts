@@ -56,6 +56,16 @@ export class PaymentsController {
         return this.payments.listProviders(ctx);
     }
 
+    /**
+     * Each provider's webhook for setup (DEC-063): the address to register,
+     * the events to tick, and when a payment update last arrived. A literal
+     * path, declared before any `payment-providers/:provider` read.
+     */
+    @Get("payment-providers/webhooks")
+    webhooks(@OrgContext() ctx: OrganizationContext) {
+        return this.payments.webhookSetup(ctx);
+    }
+
     @Delete("payment-providers/:provider")
     @RequireModule("PAYMENTS")
     disconnect(

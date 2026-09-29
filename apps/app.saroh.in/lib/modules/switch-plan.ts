@@ -126,6 +126,7 @@ const SETUP_ACTION: Record<string, string> = {
     COMMERCE_NO_CATALOG: "Add a product",
     PAYMENTS_NO_PROVIDER: "Connect a provider",
     PAYMENTS_PROVIDER_DISABLED: "Go to Providers",
+    PAYMENTS_WEBHOOK_SECRET_MISSING: "Add webhook secret",
     COMMUNICATIONS_NO_PROVIDER: "Connect a provider",
     COMMUNICATIONS_PROVIDER_DISABLED: "Go to Providers",
 };

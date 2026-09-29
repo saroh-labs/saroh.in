@@ -41,6 +41,7 @@ jest.mock("@saroh/database", () => {
         orderEvent: { create: jest.fn() },
         order: { findUnique: jest.fn() },
         storeSettings: { findUnique: jest.fn() },
+        webhookEvent: { findFirst: jest.fn() },
         $queryRaw: jest.fn(),
     };
     return {
@@ -172,6 +173,8 @@ describe("PaymentsService.connectProvider", () => {
             provider: "RAZORPAY",
             status: "CONNECTED",
             publicKey: "rzp_test_Key123",
+            // Saved without one: the list flags it (DEC-063).
+            webhookSecretMissing: true,
             createdAt: expect.any(Date),
             updatedAt: expect.any(Date),
         });
@@ -581,6 +584,82 @@ describe("PaymentsService.getWebhookSecret", () => {
         await expect(
             service.getWebhookSecret("org_1", "RAZORPAY"),
         ).resolves.toBeNull();
+    });
+
+    it("verifies Cashfree with its key secret when no webhook secret was saved (DEC-063)", async () => {
+        // Cashfree signs webhooks with the client secret, so a connection
+        // without a separate one must still verify — it used to refuse
+        // every Cashfree delivery.
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(
+            connectedRow({
+                provider: "CASHFREE",
+                keyId: "TEST1234app",
+                keySecret: "cf-client-secret",
+            }),
+        );
+        await expect(
+            service.getWebhookSecret("org_1", "cashfree"),
+        ).resolves.toBe("cf-client-secret");
+    });
+});
+
+describe("PaymentsService — a connection's webhook secret (DEC-063)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("lists a Razorpay connection saved without one as missing it, and says nothing secret", async () => {
+        const { service } = makeService();
+        const withSecret = (() => {
+            const sealed = encryptSecret(
+                JSON.stringify({
+                    keyId: "rzp_live_New",
+                    keySecret: "super-secret-value",
+                    webhookSecret: "whsec_value",
+                }),
+            );
+            return {
+                ...connectedRow({ keyId: "rzp_live_New" }),
+                id: "mpp_2",
+                encryptedCredentials: sealed.ciphertext,
+                credentialsIv: sealed.iv,
+                credentialsAuthTag: sealed.authTag,
+            };
+        })();
+        providerFindMany.mockResolvedValue([
+            connectedRow(),
+            withSecret,
+            connectedRow({ provider: "CASHFREE" }),
+        ]);
+
+        const rows = await service.listProviders(ctx());
+
+        expect(rows.map((r) => r.webhookSecretMissing)).toEqual([
+            true,
+            false,
+            false,
+        ]);
+        const json = JSON.stringify(rows);
+        expect(json).not.toContain("whsec_value");
+        expect(json).not.toContain("super-secret-value");
+    });
+
+    it("reads the webhook setup as payment:read, scoped to the caller's business", async () => {
+        const { service } = makeService();
+        const findFirst = prisma.webhookEvent.findFirst as jest.Mock;
+        findFirst.mockResolvedValue(null);
+
+        const setup = await service.webhookSetup(ctx());
+
+        expect(setup.map((s) => s.provider)).toEqual(["RAZORPAY", "CASHFREE"]);
+        expect(setup[0].url).toMatch(/\/public\/webhooks\/razorpay\/org_1$/);
+        expect(setup[0].secretRequired).toBe(true);
+        expect(setup[1].secretRequired).toBe(false);
+        for (const call of findFirst.mock.calls) {
+            expect(call[0].where.organizationId).toBe("org_1");
+        }
+        await expect(
+            service.webhookSetup(ctx({ role: "MEMBER" })),
+        ).rejects.toBeInstanceOf(ForbiddenException);
     });
 });
 

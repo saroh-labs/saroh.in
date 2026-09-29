@@ -22,6 +22,7 @@ import type {
 import type {
     ConnectedCommsProvider,
     ConnectedPaymentProvider,
+    PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
 import { ProviderSetupDialog } from "./provider-setup-dialog";
@@ -80,10 +81,13 @@ export function ProviderRowView({
     entry,
     payments,
     messaging,
+    webhooks,
 }: {
     entry: ProviderEntry;
     payments: ConnectedPaymentProvider[];
     messaging: ConnectedCommsProvider[];
+    /** Each payment provider's webhook, for setup; `null` when unread. */
+    webhooks: PaymentWebhookSetup[] | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -105,6 +109,7 @@ export function ProviderRowView({
                 urgent={urgent}
                 provider={entry.setup.provider}
                 connected={payments}
+                webhooks={webhooks}
             />
         ) : (
             <ProviderSetupDialog
@@ -159,6 +164,11 @@ export function ProviderRowView({
                                 {entry.note}
                             </p>
                         ) : null}
+                        {entry.update ? (
+                            <p className="mt-0.5 text-pretty text-[12px] leading-[1.45] text-muted-foreground">
+                                {entry.update}
+                            </p>
+                        ) : null}
                     </div>
                     <span className="hidden w-20 shrink-0 pt-2 text-[12.5px] text-muted-foreground min-[760px]:block">
                         {entry.type}
@@ -175,7 +185,9 @@ export function ProviderRowView({
                         : null}
                     {/* The one thing this row needs, so the one solid
                         button on it. */}
-                    {attention ? setupDialog("Add key id", true) : null}
+                    {attention
+                        ? setupDialog(entry.fix ?? "Enter keys again", true)
+                        : null}
                     {entry.manageHref ? (
                         <Button asChild variant="outline" size="sm">
                             <a

@@ -45,6 +45,10 @@ import {
     RefundCallError,
 } from "./providers/provider.port";
 import { needsPublicKey, publicKeyFor } from "./public-key";
+import type { SealedCredentials } from "./webhook-secret";
+import { webhookSecretFrom } from "./webhook-secret";
+import type { WebhookSetup } from "./webhook-setup";
+import { lacksWebhookSecret, readWebhookSetup } from "./webhook-setup";
 
 /** Validated input for {@link PaymentsService.connectProvider}. */
 export interface ConnectProviderInput {
@@ -52,7 +56,10 @@ export interface ConnectProviderInput {
     publicKey?: string;
     keyId: string;
     keySecret: string;
-    /** Optional webhook signing secret (S5-003) — sealed, never echoed. */
+    /**
+     * Webhook signing secret (S5-003) — sealed, never echoed. Required for
+     * Razorpay at the HTTP boundary (`ConnectProviderDto`, DEC-063).
+     */
     webhookSecret?: string;
 }
 
@@ -274,6 +281,12 @@ export interface RedactedProvider {
     provider: string;
     status: string;
     publicKey: string | null;
+    /**
+     * Saved without the webhook signing secret its provider signs with
+     * (DEC-063): a payment through it can't be confirmed. Only this yes or
+     * no — never the secret.
+     */
+    webhookSecretMissing: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -374,6 +387,7 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
         provider: row.provider,
         status: row.status,
         publicKey: row.publicKey ?? null,
+        webhookSecretMissing: lacksWebhookSecret(row),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -538,8 +552,20 @@ export class PaymentsService {
             iv: row.credentialsIv,
             authTag: row.credentialsAuthTag,
         });
-        const parsed = JSON.parse(json) as { webhookSecret?: string };
-        return parsed.webhookSecret ?? null;
+        // Razorpay's own webhook secret; Cashfree's key secret when none
+        // was saved, since Cashfree signs with it (DEC-063).
+        const parsed = JSON.parse(json) as SealedCredentials;
+        return webhookSecretFrom(name, parsed);
+    }
+
+    /**
+     * Each provider's webhook as setup shows it (DEC-063): the address to
+     * register, the events to tick, whether a signing secret is asked for,
+     * and when a verified payment update last arrived. `payment:read`.
+     */
+    async webhookSetup(ctx: OrganizationContext): Promise<WebhookSetup[]> {
+        authorize(ctx, "payment:read");
+        return readWebhookSetup(ctx.organizationId);
     }
 
     /**

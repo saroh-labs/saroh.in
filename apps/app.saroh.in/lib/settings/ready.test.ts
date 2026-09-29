@@ -257,6 +257,34 @@ describe("readyChecklist", () => {
         });
     });
 
+    it("is not ready while payments can't be confirmed — no webhook secret (DEC-063)", () => {
+        const r = readyChecklist({
+            settings: settled,
+            modules: [
+                mod("PAYMENTS", {
+                    readiness: "ATTENTION_REQUIRED",
+                    blockers: [
+                        {
+                            code: "PAYMENTS_WEBHOOK_SECRET_MISSING",
+                            actionHref: "/settings/providers",
+                        },
+                    ],
+                }),
+            ],
+        });
+        const step = r.steps.find((s) => s.key === "payments");
+        expect(step?.done).toBe(false);
+        expect(r.left[0]).toMatchObject({
+            key: "payments",
+            label: "Finish connecting payments",
+            cta: "Add webhook secret",
+            href: "/settings/providers",
+            broken: true,
+        });
+        // Not "switched off": nobody turned it off.
+        expect(r.left[0].why).not.toMatch(/switched off/);
+    });
+
     it("asks for what the business lists: a service, or either", () => {
         const noService = mod("APPOINTMENTS", {
             readiness: "SETUP_REQUIRED",

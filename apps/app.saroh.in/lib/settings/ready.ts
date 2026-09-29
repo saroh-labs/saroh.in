@@ -8,6 +8,10 @@ import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import { BUSINESS_TAB_PARAM } from "./search";
 
+/** The API's readiness code for payments that can't be confirmed (DEC-063). */
+export const PAYMENTS_WEBHOOK_SECRET_MISSING =
+    "PAYMENTS_WEBHOOK_SECRET_MISSING";
+
 /**
  * Getting a business ready to take money, and what email needs.
  *
@@ -132,6 +136,23 @@ function payments(modules: readonly ModuleView[]): Check | null {
         };
     }
     const href = view.blockers[0]?.actionHref ?? "/settings/providers";
+    // Connected, but no payment through it can be confirmed: saved without
+    // its webhook signing secret (DEC-063). Not ready to take money, and
+    // not "switched off" either.
+    if (
+        view.readiness === "ATTENTION_REQUIRED" &&
+        view.blockers[0]?.code === PAYMENTS_WEBHOOK_SECRET_MISSING
+    ) {
+        return {
+            key: "payments",
+            label: "Finish connecting payments",
+            why: "Add your webhook signing secret, so payments customers make are confirmed.",
+            cta: "Add webhook secret",
+            href,
+            broken: true,
+            left: true,
+        };
+    }
     if (view.readiness === "ATTENTION_REQUIRED") {
         return {
             key: "payments",

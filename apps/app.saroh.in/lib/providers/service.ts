@@ -1,5 +1,5 @@
 import type { CrmResult } from "@/lib/api/http";
-import { destroy, getJson, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * The business's own payment and messaging providers: which are connected,
@@ -14,7 +14,26 @@ export interface ConnectedPaymentProvider {
     provider: PaymentProviderName;
     status: string;
     publicKey: string | null;
+    /**
+     * Saved without the webhook signing secret its provider signs with, so
+     * no payment through it can be confirmed (DEC-063). Absent from an API
+     * older than that rule: read as not missing.
+     */
+    webhookSecretMissing?: boolean;
     updatedAt: string;
+}
+
+/** A provider's webhook for this business, as setup shows it (DEC-063). */
+export interface PaymentWebhookSetup {
+    provider: PaymentProviderName;
+    /** Where the provider sends payment updates for this business. */
+    url: string;
+    /** What to tick in the provider's dashboard. */
+    events: string[];
+    /** Whether setup asks for a signing secret of its own (Razorpay). */
+    secretRequired: boolean;
+    /** When a verified payment update last arrived; `null`, never. */
+    lastReceivedAt: string | null;
 }
 
 export interface ConnectPaymentInput {
@@ -49,6 +68,23 @@ export async function listPaymentProviders(): Promise<
     const base = await orgBase();
     if (!base) return null;
     return getJson<ConnectedPaymentProvider[]>(`${base}/payment-providers`);
+}
+
+/**
+ * Each payment provider's webhook for this business (DEC-063). `null` when
+ * it couldn't be read — setup then says so rather than show no address.
+ */
+export async function listPaymentWebhooks(): Promise<
+    PaymentWebhookSetup[] | null
+> {
+    const base = await orgBase();
+    if (!base) return null;
+    // Best-effort, and never a denial: the page reads it only for someone
+    // the provider-health read already let in, so a refusal or a failure
+    // here only costs the address and the last-update line.
+    const res = await apiFetch(`${base}/payment-providers/webhooks`);
+    if (!res.ok) return null;
+    return (await res.json().catch(() => null)) as PaymentWebhookSetup[] | null;
 }
 
 export async function listCommsProviders(): Promise<

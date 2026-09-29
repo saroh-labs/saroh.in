@@ -7,6 +7,7 @@ import type { ProvidersView } from "@/lib/providers/rows";
 import type {
     ConnectedCommsProvider,
     ConnectedPaymentProvider,
+    PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
 import { DomainsRowView, ProviderRowView } from "./provider-row";
@@ -29,13 +30,16 @@ export function ProviderList({
     view,
     payments,
     messaging,
+    webhooks,
 }: {
     view: ProvidersView;
     /** What is connected, for the setup dialogs. */
     payments: ConnectedPaymentProvider[];
     messaging: ConnectedCommsProvider[];
+    /** Each payment provider's webhook (DEC-063); `null` when unread. */
+    webhooks: PaymentWebhookSetup[] | null;
 }) {
-    const dialogs = { payments, messaging };
+    const dialogs = { payments, messaging, webhooks };
     const offersPayments = view.available.some((e) => e.type === "Payments");
     // With a list unread, "nothing connected" might not be true.
     const showConnected = view.connected.length > 0 || view.unread.length === 0;

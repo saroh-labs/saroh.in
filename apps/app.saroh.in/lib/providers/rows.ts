@@ -6,7 +6,9 @@ import type {
     ConnectedCommsProvider,
     ConnectedPaymentProvider,
     PaymentProviderName,
+    PaymentWebhookSetup,
 } from "./service";
+import { lastUpdateLine, webhookFor } from "./webhook";
 
 /**
  * Settings → Providers as rows: one per provider, not one per kind of
@@ -25,7 +27,8 @@ import type {
 
 /**
  * CONNECTED — working. ATTENTION — connected, but missing something it
- * needs to work (a Razorpay connection without its public key id).
+ * needs to work (a Razorpay connection without its public key id, or
+ * without its webhook signing secret, DEC-063).
  * DISCONNECTED — someone disconnected it, so nothing is being sent or taken
  * through it. NOT_CONNECTED — never set up. PENDING / FAILED — a domain's
  * DNS check, waiting or failed.
@@ -66,6 +69,17 @@ export interface ProviderEntry {
     state: "CONNECTED" | "ATTENTION" | "DISCONNECTED" | "NOT_CONNECTED";
     /** What it does for the business; empty for one not connected. */
     note: string;
+    /**
+     * The one fix a connection needing attention asks for, as its button
+     * ("Add key id", "Add webhook secret"); `null` otherwise.
+     */
+    fix: string | null;
+    /**
+     * A connected payment provider's webhook, in words: when a payment
+     * update last arrived, or that none has yet (DEC-063). `null` when
+     * there is nothing true to say.
+     */
+    update: string | null;
     refs: ProviderRef[];
     /** The provider's own dashboard — only while connected, and only where we know its real address. */
     manageHref: string | null;
@@ -182,6 +196,10 @@ export interface ProviderRowsInput {
     domains: { hostname: string; status: string }[] | null;
     /** Each storefront, and the provider its checkout really charges through. */
     checkout: { name: string; provider: string | null }[];
+    /** Each payment provider's webhook; `null` or absent when unread. */
+    webhooks?: PaymentWebhookSetup[] | null;
+    /** For "2 min ago"; the time of the read by default. */
+    now?: Date;
 }
 
 /**
@@ -203,6 +221,16 @@ export function needsPublicKey(p: ConnectedPaymentProvider): boolean {
         p.status === "CONNECTED" &&
         !p.publicKey?.trim()
     );
+}
+
+/**
+ * A connected Razorpay account saved without its webhook signing secret
+ * (DEC-063): every payment update it sends is refused, so a customer who
+ * paid stays "Awaiting payment". Setup requires it since then; one saved
+ * before needs its keys entered again with the secret.
+ */
+export function needsWebhookSecret(p: ConnectedPaymentProvider): boolean {
+    return p.status === "CONNECTED" && p.webhookSecretMissing === true;
 }
 
 const PAYMENTS_CONSEQUENCE =
@@ -263,7 +291,9 @@ function paymentEntry(
     input: ProviderRowsInput,
 ): ProviderEntry {
     const live = p.status === "CONNECTED";
-    const attention = needsPublicKey(p);
+    const noKey = needsPublicKey(p);
+    const noSecret = needsWebhookSecret(p);
+    const attention = noKey || noSecret;
     // The storefronts whose checkout really charges through it.
     const stores = input.checkout
         .filter((s) => s.provider === p.provider)
@@ -275,11 +305,20 @@ function paymentEntry(
         state: attention ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
         note: !live
             ? "Disconnected — checkout can't take online payments through it until it is connected again."
-            : attention
+            : noKey
               ? "Needs its key id — checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
-              : stores.length > 0
-                ? sentence(`Takes online payments at ${words(stores)}`)
-                : "Ready to take online payments — no storefront's checkout uses it yet.",
+              : noSecret
+                ? "Needs its webhook signing secret — payments can't be confirmed until you add it."
+                : stores.length > 0
+                  ? sentence(`Takes online payments at ${words(stores)}`)
+                  : "Ready to take online payments — no storefront's checkout uses it yet.",
+        fix: noKey ? "Add key id" : noSecret ? "Add webhook secret" : null,
+        update: live
+            ? lastUpdateLine(
+                  webhookFor(input.webhooks, p.provider),
+                  input.now ?? new Date(),
+              )
+            : null,
         refs:
             live && p.publicKey?.trim()
                 ? [{ label: "Public key", code: p.publicKey.trim() }]
@@ -298,6 +337,8 @@ function availablePayment(provider: PaymentProviderName): ProviderEntry {
         type: "Payments",
         state: "NOT_CONNECTED",
         note: "",
+        fix: null,
+        update: null,
         refs: [],
         manageHref: null,
         target: null,
@@ -334,6 +375,8 @@ function commsEntry(c: ConnectedCommsProvider): ProviderEntry {
         type: spec.type,
         state: live ? "CONNECTED" : "DISCONNECTED",
         note: live ? spec.purpose : spec.stopped,
+        fix: null,
+        update: null,
         refs:
             live && c.fromAddress
                 ? [{ label: "Sends from", code: c.fromAddress }]
@@ -356,6 +399,8 @@ function availableComms(
         type: spec.type,
         state: "NOT_CONNECTED",
         note: "",
+        fix: null,
+        update: null,
         refs: [],
         manageHref: null,
         target: null,

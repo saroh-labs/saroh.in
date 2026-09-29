@@ -5,6 +5,13 @@ jest.mock("../../site-accounts/account-area", () => ({
 jest.mock("../../sites/sells-from", () => ({
     shopRolloutOn: jest.fn(() => Promise.resolve(true)),
 }));
+// Whether a connection lacks its webhook secret, without opening a sealed
+// blob: a row whose blob says "no-webhook-secret" lacks it (DEC-063). The
+// real check is pinned in payments/webhook-setup.spec.ts.
+jest.mock("../../payments/webhook-setup", () => ({
+    lacksWebhookSecret: (row: { encryptedCredentials: string }) =>
+        row.encryptedCredentials === "no-webhook-secret",
+}));
 
 import { accountAreaOn } from "../../site-accounts/account-area";
 import { shopRolloutOn } from "../../sites/sells-from";
@@ -17,6 +24,7 @@ const shopRollout = shopRolloutOn as jest.Mock;
 function dbWith(counts: Record<string, number>) {
     const model = (name: string) => ({
         count: jest.fn().mockResolvedValue(counts[name] ?? 0),
+        findMany: jest.fn().mockResolvedValue([]),
     });
     return {
         publication: model("publication"),
@@ -201,15 +209,30 @@ describe("ModuleReadinessRegistry", () => {
  * the state that mattered here: providers exist, none of them are connected.
  */
 function dbWithProviders(opts: {
-    payments?: { total: number; connected: number };
+    payments?: { total: number; connected: number; blobs?: string[] };
     communications?: { total: number; connected: number };
 }) {
-    const provider = (counts?: { total: number; connected: number }) => ({
+    const provider = (counts?: {
+        total: number;
+        connected: number;
+        blobs?: string[];
+    }) => ({
         count: jest.fn((args?: { where?: { status?: string } }) =>
             Promise.resolve(
                 args?.where?.status === "CONNECTED"
                     ? (counts?.connected ?? 0)
                     : (counts?.total ?? 0),
+            ),
+        ),
+        // The connected rows, each with its sealed blob (DEC-063).
+        findMany: jest.fn(() =>
+            Promise.resolve(
+                (counts?.blobs ?? []).map((blob) => ({
+                    provider: "RAZORPAY",
+                    encryptedCredentials: blob,
+                    credentialsIv: "iv",
+                    credentialsAuthTag: "tag",
+                })),
             ),
         ),
     });
@@ -276,6 +299,40 @@ describe("provider readiness reflects provider STATUS, not row count", () => {
             expect(result.blockers[0]?.severity).toBe("SETUP");
         },
     );
+
+    it("PAYMENTS: connected without a webhook secret can't confirm a payment (DEC-063)", async () => {
+        const result = await new ModuleReadinessRegistry(
+            dbWithProviders({
+                payments: {
+                    total: 1,
+                    connected: 1,
+                    blobs: ["no-webhook-secret"],
+                },
+            }),
+        ).evaluate("PAYMENTS", input);
+
+        expect(result.readiness).toBe("ATTENTION_REQUIRED");
+        expect(result.blockers[0]?.code).toBe(
+            "PAYMENTS_WEBHOOK_SECRET_MISSING",
+        );
+        expect(result.blockers[0]?.severity).toBe("ATTENTION");
+        expect(result.blockers[0]?.actionHref).toBe("/settings/providers");
+        expect(result.blockers[0]?.message).toMatch(/webhook signing secret/);
+    });
+
+    it("PAYMENTS: one connection that can confirm a payment is enough", async () => {
+        const result = await new ModuleReadinessRegistry(
+            dbWithProviders({
+                payments: {
+                    total: 2,
+                    connected: 2,
+                    blobs: ["no-webhook-secret", "sealed-with-secret"],
+                },
+            }),
+        ).evaluate("PAYMENTS", input);
+
+        expect(result.readiness).toBe("ACTIVE");
+    });
 
     it("makes ATTENTION_REQUIRED reachable at all", async () => {
         // Before this change no adapter emitted severity ATTENTION, so the
