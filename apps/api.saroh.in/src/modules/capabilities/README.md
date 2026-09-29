@@ -52,7 +52,10 @@ free one (`freeAddress` in `sites/site-address.ts`).
 
 **Dependencies are the client's job.** The API never turns one on: the app
 turns each needed module on first (with its own setup), then the module.
-`setup-defaults` lists them in that order.
+`setup-defaults` lists them in that order. Sell never makes the website
+itself: when an online way is chosen and `alsoWebsite` is true, the app sends
+Website with its setup right after (an already-on Website answers
+`alreadyEnabled: true`).
 
 ## What the sheet prefills
 
@@ -66,8 +69,9 @@ GET /organizations/:orgId/modules/:key/setup-defaults   (module:manage)
   Mon–Sat 10:00–19:00 and a blank service (a business's type is its legal
   form, which suggests no service); the site named after the business on its
   own address, or a free one like it.
-- `dependencies` — the modules it needs that are off, a module after what it
-  needs.
+- `dependencies` — every module it needs, directly or through another, on or
+  off, a module after what it needs (CLASS_PACKS: `["CRM", "APPOINTMENTS"]`).
+  The app skips those already on.
 - `existing` — the minimum already there, which saving reuses; null when it
   is made new.
 - `alsoWebsite` (COMMERCE) — no website yet, so choosing an online way means

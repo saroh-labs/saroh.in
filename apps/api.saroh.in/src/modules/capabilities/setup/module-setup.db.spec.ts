@@ -541,9 +541,10 @@ describe("setup-defaults", () => {
         expect((await setup.defaults(ctx, "CLASS_PACKS")).dependencies).toEqual(
             ["CRM", "APPOINTMENTS"],
         );
+        // Every one it needs, on or off: the app skips those already on.
         await lifecycle.enable(ctx, "CRM");
         expect((await setup.defaults(ctx, "CLASS_PACKS")).dependencies).toEqual(
-            ["APPOINTMENTS"],
+            ["CRM", "APPOINTMENTS"],
         );
         expect(await setup.defaults(ctx, "PAYMENTS")).toMatchObject({
             setup: {},

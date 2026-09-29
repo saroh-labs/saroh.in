@@ -68,8 +68,9 @@ export interface ModuleSetupDefaults {
      */
     hidden: boolean;
     /**
-     * The modules that turn on with it — those it needs, directly or
-     * through another, that are off — in the order the app turns them on.
+     * Every module it needs, directly or through another, on or off, in the
+     * order the app turns them on (a module after what it needs). The app
+     * skips any already on.
      */
     dependencies: ModuleKey[];
     /** The setup payload, prefilled; send it back as edited. */
@@ -148,17 +149,18 @@ export class ModuleSetupService {
     ): Promise<ModuleSetupDefaults> {
         authorize(ctx, "module:manage");
         const organizationId = ctx.organizationId;
-        const [org, hidden, dependencies] = await Promise.all([
+        const [org, rolledOut] = await Promise.all([
             prisma.organization.findUniqueOrThrow({
                 where: { id: organizationId },
                 select: { name: true, slug: true },
             }),
-            moduleRolledOut(this.flags, moduleKey, organizationId).then(
-                (on) => !on,
-            ),
-            this.offDependencies(ctx, moduleKey),
+            moduleRolledOut(this.flags, moduleKey, organizationId),
         ]);
-        const base = { moduleKey, hidden, dependencies };
+        const base = {
+            moduleKey,
+            hidden: !rolledOut,
+            dependencies: dependenciesOf(moduleKey),
+        };
 
         switch (moduleKey) {
             case "COMMERCE": {
@@ -251,28 +253,24 @@ export class ModuleSetupService {
         });
         return row?.status === "ENABLED";
     }
+}
 
-    /** What `moduleKey` needs that is off, a module after what it needs. */
-    private async offDependencies(
-        ctx: OrganizationContext,
-        moduleKey: ModuleKey,
-    ): Promise<ModuleKey[]> {
-        const rows = await prisma.organizationModule.findMany({
-            where: { organizationId: ctx.organizationId, status: "ENABLED" },
-            select: { moduleKey: true },
-        });
-        const on = new Set(rows.map((r) => r.moduleKey));
-        const out: ModuleKey[] = [];
-        const seen = new Set<ModuleKey>([moduleKey]);
-        const visit = (of: ModuleKey) => {
-            for (const dep of MODULE_BY_KEY.get(of)?.dependencies ?? []) {
-                if (seen.has(dep)) continue;
-                seen.add(dep);
-                visit(dep);
-                if (!on.has(dep)) out.push(dep);
-            }
-        };
-        visit(moduleKey);
-        return out;
-    }
+/**
+ * Every module `moduleKey` needs, directly or through another — on or off —
+ * a module after what it needs: the order the app turns them on in, skipping
+ * any already on (the list's `lifecycle` says which).
+ */
+export function dependenciesOf(moduleKey: ModuleKey): ModuleKey[] {
+    const out: ModuleKey[] = [];
+    const seen = new Set<ModuleKey>([moduleKey]);
+    const visit = (of: ModuleKey) => {
+        for (const dep of MODULE_BY_KEY.get(of)?.dependencies ?? []) {
+            if (seen.has(dep)) continue;
+            seen.add(dep);
+            visit(dep);
+            out.push(dep);
+        }
+    };
+    visit(moduleKey);
+    return out;
 }
