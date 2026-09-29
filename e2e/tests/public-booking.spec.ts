@@ -180,6 +180,29 @@ test.describe("the booking page", () => {
     // Each test is a different customer, from an address of their own.
     test.beforeEach(({ page }) => asNewVisitor(page));
 
+    test("a link to one service opens the page on it (?service=, read on the server)", async ({
+        page,
+    }) => {
+        // The service's id, as the page itself reads its days.
+        await page.goto(`${SITE}/book`);
+        const daysRead = page.waitForRequest((r) =>
+            /\/public\/services\/[^/]+\/days$/.test(new URL(r.url()).pathname),
+        );
+        await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
+        const serviceId =
+            new URL((await daysRead).url()).pathname.split("/")[3] ?? "";
+
+        // A services list's Book (or "Choose a time") links here. The
+        // middleware once dropped the query on its way to the page, and
+        // the flow opened on no service at all.
+        await page.goto(
+            `${SITE}/book?service=${encodeURIComponent(serviceId)}`,
+        );
+        await expect(
+            page.getByRole("radio", { name: new RegExp(SERVICE) }),
+        ).toHaveAttribute("aria-checked", "true");
+    });
+
     test("the header names the clinic's place and phone, read on the server (E6)", async ({
         page,
     }) => {

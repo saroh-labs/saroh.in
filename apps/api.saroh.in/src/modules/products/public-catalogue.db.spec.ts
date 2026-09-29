@@ -253,7 +253,20 @@ describe("public catalogue (G11)", () => {
             variantTitles: ["Small", "Large"],
             blurb: "Slow rye. Baked at dawn.",
             soldOut: false,
+            listingId: expect.any(String),
+            bagVariantId: expect.any(String),
         });
+        // The card's Add to bag takes the first option that can be sold
+        // now: Small is sold out here, so Large.
+        const page = await catalogue.product(ryeSite, "sourdough", "visitor");
+        expect(card?.listingId).toBe(page.listingId);
+        expect(card?.bagVariantId).toBe(
+            page.variants.find((v) => v.title === "Large")?.id,
+        );
+        // A product without options adds itself.
+        expect(
+            shop.products.find((p) => p.slug === "focaccia")?.bagVariantId,
+        ).toBeNull();
     });
 
     it("serves a product page with only the variants sold here, and their stock words", async () => {

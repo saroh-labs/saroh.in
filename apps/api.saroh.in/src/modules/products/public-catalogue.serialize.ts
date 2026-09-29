@@ -61,6 +61,14 @@ export interface PublicCatalogueCard {
     blurb: string | null;
     /** Nothing offered here can be sold now. */
     soldOut: boolean;
+    /** The listing at the site's storefront: what the bag holds (G13). */
+    listingId: string;
+    /**
+     * The option the card's Add to bag adds: the first one offered here
+     * that can be sold now. Null for a product without options (or when
+     * every option is sold out).
+     */
+    bagVariantId: string | null;
 }
 
 export interface PublicCatalogue {

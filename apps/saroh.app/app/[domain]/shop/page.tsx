@@ -12,6 +12,7 @@ import { getCatalogue } from "@/lib/catalogue";
 import { isFreePage, moduleLabel, moduleRoute } from "@/lib/module-pages";
 import type { PublicationSnapshot } from "@/lib/publication";
 import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
+import { getCheckoutOptions } from "@/lib/shop-checkout";
 
 import SlugPage, { generateMetadata as slugMetadata } from "../[slug]/page";
 
@@ -101,10 +102,21 @@ export default async function ShopPage({
     }
 
     if (!siteId) notFound();
-    const lookup = await getCatalogue(siteId);
+    const [lookup, checkout] = await Promise.all([
+        getCatalogue(siteId),
+        getCheckoutOptions(siteId),
+    ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
         return <ShopUnavailable business={snapshot.site.name} />;
     }
-    return <ShopListing products={lookup.data.products} />;
+    // Each card's Add to bag (the design's shop), only where the site takes
+    // online orders now; otherwise the cards open the product, whose page
+    // offers "Ask about ordering".
+    return (
+        <ShopListing
+            products={lookup.data.products}
+            bagSite={checkout?.canOrder ? siteId : null}
+        />
+    );
 }

@@ -169,7 +169,16 @@ export default function ServicesListSection({
     const label = said(content.buttonLabel);
 
     return (
-        <section className="mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+        <section
+            className={
+                // Cards sit on the page's width, level with the Plans and
+                // Product grid beside them (the design's Book and Prices
+                // pages); a list keeps its reading column.
+                content.layout === "cards"
+                    ? "mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+                    : "mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+            }
+        >
             {content.heading ? (
                 <h2 className="text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight">
                     {content.heading}
