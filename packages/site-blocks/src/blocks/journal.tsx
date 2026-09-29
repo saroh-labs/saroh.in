@@ -118,7 +118,7 @@ export function withoutTags(html: string): string {
     }
 }
 
-const TRAILING = new Set([..." \t\n\r,;:.–—-"]);
+const TRAILING = new Set(" \t\n\r,;:.–—-".split(""));
 
 /** The text without trailing spaces and punctuation, as a loop. */
 function trimEndPunctuation(text: string): string {
