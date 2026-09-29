@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { RenderedJournal } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
-import { cn } from "../lib/utils";
+import { cn, trimTrailingSlashes } from "../lib/utils";
 
 /**
  * `journal` v1 — the site's latest published posts, read live (G10).
@@ -78,6 +78,29 @@ const ENTITIES: Record<string, string> = {
 };
 
 /**
+ * The text with every `<script>…</script>` and `<style>…</style>` cut out, by
+ * scanning rather than `/<(script|style)[\s\S]*?<\/\1>/`, which is
+ * quadratic on a body of many unclosed `<style` (CodeQL js/polynomial-redos).
+ * An unclosed one runs to the end, as a browser would read it.
+ */
+export function withoutScriptsAndStyles(html: string): string {
+    const lower = html.toLowerCase();
+    let out = "";
+    let at = 0;
+    for (;;) {
+        const s = lower.indexOf("<script", at);
+        const t = lower.indexOf("<style", at);
+        const open = s === -1 ? t : t === -1 ? s : Math.min(s, t);
+        if (open === -1) return out + html.slice(at);
+        const close = open === s ? "</script>" : "</style>";
+        out += `${html.slice(at, open)} `;
+        const end = lower.indexOf(close, open);
+        if (end === -1) return out;
+        at = end + close.length;
+    }
+}
+
+/**
  * The line under a post's title: its excerpt, else the opening of its body as
  * plain text, cut at a word. Drawn as text, never as markup, so a tag the
  * strip misses shows as characters rather than running.
@@ -85,8 +108,7 @@ const ENTITIES: Record<string, string> = {
 export function postExcerpt(post: JournalPost): string | null {
     const own = post.excerpt?.trim();
     if (own) return own;
-    const text = (post.content ?? "")
-        .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+    const text = withoutScriptsAndStyles(post.content ?? "")
         .replace(/<[^>]*>/g, " ")
         .replace(/&(#39|[a-z]+);/gi, (m, name: string) => {
             return ENTITIES[name.toLowerCase()] ?? m;
@@ -361,7 +383,7 @@ function JournalCards({
     if (posts.length === 0) return null;
     const showImages = content.showImages !== false;
     const showExcerpts = content.showExcerpts !== false;
-    const base = feed.basePath.replace(/\/+$/, "");
+    const base = trimTrailingSlashes(feed.basePath);
 
     return (
         <JournalFrame

@@ -6,7 +6,7 @@ import type { RenderedProductGrid } from "@saroh/block-contract";
 import { PRODUCT_GRID_DEFAULT_COUNT } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
-import { cn } from "../lib/utils";
+import { cn, trimTrailingSlashes } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
 
@@ -340,7 +340,8 @@ function ProductCards({
     );
     if (products.length === 0) return null;
     const showPrices = content.showPrices !== false;
-    const base = feed.basePath?.replace(/\/+$/, "") ?? null;
+    const base =
+        feed.basePath != null ? trimTrailingSlashes(feed.basePath) : null;
 
     return (
         <GridFrame

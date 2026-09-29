@@ -1,5 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
+
 import type { Prisma } from "@saroh/database";
+import { trimTrailingSlashes } from "../../common/paths";
 
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
@@ -185,6 +187,6 @@ export const SHOP_PATH = "/shop";
 
 /** Whether a page path sits at the shop's address or under it. */
 export function isShopPath(path: string): boolean {
-    const p = path.toLowerCase().replace(/\/+$/, "");
+    const p = trimTrailingSlashes(path.toLowerCase());
     return p === SHOP_PATH || p.startsWith(`${SHOP_PATH}/`);
 }
