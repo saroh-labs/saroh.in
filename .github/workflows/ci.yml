@@ -530,9 +530,41 @@ jobs:
           next-cache: "true"
           playwright: "true"
 
+      # The migrated and seeded database, cached as a `pg_dump -Fc` and
+      # restored in ~2s instead of ~40s of migrate and seed. Keyed on what the
+      # seeded data depends on — the migrations and schema, the seed and what
+      # it imports (the block contract, better-auth's hasher via the lockfile)
+      # — and on the time: the showcase lays its diary out relative to the
+      # moment it runs, so a dump is reused within one four-hour window of an
+      # Indian day and never after. No restore-keys: a near match is a stale
+      # database. On a miss the shards migrate and seed as before (below) and
+      # one of them saves the dump. `scripts/prepush.sh --e2e` does the same
+      # locally with a template database.
+      #
+      # pg_dump and pg_restore run inside the service container, so their
+      # version is the server's, whatever the runner image ships.
+      - name: Key the seeded database
+        id: seed-key
+        run: |
+          hour=$(TZ=Asia/Kolkata date +%-H)
+          echo "window=$(TZ=Asia/Kolkata date +%F)-$(( hour / 4 ))" >> "$GITHUB_OUTPUT"
+      - name: Restore the seeded database dump
+        id: seed-dump
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/e2e-seed.dump
+          key: e2e-seed-v1-${{ steps.seed-key.outputs.window }}-${{ hashFiles('packages/database/prisma/**', 'packages/database/src/**', 'packages/database/package.json', 'packages/block-contract/src/**', 'pnpm-lock.yaml') }}
+      - name: Load the seeded database from the dump
+        if: steps.seed-dump.outputs.cache-hit == 'true'
+        run: >-
+          docker exec -i ${{ job.services.postgres.id }}
+          pg_restore -U postgres -d saroh_e2e_test --no-owner --exit-on-error
+          < /tmp/e2e-seed.dump
+
       # Migrations, not `db push`: this stack is the one place CI exercises the
       # app end to end, so it is built the way a real environment is.
       - name: Apply migrations
+        if: steps.seed-dump.outputs.cache-hit != 'true'
         run: pnpm --filter @saroh/database db:migrate:deploy
 
       # The seed and the build in ONE turbo run, so they overlap: the seed
@@ -555,10 +587,32 @@ jobs:
       # specs failed on a 404 or a sign-in that never landed. The showcase runs
       # the base seed first, so Northwind is still there for everything else.
       - name: Seed the demo Organizations (showcase) and build the apps under test
+        if: steps.seed-dump.outputs.cache-hit != 'true'
         run: >-
           pnpm turbo run db:seed:showcase build --log-order=grouped
           --filter=@saroh/database --filter=@saroh/api --filter=auth
           --filter=application --filter=sites
+      - name: Build the apps under test (the database came from the dump)
+        if: steps.seed-dump.outputs.cache-hit == 'true'
+        run: >-
+          pnpm turbo run build --log-order=grouped
+          --filter=@saroh/database --filter=@saroh/api --filter=auth
+          --filter=application --filter=sites
+      # Before the stack starts: the specs write to it.
+      - name: Dump the seeded database for the next run
+        if: steps.seed-dump.outputs.cache-hit != 'true'
+        run: >-
+          docker exec ${{ job.services.postgres.id }}
+          pg_dump -U postgres -Fc saroh_e2e_test > /tmp/e2e-seed.dump
+      # Four shards miss together; the first to finish saves, and the others'
+      # "cache already exists" is not a failure.
+      - name: Save the seeded database dump
+        if: steps.seed-dump.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/e2e-seed.dump
+          key: ${{ steps.seed-dump.outputs.cache-primary-key }}
 
       # Started detached and polled, rather than trusting a fixed sleep: a cold
       # Next server on a runner is not reliably up in any particular number of

@@ -2,7 +2,8 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * A merchant's site is never set in Saroh's typography (H1).
@@ -113,15 +114,7 @@ test.describe("merchant sites load no Saroh font", () => {
             testInfo.project.name === "phone",
             "The site editor is a desk screen; one run is enough.",
         );
-        await page.goto(`${urls.ACCOUNTS_URL}/login`);
-        await page.getByLabel("Email").fill(demoUser.email);
-        await page
-            .getByLabel("Password", { exact: true })
-            .fill(demoUser.password);
-        await page.getByRole("button", { name: "Log in" }).click();
-        await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-            timeout: 30_000,
-        });
+        await useSession(page);
 
         await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
         await page.goto(`${urls.APP_URL}/sites`);

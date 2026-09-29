@@ -2,7 +2,8 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * The bookings calendar and its editors (U15, U16) on Pulse Fitness, the
@@ -17,13 +18,7 @@ const api = (path: string) => `${urls.API_URL}/organizations/${ORG}${path}`;
 const IST_OFFSET_MS = 330 * 60_000;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${ORG}`);
 }
 
@@ -195,6 +190,9 @@ test.describe("bookings calendar", () => {
     test("cancel from the quick look, then Undo: nothing is sent", async ({
         page,
     }) => {
+        // The page's own clock, so the hold can be run out rather than
+        // slept through. Installed before the page loads; it keeps time.
+        await page.clock.install();
         await signIn(page);
         // A future one-to-one booking with a person, within the week.
         const from = new Date().toISOString();
@@ -227,8 +225,15 @@ test.describe("bookings calendar", () => {
         await expect(sheet.getByText("Booked", { exact: true })).toBeVisible();
         await page.keyboard.press("Escape");
 
-        // Past the hold, the booking is still booked.
-        await page.waitForTimeout(9_000);
+        // Past the hold (use-held.ts, HOLD_MS 8s), the booking is still
+        // booked and nothing was sent. Running the page's clock on fires
+        // whatever timer is still held, at once.
+        const sent: string[] = [];
+        page.on("request", (r) => {
+            if (r.method() !== "GET") sent.push(r.url());
+        });
+        await page.clock.runFor(9_000);
+        expect(sent).toEqual([]);
         const after = (await diaries(page.request, from, to))
             .flatMap((d) => d.bookings)
             .find((b) => b.id === found.id);

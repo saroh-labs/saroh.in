@@ -269,17 +269,53 @@ e2e_stack() {
     export SITE_CODES_EMAIL_FAKE=log
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
-    echo "--- fresh database"
+    # The run's database is a copy of a seeded template, "<name>-template",
+    # when the template was seeded from the same migrations, schema and seed
+    # sources on the same day (e2e_seed_key), within the last
+    # PREPUSH_E2E_TEMPLATE_HOURS (default 4): the showcase lays its diary out
+    # relative to the moment it runs. The key and the time it was seeded are
+    # the template's COMMENT, which a copy does not inherit, so nothing extra
+    # lands in the run's database. `CREATE DATABASE … TEMPLATE` is a file
+    # copy (about a second, against ~40s of migrate and seed); it needs no one
+    # connected to the template, and nothing but this ever connects to it.
+    local tpl="$name-template" key meta seeded_at max_age s
+    key=$(e2e_seed_key)
+    max_age=$(( ${PREPUSH_E2E_TEMPLATE_HOURS:-4} * 3600 ))
+    meta=$(psql "$maint" -tAc "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = '$tpl'" 2>/dev/null || true)
+    seeded_at=$(echo "$meta" | sed -nE "s/^prepush-e2e $key ([0-9]+)$/\1/p")
+    s=$(date +%s)
     dropdb --if-exists --force --maintenance-db="$maint" "$name"
-    createdb --maintenance-db="$maint" "$name"
-    pnpm --filter @saroh/database db:migrate:deploy
+    if [ "$USE_CACHE" = 1 ] && [ -n "$seeded_at" ] &&
+        [ $(( s - seeded_at )) -lt "$max_age" ]; then
+        echo "--- database: a copy of $tpl (seeded $(( (s - seeded_at) / 60 )) min ago, key $key)"
+        createdb --maintenance-db="$maint" --template="$tpl" "$name"
+        echo "    copied in $(( $(date +%s) - s ))s"
+        echo "--- build"
+        pnpm turbo run build --log-order=grouped \
+            --filter=@saroh/database --filter=@saroh/api --filter=auth \
+            --filter=application --filter=sites
+    else
+        echo "--- database: fresh, migrated and seeded (no template for key $key)"
+        createdb --maintenance-db="$maint" "$name"
+        pnpm --filter @saroh/database db:migrate:deploy
 
-    # As CI: the seed and the build in one turbo run, so they overlap; turbo
-    # still makes the seed wait for the builds it runs on (turbo.json).
-    echo "--- seed and build"
-    pnpm turbo run db:seed:showcase build --log-order=grouped \
-        --filter=@saroh/database --filter=@saroh/api --filter=auth \
-        --filter=application --filter=sites
+        # As CI: the seed and the build in one turbo run, so they overlap;
+        # turbo still makes the seed wait for the builds it runs on
+        # (turbo.json). Seeded into the run's own database, so DATABASE_URL —
+        # which turbo hashes into every task — is the same on both paths and
+        # a build replays from turbo's cache either way.
+        echo "--- seed and build"
+        pnpm turbo run db:seed:showcase build --log-order=grouped \
+            --filter=@saroh/database --filter=@saroh/api --filter=auth \
+            --filter=application --filter=sites
+        echo "    migrated, seeded and built in $(( $(date +%s) - s ))s"
+
+        # Kept for the next run, before anything connects to this one.
+        dropdb --if-exists --force --maintenance-db="$maint" "$tpl"
+        createdb --maintenance-db="$maint" --template="$name" "$tpl"
+        psql "$maint" -qc "COMMENT ON DATABASE \"$tpl\" IS 'prepush-e2e $key $s'"
+        echo "    kept as $tpl for the next run"
+    fi
 
     echo "--- start the stack (logs in $E2E_LOGS)"
     pnpm --filter @saroh/api start >"$E2E_LOGS/api.log" 2>&1 &
@@ -295,6 +331,23 @@ e2e_stack() {
     cd e2e
     # shellcheck disable=SC2086
     pnpm exec playwright test $specs --project=desk --project=phone
+}
+# What the seeded template depends on: the migrations and schema, the seed
+# and everything it imports (the showcase, the block contract its sections
+# are checked against, better-auth's password hasher through the lockfile),
+# and the day in India, where the seed counts "today". Git's own object ids
+# for those paths at HEAD, so it costs nothing. CI's browser shards key their
+# database dump on the same files.
+e2e_seed_key() {
+    local p
+    {
+        for p in packages/database/prisma packages/database/src \
+            packages/database/package.json packages/block-contract/src \
+            pnpm-lock.yaml; do
+            git rev-parse "HEAD:$p" 2>/dev/null || echo "no $p"
+        done
+        TZ=Asia/Kolkata date +%F
+    } | shasum | cut -c1-12
 }
 wait_up() {
     local attempt code want

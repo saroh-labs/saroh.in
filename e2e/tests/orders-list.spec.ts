@@ -2,6 +2,7 @@
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
 
 /**
@@ -40,13 +41,7 @@ interface ListPage {
 }
 
 async function signIn(page: Page, who = demoUser) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page, who);
 }
 
 async function memberPage(browser: Browser): Promise<Page> {

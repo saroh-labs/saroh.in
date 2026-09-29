@@ -2,7 +2,8 @@
 import type { APIResponse, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * A hand-written invoice, end to end (U11): write it, issue it with its pay
@@ -20,13 +21,7 @@ import { demoUser, urls } from "../playwright.config";
 const ORG = "seed_org";
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 test.describe("invoices", () => {
@@ -392,11 +387,18 @@ test.describe("sending an invoice with its pay link (D17)", () => {
         // What the email provider made of it decides what comes next. The
         // send job answers within seconds; the seed's own email credentials
         // are placeholders, so on a fresh stack it is refused.
+        // Still queued after 30s, neither branch below applies — as before.
         let settled = recorded;
-        for (let i = 0; i < 15 && settled.sent[0]?.status === "QUEUED"; i++) {
-            await page.waitForTimeout(2_000);
-            settled = await call.get<InvoiceRead>(`/invoices/${id}`);
-        }
+        await expect
+            .poll(
+                async () => {
+                    settled = await call.get<InvoiceRead>(`/invoices/${id}`);
+                    return settled.sent[0]?.status;
+                },
+                { timeout: 30_000, intervals: [500, 1_000, 2_000] },
+            )
+            .not.toBe("QUEUED")
+            .catch(() => undefined);
         const status = settled.sent[0]?.status;
         await page.reload();
         if (status === "SENT") {

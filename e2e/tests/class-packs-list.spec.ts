@@ -2,7 +2,8 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Bookings › Packs (round-2 E15): the cards and the sell dialog, on
@@ -20,13 +21,7 @@ const headers = { "x-organization-id": ORG, origin: urls.APP_URL };
 const orgApi = (path: string) => `${urls.API_URL}/organizations/${ORG}${path}`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${ORG}`);
 }
 

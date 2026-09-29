@@ -1,12 +1,10 @@
 // @covers accounts:/login app:/open app:/customers app:/commerce/customers site:/[slug] site:/account/messages api:organizations api:customer-workspace api:contacts api:customers api:orders api:subscriptions api:invoices api:class-packs api:bookings api:enquiry api:site-accounts pkg:site-blocks
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-
-import type { Browser, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
+import type { Role } from "../fixtures/sessions";
+import { useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
 import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
@@ -27,49 +25,11 @@ const PRIYA_STORE = "seed_sc_rc_customer_priya";
 /** A Northwind contact whose same-email store customer nobody has linked. */
 const KARTHIK = "seed_contact_7";
 
-const member = {
-    email: "nisha.kulkarni@saroh.dev",
-    password: "demo-password-123",
-};
-
-/**
- * Sign in once per person and keep the session: signing in before every
- * test trips the accounts sign-in throttle long before the suite ends.
- */
-const OWNER_STATE = path.join(os.tmpdir(), "e2e-customer-detail-owner.json");
-const MEMBER_STATE = path.join(os.tmpdir(), "e2e-customer-detail-member.json");
-
-async function saveSession(
-    browser: Browser,
-    who: { email: string; password: string },
-    file: string,
-) {
-    const context = await browser.newContext({ ignoreHTTPSErrors });
-    const page = await context.newPage();
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
-    await context.storageState({ path: file });
-    await context.close();
-}
-
 /** Carry the saved session into this test's browser, then open the business. */
-async function signIn(page: Page, org: string, file = OWNER_STATE) {
-    const state = JSON.parse(fs.readFileSync(file, "utf8")) as {
-        cookies: Parameters<ReturnType<Page["context"]>["addCookies"]>[0];
-    };
-    await page.context().addCookies(state.cookies);
+async function signIn(page: Page, org: string, who: Role = "owner") {
+    await useSession(page, who);
     await page.goto(`/open/${org}`);
 }
-
-test.beforeAll(async ({ browser }) => {
-    await saveSession(browser, demoUser, OWNER_STATE);
-    await saveSession(browser, member, MEMBER_STATE);
-});
 
 const tab = (page: Page, name: RegExp) => page.getByRole("tab", { name });
 
@@ -280,7 +240,7 @@ test.describe("customer detail", () => {
 
 test.describe("customer detail, as a Member", () => {
     test("a Member sees no billing tabs and no money", async ({ page }) => {
-        await signIn(page, RYE, MEMBER_STATE);
+        await signIn(page, RYE, "member");
         await page.goto(`/customers/${PRIYA}`);
         await expect(
             page.getByRole("heading", { name: "Priya Raman" }),
@@ -314,8 +274,6 @@ const KAVI = "seed_sc_kavi_org";
 const RAHUL = "seed_sc_kavi_contact_rahul";
 /** A Northwind contact nothing else here changes. */
 const NW_CONTACT = "seed_contact_2";
-const desk = { email: "divya.kamath@saroh.dev", password: member.password };
-const DESK_STATE = path.join(os.tmpdir(), "e2e-customer-detail-desk.json");
 
 /** The row by the name: the heading and the tags beside it. */
 const nameRow = (page: Page) => page.locator("h1").locator("..");
@@ -413,11 +371,9 @@ test.describe("needs attention", () => {
     });
 
     test("a Member sees the allergy, and a count in place of the medical note", async ({
-        browser,
         page,
     }) => {
-        await saveSession(browser, desk, DESK_STATE);
-        await signIn(page, KAVI, DESK_STATE);
+        await signIn(page, KAVI, "desk");
         await page.goto(`/customers/${RAHUL}`);
         await expect(
             page.getByRole("heading", { name: "Rahul Verma" }),

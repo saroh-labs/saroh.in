@@ -2,6 +2,7 @@
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import {
     demoReviewer,
     demoUser,
@@ -30,13 +31,7 @@ import {
  */
 
 async function signIn(page: Page, who: { email: string; password: string }) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page, who);
 }
 
 /** A second, independent session — a different person, not a second tab. */
