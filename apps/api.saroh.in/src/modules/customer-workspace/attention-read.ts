@@ -57,6 +57,22 @@ export interface AttentionRead {
 }
 
 /**
+ * The allergens a person's Allergy entries name, once per name, in the order
+ * the entries come. Customer Detail's `allergens` (Z2a: once the notes').
+ */
+export function attentionAllergens(
+    entries: Pick<AttentionEntryView, "kind" | "allergen">[],
+): { id: string; name: string }[] {
+    const seen = new Map<string, { id: string; name: string }>();
+    for (const e of entries) {
+        if (e.kind !== "ALLERGY" || !e.allergen) continue;
+        const key = allergenKey(e.allergen.name);
+        if (!seen.has(key)) seen.set(key, e.allergen);
+    }
+    return [...seen.values()];
+}
+
+/**
  * Whether this viewer sees sensitive entries: `customer:sensitive` (C13,
  * permission matrix Q2), held by Owner and Admin by default and grantable to
  * a practitioner. Not implied by `contact:write`, so a front desk that edits

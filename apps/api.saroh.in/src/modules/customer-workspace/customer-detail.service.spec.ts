@@ -219,7 +219,6 @@ function make(views: Views = ALL_ON) {
                     createdByUserId: "user_1",
                     createdAt: PAST,
                     updatedAt: PAST,
-                    allergens: [{ allergen: { id: "alg_nuts", name: "Nuts" } }],
                 },
             ]),
         },
@@ -423,15 +422,19 @@ describe("CustomerDetailService", () => {
             }),
         );
         expect(detail.notes?.rows[0].body).toBe("Severe nut allergy");
-        // One chip, but the order check sees every storefront's "Nuts".
-        expect(detail.notes?.rows[0].allergens).toEqual([
-            { id: "alg_nuts", name: "Nuts" },
-        ]);
-        expect(detail.notes?.rows[0].matchAllergens).toEqual([
+        // Notes are text only (Z2a): the old fields stay, empty, for an app
+        // from before it. The allergy is Needs attention's, which the order
+        // check reads by every allergen of its name.
+        expect(detail.notes?.rows[0].allergens).toEqual([]);
+        expect(detail.notes?.rows[0].matchAllergens).toEqual([]);
+        expect(detail.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
+        expect(
+            detail.attention?.entries.find((e) => e.kind === "ALLERGY")
+                ?.matchAllergens,
+        ).toEqual([
             { id: "alg_nuts", name: "Nuts" },
             { id: "alg_nuts_2", name: "nuts" },
         ]);
-        expect(detail.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
 
         expect(detail.stats).toEqual({
             orders: 1,
@@ -759,6 +762,8 @@ describe("CustomerDetailService", () => {
             { source: "attention", label: "Needs attention" },
         ]);
         expect(detail.notes?.rows).toHaveLength(1);
+        // Its allergens come from Needs attention (Z2a): unknown, not none.
+        expect(detail.allergens).toBeNull();
     });
 
     it("gives a Member no money and no billing blocks", async () => {
@@ -781,8 +786,8 @@ describe("CustomerDetailService", () => {
         expect(db.packPurchase.findMany).not.toHaveBeenCalled();
         expect(spentReads(db, "orders")).toHaveLength(0);
 
-        // What they do see: the diary, and the notes (an allergy matters at
-        // the counter).
+        // What they do see: the diary, and Needs attention's allergies (an
+        // allergy matters at the counter).
         expect(detail.bookings?.upcoming).toHaveLength(1);
         expect(detail.stats.bookings).toBe(7);
         expect(detail.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);

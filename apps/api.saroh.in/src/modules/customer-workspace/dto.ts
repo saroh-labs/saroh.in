@@ -27,9 +27,9 @@ export const NOTE_BODY_MAX = 2000;
 export const NOTE_ALLERGENS_MAX = 30;
 
 /**
- * A note about a customer (U8): free text and the allergens it names, as ids
- * from the storefront's allergen list. At least one of the two — the service
- * says so with the field it is about.
+ * A note about a customer (U8): its text, which it needs. `allergenIds` is
+ * still accepted from an app from before Z2a; the note never keeps them, and
+ * the service puts them on Needs attention instead. Removed with Z2.
  */
 export class ContactNoteDto {
     @IsOptional()

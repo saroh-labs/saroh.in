@@ -39,13 +39,13 @@ import {
     HAS_ALLOWANCE_WHERE,
 } from "../subscriptions/classes-allowance";
 import type { AttentionEntryView } from "./attention-read";
-import { attentionFor, attentionSuggestionsFor } from "./attention-read";
-import type { ContactNoteView } from "./contact-notes.service";
 import {
-    allergenChoices,
-    loadContactNotes,
-    notedAllergens,
-} from "./contact-notes.service";
+    attentionAllergens,
+    attentionFor,
+    attentionSuggestionsFor,
+} from "./attention-read";
+import type { ContactNoteView } from "./contact-notes.service";
+import { allergenChoices, loadContactNotes } from "./contact-notes.service";
 import { requireCustomerPower } from "./customer-access";
 import type { DetailPack } from "./customer-detail-packs";
 import { readContactPacks } from "./customer-detail-packs";
@@ -351,12 +351,16 @@ export interface CustomerDetail {
     notes: {
         from: "contact";
         rows: ContactNoteView[];
-        /** The allergens a new note may name (the storefronts' lists). */
+        /**
+         * The business's allergens, one per name: what a Needs attention
+         * entry may name (an app from before Z2a offers them on a note).
+         */
         allergenChoices: { id: string; name: string }[];
     } | null;
     /**
-     * Every allergen the notes name, once per name. Order Detail checks each
-     * note's `matchAllergens` instead, which cross storefronts.
+     * Every allergen the person's Needs attention Allergy entries name, once
+     * per name (Z2a; the notes' before it); null when that couldn't be read.
+     * Order Detail checks each entry's `matchAllergens` instead.
      */
     allergens: { id: string; name: string }[] | null;
     /**
@@ -761,7 +765,7 @@ export class CustomerDetailService {
                           allergenChoices: notes[1],
                       }
                     : null,
-            allergens: noteRows ? notedAllergens(noteRows) : null,
+            allergens: attention ? attentionAllergens(attention.entries) : null,
             attention,
             ...(links === undefined ? {} : { linkedCustomers: links }),
             ...(possibleMatches === undefined ? {} : { possibleMatches }),
