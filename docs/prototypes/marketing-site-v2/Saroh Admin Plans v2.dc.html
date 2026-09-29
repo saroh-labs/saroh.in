@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Geist:wght@400..700&display=swap" rel="stylesheet"><script src="saroh-catalog.js"></script><style>
+  :root {
+    --bg: #0E0E0D; --shell: #141412; --surface: #1F1F1C; --surface-2: #2A2A26; --surface-3: #262622;
+    --border: #33332E; --border-2: #3D3D36; --text: #F5F2EC; --text-2: #C3BEB3; --text-3: #9A958A; --ink-2: #E8E4DA; --ink-3: #B8B3A8;
+    --invert-bg: #F5F2EC; --invert-text: #1C1C1A; --accent: #F0A92B; --accent-text: #F0C070; --accent-bg: #2A2013; --accent-line: #8A6420;
+    --ok-text: #7FD3A3; --ok-bg: #16301F; --danger-text: #F0948E; --danger-bg: #2E1715; --warn-text: #F0C070; --warn-bg: #2A2013; --info-text: #9CC2DE; --info-bg: #17242E;
+    --divider: rgba(245,242,236,0.10);
+  }
+  body { margin: 0; background: #0E0E0D; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; }
+  button, input, textarea, select { color: inherit; font-family: inherit; }
+  input, textarea { background: #1F1F1C; }
+  input[type=checkbox], input[type=radio] { accent-color: #F0A92B; }
+  a { color: #F0C070; } a:hover { color: #F5F2EC; }
+</style></helmet>
+<div style="min-height: {{ rootMinH }}; background: var(--bg); color: var(--text); font-size: 13.5px; padding: {{ rootPad }}; display: grid; gap: 16px; align-content: start; box-sizing: border-box">
+  <sc-if value="{{ standalone }}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center">
+    <div style="display: grid; gap: 2px; flex: 1 1 260px"><span style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3)">Admin console</span><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; letter-spacing: -0.01em">Plans &amp; modules</span></div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ hasDraft }}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; padding: 14px 16px; border-radius: 12px; background: var(--accent-bg); border: 1px solid var(--accent-line)">
+      <div style="flex: 1 1 340px; display: grid; gap: 4px"><span style="font-weight: 600; color: var(--accent-text)">Draft · {{ changeCount }}</span><span style="font-size: 12.5px; color: var(--ink-3); line-height: 1.5">{{ draftSummary }}</span></div>
+      <a href="Saroh Marketing Site V2 - Pricing.dc.html?preview=draft" target="_blank" rel="noopener" style="height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border-2); display: inline-flex; align-items: center; color: var(--text); font-weight: 600; font-size: 13px; text-decoration: none">Preview pricing page ↗</a>
+      <button type="button" onClick="{{ discard }}" style="height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border-2); background: transparent; font-weight: 600; font-size: 13px; cursor: pointer">Discard draft</button>
+      <button type="button" onClick="{{ primary.go }}" style="height: 34px; padding: 0 16px; border-radius: 9px; border: none; background: var(--accent); color: #1C1C1A; font-weight: 600; font-size: 13px; cursor: pointer">{{ primary.label }}</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ noDraft }}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 12px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border)">
+      <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--ok-bg); color: var(--ok-text)">Live</span>
+      <span style="font-weight: 600">Version {{ liveV }}</span><span style="color: var(--text-3)">Published {{ liveAt }} by {{ liveBy }}</span>
+      <sc-if value="{{ hasScheduled }}"><span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--info-bg); color: var(--info-text)">{{ scheduledNote }}</span></sc-if>
+      <span style="margin-left: auto; font-size: 12.5px; color: var(--text-3)">Change anything below to start a draft. Coupons are the exception: they work as soon as you save them.</span>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isGuided }}" hint-placeholder-val="{{ false }}">
+    <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+        <button type="button" onClick="{{ s.go }}" aria-current="{{ s.cur }}" style="display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 8px; border-radius: 10px; border: 1px solid {{ s.border }}; background: {{ s.bg }}; cursor: pointer; font-weight: 600; font-size: 13px; color: {{ s.fg }}"><span style="width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; font-size: 11.5px; background: {{ s.numBg }}; color: {{ s.numFg }}">{{ s.n }}</span>{{ s.label }}</button>
+      </sc-for>
+      <button type="button" onClick="{{ goHistory }}" style="margin-left: auto; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid {{ histBorder }}; background: transparent; cursor: pointer; font-weight: 600; font-size: 12.5px; color: var(--text-2)">Versions &amp; history</button>
+    </div>
+    <sc-if value="{{ guidedStep1 }}">
+      <div style="display: flex; gap: 6px; flex-wrap: wrap"><sc-for list="{{ subs }}" as="t" hint-placeholder-count="3"><button type="button" onClick="{{ t.go }}" style="height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid {{ t.border }}; background: {{ t.bg }}; cursor: pointer; font-size: 12.5px; font-weight: 600; color: {{ t.fg }}">{{ t.label }}</button></sc-for></div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ isTabbed }}" hint-placeholder-val="{{ false }}">
+    <div role="tablist" style="display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5"><button type="button" role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.go }}" style="border: none; background: transparent; cursor: pointer; font-size: 13px; font-weight: {{ t.weight }}; color: {{ t.color }}; padding: 9px 12px; border-bottom: 2px solid {{ t.line }}; margin-bottom: -1px; white-space: nowrap">{{ t.label }}</button></sc-for>
+    </div>
+  </sc-if>
+
+  <div style="display: grid; grid-template-columns: {{ cols }}; gap: 20px; align-items: start">
+    <sc-if value="{{ showLeft }}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; gap: 20px; min-width: 0">
+
+      <sc-if value="{{ showPlanEd }}" hint-placeholder-val="{{ true }}">
+        <section ref="{{ planRef }}" aria-label="Plan by plan" style="display: grid; gap: 14px; padding: 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border)">
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+            <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; flex: 1 1 auto">Plan by plan</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <sc-for list="{{ planChips }}" as="p" hint-placeholder-count="3"><button type="button" onClick="{{ p.go }}" aria-pressed="{{ p.sel }}" style="height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid {{ p.border }}; background: {{ p.bg }}; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; opacity: {{ p.opacity }}">{{ p.name }}<span style="font-weight: 500; color: var(--text-3)">{{ p.price }}</span><sc-if value="{{ p.changed }}"><span aria-label="Changed" style="width: 7px; height: 7px; border-radius: 999px; background: var(--accent)"></span></sc-if></button></sc-for>
+              <button type="button" onClick="{{ addPlan }}" style="height: 34px; padding: 0 12px; border-radius: 9px; border: 1px dashed var(--border-2); background: transparent; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--text-2)">+ Plan</button>
+            </div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; color: var(--text-3)"><span>{{ pe.count }}</span><sc-if value="{{ pe.retired }}"><span style="font-weight: 600; color: var(--danger-text)">Retired: not on the pricing page</span></sc-if></div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+            <label style="display: grid; gap: 5px"><span style="font-size: 12px; color: var(--text-3)">Name</span><input value="{{ pe.name }}" onInput="{{ pe.setName }}" style="height: 34px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 10px; font-size: 13px"></label>
+            <label style="display: grid; gap: 5px"><span style="font-size: 12px; color: var(--text-3)">Price a month, before GST (₹)</span><input type="number" min="0" value="{{ pe.price }}" onInput="{{ pe.setPrice }}" style="height: 34px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 10px; font-size: 13px"></label>
+            <label style="display: grid; gap: 5px"><span style="font-size: 12px; color: var(--text-3)">Button</span><input value="{{ pe.cta }}" onInput="{{ pe.setCta }}" style="height: 34px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 10px; font-size: 13px"></label>
+            <label style="display: grid; gap: 5px; grid-column: 1 / -1"><span style="font-size: 12px; color: var(--text-3)">One line under the name</span><input value="{{ pe.tagline }}" onInput="{{ pe.setTagline }}" style="height: 34px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 10px; font-size: 13px"></label>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+            <button type="button" onClick="{{ pe.feature }}" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-weight: 600; font-size: 12.5px">{{ pe.featureLabel }}</button>
+            <button type="button" onClick="{{ pe.retire }}" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-weight: 600; font-size: 12.5px; color: {{ pe.retireColor }}">{{ pe.retireLabel }}</button>
+            <span style="font-size: 12px; color: var(--text-3)">{{ pe.yearlyNote }}</span>
+          </div>
+          <div style="display: grid; border-top: 1px solid var(--border)">
+            <sc-for list="{{ peRows }}" as="r" hint-placeholder-count="10">
+              <sc-if value="{{ r.head }}"><div style="padding: 16px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-text)">{{ r.label }}</div></sc-if>
+              <sc-if value="{{ r.line }}">
+                <div style="display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 10px 18px; padding: 12px 10px; margin: 0 -10px; border-radius: 10px; border-top: 1px solid var(--divider); background: {{ r.bg }}">
+                  <div style="display: grid; gap: 4px; align-content: start">
+                    <label style="display: flex; gap: 9px; align-items: center; cursor: pointer; font-weight: 600"><input type="checkbox" checked="{{ r.inc }}" onChange="{{ r.toggle }}">{{ r.name }}<sc-if value="{{ r.changed }}"><span style="font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: var(--accent-bg); color: var(--accent-text)">Changed</span></sc-if></label>
+                    <span style="font-size: 12px; color: var(--text-3); line-height: 1.45; padding-left: 25px">{{ r.usage }}</span>
+                  </div>
+                  <sc-if value="{{ r.inc }}">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px">
+                      <label style="display: grid; gap: 4px"><span style="font-size: 11.5px; color: var(--text-3)">Comparison table</span><input value="{{ r.text }}" onInput="{{ r.setText }}" style="height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px"></label>
+                      <label style="display: grid; gap: 4px"><span style="font-size: 11.5px; color: var(--text-3)">Plan card (blank: leave off)</span><input value="{{ r.card }}" onInput="{{ r.setCard }}" style="height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px"></label>
+                      <label style="display: grid; gap: 4px"><span style="font-size: 11.5px; color: var(--text-3)">Limit (blank: none)</span><input type="number" min="0" value="{{ r.limit }}" onInput="{{ r.setLimit }}" style="height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px"></label>
+                      <label style="display: grid; gap: 4px"><span style="font-size: 11.5px; color: var(--text-3)">Counted</span><select value="{{ r.per }}" onChange="{{ r.setPer }}" style="height: 32px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface); color: var(--text); padding: 0 8px; font-size: 12.5px"><option value="">In total</option><option value="month">Each month</option></select></label>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.out }}">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+                      <span style="font-size: 12px; color: var(--text-3)">In the dashboard:</span>
+                      <div role="radiogroup" aria-label="In the dashboard" style="display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--surface-3); border: 1px solid var(--border)">
+                        <button type="button" role="radio" aria-checked="{{ r.isLocked }}" onClick="{{ r.setLocked }}" style="height: 28px; padding: 0 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12.5px; font-weight: 600; background: {{ r.lockBg }}; color: {{ r.lockFg }}">Locked</button>
+                        <button type="button" role="radio" aria-checked="{{ r.isHidden }}" onClick="{{ r.setHidden }}" style="height: 28px; padding: 0 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12.5px; font-weight: 600; background: {{ r.hideBg }}; color: {{ r.hideFg }}">Hidden</button>
+                      </div>
+                      <span style="font-size: 12px; color: var(--text-3)">{{ r.offHint }}</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ showGrid }}" hint-placeholder-val="{{ true }}">
+        <section aria-label="All modules" style="display: grid; gap: 10px">
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+            <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; flex: 1 1 auto">All modules</span>
+            <input type="search" placeholder="Find a module" value="{{ search }}" onInput="{{ setSearch }}" aria-label="Find a module" style="height: 34px; width: 200px; border-radius: 9px; border: 1px solid var(--border-2); padding: 0 10px; font-size: 13px">
+            <button type="button" onClick="{{ toggleAll }}" style="height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border-2); background: transparent; font-weight: 600; font-size: 12.5px; cursor: pointer">{{ toggleAllLabel }}</button>
+            <button type="button" onClick="{{ addModule }}" style="height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border-2); background: var(--surface-2); font-weight: 600; font-size: 13px; cursor: pointer">+ Add module</button>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-3)"><span>Click a cell to edit it plan by plan.</span><span style="display: inline-flex; gap: 6px; align-items: center"><span style="width: 7px; height: 7px; border-radius: 999px; background: var(--accent)"></span>Changed in this draft</span><span><strong style="color: var(--warn-text)">Locked</strong> shows with an upgrade panel · <strong style="color: var(--text-2)">Hidden</strong> isn't in the menu</span></div>
+          <div style="overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface)">
+            <table style="width: 100%; min-width: 860px; border-collapse: collapse">
+              <thead><tr style="text-align: left; font-size: 12px; color: var(--text-3)">
+                <th scope="col" style="padding: 12px 14px; font-weight: 600; width: 26%">Module</th>
+                <sc-for list="{{ planCols }}" as="p" hint-placeholder-count="3"><th scope="col" style="padding: 12px 10px; font-weight: 600; color: var(--text)">{{ p.name }}<div style="font-weight: 500; color: var(--text-3)">{{ p.price }} · {{ p.count }}</div></th></sc-for>
+                <th scope="col" style="padding: 12px 10px; font-weight: 600">Pricing page</th>
+                <th scope="col" style="padding: 12px 10px; font-weight: 600; width: 70px">Order</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="14">
+                  <sc-if value="{{ r.head }}"><tr><th scope="rowgroup" colspan="{{ span }}" style="padding: 0; border-top: 1px solid var(--border)"><button type="button" onClick="{{ r.collapse }}" aria-expanded="{{ r.open }}" style="width: 100%; display: flex; gap: 8px; align-items: center; border: none; background: transparent; cursor: pointer; text-align: left; padding: 14px 14px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-text)"><span style="width: 12px; color: var(--text-3)">{{ r.caret }}</span>{{ r.label }}<span style="font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text-3)">{{ r.meta }}</span></button></th></tr></sc-if>
+                  <sc-if value="{{ r.line }}">
+                    <tr style="border-top: 1px solid var(--divider); vertical-align: top">
+                      <td style="padding: 10px 14px"><button type="button" onClick="{{ r.editMod }}" style="border: none; background: transparent; padding: 0; text-align: left; cursor: pointer; display: grid; gap: 2px"><span style="font-weight: 600; color: var(--text)">{{ r.name }}<sc-if value="{{ r.isNew }}"><span style="margin-left: 6px; font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: var(--info-bg); color: var(--info-text)">New</span></sc-if></span><span style="font-size: 12px; color: var(--text-3); line-height: 1.4">{{ r.menu }}</span></button></td>
+                      <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="3">
+                        <td style="padding: 8px 6px"><button type="button" onClick="{{ c.go }}" style="position: relative; width: 100%; min-height: 40px; text-align: left; padding: 7px 9px; border-radius: 8px; border: 1px solid {{ c.border }}; background: {{ c.bg }}; cursor: pointer; display: grid; gap: 2px; font-size: 12.5px">
+                          <sc-if value="{{ c.changed }}"><span aria-label="Changed" style="position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 999px; background: var(--accent)"></span></sc-if>
+                          <sc-if value="{{ c.inc }}"><span style="color: var(--text); line-height: 1.35; padding-right: 10px">{{ c.text }}</span><sc-if value="{{ c.hasLimit }}"><span style="font-size: 11.5px; color: var(--text-3)">Limit {{ c.limit }}</span></sc-if></sc-if>
+                          <sc-if value="{{ c.out }}"><span style="justify-self: start; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: {{ c.pillBg }}; color: {{ c.pillFg }}">{{ c.offLabel }}</span></sc-if>
+                        </button></td>
+                      </sc-for>
+                      <td style="padding: 8px 6px"><select aria-label="{{ r.pricingLabel }}" value="{{ r.pricing }}" onChange="{{ r.setPricing }}" style="height: 34px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text); padding: 0 8px; font-size: 12.5px"><option value="show">Shown</option><option value="soon">Coming soon</option><option value="hidden">Hidden</option></select></td>
+                      <td style="padding: 8px 6px; white-space: nowrap"><button type="button" aria-label="Move up" onClick="{{ r.up }}" style="width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border-2); background: transparent; cursor: pointer">↑</button> <button type="button" aria-label="Move down" onClick="{{ r.down }}" style="width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border-2); background: transparent; cursor: pointer">↓</button></td>
+                    </tr>
+                    <sc-if value="{{ r.editingMod }}">
+                      <tr><td colspan="{{ span }}" style="padding: 4px 14px 16px">
+                        <div style="display: grid; gap: 12px; padding: 14px 16px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-2)">
+                          <div style="display: flex; gap: 10px; align-items: center"><span style="font-weight: 600">Module details</span><button type="button" onClick="{{ closeMod }}" style="margin-left: auto; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-weight: 600">Done</button></div>
+                          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+                            <label style="display: grid; gap: 5px"><span style="font-size: 12px; color: var(--text-3)">Name</span><input value="{{ em.name }}" onInput="{{ em.setName }}" style="height: 34px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 10px; font-size: 13px"></label>
+                            <label style="display: grid; gap: 5px"><span style="font-size: 12px; color: var(--text-3)">Row group on the pricing page</span><select value="{{ em.group }}" onChange="{{ em.setGroup }}" style="height: 34px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface); color: var(--text); padding: 0 8px; font-size: 13px"><sc-for list="{{ groups }}" as="g" hint-placeholder-count="5"><option value="{{ g.id }}">{{ g.name }}</option></sc-for></select></label>
+                            <label style="display: grid; gap: 5px; grid-column: 1 / -1"><span style="font-size: 12px; color: var(--text-3)">What it does (shown in the dashboard's upgrade panel)</span><input value="{{ em.what }}" onInput="{{ em.setWhat }}" style="height: 34px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 10px; font-size: 13px"></label>
+                          </div>
+                          <div style="font-size: 12px; color: var(--text-3)">{{ em.menuNote }}</div>
+                        </div>
+                      </td></tr>
+                    </sc-if>
+                  </sc-if>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ showOffers }}" hint-placeholder-val="{{ false }}">
+        <section aria-label="Offers" style="display: grid; gap: 14px">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px">Offers</span>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px">
+            <div style="display: grid; gap: 12px; align-content: start; padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border)">
+              <label style="display: flex; gap: 10px; align-items: center; cursor: pointer; font-weight: 600"><input type="checkbox" checked="{{ yr.on }}" onChange="{{ yr.toggle }}">Yearly billing<sc-if value="{{ yr.changed }}"><span style="width: 7px; height: 7px; border-radius: 999px; background: var(--accent)"></span></sc-if></label>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--text-2)">Pay for <input type="number" min="6" max="12" value="{{ yr.paid }}" onInput="{{ yr.setPaid }}" aria-label="Months paid" style="width: 56px; height: 30px; border-radius: 7px; border: 1px solid var(--border-2); padding: 0 8px; font-size: 13px"> months, get 12</div>
+              <div style="display: grid; gap: 4px; font-size: 12.5px; color: var(--text-3)"><sc-for list="{{ yr.lines }}" as="l" hint-placeholder-count="2"><span>{{ l.t }}</span></sc-for></div>
+            </div>
+            <div style="display: grid; gap: 12px; align-content: start; padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border)">
+              <span style="font-weight: 600; display: flex; gap: 8px; align-items: center">GST on the pricing page<sc-if value="{{ gst.changed }}"><span style="width: 7px; height: 7px; border-radius: 999px; background: var(--accent)"></span></sc-if></span>
+              <span style="font-size: 12.5px; color: var(--text-3); line-height: 1.5">Visitors can switch between with and without GST. Choose which they see first.</span>
+              <div role="radiogroup" aria-label="Shown first" style="display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--surface-3); border: 1px solid var(--border); justify-self: start">
+                <button type="button" role="radio" aria-checked="{{ gst.excl }}" onClick="{{ gst.setExcl }}" style="height: 28px; padding: 0 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12.5px; font-weight: 600; background: {{ gst.exBg }}; color: {{ gst.exFg }}">Without GST</button>
+                <button type="button" role="radio" aria-checked="{{ gst.incl }}" onClick="{{ gst.setIncl }}" style="height: 28px; padding: 0 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12.5px; font-weight: 600; background: {{ gst.inBg }}; color: {{ gst.inFg }}">With GST</button>
+              </div>
+              <span style="font-size: 12.5px; color: var(--text-3)">{{ gst.example }}</span>
+            </div>
+            <div style="display: grid; gap: 12px; align-content: start; padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border)">
+              <span style="font-weight: 600">Free trials</span>
+              <span style="font-size: 12.5px; color: var(--text-3); line-height: 1.5">Off unless you switch one on. The business adds a card or UPI Autopay first and is charged when the trial ends. If that charge fails, they drop to Free.</span>
+              <sc-for list="{{ trials }}" as="t" hint-placeholder-count="2">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap"><label style="display: flex; gap: 9px; align-items: center; cursor: pointer; font-weight: 600; min-width: 80px"><input type="checkbox" checked="{{ t.on }}" onChange="{{ t.toggle }}">{{ t.name }}</label><input type="number" min="1" max="60" value="{{ t.days }}" onInput="{{ t.setDays }}" disabled="{{ t.off }}" aria-label="{{ t.daysLabel }}" style="width: 56px; height: 30px; border-radius: 7px; border: 1px solid var(--border-2); padding: 0 8px; font-size: 13px; opacity: {{ t.op }}"><span style="color: var(--text-3); font-size: 12.5px">days · {{ t.note }}</span><sc-if value="{{ t.changed }}"><span style="width: 7px; height: 7px; border-radius: 999px; background: var(--accent)"></span></sc-if></div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: grid; gap: 12px; padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border)">
+            <div style="display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline"><span style="font-weight: 600">Add-ons</span><span style="font-size: 12.5px; color: var(--text-3)">Any plan can buy them, billed monthly with the plan.</span></div>
+            <sc-if value="{{ noAddons }}"><span style="font-size: 12.5px; color: var(--text-3)">No add-ons yet.</span></sc-if>
+            <sc-for list="{{ addons }}" as="a" hint-placeholder-count="2">
+              <div style="display: grid; gap: 10px; padding: 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-2)">
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: end">
+                  <label style="display: grid; gap: 4px; flex: 1 1 180px"><span style="font-size: 11.5px; color: var(--text-3)">Name on the pricing page</span><input value="{{ a.name }}" onInput="{{ a.setName }}" style="width: 100%; box-sizing: border-box; min-width: 0; height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px"></label>
+                  <sc-if value="{{ a.isModule }}"><label style="display: grid; gap: 4px; flex: 0 1 190px"><span style="font-size: 11.5px; color: var(--text-3)">Module</span><select value="{{ a.module }}" onChange="{{ a.setModule }}" style="height: 32px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface); color: var(--text); padding: 0 8px; font-size: 12.5px"><sc-for list="{{ modOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.name }}</option></sc-for></select></label></sc-if>
+                  <sc-if value="{{ a.isCount }}">
+                    <div role="radiogroup" aria-label="Priced" style="display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--surface-3); border: 1px solid var(--border)">
+                      <button type="button" role="radio" aria-checked="{{ a.isPack }}" onClick="{{ a.setPack }}" style="height: 26px; padding: 0 10px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; background: {{ a.packBg }}; color: {{ a.packFg }}">Pack</button>
+                      <button type="button" role="radio" aria-checked="{{ a.isUnit }}" onClick="{{ a.setUnit }}" style="height: 26px; padding: 0 10px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; background: {{ a.unitBg }}; color: {{ a.unitFg }}">Per unit</button>
+                    </div>
+                    <sc-if value="{{ a.isPack }}"><label style="display: grid; gap: 4px; width: 80px"><span style="font-size: 11.5px; color: var(--text-3)">Pack of</span><input type="number" min="1" value="{{ a.qty }}" onInput="{{ a.setQty }}" style="width: 100%; box-sizing: border-box; min-width: 0; height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px"></label></sc-if>
+                  </sc-if>
+                  <label style="display: grid; gap: 4px; width: 110px"><span style="font-size: 11.5px; color: var(--text-3)">₹ a month</span><input type="number" min="0" value="{{ a.price }}" onInput="{{ a.setPrice }}" style="width: 100%; box-sizing: border-box; min-width: 0; height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px"></label>
+                  <button type="button" onClick="{{ a.remove }}" style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--danger-text)">Remove</button>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px"><span style="color: var(--ink-2)">{{ a.summary }}</span><span style="color: var(--text-3)">{{ a.prospects }}</span></div>
+              </div>
+            </sc-for>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center"><span style="font-size: 12px; color: var(--text-3)">Add:</span><sc-for list="{{ addonKinds }}" as="k" hint-placeholder-count="5"><button type="button" onClick="{{ k.add }}" style="height: 30px; padding: 0 11px; border-radius: 999px; border: 1px dashed var(--border-2); background: transparent; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text-2)">+ {{ k.label }}</button></sc-for></div>
+          </div>
+
+          <div style="display: grid; gap: 12px; padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border)">
+            <div style="display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline"><span style="font-weight: 600">Coupons</span><span style="font-size: 12.5px; color: var(--text-3)">Not part of a version: changes here apply straight away. One use per business, and they work on monthly and yearly.</span><button type="button" onClick="{{ addCoupon }}" style="margin-left: auto; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface-2); cursor: pointer; font-weight: 600; font-size: 12.5px">+ New coupon</button></div>
+            <sc-for list="{{ coupons }}" as="c" hint-placeholder-count="1">
+              <div style="display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: end; padding: 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-2); opacity: {{ c.op }}">
+                <label style="display: grid; gap: 4px; width: 140px"><span style="font-size: 11.5px; color: var(--text-3)">Code</span><input value="{{ c.code }}" onInput="{{ c.setCode }}" style="width: 100%; box-sizing: border-box; min-width: 0; height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px; font-family: ui-monospace, monospace; letter-spacing: 0.04em"></label>
+                <label style="display: grid; gap: 4px; width: 100px"><span style="font-size: 11.5px; color: var(--text-3)">₹ off a month</span><input type="number" min="0" value="{{ c.off }}" onInput="{{ c.setOff }}" style="width: 100%; box-sizing: border-box; min-width: 0; height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px"></label>
+                <label style="display: grid; gap: 4px; width: 110px"><span style="font-size: 11.5px; color: var(--text-3)">For the first</span><div style="display: flex; gap: 6px; align-items: center"><input type="number" min="1" max="24" value="{{ c.months }}" onInput="{{ c.setMonths }}" style="width: 56px; height: 32px; border-radius: 8px; border: 1px solid var(--border-2); padding: 0 9px; font-size: 12.5px"><span style="font-size: 12.5px; color: var(--text-3)">months</span></div></label>
+                <div style="display: grid; gap: 4px"><span style="font-size: 11.5px; color: var(--text-3)">Plans</span><div style="display: flex; gap: 4px"><sc-for list="{{ c.plans }}" as="p" hint-placeholder-count="2"><button type="button" aria-pressed="{{ p.on }}" onClick="{{ p.go }}" style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid {{ p.border }}; background: {{ p.bg }}; cursor: pointer; font-size: 12.5px; font-weight: 600">{{ p.name }}</button></sc-for></div></div>
+                <span style="font-size: 12px; color: var(--text-3); padding-bottom: 8px">{{ c.uses }}</span>
+                <div style="margin-left: auto; display: flex; gap: 6px"><button type="button" onClick="{{ c.pause }}" style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-size: 12.5px; font-weight: 600">{{ c.pauseLabel }}</button><button type="button" onClick="{{ c.remove }}" style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--danger-text)">Delete</button></div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ showVersions }}" hint-placeholder-val="{{ false }}">
+        <section aria-label="Versions" style="display: grid; gap: 10px">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline"><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px">Versions</span><span style="font-size: 12.5px; color: var(--text-3)">Each business stays on the version it joined on, until you move them.</span></div>
+          <sc-for list="{{ versions }}" as="v" hint-placeholder-count="2">
+            <div style="padding: 14px 16px; border-radius: 12px; background: var(--surface); border: 1px solid {{ v.border }}; display: grid; gap: 8px">
+              <div style="display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center"><span style="font-weight: 600">Version {{ v.v }}</span><span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: {{ v.pillBg }}; color: {{ v.pillFg }}">{{ v.status }}</span><span style="color: var(--text-3)">{{ v.when }}</span><span style="font-size: 12px; color: var(--text-3)">{{ v.policy }}</span>
+                <span style="margin-left: auto; display: flex; gap: 6px"><sc-if value="{{ v.canRoll }}"><button type="button" onClick="{{ v.roll }}" disabled="{{ v.rollOff }}" title="{{ v.rollTitle }}" style="height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-weight: 600; font-size: 12.5px; opacity: {{ v.rollOp }}">Roll back to this</button></sc-if><sc-if value="{{ v.canCancel }}"><button type="button" onClick="{{ v.cancel }}" style="height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-weight: 600; font-size: 12.5px; color: var(--danger-text)">Cancel schedule</button></sc-if></span></div>
+              <sc-if value="{{ v.hasNote }}"><div style="color: var(--text-2)">{{ v.note }}</div></sc-if>
+              <ul style="margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; color: var(--ink-3)"><sc-for list="{{ v.changes }}" as="c" hint-placeholder-count="2"><li>{{ c.t }}</li></sc-for></ul>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px"><span style="color: var(--text-3)">{{ v.onLabel }}</span><sc-for list="{{ v.biz }}" as="b" hint-placeholder-count="3"><span style="padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-2)">{{ b.t }}</span></sc-for></div>
+              <sc-if value="{{ v.confirming }}">
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--accent-line)">
+                  <span style="flex: 1 1 300px; line-height: 1.5">This publishes version {{ v.v }}'s pricing again as version {{ nextV }}. History stays. Businesses keep their current terms.</span>
+                  <button type="button" onClick="{{ cancelRoll }}" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-weight: 600">Cancel</button>
+                  <button type="button" onClick="{{ v.doRoll }}" style="height: 32px; padding: 0 14px; border-radius: 8px; border: none; background: var(--accent); color: #1C1C1A; cursor: pointer; font-weight: 600">Publish as version {{ nextV }}</button>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ guidedNav }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; justify-content: flex-end; gap: 8px"><button type="button" onClick="{{ nextStep }}" disabled="{{ noDraft }}" style="height: 38px; padding: 0 18px; border-radius: 10px; border: none; background: var(--accent); color: #1C1C1A; cursor: pointer; font-weight: 600; opacity: {{ nextOp }}">Next: see what it does →</button></div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ showSide }}" hint-placeholder-val="{{ true }}">
+    <aside style="display: grid; gap: 14px; min-width: 0; position: {{ sidePos }}; top: 16px; max-height: {{ sideMax }}; overflow-y: auto">
+      <sc-if value="{{ showImpact }}" hint-placeholder-val="{{ true }}">
+        <section aria-label="What this draft does" style="display: grid; gap: 12px; padding: 16px; border-radius: 14px; background: var(--shell); border: 1px solid var(--border-2)">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px">What this draft does</span>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px">
+            <div style="padding: 12px; border-radius: 10px; background: var(--surface); display: grid; gap: 3px"><span style="font-size: 11.5px; color: var(--text-3)">Businesses affected</span><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px">{{ im.affected }}</span><span style="font-size: 11.5px; color: var(--text-3)">of {{ im.total }} on a plan</span></div>
+            <div style="padding: 12px; border-radius: 10px; background: var(--surface); display: grid; gap: 3px"><span style="font-size: 11.5px; color: var(--text-3)">Plan revenue a month</span><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; color: {{ im.revColor }}">{{ im.delta }}</span><span style="font-size: 11.5px; color: var(--text-3)">{{ im.revNote }}</span></div>
+          </div>
+          <sc-if value="{{ im.none }}"><span style="font-size: 12.5px; color: var(--text-3)">No changes yet. Edit a plan, a module or an offer and its effect on real businesses shows here.</span></sc-if>
+          <div style="display: grid; gap: 8px">
+            <sc-for list="{{ im.items }}" as="i" hint-placeholder-count="2">
+              <div style="display: grid; gap: 6px; padding: 11px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border)">
+                <div style="display: flex; gap: 8px; align-items: baseline"><span style="flex: none; font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: {{ i.pillBg }}; color: {{ i.pillFg }}">{{ i.tag }}</span><span style="font-weight: 600; line-height: 1.4">{{ i.title }}</span></div>
+                <span style="font-size: 12.5px; color: var(--text-2); line-height: 1.5">{{ i.detail }}</span>
+                <sc-if value="{{ i.hasBiz }}"><div style="display: flex; flex-wrap: wrap; gap: 4px"><sc-for list="{{ i.biz }}" as="b" hint-placeholder-count="2"><span style="font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-2)">{{ b.t }}</span></sc-for></div></sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ im.some }}"><span style="font-size: 12px; color: var(--text-3); line-height: 1.5">Counts assume businesses move to this version. If they keep their terms, only new businesses and plan changes get it.</span></sc-if>
+          <sc-if value="{{ isWorkspace }}"><button type="button" onClick="{{ toggleCmp }}" aria-expanded="{{ cmpOpen }}" style="height: 34px; border-radius: 9px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-weight: 600; font-size: 12.5px">{{ cmpLabel }}</button></sc-if>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ showCompare }}" hint-placeholder-val="{{ false }}">
+        <section aria-label="Live and draft side by side" style="display: grid; gap: 12px; padding: 16px; border-radius: 14px; background: var(--shell); border: 1px solid var(--border-2)">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px">Live and draft, side by side</span>
+          <sc-for list="{{ cmp }}" as="p" hint-placeholder-count="3">
+            <div style="display: grid; gap: 6px; padding: 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border)">
+              <div style="display: flex; gap: 8px; align-items: baseline"><span style="font-weight: 600">{{ p.name }}</span><span style="font-size: 12px; color: var(--text-3)">{{ p.same }}</span></div>
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 4px 10px; font-size: 12.5px">
+                <span style="font-size: 11px; color: var(--text-3)"></span><span style="font-size: 11px; color: var(--text-3)">Live</span><span style="font-size: 11px; color: var(--accent-text)">Draft</span>
+                <sc-for list="{{ p.lines }}" as="l" hint-placeholder-count="2"><span style="color: var(--text-3)">{{ l.k }}</span><span style="color: {{ l.oldFg }}">{{ l.a }}</span><span style="color: {{ l.newFg }}; font-weight: {{ l.w }}">{{ l.b }}</span></sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ showPublish }}" hint-placeholder-val="{{ false }}">
+        <section ref="{{ pubRef }}" aria-label="Publish" style="display: grid; gap: 14px; padding: 16px; border-radius: 14px; background: var(--shell); border: 1px solid var(--accent-line)">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px">Publish version {{ nextV }}</span>
+          <div role="radiogroup" aria-label="When" style="display: grid; gap: 8px"><span style="font-size: 12px; color: var(--text-3)">When</span>
+            <label style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 9px; border: 1px solid {{ whenNowBorder }}; cursor: pointer"><input type="radio" name="when" checked="{{ whenNow }}" onChange="{{ setWhenNow }}"><span style="font-weight: 600">Now</span></label>
+            <label style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 9px; border: 1px solid {{ whenDateBorder }}; cursor: pointer"><input type="radio" name="when" checked="{{ whenDate }}" onChange="{{ setWhenDate }}"><span style="font-weight: 600">On a date</span><input type="date" min="{{ minDate }}" value="{{ date }}" onInput="{{ setDate }}" onFocus="{{ setWhenDate }}" aria-label="Go-live date" style="height: 30px; border-radius: 7px; border: 1px solid var(--border-2); padding: 0 8px; font-size: 12.5px; color-scheme: dark"></label>
+          </div>
+          <div role="radiogroup" aria-label="Businesses already on a plan" style="display: grid; gap: 8px"><span style="font-size: 12px; color: var(--text-3)">{{ bizCount }} businesses are on a plan. What happens to them?</span>
+            <label style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 9px; border: 1px solid {{ keepBorder }}; cursor: pointer"><input type="radio" name="pol" checked="{{ polKeep }}" onChange="{{ setKeep }}"><span style="display: grid; gap: 2px"><span style="font-weight: 600">They keep their current terms</span><span style="font-size: 12px; color: var(--text-3)">Only businesses that join or change plan get this version.</span></span></label>
+            <label style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 9px; border: 1px solid {{ moveBorder }}; cursor: pointer"><input type="radio" name="pol" checked="{{ polMove }}" onChange="{{ setMove }}"><span style="display: grid; gap: 2px"><span style="font-weight: 600">Move them on {{ moveOn }}</span><span style="font-size: 12px; color: var(--text-3); line-height: 1.45">{{ moveHint }}</span></span></label>
+          </div>
+          <label style="display: grid; gap: 5px"><span style="font-size: 12px; color: var(--text-3)">Note for the change log</span><textarea rows="2" value="{{ note }}" onInput="{{ setNote }}" placeholder="Why this changed" style="border-radius: 8px; border: 1px solid var(--border-2); padding: 8px 10px; font-size: 13px; resize: vertical"></textarea></label>
+          <button type="button" onClick="{{ doPublish }}" disabled="{{ cantPublish }}" style="height: 40px; border-radius: 10px; border: none; background: var(--accent); color: #1C1C1A; cursor: pointer; font-weight: 600; font-size: 14px; opacity: {{ pubOpacity }}">{{ pubLabel }}</button>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ guidedBack }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; justify-content: space-between; gap: 8px">
+          <button type="button" onClick="{{ prevStep }}" style="height: 38px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border-2); background: transparent; cursor: pointer; font-weight: 600">← Back</button>
+          <sc-if value="{{ guidedMore }}"><button type="button" onClick="{{ nextStep }}" style="height: 38px; padding: 0 18px; border-radius: 10px; border: none; background: var(--accent); color: #1C1C1A; cursor: pointer; font-weight: 600">{{ nextLabel }}</button></sc-if>
+        </div>
+      </sc-if>
+    </aside>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}"><div role="status" style="position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 95; padding: 11px 16px; border-radius: 10px; background: var(--invert-bg); color: var(--invert-text); font-weight: 600; font-size: 13px">{{ toast }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;embedded&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const NAMES = { rye: "Rye & Co.", pulse: "Pulse Fitness", dent: "Kavi Dental", lumen: "Lumen Studio", iron: "Iron & Oak Gym", meridian: "Meridian Coaching", northwind: "Northwind Supply", kettle: "Kettle & Crumb", prana: "Prana Yoga", carepoint: "CarePoint Clinic" };
+const USAGE = {
+  rye: { products: 64, orders: 180, members: 3, blog: 22, integrations: 2, subscriptions: 41, invoicing: 190, website: 1 },
+  pulse: { products: 18, orders: 90, bookings: 620, members: 8, blog: 12, integrations: 6, subscriptions: 210, invoicing: 300, themes: 1, review: 1, roles: 2, website: 1 },
+  dent: { products: 4, orders: 60, bookings: 240, members: 3, blog: 3, integrations: 1, invoicing: 70, website: 1 },
+  lumen: { products: 12, orders: 20, bookings: 140, members: 2, blog: 8, integrations: 3, subscriptions: 30, invoicing: 45, website: 1 },
+  iron: { products: 5, orders: 9, members: 1, blog: 2, website: 1 },
+  meridian: { products: 4, orders: 6, members: 1, blog: 5, website: 1 },
+  northwind: { products: 3, orders: 2, members: 1, website: 1 },
+  kettle: { products: 5, orders: 10, members: 1, blog: 1, website: 1 },
+  prana: { bookings: 8, members: 1, blog: 4, website: 1 },
+  carepoint: { products: 30, orders: 40, bookings: 900, members: 10, blog: 30, integrations: 12, invoicing: 400, themes: 1, review: 1, roles: 3, website: 1 }
+};
+const KINDS = { members: { label: "Team members", mod: "members", unit: "team member" }, products: { label: "Products", mod: "products", unit: "product" }, orders: { label: "Orders a month", mod: "orders", unit: "order a month" }, bookings: { label: "Bookings a month", mod: "bookings", unit: "booking a month" }, integrations: { label: "Integrations", mod: "integrations", unit: "connection" }, module: { label: "A module on its own" } };
+const inr = n => "₹" + Math.round(Number(n) || 0).toLocaleString("en-IN");
+const X = () => ({ inc: false, off: "locked" });
+const YR = c => Object.assign({ on: false, paid: 10 }, c.yearly || {});
+const GST = c => Object.assign({ show: "excl" }, c.gst || {});
+const TR = p => Object.assign({ on: false, days: 14 }, p.trial || {});
+const same = (a, b) => JSON.stringify(a || null) === JSON.stringify(b || null);
+const lim = (c) => !c || !c.inc ? "Not included" : c.limit == null ? (c.text || "Included") : Number(c.limit).toLocaleString("en-IN") + (c.per ? " a month" : "");
+const tone = { danger: ["var(--danger-bg)", "var(--danger-text)", "Takes away"], warn: ["var(--warn-bg)", "var(--warn-text)", "Check"], ok: ["var(--ok-bg)", "var(--ok-text)", "Gives more"], info: ["var(--info-bg)", "var(--info-text)", "Pricing page"] };
+
+class Component extends DCLogic {
+  state = { dir: null, tab: "plans", step: 1, sub: "plans", plan: "grow", focus: null, search: "", closed: {}, detail: null, cmpOpen: false, when: "now", date: "", policy: "", note: "", roll: null, toast: "" };
+  planRef = React.createRef(); pubRef = React.createRef();
+  componentDidMount() { const hook = () => { if (window.SarohCatalog) { this._un = window.SarohCatalog.subscribe(() => this.forceUpdate()); this.forceUpdate(); } else setTimeout(hook, 50); }; hook(); }
+  componentWillUnmount() { if (this._un) this._un(); clearTimeout(this._t); }
+  mutate(fn) { const S = window.SarohCatalog, c = S.editing(); fn(c); S.saveDraft(c); }
+  flash(t) { clearTimeout(this._t); this.setState({ toast: t }); this._t = setTimeout(() => this.setState({ toast: "" }), 2600); }
+  scrollTo(ref) { setTimeout(() => { const el = ref.current; if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: "smooth" }); }, 30); }
+
+  extraDiff(a, b) {
+    const out = [], ya = YR(a), yb = YR(b), ga = GST(a), gb = GST(b);
+    if (ya.on !== yb.on) out.push(yb.on ? "Yearly billing on: pay for " + yb.paid + " months, get 12" : "Yearly billing off");
+    else if (yb.on && ya.paid !== yb.paid) out.push("Yearly billing: pay for " + ya.paid + " → " + yb.paid + " months");
+    if (ga.show !== gb.show) out.push("Pricing page shows prices " + (gb.show === "incl" ? "with" : "without") + " GST first");
+    b.plans.forEach(p => { const o = a.plans.find(x => x.id === p.id); if (!o) return; const ta = TR(o), tb = TR(p);
+      if (ta.on !== tb.on) out.push(p.name + ": " + (tb.on ? tb.days + "-day free trial on" : "free trial off")); else if (tb.on && ta.days !== tb.days) out.push(p.name + " trial: " + ta.days + " → " + tb.days + " days"); });
+    const aa = a.addons || [], ab = b.addons || [];
+    ab.forEach(x => { const o = aa.find(y => y.id === x.id); if (!o) out.push("New add-on: " + x.name); else if (!same(o, x)) out.push("Add-on changed: " + x.name); });
+    aa.forEach(x => { if (!ab.find(y => y.id === x.id)) out.push("Add-on removed: " + x.name); });
+    return out;
+  }
+
+  impact(S, live, cat) {
+    const all = S.bizAll(), ids = Object.keys(all), items = [], hit = new Set();
+    const on = pid => ids.filter(k => S.bizRec(k).plan === pid);
+    const use = (b, m) => (USAGE[b] || {})[m] || 0;
+    const add = (t, title, detail, biz) => { (biz || []).forEach(b => hit.add(b)); items.push({ t, title, detail, biz: biz || [] }); };
+    cat.plans.forEach(p => { const o = live.plans.find(x => x.id === p.id), list = on(p.id);
+      if (!o) { add("info", "New plan: " + p.name + " at " + inr(p.price), "Shown on the pricing page once published."); return; }
+      if (o.price !== p.price) { const own = list.filter(b => S.overrides(b).some(x => x.kind === "price")), pay = list.filter(b => own.indexOf(b) < 0);
+        add(p.price > o.price ? "warn" : "ok", p.name + ": " + inr(o.price) + " → " + inr(p.price) + " a month", pay.length + " businesses pay " + (p.price > o.price ? "more" : "less") + (own.length ? ". " + own.length + " have their own price and don't change." : "."), pay); }
+      if (!o.retired && p.retired) add("info", p.name + " retired", "Leaves the pricing page. The " + list.length + " businesses on it stay on it.");
+      const ta = TR(o), tb = TR(p); if (!ta.on && tb.on) add("info", p.name + ": " + tb.days + "-day free trial", "Payment method first; charged when it ends; drops to Free if the charge fails."); });
+    cat.modules.forEach(m => { const o = live.modules.find(x => x.id === m.id);
+      if (!o) { add("info", "New module: " + m.name, m.pricing === "soon" ? "Shows as coming soon." : "Added to the comparison table."); return; }
+      cat.plans.filter(p => !p.retired).forEach(p => { const x = o.cells[p.id] || X(), y = m.cells[p.id] || X(), list = on(p.id); if (!list.length && same(x, y)) return;
+        if (x.inc && !y.inc) { const users = list.filter(b => use(b, m.id) > 0);
+          add("danger", m.name + " taken off " + p.name, users.length ? users.length + " of " + list.length + " on " + p.name + " use it today. They'd see it " + (y.off === "hidden" ? "disappear from the menu." : "locked, with an upgrade panel.") : list.length + " on " + p.name + " lose it. None use it today.", users); }
+        else if (!x.inc && y.inc) add("ok", m.name + " added to " + p.name, list.length + " businesses on " + p.name + " get it.", list);
+        else if (x.inc && y.inc && (x.limit !== y.limit || x.per !== y.per)) {
+          const nl = y.limit, ol = x.limit;
+          if (nl != null && (ol == null || nl < ol || x.per !== y.per)) { const over = list.filter(b => use(b, m.id) > nl), near = list.filter(b => use(b, m.id) >= 0.8 * nl && use(b, m.id) <= nl);
+            add(over.length ? "danger" : "warn", m.name + " on " + p.name + ": " + lim(x) + " → " + lim(y), (over.length ? over.length + " over the new limit. What's over stays, read-only." : "Nobody is over it.") + (near.length ? " " + near.length + " at 80% or more will see a warning." : ""), over.concat(near)); }
+          else add("ok", m.name + " on " + p.name + ": " + lim(x) + " → " + lim(y), list.length + " businesses get more room.", list); }
+        else if (!x.inc && !y.inc && x.off !== y.off) add("info", m.name + " on " + p.name + ": " + (y.off === "hidden" ? "hidden" : "shown locked"), "Changes the dashboard menu for " + list.length + " businesses.", []); }); });
+    live.modules.forEach(m => { if (!cat.modules.find(x => x.id === m.id)) { const users = ids.filter(b => use(b, m.id) > 0); add("danger", "Module removed: " + m.name, users.length + " businesses use it today.", users); } });
+    (cat.addons || []).forEach(a => { if ((live.addons || []).find(x => x.id === a.id)) return; const k = KINDS[a.kind] || {}, mid = a.kind === "module" ? a.module : k.mod;
+      const pros = ids.filter(b => { const c = ((cat.modules.find(x => x.id === mid) || {}).cells || {})[S.bizRec(b).plan] || X(); return a.kind === "module" ? !c.inc : c.inc && c.limit != null && use(b, mid) >= 0.8 * c.limit; });
+      add("info", "New add-on: " + a.name, pros.length ? pros.length + (a.kind === "module" ? " businesses don't have it on their plan and could buy it." : " businesses are at 80% or more of their limit and could buy it.") : "Nobody needs it yet.", pros); });
+    const ya = YR(live), yb = YR(cat); if (!ya.on && yb.on) add("info", "Yearly billing: pay for " + yb.paid + " months, get 12", "A monthly or yearly switch appears on the pricing page.");
+    if (GST(live).show !== GST(cat).show) add("info", "Prices shown " + (GST(cat).show === "incl" ? "with" : "without") + " GST first", "Visitors can still switch.");
+    let now = 0, next = 0;
+    ids.forEach(b => { const r = S.bizRec(b), cur = S.price(b); now += cur; const own = S.overrides(b).some(x => x.kind === "price"), np = (cat.plans.find(p => p.id === r.plan) || {}).price; next += own || np == null ? cur : np; });
+    return { items, hit: hit.size, total: ids.length, now, next };
+  }
+
+  renderVals() {
+    const S = window.SarohCatalog, st = this.state;
+    const dir = "tabbed", ws = dir === "workspace", gd = dir === "guided", tb = dir === "tabbed";
+    if (!S) return { standalone: !this.props.embedded, rootMinH: "0", rootPad: this.props.embedded ? "0" : "22px 28px 80px", dirs: [], rows: [], planCols: [], planChips: [], peRows: [], pe: {}, em: {}, yr: { lines: [] }, gst: {}, trials: [], addons: [], addonKinds: [], coupons: [], versions: [], im: { items: [] }, cmp: [], steps: [], subs: [], tabs: [], primary: {}, groups: [], modOptions: [], noDraft: true, showLeft: true, showPlanEd: true, showGrid: true, cols: "minmax(0,1fr)" };
+    const cat = S.editing(), live = S.live(), vs = S.versions(), liveV = S.liveV(), lastLive = vs.find(v => v.v === liveV), hasDraft = !!S.draft();
+    const changes = hasDraft ? S.diff(live, cat).concat(this.extraDiff(live, cat)) : [];
+    const plans = cat.plans.filter(p => !p.retired), all = S.bizAll(), ids = Object.keys(all);
+    const onPlan = pid => ids.filter(k => S.bizRec(k).plan === pid);
+    const use = (b, m) => (USAGE[b] || {})[m] || 0;
+    const liveIds = live.modules.map(m => m.id);
+    const MENU = { website: "Website", sell: "Sell", bookingsx: "Bookings", paymentsx: "Payments" };
+    const selPlan = cat.plans.find(p => p.id === st.plan) || cat.plans[0];
+    const upd = (mid, pid, patch) => this.mutate(c => { const m = c.modules.find(x => x.id === mid); m.cells[pid] = Object.assign({}, m.cells[pid] || X(), patch); });
+    const pset = (pid, patch) => this.mutate(c => Object.assign(c.plans.find(p => p.id === pid), patch));
+    const move = (mid, d) => this.mutate(c => { const i = c.modules.findIndex(x => x.id === mid), g = c.modules[i].group; let j = i + d; while (j >= 0 && j < c.modules.length && c.modules[j].group !== g) j += d; if (j < 0 || j >= c.modules.length) return; const t = c.modules[i]; c.modules[i] = c.modules[j]; c.modules[j] = t; });
+    const liveCell = (mid, pid) => { const m = live.modules.find(x => x.id === mid); return m ? (m.cells[pid] || X()) : null; };
+    const openCell = (mid, pid) => { this.setState({ plan: pid, focus: mid, tab: tb ? "plans" : st.tab, sub: gd ? "plans" : st.sub }); this.scrollTo(this.planRef); };
+    const seg = on => ({ bg: on ? "var(--invert-bg)" : "transparent", fg: on ? "var(--invert-text)" : "var(--text-2)" });
+
+    // Plan by plan
+    const planChips = cat.plans.map(p => { const o = live.plans.find(x => x.id === p.id), sel = p.id === selPlan.id;
+      const changed = !o || !same(o, p) || cat.modules.some(m => { const lc = liveCell(m.id, p.id); return !lc || !same(lc, m.cells[p.id] || X()); });
+      return { name: p.name, price: inr(p.price), sel: String(sel), changed, opacity: p.retired ? 0.6 : 1, border: sel ? "var(--accent)" : "var(--border-2)", bg: sel ? "var(--accent-bg)" : "transparent", go: () => this.setState({ plan: p.id, focus: null }) }; });
+    const pl = onPlan(selPlan.id), yrs = YR(cat);
+    const olderOn = pl.filter(b => S.bizRec(b).v !== liveV).length;
+    const pe = { name: selPlan.name, price: String(selPlan.price), cta: selPlan.cta, tagline: selPlan.tagline, retired: !!selPlan.retired,
+      count: pl.length + (pl.length === 1 ? " business" : " businesses") + " on " + selPlan.name + (olderOn ? " · " + olderOn + " on an older version" : ""),
+      yearlyNote: yrs.on && selPlan.price ? "Yearly: " + inr(selPlan.price * yrs.paid) + " a year" : "",
+      setName: e => pset(selPlan.id, { name: e.target.value }), setPrice: e => pset(selPlan.id, { price: Number(e.target.value) || 0 }), setCta: e => pset(selPlan.id, { cta: e.target.value }), setTagline: e => pset(selPlan.id, { tagline: e.target.value }),
+      featureLabel: selPlan.featured ? "Remove highlight" : "Highlight this card", feature: () => this.mutate(c => c.plans.forEach(x => { x.featured = x.id === selPlan.id ? !selPlan.featured : false; })),
+      retireLabel: selPlan.retired ? "Offer again" : "Retire plan", retireColor: selPlan.retired ? "var(--text)" : "var(--danger-text)", retire: () => pset(selPlan.id, { retired: !selPlan.retired }) };
+    const peRows = [];
+    cat.groups.forEach(g => { const mods = cat.modules.filter(m => m.group === g.id); if (!mods.length) return; peRows.push({ head: true, label: g.name });
+      mods.forEach(m => { const c = m.cells[selPlan.id] || X(), lc = liveCell(m.id, selPlan.id), pid = selPlan.id;
+        const us = pl.map(b => use(b, m.id)), users = us.filter(u => u > 0).length, max = us.length ? Math.max.apply(null, us) : 0;
+        const near = c.inc && c.limit != null ? us.filter(u => u >= 0.8 * c.limit).length : 0, over = c.inc && c.limit != null ? us.filter(u => u > c.limit).length : 0;
+        const usage = !pl.length ? "Nobody on " + selPlan.name + " yet" : !users ? "Nobody on " + selPlan.name + " uses it" : users + " of " + pl.length + " use it" + (c.limit != null || max > 1 ? " · highest " + max.toLocaleString("en-IN") : "") + (over ? " · " + over + " over the limit" : near ? " · " + near + " at 80%+" : "");
+        const lk = seg(c.off !== "hidden"), hd = seg(c.off === "hidden");
+        peRows.push({ line: true, name: m.name, usage, inc: !!c.inc, out: !c.inc, text: c.text || "", card: c.card || "", limit: c.limit == null ? "" : String(c.limit), per: c.per || "",
+          changed: !lc || !same(lc, c), bg: st.focus === m.id ? "var(--accent-bg)" : "transparent",
+          isLocked: String(c.off !== "hidden"), isHidden: String(c.off === "hidden"), lockBg: lk.bg, lockFg: lk.fg, hideBg: hd.bg, hideFg: hd.fg,
+          offHint: c.off === "hidden" ? "Not in the menu at all." : "In the menu with a lock and an upgrade panel.",
+          toggle: e => upd(m.id, pid, e.target.checked ? { inc: true, text: c.text || "Included" } : { inc: false, off: c.off || "locked" }),
+          setText: e => upd(m.id, pid, { text: e.target.value }), setCard: e => upd(m.id, pid, { card: e.target.value }),
+          setLimit: e => upd(m.id, pid, { limit: e.target.value === "" ? null : Number(e.target.value) }), setPer: e => upd(m.id, pid, { per: e.target.value }),
+          setLocked: () => upd(m.id, pid, { off: "locked" }), setHidden: () => upd(m.id, pid, { off: "hidden" }) }); }); });
+
+    // Grid
+    const q = st.search.trim().toLowerCase(), rows = [];
+    cat.groups.forEach(g => { const mods = cat.modules.filter(m => m.group === g.id && (!q || m.name.toLowerCase().indexOf(q) >= 0)); if (!mods.length) return;
+      const open = q ? true : !st.closed[g.id], nch = mods.filter(m => plans.some(p => { const lc = liveCell(m.id, p.id); return !lc || !same(lc, m.cells[p.id] || X()); })).length;
+      rows.push({ head: true, label: g.name, open: String(open), caret: open ? "▾" : "▸", meta: mods.length + (mods.length === 1 ? " module" : " modules") + (nch ? " · " + nch + " changed" : ""), collapse: () => this.setState(s => ({ closed: Object.assign({}, s.closed, { [g.id]: !s.closed[g.id] }) })) });
+      if (!open) return;
+      mods.forEach(m => rows.push({ line: true, name: m.name, isNew: liveIds.indexOf(m.id) < 0,
+        menu: m.menu ? "Dashboard: " + MENU[m.menu] + (m.child ? " › " + m.child : "") : "Limit or feature, no menu row",
+        editMod: () => this.setState({ detail: st.detail === m.id ? null : m.id }), editingMod: st.detail === m.id,
+        pricing: m.pricing, pricingLabel: "Pricing page for " + m.name, setPricing: e => this.mutate(c => { c.modules.find(x => x.id === m.id).pricing = e.target.value; }),
+        up: () => move(m.id, -1), down: () => move(m.id, 1),
+        cells: plans.map(p => { const c = m.cells[p.id] || X(), lc = liveCell(m.id, p.id), ch = !lc || !same(lc, c);
+          return { inc: !!c.inc, out: !c.inc, text: c.text || "Included", hasLimit: c.inc && c.limit != null, limit: c.limit != null ? Number(c.limit).toLocaleString("en-IN") + (c.per ? " a month" : "") : "",
+            offLabel: c.off === "hidden" ? "Hidden" : "Locked", pillBg: c.off === "hidden" ? "var(--surface-3)" : "var(--warn-bg)", pillFg: c.off === "hidden" ? "var(--text-3)" : "var(--warn-text)",
+            changed: ch, border: ch ? "var(--accent-line)" : "var(--border)", bg: c.inc ? "var(--surface-2)" : "transparent", go: () => openCell(m.id, p.id) }; }) })); });
+    const dm = cat.modules.find(x => x.id === st.detail);
+    const em = dm ? { name: dm.name, group: dm.group, what: dm.what || "",
+      menuNote: dm.menu ? "In the dashboard this controls " + MENU[dm.menu] + (dm.child ? " › " + dm.child : "") + "." : "No menu row of its own. Its limits and access are checked where it's used.",
+      setName: e => this.mutate(c => { c.modules.find(x => x.id === dm.id).name = e.target.value; }),
+      setGroup: e => this.mutate(c => { const mm = c.modules.find(x => x.id === dm.id); mm.group = e.target.value; const i = c.modules.indexOf(mm); c.modules.splice(i, 1); let last = -1; c.modules.forEach((x, k) => { if (x.group === mm.group) last = k; }); c.modules.splice(last + 1, 0, mm); }),
+      setWhat: e => this.mutate(c => { c.modules.find(x => x.id === dm.id).what = e.target.value; }) } : {};
+    const anyOpen = cat.groups.some(g => !st.closed[g.id]);
+
+    // Offers
+    const paid = plans.filter(p => p.price > 0), yl = YR(live), gs = GST(cat);
+    const yr = { on: yrs.on, paid: String(yrs.paid), changed: !same(yl, yrs),
+      lines: paid.map(p => ({ t: p.name + ": " + inr(p.price * yrs.paid) + " a year, about " + inr(p.price * yrs.paid / 12) + " a month" })),
+      toggle: e => this.mutate(c => { c.yearly = Object.assign(YR(c), { on: e.target.checked }); }), setPaid: e => this.mutate(c => { c.yearly = Object.assign(YR(c), { paid: Math.min(12, Math.max(1, Number(e.target.value) || 10)) }); }) };
+    const ex = seg(gs.show !== "incl"), ic = seg(gs.show === "incl"), eg = paid[0];
+    const gst = { excl: String(gs.show !== "incl"), incl: String(gs.show === "incl"), exBg: ex.bg, exFg: ex.fg, inBg: ic.bg, inFg: ic.fg, changed: GST(live).show !== gs.show,
+      example: eg ? (gs.show === "incl" ? eg.name + " shows " + inr(eg.price * 1.18) + " incl. GST, or " + inr(eg.price) + " + GST" : eg.name + " shows " + inr(eg.price) + " + GST, or " + inr(eg.price * 1.18) + " incl. GST") + " (18%)" : "",
+      setExcl: () => this.mutate(c => { c.gst = { show: "excl" }; }), setIncl: () => this.mutate(c => { c.gst = { show: "incl" }; }) };
+    const trials = paid.map(p => { const t = TR(p), o = live.plans.find(x => x.id === p.id);
+      return { name: p.name, on: t.on, off: !t.on, op: t.on ? 1 : 0.45, days: String(t.days), daysLabel: p.name + " trial days", changed: !o || !same(TR(o), t),
+        note: t.on ? "shown on the pricing page" : "off", toggle: e => pset(p.id, { trial: Object.assign(t, { on: e.target.checked }) }), setDays: e => pset(p.id, { trial: Object.assign(t, { days: Math.max(1, Number(e.target.value) || 14) }) }) }; });
+    const aset = (id, patch) => this.mutate(c => { Object.assign((c.addons || []).find(a => a.id === id), patch); });
+    const addons = (cat.addons || []).map(a => { const k = KINDS[a.kind] || {}, isMod = a.kind === "module", pk = seg(a.mode !== "unit"), un = seg(a.mode === "unit"), mod = cat.modules.find(m => m.id === a.module);
+      const mid = isMod ? a.module : k.mod;
+      const pros = ids.filter(b => { const c = ((cat.modules.find(x => x.id === mid) || {}).cells || {})[S.bizRec(b).plan] || X(); return isMod ? !c.inc : c.inc && c.limit != null && use(b, mid) >= 0.8 * c.limit; }).length;
+      return { name: a.name, isModule: isMod, isCount: !isMod, module: a.module || "", qty: String(a.qty || 1), price: String(a.price || 0),
+        isPack: String(a.mode !== "unit"), isUnit: String(a.mode === "unit"), packBg: pk.bg, packFg: pk.fg, unitBg: un.bg, unitFg: un.fg,
+        summary: isMod ? (mod ? mod.name : "Pick a module") + " for " + inr(a.price) + " a month, on plans that don't include it" : a.mode === "unit" ? inr(a.price) + " a month per " + k.unit : "+" + (a.qty || 1) + " " + k.unit + (a.qty > 1 ? "s" : "") + " for " + inr(a.price) + " a month",
+        prospects: pros ? pros + (isMod ? " businesses could buy it today" : " businesses near their limit could use it") : "",
+        setName: e => aset(a.id, { name: e.target.value }), setModule: e => aset(a.id, { module: e.target.value, name: ((cat.modules.find(m => m.id === e.target.value) || {}).name || "") }),
+        setPack: () => aset(a.id, { mode: "pack" }), setUnit: () => aset(a.id, { mode: "unit" }), setQty: e => aset(a.id, { qty: Math.max(1, Number(e.target.value) || 1) }), setPrice: e => aset(a.id, { price: Number(e.target.value) || 0 }),
+        remove: () => this.mutate(c => { c.addons = (c.addons || []).filter(x => x.id !== a.id); }) }; });
+    const PRESET = { members: ["Extra team members", 3, 300], products: ["Extra products", 100, 250], orders: ["Extra orders", 100, 200], bookings: ["Extra bookings", 100, 200], integrations: ["Extra integrations", 5, 250] };
+    const addonKinds = Object.keys(KINDS).map(k => ({ label: KINDS[k].label, add: () => this.mutate(c => { const mods = c.modules.filter(m => plans.some(p => !(m.cells[p.id] || X()).inc)), m0 = mods[0] || c.modules[0], pr = PRESET[k];
+      c.addons = (c.addons || []).concat([k === "module" ? { id: "a" + Date.now().toString(36), kind: k, module: m0.id, name: m0.name, price: 500, mode: "pack", qty: 1 } : { id: "a" + Date.now().toString(36), kind: k, name: pr[0], qty: pr[1], price: pr[2], mode: "pack" }]); }) }));
+    const modOptions = cat.modules.filter(m => plans.some(p => !(m.cells[p.id] || X()).inc)).map(m => ({ id: m.id, name: m.name }));
+    const cps = S.coupons(), cset = (id, patch) => S.saveCoupons(cps.map(c => c.id === id ? Object.assign({}, c, patch) : c));
+    const coupons = cps.map(c => ({ code: c.code, off: String(c.off), months: String(c.months), op: c.active ? 1 : 0.6, uses: c.uses ? "Used " + c.uses + (c.uses === 1 ? " time" : " times") : "Not used yet",
+      pauseLabel: c.active ? "Pause" : "Resume", pause: () => cset(c.id, { active: !c.active }), remove: () => S.saveCoupons(cps.filter(x => x.id !== c.id)),
+      setCode: e => cset(c.id, { code: e.target.value.toUpperCase().replace(/\s/g, "") }), setOff: e => cset(c.id, { off: Number(e.target.value) || 0 }), setMonths: e => cset(c.id, { months: Math.max(1, Number(e.target.value) || 1) }),
+      plans: paid.map(p => { const onp = c.plans.indexOf(p.id) >= 0; return { name: p.name, on: String(onp), border: onp ? "var(--accent)" : "var(--border-2)", bg: onp ? "var(--accent-bg)" : "transparent", go: () => cset(c.id, { plans: onp ? c.plans.filter(x => x !== p.id) : c.plans.concat([p.id]) }) }; }) }));
+
+    // Versions
+    const today = S.todayISO(), nextV = vs[vs.length - 1].v + 1;
+    const versions = vs.slice().reverse().map(v => { const isLive = v.v === liveV, sched = v.goLive && v.goLive > today, onIt = ids.filter(b => S.bizRec(b).v === v.v), moving = ids.filter(b => all[b].moving && all[b].moving.v === v.v);
+      return { v: v.v, status: isLive ? "Live" : sched ? "Scheduled" : "Earlier", pillBg: isLive ? "var(--ok-bg)" : sched ? "var(--info-bg)" : "var(--surface-3)", pillFg: isLive ? "var(--ok-text)" : sched ? "var(--info-text)" : "var(--text-3)", border: isLive ? "var(--border-2)" : "var(--border)",
+        when: (sched ? "Goes live " + v.goLiveAt : "Published " + (v.goLiveAt || v.at)) + " · " + v.by,
+        policy: v.policy === "keep" ? "Existing businesses kept their terms" : v.policy === "move" ? "Existing businesses move on " + v.moveOn : "",
+        note: v.note, hasNote: !!v.note, changes: (v.changes && v.changes.length ? v.changes : ["First version"]).slice(0, 6).map(t => ({ t })),
+        onLabel: onIt.length ? onIt.length + " on it:" : moving.length ? moving.length + " moving to it:" : "Nobody on it", biz: (onIt.length ? onIt : moving).map(b => ({ t: NAMES[b] || b })),
+        canRoll: !isLive && !sched, rollOff: hasDraft, rollOp: hasDraft ? 0.45 : 1, rollTitle: hasDraft ? "Publish or discard your draft first" : "", roll: () => this.setState({ roll: v.v }), confirming: st.roll === v.v,
+        doRoll: () => { S.saveDraft(S.clone(v.catalog)); const n = S.publish({ policy: "keep", note: "Rolled back to version " + v.v }); this.setState({ roll: null }); this.flash("Version " + v.v + "'s pricing is live again as version " + n); },
+        canCancel: !!sched, cancel: () => { S.cancelScheduled(v.v); this.flash("Version " + v.v + " won't go live"); } }; });
+    const sch = S.scheduled();
+
+    // Impact + compare
+    const I = this.impact(S, live, cat), d = I.next - I.now;
+    const im = { affected: String(I.hit), total: I.total, none: !I.items.length, some: !!I.items.length,
+      delta: d === 0 ? "No change" : (d > 0 ? "+" : "−") + inr(Math.abs(d)), revColor: d > 0 ? "var(--ok-text)" : d < 0 ? "var(--danger-text)" : "var(--text)",
+      revNote: d === 0 ? inr(I.now) + " today" : inr(I.now) + " → " + inr(I.next) + " if everyone moves",
+      items: I.items.map(i => ({ title: i.title, detail: i.detail, tag: tone[i.t][2], pillBg: tone[i.t][0], pillFg: tone[i.t][1], hasBiz: !!i.biz.length, biz: i.biz.slice(0, 6).map(b => ({ t: NAMES[b] || b })).concat(i.biz.length > 6 ? [{ t: "+" + (i.biz.length - 6) + " more" }] : []) })) };
+    const cmp = cat.plans.map(p => { const o = live.plans.find(x => x.id === p.id), lines = [];
+      const L = (k, a, b) => { if (a !== b) lines.push({ k, a, b, oldFg: "var(--text-3)", newFg: "var(--text)", w: 600 }); };
+      L("Price", o ? inr(o.price) : "—", inr(p.price)); if (o) L("Yearly", yl.on && o.price ? inr(o.price * yl.paid) : "—", yrs.on && p.price ? inr(p.price * yrs.paid) : "—");
+      if (o) L("Trial", TR(o).on ? TR(o).days + " days" : "—", TR(p).on ? TR(p).days + " days" : "—"); if (o && !!o.retired !== !!p.retired) L("Status", o.retired ? "Retired" : "Offered", p.retired ? "Retired" : "Offered");
+      let sameN = 0; cat.modules.forEach(m => { const lc = liveCell(m.id, p.id), c = m.cells[p.id] || X(); if (lc && same(lc, c)) { sameN++; return; } L(m.name, lc ? lim(lc) : "—", lim(c)); });
+      return { name: p.name, lines, same: lines.length ? sameN + " other rows the same" : "No changes" }; });
+
+    // Publish
+    const dateOk = st.when === "now" || (st.date && st.date > today), moveOn = S.moveOnFrom(st.when === "date" && st.date ? st.date : "");
+    const tmr = new Date(); tmr.setDate(tmr.getDate() + 1); const minDate = tmr.getFullYear() + "-" + String(tmr.getMonth() + 1).padStart(2, "0") + "-" + String(tmr.getDate()).padStart(2, "0");
+    const doPublish = () => { if (!st.policy || !dateOk) return; const go = st.when === "date" ? st.date : "";
+      const v = S.publish({ policy: st.policy, note: st.note, goLive: go, changes }); this.setState({ policy: "", note: "", when: "now", date: "", step: gd ? "history" : st.step, tab: tb ? "versions" : st.tab, cmpOpen: false });
+      this.flash(go ? "Version " + v + " goes live on " + S.versions().find(x => x.v === v).goLiveAt : "Version " + v + " is live on the pricing page"); };
+
+    // Layout
+    const step = st.step, sideSteps = gd && (step === 2 || step === 3 || step === 4), review = tb && st.tab === "review";
+    const pick = (a, b, c) => ws ? a : gd ? b : c;
+    const stepList = [[1, "Make changes"], [2, "See what it does"], [3, "Compare"], [4, "Publish"]];
+    const steps = stepList.map(([n, label]) => { const cur = step === n, done = typeof step === "number" && n < step, locked = n > 1 && !hasDraft;
+      return { n: done ? "✓" : String(n), label, cur: cur ? "step" : "false", border: cur ? "var(--accent)" : "var(--border)", bg: cur ? "var(--accent-bg)" : "transparent", fg: locked ? "var(--text-3)" : "var(--text)",
+        numBg: cur ? "var(--accent)" : done ? "var(--ok-bg)" : "var(--surface-2)", numFg: cur ? "#1C1C1A" : done ? "var(--ok-text)" : "var(--text-2)", go: () => { if (!locked) this.setState({ step: n }); } }; });
+    const subList = [["plans", "Plan by plan"], ["grid", "All modules"], ["offers", "Offers"]];
+    const tabList = [["plans", "Plans"], ["modules", "Modules"], ["offers", "Offers"], ["versions", "Versions · " + vs.length], ["review", hasDraft ? "Review & publish · " + changes.length : "Review & publish"]];
+    const primary = pick({ label: "Publish…", go: () => this.scrollTo(this.pubRef) }, { label: step === 1 || step === "history" ? "Next: see what it does" : "Go to publish", go: () => this.setState({ step: step === 1 || step === "history" ? 2 : 4 }) }, { label: "Review & publish", go: () => this.setState({ tab: "review" }) });
+    const nextLabel = step === 2 ? "Next: compare →" : "Next: publish →";
+
+    return {
+      dirs: [["workspace", "Workspace"], ["guided", "Guided"], ["tabbed", "Tabbed"]].map(([k, label]) => { const s = seg(dir === k); return { label, sel: String(dir === k), bg: s.bg, fg: s.fg, go: () => this.setState({ dir: k }) }; }),
+      isWorkspace: ws, isGuided: gd, isTabbed: tb, standalone: !this.props.embedded,
+      rootMinH: this.props.embedded ? "0" : "100vh", rootPad: this.props.embedded ? "0" : "22px 28px 80px",
+      hasDraft, noDraft: !hasDraft, changeCount: changes.length === 1 ? "1 change" : changes.length + " changes",
+      draftSummary: (I.hit ? I.hit + (I.hit === 1 ? " business" : " businesses") + " affected" : "No business affected") + (I.next !== I.now ? " · " + (d > 0 ? "+" : "−") + inr(Math.abs(d)) + " a month if everyone moves" : "") + " · " + changes.slice(0, 2).join(" · ") + (changes.length > 2 ? " · and " + (changes.length - 2) + " more" : ""),
+      primary, discard: () => { S.discardDraft(); this.setState({ detail: null, focus: null, step: gd ? 1 : st.step }); this.flash("Draft discarded"); },
+      liveV, liveAt: lastLive ? (lastLive.goLiveAt || lastLive.at) : "", liveBy: lastLive ? lastLive.by : "", hasScheduled: !!sch.length, scheduledNote: sch.length ? "Version " + sch[0].v + " goes live " + sch[0].goLiveAt : "",
+      steps, goHistory: () => this.setState({ step: "history" }), histBorder: step === "history" ? "var(--accent)" : "var(--border-2)", guidedStep1: gd && step === 1,
+      subs: subList.map(([k, label]) => { const on = st.sub === k; return { label, border: on ? "var(--accent)" : "var(--border-2)", bg: on ? "var(--accent-bg)" : "transparent", fg: on ? "var(--text)" : "var(--text-2)", go: () => this.setState({ sub: k }) }; }),
+      tabs: tabList.map(([k, label]) => { const on = st.tab === k; return { label, sel: String(on), weight: on ? 600 : 500, color: on ? "var(--text)" : "var(--text-3)", line: on ? "var(--text)" : "transparent", go: () => this.setState({ tab: k, detail: null }) }; }),
+      cols: ws ? "minmax(0, 1fr) minmax(320px, 400px)" : "minmax(0, 1fr)",
+      showLeft: !sideSteps && !review, showSide: ws || sideSteps || review,
+      showPlanEd: pick(true, step === 1 && st.sub === "plans", st.tab === "plans"), showGrid: pick(true, step === 1 && st.sub === "grid", st.tab === "modules"),
+      showOffers: pick(true, step === 1 && st.sub === "offers", st.tab === "offers"), showVersions: pick(true, step === "history", st.tab === "versions"),
+      showImpact: pick(true, step === 2, review), showCompare: pick(st.cmpOpen, step === 3, review), showPublish: pick(hasDraft, step === 4 && hasDraft, review && hasDraft),
+      guidedNav: gd && step === 1, guidedBack: sideSteps, guidedMore: step === 2 || step === 3, nextLabel, nextOp: hasDraft ? 1 : 0.45,
+      nextStep: () => { if (hasDraft) this.setState({ step: step === 1 ? 2 : step === 2 ? 3 : 4 }); }, prevStep: () => this.setState({ step: step === 4 ? 3 : step === 3 ? 2 : 1 }),
+      sidePos: ws ? "sticky" : "static", sideMax: ws ? "calc(100vh - 32px)" : "none",
+      planRef: this.planRef, pubRef: this.pubRef, planChips, pe, peRows, addPlan: () => { const id = "p" + Date.now().toString(36); this.mutate(c => { c.plans.push({ id, name: "New plan", price: 0, tagline: "", cta: "Choose plan", featured: false, retired: false }); }); this.setState({ plan: id }); },
+      search: st.search, setSearch: e => this.setState({ search: e.target.value }), toggleAllLabel: anyOpen ? "Collapse all" : "Expand all",
+      toggleAll: () => { const c = {}; cat.groups.forEach(g => { c[g.id] = anyOpen; }); this.setState({ closed: c }); },
+      addModule: () => { const id = "m" + Date.now().toString(36); this.mutate(c => { c.modules.push({ id, name: "New module", group: c.groups[0].id, pricing: "soon", what: "", cells: {} }); }); this.setState({ detail: id, search: "" }); },
+      span: plans.length + 3, planCols: plans.map(p => { const n = onPlan(p.id).length; return { name: p.name, price: inr(p.price), count: n + (n === 1 ? " business" : " businesses") }; }), rows, em, closeMod: () => this.setState({ detail: null }),
+      groups: cat.groups.map(g => ({ id: g.id, name: g.name })),
+      yr, gst, trials, addons, noAddons: !addons.length, addonKinds, modOptions, coupons,
+      addCoupon: () => S.saveCoupons(cps.concat([{ id: "c" + Date.now().toString(36), code: "NEW" + (cps.length + 1), off: 200, plans: paid.map(p => p.id), months: 1, active: false, uses: 0 }])),
+      versions, nextV, cancelRoll: () => this.setState({ roll: null }),
+      im, cmp, cmpOpen: String(st.cmpOpen), cmpLabel: st.cmpOpen ? "Hide side-by-side" : "Compare live and draft side by side", toggleCmp: () => this.setState({ cmpOpen: !st.cmpOpen }),
+      whenNow: st.when === "now", whenDate: st.when === "date", whenNowBorder: st.when === "now" ? "var(--accent)" : "var(--border-2)", whenDateBorder: st.when === "date" ? "var(--accent)" : "var(--border-2)",
+      setWhenNow: () => this.setState({ when: "now" }), setWhenDate: () => this.setState({ when: "date" }), date: st.date, minDate, setDate: e => this.setState({ date: e.target.value, when: "date" }),
+      bizCount: ids.length, moveOn, moveHint: "They're told 7 days before" + (st.when === "date" ? " (counted from the go-live date)" : "") + ". Anything over a new limit stays, read-only.",
+      polKeep: st.policy === "keep", polMove: st.policy === "move", keepBorder: st.policy === "keep" ? "var(--accent)" : "var(--border-2)", moveBorder: st.policy === "move" ? "var(--accent)" : "var(--border-2)",
+      setKeep: () => this.setState({ policy: "keep" }), setMove: () => this.setState({ policy: "move" }),
+      note: st.note, setNote: e => this.setState({ note: e.target.value }), cantPublish: !st.policy || !dateOk, pubOpacity: st.policy && dateOk ? 1 : 0.45,
+      pubLabel: !st.policy ? "Choose what happens to existing businesses" : !dateOk ? "Pick a date from tomorrow on" : st.when === "date" ? "Schedule version " + nextV : "Publish version " + nextV + " now", doPublish,
+      toastOn: !!st.toast, toast: st.toast
+    };
+  }
+}
+</script>
+</body>
+</html>
