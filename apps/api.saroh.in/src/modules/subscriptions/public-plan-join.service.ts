@@ -13,9 +13,13 @@ import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { contactName } from "../invoices/serialize";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import type { AutopayStart } from "../payments/autopay.service";
+import { AutopayService } from "../payments/autopay.service";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
+import type { MandateMethod } from "../payments/providers/provider.port";
 import { OPENS_CHECKOUT } from "../payments/public-key";
+import { siteOriginOf } from "../sites/site-origin";
 import {
     createPlanJoinDraftInTx,
     MAX_OPEN_PLAN_JOINS,
@@ -47,9 +51,11 @@ import type { CustomerScope } from "./subscriptions.service";
  *   (DEC-059); the webhook starts the subscription. No provider that can
  *   open a window: nothing is made, and the site offers "Ask about
  *   joining" instead.
- * - **No autopay.** D12 isn't built: the first period is paid now, and
- *   each renewal is invoiced as any member's is. D12's join sheet adds
- *   "turn on autopay" here, once `supportsMandates` is live.
+ * - **Autopay, when chosen** (D12). UPI or card: one window pays the
+ *   first period and authorises (`AutopayService.startForJoin`), and the
+ *   mandate starts with the subscription. eMandate: the join is paid as
+ *   usual, and the sheet authorises once joined, from the account.
+ *   Without it, each renewal is invoiced as any member's is.
  * - **Few open at once.** Starting the same plan again, on the same terms,
  *   reuses its draft; a draft whose plan has changed since is voided and
  *   started again. At most {@link MAX_OPEN_PLAN_JOINS} different plans
@@ -84,12 +90,19 @@ export interface AccountPlanJoin {
     total: string;
     currency: string;
     payment: CreateIntentResult;
+    /**
+     * Autopay chosen with the join (D12): the same window also authorises
+     * (UPI, card). Null: a plain payment.
+     */
+    autopay: AutopayStart | null;
 }
 
 /** How a started join stands. */
 export interface AccountPlanJoinAttempt {
     state: "paying" | "joined" | "closed";
     plan: { name: string };
+    /** Once joined: the new plan's ref, to set autopay up on it (D12). */
+    subscriptionRef?: string | null;
 }
 
 function notFound(): never {
@@ -105,6 +118,9 @@ export class PublicPlanJoinService {
             STARTS_PER_WINDOW,
             START_WINDOW_MS,
         ),
+        // Autopay chosen with the join (D12); absent where a test builds
+        // this by hand, and then only a plain payment is offered.
+        @Optional() private readonly autopay?: AutopayService,
     ) {}
 
     /**
@@ -113,10 +129,11 @@ export class PublicPlanJoinService {
      * on the same draft returns the same intent.
      */
     async start(
-        customer: CustomerScope,
+        customer: CustomerScope & { siteId?: string },
         ref: string,
         idempotencyKey: string | undefined,
         now: Date = new Date(),
+        autopayMethod?: MandateMethod,
     ): Promise<AccountPlanJoin> {
         const { organizationId, contactId } = customer;
         if (!this.startLimiter.take(customer.accountId)) {
@@ -238,6 +255,50 @@ export class PublicPlanJoinService {
             });
         });
 
+        const summary = {
+            ref: draft.id,
+            plan: { name: terms.name, interval: terms.interval },
+            total: toMoneyString(draft.total.toString()),
+            currency: draft.currency,
+        };
+        // Autopay by UPI or card: one window pays and authorises (D12).
+        if (autopayMethod && autopayMethod !== "EMANDATE") {
+            if (!this.autopay) {
+                throw new ConflictException({
+                    message: "Autopay isn't available with this business.",
+                    details: { reason: "not-offered" },
+                });
+            }
+            const origin = await siteOriginOf(
+                organizationId,
+                customer.siteId ? { siteId: customer.siteId } : {},
+            );
+            const { start, paymentIntentId } = await this.autopay.startForJoin({
+                organizationId,
+                contactId,
+                draft,
+                plan: { name: terms.name, price: terms.price },
+                method: autopayMethod,
+                ...(idempotencyKey ? { idempotencyKey } : {}),
+                returnUrl: origin
+                    ? `${origin}/autopay?join=${encodeURIComponent(draft.id)}`
+                    : null,
+                now,
+            });
+            return {
+                ...summary,
+                payment: {
+                    paymentIntentId,
+                    provider: start.handoff.provider,
+                    providerIntentId: start.handoff.providerIntentId ?? "",
+                    amountCents: start.handoff.amountCents,
+                    currency: start.handoff.currency,
+                    publicKey: start.handoff.publicKey,
+                    clientParams: start.handoff.clientParams,
+                },
+                autopay: start,
+            };
+        }
         const payment = await this.payments.createIntentForInvoicePublic(
             {
                 id: draft.id,
@@ -247,13 +308,7 @@ export class PublicPlanJoinService {
             },
             { idempotencyKey, provider: provider.provider },
         );
-        return {
-            ref: draft.id,
-            plan: { name: terms.name, interval: terms.interval },
-            total: toMoneyString(draft.total.toString()),
-            currency: draft.currency,
-            payment,
-        };
+        return { ...summary, payment, autopay: null };
     }
 
     /** How a started join stands; another customer's is a 404. */
@@ -269,7 +324,7 @@ export class PublicPlanJoinService {
                 kind: "INVOICE",
                 source: "SUBSCRIPTION",
             },
-            select: { status: true, planTerms: true },
+            select: { status: true, planTerms: true, subscriptionId: true },
         });
         const terms = readPlanTerms(row?.planTerms);
         // A period's invoice the desk issued has no snapshot: not a join.
@@ -282,6 +337,12 @@ export class PublicPlanJoinService {
                 : row.status === "PAID"
                   ? "joined"
                   : "closed";
-        return { state, plan: { name: terms.name } };
+        return {
+            state,
+            plan: { name: terms.name },
+            ...(state === "joined"
+                ? { subscriptionRef: row.subscriptionId }
+                : {}),
+        };
     }
 }

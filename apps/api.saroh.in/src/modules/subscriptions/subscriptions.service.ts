@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
@@ -17,6 +18,8 @@ import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { AutopayLine } from "../payments/autopay.service";
+import { AutopayService } from "../payments/autopay.service";
 import { cancelMandatesInTx } from "../payments/mandate-cancel-job";
 import { allowanceData } from "./classes-allowance";
 import type { UpcomingCollection } from "./collections";
@@ -218,6 +221,12 @@ export interface SubscriptionView {
      */
     startedAt: string;
     createdAt: string;
+    /**
+     * How its autopay stands (D12): on, paused, being set up or failed,
+     * with the method, its displayable hint and the limit. Null: none.
+     * Only Subscription Detail's read carries it.
+     */
+    autopay?: AutopayLine | null;
 }
 
 /**
@@ -335,7 +344,12 @@ interface Terms {
  */
 @Injectable()
 export class SubscriptionsService {
-    constructor(private readonly invoices: InvoicesService) {}
+    constructor(
+        private readonly invoices: InvoicesService,
+        // The autopay line on Subscription Detail (D12); absent where a test
+        // builds the service by hand.
+        @Optional() private readonly autopay?: AutopayService,
+    ) {}
 
     // — Plans ——————————————————————————————————————————————————————
 
@@ -506,7 +520,12 @@ export class SubscriptionsService {
 
     async get(ctx: OrganizationContext, id: string): Promise<SubscriptionView> {
         authorize(ctx, "subscription:read");
-        return this.read(ctx, id);
+        const view = await this.read(ctx, id);
+        // How autopay stands (D12): read-only here; D14 adds its actions.
+        const autopay = this.autopay
+            ? await this.autopay.line(ctx.organizationId, id)
+            : null;
+        return { ...view, autopay };
     }
 
     /** What was done to it and by whom, newest first (D9). */

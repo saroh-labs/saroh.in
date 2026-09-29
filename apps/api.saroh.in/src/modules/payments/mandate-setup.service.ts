@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
     BadRequestException,
     ConflictException,
@@ -23,6 +25,7 @@ import {
 import type {
     MandateFrequency,
     MandateMethod,
+    MandateSetupHandoff,
     ProviderFactory,
 } from "./providers/provider.port";
 import {
@@ -182,6 +185,8 @@ export class MandateSetupService {
                 currency,
                 frequency,
                 setupExpiresAt,
+                setupSource: input.source ?? null,
+                setupAccountId: input.accountId ?? null,
             },
             select: { id: true },
         });
@@ -210,6 +215,8 @@ export class MandateSetupService {
                 expiresAt,
                 setupExpiresAt,
                 description: `Autopay for ${subscription.plan.name}`,
+                ...(input.returnUrl ? { returnUrl: input.returnUrl } : {}),
+                ...(input.handoff ? { handoff: input.handoff } : {}),
                 credentials: connection.credentials,
             });
             await prisma.paymentMandate.update({
@@ -226,6 +233,7 @@ export class MandateSetupService {
                 method,
                 maxAmountCents: input.maxAmountCents,
                 currency,
+                setupReference: setup.setupReference,
                 authorisationUrl: setup.authorisationUrl,
                 clientParams: setup.clientParams,
                 setupExpiresAt,
@@ -244,6 +252,134 @@ export class MandateSetupService {
                             : "SETUP_UNANSWERED",
                 },
             });
+            const at = providerName(connection.provider);
+            // TODO(D12 open question): a UPI or card authorisation with
+            // nothing owed goes out for ₹0, which Razorpay likely refuses
+            // (its minimum is ₹1). Until the user decides (take ₹1, or
+            // something else), the refusal fails safe: FAILED above, and
+            // the customer (who started it: `source`) is told to turn it
+            // on when they next pay.
+            if (
+                outcome === "REFUSED" &&
+                input.source !== undefined &&
+                refusedForNoPayment(method, firstAmountCents)
+            ) {
+                throw new ConflictException({
+                    message: AUTOPAY_NEEDS_A_PAYMENT,
+                    details: { reason: "needs-payment" },
+                });
+            }
+            if (outcome === "REFUSED") {
+                throw new ConflictException(
+                    `${at} didn't accept the autopay set-up. Try another way to pay, or pay this time without autopay`,
+                );
+            }
+            throw new ServiceUnavailableException(
+                `${at} didn't answer. Nothing was set up; try again in a few minutes`,
+            );
+        }
+    }
+
+    /**
+     * Start an authorisation for a plan being joined online (D12, G20's
+     * pay-first join), before any subscription exists: no row is written.
+     * The caller keeps what this returns on the join's draft invoice
+     * (`plan-join.ts`), and the mandate row is made under `mandateId` when
+     * the draft's payment starts the subscription. A provider report that
+     * arrives before then is held on the draft (`mandate-events.ts`) and
+     * applied once the row exists.
+     */
+    async createJoinSetup(input: CreateJoinSetupInput): Promise<JoinSetup> {
+        const now = input.now ?? new Date();
+        if (
+            !Number.isInteger(input.maxAmountCents) ||
+            input.maxAmountCents <= 0 ||
+            input.maxAmountCents > MANDATE_MAX_CENTS
+        ) {
+            throw new BadRequestException("That autopay limit isn't allowed");
+        }
+        if (
+            !Number.isInteger(input.firstAmountCents) ||
+            input.firstAmountCents < 0
+        ) {
+            throw new BadRequestException("That first payment isn't allowed");
+        }
+        const offers = await this.mandateMethods(input.organizationId);
+        const offer = offers.find((o) => o.methods.includes(input.method));
+        const connection = offer
+            ? await openMandateConnection(
+                  this.providers,
+                  input.organizationId,
+                  offer.provider,
+                  { connectedOnly: true },
+              )
+            : null;
+        if (!connection) {
+            throw new ConflictException(
+                "That way to pay isn't available for autopay with this business",
+            );
+        }
+        const contact = await prisma.contact.findFirst({
+            where: {
+                id: input.contactId,
+                organizationId: input.organizationId,
+            },
+            select: {
+                email: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+            },
+        });
+        if (!contact) throw new NotFoundException("Customer not found");
+        const setupExpiresAt = new Date(now.getTime() + SETUP_TTL_MS);
+        const expiresAt = new Date(now);
+        expiresAt.setFullYear(expiresAt.getFullYear() + MANDATE_TERM_YEARS);
+        const frequency: MandateFrequency = "AS_PRESENTED";
+        const mandateId = newMandateId();
+        const name =
+            [contact.firstName, contact.lastName]
+                .filter((p) => p?.trim())
+                .join(" ")
+                .trim() || "Customer";
+        try {
+            const setup = await connection.mandates.createSetup({
+                reference: mandateId,
+                method: input.method,
+                customer: {
+                    name,
+                    email: isReservedContactEmail(contact.email)
+                        ? null
+                        : contact.email,
+                    phone: contact.phone ?? null,
+                },
+                firstAmountCents: input.firstAmountCents,
+                maxAmountCents: input.maxAmountCents,
+                currency: input.currency,
+                frequency,
+                expiresAt,
+                setupExpiresAt,
+                description: input.description,
+                ...(input.returnUrl ? { returnUrl: input.returnUrl } : {}),
+                credentials: connection.credentials,
+            });
+            return {
+                mandateId,
+                provider: connection.provider,
+                method: input.method,
+                maxAmountCents: input.maxAmountCents,
+                currency: input.currency,
+                frequency,
+                providerCustomerId: setup.providerCustomerId,
+                setupReference: setup.setupReference,
+                authorisationUrl: setup.authorisationUrl,
+                clientParams: setup.clientParams,
+                expiresAt,
+                setupExpiresAt,
+            };
+        } catch (err) {
+            const outcome =
+                err instanceof MandateCallError ? err.outcome : "UNKNOWN";
             const at = providerName(connection.provider);
             if (outcome === "REFUSED") {
                 throw new ConflictException(
@@ -324,6 +460,21 @@ export class MandateSetupService {
     }
 }
 
+/**
+ * What the customer is told when a UPI or card authorisation with nothing
+ * to pay is refused (the D12 open question on ₹0 authorisations).
+ */
+export const AUTOPAY_NEEDS_A_PAYMENT =
+    "Couldn't start autopay without a payment — turn it on when you next pay";
+
+/** A refusal of an authorisation that took no payment, where one needs one. */
+function refusedForNoPayment(
+    method: MandateMethod,
+    firstAmountCents: number,
+): boolean {
+    return firstAmountCents === 0 && method !== "EMANDATE";
+}
+
 /** A provider a customer can set up autopay through, and its methods. */
 export interface MandateOffer {
     provider: string;
@@ -344,7 +495,57 @@ export interface CreateSetupInput {
      */
     firstAmountCents?: number;
     frequency?: MandateFrequency;
+    /** Where the customer set it up (D12); absent for staff. */
+    source?: MandateSetupSource;
+    /** The site account that set it up, when it was one. */
+    accountId?: string | null;
+    /** The page on the business's site the provider sends them back to. */
+    returnUrl?: string;
+    /**
+     * The provider's window on the site (the default, D12), or its hosted
+     * page for a set-up link sent to the customer (D13/D14).
+     */
+    handoff?: MandateSetupHandoff;
     now?: Date;
+}
+
+/** Where a customer set autopay up (D12), for the subscription's log. */
+export const MANDATE_SETUP_SOURCES = ["PAY_LINK", "PRICES", "ACCOUNT"] as const;
+export type MandateSetupSource = (typeof MANDATE_SETUP_SOURCES)[number];
+
+export interface CreateJoinSetupInput {
+    organizationId: string;
+    contactId: string;
+    method: MandateMethod;
+    maxAmountCents: number;
+    /** The join's first period (UPI, card), or 0 (eMandate). */
+    firstAmountCents: number;
+    currency: string;
+    description: string;
+    returnUrl?: string;
+    now?: Date;
+}
+
+/** An authorisation started for a join, kept on its draft until paid. */
+export interface JoinSetup {
+    /** The id the mandate row takes once the subscription starts. */
+    mandateId: string;
+    provider: string;
+    method: MandateMethod;
+    maxAmountCents: number;
+    currency: string;
+    frequency: MandateFrequency;
+    providerCustomerId: string;
+    setupReference: string;
+    authorisationUrl: string | null;
+    clientParams: Record<string, unknown>;
+    expiresAt: Date;
+    setupExpiresAt: Date;
+}
+
+/** A mandate id made before its row: letters and digits, like a cuid. */
+export function newMandateId(): string {
+    return `m${randomUUID().replace(/-/g, "")}`;
 }
 
 /** What the customer's side needs to go and approve it. Never a secret. */
@@ -354,6 +555,8 @@ export interface MandateSetupView {
     method: MandateMethod;
     maxAmountCents: number;
     currency: string;
+    /** The provider's set-up object; for UPI and card, the first payment's order. */
+    setupReference: string;
     /** The provider's page to approve it on, when it has one. */
     authorisationUrl: string | null;
     /** Non-secret parameters for the provider's window otherwise. */

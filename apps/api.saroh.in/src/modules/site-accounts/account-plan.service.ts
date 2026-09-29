@@ -7,7 +7,10 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { toMoneyString } from "../../common/money";
 import { payLinkUrl } from "../invoices/pay-link-url";
+import { AutopayService } from "../payments/autopay.service";
+import type { MandateMethod } from "../payments/providers/provider.port";
 import { ALLOWANCE_SELECT } from "../subscriptions/classes-allowance";
 import type { PauseWeeks } from "../subscriptions/dto";
 import { PAUSE_WEEKS } from "../subscriptions/dto";
@@ -15,6 +18,7 @@ import {
     overdueInvoiceOf,
     takesPaymentOnline,
 } from "../subscriptions/member-invoices";
+import { paymentsOffered } from "../subscriptions/public-plans.service";
 import { membersCanPause } from "../subscriptions/subscription-settings";
 import type { CustomerScope } from "../subscriptions/subscriptions.service";
 import { SubscriptionsService } from "../subscriptions/subscriptions.service";
@@ -75,6 +79,8 @@ export class AccountPlanService {
         @Optional()
         @Inject(AUTOPAY_CHARGE_PENDING)
         private readonly chargePending: AutopayChargePending = NO_AUTOPAY_YET,
+        // Autopay on My plan (D12); absent where a test builds this by hand.
+        @Optional() private readonly autopay?: AutopayService,
     ) {}
 
     // ---- Reading ---------------------------------------------------------
@@ -92,7 +98,24 @@ export class AccountPlanService {
             subscriptions,
             packs,
             pauseWeeks: pausing ? [...PAUSE_WEEKS] : [],
+            autopayMethods: await this.autopayMethods(member, subscriptions),
         };
+    }
+
+    /**
+     * What the business's provider can take autopay with (D12), asked only
+     * when the member has a plan to put it on. A provider that can't say
+     * offers none.
+     */
+    private async autopayMethods(
+        member: CustomerScope,
+        subscriptions: AccountPlanTab["subscriptions"],
+    ): Promise<MandateMethod[]> {
+        if (!this.autopay) return [];
+        if (!subscriptions.ok || subscriptions.value.length === 0) return [];
+        // Autopay is a way to pay: only while Payments is on (DEC-057).
+        if (!(await paymentsOffered(member.organizationId))) return [];
+        return this.autopay.offer(member.organizationId).catch(() => []);
     }
 
     /** The member's live plans (on or paused), newest first. */
@@ -140,12 +163,41 @@ export class AccountPlanService {
                     !(await this.chargePending(organizationId, overdue.id))
                         ? overdue
                         : null;
-                return subscriptionView({
-                    row,
-                    classes: month,
-                    payNow,
-                    membersCanPause: pausing,
-                });
+                const [line, owed] = this.autopay
+                    ? await Promise.all([
+                          this.autopay.line(organizationId, row.id),
+                          prisma.invoice.findFirst({
+                              where: {
+                                  organizationId,
+                                  subscriptionId: row.id,
+                                  status: "ISSUED",
+                              },
+                              orderBy: [{ dueAt: "asc" }, { issuedAt: "asc" }],
+                              select: { total: true, currency: true },
+                          }),
+                      ])
+                    : [null, null];
+                return {
+                    ...subscriptionView({
+                        row,
+                        classes: month,
+                        payNow,
+                        membersCanPause: pausing,
+                    }),
+                    autopay: line
+                        ? {
+                              state: line.state,
+                              method: line.method,
+                              hint: line.hint,
+                          }
+                        : null,
+                    autopayPays: owed
+                        ? {
+                              total: toMoneyString(owed.total),
+                              currency: owed.currency,
+                          }
+                        : null,
+                };
             }),
         );
     }

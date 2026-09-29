@@ -1,5 +1,9 @@
 import type { PlansFeed } from "@saroh/site-blocks";
-import { plansOf, plansPayOnline } from "@saroh/site-blocks";
+import {
+    plansAutopayMethods,
+    plansOf,
+    plansPayOnline,
+} from "@saroh/site-blocks";
 
 import { shopFetch } from "./catalogue";
 import type { PlansRead } from "./plans-feed";
@@ -19,7 +23,12 @@ export async function getPublicPlans(siteId: string): Promise<PlansRead> {
     const res = await shopFetch(`${encodeURIComponent(siteId)}/plans`);
     if (!res?.ok) return { plans: [], payOnline: false };
     const body: unknown = await res.json().catch(() => null);
-    return { plans: plansOf(body) ?? [], payOnline: plansPayOnline(body) };
+    return {
+        plans: plansOf(body) ?? [],
+        payOnline: plansPayOnline(body),
+        // D12: the join sheet's "Pay with"; none from an older API.
+        autopayMethods: plansAutopayMethods(body),
+    };
 }
 
 type Snapshot = Parameters<typeof enquiryPagePath>[0];

@@ -150,6 +150,22 @@ a note saying so.
   PROCESSING) before the call, so it is asked once; the payment's own
   webhook settles the invoice as a pay link's does. Ask for a debit at
   least `PRE_DEBIT_LEAD_HOURS` (26) ahead: `earliestDebitAt`.
+- **Current** (D12) — **Setting autopay up pays the invoice in the same
+  flow, where the method allows.** For UPI and card the authorisation's
+  first payment is the invoice's: `createSetup` gets `firstAmountCents` =
+  the invoice, and the invoice's PaymentIntent is recorded under the
+  set-up's `setupReference` (the adapter must make that the provider order
+  the first payment is taken on), so its capture webhook pays the invoice
+  as a pay link's does. eMandate authorises for ₹0 after a normal payment.
+  The customer comes back to `returnUrl`, a page on the business's own site
+  (`sites/site-origin.ts`); a Razorpay window takes `clientParams`
+  `razorpayOrderId`, `razorpayCustomerId` and `recurring: true`
+  (`site-blocks/booking-flow/checkout.ts`). A plan joined online has no
+  subscription until paid (DEC-062), so its set-up is kept on the draft's
+  `planTerms.autopay` (`payments/join-autopay.ts`), a provider report that
+  comes first is held there, and the mandate row is made when the payment
+  starts the subscription (`subscriptions/plan-join-autopay.ts`). Code:
+  `payments/autopay.service.ts`.
 - **Current** — **The refund webhook settles at the provider's amount**
   (#508 U2). Adapters normalise the refunded amount in paise, Saroh's
   reference and a `REFUND_FAILED` outcome (Razorpay `refund.failed`; Cashfree
@@ -228,10 +244,21 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
 - **Cancel** is `PUT /customers/:c/tokens/:t/cancel`, confirmed by
   `token.cancelled`; `DELETE …/tokens/:t` does not cancel the mandate and
   is never used.
-- **The adapter** (D19, `providers/razorpay-mandates.ts`). Set-up is a
-  registration link for the picked method (`setupReference` = its `inv_…`,
-  `receipt` = the mandate id); `get` reads the token, or before one is
-  known the link → its payment → the token. `prepareCharge` first looks
+- **The adapter** (D19, `providers/razorpay-mandates.ts`). Set-up has two
+  handoffs. **`CHECKOUT`** (the default; D12's window on the business's
+  site): `POST /customers` (`fail_existing: "0"`), then the authorisation
+  order `POST /orders` with `method`, `customer_id`, `receipt` = the
+  mandate id and `token{max_amount, expire_at, frequency}` (no frequency
+  for eMandate), for `firstAmountCents`. `setupReference` = that
+  `order_…`, so for UPI and card the invoice's intent is recorded under it
+  and one `payment.captured` pays the invoice and links the token;
+  `clientParams` = `razorpayOrderId`, `razorpayCustomerId`,
+  `recurring: true`, `method` and `callbackUrl` (the `returnUrl`, sent as
+  Checkout's `callback_url`). **`HOSTED_LINK`** (a set-up link sent to the
+  customer, D13/D14): a registration link (`setupReference` = its
+  `inv_…`); no `callback_url` is sent to it until a test-mode run shows
+  the API takes one. `get` reads the token, or before one is known the
+  order's (or link's) payment → the token. `prepareCharge` first looks
   for its order by `receipt` (the charge key), so a retry never makes a
   second; UPI orders carry the notice, card and eMandate orders none
   (`NOT_NEEDED`, still to confirm). `charge` first reads the order's
@@ -248,8 +275,18 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
   `payment.captured` (or `invoice.paid`) carries a `mandateLink` that
   writes the token id onto the PENDING mandate it paid for; a token event
   that arrived first (acknowledged, nothing written) is then read again
-  from the inbox and applied (`webhooks/mandate-link.ts`).
+  from the inbox and applied (`webhooks/mandate-link.ts`). The link runs
+  after the payment's own effect, so a plan joined with autopay has its
+  mandate row made by that payment first, and the look-back starts when
+  the set-up did (`setupExpiresAt` − the set-up TTL), not when the row was
+  made.
 - **Still open** (D19's test-mode run): the notice's delivery and the debit
   after `payment_after` in test mode, a debit above `max_amount`, a cancel
   answered twice, and whether card and eMandate debits need the notice
-  step at all — the port lets a method answer `NOT_NEEDED`.
+  step at all — the port lets a method answer `NOT_NEEDED`; and whether a
+  UPI or card authorisation with nothing owed (D12's account set-up, which
+  sends `firstAmountCents` 0) is taken, or needs the ₹1 minimum. **Open
+  product question** until then: the ₹0 order is sent as it is, and a
+  refusal fails safe — the set-up FAILED, and the customer told
+  "Couldn't start autopay without a payment — turn it on when you next
+  pay" (`AUTOPAY_NEEDS_A_PAYMENT`, `mandate-setup.service.ts`).

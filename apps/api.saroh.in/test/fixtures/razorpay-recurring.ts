@@ -36,6 +36,54 @@ export function authLink(overrides: Record<string, unknown> = {}) {
     };
 }
 
+/**
+ * `POST /customers` → 200 (with `fail_existing: "0"`, the one Razorpay
+ * already has for that email and phone comes back the same way).
+ */
+export function authCustomer(overrides: Record<string, unknown> = {}) {
+    return {
+        id: RZP.customerId,
+        entity: "customer",
+        name: "Asha Rao",
+        email: "asha@example.in",
+        contact: "+919000090000",
+        gstin: null,
+        notes: [],
+        created_at: 1790000000,
+        ...overrides,
+    };
+}
+
+/**
+ * The authorisation order an in-page set-up makes (D12, `POST /orders`
+ * with `method`, `customer_id` and a `token` block) → 200, as Razorpay's
+ * recurring-payments docs shape it.
+ */
+export function authOrder(overrides: Record<string, unknown> = {}) {
+    return {
+        id: RZP.authOrderId,
+        entity: "order",
+        amount: 100,
+        amount_paid: 0,
+        amount_due: 100,
+        currency: "INR",
+        receipt: "cmmandate000000000000001",
+        status: "created",
+        attempts: 0,
+        notes: { saroh_mandate_id: "cmmandate000000000000001" },
+        created_at: 1790000000,
+        method: "upi",
+        customer_id: RZP.customerId,
+        token: {
+            method: "upi",
+            max_amount: 180000,
+            expire_at: 2106259200,
+            frequency: "as_presented",
+        },
+        ...overrides,
+    };
+}
+
 /** A token as `GET /customers/:c/tokens/:t` and `token.*` carry it. */
 export function token(
     status: "initiated" | "confirmed" | "paused" | "cancelled" | "rejected",

@@ -315,8 +315,16 @@ export class WebhooksService {
         organizationId: string,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        const { applied } = await this.reconcileOutcome(
+            tx,
+            provider,
+            organizationId,
+            event,
+        );
         // Autopay (D19): an authorisation's payment names the mandate it
-        // made; applied beside whatever the payment itself does.
+        // made. After the payment's own effect, so a plan joined with
+        // autopay (D12) has had its mandate row made by this same payment
+        // before the token is linked to it.
         const linked = event.mandateLink
             ? await linkMandateInTx(
                   tx,
@@ -325,12 +333,6 @@ export class WebhooksService {
                   event.mandateLink,
               )
             : false;
-        const { applied } = await this.reconcileOutcome(
-            tx,
-            provider,
-            organizationId,
-            event,
-        );
         return { applied: applied || linked };
     }
 
@@ -1168,6 +1170,8 @@ export class WebhooksService {
                       organizationId: intent.organizationId,
                       now: new Date(),
                       payment,
+                      // Autopay chosen at join starts with it (D12).
+                      providerIntentId: intent.providerIntentId,
                   })
                 : null;
         // A booking's pay link (E4) paid after the booking was cancelled:

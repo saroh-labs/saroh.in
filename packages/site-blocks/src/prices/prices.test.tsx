@@ -24,7 +24,8 @@ import type {
 /**
  * Join and Buy on the site's Prices page in jsdom (round-2 G20): the Plans
  * block's Join and the Class packs block's Buy, signing in first (always on,
- * no guest path), the join sheet's words (no autopay: D12 isn't built), the
+ * no guest path), the join sheet's words (no autopay where the provider
+ * takes none; D12's is `autopay/autopay.test.tsx`), the
  * provider window on the server's payment, the wait for the webhook, and
  * "Ask about…" where the business can't take the payment online. The look
  * is the browser pass's.
@@ -230,7 +231,8 @@ describe("Join on the Plans block", () => {
         expect(sheet).toHaveTextContent("Every month");
         expect(sheet).toHaveTextContent("Starts");
         expect(sheet).toHaveTextContent("Today");
-        // No autopay, and no way to pay named (D12, DEC-059).
+        // No autopay where the provider takes none, and no way to pay
+        // named (D12, DEC-059).
         expect(sheet.textContent).not.toMatch(/autopay|upi|card/i);
         expect(join).not.toHaveBeenCalled();
 

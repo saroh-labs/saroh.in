@@ -32,6 +32,20 @@ const WEEKDAYS = [
 
 type Data = Record<string, unknown>;
 
+/** How the log names an autopay method (D12). */
+const AUTOPAY_METHOD: Record<string, string> = {
+    UPI: "UPI",
+    CARD: "card",
+    EMANDATE: "bank account",
+};
+
+/** Where the customer set autopay up (D12). */
+const SET_UP_FROM: Record<string, string> = {
+    ACCOUNT: "from their account",
+    PRICES: "from the Prices page",
+    PAY_LINK: "from the pay link",
+};
+
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
 
@@ -132,8 +146,12 @@ export function changeWhat(
             return `Renewal payment failed${invoice}`;
         case "MANDATE_LIMIT_LOW":
             return "Not charged — above the autopay limit";
-        case "MANDATE_SET_UP":
-            return "Autopay set up";
+        case "MANDATE_SET_UP": {
+            // D12: the method the customer picked.
+            const method = str(data.method);
+            const how = method ? AUTOPAY_METHOD[method] : undefined;
+            return how ? `Autopay set up with ${how}` : "Autopay set up";
+        }
         case "MANDATE_CANCELLED":
             // D20: autopay ends with what it was authorised for.
             switch (data.reason) {
@@ -178,7 +196,12 @@ export function changeWho(
             return actor.name ?? "A team member";
         case "CUSTOMER": {
             const first = sub.contact.name.split(" ")[0] || sub.contact.name;
-            return `${first}, from their account`;
+            // Autopay says where it was set up (D12).
+            const from =
+                event.kind === "MANDATE_SET_UP"
+                    ? SET_UP_FROM[str((event.data as Data).source) ?? ""]
+                    : undefined;
+            return `${first}, ${from ?? "from their account"}`;
         }
         default:
             return actor.name ?? "Saroh";

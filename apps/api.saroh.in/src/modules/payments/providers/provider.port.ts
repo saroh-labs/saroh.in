@@ -199,19 +199,48 @@ export interface CreateMandateSetupInput {
     setupExpiresAt: Date;
     /** What the provider's page says the authorisation is for. */
     description: string;
+    /**
+     * Where the provider's hosted page sends the customer back to once they
+     * have approved (or left) it: a page on the business's own site (D12),
+     * never Saroh's or the provider's. Absent: the adapter's default.
+     */
+    returnUrl?: string;
+    /**
+     * How the customer reaches the provider. `CHECKOUT` (the default, D12):
+     * the provider's window on the business's own page, opened with
+     * `clientParams`; for UPI and card `setupReference` is then the order
+     * the first payment is taken on. `HOSTED_LINK`: the provider's own page
+     * (`authorisationUrl`), for a set-up link sent to the customer
+     * (D13/D14); Razorpay's is a registration link, whose `inv_…` is the
+     * reference.
+     */
+    handoff?: MandateSetupHandoff;
     credentials: ProviderCredentials;
 }
+
+export type MandateSetupHandoff = "CHECKOUT" | "HOSTED_LINK";
 
 export interface MandateSetupResult {
     providerCustomerId: string;
     /**
      * The provider's set-up object (Razorpay: the registration link's
      * `inv_…`, or the authorisation order), echoed by its webhooks.
+     *
+     * When `firstAmountCents` is above 0 (UPI, card), it is also the
+     * provider order the first payment is made on (D12): Saroh records the
+     * invoice's payment intent under it, so that payment's own capture
+     * webhook pays the invoice as a pay link's does.
      */
     setupReference: string;
     /** The provider's hosted page to authorise on, when it has one. */
     authorisationUrl: string | null;
-    /** Non-secret parameters a checkout window needs instead. */
+    /**
+     * Non-secret parameters a checkout window needs instead. For Razorpay
+     * (D19): `razorpayOrderId`, `razorpayCustomerId`, `recurring: true` and,
+     * given a `returnUrl`, `callbackUrl`, which the site's window turns into
+     * Checkout's `order_id`, `customer_id`, `recurring: "1"` and
+     * `callback_url`.
+     */
     clientParams: Record<string, unknown>;
 }
 

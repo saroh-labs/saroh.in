@@ -13,6 +13,7 @@ import {
 import {
     buyPack,
     joinPlan,
+    joinStartAutopay,
     packPayment,
     planJoinStanding,
 } from "@/app/[domain]/account/plan/actions";
@@ -100,7 +101,12 @@ async function pricesActions(
             requestCode: requestSignInCode,
             verifyCode: verifySignInCode,
         },
-        join: { join: joinPlan, standing: planJoinStanding },
+        join: {
+            join: joinPlan,
+            standing: planJoinStanding,
+            // The join's eMandate step (D12).
+            startAutopay: joinStartAutopay,
+        },
         packs: { buy: buyPack, standing: packPayment },
         accountHref: "/account/plan",
     };

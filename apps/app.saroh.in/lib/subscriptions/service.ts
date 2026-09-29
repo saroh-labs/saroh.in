@@ -51,11 +51,30 @@ export interface PlanPriceRow {
     current: boolean;
 }
 
+/**
+ * How a subscription's autopay stands (D12): on, paused in the customer's
+ * UPI app, being set up, or failed. Only Subscription Detail's read has it.
+ */
+export interface SubscriptionAutopay {
+    state: "ON" | "PAUSED" | "PENDING" | "FAILED";
+    method: "UPI" | "CARD" | "EMANDATE" | null;
+    /** Only what the provider gave as displayable: a masked handle, last four. */
+    hint: string | null;
+    /** The most one charge may take; null when unknown. */
+    limit: string | null;
+    currency: string;
+    since: string;
+    failure:
+        "NOT_APPROVED" | "EXPIRED" | "PROVIDER_REFUSED" | "NO_ANSWER" | null;
+}
+
 export interface Subscription {
     id: string;
     status: SubscriptionStatus;
     plan: { id: string; name: string };
     contact: { id: string; name: string; email: string };
+    /** Autopay (D12); absent from the list and from an API older than D12. */
+    autopay?: SubscriptionAutopay | null;
     price: string;
     currency: string;
     interval: Interval;

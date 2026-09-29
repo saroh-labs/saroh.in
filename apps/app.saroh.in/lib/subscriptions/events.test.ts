@@ -222,3 +222,36 @@ describe("changeRows", () => {
         ]);
     });
 });
+
+describe("autopay set up by the customer (D12)", () => {
+    const setUp = (source: string | null, method: string | null = "UPI") =>
+        event({
+            kind: "MANDATE_SET_UP",
+            actor: { kind: "CUSTOMER", userId: null, name: null },
+            data: { method, source },
+        });
+
+    it("says the method they picked", () => {
+        expect(changeWhat(setUp("ACCOUNT"), SUB, NOW)).toBe(
+            "Autopay set up with UPI",
+        );
+        expect(changeWhat(setUp("ACCOUNT", "EMANDATE"), SUB, NOW)).toBe(
+            "Autopay set up with bank account",
+        );
+        expect(changeWhat(setUp("ACCOUNT", null), SUB, NOW)).toBe(
+            "Autopay set up",
+        );
+    });
+
+    it("says who, and where they set it up", () => {
+        expect(changeWho(setUp("PRICES"), SUB, null)).toBe(
+            "Meera, from the Prices page",
+        );
+        expect(changeWho(setUp("PAY_LINK"), SUB, null)).toBe(
+            "Meera, from the pay link",
+        );
+        expect(changeWho(setUp("ACCOUNT"), SUB, null)).toBe(
+            "Meera, from their account",
+        );
+    });
+});

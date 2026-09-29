@@ -195,6 +195,10 @@ const NEVER: Record<string, string> = {
     // the service (`paymentsOffered`), which answers 404.
     "subscriptions/account-plan-join.controller.ts":
         "a signed-in customer joining a plan — Payments checked by the service, dark with the account area",
+    // D12: autopay on the customer's own plan. Payments being off, or a
+    // provider without autopay, is checked by the service (409).
+    "subscriptions/account-autopay.controller.ts":
+        "a signed-in customer's own autopay — Payments and the provider checked by the service, dark with the account area",
     // A13: the customer's message thread. Every business can be written
     // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
     // a module, on both sides.

@@ -5961,6 +5961,11 @@ model PaymentMandate {
   failureReason  String?
   // Charges taken through it (D13).
   intents        PaymentIntent[]
+  // Where the customer set it up (D12): PAY_LINK | PRICES | ACCOUNT, and
+  // the site account that did, so the log can say "Autopay set up by
+  // ‹name›, from the Prices page". Null on a mandate set up by staff.
+  setupSource    String?
+  setupAccountId String?
 
   // A subscription has at most one ACTIVE mandate.
   @@unique([subscriptionId], map: "PaymentMandate_one_active_per_subscription", where: raw("status = 'ACTIVE'"))

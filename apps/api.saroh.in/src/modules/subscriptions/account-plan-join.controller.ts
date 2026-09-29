@@ -9,7 +9,16 @@ import {
     Post,
     UseGuards,
 } from "@nestjs/common";
-import { IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import {
+    IsIn,
+    IsOptional,
+    IsString,
+    MaxLength,
+    MinLength,
+} from "class-validator";
+
+import type { MandateMethod } from "../payments/providers/provider.port";
+import { MANDATE_METHODS } from "../payments/providers/provider.port";
 
 import { AccountAreaGuard } from "../site-accounts/account-area";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
@@ -25,8 +34,9 @@ import { PublicPlanJoinService } from "./public-plan-join.service";
  * What starting to join takes: an idempotency key, so a retry of the same
  * start returns the same intent. Nothing else — above all no amount, price
  * or way to pay: with the global pipe's `forbidNonWhitelisted`, any other
- * field is a 400. The plan is the path's `:ref`. (D12 adds its autopay
- * choice here once it ships; until then there is none to send.)
+ * field is a 400. The plan is the path's `:ref`. `autopay` is the method
+ * the customer picked to turn autopay on with (D12), from the business's
+ * provider's own list; absent: just pay for this period.
  */
 export class AccountJoinPlanDto {
     @IsOptional()
@@ -34,6 +44,10 @@ export class AccountJoinPlanDto {
     @MinLength(1)
     @MaxLength(255)
     idempotencyKey?: string;
+
+    @IsOptional()
+    @IsIn(MANDATE_METHODS)
+    autopay?: MandateMethod;
 }
 
 /**
@@ -60,7 +74,13 @@ export class AccountPlanJoinController {
         @Param("ref") ref: string,
         @Body() dto: AccountJoinPlanDto,
     ): Promise<AccountPlanJoin> {
-        return this.joins.start(customer, ref, dto.idempotencyKey);
+        return this.joins.start(
+            customer,
+            ref,
+            dto.idempotencyKey,
+            new Date(),
+            dto.autopay,
+        );
     }
 
     /** How a started join stands: paying, joined or closed. */

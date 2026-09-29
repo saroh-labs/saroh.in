@@ -212,3 +212,70 @@ describe("the provider's window (E11)", () => {
         ).resolves.toBe("unavailable");
     });
 });
+
+describe("autopay's authorisation window (D12)", () => {
+    it("opens Razorpay as a recurring payment for the provider's customer", async () => {
+        fakeRazorpay();
+        openProviderCheckout(
+            request({
+                clientParams: {
+                    razorpayOrderId: "order_auth",
+                    razorpayCustomerId: "cust_1",
+                    recurring: true,
+                },
+            }),
+        );
+        await flush();
+        expect(razorpay[0].options).toMatchObject({
+            order_id: "order_auth",
+            recurring: "1",
+            customer_id: "cust_1",
+        });
+    });
+
+    it("takes D19's adapter as it answers: the return page as callback_url", async () => {
+        fakeRazorpay();
+        openProviderCheckout(
+            request({
+                clientParams: {
+                    razorpayOrderId: "order_auth",
+                    razorpayCustomerId: "cust_1",
+                    recurring: true,
+                    method: "upi",
+                    callbackUrl: "https://pulse.saroh.app/autopay?pay=t",
+                },
+            }),
+        );
+        await flush();
+        expect(razorpay[0].options).toMatchObject({
+            order_id: "order_auth",
+            recurring: "1",
+            customer_id: "cust_1",
+            callback_url: "https://pulse.saroh.app/autopay?pay=t",
+        });
+    });
+
+    it("takes Razorpay's own \"1\" too, and never a return page that isn't https", async () => {
+        fakeRazorpay();
+        openProviderCheckout(
+            request({
+                clientParams: {
+                    razorpayOrderId: "order_auth",
+                    recurring: "1",
+                    callbackUrl: "javascript:alert(1)",
+                },
+            }),
+        );
+        await flush();
+        expect(razorpay[0].options).toMatchObject({ recurring: "1" });
+        expect(razorpay[0].options).not.toHaveProperty("callback_url");
+    });
+
+    it("never marks a plain payment recurring", async () => {
+        fakeRazorpay();
+        openProviderCheckout(request());
+        await flush();
+        expect(razorpay[0].options).not.toHaveProperty("recurring");
+        expect(razorpay[0].options).not.toHaveProperty("customer_id");
+    });
+});

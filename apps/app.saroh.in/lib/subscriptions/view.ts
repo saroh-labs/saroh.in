@@ -6,6 +6,7 @@ import type {
     Plan,
     Renewals,
     Subscription,
+    SubscriptionAutopay,
     SubscriptionCharge,
 } from "./service";
 
@@ -529,6 +530,51 @@ export function chargeRow(
         amount: money(c.total, c.currency),
         number: c.number,
     };
+}
+
+const AUTOPAY_METHOD: Record<string, string> = {
+    UPI: "UPI",
+    CARD: "card",
+    EMANDATE: "bank account",
+};
+
+const AUTOPAY_FAILED: Record<string, string> = {
+    NOT_APPROVED: "they didn't approve it",
+    EXPIRED: "they didn't approve it in time",
+    PROVIDER_REFUSED: "the payment provider didn't accept it",
+    NO_ANSWER: "the payment provider didn't answer",
+};
+
+/**
+ * The autopay line on Subscription Detail (D12), so the merchant can check
+ * what the customer set up: "Autopay on · UPI · mo•••@okicici · limit
+ * ₹1,500", "Autopay pending · UPI — waiting for them to approve it",
+ * "Autopay failed · card — they didn't approve it". Null: no autopay.
+ */
+export function autopayLine(
+    autopay: SubscriptionAutopay | null | undefined,
+): string | null {
+    if (!autopay) return null;
+    const method = autopay.method ? AUTOPAY_METHOD[autopay.method] : null;
+    const how = [method, autopay.hint].filter(Boolean).join(" · ");
+    const withHow = (head: string) => (how ? `${head} · ${how}` : head);
+    switch (autopay.state) {
+        case "ON": {
+            const limit = autopay.limit
+                ? ` · limit ${money(autopay.limit, autopay.currency)}`
+                : "";
+            return `${withHow("Autopay on")}${limit}`;
+        }
+        case "PAUSED":
+            return `${withHow("Autopay paused")} — paused in their UPI app`;
+        case "PENDING":
+            return `${withHow("Autopay pending")} — waiting for them to approve it`;
+        case "FAILED":
+            return `${withHow("Autopay failed")} — ${
+                AUTOPAY_FAILED[autopay.failure ?? ""] ??
+                AUTOPAY_FAILED.NOT_APPROVED
+            }`;
+    }
 }
 
 /** "UPI", "the pay link" — how the latest paid charge was paid, if any was. */

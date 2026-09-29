@@ -1,4 +1,4 @@
-import type { PlansFeed, PublicPlan } from "@saroh/site-blocks";
+import type { AutopayMethod, PlansFeed, PublicPlan } from "@saroh/site-blocks";
 
 /**
  * The Plans block's plans, for a page that has one (G9).
@@ -21,6 +21,8 @@ export function hasPlans(sections: readonly { type: string }[]): boolean {
 export interface PlansRead {
     plans: PublicPlan[];
     payOnline: boolean;
+    /** Every way the provider can take autopay (D12); none when absent. */
+    autopayMethods?: AutopayMethod[];
 }
 
 export async function plansFeed(
@@ -33,8 +35,8 @@ export async function plansFeed(
     // A failed read, Payments off or no plan on sale is an empty list (the
     // reader never throws), and an empty list draws nothing: the page still
     // serves.
-    const { plans, payOnline } = await read();
-    return { plans, joinHref, payOnline };
+    const { plans, payOnline, autopayMethods = [] } = await read();
+    return { plans, joinHref, payOnline, autopayMethods };
 }
 
 /**
