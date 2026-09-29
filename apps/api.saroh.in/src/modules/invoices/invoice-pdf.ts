@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { Logger } from "@nestjs/common";
 import PDFDocument from "pdfkit";
 
 import type { PaperView } from "./invoice-paper-view";
+import type { ParsedPng } from "./invoice-pdf-logo";
+import { pngDecodes, warnLogoSkipped } from "./invoice-pdf-logo";
 
 /**
  * An issued invoice's paper as a PDF (D16, default 37): drawn on request
@@ -15,7 +18,14 @@ import type { PaperView } from "./invoice-paper-view";
  *
  * A4, dark ink on white. A long invoice runs onto more pages: the table's
  * heading repeats under a "continued" line, and every page is numbered.
+ *
+ * The business logo, when it has one pdfkit can print, sits above its name
+ * as on the paper: a rounded square twice the name's height, cropped to
+ * fill. `invoice-pdf-logo.ts` reads it; one that will not decode is left
+ * off here, and the PDF still goes out.
  */
+
+const logger = new Logger("InvoicePdf");
 
 /** `assets/fonts` beside `src` and `dist`: `modules/invoices` is two deep. */
 const FONT_DIR = join(__dirname, "..", "..", "..", "assets", "fonts");
@@ -41,6 +51,13 @@ const FOOT = 40;
 
 const COL = { hsn: 70, qty: 40, amount: 84, gap: 10 } as const;
 
+/**
+ * The paper's logo is 40px, rounded 8px, 8px above its 20px name; here the
+ * name is 17pt, so the logo is 34pt, rounded 7pt, 7pt above it.
+ */
+const NAME_SIZE = 17;
+const LOGO = { size: NAME_SIZE * 2, radius: 7, gap: 7 } as const;
+
 /** "KD/26-27/0012" → "KD-26-27-0012.pdf": the invoice number, safe to save. */
 export function pdfFileName(number: string): string {
     const safe = number
@@ -49,7 +66,17 @@ export function pdfFileName(number: string): string {
     return `${safe || "invoice"}.pdf`;
 }
 
-export function renderInvoicePdf(view: PaperView): Promise<Buffer> {
+export interface InvoicePdfOptions {
+    /** PNG or JPEG bytes of the business logo; left off when absent. */
+    logo?: Buffer | null;
+    /** Names the business in the log line when its logo cannot be drawn. */
+    organizationId?: string;
+}
+
+export function renderInvoicePdf(
+    view: PaperView,
+    options: InvoicePdfOptions = {},
+): Promise<Buffer> {
     const { regular, bold } = loadFonts();
     const doc = new PDFDocument({
         size: "A4",
@@ -77,14 +104,57 @@ export function renderInvoicePdf(view: PaperView): Promise<Buffer> {
         doc.on("error", reject);
     });
 
-    draw(doc, view);
+    const logo = options.logo ? openLogo(doc, options.logo) : null;
+    if (options.logo && !logo) {
+        warnLogoSkipped(logger, options.organizationId ?? "-", "undecodable");
+    }
+    draw(doc, view, logo);
     doc.end();
     return done;
 }
 
 type Doc = PDFKit.PDFDocument;
 
-function draw(doc: Doc, view: PaperView): void {
+/** pdfkit's parsed image: `openImage` is public but untyped. */
+interface OpenedImage {
+    width: number;
+    height: number;
+    /** png-js's parse, on a PNG. */
+    image?: Partial<ParsedPng>;
+}
+
+/**
+ * Parse the logo before anything is drawn, so an image whose signature
+ * passed but whose data is broken leaves the page untouched.
+ */
+function openLogo(doc: Doc, bytes: Buffer): OpenedImage | null {
+    try {
+        const image = (
+            doc as Doc & { openImage(src: Buffer): OpenedImage }
+        ).openImage(bytes);
+        if (!(image.width > 0 && image.height > 0)) return null;
+        const png = image.image;
+        if (png?.imgData && !pngDecodes(png as ParsedPng)) return null;
+        return image;
+    } catch {
+        return null;
+    }
+}
+
+/** The logo, cropped to fill a rounded square (the paper's `object-cover`). */
+function drawLogo(doc: Doc, image: OpenedImage, x: number, y: number) {
+    doc.save();
+    doc.roundedRect(x, y, LOGO.size, LOGO.size, LOGO.radius).clip();
+    // pdfkit draws an already-opened image as it draws bytes.
+    doc.image(image as unknown as Buffer, x, y, {
+        cover: [LOGO.size, LOGO.size],
+        align: "center",
+        valign: "center",
+    });
+    doc.restore();
+}
+
+function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
     const left = MARGIN;
     const width = doc.page.width - MARGIN * 2;
     const bottom = () => doc.page.height - MARGIN - FOOT;
@@ -102,10 +172,15 @@ function draw(doc: Doc, view: PaperView): void {
     const rx = left + width - rightW;
     let y = MARGIN;
 
+    let nameY = y;
+    if (logo) {
+        drawLogo(doc, logo, left, y);
+        nameY += LOGO.size + LOGO.gap;
+    }
     doc.font("Bold")
-        .fontSize(17)
+        .fontSize(NAME_SIZE)
         .fillColor(INK)
-        .text(view.seller.name, left, y, { width: leftW });
+        .text(view.seller.name, left, nameY, { width: leftW });
     let ly = doc.y + 2;
     doc.font("Regular").fontSize(9).fillColor(MUTED);
     for (const line of [...view.seller.lines, view.seller.tax]) {

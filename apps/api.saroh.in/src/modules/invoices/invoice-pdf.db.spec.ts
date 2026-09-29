@@ -3,7 +3,9 @@
  * paper as a PDF named for its number, with the business's frozen GSTIN
  * and its CGST and SGST in it; a draft is a 409, another business's
  * invoice a 404, and a role without `invoice:read` a 403. Nothing is
- * stored: rendering it writes no row.
+ * stored: rendering it writes no row. A business with a logo has it printed
+ * at the top, read from storage; one whose logo's bytes are gone still gets
+ * its PDF, without it.
  *
  * Runs in the integration project (TEST_DATABASE_URL).
  */
@@ -19,6 +21,7 @@ jest.mock("../capabilities/module-enforcement.guard", () => ({
 }));
 
 import { execFileSync } from "node:child_process";
+import { crc32, deflateSync } from "node:zlib";
 
 import {
     ConflictException,
@@ -26,8 +29,10 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { createMemoryStorage } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { MediaService } from "../media/media.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import type { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesController } from "./invoices.controller";
@@ -35,8 +40,12 @@ import { InvoicesService } from "./invoices.service";
 
 const GSTIN = "29AAGCR1234M1Z5";
 
+const storage = createMemoryStorage({
+    publicBaseUrl: "https://media.saroh.test",
+});
+const media = new MediaService(storage);
 const invoices = new InvoicesService();
-const pdfs = new InvoicePdfService(invoices);
+const pdfs = new InvoicePdfService(invoices, media);
 const controller = new InvoicesController(
     invoices,
     {} as InvoiceSendService,
@@ -60,6 +69,78 @@ process.stdin.on("end", async () => {
     process.stdout.write(result.text);
 });
 `;
+
+/** The images a PDF embeds, as [width, height]. */
+const IMAGES = `
+const { PDFParse } = require(${JSON.stringify(require.resolve("pdf-parse"))});
+const chunks = [];
+process.stdin.on("data", (c) => chunks.push(c));
+process.stdin.on("end", async () => {
+    const parser = new PDFParse({ data: new Uint8Array(Buffer.concat(chunks)) });
+    const result = await parser.getImage({ imageThreshold: 0 });
+    await parser.destroy();
+    process.stdout.write(JSON.stringify(
+        result.pages.flatMap((p) => p.images.map((i) => [i.width, i.height])),
+    ));
+});
+`;
+
+function imagesOf(file: Buffer): [number, number][] {
+    return JSON.parse(
+        execFileSync(process.execPath, ["-e", IMAGES], {
+            input: file,
+        }).toString(),
+    ) as [number, number][];
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+    const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+}
+
+/** A 12-pixel-square RGBA PNG. */
+function logoPng(): Buffer {
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(12, 0);
+    ihdr.writeUInt32BE(12, 4);
+    ihdr[8] = 8; // bit depth
+    ihdr[9] = 6; // RGBA
+    const raw = Buffer.alloc(12 * (1 + 12 * 4), 0x60);
+    for (let row = 0; row < 12; row++) raw[row * (1 + 12 * 4)] = 0;
+    return Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        pngChunk("IHDR", ihdr),
+        pngChunk("IDAT", deflateSync(raw)),
+        pngChunk("IEND", Buffer.alloc(0)),
+    ]);
+}
+
+/**
+ * Upload `bytes` to the business's library and set it as the logo, as
+ * Settings does; `stored: false` leaves storage without the bytes.
+ */
+async function setLogo(
+    ctx: OrganizationContext,
+    bytes: Buffer,
+    stored = true,
+): Promise<void> {
+    const ticket = await media.createUpload(ctx, {
+        contentType: "image/png",
+        contentLength: bytes.length,
+        filename: "logo.png",
+        purpose: "business-logo",
+    });
+    if (stored) storage.putBytes(ticket.key, bytes);
+    const done = await media.completeUpload(ctx, ticket.mediaId);
+    await prisma.businessProfile.update({
+        where: { organizationId: ctx.organizationId },
+        data: { logoMediaId: done.id, logoUrl: done.url },
+    });
+}
 
 function textOf(file: Buffer): string {
     return execFileSync(process.execPath, ["-e", EXTRACT], {
@@ -227,5 +308,34 @@ describe("Download PDF (real database)", () => {
         await expect(pdfs.render(noRead, id)).rejects.toBeInstanceOf(
             ForbiddenException,
         );
+    });
+});
+
+describe("the business logo on the PDF (real database)", () => {
+    it("prints the logo set in Settings, above the name, header intact", async () => {
+        expect(
+            imagesOf((await pdfs.render(rye, await taxInvoice())).file),
+        ).toEqual([]);
+
+        await setLogo(rye, logoPng());
+        const { file } = await pdfs.render(rye, await taxInvoice());
+        expect(imagesOf(file)).toEqual([[12, 12]]);
+        const text = textOf(file);
+        for (const words of [
+            "Rye & Co.",
+            "Rye and Company Bakery LLP",
+            "TAX INVOICE",
+            `GSTIN ${GSTIN} · Karnataka (29)`,
+            "₹2,832",
+        ]) {
+            expect(text).toContain(words);
+        }
+    });
+
+    it("a logo whose bytes are gone from storage: the PDF, without it", async () => {
+        await setLogo(rye, logoPng(), false);
+        const { file } = await pdfs.render(rye, await taxInvoice());
+        expect(imagesOf(file)).toEqual([]);
+        expect(textOf(file)).toContain("Rye & Co.");
     });
 });

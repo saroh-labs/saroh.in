@@ -4,6 +4,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { ACCOUNT_THREAD_POSTER } from "../communications/account-thread";
 import { CommunicationsModule } from "../communications/communications.module";
+import { MediaModule } from "../media/media.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AccountThreadPosterService } from "../site-accounts/thread-poster";
 import { InvoicePdfService } from "./invoice-pdf.service";
@@ -21,6 +22,8 @@ import { InvoicesService } from "./invoices.service";
         forwardRef(() => OrganizationsModule),
         CapabilitiesModule,
         CommunicationsModule,
+        // Storage, for the business logo on the invoice PDF.
+        MediaModule,
     ],
     controllers: [InvoicesController],
     providers: [

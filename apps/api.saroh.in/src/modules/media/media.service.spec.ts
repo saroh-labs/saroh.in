@@ -555,3 +555,49 @@ describe("MediaService.list", () => {
         });
     });
 });
+
+describe("MediaService.readReadyObjectStart — the logo's bytes", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const row = {
+        organizationId: "org_1",
+        key: "org/org_1/business-logo/uuid-logo.png",
+        status: "READY",
+        contentType: "image/png",
+    };
+
+    it("reads a READY object of this business from storage, not its URL", async () => {
+        const bytes = new Uint8Array([0x89, 0x50]);
+        const readObjectStart = jest.fn().mockResolvedValue(bytes);
+        const service = new MediaService(fakeStorage({ readObjectStart }));
+        findUnique.mockResolvedValue(row);
+
+        await expect(
+            service.readReadyObjectStart("org_1", "m_1", 100),
+        ).resolves.toEqual({ bytes, contentType: "image/png" });
+        expect(readObjectStart).toHaveBeenCalledWith(row.key, 100);
+    });
+
+    it.each([
+        ["another business's", { ...row, organizationId: "org_2" }],
+        ["one still uploading", { ...row, status: "PENDING" }],
+        ["a missing", null],
+    ])("%s object is null, and storage is not read", async (_, found) => {
+        const readObjectStart = jest.fn();
+        const service = new MediaService(fakeStorage({ readObjectStart }));
+        findUnique.mockResolvedValue(found);
+
+        await expect(
+            service.readReadyObjectStart("org_1", "m_1", 100),
+        ).resolves.toBeNull();
+        expect(readObjectStart).not.toHaveBeenCalled();
+    });
+
+    it("bytes gone from storage are null", async () => {
+        const service = new MediaService(fakeStorage());
+        findUnique.mockResolvedValue(row);
+        await expect(
+            service.readReadyObjectStart("org_1", "m_1", 100),
+        ).resolves.toBeNull();
+    });
+});
