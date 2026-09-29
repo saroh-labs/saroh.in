@@ -358,7 +358,7 @@ test.describe("the Plan Editor (D7)", () => {
             page.getByRole("button", { name: "Publish" }).first(),
         ).toBeDisabled();
 
-        await page.getByLabel(/^Price/).fill("999");
+        await page.getByRole("textbox", { name: /^Price/ }).fill("999");
         await expect(
             page.getByText("Draft · saved — nobody can join it yet"),
         ).toBeVisible();
@@ -372,7 +372,7 @@ test.describe("the Plan Editor (D7)", () => {
                 page.getByText("Open to new sign-ups · no changes"),
             ).toBeVisible();
 
-            await page.getByLabel(/^Price/).fill("1099");
+            await page.getByRole("textbox", { name: /^Price/ }).fill("1099");
             await expect(page.getByText("Changes not live")).toBeVisible();
             await expect(
                 page.getByText(/When you publish: price ₹999 → ₹1,099/),
@@ -383,7 +383,7 @@ test.describe("the Plan Editor (D7)", () => {
                 .click();
             await expect(page.getByText("Changes published.")).toBeVisible();
 
-            await page.getByLabel(/^Price/).fill("1299");
+            await page.getByRole("textbox", { name: /^Price/ }).fill("1299");
             await expect(page.getByText("Changes not live")).toBeVisible();
             await page
                 .getByRole("button", { name: "Discard changes" })
@@ -396,7 +396,9 @@ test.describe("the Plan Editor (D7)", () => {
             await expect(
                 page.getByText("Open to new sign-ups · no changes"),
             ).toBeVisible();
-            await expect(page.getByLabel(/^Price/)).toHaveValue("1099");
+            await expect(
+                page.getByRole("textbox", { name: /^Price/ }),
+            ).toHaveValue("1099");
         } finally {
             // Nobody new can join it; the demo list is left as it was.
             await page.goto(editAddress.replace(/\/edit$/, ""));

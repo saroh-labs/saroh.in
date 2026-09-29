@@ -72,19 +72,33 @@ export class MandateSetupService {
             this.providers,
             organizationId,
         )) {
-            const connection = await openMandateConnection(
-                this.providers,
-                organizationId,
-                provider,
-                { connectedOnly: true },
-            );
-            if (!connection) continue;
             // An adapter behind a rollout flag (Razorpay, D19) is offered
-            // only where the flag is on; it fails closed while unset.
-            const flag = connection.mandates.rolloutFlag;
+            // only where the flag is on; it fails closed while unset. Asked
+            // before the credentials are opened: with the flag off, nothing
+            // is decrypted for an offer that won't be made.
+            const flag = this.providers.get(provider).mandates?.rolloutFlag;
             if (flag && !(await rolloutFlags.isEnabled(flag, organizationId))) {
                 continue;
             }
+            // Credentials that can't be opened (no PAYMENTS_ENC_KEY, a secret
+            // sealed under another key) mean no autopay through this
+            // provider — never a failed read. Subscription Detail and the
+            // offer both ask here, and must still load.
+            let connection: Awaited<ReturnType<typeof openMandateConnection>>;
+            try {
+                connection = await openMandateConnection(
+                    this.providers,
+                    organizationId,
+                    provider,
+                    { connectedOnly: true },
+                );
+            } catch {
+                this.logger.warn(
+                    `${provider}'s connection couldn't be opened; autopay isn't offered through it for now`,
+                );
+                continue;
+            }
+            if (!connection) continue;
             try {
                 const methods = await connection.mandates.mandateMethods({
                     credentials: connection.credentials,

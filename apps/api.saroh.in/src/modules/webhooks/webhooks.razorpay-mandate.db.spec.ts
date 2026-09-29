@@ -256,6 +256,41 @@ describe("the gate (waves plan boundary 6)", () => {
         expect(await setups.mandateMethods(owner.organizationId)).toEqual([]);
     });
 
+    it("credentials that can't be opened: nothing offered, never a throw, flag on or off", async () => {
+        // Subscription Detail reads the offer; a connection sealed under
+        // another key (or no PAYMENTS_ENC_KEY, as in CI's seeded stack)
+        // must cost the offer, not the page (PR #716).
+        const where = {
+            organizationId_provider: {
+                organizationId: owner.organizationId,
+                provider: "RAZORPAY",
+            },
+        };
+        const row = await prisma.merchantPaymentProvider.findUniqueOrThrow({
+            where,
+        });
+        await prisma.merchantPaymentProvider.update({
+            where,
+            data: { credentialsAuthTag: "00".repeat(16) },
+        });
+        try {
+            await setFlag(false);
+            expect(await setups.mandateMethods(owner.organizationId)).toEqual(
+                [],
+            );
+            await setFlag(true);
+            expect(await setups.mandateMethods(owner.organizationId)).toEqual(
+                [],
+            );
+            expect(fetchMock).not.toHaveBeenCalled();
+        } finally {
+            await prisma.merchantPaymentProvider.update({
+                where,
+                data: { credentialsAuthTag: row.credentialsAuthTag },
+            });
+        }
+    });
+
     it("on: UPI, card and eMandate are offered", async () => {
         expect(await setups.mandateMethods(owner.organizationId)).toEqual([
             {
