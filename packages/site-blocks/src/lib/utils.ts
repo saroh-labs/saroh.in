@@ -15,3 +15,14 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
+
+/**
+ * A path without its trailing slashes. A loop, not `/\/+$/`, which is
+ * quadratic on a long run of slashes that doesn't end the string
+ * (CodeQL js/polynomial-redos).
+ */
+export function trimTrailingSlashes(path: string): string {
+    let end = path.length;
+    while (end > 0 && path.charCodeAt(end - 1) === 47) end--;
+    return end === path.length ? path : path.slice(0, end);
+}

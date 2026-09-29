@@ -1,5 +1,7 @@
 import type { PageKind } from "@saroh/database";
 
+import { trimTrailingSlashes } from "../../common/paths";
+
 /**
  * Module pages (round-2 G14, DEC-046): a `Page` with a kind other than FREE.
  *
@@ -131,7 +133,7 @@ export const RESERVED_PAGE_PATHS: readonly {
 export function reservedPathFor(
     path: string,
 ): (typeof RESERVED_PAGE_PATHS)[number] | null {
-    const p = path.toLowerCase().replace(/\/+$/, "");
+    const p = trimTrailingSlashes(path.toLowerCase());
     return (
         RESERVED_PAGE_PATHS.find(
             (r) => p === r.root || p.startsWith(`${r.root}/`),
