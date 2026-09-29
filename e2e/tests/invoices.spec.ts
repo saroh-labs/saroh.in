@@ -144,8 +144,13 @@ test.describe("invoices", () => {
         await signIn(page);
         await page.goto(`/open/${ORG}`);
 
-        // The chips: All and each source Northwind has. It sells, and the
-        // test above writes by hand, so both are there.
+        // The chips show only when there are two sources or more. Northwind
+        // sells; an invoice written by hand is made here, not borrowed from
+        // the test above, so this test runs alone or on any shard.
+        const org = await northwind(page);
+        const { id } = await draftFor(page, org, "d18");
+        await api(page, org).post(`/invoices/${id}/issue`);
+
         await page.goto("/billing/invoices");
         const chips = page.getByRole("radiogroup", {
             name: "What it was for",

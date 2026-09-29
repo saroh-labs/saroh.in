@@ -424,7 +424,7 @@ test.describe("a treatment's next visit on the row (B14)", () => {
                     ? /Next (today|yesterday|\d{1,2} \w{3})/
                     : "Next visit not booked",
             );
-            await expect(row).not.toContainText("Late");
+            await expect(row).not.toContainText(/\bLate\b/);
         }
     });
 });

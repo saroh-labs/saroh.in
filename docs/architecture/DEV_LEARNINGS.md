@@ -828,3 +828,29 @@ the unit doesn't build goes in the waves plan's follow-up table with an ID
 Before calling a unit done, search the code for each copy string its plan
 quotes.
 **Category**: plans · `docs/plans/2026-09-28-001-round-2-phase-2-waves-plan.md` → Deferred to follow-up work
+
+## CI — `@saroh/database#lint` failed on types "that could not be resolved"
+
+**Problem**: CI's lint job failed on dozens of `no-unsafe-*` errors in
+`packages/database` ("Unsafe call of a type that could not be resolved",
+`.businessProfile`, `.$transaction`); the same command passed locally.
+**Root cause**: `lint` and `typecheck` depend on `^build` — the builds of a
+package's _dependencies_, not its own. `@saroh/database`'s own `build`
+starts with `prisma generate`, so in CI's fresh checkout it regenerated
+the client while the package's lint was reading it. Locally the client
+already sat on disk, so the race never showed.
+**Fix**: `turbo.json` makes `@saroh/database#lint` and `#typecheck` wait for
+the package's own `build`. A task that reads generated code depends on the
+task that generates it, in the same package too.
+**Category**: CI · turbo · `turbo.json`
+
+## E2E — a spec passed only when the one above it had run first (D18)
+
+**Problem**: "narrow the list by what each invoice was for" failed now and
+then: the source chips never appeared.
+**Root cause**: The chips show only for two sources or more, and the spec
+relied on the test above having written an invoice by hand. Sharding,
+retries and a fresh database break that order.
+**Fix**: The spec makes its own invoice by hand through the API. A spec
+never depends on another spec's leftovers.
+**Category**: e2e · `e2e/tests/invoices.spec.ts`

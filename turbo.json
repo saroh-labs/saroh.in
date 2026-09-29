@@ -108,6 +108,12 @@
         "lint": {
             "dependsOn": ["^build"]
         },
+        "@saroh/database#lint": {
+            "dependsOn": ["^build", "build"]
+        },
+        "@saroh/database#typecheck": {
+            "dependsOn": ["^build", "build"]
+        },
         "typecheck": {
             "dependsOn": ["^build"]
         },
