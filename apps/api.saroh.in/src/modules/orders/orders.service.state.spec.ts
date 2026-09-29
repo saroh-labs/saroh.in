@@ -40,13 +40,27 @@ jest.mock("@saroh/database", () => {
     const $queryRaw = jest.fn().mockResolvedValue([]);
     // A status change is a step on the order's timeline (ADR-008).
     const orderEvent = { create: jest.fn() };
+    // Marking paid first asks whether it is being paid online (#622): here
+    // no visit is held and no payment is going through.
+    const booking = { findFirst: jest.fn().mockResolvedValue(null) };
+    const paymentIntent = { findFirst: jest.fn().mockResolvedValue(null) };
     return {
         prisma: {
             order,
             inventory,
             orderEvent,
+            booking,
+            paymentIntent,
             $transaction: jest.fn((cb) =>
-                cb({ order, inventory, orderItem, orderEvent, $queryRaw }),
+                cb({
+                    order,
+                    inventory,
+                    orderItem,
+                    orderEvent,
+                    booking,
+                    paymentIntent,
+                    $queryRaw,
+                }),
             ),
         },
     };
