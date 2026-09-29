@@ -94,23 +94,29 @@ async function freshOrder(
     { paid = true }: { paid?: boolean } = {},
 ): Promise<string> {
     const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
-    // Receive the unit this order takes, so the fixture never sells out: one
-    // database serving every spec on both projects (`pnpm prepush --e2e`)
-    // otherwise ran the trolley dry and refused the order 409. Best effort —
-    // a shelf with tracking off has nothing to receive.
-    await page.request.post(
-        `${urls.API_URL}/organizations/${NORTHWIND}/stock/adjust`,
-        {
-            headers,
-            data: {
-                storeId: NW_STORE,
-                productId: "seed_product_11",
-                variantId: "seed_variant_11_0",
-                units: 1,
-                note: "e2e: stock for a fresh order",
+    // Receive the unit this order takes, so the fixture never sells out.
+    // `product-page-stock.spec.ts` turns tracking on for the trolley and
+    // counts it to 7; with every spec on both projects sharing one database
+    // (`pnpm prepush --e2e`; CI splits them across shards) the orders here
+    // promised all 7 and the next was refused 409. The shelf is the product's
+    // or the variant's, whichever is tracked; a shelf that isn't tracked
+    // refuses the receipt, which is fine — nothing can sell out there.
+    for (const variantId of [null, "seed_variant_11_0"]) {
+        const received = await page.request.post(
+            `${urls.API_URL}/organizations/${NORTHWIND}/stock/adjust`,
+            {
+                headers,
+                data: {
+                    storeId: NW_STORE,
+                    productId: "seed_product_11",
+                    variantId,
+                    units: 1,
+                    note: "e2e: stock for a fresh order",
+                },
             },
-        },
-    );
+        );
+        if (received.ok()) break;
+    }
     const made = await page.request.post(
         `${urls.API_URL}/stores/${NW_STORE}/orders`,
         {
