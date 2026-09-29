@@ -2,7 +2,9 @@
 // say, that everything typed is escaped, and that the pay link is only ever
 // a slot in the stored body. Pure.
 import {
+    autopayCancelledSentence,
     fillSecretLink,
+    renderAutopayCancelled,
     renderAutopaySetupLink,
     renderTransactional,
     SECRET_LINK_SLOT,
@@ -114,5 +116,42 @@ describe("renderAutopaySetupLink (D14)", () => {
         expect(body).toContain("<p>Hello,</p>");
         expect(body).toContain("&lt;b&gt;Gold&lt;/b&gt;");
         expect(body).not.toContain("<b>Gold</b>");
+    });
+});
+
+describe("the autopay-cancelled note (D14)", () => {
+    const vars = {
+        business: "Pulse & Co.",
+        firstName: "Meera",
+        plan: "Monthly unlimited",
+    };
+
+    it("says it stopped, the plan carries on, and how the next renewal is paid", () => {
+        const { subject, body } = renderAutopayCancelled(vars);
+        expect(subject).toBe("Autopay for Monthly unlimited is off");
+        expect(body).toContain("<p>Hi Meera,</p>");
+        expect(body).toContain(
+            "Pulse &amp; Co. has turned off autopay for Monthly unlimited. Nothing more will be taken automatically.",
+        );
+        expect(body).toContain("an invoice with a link to pay it");
+        // Nothing secret: no link slot at all.
+        expect(body).not.toContain(SECRET_LINK_SLOT);
+    });
+
+    it("escapes what was typed, and greets someone with no name", () => {
+        const { body } = renderAutopayCancelled({
+            ...vars,
+            firstName: null,
+            plan: "<b>Gold</b>",
+        });
+        expect(body).toContain("<p>Hello,</p>");
+        expect(body).toContain("&lt;b&gt;Gold&lt;/b&gt;");
+        expect(body).not.toContain("<b>Gold</b>");
+    });
+
+    it("the thread line is plain text, never HTML", () => {
+        expect(autopayCancelledSentence(vars)).toBe(
+            "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.",
+        );
     });
 });

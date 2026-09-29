@@ -105,3 +105,16 @@ describe("opening the set-up sheet from Home (D14)", () => {
         expect(dialog()).toBeNull();
     });
 });
+
+describe("Cancel autopay says who is told (D14)", () => {
+    it("names the address Saroh emails to say so", () => {
+        render(panel(), false);
+        const cancel = Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent === "Cancel autopay",
+        );
+        act(() => cancel?.click());
+        expect(dialog()?.textContent).toContain(
+            "Saroh emails Meera at meera@example.in to say so.",
+        );
+    });
+});

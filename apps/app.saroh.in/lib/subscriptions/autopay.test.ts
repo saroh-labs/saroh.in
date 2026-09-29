@@ -226,6 +226,47 @@ describe("cancelledText", () => {
             cancelledText({ outcome: "ALREADY_OFF", provider: null }).title,
         ).toBe("Autopay was already off.");
     });
+
+    it("says how the customer was told, claiming only what happened (D14)", () => {
+        const told = (t: {
+            email: string | null;
+            suppressed: boolean;
+            account: boolean;
+        }) =>
+            cancelledText(
+                { outcome: "CANCELLED", provider: "Razorpay", told: t },
+                "Meera",
+            ).detail;
+        expect(
+            told({
+                email: "meera@example.in",
+                suppressed: false,
+                account: false,
+            }),
+        ).toBe(
+            "The next renewal is invoiced with a pay link. Meera was told by email.",
+        );
+        expect(
+            told({
+                email: "meera@example.in",
+                suppressed: false,
+                account: true,
+            }),
+        ).toBe(
+            "The next renewal is invoiced with a pay link. Meera was told by email and in their account on your site.",
+        );
+        expect(told({ email: null, suppressed: true, account: false })).toBe(
+            "The next renewal is invoiced with a pay link. Meera has turned off email, so it wasn't emailed.",
+        );
+        expect(told({ email: null, suppressed: false, account: false })).toBe(
+            "The next renewal is invoiced with a pay link.",
+        );
+        // An older API sends no `told`: nothing is claimed.
+        expect(
+            cancelledText({ outcome: "REFUSED", provider: "Razorpay" }, "Meera")
+                .detail,
+        ).not.toContain("Meera");
+    });
 });
 
 describe("renewalWords (honest copy)", () => {

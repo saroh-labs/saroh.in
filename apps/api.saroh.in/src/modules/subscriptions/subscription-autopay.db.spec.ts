@@ -22,6 +22,7 @@ import { HttpException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import { CommunicationsService } from "../communications/communications.service";
 import { SECRET_LINK_SLOT } from "../communications/transactional";
 import { FlagKey } from "../feature-flags/flags";
@@ -497,7 +498,12 @@ describe("Cancel autopay", () => {
         const m = await member();
         const mandate = await activeMandate(m);
         const res = await staff.cancel(owner, m.subscriptionId);
-        expect(res).toEqual({ outcome: "CANCELLED", provider: "Razorpay" });
+        expect(res).toEqual({
+            outcome: "CANCELLED",
+            provider: "Razorpay",
+            // Emailed through D17's path; the account thread is dark here.
+            told: { email: m.email, suppressed: false, account: false },
+        });
         expect(fake.mandateCancelCalls).toHaveLength(1);
         const row = await prisma.paymentMandate.findUniqueOrThrow({
             where: { id: mandate.id },
@@ -587,7 +593,12 @@ describe("Cancel autopay", () => {
         await activeMandate(m);
         fake.failNextMandateCancel("REFUSED");
         const res = await staff.cancel(owner, m.subscriptionId);
-        expect(res).toEqual({ outcome: "REFUSED", provider: "Razorpay" });
+        // Saroh charges it no more, so the customer is told all the same.
+        expect(res).toMatchObject({
+            outcome: "REFUSED",
+            provider: "Razorpay",
+            told: { email: m.email },
+        });
         const [row] = await mandatesOf(m.subscriptionId);
         expect(row?.status).toBe("CANCELLED");
     });
@@ -598,13 +609,20 @@ describe("Cancel autopay", () => {
         await staff.cancel(owner, m.subscriptionId);
         fake.mandateCancelCalls.length = 0;
         const again = await staff.cancel(owner, m.subscriptionId);
-        expect(again).toEqual({ outcome: "ALREADY_OFF", provider: null });
+        expect(again).toEqual({
+            outcome: "ALREADY_OFF",
+            provider: null,
+            told: null,
+        });
         expect(fake.mandateCancelCalls).toHaveLength(0);
         const none = await member();
         expect(await staff.cancel(owner, none.subscriptionId)).toEqual({
             outcome: "ALREADY_OFF",
             provider: null,
+            told: null,
         });
+        // Told once, by the cancel that turned it off.
+        expect(await cancelledNotes(m.subscriptionId)).toHaveLength(1);
         expect(
             await prisma.subscriptionEvent.count({
                 where: {
@@ -613,6 +631,163 @@ describe("Cancel autopay", () => {
                 },
             }),
         ).toBe(1);
+    });
+});
+
+/** The autopay-cancelled emails a member's contact was sent. */
+async function cancelledNotes(subscriptionId: string) {
+    const sub = await prisma.customerSubscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        select: { contactId: true },
+    });
+    return prisma.message.findMany({
+        where: { contactId: sub.contactId, template: "AUTOPAY_CANCELLED" },
+    });
+}
+
+describe("telling the customer their autopay was cancelled (D14)", () => {
+    const area = env as { SITE_ACCOUNT_AREA?: string };
+    afterEach(async () => {
+        delete area.SITE_ACCOUNT_AREA;
+        await prisma.featureFlag.deleteMany({
+            where: { key: "ACCOUNT_THREAD" },
+        });
+    });
+
+    it("emails them in the business's words through D17's path", async () => {
+        const m = await member();
+        await activeMandate(m);
+        await staff.cancel(owner, m.subscriptionId);
+        const [note] = await cancelledNotes(m.subscriptionId);
+        expect(note).toMatchObject({
+            channel: "EMAIL",
+            status: "QUEUED",
+            toAddress: m.email,
+            subject: "Autopay for Monthly unlimited is off",
+            createdByUserId: owner.userId,
+        });
+        expect(note?.body).toContain(
+            "Pulse Fitness has turned off autopay for Monthly unlimited.",
+        );
+        expect(note?.body).toContain("an invoice with a link to pay it");
+        expect(
+            await prisma.job.count({
+                where: {
+                    type: "message.send",
+                    payload: { path: ["messageId"], equals: note?.id },
+                },
+            }),
+        ).toBe(1);
+    });
+
+    it("a revoked email consent is recorded, not sent, and not claimed", async () => {
+        const m = await member();
+        await activeMandate(m);
+        await prisma.consent.create({
+            data: {
+                organizationId: owner.organizationId,
+                contactId: m.contactId,
+                channel: "EMAIL",
+                status: "REVOKED",
+            },
+        });
+        const res = await staff.cancel(owner, m.subscriptionId);
+        expect(res.told).toEqual({
+            email: null,
+            suppressed: true,
+            account: false,
+        });
+        const [note] = await cancelledNotes(m.subscriptionId);
+        expect(note?.status).toBe("SUPPRESSED");
+    });
+
+    it("posts in their account thread only where it is live (ACCOUNT_THREAD)", async () => {
+        const dark = await member();
+        await activeMandate(dark);
+        area.SITE_ACCOUNT_AREA = "on";
+        // The area is on, the thread's rollout flag is not: email only.
+        const first = await staff.cancel(owner, dark.subscriptionId);
+        expect(first.told?.account).toBe(false);
+        expect(
+            await prisma.customerThreadMessage.count({
+                where: { organizationId: owner.organizationId },
+            }),
+        ).toBe(0);
+
+        await prisma.featureFlag.create({
+            data: { key: "ACCOUNT_THREAD", enabledByDefault: true },
+        });
+        const m = await member();
+        await activeMandate(m);
+        const res = await staff.cancel(owner, m.subscriptionId);
+        expect(res.told).toEqual({
+            email: m.email,
+            suppressed: false,
+            account: true,
+        });
+        const post = await prisma.customerThreadMessage.findFirstOrThrow({
+            where: {
+                organizationId: owner.organizationId,
+                event: "AUTOPAY_CANCELLED",
+            },
+            include: { thread: { select: { contactId: true } } },
+        });
+        expect(post).toMatchObject({ author: "SYSTEM" });
+        expect(post.thread.contactId).toBe(m.contactId);
+        expect(post.body).toBe(
+            "Pulse Fitness turned off autopay for Monthly unlimited. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.",
+        );
+    });
+
+    it("tells nobody about a set-up they never approved", async () => {
+        const m = await member();
+        await prisma.paymentMandate.create({
+            data: {
+                organizationId: owner.organizationId,
+                contactId: m.contactId,
+                subscriptionId: m.subscriptionId,
+                provider: "RAZORPAY",
+                status: "PENDING",
+                method: "UPI",
+                maxAmountCents: 180_000,
+            },
+        });
+        const res = await staff.cancel(owner, m.subscriptionId);
+        expect(res.outcome).not.toBe("ALREADY_OFF");
+        expect(res.told).toBeNull();
+        expect(await cancelledNotes(m.subscriptionId)).toHaveLength(0);
+    });
+
+    it("without the business's email provider, still cancels and claims no email", async () => {
+        const m = await member();
+        await activeMandate(m);
+        await prisma.communicationProvider.update({
+            where: {
+                organizationId_channel: {
+                    organizationId: owner.organizationId,
+                    channel: "EMAIL",
+                },
+            },
+            data: { status: "DISCONNECTED" },
+        });
+        try {
+            const res = await staff.cancel(owner, m.subscriptionId);
+            expect(res).toMatchObject({
+                outcome: "CANCELLED",
+                told: { email: null, suppressed: false, account: false },
+            });
+            expect(await cancelledNotes(m.subscriptionId)).toHaveLength(0);
+        } finally {
+            await prisma.communicationProvider.update({
+                where: {
+                    organizationId_channel: {
+                        organizationId: owner.organizationId,
+                        channel: "EMAIL",
+                    },
+                },
+                data: { status: "CONNECTED" },
+            });
+        }
     });
 });
 
