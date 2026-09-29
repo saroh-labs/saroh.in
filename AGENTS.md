@@ -86,7 +86,8 @@ the right-hand files **before** writing code.
 ```bash
 pnpm prepush          # secrets, lint, types, check:*, unit tests, vitest
 pnpm prepush --all    # before a push: + API integration (TEST_DATABASE_URL)
-                      #   and the changed screens' browser specs, desk + phone
+                      #   and the changed screens' browser specs, desk + phone,
+                      #   on CI's seeded stack built from HEAD (E2E_DATABASE_URL)
 ```
 
 `git push` runs the quick gate itself (`.husky/pre-push`); `--no-verify`

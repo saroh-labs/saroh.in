@@ -12,7 +12,7 @@ insufficient" (PRODUCT_STRATEGY §18).
 ## Rules
 
 - **Current** — **Run the changed screens' browser specs on `desk` and
-  `phone` before pushing** (`pnpm prepush --e2e`, stack running). The phone
+  `phone` before pushing** (`pnpm prepush --e2e`: CI's seeded stack, built from HEAD). The phone
   draws its own bars, sheets and toasts and fails on its own. A control drawn
   once per layout is found with `.filter({ visible: true })`, never a bare
   `.first()`.

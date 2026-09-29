@@ -99,8 +99,14 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
    It runs gitleaks, lint, typecheck, the `check:*` scripts, unit tests and
    vitest, then the API integration tests in module groups (a full `test:int`
    run can crash a worker), then the browser specs for the screens the batch
-   touched on both `desk` and `phone`, against the running stack. Push only
-   when it ends with ALL PASS.
+   touched on both `desk` and `phone`. The browser step is a copy of CI's
+   seeded-stack job, not of `pnpm dev`: from a detached worktree of HEAD it
+   re-creates `E2E_DATABASE_URL` (a throwaway `*test*` database), migrates
+   it, seeds the showcase, builds the api, accounts, app and renderer, and
+   starts them on CI's bare ports (3333, 3000, 3003, 3005) with CI's
+   placeholder env and `CI=1`. It tests committed work only and leaves the
+   portless dev stack alone. A spec run against `saroh-dev` fails on data
+   drift, not code (DEV_LEARNINGS). Push only when it ends with ALL PASS.
 5. **Push once and open one PR into `development`.** Do it when a feature is
    complete, not on a timer. Merge when CI is green, then check the change on
    the development stack. Anything unfinished carries over into the next
