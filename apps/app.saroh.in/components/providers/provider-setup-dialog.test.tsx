@@ -247,6 +247,16 @@ describe("Razorpay setup, as guided steps", () => {
         expect(byLabel("Webhook signing secret").required).toBe(true);
     });
 
+    it("says Saroh hasn't set the address when the server has none", () => {
+        open("RAZORPAY", {
+            webhooks: HOOKS.map((h) => ({ ...h, url: null })),
+        });
+        expect(text()).toContain(
+            "Saroh hasn't set the address Razorpay should send payment updates to yet",
+        );
+        expect(text()).not.toContain("api.saroh.in");
+    });
+
     it("tells a connection saved without the secret what it's missing", () => {
         open("RAZORPAY", {
             connected: [

@@ -26,8 +26,8 @@ export interface ConnectedPaymentProvider {
 /** A provider's webhook for this business, as setup shows it (DEC-063). */
 export interface PaymentWebhookSetup {
     provider: PaymentProviderName;
-    /** Where the provider sends payment updates for this business. */
-    url: string;
+    /** Where the provider sends payment updates for this business; null when the server has no public address set. */
+    url: string | null;
     /** What to tick in the provider's dashboard. */
     events: string[];
     /** Whether setup asks for a signing secret of its own (Razorpay). */

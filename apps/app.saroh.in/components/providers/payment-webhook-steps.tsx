@@ -74,6 +74,7 @@ export function WebhookAddressStep({
     const name = providerName(provider);
     const headingId = useId();
     const urlId = useId();
+    const url = setup?.url ?? null;
     return (
         <section aria-labelledby={headingId} className="grid gap-2.5">
             <StepHeading n={n} id={headingId}>
@@ -92,7 +93,7 @@ export function WebhookAddressStep({
                     too.
                 </p>
             ) : null}
-            {setup ? (
+            {setup && url ? (
                 <>
                     <div className="grid gap-1.5">
                         <Label htmlFor={urlId}>Webhook URL</Label>
@@ -100,7 +101,7 @@ export function WebhookAddressStep({
                             <Input
                                 id={urlId}
                                 readOnly
-                                value={setup.url}
+                                value={url}
                                 className="min-w-0 flex-1 font-mono text-[12px]"
                                 onFocus={(e) => e.currentTarget.select()}
                             />
@@ -110,9 +111,7 @@ export function WebhookAddressStep({
                                 size="sm"
                                 className="shrink-0 cursor-pointer"
                                 aria-label="Copy webhook URL"
-                                onClick={() =>
-                                    copy(setup.url, "Webhook URL copied")
-                                }
+                                onClick={() => copy(url, "Webhook URL copied")}
                             >
                                 <Copy aria-hidden className="size-4" />
                                 Copy
@@ -142,8 +141,9 @@ export function WebhookAddressStep({
                 </>
             ) : (
                 <p className="rounded-[10px] border border-dashed border-border-strong px-3 py-2.5 text-[12.5px] leading-[1.45] text-muted-foreground">
-                    The webhook address couldn&apos;t be loaded. Reload the page
-                    to see it — {name} still needs it to confirm payments.
+                    {setup
+                        ? `Saroh hasn't set the address ${name} should send payment updates to yet, so it can't be shown. Contact Saroh support before connecting — ${name} needs it to confirm payments.`
+                        : `The webhook address couldn't be loaded. Reload the page to see it — ${name} still needs it to confirm payments.`}
                 </p>
             )}
         </section>

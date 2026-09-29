@@ -6,7 +6,7 @@ jest.mock("../../env", () => ({
     env: {
         PAYMENTS_ENC_KEY:
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        BETTER_AUTH_URL: "https://api.example.test/",
+        API_PUBLIC_URL: "https://api.example.test/",
         NODE_ENV: "test",
     },
 }));

@@ -65,6 +65,11 @@ const envSchema = z.object({
     // create their account — waitlist invitations. Unset: the local accounts
     // app in development, and no invitation link anywhere else.
     ACCOUNTS_URL: z.string().url().optional(),
+    // The API's own public address (e.g. https://api.saroh.in), which payment
+    // providers send webhooks to. Merchants paste the address built from it
+    // into their Razorpay dashboard, so it must stay stable. Unset: setup shows
+    // no webhook address and says so (DEC-063); nothing is guessed.
+    API_PUBLIC_URL: z.string().url().optional(),
 
     // Object storage (S2-008 — media uploads via @saroh/object-storage).
     // All optional: when the R2 credentials below are absent the media module

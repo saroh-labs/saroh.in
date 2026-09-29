@@ -50,14 +50,14 @@ export function lacksWebhookSecret(row: SealedRow): boolean {
     return webhookSecretFrom(row.provider, creds) === null;
 }
 
-/** The API's own public address, which providers POST webhooks to. */
-function apiBase(): string {
-    const base =
-        env.BETTER_AUTH_URL ??
-        (env.NODE_ENV === "development"
-            ? "https://api.saroh.localhost"
-            : "https://api.saroh.in");
-    return base.replace(/\/$/, "");
+/**
+ * The API's own public address, which providers POST webhooks to: always
+ * `API_PUBLIC_URL`, never a guess. Null while it isn't set.
+ */
+function apiBase(): string | null {
+    const base = env.API_PUBLIC_URL;
+    if (!base) return null;
+    return base.endsWith("/") ? base.slice(0, -1) : base;
 }
 
 /**
@@ -65,15 +65,23 @@ function apiBase(): string {
  * `webhooks.controller.ts`'s route. The organization id in it is not a
  * secret: trust comes from the signature, never the URL.
  */
-export function webhookUrl(organizationId: string, provider: string): string {
-    return `${apiBase()}/public/webhooks/${provider.toLowerCase()}/${encodeURIComponent(organizationId)}`;
+export function webhookUrl(
+    organizationId: string,
+    provider: string,
+): string | null {
+    const base = apiBase();
+    if (!base) return null;
+    return `${base}/public/webhooks/${provider.toLowerCase()}/${encodeURIComponent(organizationId)}`;
 }
 
 /** A provider's webhook, as setup shows it (DEC-063). Nothing secret. */
 export interface WebhookSetup {
     provider: SupportedProvider;
-    /** Where the provider sends payment updates for this business. */
-    url: string;
+    /**
+     * Where the provider sends payment updates for this business; null when
+     * the server's `API_PUBLIC_URL` isn't set.
+     */
+    url: string | null;
     /** What to tick in the provider's dashboard. */
     events: string[];
     /** Whether setup asks for a signing secret of its own (Razorpay). */
