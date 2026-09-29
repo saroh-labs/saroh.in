@@ -61,6 +61,7 @@ export function SiteEditor({
     initialStyle,
     styleOptions,
     shopOpen = false,
+    packsOpen = false,
     addablePageKinds,
 }: SiteEditorProps) {
     const review = useEditorReview({
@@ -205,6 +206,7 @@ export function SiteEditor({
                         flagsBySection={flagsBySection}
                         notedKeys={review.notedKeys}
                         shopOpen={shopOpen}
+                        packsOpen={packsOpen}
                     />
                 }
                 canvas={
@@ -267,6 +269,7 @@ export function SiteEditor({
                 variables={resolveStyleVariables(style, styleOptions)}
                 onAdd={(type, variant) => addSection(type, variant)}
                 shopOpen={shopOpen}
+                packsOpen={packsOpen}
             />
 
             {publish.checking ? (

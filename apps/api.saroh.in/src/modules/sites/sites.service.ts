@@ -43,7 +43,11 @@ import type {
 } from "./dto";
 import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
 import type { PublicModulePageStates } from "./module-pages";
-import { addableModulePageKinds, publicModulePageStates } from "./module-pages";
+import {
+    addableModulePageKinds,
+    packsBlockOffered,
+    publicModulePageStates,
+} from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import type { SiteChangeKind } from "./pending-changes";
@@ -400,6 +404,12 @@ export interface SiteDetailView {
      * rolled out for the business is never listed (DEC-057).
      */
     addablePageKinds: ModulePageKind[];
+    /**
+     * Whether Add block offers the Class packs block: Class packs rolled out
+     * for the business and on. Off, the block is offered nowhere (DEC-057);
+     * one already on a page stays.
+     */
+    packsBlockOffered: boolean;
     /**
      * How many sections publishing would change (#190). Null before the first
      * publish. See {@link SitesService.pendingSectionChanges} — every surface
@@ -1026,6 +1036,7 @@ export class SitesService {
                       site.pages.map((p) => p.kind),
                   )
                 : [],
+            packsBlockOffered: await packsBlockOffered(ctx.organizationId),
         };
     }
 

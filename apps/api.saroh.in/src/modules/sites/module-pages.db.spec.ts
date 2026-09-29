@@ -452,6 +452,20 @@ describe("module pages (G14, real database)", () => {
             "JOURNAL",
             "CONTACT",
         ]);
+        // Class packs is rolled out and on: its block is offered.
+        expect(detail.packsBlockOffered).toBe(true);
+    });
+
+    it("offers the Class packs block only while Class packs is rolled out and on (DEC-057)", async () => {
+        const hidden = await business({ notRolledOut: ["MODULE_CLASS_PACKS"] });
+        expect(
+            (await sites.getSite(hidden.ctx, hidden.siteId)).packsBlockOffered,
+        ).toBe(false);
+
+        const off = await business({ switchedOff: ["CLASS_PACKS"] });
+        expect(
+            (await sites.getSite(off.ctx, off.siteId)).packsBlockOffered,
+        ).toBe(false);
     });
 
     it("offers only what is on and not yet added, and nothing without site:update", async () => {

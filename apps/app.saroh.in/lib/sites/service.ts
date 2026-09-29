@@ -534,6 +534,11 @@ export interface SiteDetail extends SiteSummary {
      * (DEC-057). Absent from an API older than G14.
      */
     addablePageKinds?: ModulePageKind[];
+    /**
+     * Whether Add block offers the Class packs block: Class packs rolled out
+     * and on (DEC-057). Absent from an older API, which reads as not.
+     */
+    packsBlockOffered?: boolean;
 }
 
 /** The storefront a site sells from, and the open ones with products. */
