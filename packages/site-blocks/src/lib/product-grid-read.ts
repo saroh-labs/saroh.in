@@ -50,6 +50,9 @@ export function isShopListingCard(value: unknown): value is ShopListingCard {
                 typeof image.alt === "string")) &&
         Array.isArray(v.variantTitles) &&
         v.variantTitles.every((t) => typeof t === "string") &&
+        (v.optionName === undefined ||
+            v.optionName === null ||
+            typeof v.optionName === "string") &&
         (v.blurb === null || typeof v.blurb === "string") &&
         typeof v.soldOut === "boolean"
     );

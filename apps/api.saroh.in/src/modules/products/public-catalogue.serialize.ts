@@ -57,6 +57,11 @@ export interface PublicCatalogueCard {
     image: { url: string; alt: string } | null;
     /** "Small · Large", when it is chosen by variant. */
     variantTitles: string[];
+    /**
+     * What the options are ("Size"), for the card's "2 sizes" (DEC-073
+     * #12). Null for a product without options.
+     */
+    optionName: string | null;
     /** Two sentences at most of the description, as plain text. */
     blurb: string | null;
     /** Nothing offered here can be sold now. */

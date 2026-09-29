@@ -135,6 +135,7 @@ const CARD_SELECT = {
             mrp: true,
             currency: true,
             stockTracked: true,
+            option: { select: { name: true } },
             images: {
                 orderBy: { position: "asc" },
                 take: 1,
@@ -347,6 +348,7 @@ export class PublicCatalogueService {
                         : { url: cover.url, alt: cover.alt }
                     : null,
                 variantTitles: offered.map((v) => v.title),
+                optionName: p.option?.name ?? null,
                 blurb: blurbOf(p.description),
                 soldOut: words.every((w) => w === "SOLD_OUT"),
                 listingId: listing.id,

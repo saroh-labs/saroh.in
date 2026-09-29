@@ -98,8 +98,15 @@ async function product(
         stockTracked?: boolean;
         variants?: { title: string; price?: string }[];
         description?: string;
+        /** What the options are ("Size"). */
+        optionName?: string;
     } = {},
 ) {
+    const option = over.optionName
+        ? await prisma.productOption.create({
+              data: { organizationId, name: over.optionName },
+          })
+        : null;
     const p = await prisma.product.create({
         data: {
             organizationId,
@@ -111,6 +118,7 @@ async function product(
             stockTracked: over.stockTracked ?? true,
             description: over.description ?? null,
             supplierCode: "SECRET-SUP-1",
+            optionId: option?.id ?? null,
         },
     });
     const variants = [];
@@ -204,6 +212,7 @@ describe("public catalogue (G11)", () => {
         ryeSite = await site(rye, online);
 
         sourdough = await product(rye, "Sourdough", {
+            optionName: "Size",
             variants: [
                 { title: "Small", price: "250.00" },
                 { title: "Large", price: "450.00" },
@@ -251,6 +260,8 @@ describe("public catalogue (G11)", () => {
             priceFrom: true,
             image: null,
             variantTitles: ["Small", "Large"],
+            // The card's "2 sizes" (DEC-073 #12).
+            optionName: "Size",
             blurb: "Slow rye. Baked at dawn.",
             soldOut: false,
             listingId: expect.any(String),
