@@ -38,11 +38,14 @@ export function MoneyCard({
     onRetryRefund,
     busy = false,
     payLink,
+    way,
     appointment = false,
 }: {
     money: OrderReadMoney;
     /** It goes to an address (a local delivery or a shipment). */
     delivery: boolean;
+    /** How it leaves, in its type's word: "Pick-up", "Local delivery". */
+    way?: string;
     /** Fulfilled by its visits (B14): no delivery or collection row. */
     appointment?: boolean;
     paymentStatus: OrderRead["paymentStatus"];
@@ -61,7 +64,7 @@ export function MoneyCard({
     // A treatment is neither delivered nor collected (B14).
     if (!appointment) {
         rows.push([
-            delivery ? "Delivery" : "Collection",
+            way ?? (delivery ? "Delivery" : "Pick-up"),
             n(money.shipping) > 0 ? format(n(money.shipping)) : "Free",
         ]);
     }

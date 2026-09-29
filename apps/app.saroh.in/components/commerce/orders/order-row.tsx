@@ -42,11 +42,11 @@ import { AgeText, StepBar, StepPill } from "./step-pill";
 
 /** The desk grid: Order · Status · Placed · Total · the row menu (B5). */
 export const ORDER_GRID =
-    "grid grid-cols-[minmax(210px,1fr)_minmax(86px,122px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
+    "grid grid-cols-[minmax(210px,1fr)_minmax(86px,140px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
 
 /** The same grid with the design's 38px selection column first (B6). */
 export const ORDER_GRID_SELECT =
-    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(86px,122px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
+    "grid grid-cols-[38px_minmax(210px,1fr)_minmax(86px,140px)_minmax(104px,118px)_minmax(84px,92px)_44px] items-center px-3.5";
 
 /** A row's selection box (B6): checked, and what toggling it does. */
 export interface RowSelect {
@@ -95,11 +95,21 @@ export function OrderGridHead({
     );
 }
 
+/**
+ * The customer's initials; a returning customer's wears the design's
+ * Saffron ring (a 1.5px gap in the row's colour, then 1.5px of Saffron).
+ * Decoration, as the initials are: nothing the row needs rests on it.
+ */
 function Avatar({ row }: { row: OrderRow }) {
+    const returning = row.customer?.returning === true;
     return (
         <span
             aria-hidden
-            className="flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-neutral-700 dark:text-foreground"
+            className={cn(
+                "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-neutral-700 dark:text-foreground",
+                returning &&
+                    "ring-[1.5px] ring-highlight ring-offset-[1.5px] ring-offset-card",
+            )}
         >
             {rowInitials(row)}
         </span>
@@ -223,7 +233,7 @@ export function OrderGridRow({
             <div className="grid min-w-0 justify-items-start gap-1.5">
                 <StepPill progress={v.progress} />
                 {v.progress.index !== null || v.age ? (
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
                         <StepBar progress={v.progress} />
                         {v.age ? <AgeText age={v.age} /> : null}
                     </div>
@@ -293,7 +303,7 @@ export function OrderCard({
             </div>
             <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
                 <span className="font-mono">{v.ref}</span>
-                <StepPill progress={v.progress} />
+                <StepPill progress={v.progress} dot={false} />
                 <span>{row.fulfilmentLabel}</span>
                 {v.age ? <AgeText age={v.age} /> : null}
                 <AttentionTag attention={v.attention} />

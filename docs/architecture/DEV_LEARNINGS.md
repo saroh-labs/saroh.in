@@ -1048,6 +1048,7 @@ the API's sentence, else ours, else a plain line.
 module and fails when a code it can send has no merchant words, and scans
 the app for a blocker's `.code` rendered directly.
 **Category**: modules · copy · DEC-057
+
 ## E2E — a phone test said a dialog fit at 320px while its buttons were off the screen
 
 **Problem**: On a phone, "Link a commerce customer" put a long email on one
@@ -1100,3 +1101,18 @@ making a storefront) ships with its fixture, and the seed says what the
 check needs. `docs/patterns/backend-billing-and-classes.md` → Business
 details before money.
 **Category**: tests · seed · DEC-068
+## Orders — a row's status ran over its Placed column at the desk
+
+**Problem**: On the Orders list at 1440, a treatment's "Next 2 Oct, 10:45"
+and a local delivery's "Handed to courier" pill were drawn on top of the
+Placed date (Kavi Dental, Rye & Co.; found in the round-2 verify).
+**Root cause**: Each row is its own grid, so the columns are fixed widths
+(`ORDER_GRID`); the Status column kept the design's 122px, and its bar and
+age sat on one `nowrap` line. The design's own words fit; the longer step
+and visit words added later did not, and a grid track doesn't clip.
+**Fix**: Status is `minmax(86px,140px)` (the longest pill fits) and the bar
+and its age wrap onto a second line rather than overflow.
+`orders-list.spec.ts` ("a row's status never runs into its Placed column")
+measures every desk row's status text against the Placed cell on Kavi and
+Rye.
+**Category**: layout · `docs/patterns/frontend-design-system.md` (reflow)

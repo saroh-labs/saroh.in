@@ -60,6 +60,8 @@ export interface OrderRow extends FulfilmentFields {
         name: string | null;
         email?: string;
         phone?: string | null;
+        /** They have ordered here before: a ring on the row's avatar. */
+        returning?: boolean;
     } | null;
     /** A walk-in (B13), with no customer record. Absent before B13. */
     walkIn?: { name: string; phone: string | null } | null;

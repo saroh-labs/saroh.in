@@ -134,7 +134,12 @@ export default async function OrdersPage({
             <OrdersScreen
                 query={query}
                 page={page}
-                stores={stores.map((s) => ({ id: s.id, name: s.name }))}
+                // Oldest first, so New order starts at the business's first
+                // storefront (the shop the design's counter sheet opens on),
+                // not the one made last.
+                stores={[...stores]
+                    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+                    .map((s) => ({ id: s.id, name: s.name }))}
                 openByStore={openByStore}
                 businessName={businessName}
                 // A Member reaches the list through `order:stage` alone

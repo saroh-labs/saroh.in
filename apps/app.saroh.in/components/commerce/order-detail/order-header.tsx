@@ -4,10 +4,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { goesToAddress } from "@/lib/orders/lifecycle";
+import { howWords } from "@/lib/orders/lifecycle";
+import type { StepTone } from "@/lib/orders/list-row";
 import type { OrderRead } from "@/lib/orders/read";
 
-import type { PillTone } from "./parts";
 import { FOCUS, StatusPill } from "./parts";
 
 /** "‹ Orders / #1063" — the bar above the order, back to the list. */
@@ -54,18 +54,17 @@ export function OrderHeading({
 }: {
     order: OrderRead;
     number: string;
-    standing: { label: string; tone: PillTone };
+    standing: { label: string; tone: StepTone };
     age: { text: string; late: boolean; rule: string | null } | null;
     /**
      * How it is fulfilled, in words, where the type says more than
-     * Delivery or Collection: "Appointment, in person · next visit today,
+     * its type's word ("Pick-up at Hill Road"): "Appointment, in person · next visit today,
      * 18:00" (B14).
      */
     how?: string;
     /** The header's buttons. */
     children: ReactNode;
 }) {
-    const delivery = goesToAddress(order);
     return (
         <div className="flex flex-wrap items-start gap-3.5">
             <div className="min-w-0 flex-[1_1_320px]">
@@ -93,11 +92,7 @@ export function OrderHeading({
                     ) : null}
                     <span>
                         <ViewerDate iso={order.placedAt} variant="moment" /> ·{" "}
-                        {order.store.name} ·{" "}
-                        {how ??
-                            (delivery
-                                ? `Delivery${order.deliveryAddress?.city ? ` to ${order.deliveryAddress.city}` : ""}`
-                                : "Collection")}
+                        {order.store.name} · {how ?? howWords(order)}
                     </span>
                 </div>
             </div>

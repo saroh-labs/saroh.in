@@ -430,6 +430,58 @@ test.describe("a treatment's next visit on the row (B14)", () => {
             await expect(row).not.toContainText(/\bLate\b/);
         }
     });
+
+    test("at the desk, a row's status never runs into its Placed column", async ({
+        page,
+    }) => {
+        test.skip(cards(page), "The phone draws cards, not columns.");
+        await signIn(page);
+        // Kavi's rows carry "Next 2 Oct, 10:45" and an unpaid line; Rye's a
+        // "Handed to courier" pill: the longest words the column holds.
+        for (const org of [KAVI, RYE]) {
+            await page.goto(`/open/${org}`);
+            await page.goto("/commerce/orders");
+            await expect(
+                orders(page).getByRole("listitem").first(),
+            ).toBeVisible();
+            await expect
+                .poll(() =>
+                    page.evaluate(() => {
+                        const hits: string[] = [];
+                        const list = [
+                            ...document.querySelectorAll(
+                                'ul[aria-label="Orders"]',
+                            ),
+                        ].find((l) => (l as HTMLElement).offsetParent !== null);
+                        for (const li of list?.querySelectorAll(
+                            ":scope > li",
+                        ) ?? []) {
+                            const cells = [...li.children];
+                            // From the end: status, placed, total, the menu.
+                            if (cells.length < 4) continue;
+                            const status = cells[cells.length - 4];
+                            const placed = cells[cells.length - 3];
+                            const range = document.createRange();
+                            range.selectNodeContents(placed);
+                            const p = range.getBoundingClientRect();
+                            for (const el of status.querySelectorAll("*")) {
+                                if (el.children.length > 0) continue;
+                                const r = el.getBoundingClientRect();
+                                const meets =
+                                    r.width > 0 &&
+                                    r.right > p.left + 0.5 &&
+                                    r.left < p.right &&
+                                    r.bottom > p.top &&
+                                    r.top < p.bottom;
+                                if (meets) hits.push(String(el.textContent));
+                            }
+                        }
+                        return hits;
+                    }),
+                )
+                .toEqual([]);
+        }
+    });
 });
 
 test.describe("orders list filters (B4)", () => {

@@ -90,7 +90,7 @@ export function CustomerCard({
                     <div className="text-[12px] text-muted-foreground">
                         {customer.orderCount > 1 && customer.firstOrderAt ? (
                             <>
-                                {customer.orderCount} orders since{" "}
+                                {customer.orderCount} orders · customer since{" "}
                                 <ViewerDate
                                     iso={customer.firstOrderAt}
                                     variant="monthYear"

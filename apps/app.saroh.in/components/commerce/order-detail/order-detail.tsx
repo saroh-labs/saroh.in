@@ -14,12 +14,13 @@ import {
     allergenWords,
     allergyCheck,
     goesToAddress,
+    headerStep,
     isOpen,
-    kitchenStanding,
     STEP_LABEL,
     stepsOf,
     waiting,
 } from "@/lib/orders/lifecycle";
+import type { StepTone } from "@/lib/orders/list-row";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
 import type { Arrival } from "@/lib/orders/row-menu";
 import type { Sellable } from "@/lib/orders/sellables";
@@ -89,11 +90,12 @@ export interface OrderPermissions {
     bookingWrite?: boolean;
 }
 
-const STANDING: Record<string, { label: string; tone: PillTone }> = {
-    UNFULFILLED: { label: "Unfulfilled", tone: "brand" },
-    FULFILLED: { label: "Fulfilled", tone: "success" },
-    REFUNDED: { label: "Refunded", tone: "neutral" },
-    CANCELLED: { label: "Cancelled", tone: "neutral" },
+/** A treatment's standing (B14), in the header pill's tones. */
+const VISITS_TONE: Record<PillTone, StepTone> = {
+    brand: "new",
+    success: "done",
+    neutral: "bad",
+    danger: "bad",
 };
 
 const firstName = (name: string | null | undefined) =>
@@ -152,8 +154,14 @@ export function OrderDetail({
     const now = new Date(clock ?? Date.parse(order.updatedAt));
     const zone = visits?.service.timezone ?? "UTC";
     const standing = appointment
-        ? visitsStanding(visits, refundedFull, order.status === "CANCELLED")
-        : STANDING[kitchenStanding(order)];
+        ? (({ label, tone }) => ({ label, tone: VISITS_TONE[tone] }))(
+              visitsStanding(
+                  visits,
+                  refundedFull,
+                  order.status === "CANCELLED",
+              ),
+          )
+        : headerStep(order);
     const unpaid =
         order.status !== "CANCELLED" &&
         (order.paymentStatus === "FAILED" ||
@@ -550,6 +558,7 @@ export function OrderDetail({
                             <MoneyCard
                                 money={money}
                                 delivery={delivery}
+                                way={order.fulfilmentLabel}
                                 appointment={appointment}
                                 paymentStatus={order.paymentStatus}
                                 refundStanding={order.refundStanding}
