@@ -8,6 +8,7 @@ import JournalSection, {
     postExcerpt,
     postEyebrow,
     withoutScriptsAndStyles,
+    withoutTags,
 } from "./journal";
 
 /** Four live posts, newest first, as the public read returns them. */
@@ -386,6 +387,20 @@ describe("withoutScriptsAndStyles", () => {
         const input = "<style".repeat(50_000);
         const started = Date.now();
         withoutScriptsAndStyles(input);
+        expect(Date.now() - started).toBeLessThan(200);
+    });
+});
+
+describe("withoutTags", () => {
+    it("replaces each tag with a space and keeps a stray <", () => {
+        expect(withoutTags("<p>Hi <b>there</b></p>")).toBe(" Hi  there  ");
+        expect(withoutTags("1 < 2")).toBe("1 < 2");
+    });
+
+    it("stays fast on many < with no >", () => {
+        const input = "<".repeat(100_000);
+        const started = Date.now();
+        expect(withoutTags(input)).toBe(input);
         expect(Date.now() - started).toBeLessThan(200);
     });
 });

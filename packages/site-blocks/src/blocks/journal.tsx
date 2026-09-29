@@ -101,6 +101,33 @@ export function withoutScriptsAndStyles(html: string): string {
 }
 
 /**
+ * The text with every tag replaced by a space, by scanning rather than
+ * `/<[^>]*>/g`, which is quadratic on a body of many `<` with no `>`
+ * (CodeQL js/polynomial-redos). A `<` with no `>` after it is kept as text.
+ */
+export function withoutTags(html: string): string {
+    let out = "";
+    let at = 0;
+    for (;;) {
+        const open = html.indexOf("<", at);
+        if (open === -1) return out + html.slice(at);
+        const close = html.indexOf(">", open + 1);
+        if (close === -1) return out + html.slice(at);
+        out += `${html.slice(at, open)} `;
+        at = close + 1;
+    }
+}
+
+const TRAILING = new Set([..." \t\n\r,;:.–—-"]);
+
+/** The text without trailing spaces and punctuation, as a loop. */
+function trimEndPunctuation(text: string): string {
+    let end = text.length;
+    while (end > 0 && TRAILING.has(text[end - 1] ?? "")) end--;
+    return text.slice(0, end);
+}
+
+/**
  * The line under a post's title: its excerpt, else the opening of its body as
  * plain text, cut at a word. Drawn as text, never as markup, so a tag the
  * strip misses shows as characters rather than running.
@@ -108,8 +135,7 @@ export function withoutScriptsAndStyles(html: string): string {
 export function postExcerpt(post: JournalPost): string | null {
     const own = post.excerpt?.trim();
     if (own) return own;
-    const text = withoutScriptsAndStyles(post.content ?? "")
-        .replace(/<[^>]*>/g, " ")
+    const text = withoutTags(withoutScriptsAndStyles(post.content ?? ""))
         .replace(/&(#39|[a-z]+);/gi, (m, name: string) => {
             return ENTITIES[name.toLowerCase()] ?? m;
         })
@@ -119,7 +145,7 @@ export function postExcerpt(post: JournalPost): string | null {
     if (text.length <= EXCERPT_CHARS) return text;
     const cut = text.slice(0, EXCERPT_CHARS);
     const space = cut.lastIndexOf(" ");
-    return `${(space > 80 ? cut.slice(0, space) : cut).replace(/[\s,;:.–—-]+$/, "")}…`;
+    return `${trimEndPunctuation(space > 80 ? cut.slice(0, space) : cut)}…`;
 }
 
 const MONTHS = [
