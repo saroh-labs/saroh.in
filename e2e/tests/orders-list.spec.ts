@@ -799,6 +799,63 @@ test.describe("orders bulk kitchen moves (B6)", () => {
         }
     });
 
+    test("Print tickets (N) opens the selected orders' tickets, oldest first, one to a page", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(page, NORTHWIND);
+        const picked = rows
+            .filter(
+                (r) => (r as Row & { ticketName?: string | null }).ticketName,
+            )
+            .slice(0, 2);
+        test.skip(picked.length < 2, "Needs two orders with a ticket.");
+
+        await page.goto("/commerce/orders");
+        for (const r of picked) {
+            await rowOf(page, r.orderId)
+                .getByRole("checkbox", {
+                    name: `Select order number ${r.orderId}`,
+                })
+                .click();
+        }
+        const print = bar(page).getByRole("link", {
+            name: "Print tickets (2)",
+        });
+        await expect(print).toBeVisible();
+        await expect(print).toHaveAttribute("target", "_blank");
+        await expect(print).toHaveCSS("cursor", "pointer");
+        const href = await print.getAttribute("href");
+        expect(href).toContain("/commerce/orders/tickets?ids=");
+
+        // The print dialog is the browser's: count the call, don't open it.
+        await page.addInitScript(() => {
+            (window as unknown as { printed: number }).printed = 0;
+            window.print = () => {
+                (window as unknown as { printed: number }).printed += 1;
+            };
+        });
+        await page.goto(href ?? "/");
+        await expect(
+            page.getByRole("heading", { name: "2 tickets" }),
+        ).toBeVisible();
+        const tickets = page
+            .getByRole("list", { name: "Tickets" })
+            .getByRole("article");
+        await expect(tickets).toHaveCount(2);
+        // Oldest first: the list is newest first, so the order flips.
+        const oldest = [...picked].reverse();
+        await expect(tickets.first()).toContainText(`#${oldest[0]?.orderId}`);
+        await expect
+            .poll(() =>
+                page.evaluate(
+                    () => (window as unknown as { printed: number }).printed,
+                ),
+            )
+            .toBe(1);
+    });
+
     test("select every row by keyboard, and Clear empties the selection", async ({
         page,
     }) => {

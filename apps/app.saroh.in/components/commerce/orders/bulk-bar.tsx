@@ -22,6 +22,11 @@ import {
 } from "@/lib/orders/bulk";
 import { holdBatch, sendBatchNow, undoBatch } from "@/lib/orders/bulk-actions";
 import type { OrderRow } from "@/lib/orders/business-service";
+import {
+    printableRows,
+    printTicketsLabel,
+    ticketsHref,
+} from "@/lib/orders/tickets";
 
 /**
  * The Orders list's bulk bar and its held batch (plan B, B6), after the
@@ -35,6 +40,10 @@ import type { OrderRow } from "@/lib/orders/business-service";
  * handover go through at once, with Undo all on the toast, as the design
  * has them. Every result is said in words: what moved, what couldn't and
  * why, and whether a customer had already been told.
+ *
+ * "Print tickets (N)" opens the selected orders' tickets in a new tab, one
+ * to a page, oldest first (`/commerce/orders/tickets`), so the selection
+ * and any held batch stay here. N counts the orders that have a ticket.
  *
  * The bar sticks to the foot of the screen, so it lifts the toasts above
  * itself (`useBottomBarInset`): "3 orders preparing · Undo all" never lands
@@ -79,6 +88,7 @@ export function BulkBar({
     );
 
     const { actions, note } = bulkActions(selected, held !== null);
+    const printable = printableRows(selected);
 
     function nameMap(action: BulkAction) {
         const names = new Map(
@@ -219,6 +229,24 @@ export function BulkBar({
                                 {action.label}
                             </button>
                         ))}
+                        {printable.length > 0 ? (
+                            <a
+                                href={ticketsHref(printable.map((r) => r.id))}
+                                target="_blank"
+                                rel="noopener"
+                                title={
+                                    printable.length < selected.length
+                                        ? `${selected.length - printable.length} of these have no ticket to print`
+                                        : "Opens the tickets to print, oldest first"
+                                }
+                                className={cn(
+                                    BAR_BUTTON,
+                                    "inline-flex items-center border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15",
+                                )}
+                            >
+                                {printTicketsLabel(printable.length)}
+                            </a>
+                        ) : null}
                         <button
                             type="button"
                             onClick={onClear}
