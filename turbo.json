@@ -93,8 +93,11 @@
         },
         // The browser E2E job seeds the showcase: its specs are set in Rye & Co.,
         // Pulse Fitness and Leela & Loom, which the base seed does not make.
+        // CI runs it in the same turbo run as the apps' build so the two
+        // overlap; it waits for the package's OWN build too, because that
+        // build's `prisma generate` rewrites the client the seed runs on.
         "db:seed:showcase": {
-            "dependsOn": ["^build"],
+            "dependsOn": ["^build", "build"],
             "cache": false
         },
         "dev": {

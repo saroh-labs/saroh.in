@@ -55,6 +55,60 @@ Lint, cycles, routes, blocks, typecheck, API unit tests, build, and a dependency
 audit that blocks on critical advisories; plus integration tests,
 `migration-replay`, and gitleaks over the full history.
 
+**Layout.** Every job starts in parallel after `What changed` (a few
+seconds). Shared setup is `.github/actions/setup`.
+
+| Job                                      | Runs when                       | Typical time             |
+| ---------------------------------------- | ------------------------------- | ------------------------ |
+| What changed, Secret scan (gitleaks)     | always                          | 10s                      |
+| Lint, typecheck and repo checks          | code changed                    | 2–3 min                  |
+| Unit tests                               | code changed                    | 2–2.5 min                |
+| Build (+ critical-only dependency audit) | code changed                    | 1.5 min warm, 4 min cold |
+| Integration (plain, rls) × 4 shards      | api or `packages/` changed      | 3–4 min, one up to 5     |
+| Migration replay from empty              | `packages/database` changed     | 1 min                    |
+| Browser E2E × 4 shards                   | `apps/ packages/ e2e/ scripts/` | 5–7 min (the long pole)  |
+| Permission states (production build)     | as E2E                          | 3 min                    |
+
+- **Current** — **Required checks keep their names.** The aggregates
+  `Lint, typecheck, test & build` (`ci`) and `Browser E2E (seeded stack)`
+  pass when every gate they gather passed or was skipped as out of reach.
+  Rename neither; branch rules and the PR page know them.
+- **Current** — **Only code decides what runs.** `What changed` drops `docs/`
+  and every `*.md` before matching paths, so a docs-only change runs only the
+  secret scan and the two aggregates, which report green. A change to CI, the
+  root manifests, the lockfile or `tooling/` runs everything, and so do the
+  weekly run and a manual run.
+- **Current** — **Only non-PR runs write the build caches.** Turbo and Next
+  caches are saved by pushes to main and development, the weekly run and
+  manual runs. A PR restores the newest of its base branch's caches and writes
+  nothing. The repository has 10 GB of Actions cache. When every PR push saved
+  about 1.3 GB, GitHub evicted the pnpm store and Playwright's Chromium, and
+  every job downloaded them again. See DEV_LEARNINGS. A saving run drops Turbo
+  entries older than a week. Playwright's browser is keyed on its version.
+- **Current** — **The integration shards read the unit job's Turbo cache**
+  for the api's workspace packages. The env is the same, so the hashes match,
+  and the shards write no cache of their own.
+- **Current** — **Each browser shard seeds and builds in one turbo run**, so
+  the seed (~40s) overlaps the build. `db:seed:showcase` waits for
+  `@saroh/database`'s own build, because its `prisma generate` rewrites the
+  client the seed uses.
+- **Current** — **Postgres services poll `pg_isready -h 127.0.0.1` every 2s.**
+  The check goes over TCP because the image's init server listens on the
+  socket only.
+- **Current** — **Superseded PR runs are cancelled.** Runs on main and
+  development never are, because each push there is checked against the one
+  before it.
+- **Rejected** (2026-09-29) — **Building the browser stack once and passing
+  it to the shards.** The shards build with their own env
+  (`NEXT_PUBLIC_ROOT_DOMAIN=localhost`), so the Build job's output does not
+  fit. A build job in front of the shards puts ~3 min in series with the
+  tests. **More browser shards** were also rejected: a run already starts 19
+  jobs, and overlapping runs queued for up to 6 min on the account's
+  concurrent-job limit.
+- **Adopted** — Check the cache before tuning jobs when CI slows down:
+  `gh api repos/saroh-labs/saroh.in/actions/cache/usage`. Close to 10 GB means
+  entries are being evicted.
+
 ## Tests
 
 | Layer       | Where                                                                         | Database                                                                                |
