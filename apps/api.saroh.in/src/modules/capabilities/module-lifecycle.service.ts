@@ -217,7 +217,16 @@ export class ModuleLifecycleService {
         await this.activation?.moduleEnabled(ctx.organizationId, moduleKey);
     }
 
-    /** Disable a module. Blocked by dependents or unmet safe-deactivation. */
+    /**
+     * Disable a module. Blocked by dependents or unmet safe-deactivation.
+     *
+     * A dependent Saroh hasn't rolled out (DEC-057) doesn't block it: the
+     * business can't see it, so it can't be named in the confirmation nor
+     * turned off first, and switching a module off never switches off
+     * another without naming it (F13, DEC-067). It keeps its own setting,
+     * as a hidden module does, and its dependency gate holds it unavailable
+     * until what it needs is back on.
+     */
     async disable(
         ctx: OrganizationContext,
         moduleKey: ModuleKey,
@@ -245,8 +254,14 @@ export class ModuleLifecycleService {
                     select: { moduleKey: true },
                 },
             );
-            if (enabledDependents.length > 0) {
-                const on = enabledDependents
+            const blocking: typeof enabledDependents = [];
+            for (const d of enabledDependents) {
+                if (await this.rolledOut(ctx, d.moduleKey as ModuleKey)) {
+                    blocking.push(d);
+                }
+            }
+            if (blocking.length > 0) {
+                const on = blocking
                     .map(
                         (d) =>
                             MODULE_BY_KEY.get(d.moduleKey as ModuleKey)
@@ -254,7 +269,7 @@ export class ModuleLifecycleService {
                     )
                     .join(" and ");
                 throw new ConflictException(
-                    `${on} ${enabledDependents.length === 1 ? "needs" : "need"} ${descriptor.label}. Turn off ${on} first.`,
+                    `${on} ${blocking.length === 1 ? "needs" : "need"} ${descriptor.label}. Turn off ${on} first.`,
                 );
             }
         }

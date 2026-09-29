@@ -92,6 +92,12 @@ export interface OrderRow extends FulfilmentFields {
      * absent from an API before B15.
      */
     attention?: OrderAttentionTag[] | null;
+    /**
+     * A treatment's next booked visit (B14, DEC-067), in the clinic's zone;
+     * null when none is booked. Only on an appointment order, and absent
+     * from an API before it or when it couldn't be read.
+     */
+    nextVisit?: { startAt: string; timezone: string } | null;
 }
 
 /** One Needs attention entry on a row (B15): its kind and words. */

@@ -4,6 +4,7 @@ import { Prisma, prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { businessTimezone } from "../bookings/staff-availability";
 import { canSeeSensitive } from "../customer-workspace/attention-read";
+import { FULFILMENT_RULES } from "./fulfilment";
 import { lateThresholdsByStore, thresholdsFor } from "./late-thresholds";
 import type { OrderAttention } from "./order-attention";
 import { attentionByCustomer } from "./order-attention";
@@ -22,6 +23,8 @@ import {
 } from "./order-list-filters";
 import type { OrderRowDto } from "./order-row";
 import { serializeOrderRow } from "./order-row";
+import type { NextVisitDto } from "./order-visits";
+import { nextVisitsFor } from "./order-visits";
 import { withBookingPayments } from "./treatment-ledger";
 
 const logger = new Logger("OrderList");
@@ -221,7 +224,7 @@ export async function listOrderRows(
     );
     // Each storefront's late thresholds, once per storefront in the page:
     // the numbers `lateSql` read for the Late filter and the counts.
-    const [thresholds, attention] = await Promise.all([
+    const [thresholds, attention, visits] = await Promise.all([
         lateThresholdsByStore(
             prisma,
             loaded.map((o) => o.store.id),
@@ -232,6 +235,11 @@ export async function listOrderRows(
                   loaded.flatMap((o) => (o.customerId ? [o.customerId] : [])),
               )
             : Promise.resolve(undefined),
+        // A treatment's next visit (B14): "Next 19 Sep, 10:00" on its row.
+        rowNextVisits(
+            organizationId,
+            loaded.flatMap((o) => (goesByVisits(o.fulfilment) ? [o.id] : [])),
+        ),
     ]);
 
     return {
@@ -253,6 +261,9 @@ export async function listOrderRows(
                                         NO_ATTENTION,
                           now,
                           lateThresholds: thresholdsFor(thresholds, o.store.id),
+                          ...(visits?.has(o.id)
+                              ? { nextVisit: visits.get(o.id) ?? null }
+                              : {}),
                       }),
                   ]
                 : [];
@@ -261,6 +272,35 @@ export async function listOrderRows(
         counts,
         nextCursor: more ? (page[page.length - 1] ?? null) : null,
     };
+}
+
+/** Whether an order is fulfilled by its visits (E9): a treatment. */
+function goesByVisits(stored: string): boolean {
+    return (
+        (FULFILMENT_RULES as Record<string, { visits: boolean } | undefined>)[
+            stored
+        ]?.visits === true
+    );
+}
+
+/**
+ * The page's treatments' next visits (B14). A failed read leaves them out,
+ * so the rows say nothing of a next visit rather than "not booked", which
+ * would be wrong; the list itself still answers.
+ */
+async function rowNextVisits(
+    organizationId: string,
+    orderIds: string[],
+): Promise<Map<string, NextVisitDto | null> | null> {
+    if (orderIds.length === 0) return null;
+    try {
+        return await nextVisitsFor(prisma, organizationId, orderIds);
+    } catch (error) {
+        logger.warn(
+            `Next visits couldn't be read for the Orders list: ${String(error)}`,
+        );
+        return null;
+    }
 }
 
 /**

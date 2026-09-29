@@ -37,6 +37,7 @@ import {
     unansweredMessages,
     viewerOf,
 } from "./home-people-sources";
+import { failedOrderRefunds } from "./home-refunds-failed";
 import { readReviews } from "./home-reviewer";
 import type { HomeSchedule } from "./home-schedule";
 import { NO_SCHEDULE, readSchedule } from "./home-schedule";
@@ -283,6 +284,7 @@ export class HomeService {
             reviews,
             notes,
             messages,
+            refundsFailed,
         ] = await Promise.all([
             active.has("CRM") && canReadLeads
                 ? guard(
@@ -490,6 +492,21 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // Refunds the provider failed (B9, DEC-067): the customer's
+            // money is still here, so it needs someone. An amount is money,
+            // so `order:read`'s.
+            available.has("COMMERCE") && holds(input, "order:read")
+                ? guard(
+                      { moduleKey: "COMMERCE", label: "Refunds" },
+                      () =>
+                          failedOrderRefunds(
+                              this.db,
+                              input.organizationId,
+                              stores,
+                          ),
+                      null,
+                  )
+                : skip(null),
         ]);
         const unavailable = slots.flat();
 
@@ -549,6 +566,7 @@ export class HomeService {
                 evidence: owed.evidence,
             });
         }
+        if (refundsFailed) actions.push(refundsFailed);
         if (renewals) actions.push(renewals);
         if (waiting) actions.push(waiting);
         if (overdueInvoiceAction) actions.push(overdueInvoiceAction);

@@ -137,6 +137,14 @@ export interface OrderMoneyDto {
      */
     refundsBeingConfirmed: { id: string; amount: string }[];
     /**
+     * Refunds the provider accepted and hasn't confirmed yet (B9, DEC-067):
+     * counted in `refunded` — a cancel is done once the provider takes the
+     * refund — and said "Refund on its way" until its webhook confirms it.
+     * One the provider then fails leaves this list and `refunded`, and
+     * raises a Needs you row (`home-refunds-failed.ts`).
+     */
+    refundsOnTheWay: { id: string; amount: string }[];
+    /**
      * Money a customer paid on an edit's charge that a later edit replaced
      * (#508, U8): not counted in `paid`, owed back to them until a refund
      * for it is on record.
@@ -619,6 +627,13 @@ export function serializeOrderRead(
                   refundsBeingConfirmed: order.paymentIntents.flatMap((p) =>
                       p.refunds.flatMap((r) =>
                           r.status === "PENDING" && !r.providerRefundId
+                              ? [{ id: r.id, amount: money(r.amountCents) }]
+                              : [],
+                      ),
+                  ),
+                  refundsOnTheWay: order.paymentIntents.flatMap((p) =>
+                      p.refunds.flatMap((r) =>
+                          r.status === "PENDING" && r.providerRefundId
                               ? [{ id: r.id, amount: money(r.amountCents) }]
                               : [],
                       ),

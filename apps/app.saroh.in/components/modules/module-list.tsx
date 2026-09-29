@@ -13,10 +13,10 @@ import {
 } from "@/lib/modules/actions";
 import type { ModuleBlocker, ModuleView } from "@/lib/modules/schema";
 import {
-    enabledDependents,
     listWords,
     missingDependencies,
     offImpact,
+    offPlan,
     refusalActionLabel,
     setupActionLabel,
 } from "@/lib/modules/switch-plan";
@@ -163,17 +163,17 @@ function ModuleRow({
     const missing = on ? [] : missingDependencies(modules, module.key);
     const blocked = missing.length > 0;
     const missingLabels = missing.map((k) => labelOf(modules, k));
-    // On, and other modules need it: they go off with it. Worked out over
-    // every module, hidden ones too, because the API refuses to turn this
-    // off while any of them is on; only the ones shown are named (DEC-057).
-    const dependents = on ? enabledDependents(all, module.key) : [];
-    const shown = new Set(modules.map((m) => m.key));
-    const dependentLabels = dependents
-        .filter((k) => shown.has(k))
-        .map((k) => labelOf(modules, k));
-    const leaving = [module.key, ...dependents]
-        .filter((k) => shown.has(k))
-        .flatMap((k) => navRowsForModule(k));
+    // On, and other modules need it: they go off with it, and every one is
+    // named in the confirmation (F13, DEC-067). Only the modules shown: one
+    // Saroh hasn't rolled out can't be named (DEC-057), so it is never
+    // turned off either — it keeps its own setting, and the API lets this
+    // go off without it (`offPlan`).
+    const plan = on ? offPlan(modules, all, module.key) : null;
+    const dependents = plan?.off ?? [];
+    const dependentLabels = dependents.map((k) => labelOf(modules, k));
+    const leaving = [module.key, ...dependents].flatMap((k) =>
+        navRowsForModule(k),
+    );
     // The step the API says is left, for a module that is on.
     const step =
         on && module.readiness !== "ACTIVE" ? module.blockers[0] : undefined;

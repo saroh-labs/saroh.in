@@ -79,6 +79,27 @@ const orders = (page: Page) =>
  */
 const cards = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
+/**
+ * The filter bar at this width (B4, B5). At the desk it is on the page; on a
+ * phone it sits in a sheet behind the Filters button, which this opens. The
+ * button is drawn once per layout (hidden at the desk), so only the visible
+ * one is pressed.
+ */
+async function filterBar(page: Page) {
+    if (cards(page)) {
+        await page
+            .getByRole("button", { name: /^Filters/ })
+            .filter({ visible: true })
+            .click();
+        return page
+            .getByRole("dialog", { name: "Filter orders" })
+            .getByRole("group", { name: "Filter orders" });
+    }
+    return page
+        .getByRole("group", { name: "Filter orders" })
+        .filter({ visible: true });
+}
+
 const tab = (page: Page, name: string) =>
     page.getByRole("navigation", { name: "Orders" }).getByRole("link", {
         name: new RegExp(`^${name}`),
@@ -226,7 +247,7 @@ test.describe("orders list", () => {
         }
     });
 
-    test("on a phone the rows stack, and the whole row opens the order", async ({
+    test("on a phone the rows stack, and the whole row opens its quick view (B5)", async ({
         page,
     }) => {
         await page.setViewportSize({ width: 390, height: 844 });
@@ -244,15 +265,71 @@ test.describe("orders list", () => {
         }));
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
 
-        // Tap the card away from the name: the link's hit area is the card.
-        // The filter bar (B4) can push the first card under the tab bar, so
-        // bring it to the middle of the screen, clear of the fixed tab bar.
+        // The filters are behind one button now (B5), so the first card
+        // starts above the fold rather than under a wall of menus.
+        const top = await card.boundingBox();
+        expect(top).not.toBeNull();
+        expect((top?.y ?? 9999) + 40).toBeLessThan(844 - 53);
+
+        // Tap the card away from the name: the button's hit area is the
+        // card, and it opens the quick view as a sheet, not the page.
         await card.evaluate((el) => el.scrollIntoView({ block: "center" }));
         const box = await card.boundingBox();
         expect(box).not.toBeNull();
         if (!box) return;
         await page.mouse.click(box.x + box.width - 12, box.y + box.height - 8);
+        const sheet = page.getByRole("dialog");
+        await expect(sheet).toBeVisible();
+        await expect(page).toHaveURL(/\/commerce\/orders(\?|$)/);
+        await expect(sheet).toContainText(`#${rows[0]?.orderId ?? ""}`);
+        const full = sheet.getByRole("link", { name: /Open full page/ });
+        await expect(full).toBeVisible();
+        await full.click();
         await expect(page).toHaveURL(/\/commerce\/orders\/[^/?]+/);
+    });
+
+    test("on a phone the filters open from one button, and say how many are on (B5)", async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto("/commerce/orders");
+
+        // No filter menus on the page itself at this width.
+        await expect(
+            page.getByRole("group", { name: "Filter orders" }),
+        ).toHaveCount(0);
+        const button = page
+            .getByRole("button", { name: /^Filters/ })
+            .filter({ visible: true });
+        await expect(button).toHaveCount(1);
+        await expect(button).toHaveAttribute("aria-label", "Filters");
+        await expect(button).toHaveCSS("cursor", "pointer");
+
+        await button.click();
+        const sheet = page.getByRole("dialog", { name: "Filter orders" });
+        await expect(sheet).toBeVisible();
+        const bar = sheet.getByRole("group", { name: "Filter orders" });
+        await expect(bar.getByRole("combobox", { name: "Date" })).toBeVisible();
+        await bar.getByRole("button", { name: "Late" }).click();
+        await expect(page).toHaveURL(/late=true/);
+        await expect(bar.getByRole("button", { name: "Late" })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
+
+        await sheet.getByRole("button", { name: "Done" }).click();
+        await expect(sheet).toHaveCount(0);
+        await expect(button).toHaveAttribute("aria-label", "Filters, 1 on");
+
+        // Clear filters, from the sheet, empties the address.
+        await button.click();
+        await page
+            .getByRole("dialog", { name: "Filter orders" })
+            .getByRole("button", { name: "Clear filters" })
+            .click();
+        await expect(page).not.toHaveURL(/late=/);
     });
 
     test("the kitchen sees the pill and progress, and no money", async ({
@@ -313,6 +390,45 @@ async function filterOptions(page: Page, org: string): Promise<FilterOptions> {
     return (await res.json()) as FilterOptions;
 }
 
+/**
+ * A treatment's row says its next visit (B14, DEC-067): "Next 19 Sep,
+ * 10:00", or "Next visit not booked". Kavi Dental is a film set: read only.
+ */
+test.describe("a treatment's next visit on the row (B14)", () => {
+    const KAVI = "seed_sc_kavi_org";
+
+    test("each open treatment's row says when its next visit is", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${KAVI}`);
+        const { rows } = await list(page, KAVI, "&tab=open");
+        const treatments = (
+            rows as (Row & {
+                nextVisit?: { startAt: string; timezone: string } | null;
+            })[]
+        ).filter(
+            (r) =>
+                r.fulfilmentType.startsWith("APPOINTMENT_") &&
+                r.nextVisit !== undefined,
+        );
+        test.skip(treatments.length === 0, "No open treatments on Kavi.");
+
+        await page.goto("/commerce/orders?tab=open");
+        for (const t of treatments.slice(0, 3)) {
+            const row = orders(page)
+                .getByRole("listitem")
+                .filter({ hasText: `#${t.orderId}` });
+            await expect(row).toContainText(
+                t.nextVisit
+                    ? /Next (today|yesterday|\d{1,2} \w{3})/
+                    : "Next visit not booked",
+            );
+            await expect(row).not.toContainText("Late");
+        }
+    });
+});
+
 test.describe("orders list filters (B4)", () => {
     test("step, fulfilment and date filters survive a reload", async ({
         page,
@@ -336,7 +452,7 @@ test.describe("orders list filters (B4)", () => {
         await page.goto(`/commerce/orders?${address}`);
         await page.reload();
         await expect(page).toHaveURL(new RegExp(`step=${step.key}`));
-        const bar = page.getByRole("group", { name: "Filter orders" });
+        const bar = await filterBar(page);
         await expect(bar.getByRole("combobox", { name: "Step" })).toContainText(
             step.label,
         );
@@ -346,6 +462,7 @@ test.describe("orders list filters (B4)", () => {
         await expect(bar.getByRole("combobox", { name: "Date" })).toContainText(
             "This month",
         );
+        if (cards(page)) await page.keyboard.press("Escape");
         await expect(tab(page, "All")).toContainText(
             String(expected.counts.all),
         );
@@ -384,7 +501,7 @@ test.describe("orders list filters (B4)", () => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
         await page.goto("/commerce/orders");
-        const bar = page.getByRole("group", { name: "Filter orders" });
+        const bar = await filterBar(page);
         const late = bar.getByRole("button", { name: "Late" });
         await expect(late).toHaveAttribute("aria-pressed", "false");
         await late.click();
@@ -398,7 +515,9 @@ test.describe("orders list filters (B4)", () => {
         await expect(attention).toHaveAttribute("aria-pressed", "true");
         await page.reload();
         await expect(
-            bar.getByRole("button", { name: "Needs attention" }),
+            (await filterBar(page)).getByRole("button", {
+                name: "Needs attention",
+            }),
         ).toHaveAttribute("aria-pressed", "true");
     });
 
@@ -410,11 +529,12 @@ test.describe("orders list filters (B4)", () => {
         await page.goto(`/open/${RYE}`);
         await page.goto("/commerce/orders?attention=true");
         const tag = page
-            .getByRole("img", { name: /Needs attention: Allergy: Sesame/ })
+            .getByRole("img", { name: /^Allergy: Sesame/ })
             .locator("visible=true")
             .first();
         await expect(tag).toBeVisible();
-        await expect(tag).toHaveText(/Allergy: Sesame/);
+        // The tag reads "Sesame", as the design shows (DEC-067).
+        await expect(tag).toHaveText(/^Sesame( \+\d+)?$/);
         await expect(
             page.getByRole("img", { name: /Needs attention couldn't/ }),
         ).toHaveCount(0);
@@ -430,7 +550,7 @@ test.describe("orders quick view and row menu (B5)", () => {
     test.beforeEach(async ({ page }, testInfo) => {
         test.skip(
             testInfo.project.name === "phone",
-            "The quick view and row menu are drawn from 760px only; a phone's card opens the order's page.",
+            "The row menu is drawn from 760px only; a phone's card opens the same quick view as a sheet, tested above.",
         );
         await page.setViewportSize({ width: 1440, height: 900 });
     });
@@ -717,6 +837,63 @@ test.describe("orders bulk kitchen moves (B6)", () => {
         for (const r of picked) {
             expect(after.rows.some((x) => x.id === r.id)).toBe(true);
         }
+    });
+
+    test("Print tickets (N) opens the selected orders' tickets, oldest first, one to a page", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(page, NORTHWIND);
+        const picked = rows
+            .filter(
+                (r) => (r as Row & { ticketName?: string | null }).ticketName,
+            )
+            .slice(0, 2);
+        test.skip(picked.length < 2, "Needs two orders with a ticket.");
+
+        await page.goto("/commerce/orders");
+        for (const r of picked) {
+            await rowOf(page, r.orderId)
+                .getByRole("checkbox", {
+                    name: `Select order number ${r.orderId}`,
+                })
+                .click();
+        }
+        const print = bar(page).getByRole("link", {
+            name: "Print tickets (2)",
+        });
+        await expect(print).toBeVisible();
+        await expect(print).toHaveAttribute("target", "_blank");
+        await expect(print).toHaveCSS("cursor", "pointer");
+        const href = await print.getAttribute("href");
+        expect(href).toContain("/commerce/orders/tickets?ids=");
+
+        // The print dialog is the browser's: count the call, don't open it.
+        await page.addInitScript(() => {
+            (window as unknown as { printed: number }).printed = 0;
+            window.print = () => {
+                (window as unknown as { printed: number }).printed += 1;
+            };
+        });
+        await page.goto(href ?? "/");
+        await expect(
+            page.getByRole("heading", { name: "2 tickets" }),
+        ).toBeVisible();
+        const tickets = page
+            .getByRole("list", { name: "Tickets" })
+            .getByRole("article");
+        await expect(tickets).toHaveCount(2);
+        // Oldest first: the list is newest first, so the order flips.
+        const oldest = [...picked].reverse();
+        await expect(tickets.first()).toContainText(`#${oldest[0]?.orderId}`);
+        await expect
+            .poll(() =>
+                page.evaluate(
+                    () => (window as unknown as { printed: number }).printed,
+                ),
+            )
+            .toBe(1);
     });
 
     test("select every row by keyboard, and Clear empties the selection", async ({
