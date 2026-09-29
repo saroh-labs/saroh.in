@@ -1,4 +1,6 @@
 # The quick local gate (scripts/prepush.sh): secrets, lint, types, check:*,
-# unit tests and vitest. A failure blocks the push — fix it, push again.
+# and the unit tests and vitest specs the change reaches. Steps that already
+# passed on this tree are skipped, so after `pnpm prepush --all` this takes
+# seconds. A failure blocks the push — fix it, push again.
 # Before a batch push, also run `pnpm prepush --all` (integration + browser).
 pnpm prepush
