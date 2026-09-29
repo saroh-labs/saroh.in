@@ -739,3 +739,37 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - Enable gains a setup payload per module, validated by the API. The minimum and the switch are saved in one transaction.
     - Readiness still comes from the data. A module saved with its minimum is ACTIVE, or it shows its remaining "Finish setup" items.
     - Existing businesses keep their modules as they are.
+
+## DEC-069 One address: the website is where customers go, storefronts become locations
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · amends DEC-018 / DEC-030 wording
+
+- Context:
+    - The address chosen at setup (`Organization.slug`) becomes the website's `Site.subdomain`, and the website is the only public front (`/`, `/shop`, `/book`, `/account`).
+    - A storefront has no public address; the site sells from one through "Sells from".
+    - Merchants meet five overlapping words (storefront, online store, the Shop kind, the Shop page, `/shop`) and an editable storefront "Web address" that goes nowhere (`Store.slug`, `Store.CustomDomain`, both unused).
+    - "Address" means four different things.
+    - The address can never change, not even for a typo.
+    - Pay links sit on another domain (`saroh.app/pay/…`).
+    - "Share your storefront" shares the site's home page.
+- Decision:
+    - **The business address is the website**, `<address>.saroh.app`, or the verified custom domain once there is one.
+        - Everything customers touch lives on it: the shop, the booking page, the account, and **pay links** (`<address>/pay/…`).
+        - `saroh.app/pay/…` stays only for a business with no site, and old links keep working.
+    - **Words:**
+        - Storefronts become **Locations**: the places the business sells from in person.
+        - **Your online shop** is the website's `/shop`, selling from one location's stock. "Sells from" is renamed to match.
+        - Each location says whether it sells in person only or online too, with a link to the shop.
+        - The four "address" meanings are named apart: _web address_, _registered address_, _location address_, and the blog's _posts path_.
+    - **The address can be changed** by the owner in Settings.
+        - The old address redirects for 90 days and stays reserved to the business, so nobody else can take it. Links already shared keep working.
+        - The reserved-word list (`RESERVED_ADDRESSES`) applies.
+    - **Selling online creates the website:** turning on selling online makes the starter site on the business's address (DEC-068's defaults), with the shop page ready to publish.
+    - **Share buttons share the link that fits** (the shop, the booking page or the site), on the custom domain when verified.
+    - **The dead storefront "Web address" and the unused `CustomDomain` table are removed** (expand/contract).
+- Consequences:
+    - The merchant-facing copy changes across Sell and Sites.
+    - Pay-link URLs move to the tenant host, and the old apex links still resolve.
+    - An address change needs a redirect table and a reserved-until date.
+    - A site created with no address because the slug was taken can no longer happen silently: creation asks for a free address instead.
+- Migration: to be planned. The address history and redirects are an additive table. `Store.slug` and `CustomDomain` are dropped in a later contract release.
