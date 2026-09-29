@@ -4,7 +4,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Booking, OrderFulfilment, Service } from "@saroh/database";
-import { Prisma, prisma } from "@saroh/database";
+import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -231,26 +231,6 @@ async function treatmentCustomerInTx(
 }
 
 /**
- * The storefront's next order number, under the storefront's row lock (NO
- * KEY UPDATE, so orders still insert against it): two treatments booked at
- * one storefront at once take turns. A staff order racing it without the
- * lock is refused by `@@unique([storeId, orderId])` and retries there.
- */
-async function nextOrderNumberInTx(tx: Tx, storeId: string): Promise<string> {
-    await tx.$queryRaw`SELECT id FROM "Store" WHERE id = ${storeId} FOR NO KEY UPDATE`;
-    let n = (await tx.order.count({ where: { storeId } })) + 1;
-    for (;;) {
-        const orderId = `ORD-${String(n).padStart(3, "0")}`;
-        const taken = await tx.order.findUnique({
-            where: { storeId_orderId: { storeId, orderId } },
-            select: { id: true },
-        });
-        if (!taken) return orderId;
-        n += 1;
-    }
-}
-
-/**
  * Sell a treatment on the booking's transaction: one order at the
  * storefront, one service line for the whole treatment (quantity 1, the
  * service's price, no stock), and the booking made its visit 1. The price
@@ -292,7 +272,8 @@ export async function startTreatmentInTx(
               },
           )
         : 0;
-    const orderNumber = await nextOrderNumberInTx(tx, storeId);
+    // The business's next number, as every order's (P3, DEC-066).
+    const orderNumber = await nextOrderNumberInTx(tx, organizationId);
     const order = await tx.order.create({
         data: {
             storeId,

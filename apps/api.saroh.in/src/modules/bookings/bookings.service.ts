@@ -1120,6 +1120,10 @@ export class BookingsService {
                         });
                     },
                     onRace: "That changed while you were booking. Try again.",
+                    // The race lost may be another order taking the
+                    // business's next order number (P3): tried again, it
+                    // books, or says what really changed.
+                    retryOnce: true,
                 },
                 { ...person, paidWith },
             );

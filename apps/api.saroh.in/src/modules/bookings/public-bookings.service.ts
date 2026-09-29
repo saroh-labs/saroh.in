@@ -493,11 +493,13 @@ export class PublicBookingsService {
         };
         const also = {
             // With a credit, the race lost may have been the pack's (or the
-            // month's) last class; tried again, the answer says which.
+            // month's) last class; tried again, the answer says which. A
+            // treatment's may have been another order taking the business's
+            // next order number (P3): tried again, it books.
             onRace: credit
                 ? "That changed while you were booking. Try again."
                 : "This slot is fully booked",
-            retryOnce: credit !== null,
+            retryOnce: credit !== null || treatmentStore !== null,
             inTx: async (tx: Prisma.TransactionClient, booking: Booking) => {
                 made.bookingId = booking.id;
                 // A note on a booking confirmed now waits on the customer's

@@ -1,5 +1,5 @@
 import { ConflictException, HttpException } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import { nextOrderNumberInTx, prisma } from "@saroh/database";
 
 import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
@@ -80,8 +80,6 @@ export async function createCheckoutOrder(
     const totalCents = subtotalCents + shippingCents;
 
     for (let attempt = 0; attempt < 5; attempt++) {
-        const count = await prisma.order.count({ where: { storeId } });
-        const orderNumber = `ORD-${String(count + 1 + attempt).padStart(3, "0")}`;
         try {
             return await prisma.$transaction(async (tx) => {
                 // Found whatever case staff typed it in, as a treatment's
@@ -163,6 +161,12 @@ export async function createCheckoutOrder(
                         },
                     });
                 }
+                // The business's next number, whichever storefront sells
+                // it (P3, DEC-066): taken last, so its lock is held briefly.
+                const orderNumber = await nextOrderNumberInTx(
+                    tx,
+                    scope.organizationId,
+                );
                 const order = await tx.order.create({
                     data: {
                         storeId,
@@ -217,7 +221,8 @@ export async function createCheckoutOrder(
         } catch (err) {
             if ((err as { code?: string }).code !== "P2002") throw err;
             // A double tap raced this one with the same key: its order
-            // stands. Otherwise another order took the number.
+            // stands. Otherwise an order the API before P3 numbered took
+            // the number: the next attempt takes another.
             const raced = await prisma.order.findUnique({
                 where: {
                     storeId_checkoutKey: { storeId, checkoutKey: dto.key },

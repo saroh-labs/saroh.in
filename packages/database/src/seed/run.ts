@@ -1,5 +1,6 @@
 import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
+import { alignOrderNumberSequence } from "../order-number";
 import {
     ANALYTICS_DAYS,
     ANALYTICS_PATHS,
@@ -746,6 +747,9 @@ async function seedCommerce(
         organizationId: orgId,
         orderIdPrefix: SEED_PREFIX,
     });
+    // The business's one order-number series (P3, DEC-066) continues from
+    // the fixtures: the next order taken by hand follows the highest.
+    await alignOrderNumberSequence(prisma, orgId);
 
     return store.id;
 }
@@ -1527,6 +1531,10 @@ export async function deleteSeeded(
         // Keyed by its organization, so matched on that.
         () =>
             prisma.invoiceSequence.deleteMany({
+                where: { organizationId: { startsWith: prefix } },
+            }),
+        () =>
+            prisma.orderNumberSequence.deleteMany({
                 where: { organizationId: { startsWith: prefix } },
             }),
         () => prisma.organization.deleteMany({ where }),

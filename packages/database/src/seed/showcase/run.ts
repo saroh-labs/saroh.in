@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import { holdOpenLines } from "../../backfill/held-stock";
 import { assertDatabaseTarget } from "../../database-target";
+import { alignOrderNumberSequence } from "../../order-number";
 import {
     ANALYTICS_DAYS,
     ANALYTICS_PATHS,
@@ -218,6 +219,11 @@ export async function seedShowcase(
         prisma,
         businesses.map((b) => b.id),
     );
+    // Each business's one order-number series (P3, DEC-066) continues from
+    // its fixtures: the next order taken by hand follows the highest.
+    for (const b of businesses) {
+        await alignOrderNumberSequence(prisma, b.id);
+    }
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);

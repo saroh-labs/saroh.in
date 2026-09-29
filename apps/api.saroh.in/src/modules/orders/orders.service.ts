@@ -6,7 +6,7 @@ import {
     NotFoundException,
     Optional,
 } from "@nestjs/common";
-import { Prisma, prisma } from "@saroh/database";
+import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
@@ -338,11 +338,21 @@ export class OrdersService {
             },
         };
 
-        // Assign a per-store order number with a retry on the rare race where
-        // two orders claim the same number (the @@unique([storeId, orderId])).
+        // Numbered in the business's one series (P3, DEC-066), whichever
+        // storefront takes it. A storefront is always a business's.
+        const numberingOrg =
+            organizationId ??
+            (
+                await prisma.store.findUniqueOrThrow({
+                    where: { id: storeId },
+                    select: { organizationId: true },
+                })
+            ).organizationId;
+
+        // Retried when an order the API before P3 numbered took the number
+        // (the @@unique([storeId, orderId])), or a concurrent order's number
+        // broke a coded order's serializable transaction.
         for (let attempt = 0; attempt < 5; attempt++) {
-            const count = await prisma.order.count({ where: { storeId } });
-            const orderNumber = `ORD-${String(count + 1 + attempt).padStart(3, "0")}`;
             try {
                 const created = await prisma.$transaction(
                     async (tx) => {
@@ -354,6 +364,10 @@ export class OrdersService {
                             userId,
                             dto,
                         });
+                        const orderNumber = await nextOrderNumberInTx(
+                            tx,
+                            numberingOrg,
+                        );
                         const { items, ...order } = await tx.order.create({
                             data: { ...data, ...party, orderId: orderNumber },
                             select: {
@@ -444,8 +458,13 @@ export class OrdersService {
                     : { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;
-                // A serialization failure only means something on the coded
-                // path: another order took the code's last use first.
+                // A serialization failure only happens on the coded path:
+                // another order took the code's last use first — which the
+                // next attempt's re-count says in its own words — or took
+                // the business's next number (P3). Tried again first.
+                if (applied && isSerializationFailure(err) && attempt < 4) {
+                    continue;
+                }
                 if (applied && isSerializationFailure(err)) {
                     throw new ConflictException({
                         message: `${applied.code} was just used by another order. Try again, or remove it.`,

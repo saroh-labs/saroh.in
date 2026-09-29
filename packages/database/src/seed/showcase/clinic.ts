@@ -423,9 +423,10 @@ async function writeOrders(prisma: Db, orders: KaviWorld["orders"]) {
     const orgId = KAVI.orgId;
     const storeId = KAVI.storeId;
     const taken = new Set(
+        // Any of the business's orders (P3, DEC-066: one series).
         (
             await prisma.order.findMany({
-                where: { storeId },
+                where: { store: { organizationId: orgId } },
                 select: { orderId: true },
             })
         ).map((o) => o.orderId),

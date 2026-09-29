@@ -12,6 +12,8 @@ export * from "./client";
 export * from "@saroh/block-contract";
 export * from "./org-context";
 export * from "./rls-proxy";
+// The one allocator every order number comes from (P3, DEC-066).
+export * from "./order-number";
 // The #529 backfill, exported so the API's integration suite can run it
 // against old-shape rows (twice) and check what it did.
 export * from "./backfill/catalogue-settings";
@@ -44,3 +46,6 @@ export * from "./backfill/store-members-to-memberships";
 // The F10b business-type backfill (`company` → `pvt`), exported so the API's
 // integration suite can run it twice and check what it did.
 export * from "./backfill/business-type-pvt";
+// The P3 order-number backfill (DEC-066), exported so the API's integration
+// suite can run it twice and check what it did.
+export * from "./backfill/order-numbers";
