@@ -29,7 +29,7 @@ const CATALOGUE: RoleCatalogue = {
             label: "Change what a role can do",
         },
         { action: "order:read", group: "sell", label: "See orders" },
-        { action: "store:write", group: "sell", label: "Change storefronts" },
+        { action: "store:write", group: "sell", label: "Change locations" },
         {
             action: "payment:manage",
             group: "money",

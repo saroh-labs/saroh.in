@@ -46,7 +46,7 @@ export function VisitsStorefrontNote() {
                 href={STOREFRONTS_HREF}
                 className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-                Add a storefront
+                Add a location
             </Link>
         </p>
     );

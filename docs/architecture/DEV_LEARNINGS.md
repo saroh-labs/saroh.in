@@ -1136,3 +1136,21 @@ renewal PDF against a real database.
 reading it as a number. `docs/patterns/backend-billing-and-classes.md` → GST
 shows only when it applies.
 **Category**: invoices · GST · DEC-072
+
+## Copy — the service editor matched an API refusal by its words (DEC-069 L11)
+
+**Problem**: Rewording the API's "Treatments are sold as orders — add a
+storefront first." to say location would have silently moved the app's
+inline note under Time into a generic error toast.
+**Root cause**: `components/services/service-editor/service-editor.tsx`
+decides where to show the refusal with `error === TREATMENT_NEEDS_STOREFRONT`,
+a copy of the API's sentence kept in `lib/services/service-editor.ts`. The
+API already sends `details.reason: "no-storefront"`, but the app's save path
+passes only the message on.
+**Fix**: the app's constant changed in the same commit as the API's words.
+`src/common/merchant-copy.spec.ts` now fails on any API prose that says
+storefront, so a copy change there is visible in review.
+**Rule**: branch on a code or `details.reason`, never on a message's words;
+when an old app still compares words, change both sides together and expect
+an old app to fall back to the toast until it is redeployed.
+**Category**: copy · API contract · DEC-069
