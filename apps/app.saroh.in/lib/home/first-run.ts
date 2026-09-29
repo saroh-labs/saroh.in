@@ -1,3 +1,4 @@
+import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 
 /**
@@ -94,7 +95,11 @@ export function turnOnOrder(modules: ModuleView[], key: string): string[] {
  */
 export function firstRunJobs(modules: ModuleView[]): FirstRunJob[] {
     const byKey = new Map(modules.map((m) => [m.key, m]));
+    // Only what Saroh has rolled out here (DEC-057): the API lists every
+    // module, a dark one with ROLLOUT_DISABLED.
+    const shown = rolledOutKeys(modules);
     return JOBS.flatMap((job) => {
+        if (!shown.has(job.key)) return [];
         const view = byKey.get(job.key);
         if (!view || view.lifecycle === "ENABLED") return [];
         const order = turnOnOrder(modules, job.key);

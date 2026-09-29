@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { setModuleStatusAction } from "@/lib/modules/actions";
+import { blockerSentence } from "@/lib/modules/blocker-copy";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import { alsoSellToast } from "@/lib/services/also-sell";
 
@@ -30,7 +31,8 @@ export function AlsoSell({ features }: { features: AlsoSellFeature[] }) {
             if (!res.ok) {
                 // The API says why in a sentence ("Class packs needs
                 // Appointments. Turn on Appointments first.").
-                showError(res.blockers?.[0]?.message ?? res.error);
+                const refused = res.blockers?.[0];
+                showError(refused ? blockerSentence(refused) : res.error);
                 return;
             }
             router.refresh();

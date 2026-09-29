@@ -1,3 +1,4 @@
+import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 
 /**
@@ -39,10 +40,10 @@ export function alsoSellFeatures(
     modules: readonly ModuleView[] | null,
 ): AlsoSellFeature[] | null {
     if (!modules?.some((m) => m.canManage)) return null;
+    const shown = rolledOut(modules);
     const features = FEATURES.flatMap((f) => {
-        const view = modules.find((m) => m.key === f.key);
+        const view = shown.find((m) => m.key === f.key);
         if (!view) return [];
-        if (view.blockers.some((b) => b.code === "ROLLOUT_DISABLED")) return [];
         return [{ ...f, on: view.lifecycle === "ENABLED" }];
     });
     return features.length > 0 ? features : null;

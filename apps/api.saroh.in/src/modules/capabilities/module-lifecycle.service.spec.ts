@@ -237,6 +237,50 @@ describe("ModuleLifecycleService", () => {
         expect(db.organizationModule.upsert).not.toHaveBeenCalled();
     });
 
+    it("every refusal names the module, never its key (DEC-057)", async () => {
+        const on = makeDb();
+        on.organizationModule.findUnique.mockResolvedValue({
+            id: "om_1",
+            status: "ENABLED",
+        });
+        const blocked = new ModuleLifecycleService(
+            makeReadiness([{ code: "SOMETHING", message: "x" }]),
+            on as never,
+        );
+        const said = async (p: Promise<unknown>) => {
+            const e = (await p.then(
+                () => null,
+                (err: unknown) => err,
+            )) as { getResponse(): unknown } | null;
+            expect(e).not.toBeNull();
+            return JSON.stringify(e?.getResponse());
+        };
+        const refusals = [
+            await said(blocked.disable(OWNER, "CLASS_PACKS")),
+            await said(blocked.archive(OWNER, "CLASS_PACKS")),
+        ];
+        const off = makeDb();
+        off.organizationModule.findUnique.mockResolvedValue({
+            id: "om_1",
+            status: "DISABLED",
+        });
+        refusals.push(
+            await said(
+                new ModuleLifecycleService(
+                    makeReadiness(),
+                    off as never,
+                ).selectForProject(OWNER, "proj_1", "CRM"),
+            ),
+        );
+        expect(refusals[0]).toContain("Class packs can't be turned off yet.");
+        expect(refusals[1]).toContain(
+            "Turn Class packs off before archiving it.",
+        );
+        for (const r of refusals) {
+            expect(r).not.toMatch(/"message":"[^"]*\b[A-Z]+_[A-Z_]+\b/);
+        }
+    });
+
     it("disable writes a DISABLED row when safe", async () => {
         const db = makeDb();
         db.organizationModule.findUnique.mockResolvedValue({

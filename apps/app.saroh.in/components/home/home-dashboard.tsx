@@ -7,6 +7,7 @@ import { firstRunJobs } from "@/lib/home/first-run";
 import { formatList, nextLine } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
 import { showsWeek, weekRows } from "@/lib/home/week";
+import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
@@ -143,7 +144,9 @@ function FirstRun({
 
     // May turn things on, just none of the four starting jobs: the full list
     // is still theirs, so point at it rather than saying nobody can.
-    if (modules.some((m) => m.canManage && m.lifecycle !== "ENABLED")) {
+    if (
+        rolledOut(modules).some((m) => m.canManage && m.lifecycle !== "ENABLED")
+    ) {
         return (
             <EmptyState
                 icon={<Home aria-hidden />}

@@ -172,6 +172,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 user={session.user}
                 organizations={organizations}
                 activeOrg={activeOrg}
+                moduleKeys={moduleKeys}
                 unread={
                     navCan({ role, actions }, NOTIFICATIONS_NAV.action)
                         ? unread

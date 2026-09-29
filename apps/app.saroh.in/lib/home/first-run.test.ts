@@ -53,6 +53,17 @@ describe("firstRunJobs", () => {
         expect(bookings?.pulls).toEqual([]);
     });
 
+    it("never offers a module Saroh hasn't rolled out, nor one that needs it (DEC-057)", () => {
+        const dark = [{ code: "ROLLOUT_DISABLED" }];
+        const modules = ALL.map((m) =>
+            m.key === "WEBSITE" || m.key === "CRM"
+                ? { ...m, blockers: dark }
+                : m,
+        );
+        // Website is dark; Contacts is dark, and Bookings needs it while off.
+        expect(firstRunJobs(modules).map((j) => j.key)).toEqual(["COMMERCE"]);
+    });
+
     it("leaves out a job this business cannot have", () => {
         const modules = ALL.filter((m) => m.key !== "WEBSITE");
         expect(firstRunJobs(modules).map((j) => j.key)).not.toContain(
