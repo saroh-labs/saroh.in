@@ -36,7 +36,7 @@ export function PossibleMatch({
             role="note"
             className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2.5"
         >
-            <span className="flex-[1_1_240px] text-[13px] text-brand-subtle-foreground">
+            <span className="min-w-0 flex-[1_1_240px] text-[13px] text-brand-subtle-foreground [overflow-wrap:anywhere]">
                 <strong className="font-semibold">
                     Possible match — link?
                 </strong>{" "}
@@ -81,7 +81,7 @@ export function DuplicateNotice({
                     role="note"
                     className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-card px-[13px] py-2.5"
                 >
-                    <span className="flex-[1_1_240px] text-[13px] text-foreground/75">
+                    <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
                         <strong className="font-semibold text-foreground">
                             Looks like the same person:
                         </strong>{" "}
@@ -125,7 +125,7 @@ export function PartialNotice({
             role="status"
             className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5"
         >
-            <span className="flex-[1_1_240px] text-[13px] text-foreground/75">
+            <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
                 <strong className="font-semibold text-foreground">
                     Some of {first}&apos;s record couldn&apos;t be read:
                 </strong>{" "}

@@ -101,6 +101,14 @@ must skip ancestor/descendant pairs or it reports every row as a bug.
 **Resizing the window cannot reach 320px.** Chrome has a ~500px minimum window
 width, so a resize to 320 silently gives 500. Use viewport emulation.
 
+**On the phone project, `innerWidth` lies about overflow.** The Pixel 7 is a
+mobile viewport: content wider than the screen makes Chrome zoom the page
+out and widen `innerWidth` to match, so `scrollWidth <= innerWidth` passes
+on the very bug. Measure against the width you set (`page.viewportSize()`)
+and fail when `innerWidth` has grown, as `phone-reflow.spec.ts` does. Test
+with the values merchants have: a 60-character email with no hyphen (a
+hyphen is a line break the layout didn't earn), and long names.
+
 **A flaky harness gets ignored, which is worse than none.** Poll for readiness
 rather than sleeping a fixed number of seconds; a cold Next server on a runner
 is not reliably up in any particular time.

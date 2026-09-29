@@ -90,7 +90,7 @@ export function InvoicePaper({
     return (
         <article
             aria-label={`The ${title.toLowerCase()} as it prints`}
-            className="invoice-paper invoice-print rounded-[6px] border border-border px-5 py-[22px] shadow-[0_6px_18px_hsl(60_4%_11%/0.08)] sm:px-7 sm:py-[26px] print:rounded-none print:border-0 print:p-0 print:shadow-none"
+            className="invoice-paper invoice-print rounded-[6px] border border-border px-5 py-[22px] shadow-[0_6px_18px_hsl(60_4%_11%/0.08)] [overflow-wrap:anywhere] sm:px-7 sm:py-[26px] print:rounded-none print:border-0 print:p-0 print:shadow-none"
         >
             <header className="flex flex-wrap items-start gap-4 border-b-2 border-foreground pb-4">
                 <div className="min-w-0 flex-[1_1_200px]">

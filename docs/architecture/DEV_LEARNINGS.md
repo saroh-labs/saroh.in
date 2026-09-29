@@ -1009,6 +1009,36 @@ waits, and its teardown stops only its own servers.
 **Gotcha**: A test that was skipped "because the seed has none" is not
 coverage — make the record. And a long email pushed the phone's Link button
 off-screen in "Link a commerce customer" (the test keeps emails short; the
-dialog does not wrap).
+dialog did not wrap — fixed in P2, next entry).
 **Category**: e2e · tooling · `.agents/skills/saroh-browser-tests/SKILL.md`,
 `docs/patterns/devops-tooling-and-deploy.md`, `scripts/prepush.sh`
+
+## E2E — a phone test said a dialog fit at 320px while its buttons were off the screen
+
+**Problem**: On a phone, "Link a commerce customer" put a long email on one
+line and pushed Link off the screen; the invoice send confirm, the
+duplicate notice on Customer Detail, its email in the header, the invoice
+paper and Order Detail's header actions did the same with long values. The
+first draft of the guard (`scrollWidth <= innerWidth`) passed on most of
+them.
+**Root cause**: Two. In the app, a dialog is a CSS grid, and a grid item's
+`min-width: auto` let one unbreakable value (an email has no break point)
+set the dialog's width; a text line's `truncate` or a `flex-none` button row
+did the same outside dialogs. In the test, the Pixel 7 project is a mobile
+viewport: content wider than the screen makes Chrome zoom the page out and
+widen its layout viewport, so `innerWidth` grows with the overflow (320 → 426) and the check compares the bug with itself. A fixed dialog's `w-full`
+then follows the widened viewport too. And a paragraph whose text spills
+keeps its own box, so a "what sticks out" search by `getBoundingClientRect`
+finds nothing but the tab bar.
+**Fix**: `DialogContent` and `AlertDialogContent` have one
+`minmax(0,1fr)` column, `break-words`, and a height capped at the screen's
+with the rest scrolling inside; rows that hold an address wrap it
+(`[overflow-wrap:anywhere]`) and keep their buttons `shrink-0`.
+`e2e/tests/phone-reflow.spec.ts` opens the dialogs and sheets of Customer
+Detail, Order Detail, New order, the invoice send confirm, Change plan and
+Settings › Team with a 60-character email (no hyphen) and long names, at
+320px and 390px, and measures against the width it SET
+(`page.viewportSize()`), failing when `innerWidth` has grown; on failure it
+names the innermost boxes past the edge or spilling their text.
+**Category**: e2e · design system · `.agents/skills/saroh-browser-tests/SKILL.md`
+(Traps), `docs/patterns/frontend-design-system.md` (reflow)

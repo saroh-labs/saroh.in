@@ -134,11 +134,13 @@ export function Header({
                     {/* Phone and email are part of the person: whoever
                         reads the customer (`contact:read`) sees them
                         (matrix §3). */}
-                    <div className="mt-[5px] flex flex-wrap gap-3.5 text-[13px]">
+                    <div className="mt-[5px] flex min-w-0 flex-wrap gap-3.5 text-[13px]">
                         {email ? (
+                            // A long address wraps on a phone, whole, rather
+                            // than pushing the page sideways.
                             <a
                                 href={`mailto:${email}`}
-                                className="text-brand hover:text-foreground"
+                                className="min-w-0 max-w-full text-brand [overflow-wrap:anywhere] hover:text-foreground"
                             >
                                 {email}
                             </a>
