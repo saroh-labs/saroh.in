@@ -556,6 +556,38 @@ Deploy the previous API. A `mandate.cancel` job left PENDING dead-letters on
 the old image (no handler); its mandate is already CANCELLED in Saroh and is
 never charged. The table stays; the old image never reads it.
 
+## D19: Razorpay autopay (off until a test-mode run passes)
+
+The Razorpay adapter can set up, read, charge and cancel mandates, and
+Razorpay's `token.*`, `invoice.expired`, `order.notification.*` and
+recurring `payment.*` webhooks settle through the inbox.
+
+- **No migration.** A new rollout flag, `RAZORPAY_AUTOPAY`: no business is
+  offered autopay through Razorpay while it is off, and never configured
+  it is off. **Leave it without a row in production** until a Razorpay
+  test-mode run on a development business has authorised a UPI mandate
+  and settled one charge (waves plan, boundary 6), and D12 (the set-up
+  screens) is live.
+- **Either order.** Nothing creates a mandate until D12, and the webhook
+  mapping only moves rows a set-up made, so the old app, and the old API
+  on these deliveries (it ignores `token.*`), are safe.
+- **The business's Razorpay webhook** must also send `token.confirmed`,
+  `token.rejected`, `token.paused`, `token.cancelled`,
+  `order.notification.delivered`, `order.notification.failed`,
+  `invoice.paid` and `invoice.expired` before its flag is turned on.
+
+### Verify
+
+With the flag on for one development business, its customer authorises a
+UPI mandate from the set-up link and the mandate reads ACTIVE with a masked
+handle; one charge's notice is delivered, the debit is asked after
+`payment_after`, and `payment.captured` marks the invoice PAID.
+
+### Rollback
+
+Turn the flag's override off: no new set-ups. Mandates already made are
+still charged and cancelled; to stop charging too, deploy the previous API.
+
 ## Date-range indexes (review follow-up)
 
 **Migration** `20261015100000_calendar_range_indexes`: `Order

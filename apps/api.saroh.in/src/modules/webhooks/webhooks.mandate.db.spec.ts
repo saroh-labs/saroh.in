@@ -183,8 +183,8 @@ describe("what autopay is offered", () => {
         expect(await setups.mandateMethods(owner.organizationId)).toEqual([]);
     });
 
-    it("Razorpay and Cashfree take no autopay until their adapters do (D19)", () => {
-        expect(supportsMandates(new RazorpayProvider())).toBe(false);
+    it("Razorpay's adapter takes autopay (D19, behind its flag); Cashfree's doesn't yet", () => {
+        expect(supportsMandates(new RazorpayProvider())).toBe(true);
         expect(supportsMandates(new CashfreeProvider())).toBe(false);
         expect(supportsMandates(fake)).toBe(true);
     });

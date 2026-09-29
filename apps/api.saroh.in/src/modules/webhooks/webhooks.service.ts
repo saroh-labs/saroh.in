@@ -41,6 +41,7 @@ import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import { completePlanJoinInTx } from "../subscriptions/plan-join";
+import { linkMandateInTx } from "./mandate-link";
 import { applyOnlineOrderSuccess } from "./online-order-payment";
 import type {
     NormalizedWebhookEvent,
@@ -309,6 +310,32 @@ export class WebhooksService {
      * of HTTP/secret concerns. Returns `{ applied }` — whether any state moved.
      */
     private async reconcile(
+        tx: Tx,
+        provider: string,
+        organizationId: string,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        // Autopay (D19): an authorisation's payment names the mandate it
+        // made; applied beside whatever the payment itself does.
+        const linked = event.mandateLink
+            ? await linkMandateInTx(
+                  tx,
+                  this.factory.get(provider),
+                  organizationId,
+                  event.mandateLink,
+              )
+            : false;
+        const { applied } = await this.reconcileOutcome(
+            tx,
+            provider,
+            organizationId,
+            event,
+        );
+        return { applied: applied || linked };
+    }
+
+    /** {@link reconcile}'s money or mandate effect, by the event's outcome. */
+    private async reconcileOutcome(
         tx: Tx,
         provider: string,
         organizationId: string,

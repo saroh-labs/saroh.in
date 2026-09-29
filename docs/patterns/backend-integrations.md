@@ -109,8 +109,12 @@ a note saying so.
   re-sends only when it has none. Never match a refund by amount alone.
 - **Current** (D20, D11) — **Autopay is an optional capability of the
   merchant port.** `MerchantProvider.mandates?: MandateCapability`; a
-  provider without it never offers autopay (`supportsMandates`) — Razorpay
-  until D19, Cashfree this round. The capability has `mandateMethods`,
+  provider without it never offers autopay (`supportsMandates`) — Cashfree
+  this round. An adapter may name a `rolloutFlag` (Razorpay:
+  `RAZORPAY_AUTOPAY`, D19): `MandateSetupService.mandateMethods` offers it
+  only where that flag is on, so a screen asks that, never
+  `supportsMandates` alone; reading, charging and cancelling a mandate
+  already made never wait on the flag. The capability has `mandateMethods`,
   `createSetup`, `get`, `prepareCharge`, `getPreDebit`, `charge` and
   `cancel`; the fake implements all of it (`providers/fake.provider.ts`).
   Adapters throw `MandateCallError` with `REFUSED`, `UNKNOWN` or `NOT_YET`
@@ -216,6 +220,27 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
 - **Cancel** is `PUT /customers/:c/tokens/:t/cancel`, confirmed by
   `token.cancelled`; `DELETE …/tokens/:t` does not cancel the mandate and
   is never used.
+- **The adapter** (D19, `providers/razorpay-mandates.ts`). Set-up is a
+  registration link for the picked method (`setupReference` = its `inv_…`,
+  `receipt` = the mandate id); `get` reads the token, or before one is
+  known the link → its payment → the token. `prepareCharge` first looks
+  for its order by `receipt` (the charge key), so a retry never makes a
+  second; UPI orders carry the notice, card and eMandate orders none
+  (`NOT_NEEDED`, still to confirm). `charge` first reads the order's
+  payments, so a retry never debits twice. A refused cancel is re-read:
+  a token already cancelled is a success. Errors keep only the HTTP
+  status and Razorpay's `reason` code.
+- **Webhooks** (D19, `webhooks/providers/razorpay-mandate-events.ts`).
+  `token.confirmed` / `.paused` / `.cancelled` / `.rejected` → MANDATE
+  ACTIVE / PAUSED / CANCELLED / FAILED by the token id;
+  `invoice.expired` → FAILED by the link; `order.notification.*` →
+  PRE_DEBIT by the charge order; a recurring charge's `payment.captured`
+  / `.failed` settle its order's intent as any pay link's. **Token events
+  name no customer, order or link**, so an authorisation's
+  `payment.captured` (or `invoice.paid`) carries a `mandateLink` that
+  writes the token id onto the PENDING mandate it paid for; a token event
+  that arrived first (acknowledged, nothing written) is then read again
+  from the inbox and applied (`webhooks/mandate-link.ts`).
 - **Still open** (D19's test-mode run): the notice's delivery and the debit
   after `payment_after` in test mode, a debit above `max_amount`, a cancel
   answered twice, and whether card and eMandate debits need the notice

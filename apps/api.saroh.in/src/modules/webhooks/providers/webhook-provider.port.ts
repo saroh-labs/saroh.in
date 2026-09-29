@@ -83,6 +83,22 @@ export interface NormalizedWebhookEvent {
      * `providerIntentId`.
      */
     preDebitStatus?: "DELIVERED" | "FAILED";
+    /**
+     * An authorisation's own payment names the mandate it made (D19):
+     * Razorpay's token webhooks carry no customer, order or link, so the
+     * token id reaches a PENDING mandate only through the payment (or the
+     * paid registration link) that set it up. Applied beside `outcome`,
+     * whatever that is.
+     */
+    mandateLink?: WebhookMandateLink;
+}
+
+/** A set-up (by any of its references) → the provider's mandate id. */
+export interface WebhookMandateLink {
+    providerMandateId: string;
+    providerCustomerId?: string;
+    /** The set-up's references as the payment carries them (link, order). */
+    setupReferences: string[];
 }
 
 export interface VerifySignatureInput {
