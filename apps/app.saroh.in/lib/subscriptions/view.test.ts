@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Plan, Subscription, SubscriptionCharge } from "./service";
 import {
+    autopayLine,
     chargeRow,
     classesText,
     collectionRows,
@@ -433,5 +434,53 @@ describe("headline", () => {
         );
         expect(h.big).toBe("—");
         expect(h.pill).toEqual({ tone: "accent", label: "Ends 1 Oct" });
+    });
+});
+
+describe("autopayLine (D12)", () => {
+    const base = {
+        method: "UPI" as const,
+        hint: "mo•••@okicici",
+        limit: "1500.00",
+        currency: "INR",
+        since: "2026-10-01T05:00:00.000Z",
+        failure: null,
+    };
+
+    it("says autopay is on, with the method, hint and limit", () => {
+        expect(autopayLine({ ...base, state: "ON" })).toBe(
+            "Autopay on · UPI · mo•••@okicici · limit ₹1,500",
+        );
+    });
+
+    it("says a set-up is waiting for the customer", () => {
+        expect(autopayLine({ ...base, state: "PENDING", hint: null })).toBe(
+            "Autopay pending · UPI — waiting for them to approve it",
+        );
+    });
+
+    it("says a failed set-up, and why", () => {
+        expect(
+            autopayLine({
+                ...base,
+                state: "FAILED",
+                method: "CARD",
+                hint: null,
+                failure: "EXPIRED",
+            }),
+        ).toBe("Autopay failed · card — they didn't approve it in time");
+        expect(
+            autopayLine({
+                ...base,
+                state: "FAILED",
+                hint: null,
+                failure: "PROVIDER_REFUSED",
+            }),
+        ).toBe("Autopay failed · UPI — the payment provider didn't accept it");
+    });
+
+    it("is nothing without autopay", () => {
+        expect(autopayLine(null)).toBeNull();
+        expect(autopayLine(undefined)).toBeNull();
     });
 });
