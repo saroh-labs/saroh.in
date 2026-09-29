@@ -1056,7 +1056,7 @@ model StoreAllergen {
   createdAt DateTime @default(now())
 
   products     ProductAllergen[]
-  // Customers' notes that name it (U8). Removing it is refused while any do.
+  // Customers' notes that named it (U8). Unused since Z2a: dropped with Z2.
   contactNotes ContactNoteAllergen[]
 
   // Needs attention Allergy entries that name it (C1). Removing it is
@@ -2628,9 +2628,9 @@ model ContactNote {
   @@index([organizationId])
 }
 
-// One allergen a note names. NoAction on the allergen, as ProductAllergen:
-// removing an allergen from the list is refused in the API while a note names
-// it, so an allergy is never dropped from a customer's record in passing.
+// One allergen a note named. Nothing reads or writes it since Z2a (notes are
+// text only; allergies are ContactAttention entries), and it is dropped with
+// Z2. Removing an allergen clears any rows still naming it (NoAction).
 model ContactNoteAllergen {
   noteId         String
   note           ContactNote   @relation(fields: [noteId], references: [id], onDelete: Cascade)

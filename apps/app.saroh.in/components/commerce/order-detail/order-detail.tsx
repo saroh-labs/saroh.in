@@ -121,7 +121,7 @@ export function OrderDetail({
     arrival = null,
 }: {
     order: OrderRead;
-    /** Allergy notes; "unavailable" when they could not be read. */
+    /** Their allergies (Needs attention); "unavailable" when not read. */
     notes: AllergyNote[] | "unavailable";
     payments: OrderPaymentsSummary | null;
     can: OrderPermissions;

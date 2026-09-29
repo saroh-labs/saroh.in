@@ -316,7 +316,11 @@ export interface OrderAttention {
     hiddenSensitiveCount: number;
 }
 
-/** A customer note that names allergens, from the contact's detail read. */
+/**
+ * One of the customer's allergies as the allergy check reads it: a Needs
+ * attention Allergy entry's words and the allergens it matches
+ * (`allergyNotesOf`). Notes carry text only since Z2a.
+ */
 export interface AllergyNote {
     body: string;
     allergens: AllergenRef[];

@@ -224,9 +224,10 @@ const listed = (names: string[]) =>
         : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
 /**
- * The customer's allergy notes against what each line contains or may
- * contain — by allergen id, never by spelling (ADR-008). A line that
- * contains an allergen says so over one that only may.
+ * The customer's allergies — their Needs attention Allergy entries, as
+ * `allergyNotesOf` gives them (Z2a: never the notes) — against what each
+ * line contains or may contain, by allergen id, never by spelling
+ * (ADR-008). A line that contains an allergen says so over one that only may.
  */
 export function allergyCheck(
     lines: Pick<OrderReadLine, "id" | "name" | "allergens">[],
@@ -255,34 +256,6 @@ export function allergyCheck(
     }
     out.hits = Array.from(hit.values());
     return out;
-}
-
-/** A note as the contact's detail read sends it. */
-export interface DetailAllergyNote {
-    body: string;
-    /** As written: one per name. */
-    allergens: AllergenRef[];
-    /**
-     * Each named allergen's id on every storefront with the same name — what
-     * an order from any storefront is checked against (#508 R6).
-     */
-    matchAllergens?: AllergenRef[];
-}
-
-/**
- * The notes `allergyCheck` reads: each note that names an allergen, with the
- * ids from every storefront so a second storefront's "Peanuts" still hits.
- * Falls back to the note's own ids if the API has not sent the wider list.
- */
-export function allergyNotesFrom(rows: DetailAllergyNote[]): AllergyNote[] {
-    return rows
-        .filter((n) => n.allergens.length > 0)
-        .map((n) => ({
-            body: n.body,
-            allergens: n.matchAllergens?.length
-                ? n.matchAllergens
-                : n.allergens,
-        }));
 }
 
 export function allergenWords(list: AllergenRef[]): string {

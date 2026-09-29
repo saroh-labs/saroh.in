@@ -847,11 +847,12 @@ export async function checkRye(
         allergyOrders: await one(prisma.$queryRaw<Row[]>`
             SELECT COUNT(DISTINCT o.id) AS n FROM "Order" o
             JOIN "CustomerIdentityLink" l ON l."customerId" = o."customerId"
-            JOIN "ContactNote" note ON note."contactId" = l."contactId"
-            JOIN "ContactNoteAllergen" na ON na."noteId" = note.id
+            JOIN "ContactAttention" a ON a."contactId" = l."contactId"
+                AND a.kind = 'ALLERGY' AND a.status = 'ACTIVE'
+                AND a."removedAt" IS NULL
             JOIN "OrderItem" i ON i."orderId" = o.id
             JOIN "ProductAllergen" pa ON pa."productId" = i."productId"
-                AND pa."allergenId" = na."allergenId"
+                AND pa."allergenId" = a."allergenId"
             WHERE o."organizationId" = ${orgId} AND o.stage = 'NEW'
               AND o."createdAt" >= ${today}::timestamp`),
         series: (
@@ -948,7 +949,7 @@ export async function checkRye(
         "subscribers linked to their store customers":
             counts.identityLinks >= 1,
         "exactly one possible match": counts.possibleMatches === 1,
-        "an order today whose line holds an allergen the customer's note names":
+        "an order today whose line holds an allergen on the customer's Needs attention":
             counts.allergyOrders >= 1,
     }).flatMap(([what, ok]) => (ok ? [] : [what]));
     if (missing.length > 0) failures.push(`missing: ${missing.join("; ")}`);

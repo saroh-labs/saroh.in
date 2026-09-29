@@ -3,17 +3,12 @@ import type { Prisma } from "@saroh/database";
 import { allergenKey } from "./allergen-match";
 
 /**
- * A note that names an allergen puts it on Needs attention too (C1), for one
- * release: Order Detail's banner still reads the notes' allergens, and the
- * Allergy entries are what it reads next (B15). The note keeps its allergens
- * as written.
+ * Allergens sent with a note go on Needs attention as Allergy entries (C1).
+ * Since Z2a a note keeps text only, and this is how the allergens an app from
+ * before Z2a still sends with a note reach the person's record.
  *
  * One entry per allergen name per person: an allergen already on their list
- * (active, or waiting as a suggestion) is not added twice. Only ever adds —
- * taking an allergen off a note leaves the entry for the team to remove on
- * Needs attention, since it may have been added there on its own. An edit
- * passes only the allergens it adds (`contact-notes.service.ts`), so an
- * entry the team removed isn't brought back by the note that named it.
+ * (active, or waiting as a suggestion) is not added twice. Only ever adds.
  */
 export async function ensureAllergyEntries(
     tx: Pick<Prisma.TransactionClient, "contactAttention" | "storeAllergen">,

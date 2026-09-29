@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { allergyNotesOf } from "@/lib/orders/attention";
 import {
     allergenWords,
     allergyCheck,
-    allergyNotesFrom,
     canCancel,
     eventText,
     flowOf,
@@ -17,7 +17,30 @@ import {
     stepsOf,
     waiting,
 } from "@/lib/orders/lifecycle";
-import type { OrderReadEvent, OrderReadLine } from "@/lib/orders/read";
+import type {
+    OrderAttentionEntry,
+    OrderReadEvent,
+    OrderReadLine,
+} from "@/lib/orders/read";
+
+/** A Needs attention Allergy entry as the order read carries it (B15). */
+const allergy = (
+    over: Partial<OrderAttentionEntry> = {},
+): OrderAttentionEntry => ({
+    id: "at_1",
+    kind: "ALLERGY",
+    label: "Peanuts",
+    detail: null,
+    sensitive: false,
+    allergen: null,
+    matchAllergens: [],
+    source: "STAFF",
+    ...over,
+});
+
+/** The banner's input from these entries (Z2a: never the notes). */
+const fromAttention = (entries: OrderAttentionEntry[]) =>
+    allergyNotesOf({ entries, hiddenSensitiveCount: 0 }) ?? [];
 
 describe("canCancel", () => {
     it("allows cancelling before the goods go out, and not after", () => {
@@ -220,16 +243,15 @@ describe("allergyCheck", () => {
         );
         expect(asWritten.hits).toEqual([]);
 
-        const notes = allergyNotesFrom([
-            {
-                body: "Peanut allergy",
-                allergens: [peanutsA],
+        const notes = fromAttention([
+            allergy({
+                allergen: peanutsA,
                 matchAllergens: [peanutsA, peanutsB],
-            },
-            { body: "Prefers oat milk", allergens: [], matchAllergens: [] },
+            }),
+            allergy({ id: "at_2", kind: "OTHER", label: "Prefers oat milk" }),
         ]);
         expect(notes).toEqual([
-            { body: "Peanut allergy", allergens: [peanutsA, peanutsB] },
+            { body: "Allergy: Peanuts", allergens: [peanutsA, peanutsB] },
         ]);
         const check = allergyCheck([satay], notes);
         expect(check.hits).toEqual([peanutsB]);
@@ -237,10 +259,10 @@ describe("allergyCheck", () => {
         expect(allergenWords(check.hits)).toBe("peanuts");
     });
 
-    it("keeps a note's own ids when the wider list is missing", () => {
+    it("keeps an entry's own allergen when the wider list is missing", () => {
         expect(
-            allergyNotesFrom([{ body: "Sesame", allergens: [SESAME] }]),
-        ).toEqual([{ body: "Sesame", allergens: [SESAME] }]);
+            fromAttention([allergy({ label: "Sesame", allergen: SESAME })]),
+        ).toEqual([{ body: "Allergy: Sesame", allergens: [SESAME] }]);
     });
 
     it("does not hit a different allergen on another storefront", () => {
@@ -253,15 +275,14 @@ describe("allergyCheck", () => {
                     },
                 }),
             ],
-            allergyNotesFrom([
-                {
-                    body: "Peanuts",
-                    allergens: [{ id: "al_peanuts_a", name: "Peanuts" }],
+            fromAttention([
+                allergy({
+                    allergen: { id: "al_peanuts_a", name: "Peanuts" },
                     matchAllergens: [
                         { id: "al_peanuts_a", name: "Peanuts" },
                         { id: "al_peanuts_b", name: "Peanuts" },
                     ],
-                },
+                }),
             ]),
         );
         expect(check.hits).toEqual([]);
