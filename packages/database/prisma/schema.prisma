@@ -3675,6 +3675,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_subscription_renew", where: raw("type = 'subscription.renew' AND status = 'PENDING'"))
   // One waiting run of the booking-hold sweep (U19), like the renewal chain.
   @@unique([type], map: "Job_one_pending_booking_release_holds", where: raw("type = 'booking.release-holds' AND status = 'PENDING'"))
+  // One waiting run of the pending payment sweep (P1), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_payments_confirm_pending", where: raw("type = 'payments.confirm-pending' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -4291,6 +4293,12 @@ model PaymentIntent {
   checkForMandateId String?         @unique
   checkForMandate   PaymentMandate? @relation("MandateAuthorisationCheck", fields: [checkForMandateId], references: [id], onDelete: SetNull)
 
+  // When Saroh last asked the provider about this intent's order (P1): the
+  // sweep that settles a capture whose webhook never came asks an open
+  // intent again only after a pause that grows with its age
+  // (webhooks/payment-lookup.service.ts). Null: never asked.
+  lastLookupAt DateTime?
+
   @@unique([orderId, idempotencyKey])
   @@unique([invoiceId, idempotencyKey])
   @@index([organizationId])
@@ -4298,6 +4306,7 @@ model PaymentIntent {
   @@index([invoiceId])
   @@index([provider, providerIntentId])
   @@index([viaMandateId])
+  @@index([status, createdAt])
 }
 
 // PaymentAttempt — one interaction with the provider for an intent.

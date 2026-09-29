@@ -316,6 +316,29 @@ export class WebhooksService {
     }
 
     /**
+     * Settle a payment the provider itself confirmed when Saroh asked it
+     * (P1): the checkout's signed return, the pending sweep, or `payments
+     * reconcile`. It runs the webhook's own reconciliation, so whichever of
+     * the look-up and the webhook comes first settles the intent and the
+     * other finds it settled and changes nothing — every effect checks the
+     * state it moves from under the intent's row lock, as a replay does.
+     *
+     * Nothing is written to the webhook inbox: this is not a delivery, and
+     * the caller has already checked the provider's answer (its order, its
+     * status and its amount against the intent). The caller's event is
+     * built from that answer, never from anything the browser sent.
+     */
+    async settleLookedUp(
+        provider: string,
+        organizationId: string,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        return prisma.$transaction((tx) =>
+            this.reconcile(tx, provider, organizationId, event),
+        );
+    }
+
+    /**
      * Map a verified event to a PaymentIntent and apply its money effect. Pure
      * of HTTP/secret concerns. Returns `{ applied }` — whether any state moved.
      */
