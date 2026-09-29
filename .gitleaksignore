@@ -45,3 +45,14 @@ c865ed0ca9c60edea418d5a919966447f2bb6fe3:apps/saroh.app/lib/shop-checkout-shape.
 # G20: public-plan-join.db.spec.ts WEBHOOK_SECRET is a fake HMAC key for
 # FakeMerchantProvider in a test, never a real credential.
 e17ec2cbdb3ef00b4a4485fa78eebdcb7aa82e62:apps/api.saroh.in/src/modules/subscriptions/public-plan-join.db.spec.ts:generic-api-key:69
+
+# Autopay and plan-join db specs (D12, D12B, D13, D13B, G20): each spec signs
+# its own fake Razorpay webhooks with a made-up local secret named after the
+# unit. No provider has ever seen it. The recurring fixture carries the token
+# id from Razorpay's sample payload. Flagged on entropy by generic-api-key.
+87fd580478af613dc7a59877944802fe28da84f8:apps/api.saroh.in/src/modules/subscriptions/subscriptions.charge-timing.db.spec.ts:generic-api-key:59
+cbc4c924acdd856c4bc3abfafab16957bc397f63:apps/api.saroh.in/src/modules/subscriptions/subscriptions.charge.razorpay.db.spec.ts:generic-api-key:53
+103c2a8cb1651d7b7358b7e60be8985551a54435:apps/api.saroh.in/src/modules/payments/autopay-check.razorpay.db.spec.ts:generic-api-key:64
+07492ebf64c272eb0efeb17f9306a9e493b78da1:apps/api.saroh.in/src/modules/payments/autopay.razorpay.db.spec.ts:generic-api-key:62
+b580854ea34baab02cce3f8bd2fda3eb87f15912:apps/api.saroh.in/test/fixtures/razorpay-recurring.ts:generic-api-key:47
+c45022983411033024eacea16b61a80fe6de9865:apps/api.saroh.in/src/modules/subscriptions/public-plan-join.db.spec.ts:generic-api-key:69
