@@ -5,6 +5,8 @@ import { maskVpa } from "../mandate-rules";
 import type {
     CancelMandateInput,
     CreateMandateSetupInput,
+    FindMandateChargeInput,
+    FoundMandateCharge,
     GetMandateInput,
     GetPreDebitInput,
     MandateCapability,
@@ -453,6 +455,33 @@ export class RazorpayMandates implements MandateCapability {
         // No id: it took the request; the payment webhook, or the next
         // ask above, says what became of it.
         return { providerPaymentRef: paymentId ?? null, status: "PENDING" };
+    }
+
+    /**
+     * The debit on a prepared order, from its payments (D13): a captured
+     * one first, then one still in flight, then a failed one; none at all
+     * is `NONE`, and a debit may be asked for.
+     */
+    async findCharge(
+        input: FindMandateChargeInput,
+    ): Promise<FoundMandateCharge> {
+        const found = await this.call(
+            "look up",
+            input.credentials,
+            "GET",
+            `/orders/${encodeURIComponent(input.providerIntentId)}/payments`,
+        );
+        const payments = (
+            Array.isArray(found.items) ? (found.items as Json[]) : []
+        ).filter((p) => text(p.id));
+        const pick = (status: MandateChargeResult["status"]) =>
+            payments.find((p) => chargeStatus(p.status) === status);
+        const hit = pick("SUCCEEDED") ?? pick("PENDING") ?? pick("FAILED");
+        if (!hit) return { status: "NONE", providerPaymentRef: null };
+        return {
+            status: chargeStatus(hit.status),
+            providerPaymentRef: text(hit.id) ?? null,
+        };
     }
 
     async cancel(input: CancelMandateInput): Promise<void> {

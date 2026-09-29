@@ -146,7 +146,23 @@ export interface Subscription {
     } | null;
     startedAt: string;
     createdAt: string;
+    /**
+     * An autopay charge is under way on one of its unpaid invoices (D13):
+     * "Autopay charge in progress · ‹date›", `at` being when the debit is
+     * asked for. No Retry and no pay link meanwhile. Only Subscription
+     * Detail's read has it; absent from an API older than D13.
+     */
+    autopayCharge?: { at: string } | null;
+    /**
+     * How Retry goes now (D13): `MANDATE` charges their autopay again,
+     * `PAY_LINK` makes a new pay link. Null: nothing to retry, or a charge
+     * is under way. Absent from an API older than D13 (a pay link).
+     */
+    retryVia?: RetryVia | null;
 }
+
+/** How a failed renewal is retried (D13). */
+export type RetryVia = "MANDATE" | "PAY_LINK";
 
 export interface UpcomingCollection {
     /** Its local date, YYYY-MM-DD. */
@@ -574,16 +590,25 @@ export function cancelSubscription(id: string, when: "now" | "periodEnd") {
     );
 }
 /**
- * Retry a failed renewal with a new pay link (`POST :id/retry`): the old
- * link stops, nothing is charged or sent, and the link comes back once for
- * the merchant to copy (Home's "Retry by pay link", F4).
+ * Retry a failed renewal (`POST :id/retry`). By pay link (the default): the
+ * old link stops, nothing is charged or sent, and the link comes back once
+ * for the merchant to copy (Home's "Retry by pay link", F4). By autopay
+ * (D13): a new charge on their mandate, with no link (`url` null); `paid`
+ * when the provider had already collected it.
  */
-export function retrySubscription(id: string) {
-    return send<{ invoiceId: string; url: string }>(
+export function retrySubscription(id: string, via: RetryVia = "PAY_LINK") {
+    return send<{
+        invoiceId: string;
+        url: string | null;
+        via?: RetryVia;
+        paid?: boolean;
+    }>(
         `${sub(id)}/retry`,
         "POST",
-        {},
-        "Couldn't make a new pay link. Nothing changed.",
+        via === "PAY_LINK" ? {} : { via },
+        via === "PAY_LINK"
+            ? "Couldn't make a new pay link. Nothing changed."
+            : "Autopay wasn't charged. Nothing changed.",
     );
 }
 

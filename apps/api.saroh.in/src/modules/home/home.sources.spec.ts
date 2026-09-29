@@ -58,6 +58,8 @@ function moneyDb(opts: {
     return {
         // D9's log: no RENEWAL_FAILED or MANDATE_LIMIT_LOW before autopay.
         subscriptionEvent: { findMany: jest.fn().mockResolvedValue([]) },
+        // D13: no autopay charge under way.
+        paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
         invoice: {
             findMany,
             count: jest
@@ -210,6 +212,40 @@ describe("failedRenewals", () => {
         expect(action?.count).toBe(1);
         expect(action?.evidence).toHaveLength(1);
         expect(action?.evidence?.[0].tag).toBe("Payment failed");
+    });
+
+    it("says Autopay charge in progress, with the debit's day, while a charge is under way (D13)", async () => {
+        const db = moneyDb({ unpaid: [periodInvoice()] });
+        const action = await failedRenewals(
+            db as never,
+            "org_1",
+            NOW,
+            true,
+            () =>
+                Promise.resolve([
+                    {
+                        subscriptionId: "sub_1",
+                        kind: "RENEWAL_FAILED",
+                        at: ago(DAY),
+                    },
+                ]),
+            () =>
+                Promise.resolve(
+                    new Map([
+                        [
+                            "inv_sub_1",
+                            {
+                                intentId: "pi_1",
+                                at: new Date("2026-09-28T04:00:00.000Z"),
+                            },
+                        ],
+                    ]),
+                ),
+            "Asia/Kolkata",
+        );
+        expect(action?.evidence?.[0].tag).toBe(
+            "Autopay charge in progress · 28 Sep",
+        );
     });
 
     it("gives nothing for an invoice not yet due with no event", async () => {

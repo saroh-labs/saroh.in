@@ -35,6 +35,7 @@ import {
     PauseSubscriptionDto,
     PlanDraftDto,
     PlanInputDto,
+    RetryPaymentDto,
     SkipCollectionDto,
     SubscribeDto,
     SubscriptionSettingsDto,
@@ -333,9 +334,11 @@ export class SubscriptionsController {
     }
 
     /**
-     * Retry a failed charge: a new pay link for the overdue latest invoice,
-     * replacing the old one. Answers with the token and the link's address
-     * (Home's "Retry by pay link", F4), shown once.
+     * Retry a failed renewal (D13): charge their autopay again (`via`
+     * MANDATE) or make a new pay link (PAY_LINK, the default), replacing
+     * the old one. A pay link's token and address are answered once
+     * (Home's "Retry by pay link", F4); an autopay retry answers without
+     * one. `paid`: the provider had already captured it.
      */
     @Post(":subscriptionId/retry")
     @HttpCode(200)
@@ -343,8 +346,12 @@ export class SubscriptionsController {
     async retry(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
+        @Body() dto: RetryPaymentDto,
     ) {
-        const link = await this.subscriptions.retryPayment(ctx, id);
-        return { ...link, url: payLinkUrl(link.token) };
+        const done = await this.subscriptions.retryPayment(ctx, id, dto.via);
+        return {
+            ...done,
+            url: done.token ? payLinkUrl(done.token) : null,
+        };
     }
 }

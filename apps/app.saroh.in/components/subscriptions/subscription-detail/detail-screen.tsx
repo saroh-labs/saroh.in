@@ -19,6 +19,7 @@ import type {
 import {
     autopayLine,
     chargeRow,
+    chargingText,
     collectionRows,
     dayText,
     failWhy,
@@ -30,6 +31,7 @@ import {
     money,
     olderPrice,
     paysBy,
+    retryOffer,
     sortCharges,
 } from "@/lib/subscriptions/view";
 
@@ -129,6 +131,7 @@ export function SubscriptionDetail({
         keep,
         toggleSkip,
         newPayLink,
+        chargeAgain,
     } = useSubscriptionActions(sub, plans, now, () => setStep(null));
 
     // The step came in the address; once opened, a refresh shouldn't reopen it.
@@ -145,16 +148,23 @@ export function SubscriptionDetail({
         : null;
 
     const failedId = sub.failedCharge?.id;
+    // Retry by autopay or by a new link, as the API offers it (D13); none
+    // while a charge is under way.
+    const retry = retryOffer(sub, canPayLink);
+    const charging = chargingText(sub, now);
     const actions: Action[] = !canWrite
         ? []
         : tab === "failed"
           ? [
-                ...(canPayLink && sub.failedCharge
+                ...(retry
                     ? [
                           {
-                              label: "Retry with a new pay link",
+                              label: retry.label,
                               kind: "primary" as const,
-                              go: newPayLink,
+                              go:
+                                  retry.via === "MANDATE"
+                                      ? chargeAgain
+                                      : newPayLink,
                           },
                       ]
                     : []),
@@ -337,10 +347,11 @@ export function SubscriptionDetail({
                             {failWhy(sub, now)}
                         </div>
                         <div className="mt-[3px] text-[12.5px] leading-[1.5] text-foreground/75">
-                            Saroh doesn&apos;t charge a card or try again on its
-                            own — {first} pays through the invoice&apos;s link.
-                            Send a new link, record a payment you took, pause or
-                            cancel.
+                            {charging
+                                ? `${charging}. The pay link is held until their bank answers, so ${first} isn't charged twice.`
+                                : sub.retryVia === "MANDATE"
+                                  ? `Their autopay didn't collect it, and Saroh doesn't try again on its own. Charge autopay again, send a new link, record a payment you took, pause or cancel.`
+                                  : `Saroh doesn't charge a card or try again on its own — ${first} pays through the invoice's link. Send a new link, record a payment you took, pause or cancel.`}
                         </div>
                         {payLink ? (
                             <PayLinkRow url={payLink} name={first} />

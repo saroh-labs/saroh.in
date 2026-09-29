@@ -12,6 +12,7 @@ import {
     keepSubscription,
     pauseSubscription,
     resumeSubscription,
+    retrySubscription,
     skipCollection,
     unskipCollection,
 } from "@/lib/subscriptions/actions";
@@ -196,6 +197,29 @@ export function useSubscriptionActions(
         );
     }
 
+    /**
+     * "Charge autopay again" (D13): a new charge on their mandate. Their
+     * bank tells them a day ahead, so it lands in a day or two; if the
+     * provider had already collected the last one, the renewal is paid.
+     */
+    function chargeAgain() {
+        void run(
+            () => retrySubscription(sub.id, "MANDATE"),
+            (res) => {
+                if ("data" in res && res.data.paid) {
+                    showSuccess(
+                        "Autopay had already collected it. The renewal is paid.",
+                    );
+                    return;
+                }
+                showSuccess(
+                    "Autopay charge started.",
+                    "Their bank tells them a day ahead, so the payment lands in a day or two.",
+                );
+            },
+        );
+    }
+
     return {
         busy,
         busyDate,
@@ -208,5 +232,6 @@ export function useSubscriptionActions(
         keep,
         toggleSkip,
         newPayLink,
+        chargeAgain,
     };
 }

@@ -15,8 +15,9 @@ import type { HomeInline, HomeNeed } from "./service";
  *   Undo. When the step tells the customer, A14 holds that notice ten
  *   seconds too, so Undo is offered only for the hold; when nothing is
  *   sent, the row keeps its Undo for the stage's own window.
- * - **once** (Retry by pay link): made at once, and nothing to take back —
- *   a new link replaces the old one — so the confirm says so first.
+ * - **once** (Retry by pay link, or by autopay): made at once, and nothing
+ *   to take back — a new link replaces the old one; an autopay charge is
+ *   told to the customer by their bank — so the confirm says so first.
  */
 export type InlineRun = "held" | "undo" | "once";
 
@@ -70,7 +71,9 @@ export function failedText(inline: HomeInline): string {
         case "MARK_SENT":
             return "The order wasn't marked sent.";
         case "RETRY":
-            return "No new pay link was made.";
+            return inline.via === "MANDATE"
+                ? "Autopay wasn't charged."
+                : "No new pay link was made.";
         case "SEND_REMINDER":
             return "The reminder wasn't sent.";
         case "REPLY":

@@ -334,6 +334,12 @@ export interface InvoiceOnlineView {
     /** A link is out; the token itself is never read back. */
     payLinkActive: boolean;
     payments: InvoiceOnlinePayment[];
+    /**
+     * An autopay charge is under way on it (D13): "Autopay charge in
+     * progress · ‹date›", `at` being when the debit is asked for. The pay
+     * link, Send and Send reminder are held meanwhile. Null: none.
+     */
+    autopayCharge?: { at: string } | null;
 }
 
 /** "Asha Rao", or the email when the contact has no name. */

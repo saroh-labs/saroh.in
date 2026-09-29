@@ -6,7 +6,7 @@ import { autopayDoneAnswer, autopayStartAnswer } from "./autopay-shape";
 import type { CheckoutIntent } from "./checkout-shape";
 import { isIntent } from "./checkout-shape";
 import type { PayInvoice } from "./invoice-pay-shape";
-import { isPayInvoice, payAutopayOf } from "./invoice-pay-shape";
+import { isPayInvoice, payAutopayOf, payChargingOf } from "./invoice-pay-shape";
 
 export type { PayInvoice, PayInvoiceLine } from "./invoice-pay-shape";
 
@@ -43,7 +43,12 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
             ? {
                   ok: true,
                   // Autopay (D12) checked field by field; strange is none.
-                  invoice: { ...body, autopay: payAutopayOf(body.autopay) },
+                  invoice: {
+                      ...body,
+                      autopay: payAutopayOf(body.autopay),
+                      // A charge under way (D13), checked the same way.
+                      autopayCharging: payChargingOf(body.autopayCharging),
+                  },
               }
             : { ok: false, reason: "unavailable" };
     }

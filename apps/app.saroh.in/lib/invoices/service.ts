@@ -50,6 +50,12 @@ export interface InvoiceOnline {
     providerConnected: boolean;
     payLinkActive: boolean;
     payments: InvoiceOnlinePayment[];
+    /**
+     * An autopay charge is under way on it (D13), `at` being when the debit
+     * is asked for: the pay link and sends are held until the bank answers.
+     * Null or absent (an API older than D13): none.
+     */
+    autopayCharge?: { at: string } | null;
 }
 
 /** Where an invoice can be sent (D17): the business's email, the account thread. */
@@ -65,7 +71,9 @@ export interface InvoiceSend {
         | "NOT_OWED"
         | "NO_PAYMENT_PROVIDER"
         | "NO_EMAIL_PROVIDER"
-        | "NO_EMAIL_ADDRESS";
+        | "NO_EMAIL_ADDRESS"
+        /** An autopay charge is under way on it (D13). */
+        | "AUTOPAY_PENDING";
     /** Where the email would go. */
     emailTo?: string;
     /** Something went in the last day: the next reminder can go from here. */

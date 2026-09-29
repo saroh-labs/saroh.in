@@ -10,6 +10,7 @@ import { prisma } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { payLinkUrl } from "../invoices/pay-link-url";
 import { AutopayService } from "../payments/autopay.service";
+import { subscriptionChargesUnderWay } from "../payments/charge-under-way";
 import type { MandateMethod } from "../payments/providers/provider.port";
 import { ALLOWANCE_SELECT } from "../subscriptions/classes-allowance";
 import type { PauseWeeks } from "../subscriptions/dto";
@@ -52,8 +53,9 @@ import {
 
 /**
  * Whether an autopay charge is under way on an invoice (D13), when "Pay now"
- * is hidden and a pay-link request is a 409. D13 isn't built yet, so the
- * default says never; D13 provides the real check under this token.
+ * is hidden and a pay-link request is a 409. `SubscriptionsModule` provides
+ * the real check (`payments/charge-under-way.ts`); a spec that builds this
+ * by hand gets "never".
  */
 export const AUTOPAY_CHARGE_PENDING = Symbol("AUTOPAY_CHARGE_PENDING");
 export type AutopayChargePending = (
@@ -175,6 +177,11 @@ export class AccountPlanService {
             }),
             takesPaymentOnline(prisma, organizationId),
         ]);
+        const charging = await subscriptionChargesUnderWay(
+            prisma,
+            organizationId,
+            rows.map((r) => r.id),
+        );
         return Promise.all(
             rows.map(async (row) => {
                 const [month, overdue] = await Promise.all([
@@ -183,8 +190,10 @@ export class AccountPlanService {
                         ? overdueInvoiceOf(prisma, member, row.id, now)
                         : Promise.resolve(null),
                 ]);
+                const underWay = charging.get(row.id) ?? null;
                 const payNow =
                     overdue &&
+                    !underWay &&
                     !(await this.chargePending(organizationId, overdue.id))
                         ? overdue
                         : null;
@@ -216,6 +225,9 @@ export class AccountPlanService {
                               hint: line.hint,
                               check: line.check,
                           }
+                        : null,
+                    autopayCharging: underWay
+                        ? { at: underWay.at.toISOString() }
                         : null,
                     autopayPays: owed
                         ? {

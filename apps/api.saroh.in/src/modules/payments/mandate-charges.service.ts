@@ -1,7 +1,16 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { toMinor } from "../../common/money";
+import { fromMinor, toMinor } from "../../common/money";
+import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
+import { OPEN_MANDATE_CHARGE } from "./charge-under-way";
+import { mandateChargingOn } from "./mandate-charge-gate";
+import {
+    failMandateChargeInTx,
+    recordChargeEventInTx,
+    settleCapturedChargeInTx,
+} from "./mandate-charge-outcome";
 import type { MandateConnection } from "./mandate-connection";
 import { openMandateConnection } from "./mandate-connection";
 import type {
@@ -100,7 +109,33 @@ export interface PrepareChargeInput {
     debitAt: Date;
 }
 
-const OPEN_CHARGE = ["CREATED", "REQUIRES_PAYMENT", "PROCESSING"];
+const OPEN_CHARGE = OPEN_MANDATE_CHARGE;
+
+/** What queueing a renewal's charge did (D13). */
+export type QueueChargeResult =
+    /** The charge's intent and its first step are written. */
+    | { status: "QUEUED"; intentId: string; key: string }
+    /** Above the mandate's limit: MANDATE_LIMIT_LOW, nothing charged. */
+    | { status: "LIMIT_LOW" }
+    /** No mandate to charge, or charging is off: the pay link, as before. */
+    | { status: "NONE" };
+
+/** What a look-up found and did (D13; Retry asks the provider first). */
+export type LookUpResult =
+    /** The provider had captured it: the invoice is paid now. */
+    | "PAID"
+    /** The provider declined it: FAILED, RENEWAL_FAILED, the pay link opens. */
+    | "FAILED"
+    /** Taken, not answered yet: it stays under way. */
+    | "PENDING"
+    /** No debit was made: the charge may ask for it again. */
+    | "NONE"
+    /** The provider gave no answer: nothing changed. */
+    | "UNKNOWN"
+    /** Nothing open to look up. */
+    | "ALREADY";
+
+type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class MandateChargesService {
@@ -183,6 +218,8 @@ export class MandateChargesService {
                     organizationId,
                     invoiceId,
                     viaMandateId: { not: null },
+                    // A sale's charge only: never D12B's ₹1 autopay check.
+                    purpose: null,
                     status: { in: OPEN_CHARGE },
                 },
                 select: { id: true },
@@ -443,6 +480,249 @@ export class MandateChargesService {
                 `Charge ${intentId}: no answer from ${mandate.provider}; it stays in progress until the provider says`,
             );
             return { status: "UNKNOWN", intentId };
+        }
+    }
+
+    /**
+     * The subscription's ACTIVE mandate Saroh may charge now (D13): made at
+     * the provider, and its provider's charging on for the business
+     * (`mandateChargingOn`, the rollout flag). Null: the pay link, as
+     * before D13.
+     */
+    async chargeableMandate(
+        organizationId: string,
+        subscriptionId: string,
+        db: Pick<Tx, "paymentMandate"> = prisma,
+    ): Promise<{
+        id: string;
+        provider: string;
+        maxAmountCents: number | null;
+        currency: string;
+    } | null> {
+        const mandate = await db.paymentMandate.findFirst({
+            where: {
+                organizationId,
+                subscriptionId,
+                status: "ACTIVE",
+                providerMandateId: { not: null },
+            },
+            select: {
+                id: true,
+                provider: true,
+                maxAmountCents: true,
+                currency: true,
+            },
+        });
+        if (!mandate) return null;
+        const on = await mandateChargingOn(
+            this.providers,
+            organizationId,
+            mandate.provider,
+        );
+        return on ? mandate : null;
+    }
+
+    /**
+     * Queue an autopay charge for a subscription's issued invoice (D13), on
+     * the caller's transaction: the renewal that just issued it, or Retry.
+     * With a chargeable mandate and the invoice within its limit, the
+     * charge's intent (CREATED, under `inv_<invoiceId>_<attempt>`) and the
+     * job's first step are written together, so the invoice reads
+     * "Autopay charge in progress" from this commit on. Above the limit,
+     * MANDATE_LIMIT_LOW is written and nothing is charged. Otherwise
+     * nothing is written (never enqueue a no-op).
+     */
+    async queueInTx(
+        tx: Tx,
+        input: {
+            organizationId: string;
+            subscriptionId: string;
+            invoiceId: string;
+            now?: Date;
+        },
+    ): Promise<QueueChargeResult> {
+        const { organizationId, subscriptionId, invoiceId } = input;
+        const mandate = await this.chargeableMandate(
+            organizationId,
+            subscriptionId,
+            tx,
+        );
+        if (!mandate) return { status: "NONE" };
+        const invoice = await tx.invoice.findFirst({
+            where: { id: invoiceId, organizationId, subscriptionId },
+            select: { status: true, total: true, currency: true },
+        });
+        const amountCents = invoice ? toMinor(invoice.total) : 0;
+        if (
+            invoice?.status !== "ISSUED" ||
+            invoice.currency !== mandate.currency ||
+            amountCents <= 0
+        ) {
+            return { status: "NONE" };
+        }
+        if (
+            mandate.maxAmountCents === null ||
+            amountCents > mandate.maxAmountCents
+        ) {
+            await recordChargeEventInTx(
+                tx,
+                organizationId,
+                invoiceId,
+                "MANDATE_LIMIT_LOW",
+                {
+                    limit:
+                        mandate.maxAmountCents === null
+                            ? "0.00"
+                            : fromMinor(mandate.maxAmountCents),
+                    amount: fromMinor(amountCents),
+                    currency: invoice.currency,
+                },
+            );
+            return { status: "LIMIT_LOW" };
+        }
+        const earlier = await tx.paymentIntent.count({
+            where: {
+                organizationId,
+                invoiceId,
+                viaMandateId: { not: null },
+                purpose: null,
+            },
+        });
+        const key = chargeKey(invoiceId, earlier + 1);
+        const intent = await tx.paymentIntent.create({
+            data: {
+                organizationId,
+                invoiceId,
+                provider: mandate.provider,
+                amountCents,
+                currency: invoice.currency,
+                status: "CREATED",
+                idempotencyKey: key,
+                viaMandateId: mandate.id,
+                preDebitStatus: "PENDING",
+            },
+            select: { id: true },
+        });
+        await enqueueChargeStepInTx(
+            tx,
+            organizationId,
+            { invoiceId, mandateId: mandate.id, key, step: "PREPARE" },
+            input.now ?? new Date(),
+        );
+        return { status: "QUEUED", intentId: intent.id, key };
+    }
+
+    /**
+     * Whether each subscription's unpaid renewal can be retried through
+     * its autopay (D13, default 35): `MANDATE` when it has a chargeable
+     * mandate and its latest unpaid invoice is within the limit. Anything
+     * else is a pay link. Callers check "a charge is under way" apart.
+     */
+    async mandateRetryable(
+        organizationId: string,
+        subscriptionIds: readonly string[],
+    ): Promise<Set<string>> {
+        const retryable = new Set<string>();
+        for (const subscriptionId of new Set(subscriptionIds)) {
+            const mandate = await this.chargeableMandate(
+                organizationId,
+                subscriptionId,
+            );
+            if (mandate?.maxAmountCents == null) continue;
+            const invoice = await prisma.invoice.findFirst({
+                where: { organizationId, subscriptionId, status: "ISSUED" },
+                orderBy: [
+                    { issuedAt: { sort: "desc", nulls: "last" } },
+                    { id: "desc" },
+                ],
+                select: { total: true, currency: true },
+            });
+            if (
+                invoice?.currency === mandate.currency &&
+                toMinor(invoice.total) <= mandate.maxAmountCents
+            ) {
+                retryable.add(subscriptionId);
+            }
+        }
+        return retryable;
+    }
+
+    /**
+     * Ask the provider what became of a charge's debit, and settle what it
+     * says (D13, DEC-026): captured → the invoice is paid (and CHARGED);
+     * declined → FAILED and RENEWAL_FAILED; nothing made → the intent can
+     * ask for its debit again; in flight or no answer → nothing changes.
+     * Retry does this before anything else, so a charge whose webhook was
+     * lost is found, never charged twice.
+     */
+    async lookUp(input: {
+        organizationId: string;
+        intentId: string;
+    }): Promise<LookUpResult> {
+        const { organizationId, intentId } = input;
+        const intent = await prisma.paymentIntent.findFirst({
+            where: {
+                id: intentId,
+                organizationId,
+                viaMandateId: { not: null },
+                purpose: null,
+            },
+            select: {
+                status: true,
+                provider: true,
+                providerIntentId: true,
+            },
+        });
+        if (!intent || !OPEN_CHARGE.includes(intent.status)) return "ALREADY";
+        // No order yet: nothing can have been debited on it.
+        if (!intent.providerIntentId) return "NONE";
+        const connection = await openMandateConnection(
+            this.providers,
+            organizationId,
+            intent.provider,
+            // A charge may have been taken before the connection went.
+            { connectedOnly: false },
+        );
+        if (!connection) return "UNKNOWN";
+        let found;
+        try {
+            found = await connection.mandates.findCharge({
+                providerIntentId: intent.providerIntentId,
+                credentials: connection.credentials,
+            });
+        } catch {
+            this.logger.warn(
+                `Charge ${intentId}: no answer from ${intent.provider} looking it up; nothing changed`,
+            );
+            return "UNKNOWN";
+        }
+        switch (found.status) {
+            case "SUCCEEDED": {
+                const settled = await prisma.$transaction((tx) =>
+                    settleCapturedChargeInTx(
+                        tx,
+                        organizationId,
+                        intentId,
+                        found.providerPaymentRef,
+                    ),
+                );
+                return settled === "ALREADY" ? "ALREADY" : "PAID";
+            }
+            case "FAILED": {
+                const moved = await prisma.$transaction((tx) =>
+                    failMandateChargeInTx(tx, organizationId, intentId),
+                );
+                return moved ? "FAILED" : "ALREADY";
+            }
+            case "PENDING":
+                return "PENDING";
+            case "NONE":
+                // Claimed, but the provider made no debit: ask again.
+                await prisma.paymentIntent.updateMany({
+                    where: { id: intentId, status: "PROCESSING" },
+                    data: { status: "REQUIRES_PAYMENT" },
+                });
+                return "NONE";
         }
     }
 

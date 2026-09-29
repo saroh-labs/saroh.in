@@ -100,7 +100,11 @@ export function InvoiceQuickLook({
         i.kind !== "CREDIT_NOTE" &&
         !i.order;
     const canLink =
-        canWrite && owedHere && (full?.online?.providerConnected ?? false);
+        canWrite &&
+        owedHere &&
+        (full?.online?.providerConnected ?? false) &&
+        // No link while autopay is charging it (D13).
+        !full?.online?.autopayCharge;
     const linkOut = full?.online?.payLinkActive ?? false;
     const firstName = who.name.split(" ")[0] ?? who.name;
 

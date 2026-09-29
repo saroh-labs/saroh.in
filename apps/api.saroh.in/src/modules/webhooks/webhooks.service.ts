@@ -38,6 +38,7 @@ import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
+import { recordChargeEventInTx } from "../payments/mandate-charge-outcome";
 import {
     applyMandateChangeInTx,
     applyPreDebitInTx,
@@ -88,6 +89,8 @@ interface IntentRow {
     status: string;
     amountCents: number;
     currency: string;
+    /** A renewal's autopay charge (D13): its outcome is logged on the plan. */
+    viaMandateId?: string | null;
 }
 
 /** What the provider is called on an invoice paid through it. */
@@ -701,6 +704,17 @@ export class WebhooksService {
     ): Promise<{ applied: boolean }> {
         const result = await this.applyIntentFailure(tx, intent);
         if (result.applied) {
+            // A renewal's autopay charge declined (D13): RENEWAL_FAILED,
+            // which Home reads as "Payment failed"; the pay link opens again.
+            if (intent.viaMandateId) {
+                await recordChargeEventInTx(
+                    tx,
+                    intent.organizationId,
+                    invoiceId,
+                    "RENEWAL_FAILED",
+                    { reason: "DECLINED" },
+                );
+            }
             await enqueueTeamAlert(tx, intent.organizationId, {
                 event: "failed",
                 invoiceId,
@@ -1231,6 +1245,15 @@ export class WebhooksService {
                     where: { id: invoiceId },
                     data: { status: "PAID", paidAt: new Date(), ...payment },
                 });
+                // Paid by autopay (D13): CHARGED on the subscription's log.
+                if (intent.viaMandateId) {
+                    await recordChargeEventInTx(
+                        tx,
+                        intent.organizationId,
+                        invoiceId,
+                        "CHARGED",
+                    );
+                }
                 // A booking's pay link (E4): the booking reads as paid
                 // online. The invoice's lock is held, then the booking's.
                 if (invoice.source === "BOOKING" && invoice.bookingId) {

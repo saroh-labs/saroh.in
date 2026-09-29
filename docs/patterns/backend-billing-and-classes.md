@@ -462,9 +462,37 @@
 "PRIVACY_REMOVAL")` before its transaction and refuses while
   `unconfirmed` isn't zero. `cancelConfirmedAt` null on a CANCELLED row is
   "being confirmed" (DEC-026); a confirmed row is never asked again.
-- **Payment failed** is derived — the latest invoice unpaid past due — never
-  stored. "Retry now" mints a new pay link for that invoice, replacing the
-  old one; nothing is charged.
+- **Payment failed** is derived — the latest invoice unpaid and past due,
+  or whose autopay charge failed since it was issued (RENEWAL_FAILED,
+  MANDATE_LIMIT_LOW) — never stored. Retry (`subscriptions.service.ts`
+  `retryPayment`) asks the provider about an open charge first (a capture
+  it finds pays the invoice; one still in flight is a 409), then either
+  charges the mandate again under a new key (`via: MANDATE`) or mints a new
+  pay link, replacing the old one (`PAY_LINK`, the default). The read's
+  `retryVia` says which is on offer.
+- **Renewals charge the mandate** (round-2 D13). `renewOne` issues the
+  period's invoice, then `MandateChargesService.queueInTx` on the same
+  transaction: with an ACTIVE mandate whose provider's charging is on
+  (`payments/mandate-charge-gate.ts`, the rollout flag) and the invoice
+  within `maxAmountCents`, it writes a CREATED intent under
+  `inv_<invoiceId>_<attempt>` and the `subscription.charge` job; above the
+  limit it writes MANDATE_LIMIT_LOW and charges nothing; otherwise
+  nothing. The job (`subscription-charge.handler.ts`, steps in
+  `charge-job.ts`) prepares (order + pre-debit notice), debits at
+  `debitAfter` once the notice is DELIVERED or NOT_NEEDED, and looks the
+  debit up if its webhook is late. Each step re-checks the subscription
+  isn't CANCELLED and the mandate is still chargeable, or lets the charge
+  go (CANCELLED). Outcomes are written by `payments/mandate-charge-outcome.ts`
+  (CHARGED; RENEWAL_FAILED with `data.reason`; the team's "Payment failed"
+  alert on a decline). The invoice is raised on the renewal date as ever;
+  the debit is 26 hours later, inside the 7-day due window.
+- **One charge at a time per invoice** (D13). While a mandate charge is
+  under way (`payments/charge-under-way.ts`: open and either PROCESSING or
+  on an ACTIVE mandate; sales only, never D12B's ₹1 check), a pay link,
+  its checkout, Send and Send reminder, the account's "Pay now" and Retry
+  are refused with 409 "Autopay charge in progress", and the reads say
+  "Autopay charge in progress · ‹date›" (`autopayCharge`,
+  `online.autopayCharge`, `autopayCharging`).
 
 ## Courses and class packs — **Current**
 

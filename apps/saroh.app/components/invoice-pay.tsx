@@ -50,7 +50,12 @@ export function InvoicePay({
     const money = (a: string) => payMoney(a, invoice.currency);
     const issued = payDate(invoice.issuedAt);
     const due = payDate(invoice.dueAt);
-    const payable = invoice.status === "ISSUED" || invoice.status === "OVERDUE";
+    // While autopay is charging it (D13) there is nothing to pay here: the
+    // customer would be charged twice.
+    const charging = invoice.autopayCharging ?? null;
+    const payable =
+        (invoice.status === "ISSUED" || invoice.status === "OVERDUE") &&
+        !charging;
     // Autopay for the invoice's plan (D12): offered, or on already.
     const autopay =
         invoice.autopay &&
@@ -197,6 +202,29 @@ export function InvoicePay({
                                 : `Pay ${money(invoice.total)}`}
                         </button>
                     )}
+                    <button
+                        type="button"
+                        onClick={() => router.refresh()}
+                        className={cn(ctaClasses("secondary"), "w-full")}
+                    >
+                        Check again
+                    </button>
+                </div>
+            ) : charging ? (
+                <div className="mt-6 space-y-4">
+                    <div
+                        role="status"
+                        className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
+                    >
+                        <p className="font-semibold text-site-fg">
+                            Autopay charge in progress · {payDate(charging.at)}
+                        </p>
+                        <p className="mt-1 text-sm text-site-muted">
+                            Your autopay is paying this invoice. Your bank lets
+                            you know before it takes the money, so there&apos;s
+                            nothing to pay here.
+                        </p>
+                    </div>
                     <button
                         type="button"
                         onClick={() => router.refresh()}

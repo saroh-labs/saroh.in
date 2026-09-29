@@ -11,13 +11,16 @@ export type SendChannel = "email" | "thread";
  * - `NOT_OWED`: paid, void, credited, an order's paper or a credit note;
  * - `NO_PAYMENT_PROVIDER`: no provider, so no pay link to send;
  * - `NO_EMAIL_PROVIDER`: no email provider connected, and no thread;
- * - `NO_EMAIL_ADDRESS`: a provider, but nowhere to send it, and no thread.
+ * - `NO_EMAIL_ADDRESS`: a provider, but nowhere to send it, and no thread;
+ * - `AUTOPAY_PENDING`: an autopay charge is under way on it (D13), so no
+ *   pay link goes out until it is answered.
  */
 export type SendBlocker =
     | "NOT_OWED"
     | "NO_PAYMENT_PROVIDER"
     | "NO_EMAIL_PROVIDER"
-    | "NO_EMAIL_ADDRESS";
+    | "NO_EMAIL_ADDRESS"
+    | "AUTOPAY_PENDING";
 
 /**
  * The one flag Invoice Detail and Home's Send reminder (F4) both read, so

@@ -25,6 +25,7 @@ import type {
     AutopayStart,
 } from "./autopay.service";
 import { AutopayService } from "./autopay.service";
+import { autopayChargeInProgress, chargeUnderWayOn } from "./charge-under-way";
 import type { CreateIntentResult } from "./payments.service";
 import { PaymentsService } from "./payments.service";
 import type { MandateMethod } from "./providers/provider.port";
@@ -69,6 +70,12 @@ export interface PublicInvoiceView {
      * plan has ended, or the business's provider takes no autopay.
      */
     autopay?: PayAutopay | null;
+    /**
+     * An autopay charge is under way on this invoice (D13): the page says
+     * "Autopay charge in progress · ‹date›" (`at`: when the debit is asked
+     * for) and offers no payment, which the API would refuse (409).
+     */
+    autopayCharging?: { at: string } | null;
 }
 
 /** What the pay page may say about autopay (D12). */
@@ -224,8 +231,19 @@ export class PublicInvoicesService {
         return runInOrgContext(found.organizationId, async () => {
             const paper = await invoicePaper(found.organizationId, found.id);
             // Autopay only on a plan's invoice that offers it (D12).
-            const autopay = await this.payAutopay(found);
-            return autopay ? { ...paper, autopay } : paper;
+            const [autopay, charging] = await Promise.all([
+                this.payAutopay(found),
+                chargeUnderWayOn(prisma, found.organizationId, found.id),
+            ]);
+            const view: PublicInvoiceView = autopay
+                ? { ...paper, autopay }
+                : paper;
+            return charging
+                ? {
+                      ...view,
+                      autopayCharging: { at: charging.at.toISOString() },
+                  }
+                : view;
         });
     }
 
@@ -405,6 +423,12 @@ export class PublicInvoicesService {
                         ? "This invoice is already paid."
                         : "This invoice is no longer payable.",
                 );
+            }
+            // One charge at a time (D13): autopay is charging it.
+            if (
+                await chargeUnderWayOn(prisma, found.organizationId, invoice.id)
+            ) {
+                throw autopayChargeInProgress();
             }
             return this.payments.createIntentForInvoicePublic(invoice, options);
         });

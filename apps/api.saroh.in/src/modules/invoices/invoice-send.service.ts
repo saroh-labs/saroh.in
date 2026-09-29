@@ -20,6 +20,11 @@ import {
 import { CommunicationsService } from "../communications/communications.service";
 import type { InvoiceTemplate } from "../communications/transactional";
 import { authorize } from "../organizations/organization-policy";
+import {
+    AUTOPAY_CHARGE_IN_PROGRESS,
+    autopayChargeInProgress,
+    chargeUnderWayOn,
+} from "../payments/charge-under-way";
 import { isPastDue } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrl } from "./pay-link-url";
@@ -87,9 +92,9 @@ function sendable(row: SendRow): boolean {
  * happens on one transaction under the invoice's row lock, so two clicks
  * can't send twice or both pass the one-reminder-a-day rule.
  *
- * Not here yet: D13's "Autopay charge in progress" refusal. D13 adds the
- * mandate charge, and with it the check that an invoice with a PENDING
- * mandate intent is neither sent nor reminded about (409).
+ * While an autopay charge is under way on the invoice (D13) it is neither
+ * sent nor reminded about: the flag says `AUTOPAY_PENDING` and the API
+ * answers 409 "Autopay charge in progress".
  */
 @Injectable()
 export class InvoiceSendService {
@@ -167,6 +172,9 @@ export class InvoiceSendService {
             nextReminderAt,
         });
         if (!sendable(row)) return none("NOT_OWED");
+        if (await chargeUnderWayOn(db, organizationId, row.id)) {
+            return none("AUTOPAY_PENDING");
+        }
 
         const [payments, emailOn, to, threadOn] = await Promise.all([
             db.merchantPaymentProvider.count({
@@ -226,6 +234,9 @@ export class InvoiceSendService {
             this.assertSendable(row);
 
             const view = await this.sendChannels(tx, organizationId, row, now);
+            if (view.reason === "AUTOPAY_PENDING") {
+                throw autopayChargeInProgress();
+            }
             if (view.channels.length === 0) {
                 throw new ConflictException(blockerMessage(view.reason));
             }
@@ -424,6 +435,8 @@ export function blockerMessage(reason: SendBlocker | undefined): string {
             return "Connect an email provider in Settings to send invoices. You can copy the pay link instead.";
         case "NO_EMAIL_ADDRESS":
             return "There's no email address to send this to. You can copy the pay link instead.";
+        case "AUTOPAY_PENDING":
+            return AUTOPAY_CHARGE_IN_PROGRESS;
         default:
             return "This invoice isn't owed, so there's nothing to send.";
     }

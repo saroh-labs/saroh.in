@@ -264,3 +264,14 @@ export class ListSubscriptionsQueryDto {
     @IsString()
     planId?: string;
 }
+
+/**
+ * Retry a failed renewal (D13): `MANDATE` charges the customer's autopay
+ * again, `PAY_LINK` (the default, as before D13) makes a new pay link. The
+ * subscription's read says which is on offer (`retryVia`).
+ */
+export class RetryPaymentDto {
+    @IsOptional()
+    @IsIn(["MANDATE", "PAY_LINK"])
+    via?: "MANDATE" | "PAY_LINK";
+}

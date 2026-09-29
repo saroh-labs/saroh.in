@@ -91,6 +91,8 @@ function setup(opts: {
     reach?: InlinePorts["orderReach"];
     signsIn?: boolean;
     noSending?: boolean;
+    /** D13: each renewal's autopay, by subscription. */
+    charges?: Record<string, "CHARGING" | "MANDATE">;
 }) {
     const db = {
         order: { findMany: jest.fn().mockResolvedValue(opts.orders ?? []) },
@@ -114,6 +116,13 @@ function setup(opts: {
     const ports: InlinePorts = {
         orderReach: opts.reach ?? jest.fn().mockResolvedValue("EMAIL"),
         signsIn: jest.fn().mockResolvedValue(opts.signsIn ?? true),
+        ...(opts.charges
+            ? {
+                  renewalCharges: jest
+                      .fn()
+                      .mockResolvedValue(new Map(Object.entries(opts.charges))),
+              }
+            : {}),
     };
     const service = new HomeInlineService(
         opts.noSending ? undefined : sending,
@@ -243,6 +252,24 @@ describe("retryVia", () => {
         ).toBeNull();
         expect(retryVia({ at: null }, NOW)).toBeNull();
     });
+
+    it("takes a renewal whose autopay failed before its due date (D13)", () => {
+        const ahead = new Date(NOW.getTime() + DAY).toISOString();
+        expect(retryVia({ at: ahead, tag: "Payment failed" }, NOW)).toBe(
+            "PAY_LINK",
+        );
+        expect(retryVia({ at: ahead, tag: "Autopay limit too low" }, NOW)).toBe(
+            "PAY_LINK",
+        );
+    });
+
+    it("charges autopay again when the mandate can take it, else a link only for someone who may make one", () => {
+        const past = new Date(NOW.getTime() - DAY).toISOString();
+        expect(retryVia({ at: past }, NOW, { mandate: true })).toBe("MANDATE");
+        expect(
+            retryVia({ at: past }, NOW, { mandate: false, payLink: false }),
+        ).toBeNull();
+    });
 });
 
 describe("HomeInlineService.decorate", () => {
@@ -327,9 +354,39 @@ describe("HomeInlineService.decorate", () => {
             sends: false,
             undoable: false,
         });
-        // Not past due: the pay-link retry refuses it (D13's mandate retry
-        // will take it).
-        expect(actions[0].evidence?.[1].inline).toBeUndefined();
+        // Not yet due, but its autopay failed (D13): it can be retried.
+        expect(actions[0].evidence?.[1].inline).toMatchObject({
+            kind: "RETRY",
+            via: "PAY_LINK",
+            target: "sub_2",
+        });
+    });
+
+    it("offers no Retry while an autopay charge is under way (D13)", async () => {
+        const { service } = setup({ charges: { sub_1: "CHARGING" } });
+        const past = new Date(NOW.getTime() - 2 * DAY).toISOString();
+        const actions = [
+            action("PAYMENTS_FAILED_RENEWALS", [ev("sub_1", { at: past })]),
+        ];
+        await service.decorate(actions, OWNER, NOW);
+        expect(actions[0].evidence?.[0].inline).toBeUndefined();
+    });
+
+    it("retries by autopay when the mandate can take it, in its own words (D13)", async () => {
+        const { service } = setup({ charges: { sub_1: "MANDATE" } });
+        const past = new Date(NOW.getTime() - 2 * DAY).toISOString();
+        const actions = [
+            action("PAYMENTS_FAILED_RENEWALS", [ev("sub_1", { at: past })]),
+        ];
+        // Charging autopay needs subscription:write only, not invoice:write.
+        await service.decorate(actions, holding("subscription:write"), NOW);
+        expect(actions[0].evidence?.[0].inline).toMatchObject({
+            kind: "RETRY",
+            via: "MANDATE",
+            label: "Charge autopay again",
+            sends: false,
+            undoable: false,
+        });
     });
 
     it("offers no Retry without subscription:write and invoice:write, or without a payment provider", async () => {

@@ -136,7 +136,7 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
     },
     RAZORPAY_AUTOPAY: {
         purpose:
-            "Offers autopay (UPI Autopay, card or bank eMandate) to the customers of a business that takes payments through Razorpay. Turn it on only after a Razorpay test-mode run has authorised a mandate and settled one charge; off, no new autopay is set up through Razorpay, while mandates already made are still charged and cancelled.",
+            "Offers autopay (UPI Autopay, card or bank eMandate) to the customers of a business that takes payments through Razorpay. Turn it on only after a Razorpay test-mode run has authorised a mandate and settled one charge; off, no autopay is set up or charged through Razorpay (renewals are invoiced with a pay link, as before autopay), while mandates already made can still be cancelled.",
         owner: "Release manager",
         reviewBy: "2027-01-31",
         removeWhen:

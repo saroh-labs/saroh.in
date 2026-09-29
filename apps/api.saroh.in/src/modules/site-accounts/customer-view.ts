@@ -167,6 +167,12 @@ export interface AccountSubscription extends AccountPlan {
      * invoice, which UPI or card pay in the same window. Null: nothing owed.
      */
     autopayPays?: { total: string; currency: string } | null;
+    /**
+     * An autopay charge is under way on the plan (D13): "Autopay charge in
+     * progress · ‹date›", `at` being when the debit is asked for. "Pay now"
+     * is hidden meanwhile. Null: none. Absent from an API older than D13.
+     */
+    autopayCharging?: { at: string } | null;
 }
 
 /** A plan's autopay as the member sees it (D12). */
