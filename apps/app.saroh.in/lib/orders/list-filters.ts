@@ -173,6 +173,24 @@ export function filtersActive(filters: OrdersFilters): boolean {
     );
 }
 
+/**
+ * How many filters are on, for the phone's "Filters · 2" (B5): a date
+ * counts once whether a preset or a range, and a custom date with no day
+ * chosen yet not at all, as {@link filtersActive} reads it.
+ */
+export function filtersOn(filters: OrdersFilters): number {
+    return [
+        filters.date !== null &&
+            (filters.date !== "custom" || !!filters.from || !!filters.to),
+        !!filters.step,
+        !!filters.fulfilment,
+        !!filters.payment,
+        !!filters.product,
+        filters.attention,
+        filters.late,
+    ].filter(Boolean).length;
+}
+
 /** What the API is asked for the filters (B4). */
 export function filterParams(
     filters: OrdersFilters,

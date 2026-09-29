@@ -128,8 +128,8 @@ each with why it stops there:
   words to `lib/orders/visits.ts`, and the timeline's lines to
   `lib/orders/timeline-steps.ts`. The header and the money column are the
   next seams.
-- `app.saroh.in/components/commerce/orders/order-quick-view.tsx` (407; 401
-  before B14's "1 of 3 visits" line) — the panel, its read and retry, and
+- `app.saroh.in/components/commerce/orders/order-quick-view.tsx` (421 after
+  B5's phone sheet, DEC-067; 401 before B14's "1 of 3 visits" line) — the panel, its read and retry, and
   the body share one open state; the body is the seam.
 - The calendar's `lib/calendar/layers.ts` (443) — the layers' order,
   tones, words and day lines. E22 put the named problems and their fixes

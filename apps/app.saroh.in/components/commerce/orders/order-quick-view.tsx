@@ -54,16 +54,22 @@ const CHIP = {
  *
  * An appointment's visits are marked on Order Detail (DESIGN-NOTES), so it
  * offers no next action here.
+ *
+ * On a phone (DEC-067) a card opens the same panel as a sheet from the
+ * bottom (`side="bottom"`), rather than going straight to the full page.
  */
 export function OrderQuickView({
     row,
     can,
     onOpenChange,
+    side = "right",
 }: {
     /** The row it opened from; null when closed. */
     row: OrderRow | null;
     can: OrderAbilities;
     onOpenChange: (open: boolean) => void;
+    /** From the right at the desk; from the bottom on a phone (B5). */
+    side?: "right" | "bottom";
 }) {
     const [read, setRead] = useState<Read>({ state: "loading" });
     const [attempt, setAttempt] = useState(0);
@@ -111,6 +117,7 @@ export function OrderQuickView({
         return (
             <QuickLook
                 open={false}
+                side={side}
                 onOpenChange={onOpenChange}
                 title=""
                 description=""
@@ -127,6 +134,7 @@ export function OrderQuickView({
     return (
         <QuickLook
             open
+            side={side}
             onOpenChange={onOpenChange}
             title={`${ref} · ${customer}`}
             titleClassName="font-display text-[20px] font-semibold tracking-[-0.02em]"
@@ -142,7 +150,7 @@ export function OrderQuickView({
                     <Button
                         asChild
                         variant="outline"
-                        className="mr-auto h-[38px] gap-[7px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                        className="mr-auto h-[38px] cursor-pointer gap-[7px] rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
                     >
                         <Link href={orderPageHref(row.store.id, row.id)}>
                             Open full page
@@ -153,7 +161,7 @@ export function OrderQuickView({
                         next.via === "page" ? (
                             <Button
                                 asChild
-                                className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                                className="h-[38px] cursor-pointer rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
                             >
                                 <Link
                                     href={orderPageHref(
@@ -177,7 +185,7 @@ export function OrderQuickView({
                                         to: next.to,
                                     })
                                 }
-                                className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                                className="h-[38px] cursor-pointer rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
                             >
                                 {next.label}
                             </Button>
