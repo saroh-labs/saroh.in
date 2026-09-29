@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { ADDED_BY_HAND } from "@/lib/customer-workspace/added";
 import type {
     CustomerDetail,
     DetailOrder,
@@ -110,6 +111,62 @@ describe("Usually buys", () => {
         expect(html).not.toContain("Usually buys");
         // The rest of the order picture still shows.
         expect(html).toContain('aria-label="How they get orders"');
+    });
+});
+
+describe("Delivery address before a first order (DEC-073)", () => {
+    const handAdded = (address: Partial<CustomerDetail["contact"]>) =>
+        overview({
+            ...customer([]),
+            contact: {
+                ...customer([]).contact,
+                source: ADDED_BY_HAND,
+                ...address,
+            },
+        });
+
+    it("a customer added by hand shows their saved address", () => {
+        const html = handAdded({
+            addressLine1: "14 Hill Road",
+            addressLine2: null,
+            city: "Mumbai",
+            postalCode: "400050",
+            state: "Maharashtra",
+            country: "IN",
+        });
+        expect(html).toContain("No orders yet");
+        expect(html).toContain("Added by hand");
+        expect(html).toContain('aria-label="Delivery address"');
+        expect(html).toContain("14 Hill Road, Mumbai 400050, Maharashtra");
+    });
+
+    it("draws no address card when none is saved", () => {
+        const html = handAdded({ addressLine1: null, city: null });
+        expect(html).toContain("No orders yet");
+        expect(html).not.toContain("Delivery address");
+    });
+
+    it("once they have ordered, the address sits in How they get orders", () => {
+        const html = overview({
+            ...customer([
+                order([
+                    {
+                        productId: "p1",
+                        kind: "product",
+                        name: "Sourdough loaf",
+                        variant: null,
+                        quantity: 1,
+                    },
+                ]),
+            ]),
+            contact: {
+                ...customer([]).contact,
+                addressLine1: "14 Hill Road",
+                city: "Mumbai",
+            },
+        });
+        expect(html).not.toContain('aria-label="Delivery address"');
+        expect(html).toContain("14 Hill Road, Mumbai");
     });
 });
 
