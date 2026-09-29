@@ -1136,3 +1136,23 @@ renewal PDF against a real database.
 reading it as a number. `docs/patterns/backend-billing-and-classes.md` → GST
 shows only when it applies.
 **Category**: invoices · GST · DEC-072
+
+## RLS — "is this address free" would miss another business under enforcement (L1)
+
+**Problem**: `addressTaken` and `freeAddress` (`sites/site-address.ts`) are
+asked during one business's request too: site creation, the Turn on sheet
+and, from L2, a change of address. With `RLS_ENFORCEMENT` on, `Site` and the
+new `AddressReservation` are scoped to that business there, so another
+business's site or held address read as free. A held address has no unique
+index to catch the claim afterwards.
+**Root cause**: the check is cross-business by nature, but it read through
+the caller's (GUC'd) client.
+**Fix**: `outsideOrgContext(fn)` (`@saroh/database`, rls-proxy) leaves the
+ambient org context and its transaction. `site-address.ts` uses it for its
+reads (and `releaseExpired`) only when enforcement is on and a context is
+active. `site-address.db.spec.ts` checks it under `TEST_RLS=on`: business A
+can't list B's holds, yet sees B's address as taken.
+**Rule**: a read that must see every business (uniqueness across tenants)
+goes through `outsideOrgContext`, never the request's client; such a read is
+outside the caller's transaction.
+**Category**: RLS · `docs/patterns/backend-data-and-money.md`
