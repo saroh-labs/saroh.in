@@ -326,6 +326,26 @@ export function paidBy(method: string): string {
 }
 
 /**
+ * How it was paid, inside a sentence: "Paid 29 Sep online", "Paid by UPI".
+ * Lower-casing `paidBy` wrote "by online" and "by upi".
+ */
+export function paidHow(method: string): string {
+    switch (method) {
+        case "ONLINE":
+            return "online";
+        case "ORDER":
+            return "with the order";
+        case "RECORDED":
+            return "(recorded by hand)";
+        case "OTHER":
+            return "another way";
+        case "UPI":
+            return "by UPI";
+    }
+    return `by ${paidBy(method).toLowerCase()}`;
+}
+
+/**
  * The line under the pill, in parts so the date can be written in the
  * viewer's timezone: "Due · 22 Sep · in 4 days", "3 days late", "Paid 18 Sep
  * · UPI". `date` is the instant to show between `before` and `after`.
