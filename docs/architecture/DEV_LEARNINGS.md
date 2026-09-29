@@ -1012,3 +1012,19 @@ off-screen in "Link a commerce customer" (the test keeps emails short; the
 dialog does not wrap).
 **Category**: e2e · tooling · `.agents/skills/saroh-browser-tests/SKILL.md`,
 `docs/patterns/devops-tooling-and-deploy.md`, `scripts/prepush.sh`
+
+## E2E — the phone tab-bar check found "no tab bar" on CI only (#718)
+
+**Problem**: `four-scenes` "/commerce leaves nothing under the bar" failed on
+CI's shard 3 (and its retry) with `["no tab bar"]`; it passed four times in
+a row locally, and the failure screenshot shows the bar.
+**Root cause**: `/commerce` redirects to `/commerce/storefronts`. The spec
+waited for the page height to settle, then measured once — and on CI's
+2-vCPU runner, with 2 workers, that one look landed between the two pages:
+the old bar gone, the new one not drawn. A fast local machine never lands
+in that gap.
+**Fix**: The measurement itself is polled until it holds (`expect.poll`,
+10s); a control really under the bar still fails. Rule: after a navigation
+or redirect, never read the page once and assert — assert through a
+web-first expectation or a poll, so a slow runner waits instead of failing.
+**Category**: e2e · `e2e/tests/four-scenes.spec.ts` · `.agents/skills/saroh-browser-tests/SKILL.md`

@@ -62,6 +62,12 @@ screen, `expect.poll` on the API or on a measurement that must settle, and
 for a timer in the page (a ten-second hold, an Undo toast) install
 `page.clock` before the page loads and `runFor` past it.
 
+Never read the page once with `page.evaluate` and assert on the result: CI's
+runners are slower than this Mac, and a single look can land between two
+pages (a redirect) or before a list has drawn. Put the measurement inside
+`expect.poll(() => page.evaluate(…)).toEqual(…)`, so a slow runner waits and
+a real problem still fails at the timeout (DEV_LEARNINGS, #718).
+
 ## Two projects, because the scenes differ
 
 - **`desk`** — 1440, mouse. `pointer: fine`, so `coarse:` utilities are inert.

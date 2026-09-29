@@ -157,33 +157,47 @@ test.describe("the phone tab bar", () => {
                     { timeout: 15_000, intervals: [300] },
                 )
                 .toBe(true);
-            const hidden = await page.evaluate(() => {
-                const nav = document.querySelector('nav[aria-label="Main"]');
-                if (!nav) return ["no tab bar"];
-                const top = nav.getBoundingClientRect().top;
-                return [
-                    ...document.querySelectorAll<HTMLElement>(
-                        "button, a[href], [role=button], input",
-                    ),
-                ]
-                    .filter((el) => !nav.contains(el))
-                    .filter((el) => {
-                        const r = el.getBoundingClientRect();
-                        return (
-                            r.width > 0 &&
-                            r.height > 0 &&
-                            r.bottom > top + 1 &&
-                            r.top < window.innerHeight
-                        );
-                    })
-                    .map((el) =>
-                        (
-                            el.getAttribute("aria-label") ??
-                            (el.textContent.trim() || el.tagName)
-                        ).slice(0, 30),
-                    );
-            });
-            expect(hidden).toEqual([]);
+            // Measured again until it holds: a route that redirects
+            // (/commerce → /commerce/storefronts) can be between pages on a
+            // busy runner, with the old bar gone and the new one not drawn
+            // yet. A control really under the bar still fails at the timeout.
+            await expect
+                .poll(
+                    () =>
+                        page
+                            .evaluate(() => {
+                                const nav = document.querySelector(
+                                    'nav[aria-label="Main"]',
+                                );
+                                if (!nav) return ["no tab bar"];
+                                const top = nav.getBoundingClientRect().top;
+                                return [
+                                    ...document.querySelectorAll<HTMLElement>(
+                                        "button, a[href], [role=button], input",
+                                    ),
+                                ]
+                                    .filter((el) => !nav.contains(el))
+                                    .filter((el) => {
+                                        const r = el.getBoundingClientRect();
+                                        return (
+                                            r.width > 0 &&
+                                            r.height > 0 &&
+                                            r.bottom > top + 1 &&
+                                            r.top < window.innerHeight
+                                        );
+                                    })
+                                    .map((el) =>
+                                        (
+                                            el.getAttribute("aria-label") ??
+                                            (el.textContent.trim() ||
+                                                el.tagName)
+                                        ).slice(0, 30),
+                                    );
+                            })
+                            .catch(() => ["between pages"]),
+                    { timeout: 10_000, intervals: [300] },
+                )
+                .toEqual([]);
         });
     }
 
