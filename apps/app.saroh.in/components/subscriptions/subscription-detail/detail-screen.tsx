@@ -80,6 +80,7 @@ export function SubscriptionDetail({
     canWrite,
     canPayLink,
     initialStep,
+    openSetUpLink = false,
     contacts,
     nowIso,
 }: {
@@ -98,6 +99,11 @@ export function SubscriptionDetail({
     canPayLink: boolean;
     /** `?do=` from the list's quick look. */
     initialStep: Step | "restart" | null;
+    /**
+     * `?do=autopay-link` from Home's "Send a set-up link" (D14): opens that
+     * sheet, when this screen offers it.
+     */
+    openSetUpLink?: boolean;
     contacts: ContactOption[];
     nowIso: string;
 }) {
@@ -436,6 +442,7 @@ export function SubscriptionDetail({
                                 subscriptionId={sub.id}
                                 panel={autopay}
                                 card={sub.autopayCard ?? null}
+                                openSend={openSetUpLink}
                                 firstName={first}
                                 timeZone={tz}
                                 now={now}

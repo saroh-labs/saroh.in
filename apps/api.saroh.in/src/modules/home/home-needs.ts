@@ -138,6 +138,7 @@ function fromEvidence(
         href: ev.href,
         // F4: the action the row offers in place, when it offers one.
         ...(ev.inline ? { inline: ev.inline } : {}),
+        ...(ev.link ? { link: ev.link } : {}),
     };
 }
 

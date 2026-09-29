@@ -50,6 +50,17 @@ export interface HomeInline {
 }
 
 /**
+ * A step a Needs-you row opens where it is taken, beside its inline action
+ * (D14): "Send a set-up link" on a renewal whose autopay limit is too low
+ * opens Subscription Detail's own set-up sheet. Sent only to someone who may
+ * take it, while the business offers autopay.
+ */
+export interface HomeRowLink {
+    label: string;
+    href: string;
+}
+
+/**
  * One row of Needs you (F3), flat and already ranked by the API.
  *
  * Money travels in minor units beside the words, and `amountIn` says where
@@ -70,6 +81,7 @@ export interface HomeNeed {
     href: string;
     moduleKey?: string;
     inline?: HomeInline;
+    link?: HomeRowLink;
 }
 
 /**

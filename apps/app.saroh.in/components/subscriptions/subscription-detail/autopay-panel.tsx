@@ -36,6 +36,8 @@ const SMALL = "h-8 rounded-[8px] px-3 text-[12.5px] font-semibold coarse:h-11";
  * Autopay under the Plan card's "Pays by" line (D14): how it came to be,
  * what needs attention, and — for someone with `subscription:write` —
  * "Send a set-up link" and "Cancel autopay", each asked before it acts.
+ * `openSend` opens the set-up sheet straight away (Home's "Send a set-up
+ * link", D14), only when it is offered here.
  */
 export function AutopayActions({
     subscriptionId,
@@ -44,15 +46,19 @@ export function AutopayActions({
     firstName,
     timeZone,
     now,
+    openSend = false,
 }: {
     subscriptionId: string;
     panel: AutopayPanel;
     card: AutopayCard | null;
+    openSend?: boolean;
     firstName: string;
     timeZone: string;
     now: Date;
 }) {
-    const [open, setOpen] = useState<"send" | "cancel" | null>(null);
+    const [open, setOpen] = useState<"send" | "cancel" | null>(() =>
+        openSend && panel.sendLabel !== null && card ? "send" : null,
+    );
     const showsActions = panel.sendLabel !== null || panel.canCancel;
     if (!panel.detail && !panel.notice && !showsActions) return null;
     return (
