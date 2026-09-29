@@ -262,12 +262,12 @@ export async function addCustomer(
     return holder ? { ...failure, holder } : failure;
 }
 
+/** A note is text only (Z2a): an allergy goes on Needs attention. */
 export interface NoteInput {
     body: string;
-    allergenIds: string[];
 }
 
-/** Write a note about a customer; the API checks each allergen id. */
+/** Write a note about a customer. */
 export function createNote(
     contactId: string,
     input: NoteInput,

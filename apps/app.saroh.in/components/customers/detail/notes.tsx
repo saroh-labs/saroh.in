@@ -20,14 +20,13 @@ import { Empty } from "./parts";
 const MAX = 500;
 
 /**
- * Notes the team keeps about a customer — never shown to them. An allergy is
- * picked from the storefront's allergen list, not typed, so Order Detail's
- * banner matches the products exactly. Deleting one of your own has Undo.
+ * Notes the team keeps about a customer — never shown to them. Text only
+ * (Z2a): an allergy goes on Needs attention, which Order Detail's banner
+ * checks the products against. Deleting one of your own has Undo.
  */
 export function Notes({
     contactId,
     rows,
-    choices,
     canWrite,
     userId,
     timeZone,
@@ -35,7 +34,6 @@ export function Notes({
 }: {
     contactId: string;
     rows: DetailNote[];
-    choices: { id: string; name: string }[];
     canWrite: boolean;
     userId: string | null;
     timeZone: string;
@@ -43,24 +41,19 @@ export function Notes({
 }) {
     const router = useRouter();
     const [draft, setDraft] = useState("");
-    const [picked, setPicked] = useState<string[]>([]);
     const [busy, setBusy] = useState(false);
     const [gone, setGone] = useState<string[]>([]);
-    const ids = { text: useId(), allergy: useId() };
+    const textId = useId();
     const text = draft.trim();
-    const off = busy || (!text && !picked.length) || text.length > MAX;
+    const off = busy || !text || text.length > MAX;
 
     async function add() {
         if (off) return;
         setBusy(true);
-        const res = await addNoteAction(contactId, {
-            body: text,
-            allergenIds: picked,
-        });
+        const res = await addNoteAction(contactId, { body: text });
         setBusy(false);
         if (!res.ok) return showError(res.error);
         setDraft("");
-        setPicked([]);
         router.refresh();
     }
 
@@ -73,10 +66,7 @@ export function Notes({
         }
         router.refresh();
         showUndo("Note deleted.", () => {
-            void addNoteAction(contactId, {
-                body: n.body,
-                allergenIds: n.allergens.map((a) => a.id),
-            }).then((back) => {
+            void addNoteAction(contactId, { body: n.body }).then((back) => {
                 if (!back.ok) showError(back.error);
                 router.refresh();
             });
@@ -92,58 +82,17 @@ export function Notes({
             </p>
             {canWrite ? (
                 <div className="mb-3 rounded-xl border border-border bg-card px-3.5 py-3">
-                    <label htmlFor={ids.text} className="sr-only">
+                    <label htmlFor={textId} className="sr-only">
                         New note
                     </label>
                     <textarea
-                        id={ids.text}
+                        id={textId}
                         rows={2}
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
-                        placeholder="e.g. Allergic to sesame — check the bun tray"
+                        placeholder="e.g. Collects on Saturdays before 8"
                         className="block w-full resize-y rounded-[8px] border border-border bg-card px-2.5 py-2 text-[13px] leading-[1.5] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
-                    {choices.length ? (
-                        <div
-                            role="group"
-                            aria-labelledby={ids.allergy}
-                            className="mt-2 flex flex-wrap items-center gap-1.5"
-                        >
-                            <span
-                                id={ids.allergy}
-                                className="mr-0.5 text-[11.5px] text-muted-foreground"
-                            >
-                                Allergy
-                            </span>
-                            {choices.map((a) => {
-                                const on = picked.includes(a.id);
-                                return (
-                                    <button
-                                        key={a.id}
-                                        type="button"
-                                        aria-pressed={on}
-                                        onClick={() =>
-                                            setPicked((p) =>
-                                                on
-                                                    ? p.filter(
-                                                          (x) => x !== a.id,
-                                                      )
-                                                    : [...p, a.id],
-                                            )
-                                        }
-                                        className={cn(
-                                            "h-7 rounded-full border px-2.5 text-[12px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11",
-                                            on
-                                                ? "border-destructive-subtle-foreground bg-destructive-subtle font-semibold text-destructive-subtle-foreground"
-                                                : "border-border bg-card text-foreground/75 hover:bg-muted",
-                                        )}
-                                    >
-                                        {a.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    ) : null}
                     <div className="mt-2 flex items-center gap-2">
                         <span
                             className={cn(
@@ -174,8 +123,9 @@ export function Notes({
             )}
             {!shown.length ? (
                 <Empty title="No notes yet">
-                    Useful for things the team should remember — an allergy, a
-                    usual order, how they like to be called.
+                    Useful for things the team should remember — a usual order,
+                    how they like to be called. An allergy goes on Needs
+                    attention, where orders are checked against it.
                 </Empty>
             ) : null}
             <div className="flex flex-col gap-2">
@@ -205,23 +155,9 @@ export function Notes({
                                 </button>
                             ) : null}
                         </div>
-                        {n.allergens.length ? (
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                {n.allergens.map((a) => (
-                                    <span
-                                        key={a.id}
-                                        className="rounded-full bg-destructive-subtle px-2 py-0.5 text-[11.5px] font-semibold text-destructive-subtle-foreground"
-                                    >
-                                        Allergy: {a.name}
-                                    </span>
-                                ))}
-                            </div>
-                        ) : null}
-                        {n.body ? (
-                            <div className="mt-1 whitespace-pre-line text-[13.5px] leading-[1.55] text-foreground/75">
-                                {n.body}
-                            </div>
-                        ) : null}
+                        <div className="mt-1 whitespace-pre-line text-[13.5px] leading-[1.55] text-foreground/75">
+                            {n.body}
+                        </div>
                     </article>
                 ))}
             </div>

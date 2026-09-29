@@ -250,7 +250,6 @@ export function CustomerDetailScreen({
                     <Notes
                         contactId={d.contact.id}
                         rows={d.notes.rows}
-                        choices={d.notes.allergenChoices}
                         canWrite={canWrite}
                         userId={userId}
                         timeZone={d.timezone}

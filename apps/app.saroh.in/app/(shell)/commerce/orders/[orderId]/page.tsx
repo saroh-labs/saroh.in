@@ -11,7 +11,10 @@ import {
     ordersAccess,
 } from "@/lib/orders/access";
 import { allergyNotesOf } from "@/lib/orders/attention";
-import { getAllergyNotes, getOrderRead } from "@/lib/orders/kitchen-service";
+import {
+    getAttentionAllergies,
+    getOrderRead,
+} from "@/lib/orders/kitchen-service";
 import type { AllergyNote } from "@/lib/orders/read";
 import { arrivalOf } from "@/lib/orders/row-menu";
 import { sellablesOf } from "@/lib/orders/sellables";
@@ -38,7 +41,7 @@ export const metadata = { title: "Order" };
  * read itself (B15), so the kitchen's view has it too. Beside it, each read
  * on its own so one failing costs only its panel: the provider's payment
  * attempts (money roles) and the review invitation (`order:read`) — and,
- * from an API before B15 only, the contact's allergy notes (U8).
+ * from an API before B15 only, the contact's Needs attention (C1).
  *
  * Someone holding neither `order:read` nor `order:stage` gets the design's
  * locked card before the order is read (B7), rather than the generic denial
@@ -80,14 +83,14 @@ export default async function OrderPage({
             : Promise.resolve(false);
     // The allergy check reads the order's own Needs attention (B15), which
     // reaches the kitchen too; an API before B15 sends none, and the
-    // contact's notes are read instead.
+    // contact's Needs attention is read instead (Z2a: never the notes).
     const fromOrder = allergyNotesOf(order.attention);
     const [notes, payments, reviewState, canPayOnline, addable] =
         await Promise.all([
             fromOrder !== undefined
                 ? Promise.resolve(fromOrder)
                 : contactId
-                  ? getAllergyNotes(contactId)
+                  ? getAttentionAllergies(contactId)
                   : Promise.resolve<AllergyNote[]>([]),
             order.money
                 ? getOrderPayments(order.id).catch(() => null)
