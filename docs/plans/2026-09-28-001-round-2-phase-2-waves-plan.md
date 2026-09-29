@@ -214,3 +214,17 @@ one exists.
   answered before wave 7 (C13). Proposed: yes.
 - **B8:** build B7's "Share your storefront" button, or drop it? Proposed:
   build it, in B8.
+
+## Payments and checkout polish (P1–P5), after autopay
+
+Found in the live Razorpay test-mode walk-through on Northwind (2026-09-29).
+The user set the order: after the autopay units (D12, D13, D14), with P1
+and P2 first because both involve money.
+
+| ID | Unit | Why | Scope |
+|---|---|---|---|
+| P1 | Confirm a payment on the checkout's signed return, with the webhook as a backup | A booking paid in Razorpay stayed "Awaiting payment" because its webhook never arrived; the hold then lapsed with the money taken | Checkout hands back `razorpay_payment_id`, `order_id` and `signature` to the page. The renderer posts them to the API, which verifies the signature with the key secret and settles the intent through the same idempotent path the webhook uses (bookings, shop orders, G20 joins, pack purchases, pay links). The webhook stays; whichever arrives first settles and the other is a no-op. Add a sweep that asks the provider about intents still pending after N minutes, so a hold never lapses on money already taken. Include a way to reconcile the stuck 15:00 test booking. |
+| P2 | Take payment at the desk from the booking | A pay-at-the-desk booking shows "₹500 due at the visit", with no way to record the payment and no invoice | Booking detail and quick view get "Take ₹X": cash, UPI at the counter, card, or send a pay link. It makes (or finds) the booking's invoice, marks it paid with the method, and the booking shows "Paid at the desk · ‹method›". Respect `payment:manage`/`invoice:write`. Follow the Bookings and Invoice designs. |
+| P3 | Order numbers are unique per business | Two orders in one Orders list are both #ORD-001 (each storefront counts from 1) | Decide the numbering (per-business series, or a storefront prefix) with the user, then an additive change plus display. Needs a DEC entry. |
+| P4 | Shop setup tells the merchant what's missing | `/shop` is a 404 until the site's "Sells from" is answered, and nothing says so; the header has no Shop link; the order confirmation shows only inside the bag sheet | A Website checklist/flag "Choose which storefront your site sells from", a Shop link in the site header when the shop serves (G13's wiring), and an order confirmation page on the merchant's site after payment (same rule as D12: the customer lands on the merchant's site). |
+| P5 | "Made by" on the product page | Shows the storefront's name ("Online") where a maker or brand belongs | Show the product's brand/maker when set; otherwise hide the row. |
