@@ -11,12 +11,9 @@ import {
     enqueueMandateCancelInTx,
     scopeWhere,
 } from "./mandate-cancel-job";
-import { openProviderCredentials } from "./provider-credentials";
-import type {
-    MandateCapability,
-    ProviderCredentials,
-    ProviderFactory,
-} from "./providers/provider.port";
+import type { MandateConnection } from "./mandate-connection";
+import { openMandateConnection } from "./mandate-connection";
+import type { ProviderFactory } from "./providers/provider.port";
 import { MandateCallError, PROVIDER_FACTORY } from "./providers/provider.port";
 
 /** What asking the provider settled, for the mandates still to confirm. */
@@ -51,7 +48,8 @@ interface Row {
 
 /**
  * Autopay mandates at the business's own provider (DEC-038). D20 owns how
- * a mandate ends; D11 adds set-up and D13 charging to this service.
+ * a mandate ends. D11's set-up is `mandate-setup.service.ts`, and its
+ * two-step charge `mandate-charges.service.ts` (D13 calls it).
  *
  * A mandate is cancelled in two steps. It is marked CANCELLED in Saroh
  * first (`mandate-cancel-job.ts`), so nothing charges it again; then the
@@ -172,8 +170,11 @@ export class MandatesService {
         } catch (err) {
             // An error that isn't the port's own is a call that may have
             // gone through: ask again, never assume (DEC-026).
+            // A cancel is never "not yet": any answer but a refusal is asked again.
             const outcome =
-                err instanceof MandateCallError ? err.outcome : "UNKNOWN";
+                err instanceof MandateCallError && err.outcome === "REFUSED"
+                    ? "REFUSED"
+                    : "UNKNOWN";
             if (outcome === "REFUSED") {
                 this.logger.error(
                     `Mandate ${row.id}: ${row.provider} refused to cancel it; it stays cancelled in Saroh, unconfirmed`,
@@ -193,26 +194,14 @@ export class MandatesService {
      * still live at the provider. Null when there's no connection, or its
      * adapter has no mandates.
      */
-    private async connection(
+    private connection(
         organizationId: string,
         provider: string,
     ): Promise<Connection | null> {
-        const row = await prisma.merchantPaymentProvider.findUnique({
-            where: { organizationId_provider: { organizationId, provider } },
+        return openMandateConnection(this.providers, organizationId, provider, {
+            connectedOnly: false,
         });
-        if (!row) return null;
-        let mandates: MandateCapability | undefined;
-        try {
-            mandates = this.providers.get(provider).mandates;
-        } catch {
-            return null;
-        }
-        if (!mandates) return null;
-        return { mandates, credentials: openProviderCredentials(row) };
     }
 }
 
-interface Connection {
-    mandates: MandateCapability;
-    credentials: ProviderCredentials;
-}
+type Connection = MandateConnection;

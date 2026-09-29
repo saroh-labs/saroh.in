@@ -125,13 +125,16 @@ export interface CancelMandateInput {
  * A mandate call that did not come back with an answer. `REFUSED`: the
  * provider definitely didn't do it and would refuse again. `UNKNOWN`: it
  * may have — a timeout, a network error, a 5xx — so Saroh asks again
- * rather than assuming either way (DEC-026). A cancel of a mandate the
+ * rather than assuming either way (DEC-026). `NOT_YET`: the provider
+ * won't take a debit yet — its pre-debit notice isn't delivered, or
+ * `debitAfter` hasn't come (Razorpay `pre_debit_notification_not_sent`) —
+ * and nothing was charged; ask again later. A cancel of a mandate the
  * provider already has cancelled is a success, never an error.
  */
 export class MandateCallError extends Error {
     constructor(
         message: string,
-        readonly outcome: "REFUSED" | "UNKNOWN",
+        readonly outcome: "REFUSED" | "UNKNOWN" | "NOT_YET",
     ) {
         super(message);
         this.name = "MandateCallError";
@@ -139,13 +142,195 @@ export class MandateCallError extends Error {
 }
 
 /**
- * Autopay mandates at the business's own provider (DEC-038). D11 grows it
- * with set-up, charge and status; D20 needs only `cancel`. A provider
- * without it (Razorpay until D19, Cashfree this round) never offers
- * autopay: {@link supportsMandates}.
+ * How a customer can authorise autopay. A provider's authorisation takes
+ * exactly one (D11 spike: a Razorpay recurring order carries one method,
+ * and without one its Checkout shows cards only), so the customer picks
+ * from what the business's account can set up — Saroh never narrows it
+ * (DEC-059). Never a card or bank detail: only the kind.
+ */
+export const MANDATE_METHODS = ["UPI", "CARD", "EMANDATE"] as const;
+export type MandateMethod = (typeof MANDATE_METHODS)[number];
+
+export function isMandateMethod(value: unknown): value is MandateMethod {
+    return (
+        typeof value === "string" &&
+        (MANDATE_METHODS as readonly string[]).includes(value)
+    );
+}
+
+/**
+ * How often a mandate may be charged. Saroh uses `AS_PRESENTED`: it says
+ * when to charge, because renewal dates move (a pause, D8).
+ */
+export const MANDATE_FREQUENCIES = [
+    "AS_PRESENTED",
+    "WEEKLY",
+    "MONTHLY",
+    "QUARTERLY",
+    "YEARLY",
+] as const;
+export type MandateFrequency = (typeof MANDATE_FREQUENCIES)[number];
+
+/** A mandate's state as the provider reports it, in Saroh's words. */
+export type ProviderMandateStatus =
+    "PENDING" | "ACTIVE" | "PAUSED" | "CANCELLED" | "FAILED";
+
+/** Start an authorisation (D11): the customer approves it at the provider. */
+export interface CreateMandateSetupInput {
+    /** Saroh's reference — the PaymentMandate row's id. */
+    reference: string;
+    method: MandateMethod;
+    /** Who authorises. Only what the provider needs to reach them. */
+    customer: { name: string; email: string | null; phone: string | null };
+    /**
+     * The authorisation's own payment, in minor units. UPI and card take at
+     * least ₹1, which D12 makes the invoice's own payment; eMandate's is 0.
+     */
+    firstAmountCents: number;
+    /** The most one charge may take, in minor units. */
+    maxAmountCents: number;
+    currency: string;
+    frequency: MandateFrequency;
+    /** When the authority lapses at the provider. */
+    expiresAt: Date;
+    /** When an unanswered set-up stops being offered. */
+    setupExpiresAt: Date;
+    /** What the provider's page says the authorisation is for. */
+    description: string;
+    credentials: ProviderCredentials;
+}
+
+export interface MandateSetupResult {
+    providerCustomerId: string;
+    /**
+     * The provider's set-up object (Razorpay: the registration link's
+     * `inv_…`, or the authorisation order), echoed by its webhooks.
+     */
+    setupReference: string;
+    /** The provider's hosted page to authorise on, when it has one. */
+    authorisationUrl: string | null;
+    /** Non-secret parameters a checkout window needs instead. */
+    clientParams: Record<string, unknown>;
+}
+
+/** Read one mandate: by the provider's id, or by its set-up before that. */
+export interface GetMandateInput {
+    providerMandateId: string | null;
+    providerCustomerId: string | null;
+    setupReference: string | null;
+    credentials: ProviderCredentials;
+}
+
+export interface ProviderMandate {
+    status: ProviderMandateStatus;
+    /** Null while the provider hasn't made the mandate (token) yet. */
+    providerMandateId: string | null;
+    providerCustomerId: string | null;
+    method: MandateMethod | null;
+    /**
+     * Only what the provider returns as displayable: a masked UPI handle
+     * (`as•••@okbank`) or a card's last four. Never a full VPA or number.
+     */
+    displayHint: string | null;
+    maxAmountCents: number | null;
+    expiresAt: Date | null;
+    /** The provider's reason code for a failed set-up. */
+    failureReason: string | null;
+}
+
+/**
+ * Step one of a charge (D11 spike): the provider's order, made with a
+ * pre-debit notice. Razorpay refuses a UPI debit sooner than 25 hours after
+ * the notice, so `debitAt` carries a margin ({@link PRE_DEBIT_LEAD_HOURS}).
+ * A method that needs no notice answers `NOT_NEEDED` and may be charged
+ * at once.
+ */
+export interface PrepareMandateChargeInput {
+    /** Saroh's charge key (`inv_<invoiceId>_<attempt>`), the order's receipt. */
+    reference: string;
+    providerMandateId: string;
+    providerCustomerId: string | null;
+    method: MandateMethod | null;
+    amountCents: number;
+    currency: string;
+    /** When Saroh wants the debit; not before the notice's lead time. */
+    debitAt: Date;
+    credentials: ProviderCredentials;
+}
+
+export type PreDebitStatus = "PENDING" | "DELIVERED" | "FAILED" | "NOT_NEEDED";
+
+export interface PreparedMandateCharge {
+    /** The provider's order id (the intent's `providerIntentId`). */
+    providerIntentId: string;
+    /** The earliest the debit may be asked for, as the provider took it. */
+    debitAfter: Date;
+    preDebitStatus: PreDebitStatus;
+    /** The provider's notice id, when it has one. */
+    preDebitRef: string | null;
+}
+
+/** Step two: ask for the debit on a prepared order. */
+export interface MandateChargeInput {
+    reference: string;
+    providerIntentId: string;
+    providerMandateId: string;
+    providerCustomerId: string | null;
+    amountCents: number;
+    currency: string;
+    credentials: ProviderCredentials;
+}
+
+export interface MandateChargeResult {
+    /** The provider's payment id, when it gave one. */
+    providerPaymentRef: string | null;
+    /**
+     * `PENDING`: taken, answer to come (UPI takes up to about 36 hours;
+     * the payment webhook settles it). `SUCCEEDED` / `FAILED`: answered now.
+     */
+    status: "PENDING" | "SUCCEEDED" | "FAILED";
+}
+
+/** Read a prepared charge's notice (a webhook may be late or lost). */
+export interface GetPreDebitInput {
+    providerIntentId: string;
+    credentials: ProviderCredentials;
+}
+
+/**
+ * Hours ahead of a debit Saroh asks for the pre-debit notice: Razorpay's
+ * 25-hour minimum (D11 spike) plus a margin for the clocks and the job.
+ */
+export const PRE_DEBIT_LEAD_HOURS = 26;
+
+/**
+ * Autopay mandates at the business's own provider (DEC-038, D11). A
+ * provider without it (Razorpay until D19, Cashfree this round) never
+ * offers autopay: {@link supportsMandates}. Every call throws
+ * {@link MandateCallError}; errors are sanitised to a code, never the
+ * provider's body or a credential.
  */
 export interface MandateCapability {
-    /** Resolves once the provider says the mandate is cancelled. Throws {@link MandateCallError}. */
+    /**
+     * The methods this business's account can set up autopay with. Empty
+     * means none: autopay isn't offered.
+     */
+    mandateMethods(input: {
+        credentials: ProviderCredentials;
+    }): Promise<MandateMethod[]>;
+    /** Start an authorisation. */
+    createSetup(input: CreateMandateSetupInput): Promise<MandateSetupResult>;
+    /** The mandate as the provider has it now. */
+    get(input: GetMandateInput): Promise<ProviderMandate>;
+    /** Charge step one: the order and its pre-debit notice. */
+    prepareCharge(
+        input: PrepareMandateChargeInput,
+    ): Promise<PreparedMandateCharge>;
+    /** The prepared order's notice, as the provider has it now. */
+    getPreDebit(input: GetPreDebitInput): Promise<PreDebitStatus>;
+    /** Charge step two: the debit. `NOT_YET` until the notice allows it. */
+    charge(input: MandateChargeInput): Promise<MandateChargeResult>;
+    /** Resolves once the provider says the mandate is cancelled. */
     cancel(input: CancelMandateInput): Promise<void>;
 }
 
@@ -169,7 +354,10 @@ export interface MerchantProvider {
     findRefund(input: FindRefundInput): Promise<RefundResult | null>;
 }
 
-/** Whether this provider's adapter can take autopay at all (D11). */
+/**
+ * Whether this provider's adapter can take autopay at all (D11). Whether a
+ * business's account can is {@link MandateCapability.mandateMethods}.
+ */
 export function supportsMandates(provider: MerchantProvider): boolean {
     return provider.mandates !== undefined;
 }

@@ -33,6 +33,10 @@ import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
+import {
+    applyMandateChangeInTx,
+    applyPreDebitInTx,
+} from "../payments/mandate-events";
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
@@ -311,6 +315,30 @@ export class WebhooksService {
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
         if (event.outcome === "IGNORED") return { applied: false };
+
+        // Autopay (D11): a mandate's state, or a charge's pre-debit notice.
+        // A mandate charge's own payment settles below, as any intent's.
+        if (event.outcome === "MANDATE") {
+            return event.mandate
+                ? applyMandateChangeInTx(
+                      tx,
+                      organizationId,
+                      provider,
+                      event.mandate,
+                  )
+                : { applied: false };
+        }
+        if (event.outcome === "PRE_DEBIT") {
+            return event.preDebitStatus && event.providerIntentId
+                ? applyPreDebitInTx(
+                      tx,
+                      organizationId,
+                      provider,
+                      event.providerIntentId,
+                      event.preDebitStatus,
+                  )
+                : { applied: false };
+        }
 
         const intent = await this.findIntent(
             tx,
