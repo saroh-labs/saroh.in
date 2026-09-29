@@ -72,6 +72,7 @@ export class FakeWebhookProvider implements WebhookProvider {
                   }
                 : undefined,
             preDebitStatus: body.preDebitStatus,
+            mandateLink: body.mandateLink,
         };
     }
 }

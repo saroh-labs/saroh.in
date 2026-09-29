@@ -10,6 +10,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { isReservedContactEmail } from "../contacts/contact-email";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { mandateProviders, openMandateConnection } from "./mandate-connection";
 import { applyMandateChangeInTx } from "./mandate-events";
 import type { ReportedMandateStatus } from "./mandate-rules";
@@ -29,6 +30,9 @@ import {
     MandateCallError,
     PROVIDER_FACTORY,
 } from "./providers/provider.port";
+
+// Stateless: it reads the flag rows on every call.
+const rolloutFlags = new FeatureFlagService();
 
 /**
  * Setting up autopay (round-2 D11, DEC-038): which methods a business's
@@ -66,6 +70,12 @@ export class MandateSetupService {
                 { connectedOnly: true },
             );
             if (!connection) continue;
+            // An adapter behind a rollout flag (Razorpay, D19) is offered
+            // only where the flag is on; it fails closed while unset.
+            const flag = connection.mandates.rolloutFlag;
+            if (flag && !(await rolloutFlags.isEnabled(flag, organizationId))) {
+                continue;
+            }
             try {
                 const methods = await connection.mandates.mandateMethods({
                     credentials: connection.credentials,

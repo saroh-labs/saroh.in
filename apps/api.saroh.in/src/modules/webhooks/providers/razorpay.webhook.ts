@@ -1,5 +1,11 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import {
+    isRazorpayMandateEvent,
+    razorpayMandateEntityId,
+    razorpayMandateFields,
+    razorpayMandateLink,
+} from "./razorpay-mandate-events";
 import type {
     NormalizedWebhookEvent,
     ParseEventInput,
@@ -64,6 +70,21 @@ export class RazorpayWebhookProvider implements WebhookProvider {
         const eventType = body.event ?? "unknown";
         const payment = body.payload?.payment?.entity;
         const refund = body.payload?.refund?.entity;
+        const raw = (payload ?? {}) as Record<string, unknown>;
+
+        // Autopay (D19): a token's state, a link that lapsed, or a charge's
+        // pre-debit notice. A token moves more than once (paused, then
+        // confirmed again), so its fallback key carries the event's time.
+        if (isRazorpayMandateEvent(eventType)) {
+            const at = typeof raw.created_at === "number" ? raw.created_at : "";
+            return {
+                providerEventId:
+                    headerValue(headers, "x-razorpay-event-id") ??
+                    `${eventType}:${razorpayMandateEntityId(raw) ?? "unknown"}:${at}`,
+                eventType,
+                ...razorpayMandateFields(eventType, raw),
+            };
+        }
 
         // Prefer Razorpay's per-delivery event id header; fall back to a stable
         // id derived from the entity so the inbox stays idempotent either way.
@@ -72,6 +93,9 @@ export class RazorpayWebhookProvider implements WebhookProvider {
             `${eventType}:${refund?.id ?? payment?.id ?? "unknown"}`;
 
         return {
+            // An authorisation's payment (or its paid link) names the token
+            // it made, which the token's own events never tie to a set-up.
+            mandateLink: razorpayMandateLink(raw),
             providerEventId,
             eventType,
             outcome: outcomeFor(eventType),

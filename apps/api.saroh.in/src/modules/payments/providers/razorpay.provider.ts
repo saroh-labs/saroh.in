@@ -4,12 +4,14 @@ import type {
     CreateOrderIntentInput,
     CreateOrderIntentResult,
     FindRefundInput,
+    MandateCapability,
     MerchantProvider,
     ProviderCredentials,
     RefundInput,
     RefundResult,
 } from "./provider.port";
 import { readRefundAnswer, RefundCallError } from "./provider.port";
+import { RazorpayMandates } from "./razorpay-mandates";
 
 /**
  * Razorpay adapter (S5-002).
@@ -23,6 +25,12 @@ import { readRefundAnswer, RefundCallError } from "./provider.port";
  */
 export class RazorpayProvider implements MerchantProvider {
     readonly name = "RAZORPAY";
+    /**
+     * Autopay through recurring tokens (round-2 D19). Offered to a business
+     * only while its `RAZORPAY_AUTOPAY` rollout flag is on
+     * (`MandateCapability.rolloutFlag`); see `razorpay-mandates.ts`.
+     */
+    readonly mandates: MandateCapability = new RazorpayMandates();
     private readonly logger = new Logger(RazorpayProvider.name);
     private readonly baseUrl = "https://api.razorpay.com/v1";
 

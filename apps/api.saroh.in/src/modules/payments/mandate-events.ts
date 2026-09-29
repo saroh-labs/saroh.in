@@ -300,6 +300,49 @@ function isWholePositive(value: unknown): value is number {
 }
 
 /**
+ * The provider named the mandate a set-up made (D19): Razorpay's
+ * authorisation payment carries the token id, which its token webhooks
+ * never tie to a link or order. Writes the id (and the provider's
+ * customer) onto the PENDING mandate whose set-up it paid, once — only
+ * while it has none, so a later or repeated payment changes nothing.
+ * Returns the mandate linked and when it was made, or null.
+ */
+export async function linkMandateSetupInTx(
+    tx: Tx,
+    organizationId: string,
+    provider: string,
+    link: {
+        providerMandateId: string;
+        providerCustomerId?: string;
+        setupReferences: string[];
+    },
+): Promise<{ mandateId: string; createdAt: Date } | null> {
+    if (link.setupReferences.length === 0) return null;
+    const row = await tx.paymentMandate.findFirst({
+        where: {
+            organizationId,
+            provider,
+            status: "PENDING",
+            providerMandateId: null,
+            setupReference: { in: link.setupReferences },
+        },
+        select: { id: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+    });
+    if (!row) return null;
+    const { count } = await tx.paymentMandate.updateMany({
+        where: { id: row.id, status: "PENDING", providerMandateId: null },
+        data: {
+            providerMandateId: link.providerMandateId,
+            ...(link.providerCustomerId
+                ? { providerCustomerId: link.providerCustomerId }
+                : {}),
+        },
+    });
+    return count > 0 ? { mandateId: row.id, createdAt: row.createdAt } : null;
+}
+
+/**
  * A mandate charge's pre-debit notice was delivered, or failed (Razorpay
  * `order.notification.delivered` / `.failed`). Moves only a notice still
  * PENDING, so a late or repeated report changes nothing twice.

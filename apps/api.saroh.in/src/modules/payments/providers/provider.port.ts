@@ -8,6 +8,8 @@
  * IN for the single provider call and never retained by the port.
  */
 
+import type { FlagKey } from "../../feature-flags/flags";
+
 /** The closed set of providers this app can connect. */
 export const SUPPORTED_PROVIDERS = ["RAZORPAY", "CASHFREE"] as const;
 export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
@@ -305,12 +307,20 @@ export const PRE_DEBIT_LEAD_HOURS = 26;
 
 /**
  * Autopay mandates at the business's own provider (DEC-038, D11). A
- * provider without it (Razorpay until D19, Cashfree this round) never
- * offers autopay: {@link supportsMandates}. Every call throws
- * {@link MandateCallError}; errors are sanitised to a code, never the
- * provider's body or a credential.
+ * provider without it (Cashfree this round) never offers autopay:
+ * {@link supportsMandates}. Every call throws {@link MandateCallError};
+ * errors are sanitised to a code, never the provider's body or a
+ * credential.
  */
 export interface MandateCapability {
+    /**
+     * The rollout flag a business needs on before autopay is offered
+     * through this adapter (Razorpay: `RAZORPAY_AUTOPAY`, D19, waves plan
+     * boundary 6). It gates offering and set-up only
+     * (`MandateSetupService.mandateMethods`); reading, charging and
+     * cancelling a mandate already made never wait on it. None: no gate.
+     */
+    readonly rolloutFlag?: FlagKey;
     /**
      * The methods this business's account can set up autopay with. Empty
      * means none: autopay isn't offered.
@@ -356,7 +366,9 @@ export interface MerchantProvider {
 
 /**
  * Whether this provider's adapter can take autopay at all (D11). Whether a
- * business's account can is {@link MandateCapability.mandateMethods}.
+ * business is offered it — the rollout flag, then what its account can
+ * set up — is `MandateSetupService.mandateMethods`, which is what any
+ * screen must ask; never offer autopay on this alone.
  */
 export function supportsMandates(provider: MerchantProvider): boolean {
     return provider.mandates !== undefined;
