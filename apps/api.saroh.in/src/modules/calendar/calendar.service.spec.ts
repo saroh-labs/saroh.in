@@ -409,8 +409,9 @@ describe("CalendarService.read, a month at a time", () => {
         });
     });
 
-    it("a Member gets the diary, and no billing layers or takings — omitted, not refused", async () => {
+    it("a Member gets the diary and the orders they move, and no billing layers, takings or order money — omitted, not refused", async () => {
         const { service, db } = build(undefined, {
+            orders: [order("o1", "2026-09-05T04:00:00Z")],
             bookings: [
                 {
                     id: "bk_1",
@@ -428,7 +429,16 @@ describe("CalendarService.read, a month at a time", () => {
         });
         const res = await service.read(MEMBER, monthRange("2026-09"), NOW);
 
-        expect(res.layers).toEqual(["bookings", "classes"]);
+        // `order:stage` shows the orders layer (E20, DEC-067), no money.
+        expect(res.layers).toEqual(["orders", "bookings", "classes"]);
+        const placed = res.days[4].layers.orders?.items[0];
+        expect(placed).toMatchObject({
+            title: "O1",
+            link: { type: "order", id: "o1" },
+        });
+        for (const key of ["amount", "currency", "in", "out", "due"]) {
+            expect(placed).not.toHaveProperty(key);
+        }
         expect(res).not.toHaveProperty("takings");
         expect(res.days[7].layers.bookings?.items[0]).toMatchObject({
             title: "Physio · Asha Rao",
@@ -442,7 +452,58 @@ describe("CalendarService.read, a month at a time", () => {
         }
         expect(db.invoice.findMany).not.toHaveBeenCalled();
         expect(db.customerSubscription.findMany).not.toHaveBeenCalled();
-        expect(db.order.findMany).not.toHaveBeenCalled();
+    });
+
+    it("order:stage alone opens the calendar on the orders layer, without money (E20)", async () => {
+        const { service, db } = build(["COMMERCE"], {
+            orders: [order("o1", "2026-09-05T04:00:00Z")],
+        });
+        const res = await service.read(
+            custom("order:stage"),
+            monthRange("2026-09"),
+            NOW,
+        );
+        expect(res.layers).toEqual(["orders"]);
+        expect(res.days[4].layers.orders?.items[0]).not.toHaveProperty(
+            "amount",
+        );
+        expect(res).not.toHaveProperty("takings");
+        expect(res).not.toHaveProperty("money");
+        expect(db.invoice.findMany).not.toHaveBeenCalled();
+    });
+
+    it("payment:read without order:read still leaves an order's amount out, as Orders does", async () => {
+        const { service } = build(["COMMERCE"], {
+            orders: [order("o1", "2026-09-05T04:00:00Z")],
+        });
+        const res = await service.read(
+            custom("order:stage", "payment:read"),
+            monthRange("2026-09"),
+            NOW,
+        );
+        expect(res.days[4].layers.orders?.items[0]).not.toHaveProperty(
+            "amount",
+        );
+        const full = await service.read(
+            custom("order:read", "payment:read"),
+            monthRange("2026-09"),
+            NOW,
+        );
+        expect(full.days[4].layers.orders?.items[0]).toMatchObject({
+            amount: "250.00",
+        });
+    });
+
+    it("neither order:read nor order:stage: no orders layer, and orders aren't read for it", async () => {
+        const { service } = build(["COMMERCE", "APPOINTMENTS"], {
+            orders: [order("o1", "2026-09-05T04:00:00Z")],
+        });
+        const res = await service.read(
+            custom("booking:read"),
+            monthRange("2026-09"),
+            NOW,
+        );
+        expect(res.layers).not.toContain("orders");
     });
 
     it("the invoices read throwing: the rest returns, invoices named, takings unknown", async () => {

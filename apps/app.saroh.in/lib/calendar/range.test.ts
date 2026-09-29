@@ -167,6 +167,8 @@ describe("calendarLocked", () => {
     it("any one layer read opens the calendar", () => {
         expect(calendarLocked(["org:read", "invoice:read"])).toBe(false);
         expect(calendarLocked(["booking:read"])).toBe(false);
+        // Whoever moves orders sees them on the calendar (E20, DEC-067).
+        expect(calendarLocked(["org:read", "order:stage"])).toBe(false);
     });
 
     it("unknown actions are not a lock — the API decides", () => {

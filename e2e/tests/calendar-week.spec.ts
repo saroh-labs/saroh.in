@@ -188,3 +188,59 @@ test.describe("calendar week, hour grid", () => {
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
     });
 });
+
+/**
+ * The orders layer reaches whoever moves orders (E20, DEC-067): Rye's
+ * Member holds `order:stage`, and sees the orders on the calendar without
+ * their money. Read-only.
+ */
+test.describe("calendar orders for the kitchen (E20)", () => {
+    const member = {
+        email: "nisha.kulkarni@saroh.dev",
+        password: "demo-password-123",
+    };
+
+    test("a Member sees the orders layer, and no amount or money strip", async ({
+        page,
+    }) => {
+        await page.goto(`${urls.ACCOUNTS_URL}/login`);
+        await page.getByLabel("Email").fill(member.email);
+        await page
+            .getByLabel("Password", { exact: true })
+            .fill(member.password);
+        await page.getByRole("button", { name: "Log in" }).click();
+        await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
+            timeout: 30_000,
+        });
+        await page.goto(`/open/${ORG}`);
+
+        const from = `${istDay(0).slice(0, 7)}-01`;
+        const res = await page.request.get(
+            `${urls.API_URL}/organizations/${ORG}/calendar?from=${from}&to=${istDay(0)}`,
+            { headers: { "x-organization-id": ORG, origin: urls.APP_URL } },
+        );
+        expect(res.ok()).toBe(true);
+        const month = (await res.json()) as {
+            layers: string[];
+            money?: unknown;
+            days: { layers: { orders?: { items: object[] } } }[];
+        };
+        expect(month.layers).toContain("orders");
+        expect(month).not.toHaveProperty("money");
+        for (const day of month.days) {
+            for (const item of day.layers.orders?.items ?? []) {
+                expect(item).not.toHaveProperty("amount");
+            }
+        }
+
+        await page.goto("/calendar");
+        await expect(
+            page
+                .getByRole("group", { name: "Show on the calendar" })
+                .getByRole("button", { name: /Orders/ }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("group", { name: "This month's money" }),
+        ).toHaveCount(0);
+    });
+});

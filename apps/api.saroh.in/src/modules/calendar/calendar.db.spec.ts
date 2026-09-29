@@ -513,14 +513,21 @@ describe("Business Calendar month (DB)", () => {
         ]);
     });
 
-    it("a Member gets the diary layers and no money", async () => {
+    it("a Member gets the diary layers and the orders they move, and no money (E20)", async () => {
         const month = await calendar.read(
             { ...ctx, role: "MEMBER" },
             monthRange("2026-09"),
             NOW,
         );
-        expect(month.layers).toEqual(["bookings", "classes"]);
+        expect(month.layers).toEqual(["orders", "bookings", "classes"]);
         expect(month).not.toHaveProperty("takings");
+        expect(month).not.toHaveProperty("money");
         expect(month.toActOn).toEqual([]);
+        const orders = month.days.flatMap((d) => d.layers.orders?.items ?? []);
+        expect(orders.length).toBeGreaterThan(0);
+        for (const item of orders) {
+            expect(item).not.toHaveProperty("amount");
+            expect(item).not.toHaveProperty("in");
+        }
     });
 });
