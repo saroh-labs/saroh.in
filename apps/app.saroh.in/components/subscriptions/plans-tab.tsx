@@ -14,6 +14,7 @@ import type { PlanCardView } from "@/lib/subscriptions/plan-cards";
 import { archiveToast, planCard } from "@/lib/subscriptions/plan-cards";
 import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
 
+import { AutopayTimingSetting } from "./autopay-timing-setting";
 import { MembersPauseRow } from "./members-pause-row";
 import { Pill } from "./pill";
 import { PlanDialog } from "./plan-dialog";
@@ -37,15 +38,19 @@ export function PlansTab({
     canWrite,
     showClasses,
     settings = null,
+    nowIso,
 }: {
     plans: Plan[] | null;
     canWrite: boolean;
     showClasses: boolean;
     /**
      * "Members can pause from their account" (A8): its row shows once
-     * customers have an account on the site, and not when unread.
+     * customers have an account on the site, and not when unread. "When
+     * autopay charges" (D13B): only when autopay can charge.
      */
     settings?: SubscriptionSettings | null;
+    /** Now, from the server: the timing previews' sample renewal. */
+    nowIso?: string;
 }) {
     const router = useRouter();
     const [editing, setEditing] = useState<Plan | "new" | null>(null);
@@ -98,6 +103,13 @@ export function PlansTab({
                 <MembersPauseRow
                     on={settings.membersCanPause}
                     canWrite={canWrite}
+                />
+            ) : null}
+            {settings?.autopay?.available && nowIso ? (
+                <AutopayTimingSetting
+                    settings={settings.autopay}
+                    canWrite={canWrite}
+                    nowIso={nowIso}
                 />
             ) : null}
             <div className="mb-3 flex flex-wrap items-center gap-2.5">

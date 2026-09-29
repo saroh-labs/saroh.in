@@ -176,6 +176,45 @@ describe("PlanTab", () => {
         expect(screen.queryByRole("button", { name: "Pay now" })).toBeNull();
     });
 
+    it("says when autopay next charges (D13B): the next renewal's, or a queued charge's instead of 'in progress'", () => {
+        const { unmount } = render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf([
+                    {
+                        ...SUB,
+                        payNow: null,
+                        autopayNextCharge: { at: "2026-10-18T04:30:00.000Z" },
+                    },
+                ])}
+                api={api()}
+            />,
+        );
+        expect(
+            screen.getByText("Next autopay charge: 18 Oct 2026"),
+        ).toBeTruthy();
+        unmount();
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf([
+                    {
+                        ...SUB,
+                        payNow: null,
+                        autopayCharging: { at: "2026-10-25T18:30:00.000Z" },
+                        autopayNextCharge: { at: "2026-10-25T18:30:00.000Z" },
+                    },
+                ])}
+                api={api()}
+            />,
+        );
+        expect(
+            screen.getByText("Next autopay charge: 26 Oct 2026"),
+        ).toBeTruthy();
+        expect(screen.queryByText(/Autopay charge in progress/)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Pay now" })).toBeNull();
+    });
+
     it("with pausing off, there is no Pause button and Cancel offers no pause instead", async () => {
         render(
             <PlanTab

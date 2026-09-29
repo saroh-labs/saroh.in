@@ -161,6 +161,32 @@ describe("changeWhat", () => {
         expect(cancelled()).toBe("Autopay cancelled");
     });
 
+    it("says an early renewal invoice, and why it was dropped (D13B)", () => {
+        expect(
+            what({
+                kind: "INVOICED",
+                data: {
+                    periodStart: "2026-10-29T18:30:00.000Z",
+                    periodEnd: "2026-11-29T18:30:00.000Z",
+                    early: true,
+                },
+            }),
+        ).toBe(
+            "Invoiced 30 Oct – 29 Nov early, for autopay on the renewal date",
+        );
+        const dropped = (data: Record<string, unknown>) =>
+            what({ kind: "EARLY_INVOICE_CANCELLED", data });
+        expect(dropped({ reason: "CANCELLED", by: "VOIDED" })).toBe(
+            "Voided the early renewal invoice — cancelled before the renewal, autopay not charged",
+        );
+        expect(dropped({ reason: "PAUSED", by: "CREDITED" })).toBe(
+            "Credited the early renewal invoice — paused before the renewal, autopay not charged",
+        );
+        expect(dropped({ reason: "PLAN_CHANGED", by: "VOIDED" })).toContain(
+            "plan changed before the renewal",
+        );
+    });
+
     it("never breaks on data it didn't expect", () => {
         expect(what({ kind: "PLAN_CHANGE_BOOKED", data: { to: 3 } })).toBe(
             "Booked a plan change",

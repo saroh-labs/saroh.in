@@ -48,6 +48,8 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
                       autopay: payAutopayOf(body.autopay),
                       // A charge under way (D13), checked the same way.
                       autopayCharging: payChargingOf(body.autopayCharging),
+                      // When autopay next charges (D13B): the same shape.
+                      autopayNextCharge: payChargingOf(body.autopayNextCharge),
                   },
               }
             : { ok: false, reason: "unavailable" };

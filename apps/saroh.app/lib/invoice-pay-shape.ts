@@ -52,6 +52,13 @@ export interface PayInvoice {
      * would refuse it). Null or absent: none.
      */
     autopayCharging?: { at: string } | null;
+    /**
+     * When autopay next takes money (D13B): a charge queued on this invoice
+     * for a later day ("Next autopay charge: ‹date›" instead of "in
+     * progress"), or, the invoice paid and autopay on, the next renewal's.
+     * Null or absent: none to say.
+     */
+    autopayNextCharge?: { at: string } | null;
 }
 
 export interface PayAutopay {

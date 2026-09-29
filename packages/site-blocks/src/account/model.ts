@@ -146,6 +146,13 @@ export interface AccountSubscription extends AccountPlan {
      * meanwhile. Null or absent: none.
      */
     autopayCharging?: { at: string } | null;
+    /**
+     * When autopay next takes money (D13B, DEC-065): "Next autopay charge:
+     * ‹date›" — a charge queued for a later day (said instead of "in
+     * progress"), or the next renewal's by the business's timing. Null or
+     * absent: none to say.
+     */
+    autopayNextCharge?: { at: string } | null;
 }
 
 export interface AccountPack {
