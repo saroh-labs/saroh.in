@@ -42,12 +42,16 @@ Live · Live with unpublished changes), "Not saved" with Try again, and the
 `lib/editor-shell/state.ts` and `autosave.ts`; a record service reads a
 refused write with `editorFailure` (`lib/editor-shell/result.ts`) so a stale
 revision becomes the conflict state. Don't give a record type its own save
-loop. The Pack Editor (`components/class-packs/pack-editor/`, E18) is the
-reference consumer: its rules are pure in `lib/class-packs/pack-editor.ts`,
+loop. The Pack Editor (`components/class-packs/pack-editor/`, E18) and the
+Plan Editor (`components/subscriptions/plan-editor/`, D7) are the reference
+consumers. The Pack Editor's rules are pure in `lib/class-packs/pack-editor.ts`:
 `problemsOf` receives the last record (for a rule against what is live, such
 as a sold pack's kind), `viewable` says when "View" shows, and what an
 autosave sends leaves out a field the API would refuse ("4500.", 5 days) so
-the rest still saves while that field's problem keeps Publish off.
+the rest still saves while that field's problem keeps Publish off. The Plan
+Editor's rules (problems, the save blocker, "When you publish" lines) are pure
+in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
+typed form into the API's values and back.
 
 ## Rules
 

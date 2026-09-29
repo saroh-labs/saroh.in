@@ -3,10 +3,12 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { CappedList } from "@/lib/lists/capped";
 import { loadPlanEvents, setPlanArchived } from "@/lib/subscriptions/actions";
 import type { AutopayTimingSettings } from "@/lib/subscriptions/autopay-timing";
@@ -21,6 +23,7 @@ import {
     subscriberRows,
     subscribersEmptyText,
 } from "@/lib/subscriptions/plan-detail";
+import { editHref } from "@/lib/subscriptions/plan-editor";
 import type {
     Optional,
     Plan,
@@ -31,22 +34,19 @@ import { payRows } from "@/lib/subscriptions/view";
 
 import { PaymentsCrumbs } from "../payments-crumbs";
 import { Pill } from "../pill";
-import { PlanDialog } from "../plan-dialog";
 import { PlanHistory } from "./history";
 import { PlanOverview } from "./overview";
 import { PlanAutopayTiming } from "./plan-autopay-timing";
 import { PlanSubscribers } from "./subscribers";
-
-/** An Undo toast lasts ten seconds (round-2 default 136). */
-const UNDO_MS = 10_000;
 
 const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
 
 /**
  * Payments → Plans → one plan (D4), after "Saroh Plan Detail": the header
  * with Archive and Edit plan, then Overview, Subscribers and History.
- * Archive and Open to sign-ups act at once with Undo; Edit plan opens
- * today's dialog until the Plan Editor page lands (D7).
+ * Archive and Open to sign-ups act at once with Undo, for the shared
+ * ten-second hold (`lib/hold-undo.ts`); Edit plan opens the Plan Editor
+ * (D7), and so does Finish draft.
  *
  * The plan is required; who's on it and its history are read on their own,
  * so either failing costs its own tab and nothing else.
@@ -60,7 +60,6 @@ export function PlanDetail({
     canWrite,
     initialTab,
     nowIso,
-    autopayOffered = false,
     autopay = null,
 }: {
     plan: Plan;
@@ -71,15 +70,12 @@ export function PlanDetail({
     canWrite: boolean;
     initialTab: DetailTab;
     nowIso: string;
-    /** The business offers autopay (D14): the edit copy may say so. */
-    autopayOffered?: boolean;
     /** "When autopay charges" (D13B); null when autopay can't charge. */
     autopay?: AutopayTimingSettings | null;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
     const [tab, setTab] = useState<DetailTab>(initialTab);
-    const [editing, setEditing] = useState(false);
     const [busy, setBusy] = useState(false);
     const [, start] = useTransition();
     const firstPage = events.state === "ok" ? events.data : null;
@@ -120,7 +116,7 @@ export function PlanDetail({
     function archive() {
         // A draft has nothing to archive: finishing it is editing it.
         if (plan.status === "DRAFT") {
-            setEditing(true);
+            router.push(editHref(plan.id));
             return;
         }
         const to = plan.status !== "ARCHIVED";
@@ -144,7 +140,7 @@ export function PlanDetail({
                         setOlder([]);
                         router.refresh();
                     }),
-                { duration: UNDO_MS },
+                { duration: HOLD_UNDO_MS },
             );
         });
     }
@@ -210,11 +206,8 @@ export function PlanDetail({
                         >
                             {head.archiveLabel}
                         </Button>
-                        <Button
-                            className={cn(BTN, "coarse:h-11")}
-                            onClick={() => setEditing(true)}
-                        >
-                            Edit plan
+                        <Button asChild className={cn(BTN, "coarse:h-11")}>
+                            <Link href={editHref(plan.id)}>Edit plan</Link>
                         </Button>
                     </div>
                 ) : null}
@@ -318,14 +311,6 @@ export function PlanDetail({
                     />
                 )}
             </div>
-
-            {editing ? (
-                <PlanDialog
-                    plan={plan}
-                    onClose={() => setEditing(false)}
-                    autopayOffered={autopayOffered}
-                />
-            ) : null}
         </>
     );
 }
