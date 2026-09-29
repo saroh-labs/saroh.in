@@ -18,8 +18,20 @@ export const ROLLOUT_DISABLED = "ROLLOUT_DISABLED";
 type Node = Pick<ModuleView, "key" | "blockers"> &
     Partial<Pick<ModuleView, "lifecycle" | "dependencies">>;
 
-/** Saroh has switched this module off (its rollout flag is off). */
-export function isHiddenByRollout(module: Pick<ModuleView, "blockers">) {
+/**
+ * Modules with no screen yet, hidden the same way (DEC-068): Automations is
+ * never offered until it has one.
+ */
+export const NOT_OFFERED: ReadonlySet<string> = new Set(["AUTOMATIONS"]);
+
+/**
+ * Saroh has switched this module off (its rollout flag is off), or it has
+ * no screen to offer yet (DEC-068).
+ */
+export function isHiddenByRollout(
+    module: Pick<ModuleView, "blockers"> & Partial<Pick<ModuleView, "key">>,
+) {
+    if (module.key && NOT_OFFERED.has(module.key)) return true;
     return module.blockers.some((b) => b.code === ROLLOUT_DISABLED);
 }
 
