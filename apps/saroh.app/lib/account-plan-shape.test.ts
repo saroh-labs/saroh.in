@@ -25,6 +25,8 @@ const SUB = {
     canPause: true,
     canResume: false,
     canCancel: true,
+    autopay: null,
+    autopayPays: null,
 };
 
 const PACK = {
@@ -39,6 +41,7 @@ const TAB = {
     subscriptions: { ok: true, value: [SUB] },
     packs: { ok: true, value: [PACK] },
     pauseWeeks: [2, 4, 8],
+    autopayMethods: [],
 };
 
 describe("planTabResult", () => {
@@ -56,11 +59,49 @@ describe("planTabResult", () => {
             subscriptions: { ok: false },
             packs: { ok: false },
             pauseWeeks: [2, 4, 8],
+            autopayMethods: [],
         });
         expect(
             planTabResult({ ...TAB, subscriptions: { ok: false } })
                 ?.subscriptions,
         ).toEqual({ ok: false });
+    });
+
+    it("reads autopay (D12): the provider's methods and each plan's state, anything strange as none", () => {
+        const tab = planTabResult({
+            ...TAB,
+            autopayMethods: ["UPI", "NACH", "CARD"],
+            subscriptions: {
+                ok: true,
+                value: [
+                    {
+                        ...SUB,
+                        autopay: {
+                            state: "ON",
+                            method: "UPI",
+                            hint: "mo•••@okicici",
+                        },
+                        autopayPays: { total: "2500.00", currency: "INR" },
+                    },
+                    { ...SUB, ref: "sub_2", autopay: { state: "MAYBE" } },
+                ],
+            },
+        });
+        expect(tab?.autopayMethods).toEqual(["UPI", "CARD"]);
+        const subs = tab?.subscriptions;
+        expect(subs?.ok && subs.value[0].autopay).toEqual({
+            state: "ON",
+            method: "UPI",
+            hint: "mo•••@okicici",
+        });
+        expect(subs?.ok && subs.value[0].autopayPays).toEqual({
+            total: "2500.00",
+            currency: "INR",
+        });
+        expect(subs?.ok && subs.value[1].autopay).toBeNull();
+        // An API from before D12 offers none.
+        const { autopayMethods: _, ...older } = TAB;
+        expect(planTabResult(older)?.autopayMethods).toEqual([]);
     });
 
     it("refuses what isn't a tab at all", () => {

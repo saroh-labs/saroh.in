@@ -3,6 +3,7 @@ import type {
     PlanJoinAttempt,
     PlanJoinStarted,
 } from "@saroh/site-blocks";
+import { autopayStartOf } from "@saroh/site-blocks";
 
 /**
  * Joining a plan from the site (round-2 G20): the API's answers narrowed,
@@ -79,6 +80,10 @@ export function joinStartAnswer(
                           publicKey: body.payment.publicKey,
                           clientParams: body.payment.clientParams,
                       },
+                      // Autopay started with it (D12), checked; else none.
+                      autopay: autopayStartOf(
+                          (body as { autopay?: unknown }).autopay,
+                      ),
                   },
               }
             : { ok: false, reason: "error", message: JOIN_TROUBLE };
@@ -120,7 +125,15 @@ export function joinStandingAnswer(
     body: unknown,
 ): JoinResult<PlanJoinAttempt> {
     if (status >= 200 && status < 300 && isAttempt(body)) {
-        return { ok: true, data: body };
+        const ref = (body as { subscriptionRef?: unknown }).subscriptionRef;
+        return {
+            ok: true,
+            data: {
+                state: body.state,
+                plan: { name: body.plan.name },
+                subscriptionRef: isString(ref) ? ref : null,
+            },
+        };
     }
     if (status === 401) {
         return {

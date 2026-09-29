@@ -152,6 +152,9 @@ const SITE_LAYER_ALLOWED = new Set([
     // review page: a Saroh surface in the business's palette, drawing no block.
     "apps/saroh.app/app/pay/[token]/page.tsx",
     "apps/saroh.app/components/invoice-pay.tsx",
+    // Its "Pay and turn on autopay" (D12): part of the same pay page, whose
+    // options are the package's own (PayOption, AutopayMethodChoice).
+    "apps/saroh.app/components/invoice-autopay.tsx",
     // An order's pay link (plan B, B11): the invoice pay page's twin for an
     // order, the same category and drawing no block.
     "apps/saroh.app/app/pay/o/[token]/page.tsx",

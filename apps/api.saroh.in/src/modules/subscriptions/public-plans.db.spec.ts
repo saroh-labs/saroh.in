@@ -173,8 +173,13 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
         });
         const read = await service.list(siteId, "visitor");
         expect(read.payOnline).toBe(true);
-        // Never how: no provider or payment method is named (DEC-059).
-        expect(Object.keys(read).sort()).toEqual(["payOnline", "plans"]);
+        // Never how: no provider or payment method is named (DEC-059),
+        // beyond the autopay methods the provider itself reports (D12).
+        expect(Object.keys(read).sort()).toEqual([
+            "autopayMethods",
+            "payOnline",
+            "plans",
+        ]);
     });
 
     it("a cancelled member doesn't count towards Most chosen", async () => {
@@ -224,6 +229,7 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
         expect(await service.list(siteId, "visitor")).toEqual({
             plans: [],
             payOnline: false,
+            autopayMethods: [],
         });
     });
 
@@ -282,6 +288,7 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
         await expect(tight.list(siteId, "calm")).resolves.toEqual({
             plans: [],
             payOnline: false,
+            autopayMethods: [],
         });
     });
 });

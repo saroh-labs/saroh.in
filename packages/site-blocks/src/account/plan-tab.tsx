@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
+import { autopayStateLine } from "../autopay/words";
+import { AutopaySheet } from "./autopay-sheet";
 import { BuyPackSheet } from "./buy-pack-sheet";
 import { CancelSheet } from "./cancel-sheet";
 import type { AccountPlanTab, AccountSubscription, AccountView } from "./model";
@@ -36,8 +38,10 @@ import { PLAN_OFFLINE } from "./plan-api";
  * From here a member pauses for 2, 4 or 8 weeks (when the business lets
  * them), resumes, cancels at the end of the period ("Pause instead" first),
  * and pays an overdue invoice with "Pay now", which opens a pay link made
- * that moment. There is no plan change (default 8) and no autopay until
- * D12. Everything goes through the site's server actions (`api`).
+ * that moment. There is no plan change (default 8). Where the business's
+ * provider takes autopay (`tab.autopayMethods`, D12), each plan says how
+ * its autopay stands and offers "Set up autopay" or "Change how autopay
+ * pays". Everything goes through the site's server actions (`api`).
  *
  * With packs on sale (A11, `packs`), the Class packs card shows even with
  * none held, and "Buy a pack" opens the sheet that buys one online — or
@@ -68,6 +72,7 @@ type Busy = { ref: string; what: "pay" | "resume" } | null;
 type Open =
     | { kind: "pause"; plan: AccountSubscription }
     | { kind: "cancel"; plan: AccountSubscription }
+    | { kind: "autopay"; plan: AccountSubscription }
     | { kind: "buy" }
     | null;
 
@@ -136,6 +141,8 @@ export function PlanTab({
 
     const plans = tab.subscriptions;
     const packs = tab.packs;
+    // Autopay only where the provider takes it and the site can start it.
+    const autopayMethods = api.startAutopay ? (tab.autopayMethods ?? []) : [];
     const canBuy = shop !== null && shop.onSale.packs.length > 0;
     const showPacks = !packs.ok || packs.value.length > 0 || canBuy;
 
@@ -190,6 +197,15 @@ export function PlanTab({
                             setSaid(null);
                             setOpen({ kind: "cancel", plan });
                         }}
+                        onAutopay={
+                            autopayMethods.length > 0
+                                ? () => {
+                                      setSaid(null);
+                                      setProblem(null);
+                                      setOpen({ kind: "autopay", plan });
+                                  }
+                                : null
+                        }
                     />
                 ))
             )}
@@ -258,6 +274,16 @@ export function PlanTab({
                     }}
                 />
             ) : null}
+            {api.startAutopay ? (
+                <AutopaySheet
+                    plan={open?.kind === "autopay" ? open.plan : null}
+                    methods={autopayMethods}
+                    onClose={() => setOpen(null)}
+                    start={api.startAutopay}
+                    businessName={account.businessName}
+                    customer={{ name: account.name, email: account.email }}
+                />
+            ) : null}
             <PauseSheet
                 plan={open?.kind === "pause" ? open.plan : null}
                 weeks={tab.pauseWeeks}
@@ -296,6 +322,7 @@ function PlanCard({
     onPause,
     onResume,
     onCancel,
+    onAutopay,
 }: {
     id: string;
     plan: AccountSubscription;
@@ -305,12 +332,24 @@ function PlanCard({
     onPause: () => void;
     onResume: () => void;
     onCancel: () => void;
+    /** Set up autopay, or change how it pays (D12); null: not offered. */
+    onAutopay: (() => void) | null;
 }) {
     const overdue = plan.payNow;
     const sub = overdue
         ? `${accountMoney(overdue.total, overdue.currency)} is overdue${overdue.dueAt ? ` since ${accountDate(overdue.dueAt, plan.timezone)}` : ""}`
         : planLine(plan);
     const classes = planClassesLine(plan);
+    const autopay = autopayStateLine(plan.autopay);
+    const autopayOn =
+        plan.autopay?.state === "ON" || plan.autopay?.state === "PAUSED";
+    // A set-up still being confirmed isn't started again from here.
+    const autopayAction =
+        onAutopay && plan.autopay?.state !== "PENDING" && !plan.endsAt
+            ? autopayOn
+                ? "Change how autopay pays"
+                : "Set up autopay"
+            : null;
     const actions = (
         <>
             {overdue ? (
@@ -342,6 +381,16 @@ function PlanCard({
                     Pause
                 </button>
             ) : null}
+            {autopayAction && onAutopay ? (
+                <button
+                    type="button"
+                    className={buttonClasses(false)}
+                    disabled={disabled}
+                    onClick={onAutopay}
+                >
+                    {autopayAction}
+                </button>
+            ) : null}
             {plan.canCancel ? (
                 <button
                     type="button"
@@ -363,6 +412,9 @@ function PlanCard({
                         {sub}
                         {classes ? (
                             <span className="mt-0.5 block">{classes}</span>
+                        ) : null}
+                        {autopay ? (
+                            <span className="mt-0.5 block">{autopay}</span>
                         ) : null}
                     </>
                 }

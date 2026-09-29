@@ -14,6 +14,7 @@ import { toCents } from "../invoices/totals";
 import { allowanceData } from "./classes-allowance";
 import type { Interval } from "./periods";
 import { INTERVALS, periodContaining, periodLabel } from "./periods";
+import { startJoinMandateInTx } from "./plan-join-autopay";
 import { customerActor, recordSubscriptionEvent } from "./subscription-events";
 
 /**
@@ -35,8 +36,10 @@ import { customerActor, recordSubscriptionEvent } from "./subscription-events";
  * no hole (DEC-023). A staff-issued SUBSCRIPTION invoice always has a
  * number, so "source SUBSCRIPTION, no number" is only ever one of these.
  *
- * No autopay: D12 (the customer sets up autopay) isn't built. Each renewal
- * after the first is invoiced as any member's is.
+ * Autopay (D12): a join may carry an authorisation on the draft
+ * (`planTerms.autopay`, `payments/join-autopay.ts`), whose UPI or card
+ * payment is the first period's; the mandate starts with the subscription
+ * (`plan-join-autopay.ts`). Each renewal is still invoiced (DEC-038).
  */
 
 type Tx = Prisma.TransactionClient;
@@ -254,6 +257,11 @@ export async function completePlanJoinInTx(
             paymentReference: string | null;
             paymentNote: string;
         };
+        /**
+         * The provider order it was paid on: when it is the draft's autopay
+         * authorisation (D12), the mandate starts with the subscription.
+         */
+        providerIntentId?: string | null;
     },
 ): Promise<"joined" | "gone"> {
     const { now, organizationId } = input;
@@ -362,6 +370,15 @@ export async function completePlanJoinInTx(
             },
         },
     );
+    // Autopay chosen at join, authorised with this payment (D12).
+    await startJoinMandateInTx(tx, {
+        organizationId,
+        subscriptionId: created.id,
+        contactId: member.id,
+        accountId: terms.accountId,
+        planTerms: draft.planTerms,
+        providerIntentId: input.providerIntentId,
+    });
     return "joined";
 }
 

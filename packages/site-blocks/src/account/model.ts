@@ -1,3 +1,5 @@
+import type { AutopayMethod, AutopayState } from "../autopay/api";
+
 /**
  * The customer account area's data, as the site's server hands it to the
  * pages (ADR-011; round-2 plan A, A5). The same shapes the API's allow-list
@@ -127,6 +129,13 @@ export interface AccountSubscription extends AccountPlan {
     canPause: boolean;
     canResume: boolean;
     canCancel: boolean;
+    /** How its autopay stands (D12); null or absent: none. */
+    autopay?: AutopayState | null;
+    /**
+     * What turning autopay on pays now (D12): the plan's oldest unpaid
+     * invoice, paid in the same window by UPI or card. Null: nothing owed.
+     */
+    autopayPays?: { total: string; currency: string } | null;
 }
 
 export interface AccountPack {
@@ -143,6 +152,11 @@ export interface AccountPlanTab {
     packs: Block<AccountPack[]>;
     /** The weeks a pause may last; empty when the business has pausing off. */
     pauseWeeks: number[];
+    /**
+     * Every way the business's provider can take autopay (D12); empty or
+     * absent: autopay isn't offered.
+     */
+    autopayMethods?: AutopayMethod[];
 }
 
 export interface AccountClasses {

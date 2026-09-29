@@ -153,6 +153,21 @@ function openRazorpay(
                             ? { contact: request.booker.phone }
                             : {}),
                     },
+                    // Autopay's authorisation order (D12): Checkout takes
+                    // it as a recurring payment for the provider's customer.
+                    ...(handoff.clientParams.recurring === true
+                        ? {
+                              recurring: "1",
+                              ...(text(handoff.clientParams.razorpayCustomerId)
+                                  ? {
+                                        customer_id: text(
+                                            handoff.clientParams
+                                                .razorpayCustomerId,
+                                        ),
+                                    }
+                                  : {}),
+                          }
+                        : {}),
                     // A refusal comes back to the page, which says so and
                     // offers another try on the same order.
                     retry: { enabled: false },

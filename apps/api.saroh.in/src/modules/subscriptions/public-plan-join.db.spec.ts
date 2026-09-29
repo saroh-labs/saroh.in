@@ -423,6 +423,8 @@ describe("joining a plan online", () => {
         expect(joined.body).toEqual({
             state: "joined",
             plan: { name: "Monthly unlimited" },
+            // The new plan, for autopay's eMandate step after (D12).
+            subscriptionRef: expect.any(String),
         });
         // On it now: joining again is refused, in words.
         const twice = await join(s, token);

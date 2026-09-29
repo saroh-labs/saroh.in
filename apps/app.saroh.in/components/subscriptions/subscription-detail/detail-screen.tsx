@@ -17,6 +17,7 @@ import type {
     SubscriptionEventsPage,
 } from "@/lib/subscriptions/service";
 import {
+    autopayLine,
     chargeRow,
     collectionRows,
     dayText,
@@ -415,9 +416,11 @@ export function SubscriptionDetail({
                                     : null
                             }
                             paysBy={
-                                how
+                                // What the customer set up (D12) comes first.
+                                autopayLine(sub.autopay) ??
+                                (how
                                     ? `Pays by ${how}`
-                                    : "Each renewal is invoiced with a pay link"
+                                    : "Each renewal is invoiced with a pay link")
                             }
                         />
                         <ChangesCard

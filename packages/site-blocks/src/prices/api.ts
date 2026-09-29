@@ -4,6 +4,7 @@ import type {
     SignInOptions,
 } from "../account/api";
 import type { PacksApi } from "../account/packs-api";
+import type { AutopayMethod, AutopayStart } from "../autopay/api";
 import type { PaymentHandoff } from "../booking-flow/api";
 
 /**
@@ -22,12 +23,19 @@ export interface PlanJoinStarted {
     total: string;
     currency: string;
     payment: PaymentHandoff;
+    /**
+     * Autopay chosen with the join (D12): the same window authorises it
+     * (UPI, card). Absent or null: a plain payment.
+     */
+    autopay?: AutopayStart | null;
 }
 
 /** How a started join stands. */
 export interface PlanJoinAttempt {
     state: "paying" | "joined" | "closed";
     plan: { name: string };
+    /** Once joined: the new plan's ref, to authorise autopay on (D12). */
+    subscriptionRef?: string | null;
 }
 
 /**
@@ -43,13 +51,26 @@ export type JoinResult<T> =
 
 /** The site's server actions for joining a plan. */
 export interface JoinApi {
-    /** Start paying to join; the same key replays the same payment. */
+    /**
+     * Start paying to join; the same key replays the same payment. With
+     * `autopay`, the method to turn autopay on with (D12).
+     */
     join(
         ref: string,
         idempotencyKey: string,
+        autopay?: AutopayMethod,
     ): Promise<JoinResult<PlanJoinStarted>>;
     /** How a started join stands. */
     standing(ref: string): Promise<JoinResult<PlanJoinAttempt>>;
+    /**
+     * Authorise autopay on a plan just joined (D12): eMandate, which takes
+     * nothing, after the join is paid. Absent: the site can't.
+     */
+    startAutopay?(
+        subscriptionRef: string,
+        method: AutopayMethod,
+        idempotencyKey: string,
+    ): Promise<JoinResult<AutopayStart>>;
 }
 
 /**

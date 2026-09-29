@@ -42,7 +42,35 @@ describe("starting to join (G20)", () => {
                 publicKey: "rzp_test_1",
                 clientParams: { razorpayOrderId: "order_1" },
             },
+            autopay: null,
         });
+    });
+
+    it("carries autopay started with the join (D12), checked", () => {
+        const autopay = {
+            ref: "m_1",
+            method: "UPI",
+            mode: "PAY_AND_AUTHORISE",
+            limit: "3800.00",
+            currency: "INR",
+            handoff: {
+                provider: "RAZORPAY",
+                amountCents: 250000,
+                currency: "INR",
+                providerIntentId: "order_auth",
+                publicKey: "rzp_test_1",
+                clientParams: { recurring: true },
+            },
+            authorisationUrl: null,
+            returnUrl: "https://pulse.saroh.app/autopay?join=inv_1",
+        };
+        const answer = joinStartAnswer(201, { ...STARTED, autopay });
+        expect(answer.ok && answer.data.autopay).toEqual(autopay);
+        const odd = joinStartAnswer(201, {
+            ...STARTED,
+            autopay: { ...autopay, mode: "CHARGE" },
+        });
+        expect(odd.ok && odd.data.autopay).toBeNull();
     });
 
     it("a malformed success is trouble, not a crash", () => {
@@ -95,9 +123,17 @@ describe("how a join stands", () => {
             const body = { state, plan: { name: "Monthly" } };
             expect(joinStandingAnswer(200, body)).toEqual({
                 ok: true,
-                data: body,
+                data: { ...body, subscriptionRef: null },
             });
         }
+        // Once joined, the new plan's ref (D12's eMandate step).
+        expect(
+            joinStandingAnswer(200, {
+                state: "joined",
+                plan: { name: "Monthly" },
+                subscriptionRef: "sub_1",
+            }),
+        ).toMatchObject({ ok: true, data: { subscriptionRef: "sub_1" } });
     });
 
     it("says why it can't be read", () => {
