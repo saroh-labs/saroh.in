@@ -40,6 +40,14 @@ a note saying so.
 - **Current** — **Verify before you parse.** A webhook's signature is checked
   against the raw body before anything in it is trusted; a missing secret or a
   bad signature is a 401 and writes nothing.
+- **Current** — **A payment connection holds the secret its webhooks are
+  signed with** (DEC-063). Connecting Razorpay requires its own webhook secret
+  (a 400 without it). Cashfree signs with the key secret, so it needs nothing
+  more. `payments/webhook-secret.ts` says which, and
+  `payments/webhook-setup.ts` flags a connection saved without one
+  (`webhookSecretMissing`, readiness `PAYMENTS_WEBHOOK_SECRET_MISSING`) and
+  builds the webhook URL setup shows. A new provider declares its signing
+  scheme there.
 - **Current** — **Inboxes are idempotent.** `(provider, providerEventId)` is
   unique, so a duplicate delivery hits P2002 and returns 200 without moving state
   twice. Reconciliation follows a state machine that rejects illegal
