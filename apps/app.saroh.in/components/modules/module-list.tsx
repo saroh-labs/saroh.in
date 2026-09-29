@@ -2,10 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
+import { showError, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { navRowsForModule } from "@/components/shared/nav-items";
 import {
     readModuleImpactAction,
@@ -25,6 +26,10 @@ import {
 /**
  * Settings → Modules ("Saroh Settings" design): one bordered list, a switch
  * a row, and under each name what it is for.
+ *
+ * Turning one on opens the "Turn on" sheet (DEC-068): it asks for the
+ * module's minimum and brings what it needs, so the switch and "Turn on X
+ * and Y" open the same sheet.
  *
  * Turning a module off is entirely reversible — nothing is deleted — so it
  * takes UNDO, and never a modal. Where it changes something a person would
@@ -46,8 +51,17 @@ export function ModuleList({
     all?: ModuleView[];
 }) {
     const canManage = modules.some((m) => m.canManage);
+    // Turning one on asks for its minimum first, in the one sheet (DEC-068).
+    const [turningOn, setTurningOn] = useState<string[] | null>(null);
     return (
         <div className="max-w-[760px]">
+            <TurnOnSheet
+                picked={turningOn}
+                modules={all}
+                onOpenChange={(open) => {
+                    if (!open) setTurningOn(null);
+                }}
+            />
             <div className="overflow-hidden rounded-xl border border-border bg-card">
                 {[...modules].sort(byAttentionFirst).map((module, i) => (
                     <ModuleRow
@@ -56,6 +70,7 @@ export function ModuleList({
                         modules={modules}
                         all={all}
                         first={i === 0}
+                        onTurnOn={(key) => setTurningOn([key])}
                     />
                 ))}
             </div>
@@ -139,11 +154,14 @@ function ModuleRow({
     modules,
     all,
     first,
+    onTurnOn,
 }: {
     module: ModuleView;
     modules: ModuleView[];
     all: ModuleView[];
     first: boolean;
+    /** Open the "Turn on" sheet, which brings what it needs (DEC-068). */
+    onTurnOn: (key: string) => void;
 }) {
     const [pending, startTransition] = useTransition();
     const [asking, setAsking] = useState(false);
@@ -217,18 +235,6 @@ function ModuleRow({
         });
     };
 
-    const turnOn = (keys: string[]) => {
-        const names = keys.map((k) => labelOf(modules, k));
-        const rows = keys.flatMap((k) => navRowsForModule(k));
-        run(
-            keys.map((k) => [k, "ENABLED"]),
-            () =>
-                showSuccess(
-                    `${listWords(names)} ${keys.length > 1 ? "are" : "is"} on${rows.length > 0 ? ` — ${listWords(rows)} ${rows.length === 1 ? "is" : "are"} in the rail now` : ""}.`,
-                ),
-        );
-    };
-
     const turnOff = () => {
         setAsking(false);
         // Off: what needs it first, then the module itself.
@@ -272,7 +278,7 @@ function ModuleRow({
 
     const flip = () => {
         if (!module.canManage || blocked || pending) return;
-        if (!on) return turnOn([module.key]);
+        if (!on) return onTurnOn(module.key);
         if (!asking) return askFirst();
         // A second press while asking is the answer "yes" — unless
         // something refuses it, which no press overrides.
@@ -370,7 +376,7 @@ function ModuleRow({
                         size="sm"
                         className="mt-2"
                         disabled={pending}
-                        onClick={() => turnOn([...missing, module.key])}
+                        onClick={() => onTurnOn(module.key)}
                     >
                         Turn on {listWords([...missingLabels, label])}
                     </Button>
