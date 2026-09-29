@@ -208,6 +208,8 @@ export default async function SiteLayout({
                 // A module page leaves the menu while its module is off (G15).
                 modules={resolved.modules}
                 action={action}
+                // A Shop entry in the menu while /shop serves (P4).
+                shopServes={shopServes}
                 account={account}
                 bag={bag}
             />

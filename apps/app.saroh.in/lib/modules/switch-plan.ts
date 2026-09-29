@@ -117,6 +117,7 @@ const SETUP_ACTION: Record<string, string> = {
     CRM_NO_PIPELINE: "Create a pipeline",
     WEBSITE_NO_SITE: "Create a site",
     WEBSITE_NO_PUBLICATION: "Publish your site",
+    WEBSITE_SHOP_NOT_CHOSEN: "Choose storefront",
     APPOINTMENTS_NO_SERVICE: "Add a service",
     APPOINTMENTS_NO_AVAILABILITY: "Set availability",
     COURSES_NO_COURSE: "Make a course",

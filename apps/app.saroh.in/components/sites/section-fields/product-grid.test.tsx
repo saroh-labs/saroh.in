@@ -288,8 +288,8 @@ describe("the Product grid in the editor (G12)", () => {
     it("is offered only while the shop is open for the business", () => {
         expect(addableSections(false)).not.toContain("productGrid");
         expect(addableSections(true)).toContain("productGrid");
-        expect(addableSections(true)).toEqual(SECTION_ORDER);
-        expect(addableSections(false)).toEqual(
+        expect(addableSections(true, true)).toEqual(SECTION_ORDER);
+        expect(addableSections(false, true)).toEqual(
             SECTION_ORDER.filter((t) => t !== "productGrid"),
         );
     });

@@ -12,6 +12,10 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BOUND_BLOCKS, boundHref } from "@/components/sites/block-kinds";
+import {
+    addableSections,
+    SECTION_ORDER,
+} from "@/components/sites/editor-constants";
 import { emptySection } from "@/components/sites/empty-section";
 import type { PacksContent, Section } from "@/lib/sites/service";
 
@@ -106,6 +110,22 @@ describe("the Class packs block's fields (G20)", () => {
         expect(host.textContent).toContain("Descriptions");
         expect(host.textContent).not.toMatch(/choose (a|which) pack/i);
         expect(host.textContent).not.toMatch(/upi|card|autopay/i);
+    });
+});
+
+describe("Add block offers Class packs only when the module is (DEC-057)", () => {
+    it("is offered while Class packs is rolled out and on", () => {
+        expect(addableSections(false, true)).toContain("packs");
+        expect(addableSections(true, true)).toContain("packs");
+    });
+
+    it("is left out when it isn't, or when the API doesn't say", () => {
+        expect(addableSections(true, false)).not.toContain("packs");
+        expect(addableSections(true)).not.toContain("packs");
+        // Everything else is still offered.
+        expect(addableSections(true, false)).toEqual(
+            SECTION_ORDER.filter((t) => t !== "packs"),
+        );
     });
 });
 

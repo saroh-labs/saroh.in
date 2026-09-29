@@ -76,6 +76,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         // G13: pure; public-checkout.db.spec.ts runs here.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
+        // P4: the order confirmation's view, pure.
+        "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",

@@ -252,6 +252,22 @@ export function onTheShop(
     return fields[key] !== false;
 }
 
+/**
+ * The shop's "Made by" line (P5), as the site prints it: the product's own
+ * maker and where it is made, each on its own switch; null hides the row.
+ * Made here has neither, so no row — never the storefront's name, which
+ * is where it sells, not who makes it.
+ */
+export function madeByLine(
+    product: Pick<ProductDetail, "maker" | "madeIn" | "shopFields">,
+): string | null {
+    const parts = [
+        onTheShop(product.shopFields, "maker") ? product.maker?.trim() : null,
+        onTheShop(product.shopFields, "madeIn") ? product.madeIn?.trim() : null,
+    ].filter((part): part is string => !!part);
+    return parts.length > 0 ? parts.join(", ") : null;
+}
+
 const MONTHS = [
     "Jan",
     "Feb",

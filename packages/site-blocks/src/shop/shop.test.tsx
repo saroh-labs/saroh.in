@@ -385,6 +385,11 @@ describe("the header's bag", () => {
         });
 
         await screen.findByRole("heading", { name: "Order placed" });
+        // The confirmation page, on the business's own site (P4).
+        expect(
+            screen.getByRole("link", { name: "See your order" }),
+        ).toHaveAttribute("href", `/shop/order/${STARTED.orderId}`);
+        expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
         expect(start).toHaveBeenCalledTimes(1);
         const request = start.mock.calls[0][0];
         expect(request).toMatchObject({

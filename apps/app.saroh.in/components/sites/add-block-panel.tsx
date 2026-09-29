@@ -31,6 +31,7 @@ export function AddBlockPanel({
     onPick,
     onBrowse,
     shopOpen = false,
+    packsOpen = false,
 }: {
     /** A block was chosen. `looks` says whether a look still has to be picked. */
     onPick: (type: SectionType, looks: number) => void;
@@ -41,8 +42,12 @@ export function AddBlockPanel({
     onBrowse: () => void;
     /** The shop is open for the business: the Product grid is offered (G12). */
     shopOpen?: boolean;
+    /** Class packs is rolled out and on: its block is offered (DEC-057). */
+    packsOpen?: boolean;
 }) {
-    const { structure, business } = addBlockGroups(addableSections(shopOpen));
+    const { structure, business } = addBlockGroups(
+        addableSections(shopOpen, packsOpen),
+    );
 
     return (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-4 pt-4">

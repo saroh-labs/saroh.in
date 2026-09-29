@@ -213,6 +213,9 @@ module.exports = {
         // G13: the site bag's pricing, DB-free. The real rows are in
         // public-checkout.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
+        // P4: the site's order confirmation, DB-free. Its access rules are
+        // in checkout-confirmation.db.spec.ts.
+        "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
         "<rootDir>/src/modules/discounts/redeem.spec.ts",

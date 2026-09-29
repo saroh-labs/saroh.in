@@ -131,6 +131,19 @@ export async function pricesOffer(
     return { once: book.state === "on", plans: plansOn, packs: packsOn };
 }
 
+/**
+ * Whether the editor offers the Class packs block: Class packs rolled out
+ * for the business and on, the gate a Prices page's packs ask. Off, the
+ * block is not in Add block at all (DEC-057); one already on a page stays.
+ */
+export async function packsBlockOffered(
+    organizationId: string,
+    db: ModuleDb = prisma,
+): Promise<boolean> {
+    if (!(await rolledOut("CLASS_PACKS", organizationId))) return false;
+    return classPacksOn(db, organizationId);
+}
+
 /** The kinds a site could add now: on, and not on the site yet. */
 export async function addableModulePageKinds(
     organizationId: string,

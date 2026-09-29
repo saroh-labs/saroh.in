@@ -255,6 +255,25 @@ export function onTheShop(shopFields: unknown, key: string): boolean {
     return (shopFields as Record<string, unknown>)[key] !== false;
 }
 
+/**
+ * The product page's "Made by" line (P5): the product's own maker or
+ * supplier, and where it is made, each on its own switch. Null hides the
+ * row. A product made here has neither (the editor clears both), so it
+ * shows no row rather than the storefront's name ("Online"), which is
+ * where it sells, never who makes it.
+ */
+export function madeByLine(p: {
+    maker: string | null;
+    madeIn: string | null;
+    shopFields: unknown;
+}): string | null {
+    const parts = [
+        onTheShop(p.shopFields, "maker") ? p.maker?.trim() : null,
+        onTheShop(p.shopFields, "madeIn") ? p.madeIn?.trim() : null,
+    ].filter((part): part is string => !!part);
+    return parts.length > 0 ? parts.join(", ") : null;
+}
+
 /** A review's day, pinned to UTC so every reader prints the same text. */
 export function reviewDay(at: Date): string {
     return at.toLocaleDateString("en-IN", {

@@ -9,6 +9,8 @@ import { JobsModule } from "../jobs/jobs.module";
 import { PaymentsModule } from "../payments/payments.module";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { StoresModule } from "../stores/stores.module";
+import { CheckoutConfirmationService } from "./checkout-confirmation";
+import { CheckoutConfirmationController } from "./checkout-confirmation.controller";
 import {
     CLOSE_ABANDONED_CHECKOUT_TYPE,
     CloseAbandonedCheckoutHandler,
@@ -46,6 +48,8 @@ import { PublicCheckoutService } from "./public-checkout.service";
         OrdersController,
         OrganizationOrdersController,
         PublicCheckoutController,
+        // The site's order confirmation page (P4).
+        CheckoutConfirmationController,
     ],
     providers: [
         OrdersService,
@@ -54,6 +58,7 @@ import { PublicCheckoutService } from "./public-checkout.service";
         OrderFulfilmentChangeService,
         OrderCancelService,
         PublicCheckoutService,
+        CheckoutConfirmationService,
         CloseAbandonedCheckoutHandler,
         OrderStageBatchService,
         OrderStageBatchCommitHandler,

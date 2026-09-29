@@ -144,6 +144,9 @@ export default async function SiteEditorPage({
             // The API sends where the site sells from only while the shop is
             // open for the business; only then is a Product grid offered.
             shopOpen={site.sellsFrom != null}
+            // The Class packs block, only while Class packs is rolled out
+            // and on (DEC-057).
+            packsOpen={site.packsBlockOffered === true}
             // The module pages the page menu may offer (G14, G16); the API
             // lists none for a role without `site:update`.
             addablePageKinds={site.addablePageKinds ?? []}

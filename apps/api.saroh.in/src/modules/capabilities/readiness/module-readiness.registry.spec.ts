@@ -5,6 +5,14 @@ jest.mock("../../site-accounts/account-area", () => ({
 jest.mock("../../sites/sells-from", () => ({
     shopRolloutOn: jest.fn(() => Promise.resolve(true)),
 }));
+// A live site whose shop waits on "Sells from" (P4), switched per test; the
+// real rows are read in sells-from-awaiting.db.spec.ts.
+jest.mock("../../sites/sells-from-awaiting", () => ({
+    ...jest.requireActual<typeof import("../../sites/sells-from-awaiting")>(
+        "../../sites/sells-from-awaiting",
+    ),
+    siteAwaitingSellsFrom: jest.fn(() => Promise.resolve(null)),
+}));
 // Whether a connection lacks its webhook secret, without opening a sealed
 // blob: a row whose blob says "no-webhook-secret" lacks it (DEC-063). The
 // real check is pinned in payments/webhook-setup.spec.ts.
@@ -15,6 +23,7 @@ jest.mock("../../payments/webhook-setup", () => ({
 
 import { accountAreaOn } from "../../site-accounts/account-area";
 import { shopRolloutOn } from "../../sites/sells-from";
+import { siteAwaitingSellsFrom } from "../../sites/sells-from-awaiting";
 import { ModuleReadinessRegistry } from "./module-readiness.registry";
 
 const accountArea = accountAreaOn as jest.Mock;
@@ -85,6 +94,35 @@ describe("ModuleReadinessRegistry", () => {
             (await registry({ publication: 1 }).evaluate("WEBSITE", input))
                 .readiness,
         ).toBe("ACTIVE");
+    });
+
+    it("Website: live, but its shop waits on Sells from → the step to choose it (P4)", async () => {
+        const waiting = siteAwaitingSellsFrom as jest.Mock;
+        waiting.mockResolvedValueOnce("site_1");
+        const result = await registry({ publication: 1 }).evaluate(
+            "WEBSITE",
+            input,
+        );
+        expect(result).toEqual({
+            readiness: "SETUP_REQUIRED",
+            blockers: [
+                {
+                    code: "WEBSITE_SHOP_NOT_CHOSEN",
+                    message:
+                        "Choose which storefront your site sells from — until then your shop page isn't live.",
+                    severity: "SETUP",
+                    actionHref: "/sites/site_1/settings#sells-from",
+                },
+            ],
+        });
+
+        // Not live yet: publishing comes first, and the shop isn't asked.
+        waiting.mockClear();
+        expect(
+            (await registry({ site: 1 }).evaluate("WEBSITE", input)).blockers[0]
+                .code,
+        ).toBe("WEBSITE_NO_PUBLICATION");
+        expect(waiting).not.toHaveBeenCalled();
     });
 
     it("CRM: pipeline required for ACTIVE", async () => {

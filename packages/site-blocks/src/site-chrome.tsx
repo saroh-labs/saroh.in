@@ -181,6 +181,32 @@ export function siteMenu(
     return [{ label: "Home", href: "/" }, ...shown];
 }
 
+/** The shop's address, and its menu entry. */
+const SHOP_HREF = "/shop";
+
+/**
+ * The menu with a Shop entry when the shop serves (P4, G13's wiring): the
+ * layout passes `shopServes` from the catalogue read `/shop` draws, so the
+ * entry is there exactly when `/shop` is. A menu that already opens `/shop`
+ * (a Shop page the merchant added, G14) keeps it as it is. Otherwise Shop
+ * goes after Home, as the design's menu reads ("Home · Shop · …"), and a
+ * site with no menu gets "Home · Shop". Not serving: the menu as it was.
+ */
+export function withShopLink(
+    menu: readonly SiteNavItem[],
+    shopServes: boolean,
+): SiteNavItem[] {
+    if (!shopServes) return [...menu];
+    const opensShop = (item: SiteNavItem) =>
+        item.kind === "SHOP" ||
+        item.href.replace(/\/+$/, "").toLowerCase() === SHOP_HREF;
+    if (menu.some(opensShop)) return [...menu];
+    const shop: SiteNavItem = { label: "Shop", href: SHOP_HREF, kind: "SHOP" };
+    if (menu.length === 0) return [{ label: "Home", href: "/" }, shop];
+    const at = menu[0] && isHome(menu[0]) ? 1 : 0;
+    return [...menu.slice(0, at), shop, ...menu.slice(at)];
+}
+
 /** An entry that opens the home page: "/" (or "", as a page path can be). */
 function isHome(item: SiteNavItem): boolean {
     return item.href === "/" || item.href === "";
@@ -211,9 +237,16 @@ export function SiteHeader({
     bag,
     account,
     modules,
+    shopServes = false,
 }: {
     name: string;
     navigation: SiteNavItem[];
+    /**
+     * `/shop` serves for this site now (P4): the menu gets a Shop entry
+     * unless it already opens the shop (`withShopLink`). Only the live
+     * site passes it; the editor's canvas and a draft preview don't.
+     */
+    shopServes?: boolean;
     /**
      * Whether each module page shows now (G15), from the public site read.
      * An entry whose module is off leaves the menu; one not named here
@@ -235,10 +268,12 @@ export function SiteHeader({
 }) {
     const to = (href: string) =>
         basePath && href.startsWith("/") ? `${basePath}${href}` : href;
-    const items = siteMenu(navigation, modules).map((item) => ({
-        label: item.label,
-        href: to(item.href),
-    }));
+    const items = withShopLink(siteMenu(navigation, modules), shopServes).map(
+        (item) => ({
+            label: item.label,
+            href: to(item.href),
+        }),
+    );
     const main = action ? { label: action.label, href: to(action.href) } : null;
     const hasMenu = items.length > 0 || main !== null;
 

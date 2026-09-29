@@ -215,6 +215,10 @@ const NEVER: Record<string, string> = {
     // payment already made still lands through the webhook.
     "orders/public-checkout.controller.ts":
         "a published site's bag and checkout — Commerce checked by the service",
+    // P4: a site order's confirmation page. Never module-gated: an order
+    // already paid is shown to whoever placed it, Commerce on or off.
+    "orders/checkout-confirmation.controller.ts":
+        "a placed site order's confirmation — shown to its customer only",
     // G9: a site's Plans block. Payments being off is checked by the
     // service (`paymentsOffered`), which answers 404, as a site with no plans.
     "subscriptions/public-plans.controller.ts":

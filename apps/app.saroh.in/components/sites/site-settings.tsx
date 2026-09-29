@@ -305,6 +305,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                     siteId={site.id}
                     sellsFrom={site.sellsFrom}
                     canChange={site.can.manageSettings}
+                    awaiting={site.shopAwaitsSellsFrom === true}
                 />
             ) : null}
 

@@ -1,13 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type { SignedInCustomer } from "../account/api";
 import { destructiveAlertClasses } from "../alert";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
+import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
 import type { CheckoutStanding, CheckoutStarted, ShopCheckoutApi } from "./api";
+import { orderConfirmationHref } from "./order-confirmation";
 import { SheetFrame, sheetAltButton, sheetButton } from "./sheet-frame";
 
 /**
@@ -144,10 +147,21 @@ export function CheckoutPay({
                     lead={`Order ${s.orderNumber} · ${formatAmount(s.total, s.currency)}. ${businessName} will be in touch when it's ready.`}
                     onClose={onClose}
                 >
+                    {/* The confirmation page, on the business's own site (P4). */}
+                    <Link
+                        href={orderConfirmationHref(started.orderId)}
+                        onClick={onClose}
+                        className={cn(
+                            sheetButton(false),
+                            "flex items-center justify-center",
+                        )}
+                    >
+                        See your order
+                    </Link>
                     <button
                         type="button"
                         onClick={onClose}
-                        className={sheetButton(false)}
+                        className={sheetAltButton}
                     >
                         Done
                     </button>
