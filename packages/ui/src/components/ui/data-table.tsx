@@ -69,7 +69,7 @@ export function DataTable<TData, TValue>({
                                             <button
                                                 type="button"
                                                 onClick={header.column.getToggleSortingHandler()}
-                                                className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active"
                                             >
                                                 {flexRender(
                                                     header.column.columnDef

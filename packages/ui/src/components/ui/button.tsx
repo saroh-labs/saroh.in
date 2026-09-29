@@ -28,7 +28,7 @@ const buttonVariants = cva(
      * otherwise, and a pencil at 24 beside a 13px label reads as a mistake.
      * An icon that states its own size (`size-*`, `h-*`) keeps it.
      */
-    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold [&_svg]:shrink-0 [&_svg:not([class*='size-']):not([class*='h-'])]:size-4 ring-offset-background transition-[color,background-color,border-color,text-decoration-color] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:border-transparent disabled:bg-disabled disabled:text-disabled-foreground",
+    "inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold [&_svg]:shrink-0 [&_svg:not([class*='size-']):not([class*='h-'])]:size-4 ring-offset-background transition-[color,background-color,border-color,text-decoration-color] duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:border-transparent disabled:bg-disabled disabled:text-disabled-foreground",
     {
         variants: {
             variant: {
@@ -45,7 +45,7 @@ const buttonVariants = cva(
                 highlight:
                     "bg-highlight text-highlight-foreground hover:bg-highlight-hover active:bg-highlight-active active:text-highlight-active-foreground",
                 success:
-                    "bg-success text-success-foreground hover:bg-success/90",
+                    "bg-success text-success-foreground hover:bg-success/90 active:bg-success/80",
                 destructive:
                     "bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-active",
                 // The brand file's "Secondary": a raised surface with a visible

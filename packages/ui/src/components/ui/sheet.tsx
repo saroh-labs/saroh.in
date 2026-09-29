@@ -94,7 +94,7 @@ const SheetContent = React.forwardRef<
                 {closeButton ? (
                     /* A 30px target (44 on touch), not a bare 16px glyph:
                        closing a sheet is the most common thing done in one. */
-                    <SheetPrimitive.Close className="absolute right-3 top-3 z-10 grid size-[30px] place-items-center rounded-[7px] text-muted-foreground ring-offset-background transition-colors duration-fast hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none coarse:size-11">
+                    <SheetPrimitive.Close className="absolute right-3 top-3 z-10 grid size-[30px] cursor-pointer place-items-center rounded-[7px] text-muted-foreground ring-offset-background transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:pointer-events-none coarse:size-11">
                         <X className="size-4" strokeWidth={2.1} />
                         <span className="sr-only">Close</span>
                     </SheetPrimitive.Close>
