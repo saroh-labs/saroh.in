@@ -866,6 +866,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
         - The Packs summary and Extend copy say what the API does.
         - The editor's first-pack hint names the pack's kind.
         - E17's "Each sale" card is accepted.
+    - **Home and settings:**
+        - This week has no "Website · Live" row until DEC-069 settles which address to show.
+        - Checklist rows are two lines (title and reason), shared with Home.
+        - The phone tab bar stays Home, Sell, Calendar, Insights; the two designs disagree with each other.
+        - Mark sent is offered only on orders ready to hand over (the API's stage rule).
 - **Fixed to match the design, or to correct a small error:**
     1. Order Detail's customer card reads "Needs attention: Sesame", since the card covers every kind of entry, not just allergies.
     2. A treatment order shows Needs attention in the customer card as well as the Visits card.
@@ -873,3 +878,5 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     4. "They asked to stop" shows only when they did ask.
     5. A customer added by hand shows their saved address on Overview before they have an order.
     6. C12's booking-note card uses the customer's full name, and names the roles that can see a sensitive note.
+    7. Settings › Business's "Address" tab is "Registered address" (DEC-069 names the four addresses apart).
+    8. Permission lists hide the permissions of modules hidden from the business ("Manage automations" while DEC-068 hides Automations).
