@@ -103,8 +103,8 @@ import type { WorkingHours } from "./working-hours";
  * ## Range (plan 005 E20)
  *
  * The read takes `from`/`to` (local dates, both inclusive) and is refused
- * wholly before the joined month or past three months ahead (`range.ts`);
- * `month` stays as an alias for one release (Z3). A caller who reads none
+ * wholly before the joined month or past three months ahead (`range.ts`).
+ * (The one-release `month` alias is gone: Z3.) A caller who reads none
  * of the layers is refused outright (403), which the app shows as locked.
  * Items carry their person, length and flags; the read also returns the
  * days off, the team and the joined day. A business with no orders gets a
@@ -127,7 +127,7 @@ export interface CalendarUnavailable {
 }
 
 export interface CalendarMonth {
-    /** The month asked for; for a range, the month `from` is in. */
+    /** The month `from` is in. */
     month: string;
     timezone: string;
     timezoneSource: ZoneSource;
@@ -277,16 +277,7 @@ export class CalendarService {
         @Optional() private readonly db: typeof prisma = prisma,
     ) {}
 
-    /** One month: the query the previous app sends (alias until Z3). */
-    month(
-        ctx: OrganizationContext,
-        month: string,
-        now: Date = new Date(),
-    ): Promise<CalendarMonth> {
-        return this.read(ctx, { month }, now);
-    }
-
-    /** The days asked for: `from`/`to`, or the `month` alias. */
+    /** The days asked for: `from`/`to`. */
     async read(
         ctx: OrganizationContext,
         query: CalendarQuery,

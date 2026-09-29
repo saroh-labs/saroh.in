@@ -6,11 +6,11 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { CalendarMonth } from "./calendar.service";
 import { CalendarService } from "./calendar.service";
-import { CalendarMonthQueryDto } from "./dto";
+import { CalendarQueryDto } from "./dto";
 
 /**
  * The Business Calendar (U4, plan 005 E20): everything dated, per day and
- * layer, in one read of `from`..`to` (or the `month` alias, until Z3). Not
+ * layer, in one read of `from`..`to`. Not
  * module-gated: it spans modules and leaves out, layer by layer, whatever
  * is off or the viewer may not read — like Home. A viewer who reads no
  * layer at all is refused (403).
@@ -23,10 +23,9 @@ export class CalendarController {
     @Get()
     read(
         @OrgContext() ctx: OrganizationContext,
-        @Query() query: CalendarMonthQueryDto,
+        @Query() query: CalendarQueryDto,
     ): Promise<CalendarMonth> {
         return this.calendar.read(ctx, {
-            month: query.month,
             from: query.from,
             to: query.to,
         });

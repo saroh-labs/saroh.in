@@ -356,8 +356,8 @@ SELECT count(*) FROM "ClassPack" WHERE status = 'DRAFT';
 ## E20: the calendar reads a range (wave 3)
 
 `GET organizations/:org/calendar` takes `from`/`to` (local dates, both
-inclusive, at most 62 days) as well as `month` (`calendar/range.ts`). No
-migration.
+inclusive, at most 62 days) as well as `month` until Z3 (below)
+(`calendar/range.ts`). No migration.
 
 - **API before app.** The new workspace asks for `from`/`to`, which the old
   API refuses (400), so deploy the API first. The old workspace sends
@@ -386,6 +386,21 @@ business joined>` opens the joined month, with no error page.
 
 Roll the workspace back first (it asks for `from`/`to`), then the API.
 Nothing is stored.
+
+### Z3: the `month` alias is removed (done, batch 2026-09-29)
+
+E20 went to production in #708, so no workspace that sends `month` is live.
+The API now answers `from`/`to` only; `?month=` is a 400 ("property month
+should not exist"). Before this release, confirmed that nothing calls the
+alias: the workspace reads `calendar?from=&to=` (`lib/calendar/service.ts`;
+its own `/calendar?month=` is a page URL, not the API), and neither
+`saroh.app`, `site-blocks` nor `e2e` reads the calendar. No migration.
+
+- **Rolling the API back** below this release is fine: the E20 API answers
+  both.
+- **Rolling the workspace back below E20 now breaks the calendar** (it
+  would send `month`, which this API refuses). Roll the API back with it,
+  to #708 or earlier.
 
 ## E9: a treatment sold as one order (wave 2)
 

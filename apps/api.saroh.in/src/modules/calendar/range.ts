@@ -2,20 +2,18 @@ import { BadRequestException } from "@nestjs/common";
 import { DateTime } from "luxon";
 
 import type { MonthWindow } from "./month";
-import { isMonth, monthWindow } from "./month";
 
 /**
  * Which days the calendar reads (plan 005 E20, R15): a `from`/`to` range of
  * local dates in the business's zone, both inclusive — a week crossing two
- * months is one read — or, for one release, the month query the previous
- * app sends (follow-up Z3 removes it).
+ * months is one read. (The `month` query the app before E20 sent was an
+ * alias for one release; follow-up Z3 removed it.)
  *
  * A range reaches back to the first of the month the business joined Saroh
  * (nothing of it exists before) and forward to the end of the third month
  * from this one (as far as anyone plans). Wholly outside that it is refused with a
  * 400 naming the nearest month it reaches, so the app can open that month
- * instead of an error. The month alias is not refused: the previous app
- * reads the joined day from the answer and pulls the address back itself.
+ * instead of an error.
  */
 
 /** Months ahead of this one a range may reach. */
@@ -26,17 +24,17 @@ export const MAX_RANGE_DAYS = 62;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** What the controller passes on: `month`, or `from` with `to`. */
+/** What the controller passes on: `from` with `to`. */
 export interface CalendarQuery {
-    month?: string;
     from?: string;
     to?: string;
 }
 
 /** The span a query asks for, once it is known to be well formed. */
-export type CalendarSpan =
-    | { kind: "month"; month: string }
-    | { kind: "range"; from: string; to: string };
+export interface CalendarSpan {
+    from: string;
+    to: string;
+}
 
 /** Why a range was refused, as `details.reason` says it. */
 export type OutsideReason = "before_joined" | "too_far_ahead";
@@ -48,19 +46,7 @@ function isDate(value: string): boolean {
 
 /** Read the query into a span, or refuse it. */
 export function spanOf(query: CalendarQuery): CalendarSpan {
-    const { month, from, to } = query;
-    const ranged = from !== undefined || to !== undefined;
-    if (month !== undefined && ranged) {
-        throw new BadRequestException(
-            "Ask for a month or for from and to, not both.",
-        );
-    }
-    if (month !== undefined) {
-        if (!isMonth(month)) {
-            throw new BadRequestException("month must be YYYY-MM.");
-        }
-        return { kind: "month", month };
-    }
+    const { from, to } = query;
     if (from === undefined || to === undefined) {
         throw new BadRequestException("from and to are both needed.");
     }
@@ -75,7 +61,7 @@ export function spanOf(query: CalendarQuery): CalendarSpan {
             `A range can be at most ${MAX_RANGE_DAYS} days.`,
         );
     }
-    return { kind: "range", from, to };
+    return { from, to };
 }
 
 function daysBetween(from: string, to: string): number {
@@ -103,14 +89,12 @@ export function rangeWindow(
 
 /** The window a span covers in a zone. */
 export function windowOf(span: CalendarSpan, zone: string): MonthWindow {
-    return span.kind === "month"
-        ? monthWindow(span.month, zone)
-        : rangeWindow(span.from, span.to, zone);
+    return rangeWindow(span.from, span.to, zone);
 }
 
-/** The month a span is named by: the month asked, or the one `from` is in. */
+/** The month a span is named by: the one `from` is in. */
 export function monthOf(span: CalendarSpan): string {
-    return span.kind === "month" ? span.month : span.from.slice(0, 7);
+    return span.from.slice(0, 7);
 }
 
 export interface Reach {
@@ -144,7 +128,6 @@ export function reachOf(joinedAt: string | null, today: string): Reach {
  * before joining hold nothing, and the app mutes them.
  */
 export function assertWithinReach(span: CalendarSpan, reach: Reach): void {
-    if (span.kind !== "range") return;
     if (reach.first !== null && span.to < reach.first) {
         const earliestMonth = reach.first.slice(0, 7);
         throw new BadRequestException({
