@@ -2,6 +2,7 @@ import fs from "node:fs";
 
 import { expect, test as setup } from "@playwright/test";
 
+import { orderLine } from "../fixtures/own-data";
 import type { Role } from "../fixtures/sessions";
 import { AUTH_DIR, people, sessionFile } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
@@ -16,6 +17,11 @@ import { ignoreHTTPSErrors, urls } from "../playwright.config";
  * but the app cannot see (a cookie on the wrong domain, a bare-port runner
  * against the portless names) fails here, once, by name — not as 150
  * redirects to /login across the suite.
+ *
+ * The owner also brings in the one record every test shares and none
+ * changes: the untracked product each test's own orders are for
+ * (`fixtures/own-data.ts`). Made here, once, so parallel tests never race
+ * to make it.
  */
 fs.mkdirSync(AUTH_DIR, { recursive: true });
 
@@ -45,6 +51,8 @@ for (const role of Object.keys(people) as Role[]) {
             // The workspace, on its own origin, must see the same session.
             await page.goto(`${urls.APP_URL}/`);
             await expect(page).not.toHaveURL(/\/login/);
+
+            if (role === "owner") await orderLine(page.request);
         } finally {
             await context.close();
         }

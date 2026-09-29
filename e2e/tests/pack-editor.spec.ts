@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { stamp as ownStamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -48,7 +49,7 @@ test.describe("the Pack Editor on Northwind (E18)", () => {
         await expect(
             page.getByText("Not saved yet — start with a name"),
         ).toBeVisible();
-        const name = `E2E pack ${Date.now()}`;
+        const name = `E2E pack ${ownStamp(test.info())}`;
         await page.getByLabel("Name").fill(name);
         // The first autosave makes it a draft at its own address.
         await page.waitForURL(/\/class-packs\/[^/]+\/edit$/);

@@ -1,7 +1,8 @@
 // @covers accounts:/login app:/open app:/customers app:/commerce/customers site:/[slug] site:/account/messages api:organizations api:customer-workspace api:contacts api:customers api:orders api:subscriptions api:invoices api:class-packs api:bookings api:enquiry api:site-accounts pkg:site-blocks
-import type { Page } from "@playwright/test";
+import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { makeContact, makeOrder, stamp } from "../fixtures/own-data";
 import type { Role } from "../fixtures/sessions";
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
@@ -10,11 +11,12 @@ import { asNewVisitor, signInOnSheet } from "./site-codes";
 /**
  * Customer Detail (plan 2026-09-23-003, U18): one page per person, rooted on
  * the contact, with tabs by business kind — Rye & Co. (a bakery) and Pulse
- * Fitness (a gym) — plus not found, notes with an allergy, a possible match
- * that a person links, and a Member who sees no money.
+ * Fitness (a gym) — plus not found, notes, a possible match that a person
+ * links, and a Member who sees no money.
  *
- * Every change it makes is undone before it ends, so the demo businesses are
- * left as they were; desk and phone run one after the other on the same data.
+ * Rye, Pulse and Kavi are only read. Every write — a note, a link, a Needs
+ * attention entry — is on a Northwind contact the test makes for itself,
+ * so desk and phone, and every other spec, can run beside it.
  */
 
 const RYE = "seed_sc_rc_org";
@@ -22,8 +24,6 @@ const PULSE = "seed_sc_pulse_org";
 const NORTHWIND = "seed_org";
 const PRIYA = "seed_sc_rc_contact_priya";
 const PRIYA_STORE = "seed_sc_rc_customer_priya";
-/** A Northwind contact whose same-email store customer nobody has linked. */
-const KARTHIK = "seed_contact_7";
 
 /** Carry the saved session into this test's browser, then open the business. */
 async function signIn(page: Page, org: string, who: Role = "owner") {
@@ -173,10 +173,17 @@ test.describe("customer detail", () => {
 
     test("a note is text only; deleted, brought back, deleted (Z2a)", async ({
         page,
-    }) => {
-        await signIn(page, RYE);
-        await page.goto(`/customers/${PRIYA}?tab=notes`);
-        const text = `E2E note ${Date.now()}`;
+    }, testInfo) => {
+        // A Northwind contact of its own: Rye is a film set.
+        await signIn(page, NORTHWIND);
+        const s = stamp(testInfo);
+        const who = await makeContact(page.request, {
+            firstName: "Note",
+            lastName: s,
+            email: `note-${s}@example.test`,
+        });
+        await page.goto(`/customers/${who.id}?tab=notes`);
+        const text = `E2E note ${s}`;
         await page.getByLabel("New note").fill(text);
         // Allergies live on Needs attention, not on a note (Z2a).
         await expect(page.getByRole("group", { name: "Allergy" })).toHaveCount(
@@ -192,7 +199,6 @@ test.describe("customer detail", () => {
         await page.getByRole("button", { name: "Undo" }).last().click();
         await expect(page.getByText(text)).toBeVisible();
 
-        // Leave the customer as found.
         await page
             .getByRole("article")
             .filter({ hasText: text })
@@ -203,38 +209,37 @@ test.describe("customer detail", () => {
 
     test("a possible match is linked by a person, and its orders come in", async ({
         page,
-    }) => {
+    }, testInfo) => {
         await signIn(page, NORTHWIND);
-        await page.goto(`/customers/${KARTHIK}`);
+        // A pair of its own: a contact, and a storefront customer with the
+        // same email, made by an order that is left unpaid (a paid one links
+        // them by itself, C2) — so nobody has linked them yet.
+        // Short, as a real one is: the dialog does not wrap a long email on
+        // a phone, and its Link button is pushed off the screen.
+        const s = stamp(testInfo).split("-").pop() ?? "";
+        const email = `m${s}@ex.in`;
+        const who = await makeContact(page.request, {
+            firstName: "Karthik",
+            lastName: s,
+            email,
+        });
+        await makeOrder(page.request, {
+            paid: false,
+            customer: { email, name: who.name },
+        });
+
+        await page.goto(`/customers/${who.id}`);
         await expect(page.getByText("Possible match — link?")).toBeVisible();
         await page.getByRole("button", { name: "Review and link" }).click();
         const dialog = page.getByRole("dialog", {
             name: "Link a commerce customer",
         });
         await dialog.getByRole("button", { name: "Link" }).first().click();
-        try {
-            await expect(page.getByText("Possible match — link?")).toHaveCount(
-                0,
-            );
-            await tab(page, /^Orders/).click();
-            await expect(
-                page.getByRole("link", { name: /^#/ }).first(),
-            ).toBeVisible();
-        } finally {
-            // Unlink, so the demo still offers the match.
-            const detail = await page.request.get(
-                `${urls.API_URL}/organizations/${NORTHWIND}/customers/${KARTHIK}/detail`,
-            );
-            const body = (await detail.json()) as {
-                linkedCustomers?: { linkId: string }[];
-            };
-            for (const link of body.linkedCustomers ?? []) {
-                await page.request.delete(
-                    `${urls.API_URL}/organizations/${NORTHWIND}/customers/links/${link.linkId}`,
-                    { headers: { origin: urls.APP_URL } },
-                );
-            }
-        }
+        await expect(page.getByText("Possible match — link?")).toHaveCount(0);
+        await tab(page, /^Orders/).click();
+        await expect(
+            page.getByRole("link", { name: /^#/ }).first(),
+        ).toBeVisible();
     });
 });
 
@@ -265,82 +270,72 @@ test.describe("customer detail, as a Member", () => {
 });
 
 /**
- * Needs attention on Customer Detail (C5, DEC-040). Writes happen on
- * Northwind; Kavi Dental is a film set, so it is only read — by Divya on the
- * desk, a Member, who sees Rahul's latex allergy and a count in place of his
- * sensitive medical note.
+ * Needs attention on Customer Detail (C5, DEC-040). Writes happen on a
+ * Northwind contact each test makes; Kavi Dental is a film set, so it is
+ * only read — by Divya on the desk, a Member, who sees Rahul's latex allergy
+ * and a count in place of his sensitive medical note.
  */
 const KAVI = "seed_sc_kavi_org";
 const RAHUL = "seed_sc_kavi_contact_rahul";
-/** A Northwind contact nothing else here changes. */
-const NW_CONTACT = "seed_contact_2";
 
 /** The row by the name: the heading and the tags beside it. */
 const nameRow = (page: Page) => page.locator("h1").locator("..");
 
-/** Take every "Wheelchair" entry this suite added off the contact. */
-async function clearWheelchair(page: Page) {
-    const base = `${urls.API_URL}/organizations/${NORTHWIND}/customers/${NW_CONTACT}/attention`;
-    const res = await page.request.get(base);
-    const body = (await res.json()) as {
-        entries?: { id: string; label: string }[];
-    };
-    for (const e of body.entries ?? []) {
-        if (e.label !== "Wheelchair") continue;
-        await page.request.delete(`${base}/${e.id}`, {
-            headers: { origin: urls.APP_URL },
-        });
-    }
+/** A Northwind contact of this test's own, with nothing on Needs attention. */
+async function aContact(page: Page, testInfo: TestInfo): Promise<string> {
+    const s = stamp(testInfo);
+    return (
+        await makeContact(page.request, {
+            firstName: "Access",
+            lastName: s,
+            email: `attention-${s}@example.test`,
+        })
+    ).id;
 }
 
 test.describe("needs attention", () => {
     test("add Access 'Wheelchair': the tag shows by the name; Remove has Undo", async ({
         page,
-    }) => {
+    }, testInfo) => {
         await signIn(page, NORTHWIND);
-        await clearWheelchair(page);
-        try {
-            await page.goto(`/customers/${NW_CONTACT}`);
-            const card = page.getByRole("region", { name: "Needs attention" });
-            await card.getByRole("button", { name: "Add" }).click();
-            const sheet = page.getByRole("dialog", {
-                name: "Add to Needs attention",
-            });
-            await sheet.getByRole("radio", { name: "Access" }).click();
-            // Access isn't sensitive unless someone ticks it.
-            await expect(sheet.getByRole("checkbox")).not.toBeChecked();
-            await sheet
-                .getByLabel("Short label for the team")
-                .fill("Wheelchair");
-            await sheet
-                .getByRole("button", { name: "Add to Needs attention" })
-                .click();
-            await expect(sheet).toHaveCount(0);
+        const contact = await aContact(page, testInfo);
+        await page.goto(`/customers/${contact}`);
+        const card = page.getByRole("region", { name: "Needs attention" });
+        await card.getByRole("button", { name: "Add" }).click();
+        const sheet = page.getByRole("dialog", {
+            name: "Add to Needs attention",
+        });
+        await sheet.getByRole("radio", { name: "Access" }).click();
+        // Access isn't sensitive unless someone ticks it.
+        await expect(sheet.getByRole("checkbox")).not.toBeChecked();
+        await sheet.getByLabel("Short label for the team").fill("Wheelchair");
+        await sheet
+            .getByRole("button", { name: "Add to Needs attention" })
+            .click();
+        await expect(sheet).toHaveCount(0);
 
-            await expect(
-                nameRow(page).getByText("Access: Wheelchair"),
-            ).toBeVisible();
-            await expect(card).toContainText("Access: Wheelchair");
+        await expect(
+            nameRow(page).getByText("Access: Wheelchair"),
+        ).toBeVisible();
+        await expect(card).toContainText("Access: Wheelchair");
 
-            await card
-                .getByRole("button", { name: "Remove Access: Wheelchair" })
-                .click();
-            await expect(card).not.toContainText("Access: Wheelchair");
-            await expect(
-                nameRow(page).getByText("Access: Wheelchair"),
-            ).toHaveCount(0);
-            await page.getByRole("button", { name: "Undo" }).last().click();
-            await expect(card).toContainText("Access: Wheelchair");
-        } finally {
-            await clearWheelchair(page);
-        }
+        await card
+            .getByRole("button", { name: "Remove Access: Wheelchair" })
+            .click();
+        await expect(card).not.toContainText("Access: Wheelchair");
+        await expect(nameRow(page).getByText("Access: Wheelchair")).toHaveCount(
+            0,
+        );
+        await page.getByRole("button", { name: "Undo" }).last().click();
+        await expect(card).toContainText("Access: Wheelchair");
     });
 
     test("a save that fails keeps what was typed and says so", async ({
         page,
-    }) => {
+    }, testInfo) => {
         await signIn(page, NORTHWIND);
-        await page.goto(`/customers/${NW_CONTACT}`);
+        const contact = await aContact(page, testInfo);
+        await page.goto(`/customers/${contact}`);
         await page
             .getByRole("region", { name: "Needs attention" })
             .getByRole("button", { name: "Add" })
@@ -351,7 +346,7 @@ test.describe("needs attention", () => {
         await sheet.getByRole("radio", { name: "Access" }).click();
         await sheet.getByLabel("Short label for the team").fill("Wheelchair");
         // The Server Action's POST never reaches the server.
-        await page.route(`**/customers/${NW_CONTACT}**`, (route) =>
+        await page.route(`**/customers/${contact}**`, (route) =>
             route.request().method() === "POST"
                 ? route.abort()
                 : route.continue(),

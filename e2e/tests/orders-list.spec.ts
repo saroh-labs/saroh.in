@@ -2,6 +2,7 @@
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { makeOrder } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
 
@@ -11,12 +12,18 @@ import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
  * said in words, the age or "Late", the unpaid line, and paging by the API's
  * cursor — against the seeded stack.
  *
- * Read-only: nothing here writes. Northwind Supply is the generic dev
- * business; Rye & Co. is a film set and is only read, by its Member.
+ * Counts, pages and "the first row" are read on Rye & Co., as its owner:
+ * a film set, which no test writes to, so what the API said a moment ago is
+ * still what the screen draws. Northwind's orders are made and moved by the
+ * order specs running beside this one. The writes here — a step and its
+ * Undo, a new pay link — go to Northwind, on orders each test makes itself
+ * (`fixtures/own-data.ts`).
  */
 
 const NORTHWIND = "seed_org";
 const RYE = "seed_sc_rc_org";
+/** Where lists and counts are read: nothing changes them mid-test. */
+const LISTS = RYE;
 
 const member = {
     email: "nisha.kulkarni@saroh.dev",
@@ -106,9 +113,9 @@ test.describe("orders list", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const all = await list(page, NORTHWIND);
-        const open = await list(page, NORTHWIND, "&tab=open");
+        await page.goto(`/open/${LISTS}`);
+        const all = await list(page, LISTS);
+        const open = await list(page, LISTS, "&tab=open");
 
         await page.goto("/commerce/orders");
         await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
@@ -144,7 +151,7 @@ test.describe("orders list", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto(`/open/${LISTS}`);
         const q = "no-such-order-b7";
         await page.goto(`/commerce/orders?q=${q}`);
         await expect(
@@ -159,8 +166,8 @@ test.describe("orders list", () => {
 
     test("an empty tab says what would land there", async ({ page }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const refunded = await list(page, NORTHWIND, "&tab=refunded");
+        await page.goto(`/open/${LISTS}`);
+        const refunded = await list(page, LISTS, "&tab=refunded");
         test.skip(refunded.rows.length > 0, "Northwind has refunds here.");
 
         await page.goto("/commerce/orders?tab=refunded");
@@ -173,10 +180,10 @@ test.describe("orders list", () => {
 
     test("a late Pick-up order reads Late, in words", async ({ page }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto(`/open/${LISTS}`);
         const late = await list(
             page,
-            NORTHWIND,
+            LISTS,
             "&tab=open&late=true&fulfilment=PICKUP",
         );
         const order = late.rows.at(0);
@@ -201,8 +208,8 @@ test.describe("orders list", () => {
 
     test("pages by the cursor, and back", async ({ page }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const first = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const first = await list(page, LISTS);
         test.skip(!first.nextCursor, "Fewer than one page of orders here.");
 
         await page.goto("/commerce/orders");
@@ -223,8 +230,8 @@ test.describe("orders list", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");
@@ -248,8 +255,8 @@ test.describe("orders list", () => {
     }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");
@@ -289,7 +296,7 @@ test.describe("orders list", () => {
     }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto(`/open/${LISTS}`);
         await page.goto("/commerce/orders");
 
         // No filter menus on the page itself at this width.
@@ -430,8 +437,8 @@ test.describe("orders list filters (B4)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const options = await filterOptions(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const options = await filterOptions(page, LISTS);
         const type = options.types.at(0);
         const step = options.steps.find(
             (s) => type && s.types.includes(type.type),
@@ -442,7 +449,7 @@ test.describe("orders list filters (B4)", () => {
         const address = `step=${step.key}&fulfilment=${type.type.toLowerCase()}&date=month`;
         const expected = await list(
             page,
-            NORTHWIND,
+            LISTS,
             `&step=${step.key}&fulfilment=${type.type}&date=month`,
         );
         await page.goto(`/commerce/orders?${address}`);
@@ -477,8 +484,8 @@ test.describe("orders list filters (B4)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const empty = await list(page, NORTHWIND, "&step=teleported");
+        await page.goto(`/open/${LISTS}`);
+        const empty = await list(page, LISTS, "&step=teleported");
         expect(empty.counts.all).toBe(0);
 
         await page.goto("/commerce/orders?step=teleported&date=today");
@@ -495,7 +502,7 @@ test.describe("orders list filters (B4)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto(`/open/${LISTS}`);
         await page.goto("/commerce/orders");
         const bar = await filterBar(page);
         const late = bar.getByRole("button", { name: "Late" });
@@ -566,8 +573,8 @@ test.describe("orders quick view and row menu (B5)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         const top = rows.at(0);
         test.skip(!top, "No orders here.");
         if (!top) return;
@@ -595,8 +602,8 @@ test.describe("orders quick view and row menu (B5)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         const top = rows.at(0);
         test.skip(!top, "No orders here.");
         if (!top) return;
@@ -622,16 +629,12 @@ test.describe("orders quick view and row menu (B5)", () => {
     }) => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(
-            page,
-            NORTHWIND,
-            "&tab=open&step=preparing",
-        );
-        const target = rows.find((r) => r.fulfilmentType === "PICKUP");
-        test.skip(!target, "Needs a Pick-up order at Preparing on Northwind.");
-        if (!target) return;
+        // A Pick-up order of its own at Preparing: the newest, so the top of
+        // the list's first page. Open, not "Preparing": once it is Ready a
+        // Preparing list drops the row, and its quick view with it.
+        const target = await makeOrder(page.request, { stage: "PREPARING" });
 
-        await page.goto("/commerce/orders?tab=open&step=preparing");
+        await page.goto("/commerce/orders?tab=open");
         await openerOf(page, target.orderId).click();
         const panel = quickView(page);
         await panel.getByRole("button", { name: "Mark ready" }).click();
@@ -641,7 +644,6 @@ test.describe("orders quick view and row menu (B5)", () => {
             "Ready",
         );
         await page.keyboard.press("Escape");
-        // Put it back, so the next run finds it where it was.
         await page.getByRole("button", { name: "Undo" }).click();
         await expect(
             page.getByText(`#${target.orderId} is back to preparing.`),
@@ -652,8 +654,8 @@ test.describe("orders quick view and row menu (B5)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         const top = rows.at(0);
         test.skip(!top, "No orders here.");
         if (!top) return;
@@ -714,14 +716,8 @@ test.describe("orders quick view and row menu (B5)", () => {
     }) => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(
-            page,
-            NORTHWIND,
-            "&tab=open&payment=UNPAID",
-        );
-        const target = rows.at(0);
-        test.skip(!target, "Needs an unpaid open order on Northwind.");
-        if (!target) return;
+        // An unpaid open order of its own: the newest, on the first page.
+        const target = await makeOrder(page.request, { paid: false });
 
         // A link made first, through the API, as Order Detail would.
         const first = await page.request.post(
@@ -792,18 +788,11 @@ test.describe("orders bulk kitchen moves (B6)", () => {
     }) => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(
-            page,
-            NORTHWIND,
-            "&tab=open&step=preparing",
-        );
-        const picked = rows
-            .filter((r) => r.fulfilmentType === "PICKUP")
-            .slice(0, 2);
-        test.skip(
-            picked.length < 2,
-            "Needs two Pick-up orders at Preparing on Northwind.",
-        );
+        // Two Pick-up orders of its own at Preparing, newest on the list.
+        const picked = [
+            await makeOrder(page.request, { stage: "PREPARING" }),
+            await makeOrder(page.request, { stage: "PREPARING" }),
+        ];
 
         await page.goto("/commerce/orders?tab=open&step=preparing");
         for (const r of picked) {
@@ -839,8 +828,8 @@ test.describe("orders bulk kitchen moves (B6)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         const picked = rows
             .filter(
                 (r) => (r as Row & { ticketName?: string | null }).ticketName,
@@ -896,8 +885,8 @@ test.describe("orders bulk kitchen moves (B6)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");

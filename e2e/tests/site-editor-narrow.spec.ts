@@ -12,6 +12,9 @@ import { NORTHWIND_ORG, REVIEWED_SITE, urls } from "../playwright.config";
  *
  * Runs on Northwind, the seeded store tests may write to. The one edit is
  * put back before the test ends, so the draft is as it was found.
+ *
+ * `@serial`: it edits Northwind's one site, which site-versions publishes
+ * and site-review reads.
  */
 
 const PHONE = { width: 390, height: 844 };
@@ -40,8 +43,16 @@ async function openEditor(page: Page) {
 const heroChip = (page: Page) =>
     page.getByRole("button", { name: /^Hero block, \d+ of \d+/ }).first();
 
-test.describe("the site editor on a phone", () => {
+test.describe("the site editor on a phone", { tag: "@serial" }, () => {
     test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+    // Both projects would draw the same 390px touch screen: one run is
+    // enough, and it is one less in the serial phase.
+    test.beforeEach(({ page: _page }, testInfo) => {
+        test.skip(
+            !testInfo.project.name.startsWith("phone"),
+            "The phone project runs it; the desk would repeat the same scene.",
+        );
+    });
 
     test("edits the hero's heading in the sheet, and the page shows it", async ({
         page,

@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { phone as aPhone, stamp as ownStamp } from "../fixtures/own-data";
 import type { Role } from "../fixtures/sessions";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
@@ -51,9 +52,9 @@ test.describe("Customer Detail — merge", () => {
         page,
     }) => {
         await signIn(page, NORTHWIND, "owner");
-        const stamp = Date.now();
+        const stamp = ownStamp(test.info());
         // The same phone, two emails: the pair C2 suggests.
-        const phone = `+91 90000 ${String(stamp).slice(-5)}`;
+        const phone = aPhone();
         const kept = await makeContact(page, {
             email: `merge-a-${stamp}@example.test`,
             firstName: "Merge",
@@ -114,12 +115,12 @@ test.describe("Customer Detail — merge", () => {
         page,
     }) => {
         await signIn(page, NORTHWIND, "owner");
-        const stamp = Date.now();
+        const stamp = ownStamp(test.info());
         const lone = await makeContact(page, {
             email: `merge-lone-${stamp}@example.test`,
             firstName: "Lone",
             lastName: `${stamp}`,
-            phone: `+91 91111 ${String(stamp).slice(-5)}`,
+            phone: aPhone(),
         });
         await page.goto(`/customers/${lone}`);
         await page
