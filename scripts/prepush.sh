@@ -151,6 +151,7 @@ e2e_stack() {
     export SITE_RELAY_SECRET=saroh-dev-insecure-site-relay-secret-not-for-production
     export SITE_ACCOUNTS_CODE_SECRET=ci-placeholder-site-code-secret-at-least-32-chars # gitleaks:allow (CI placeholder)
     export SITE_CODES_EMAIL_FAKE=log
+    export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     echo "--- fresh database"
     dropdb --if-exists --force --maintenance-db="$maint" "$name"

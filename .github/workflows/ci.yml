@@ -484,6 +484,11 @@ jobs:
       SITE_RELAY_SECRET: saroh-dev-insecure-site-relay-secret-not-for-production
       SITE_ACCOUNTS_CODE_SECRET: ci-placeholder-site-code-secret-at-least-32-chars
       SITE_CODES_EMAIL_FAKE: log
+      # Every real environment has a payments key, and sending an invoice
+      # seals its pay link with it (D17): without one, Send answered 500 on
+      # this stack. The same throwaway key the API specs use; it opens
+      # nothing — the seeded connections are fakes.
+      PAYMENTS_ENC_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     steps:
       - uses: actions/checkout@v4
