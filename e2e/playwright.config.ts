@@ -115,12 +115,45 @@ export const REVIEWED_SITE = "Northwind Supply";
  */
 export const NORTHWIND_ORG = "seed_org";
 
+/**
+ * A test that changes something every other test reads — a business
+ * setting, a storefront's ways, a service's deposit, Northwind's one site —
+ * is tagged `@serial`. It runs in the `*-serial` projects, one test at a
+ * time, after every parallel test has finished (`run.mjs`).
+ */
+const SERIAL = /@serial/;
+
+/**
+ * Workers for the parallel projects. The stack under test runs on the same
+ * machine as the browsers, so it is sized to the machine: two on a 2-vCPU
+ * CI runner, four on a laptop. `PW_WORKERS` overrides either.
+ */
+const workers = Number(process.env.PW_WORKERS) || (process.env.CI ? 2 : 4);
+
+/**
+ * `run.mjs` runs the suite in phases (setup, parallel, serial) and names
+ * the phase, so each keeps its own traces: Playwright empties its output
+ * folder when a run starts, and the serial phase would otherwise delete
+ * the parallel phase's failures.
+ */
+const phase = process.env.E2E_PHASE;
+
+const desk = {
+    ...devices["Desktop Chrome"],
+    viewport: { width: 1440, height: 900 },
+};
+// A real touch pointer, which is what makes `pointer: coarse` match — the
+// whole basis of the touch-target rules (#178).
+const phone = { ...devices["Pixel 7"] };
+
 export default defineConfig({
     testDir: "./tests",
-    // Serial by default: these share one seeded Organization, and a spec that
-    // disables a module would otherwise race one that expects it enabled.
-    workers: 1,
-    fullyParallel: false,
+    outputDir: phase ? `test-results/${phase}` : "test-results",
+    // Every test owns the records it changes (fixtures/own-data.ts), so any
+    // two can run at once; the few that change what everyone reads are
+    // `@serial` and wait for the rest.
+    fullyParallel: true,
+    workers,
     forbidOnly: Boolean(process.env.CI),
     retries: process.env.CI ? 1 : 0,
     reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
@@ -129,6 +162,8 @@ export default defineConfig({
     use: {
         baseURL: APP_URL,
         trace: "retain-on-failure",
+        // A click that cannot land fails in seconds, not at the test timeout.
+        actionTimeout: 15_000,
         screenshot: "only-on-failure",
         // portless serves the `.localhost` names over HTTPS with its own local
         // CA, which a CI browser has no reason to trust. Opt-in, and never on
@@ -137,17 +172,44 @@ export default defineConfig({
     },
     projects: [
         {
-            name: "desk",
-            use: {
-                ...devices["Desktop Chrome"],
-                viewport: { width: 1440, height: 900 },
-            },
+            // Signs each seeded person in through the real form once and
+            // saves the session to e2e/.auth/ (fixtures/sessions.ts). Every
+            // spec that only needs to BE signed in reuses it.
+            name: "setup",
+            testMatch: /auth\.setup\.ts$/,
         },
         {
-            // A real touch pointer, which is what makes `pointer: coarse`
-            // match — the whole basis of the touch-target rules (#178).
+            name: "desk",
+            dependencies: ["setup"],
+            grepInvert: SERIAL,
+            use: desk,
+        },
+        {
             name: "phone",
-            use: { ...devices["Pixel 7"] },
+            dependencies: ["setup"],
+            grepInvert: SERIAL,
+            use: phone,
+        },
+        /*
+         * The `@serial` tests, one at a time, once the parallel ones are
+         * done. `run.mjs` runs these as a phase of their own with
+         * `--workers=1 --no-deps`, which is what lets CI shard them; a bare
+         * `playwright test` (no shard) gets the same order from the
+         * dependencies below.
+         */
+        {
+            name: "desk-serial",
+            dependencies: ["desk", "phone"],
+            grep: SERIAL,
+            workers: 1,
+            use: desk,
+        },
+        {
+            name: "phone-serial",
+            dependencies: ["desk-serial"],
+            grep: SERIAL,
+            workers: 1,
+            use: phone,
         },
     ],
 });

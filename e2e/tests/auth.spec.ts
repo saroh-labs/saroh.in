@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/ app:/choose app:/open app:/bookings api:organizations api:saved-views api:bookings
 import { expect, test } from "@playwright/test";
 
 import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";

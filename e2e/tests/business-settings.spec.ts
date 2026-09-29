@@ -1,7 +1,9 @@
+// @covers accounts:/login app:/open app:/settings/organization api:organizations api:audit
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Business settings, Tax and invoices: registering for GST (e890237c).
@@ -23,13 +25,7 @@ const headers = { "x-organization-id": ORG, origin: urls.APP_URL };
 const settingsUrl = `${urls.API_URL}/organizations/${ORG}/settings`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 interface TaxRead {
@@ -66,7 +62,9 @@ async function putBack(request: APIRequestContext) {
     expect(res.ok()).toBe(true);
 }
 
-test.describe("business settings", () => {
+// @serial: GST registration and the invoice prefix are Northwind's own,
+// read by every order and invoice test running beside it.
+test.describe("business settings", { tag: "@serial" }, () => {
     test("registering for GST: Save comes back once the GSTIN and address are filled", async ({
         page,
     }) => {

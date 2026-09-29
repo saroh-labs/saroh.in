@@ -1,3 +1,4 @@
+// @covers accounts:/login site:/ site:/book api:site-accounts api:bookings api:sites pkg:site-blocks
 import { createHmac, randomBytes } from "node:crypto";
 
 import type { Page } from "@playwright/test";
@@ -126,15 +127,20 @@ test.describe("site sign-in: in the browser", () => {
         });
     }
 
-    /** The booking page, a service and its first free time. */
+    /**
+     * The booking page, a service and a free time on the first open day:
+     * the first for the desk, the second for the phone, which runs at the
+     * same moment (`public-booking.spec.ts` books the last days).
+     */
     async function chooseTime(page: Page) {
+        const nth = test.info().project.name.startsWith("phone") ? 1 : 0;
         await page.goto(`${SITE}/book`);
         await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
         const times = page.locator('[role="radiogroup"] button[role="radio"]', {
             hasText: /^\d{2}:\d{2}$/,
         });
-        await expect(times.first()).toBeVisible({ timeout: 15_000 });
-        await times.first().click();
+        await expect(times.nth(nth)).toBeVisible({ timeout: 15_000 });
+        await times.nth(nth).click();
     }
 
     test("signs in at the last step of booking on Northwind, stays signed in on reload, and is not signed in on another site (A9)", async ({

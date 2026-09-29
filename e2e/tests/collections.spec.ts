@@ -1,9 +1,11 @@
+// @covers accounts:/login app:/open app:/commerce/products api:collections api:products
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
-import { demoUser, urls } from "../playwright.config";
+import { urls } from "../playwright.config";
 
 /**
  * Collections on the screens (#524): New collection on the Products list's
@@ -25,13 +27,7 @@ const headers = { "x-organization-id": ORG, origin: urls.APP_URL };
 const orgApi = (path: string) => `${urls.API_URL}/organizations/${ORG}${path}`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 /** Delete every collection called one of `names` (a failed run's too). */

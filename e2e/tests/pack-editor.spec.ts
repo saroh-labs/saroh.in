@@ -1,7 +1,10 @@
+// @covers accounts:/login app:/open app:/class-packs app:/class-packs/new api:class-packs
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { stamp as ownStamp } from "../fixtures/own-data";
+import { useSession } from "../fixtures/sessions";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The Pack Editor (round-2 E18) on Northwind, where browser checks may
@@ -18,13 +21,7 @@ const packApi = (path: string) =>
     `${urls.API_URL}/organizations/${NORTHWIND_ORG}/class-packs${path}`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${NORTHWIND_ORG}`);
 }
 
@@ -52,7 +49,7 @@ test.describe("the Pack Editor on Northwind (E18)", () => {
         await expect(
             page.getByText("Not saved yet — start with a name"),
         ).toBeVisible();
-        const name = `E2E pack ${Date.now()}`;
+        const name = `E2E pack ${ownStamp(test.info())}`;
         await page.getByLabel("Name").fill(name);
         // The first autosave makes it a draft at its own address.
         await page.waitForURL(/\/class-packs\/[^/]+\/edit$/);

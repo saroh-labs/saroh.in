@@ -1,7 +1,9 @@
+// @covers accounts:/login app:/open app:/calendar api:calendar api:orders api:bookings api:staff
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Home › Calendar's Week (plan 005 E25) on Rye & Co., the seeded bakery:
@@ -19,13 +21,7 @@ const MONTHS = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
 const PULSE = "seed_sc_pulse_org";
 
 async function signIn(page: Page, org = ORG) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${org}`);
 }
 
@@ -203,15 +199,7 @@ test.describe("calendar orders for the kitchen (E20)", () => {
     test("a Member sees the orders layer, and no amount or money strip", async ({
         page,
     }) => {
-        await page.goto(`${urls.ACCOUNTS_URL}/login`);
-        await page.getByLabel("Email").fill(member.email);
-        await page
-            .getByLabel("Password", { exact: true })
-            .fill(member.password);
-        await page.getByRole("button", { name: "Log in" }).click();
-        await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-            timeout: 30_000,
-        });
+        await useSession(page, member);
         await page.goto(`/open/${ORG}`);
 
         const from = `${istDay(0).slice(0, 7)}-01`;

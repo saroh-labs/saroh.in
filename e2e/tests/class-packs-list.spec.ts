@@ -1,7 +1,10 @@
+// @covers accounts:/login app:/open app:/class-packs api:class-packs api:invoices api:payments
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { stamp as ownStamp } from "../fixtures/own-data";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Bookings › Packs (round-2 E15): the cards and the sell dialog, on
@@ -19,13 +22,7 @@ const headers = { "x-organization-id": ORG, origin: urls.APP_URL };
 const orgApi = (path: string) => `${urls.API_URL}/organizations/${ORG}${path}`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${ORG}`);
 }
 
@@ -33,7 +30,11 @@ async function signIn(page: Page) {
 async function aService(request: APIRequestContext): Promise<string> {
     const res = await request.get(orgApi("/services"), { headers });
     expect(res.ok()).toBe(true);
-    const services = (await res.json()) as { id: string }[];
+    // One of the seed's: an "E2E …" service is another test's, and may be
+    // deleted while this pack still names it.
+    const services = (
+        (await res.json()) as { id: string; name: string }[]
+    ).filter((s) => !s.name.startsWith("E2E "));
     expect(services.length).toBeGreaterThan(0);
     return services[0].id;
 }
@@ -47,7 +48,7 @@ test.describe("class packs list", () => {
         page,
     }) => {
         const request = page.request;
-        const stamp = Date.now();
+        const stamp = ownStamp(test.info());
         const live = `E2E pack ${stamp}`;
         const draftName = `E2E draft ${stamp}`;
         const serviceId = await aService(request);

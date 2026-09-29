@@ -1,9 +1,11 @@
+// @covers accounts:/login app:/open app:/commerce/products app:/commerce/products/new api:products api:catalogue api:stock api:media api:stores
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
-import { demoUser, urls } from "../playwright.config";
+import { urls } from "../playwright.config";
 
 /**
  * The product editor film (#472), as a test: make a product on one page,
@@ -33,13 +35,7 @@ const PHOTOS = [
 ];
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;

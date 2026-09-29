@@ -917,3 +917,114 @@ code change. `--int` takes 95s, and `--all` 10.7 min, most of it the
 browser specs.
 **Category**: tooling · `scripts/prepush.sh`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
+## Tooling — `--e2e` picked 25 spec files for a batch, and `--int` ran all 381
+
+**Problem**: After the gate got fast, a batch's browser step still took about
+11 min. The integration step still ran every spec, whatever the batch touched.
+Batch 2's `--e2e` chose 25 of the 34 spec files.
+**Root cause**: The browser step chose specs by grepping them for a changed
+folder's name. Short names such as `orders`, `home` and `shared` match nearly
+every spec, and the grep did not look at api or package changes. The
+integration step had no selection at all.
+**Fix**: Every spec's first line names what it exercises
+(`// @covers app:/commerce/orders api:orders site:/shop pkg:site-blocks`).
+`scripts/e2e-affected.mjs` maps the changed files onto those keys through an
+import scan and prints why it chose each spec. `--int` runs
+`jest --findRelatedTests` plus the permission, RLS and module-annotation
+specs. Global changes, and `--full`, still run everything, and CI always
+does. `check:e2e-covers` keeps the keys honest. On a commit that touches one
+screen and one api module, `--e2e` picked 2 spec files (24 tests) and took
+105s instead of 657s. The integration run picked 10 of 381 specs and took 9s
+instead of 84s. Batch 2 would still have run every spec, because it changed
+the schema and CI.
+**Merging with a branch that edits the same specs**: the `@covers` line sits
+above the imports. A branch that rewrites a spec's first import line (the
+storageState sign-in change drops `demoUser` and `Page`) makes git report a
+conflict between two edits that do not touch each other. Resolve it with a
+one-off union merge, never a committed one: add
+`e2e/tests/*.spec.ts merge=union` to `.git/info/attributes`, merge, then
+remove the line. A union merge keeps both sides of the hunk, so the import
+line the other branch deleted comes back (tried on a scratch repo: the
+merged spec had the `@covers` line and the stale `import type { Page }`).
+Delete those lines by hand, then run `pnpm run check:e2e-covers` and the e2e
+lint. Or take the other branch's spec whole and put the one `@covers` line
+back on top (`git show r2/e2e-b:<spec> | head -1`).
+**Category**: tooling · `scripts/e2e-affected.mjs`, `scripts/prepush.sh`,
+`docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
+## E2E — every browser spec typed a password, and every run seeded from nothing
+
+**Problem**: The browser step spent minutes on work that never changed. About
+150 tests signed in through the accounts form, one by one (three specs had
+already grown their own saved-session helpers to dodge the sign-in
+throttle). Every `prepush --e2e` run and every CI shard migrated and seeded
+a fresh database (~40s). Three specs slept a fixed time: 9s to outlast a
+booking's Undo hold, 2s a poll, 300ms a scroll.
+**Root cause**: Nothing was shared between tests or between runs. A
+sign-in's cookies, and a seeded database, are the same every time until the
+seed or the session code changes.
+**Fix**: A Playwright `setup` project (`e2e/tests/auth.setup.ts`) signs the
+four seeded people in once per run and checks the workspace sees each
+session; specs call `useSession` (`e2e/fixtures/sessions.ts`). The specs
+about signing in (`auth.spec.ts`, `site-sign-in.spec.ts`) still use the form,
+and nothing signs out on a saved session — sign-out revokes it on the server
+for every later spec. `prepush --e2e` keeps `<E2E db>-template`, keyed on the
+seed's inputs and the Indian day, and copies it per run (1s against 38s);
+CI shards restore a `pg_dump` cached on the same inputs. The sleeps became
+`page.clock.runFor` past the hold and `expect.poll`. Measured: all 34 spec
+files on desk and phone, 334 passed, in 553s end to end on a template hit,
+against 657s for 25 files before.
+**Gotcha**: The showcase seed lays its data out relative to the moment it
+runs, so a seeded copy has a shelf life: the template is reused for 4 hours
+of one Indian day (`PREPUSH_E2E_TEMPLATE_HOURS`), CI's dump for one 4-hour
+window. Don't key either on the files alone.
+**Category**: e2e · tooling · `.agents/skills/saroh-browser-tests/SKILL.md`,
+`docs/patterns/devops-tooling-and-deploy.md` → CI and How the gate stays fast
+
+## E2E — the browser suite could only run one test at a time
+
+**Problem**: 34 spec files on desk and phone took 553s on one worker, and CI's
+shards split them by file (135s against 195s). Turning on parallel workers
+failed on data, not code: the deposit test switched the walkthrough to
+deposits and every other booking lost Pay at the desk; desk and phone
+changed the same invoice prefix at once; two tests archived Rye's one
+Sourdough plan; booking tests took "the third free time" from a list that
+shrank as the others booked ("That time has just gone"); earlier, the
+trolley's stock ran out and D18 leaned on another test's invoice. Four
+tests had been skipped on every fresh seed and so never ran at all (Mark
+ready from the quick view, the bulk Undo, both extra-hours journeys).
+**Root cause**: Specs wrote to shared seeded records — Northwind's settings,
+a named customer, "the first Preparing order", Rye's and Pulse's own data —
+and read counts and first rows other specs were changing. One worker hid it.
+**Fix**: Every test makes what it changes, through the API, with a stamp
+unique to the test, project and worker (`e2e/fixtures/own-data.ts`); orders
+are of one untracked product the setup project makes once. Lists and counts
+are read on Rye, which nothing writes to; writes moved off Rye and Pulse to
+Northwind. Business-wide changes are tagged `@serial` and run alone after
+the rest (`e2e/run.mjs`: setup, parallel, serial). Each booking test takes a
+day of its own. `fullyParallel` on 4 workers: ~220s end to end, four
+back-to-back runs with no retry. `prepush --e2e` takes a lock so a second run
+waits, and its teardown stops only its own servers.
+**Gotcha**: A test that was skipped "because the seed has none" is not
+coverage — make the record. And a long email pushed the phone's Link button
+off-screen in "Link a commerce customer" (the test keeps emails short; the
+dialog does not wrap).
+**Category**: e2e · tooling · `.agents/skills/saroh-browser-tests/SKILL.md`,
+`docs/patterns/devops-tooling-and-deploy.md`, `scripts/prepush.sh`
+
+## E2E — the phone tab-bar check found "no tab bar" on CI only (#718)
+
+**Problem**: `four-scenes` "/commerce leaves nothing under the bar" failed on
+CI's shard 3 (and its retry) with `["no tab bar"]`; it passed four times in
+a row locally, and the failure screenshot shows the bar.
+**Root cause**: `/commerce` redirects to `/commerce/storefronts`. The spec
+waited for the page height to settle, then measured once — and on CI's
+2-vCPU runner, with 2 workers, that one look landed between the two pages:
+the old bar gone, the new one not drawn. A fast local machine never lands
+in that gap.
+**Fix**: The measurement itself is polled until it holds (`expect.poll`,
+10s); a control really under the bar still fails. Rule: after a navigation
+or redirect, never read the page once and assert — assert through a
+web-first expectation or a poll, so a slow runner waits instead of failing.
+**Category**: e2e · `e2e/tests/four-scenes.spec.ts` · `.agents/skills/saroh-browser-tests/SKILL.md`

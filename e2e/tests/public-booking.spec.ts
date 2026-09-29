@@ -1,7 +1,9 @@
+// @covers accounts:/login site:/book api:bookings api:site-accounts api:payments pkg:site-blocks
 import type { Page, Request } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
 import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
@@ -41,23 +43,27 @@ const SITE = (() => {
 const SERVICE = "Warehouse walkthrough";
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 /**
  * Open the page on the service and pick a free time: its label, and the
  * service's id (from the page's own read of its days).
+ *
+ * Every test here books at the same moment as the others, on both projects,
+ * and a list of free times shrinks as they book: "the third free time" is a
+ * different time a second later, so two tests picking by position took the
+ * same one ("That time has just gone"). Each test has a DAY of its own
+ * instead — `slot` (0–3, one per test) counted back from the furthest open
+ * day, the phone's four before the desk's — and takes that day's first
+ * time. The first open day is left to `site-sign-in.spec.ts`.
  */
 async function pickTime(
     page: Page,
-    nth: number,
+    slot: number,
 ): Promise<{ label: string; serviceId: string }> {
+    const phone = test.info().project.name.startsWith("phone");
+    const fromEnd = 1 + slot + (phone ? 4 : 0);
     await page.goto(`${SITE}/book`);
     await expect(
         page.getByRole("heading", { name: "Book your appointment" }),
@@ -68,16 +74,17 @@ async function pickTime(
     await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
     const serviceId =
         new URL((await daysRead).url()).pathname.split("/")[3] ?? "";
-    // The furthest day with free times, never today: late in the day today
-    // may have fewer free times left than the test picks from.
     const openDays = page.getByRole("radio", { name: /times? free/ });
     await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
-    await openDays.nth((await openDays.count()) - 1).click();
+    const count = await openDays.count();
+    // Nine open days: eight for these tests, the first for site sign-in.
+    expect(count, "open days on the walkthrough").toBeGreaterThan(8);
+    await openDays.nth(count - fromEnd).click();
     const times = page.locator('[role="radiogroup"] button[role="radio"]', {
         hasText: /^\d{2}:\d{2}$/,
     });
     await expect(times.first()).toBeVisible({ timeout: 15_000 });
-    const time = times.nth(nth);
+    const time = times.first();
     const label = (await time.innerText()).trim();
     await time.click();
     await expect(time).toHaveAttribute("aria-checked", "true");
@@ -178,7 +185,7 @@ test.describe("the booking page", () => {
     }, testInfo) => {
         test.setTimeout(120_000);
         const email = `desk-${testInfo.project.name}-${Date.now()}@example.in`;
-        await pickTime(page, 1);
+        await pickTime(page, 0);
 
         // Days say what they are: Full, Closed, or how many are free.
         await expect(
@@ -230,7 +237,7 @@ test.describe("the booking page", () => {
     }, testInfo) => {
         test.setTimeout(120_000);
         const email = `now-${testInfo.project.name}-${Date.now()}@example.in`;
-        const { label, serviceId } = await pickTime(page, 2);
+        const { label, serviceId } = await pickTime(page, 1);
         await details(page);
         await expect(
             page.getByRole("radio", { name: /^Pay ₹\S+ now Online/ }),
@@ -319,7 +326,7 @@ test.describe("the booking page", () => {
         );
         const bookBodies = watchBookings(page);
 
-        await pickTime(page, 3);
+        await pickTime(page, 2);
         await details(page);
         await continueAndSignIn(page, email);
 
@@ -358,7 +365,7 @@ test.describe("the booking page", () => {
 
         const provider = await fakeProvider(page, 150_000);
 
-        await pickTime(page, 4);
+        await pickTime(page, 3);
         await details(page);
         const intent = page.waitForRequest((r) =>
             r.url().includes("/payment-intent"),
@@ -399,124 +406,129 @@ test.describe("the booking page", () => {
         );
     });
 
-    test("a deposit: paid online to hold the time, the rest at the visit, and never at the desk (E8)", async ({
-        page,
-        browser,
-        request,
-    }, testInfo) => {
-        test.setTimeout(150_000);
-        const email = `deposit-${testInfo.project.name}-${Date.now()}@example.in`;
+    // @serial: the deposit is the service's own setting, and while it is on
+    // no booking of the walkthrough anywhere offers Pay at the desk.
+    test(
+        "a deposit: paid online to hold the time, the rest at the visit, and never at the desk (E8)",
+        {
+            tag: "@serial",
+        },
+        async ({ page, browser, request }, testInfo) => {
+            test.setTimeout(150_000);
+            const email = `deposit-${testInfo.project.name}-${Date.now()}@example.in`;
 
-        // Staff, in a context of their own: the service found through the
-        // API by its name, and set to take a 50% deposit for this test.
-        const staff = await browser.newContext({ ignoreHTTPSErrors });
-        const desk = await staff.newPage();
-        await signIn(desk);
-        const services = (await (
-            await desk.request.get(
-                `${urls.API_URL}/organizations/${ORG}/services`,
-            )
-        ).json()) as {
-            id: string;
-            name: string;
-            priceCents: number | null;
-            depositMode: string;
-        }[];
-        const walkthrough = services.find((s) => s.name === SERVICE);
-        expect(walkthrough?.priceCents ?? 0).toBeGreaterThan(0);
-        const serviceUrl = `${urls.API_URL}/organizations/${ORG}/services/${walkthrough?.id ?? ""}`;
-        const setDeposit = (depositMode: string) =>
-            desk.request.patch(serviceUrl, {
-                data: { depositMode },
-                // The API refuses a write with no Origin (#50).
-                headers: { origin: urls.APP_URL },
-            });
-        const was = walkthrough?.depositMode ?? "NONE";
-        const set = await setDeposit("PERCENT_50");
-        expect(set.ok()).toBe(true);
-        const depositCents = ((await set.json()) as { depositCents: number })
-            .depositCents;
-        expect(depositCents).toBe(
-            Math.round((walkthrough?.priceCents ?? 0) / 2),
-        );
-
-        let payToken = "";
-        try {
-            const provider = await fakeProvider(page, depositCents);
-            const bookBodies = watchBookings(page);
-            await pickTime(page, 5);
-            await details(page);
-
-            // The deposit first and chosen; the whole price the other way;
-            // no desk.
-            const paying = page
-                .getByRole("radiogroup", { name: "Paying" })
-                .filter({ visible: true });
-            const deposit = paying.getByRole("radio", {
-                name: /^Pay ₹[\d,]+ deposit now The rest \(₹[\d,]+\) at Northwind Supply\. Refunded if you cancel in time\./,
-            });
-            await expect(deposit).toHaveAttribute("aria-checked", "true");
-            await expect(
-                paying.getByRole("radio", {
-                    name: /^Pay the full ₹[\d,]+ now/,
-                }),
-            ).toBeVisible();
-            await expect(
-                paying.getByRole("radio", { name: /Pay at the desk/ }),
-            ).toHaveCount(0);
-            const part = /^Pay (₹[\d,]+) deposit now/.exec(
-                await deposit.innerText(),
-            )?.[1];
-            expect(part).toBeTruthy();
-
-            const intent = page.waitForRequest((r) =>
-                r.url().includes("/payment-intent"),
+            // Staff, in a context of their own: the service found through the
+            // API by its name, and set to take a 50% deposit for this test.
+            const staff = await browser.newContext({ ignoreHTTPSErrors });
+            const desk = await staff.newPage();
+            await signIn(desk);
+            const services = (await (
+                await desk.request.get(
+                    `${urls.API_URL}/organizations/${ORG}/services`,
+                )
+            ).json()) as {
+                id: string;
+                name: string;
+                priceCents: number | null;
+                depositMode: string;
+            }[];
+            const walkthrough = services.find((s) => s.name === SERVICE);
+            expect(walkthrough?.priceCents ?? 0).toBeGreaterThan(0);
+            const serviceUrl = `${urls.API_URL}/organizations/${ORG}/services/${walkthrough?.id ?? ""}`;
+            const setDeposit = (depositMode: string) =>
+                desk.request.patch(serviceUrl, {
+                    data: { depositMode },
+                    // The API refuses a write with no Origin (#50).
+                    headers: { origin: urls.APP_URL },
+                });
+            const was = walkthrough?.depositMode ?? "NONE";
+            const set = await setDeposit("PERCENT_50");
+            expect(set.ok()).toBe(true);
+            const depositCents = (
+                (await set.json()) as { depositCents: number }
+            ).depositCents;
+            expect(depositCents).toBe(
+                Math.round((walkthrough?.priceCents ?? 0) / 2),
             );
-            await page
-                .getByRole("button", { name: "Continue to sign in" })
-                .filter({ visible: true })
-                .click();
-            await signInOnSheet(page, email);
-            payToken = payTokenOf(await intent);
-            expect(bookBodies.map((b) => b.pay)).toEqual(["DEPOSIT"]);
 
-            // Only the deposit is asked for now, and a deposit is never
-            // turned into a desk booking.
-            await expect(
-                page.getByRole("heading", {
-                    name: `Pay ${part} to confirm your place`,
-                }),
-            ).toBeVisible();
-            await expect(
-                page.getByRole("button", {
-                    name: "Book it to pay at the desk",
-                }),
-            ).toHaveCount(0);
-            await expect(page.getByText("Paying…")).toBeVisible();
+            let payToken = "";
+            try {
+                const provider = await fakeProvider(page, depositCents);
+                const bookBodies = watchBookings(page);
+                await pickTime(page, 0);
+                await details(page);
 
-            provider.confirm();
-            await expect(
-                page.getByRole("heading", { name: "You're booked, Asha." }),
-            ).toBeVisible({ timeout: 15_000 });
-            await expect(
-                page.getByText(
-                    new RegExp(
-                        `^Paid a ${part} deposit\\. The rest \\(₹[\\d,]+\\) is paid at Northwind Supply\\.$`,
-                    ),
-                ),
-            ).toBeVisible();
-        } finally {
-            // Nothing was paid for real: let the hold go, and put the
-            // service back as it was.
-            if (payToken) {
-                await request.post(
-                    `${urls.API_URL}/public/services/holds/${payToken}/release`,
+                // The deposit first and chosen; the whole price the other way;
+                // no desk.
+                const paying = page
+                    .getByRole("radiogroup", { name: "Paying" })
+                    .filter({ visible: true });
+                const deposit = paying.getByRole("radio", {
+                    name: /^Pay ₹[\d,]+ deposit now The rest \(₹[\d,]+\) at Northwind Supply\. Refunded if you cancel in time\./,
+                });
+                await expect(deposit).toHaveAttribute("aria-checked", "true");
+                await expect(
+                    paying.getByRole("radio", {
+                        name: /^Pay the full ₹[\d,]+ now/,
+                    }),
+                ).toBeVisible();
+                await expect(
+                    paying.getByRole("radio", { name: /Pay at the desk/ }),
+                ).toHaveCount(0);
+                const part = /^Pay (₹[\d,]+) deposit now/.exec(
+                    await deposit.innerText(),
+                )?.[1];
+                expect(part).toBeTruthy();
+
+                const intent = page.waitForRequest((r) =>
+                    r.url().includes("/payment-intent"),
                 );
+                await page
+                    .getByRole("button", { name: "Continue to sign in" })
+                    .filter({ visible: true })
+                    .click();
+                await signInOnSheet(page, email);
+                payToken = payTokenOf(await intent);
+                expect(bookBodies.map((b) => b.pay)).toEqual(["DEPOSIT"]);
+
+                // Only the deposit is asked for now, and a deposit is never
+                // turned into a desk booking.
+                await expect(
+                    page.getByRole("heading", {
+                        name: `Pay ${part} to confirm your place`,
+                    }),
+                ).toBeVisible();
+                await expect(
+                    page.getByRole("button", {
+                        name: "Book it to pay at the desk",
+                    }),
+                ).toHaveCount(0);
+                await expect(page.getByText("Paying…")).toBeVisible();
+
+                provider.confirm();
+                await expect(
+                    page.getByRole("heading", { name: "You're booked, Asha." }),
+                ).toBeVisible({ timeout: 15_000 });
+                await expect(
+                    page.getByText(
+                        new RegExp(
+                            `^Paid a ${part} deposit\\. The rest \\(₹[\\d,]+\\) is paid at Northwind Supply\\.$`,
+                        ),
+                    ),
+                ).toBeVisible();
+            } finally {
+                // Nothing was paid for real: let the hold go, and put the
+                // service back as it was.
+                if (payToken) {
+                    await request.post(
+                        `${urls.API_URL}/public/services/holds/${payToken}/release`,
+                    );
+                }
+                await setDeposit(was);
+                await staff.close();
             }
-            await setDeposit(was);
-            await staff.close();
-        }
-    });
+        },
+    );
 });
 
 /**

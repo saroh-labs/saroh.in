@@ -1,12 +1,9 @@
+// @covers accounts:/login app:/open app:/sites api:sites pkg:site-blocks
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import {
-    demoUser,
-    NORTHWIND_ORG,
-    REVIEWED_SITE,
-    urls,
-} from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { NORTHWIND_ORG, REVIEWED_SITE, urls } from "../playwright.config";
 
 /**
  * The site editor on a phone (round 2, G4): the page fills the screen, the
@@ -15,18 +12,15 @@ import {
  *
  * Runs on Northwind, the seeded store tests may write to. The one edit is
  * put back before the test ends, so the draft is as it was found.
+ *
+ * `@serial`: it edits Northwind's one site, which site-versions publishes
+ * and site-review reads.
  */
 
 const PHONE = { width: 390, height: 844 };
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 /** Northwind's site, opened in the editor. */
@@ -49,8 +43,16 @@ async function openEditor(page: Page) {
 const heroChip = (page: Page) =>
     page.getByRole("button", { name: /^Hero block, \d+ of \d+/ }).first();
 
-test.describe("the site editor on a phone", () => {
+test.describe("the site editor on a phone", { tag: "@serial" }, () => {
     test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+    // Both projects would draw the same 390px touch screen: one run is
+    // enough, and it is one less in the serial phase.
+    test.beforeEach(({ page: _page }, testInfo) => {
+        test.skip(
+            !testInfo.project.name.startsWith("phone"),
+            "The phone project runs it; the desk would repeat the same scene.",
+        );
+    });
 
     test("edits the hero's heading in the sheet, and the page shows it", async ({
         page,

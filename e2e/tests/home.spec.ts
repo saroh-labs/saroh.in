@@ -1,7 +1,9 @@
+// @covers accounts:/login app:/open app:/ api:home api:orders api:bookings
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Home's inline actions (round 2, F4) on Northwind Supply, the generic dev
@@ -18,13 +20,7 @@ import { demoUser, urls } from "../playwright.config";
 const NORTHWIND = "seed_org";
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND}`);
 }
 
@@ -38,66 +34,75 @@ async function allRows(page: Page) {
 }
 
 test.describe("Home's inline actions (F4)", () => {
-    test("Mark sent confirms in the row, and Undo puts the order back", async ({
-        page,
-    }) => {
-        test.setTimeout(90_000);
-        await signIn(page);
-        await page.goto("/");
+    // @serial: Needs you shows a handful of Northwind's open orders, late
+    // and oldest first, so an order made here would not be among them: it
+    // moves the seed's own and puts it back, while nothing else moves orders.
+    test(
+        "Mark sent confirms in the row, and Undo puts the order back",
+        {
+            tag: "@serial",
+        },
+        async ({ page }) => {
+            test.setTimeout(90_000);
+            await signIn(page);
+            await page.goto("/");
 
-        const rows = await allRows(page);
-        const row = rows
-            .filter({
-                has: page.getByRole("button", {
-                    name: "Mark sent",
-                    exact: true,
-                }),
-            })
-            .first();
-        test.skip(
-            (await row.count()) === 0,
-            "Northwind has no order ready to hand over",
-        );
-        const title = (await row.getByRole("link").first().innerText()).split(
-            "\n",
-        )[0];
+            const rows = await allRows(page);
+            const row = rows
+                .filter({
+                    has: page.getByRole("button", {
+                        name: "Mark sent",
+                        exact: true,
+                    }),
+                })
+                .first();
+            test.skip(
+                (await row.count()) === 0,
+                "Northwind has no order ready to hand over",
+            );
+            const title = (
+                await row.getByRole("link").first().innerText()
+            ).split("\n")[0];
 
-        await row
-            .getByRole("button", { name: "Mark sent", exact: true })
-            .click();
-        const confirm = row.getByRole("alertdialog");
-        await expect(confirm).toBeVisible();
-        // It says who is told, or that nobody is, before anything happens.
-        await expect(confirm).toContainText(
-            /tells|sees that the order|Nothing is sent to/,
-        );
-        // Cancel closes it and nothing moved.
-        await confirm.getByRole("button", { name: "Cancel" }).click();
-        await expect(confirm).toHaveCount(0);
+            await row
+                .getByRole("button", { name: "Mark sent", exact: true })
+                .click();
+            const confirm = row.getByRole("alertdialog");
+            await expect(confirm).toBeVisible();
+            // It says who is told, or that nobody is, before anything happens.
+            await expect(confirm).toContainText(
+                /tells|sees that the order|Nothing is sent to/,
+            );
+            // Cancel closes it and nothing moved.
+            await confirm.getByRole("button", { name: "Cancel" }).click();
+            await expect(confirm).toHaveCount(0);
 
-        await row
-            .getByRole("button", { name: "Mark sent", exact: true })
-            .click();
-        await row
-            .getByRole("alertdialog")
-            .getByRole("button", { name: /^Mark sent/ })
-            .click();
-        await expect(row.getByText(/^Marked sent/)).toBeVisible();
+            await row
+                .getByRole("button", { name: "Mark sent", exact: true })
+                .click();
+            await row
+                .getByRole("alertdialog")
+                .getByRole("button", { name: /^Mark sent/ })
+                .click();
+            await expect(row.getByText(/^Marked sent/)).toBeVisible();
 
-        // Undo within the hold: the order is back, and its button with it.
-        await row.getByRole("button", { name: "Undo" }).click();
-        await expect(
-            page
-                .getByText(/^Undone\./)
-                .locator("visible=true")
-                .first(),
-        ).toBeVisible();
-        await page.reload();
-        const again = (await allRows(page)).filter({ hasText: title }).first();
-        await expect(
-            again.getByRole("button", { name: "Mark sent", exact: true }),
-        ).toBeVisible();
-    });
+            // Undo within the hold: the order is back, and its button with it.
+            await row.getByRole("button", { name: "Undo" }).click();
+            await expect(
+                page
+                    .getByText(/^Undone\./)
+                    .locator("visible=true")
+                    .first(),
+            ).toBeVisible();
+            await page.reload();
+            const again = (await allRows(page))
+                .filter({ hasText: title })
+                .first();
+            await expect(
+                again.getByRole("button", { name: "Mark sent", exact: true }),
+            ).toBeVisible();
+        },
+    );
 
     test("Send reminder says how it reaches them, and Cancel sends nothing", async ({
         page,

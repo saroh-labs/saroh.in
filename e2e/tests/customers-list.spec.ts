@@ -1,11 +1,10 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-
-import type { Browser, Page } from "@playwright/test";
+// @covers accounts:/login app:/open app:/commerce/customers app:/stores app:/customers api:customer-workspace api:customers api:stores
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
+import type { Role } from "../fixtures/sessions";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * The Customers list (round 2 C4, Saroh Customers.dc.html): one list for the
@@ -14,43 +13,17 @@ import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
  *
  * Read-only: nothing here saves, so it runs on Northwind and reads Rye & Co.
  * (a film set) without changing either. Desk and phone run the same steps.
+ * What it picks by position — "the first customer" — it picks on Rye,
+ * which no test writes to.
  */
 
 const NORTHWIND = "seed_org";
 const NW_STORE = "seed_store";
 const RYE = "seed_sc_rc_org";
 
-const member = {
-    email: "nisha.kulkarni@saroh.dev",
-    password: "demo-password-123",
-};
-
-const OWNER_STATE = path.join(os.tmpdir(), "e2e-customers-list-owner.json");
-const MEMBER_STATE = path.join(os.tmpdir(), "e2e-customers-list-member.json");
-
-async function saveSession(
-    browser: Browser,
-    who: { email: string; password: string },
-    file: string,
-) {
-    const context = await browser.newContext({ ignoreHTTPSErrors });
-    const page = await context.newPage();
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
-    await context.storageState({ path: file });
-    await context.close();
-}
-
-async function signIn(page: Page, org: string, file = OWNER_STATE) {
-    const state = JSON.parse(fs.readFileSync(file, "utf8")) as {
-        cookies: Parameters<ReturnType<Page["context"]>["addCookies"]>[0];
-    };
-    await page.context().addCookies(state.cookies);
+/** Carry the saved session into this test's browser, then open the business. */
+async function signIn(page: Page, org: string, who: Role = "owner") {
+    await useSession(page, who);
     await page.goto(`/open/${org}`);
 }
 
@@ -74,22 +47,20 @@ async function firstCustomers(page: Page, org: string, query = "") {
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-test.beforeAll(async ({ browser }) => {
-    await saveSession(browser, demoUser, OWNER_STATE);
-    await saveSession(browser, member, MEMBER_STATE);
-});
-
 test.describe("customers list", () => {
     test("search, a chip and a sort, then a row opens the customer", async ({
         page,
     }) => {
-        await signIn(page, NORTHWIND);
-        const api = await firstCustomers(page, NORTHWIND);
+        // Read on Rye, as its owner: Northwind's customers are made, and
+        // merged away, by the specs running beside this one, so its first
+        // row could be gone by the time it is searched for.
+        await signIn(page, RYE);
+        const api = await firstCustomers(page, RYE);
         await page.goto("/commerce/customers");
         await expect(
             page.getByRole("heading", { name: "Customers", level: 1 }),
         ).toBeVisible();
-        test.skip(api.rows.length === 0, "Northwind has no customer rows");
+        test.skip(api.rows.length === 0, "Rye has no customer rows");
 
         const someone = api.rows[0];
         const name = someone.name ?? someone.email ?? "";
@@ -165,7 +136,7 @@ test.describe("customers list", () => {
     });
 
     test("a Member without invoices sees no Spent", async ({ page }) => {
-        await signIn(page, RYE, MEMBER_STATE);
+        await signIn(page, RYE, "member");
         await page.goto("/commerce/customers");
         await expect(
             page.getByRole("heading", { name: "Customers", level: 1 }),

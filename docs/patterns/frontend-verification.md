@@ -39,6 +39,21 @@ insufficient" (PRODUCT_STRATEGY §18).
   honoured; nothing hidden at 320px or 390px; loading, empty, error, success,
   disabled, setup, attention and forbidden states each distinct. Gap: the
   automated activation specs the gate calls for are not written yet.
+- **Current** — **Browser specs sign in once per person** (2026-09-29): the
+  Playwright `setup` project signs the seeded people in through the form and
+  saves their sessions; a spec uses `useSession` (`e2e/fixtures/sessions.ts`).
+  Only specs about signing in type a password, and none signs out on a saved
+  session. No `waitForTimeout`: wait on a condition, or run `page.clock` past
+  a timer. The browser-tests skill has the detail.
+- **Current** — **Browser specs run in parallel, so each owns its data**
+  (2026-09-29): the suite is `fullyParallel` (`e2e/run.mjs`: 4 workers
+  locally, 2 per CI shard). A test that changes a record makes it first
+  through the API with a unique stamp (`e2e/fixtures/own-data.ts`) and
+  asserts on its own records, never a global count or "the first row";
+  lists and counts are read on Rye, which nothing writes to. A test that
+  changes a business-wide setting is tagged `@serial` and runs alone after
+  the rest. Writes go to Northwind only. The browser-tests skill has the
+  rules.
 - **Current** — **Cross-origin, layout and touch questions need a browser:**
   `e2e/` (Playwright) and `.agents/skills/saroh-browser-tests/SKILL.md`, with
   `E2E_IGNORE_HTTPS_ERRORS=1` locally.

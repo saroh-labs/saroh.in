@@ -1,7 +1,9 @@
+// @covers accounts:/login app:/open app:/settings/modules api:capabilities
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * Settings › Modules: switching a module off never switches off another
@@ -23,13 +25,7 @@ interface ModuleView {
 }
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${NORTHWIND_ORG}`);
 }
 
