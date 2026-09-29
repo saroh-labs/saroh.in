@@ -952,3 +952,32 @@ lint. Or take the other branch's spec whole and put the one `@covers` line
 back on top (`git show r2/e2e-b:<spec> | head -1`).
 **Category**: tooling · `scripts/e2e-affected.mjs`, `scripts/prepush.sh`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
+## E2E — every browser spec typed a password, and every run seeded from nothing
+
+**Problem**: The browser step spent minutes on work that never changed. About
+150 tests signed in through the accounts form, one by one (three specs had
+already grown their own saved-session helpers to dodge the sign-in
+throttle). Every `prepush --e2e` run and every CI shard migrated and seeded
+a fresh database (~40s). Three specs slept a fixed time: 9s to outlast a
+booking's Undo hold, 2s a poll, 300ms a scroll.
+**Root cause**: Nothing was shared between tests or between runs. A
+sign-in's cookies, and a seeded database, are the same every time until the
+seed or the session code changes.
+**Fix**: A Playwright `setup` project (`e2e/tests/auth.setup.ts`) signs the
+four seeded people in once per run and checks the workspace sees each
+session; specs call `useSession` (`e2e/fixtures/sessions.ts`). The specs
+about signing in (`auth.spec.ts`, `site-sign-in.spec.ts`) still use the form,
+and nothing signs out on a saved session — sign-out revokes it on the server
+for every later spec. `prepush --e2e` keeps `<E2E db>-template`, keyed on the
+seed's inputs and the Indian day, and copies it per run (1s against 38s);
+CI shards restore a `pg_dump` cached on the same inputs. The sleeps became
+`page.clock.runFor` past the hold and `expect.poll`. Measured: all 34 spec
+files on desk and phone, 334 passed, in 553s end to end on a template hit,
+against 657s for 25 files before.
+**Gotcha**: The showcase seed lays its data out relative to the moment it
+runs, so a seeded copy has a shelf life: the template is reused for 4 hours
+of one Indian day (`PREPUSH_E2E_TEMPLATE_HOURS`), CI's dump for one 4-hour
+window. Don't key either on the files alone.
+**Category**: e2e · tooling · `.agents/skills/saroh-browser-tests/SKILL.md`,
+`docs/patterns/devops-tooling-and-deploy.md` → CI and How the gate stays fast
