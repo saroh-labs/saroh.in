@@ -197,6 +197,9 @@ test.describe("order detail", () => {
         const orderId = await priyaOrderToday(page);
         await page.goto(`/commerce/orders/${orderId}`);
         const card = page.getByRole("region", { name: "Customer" });
+        // "Needs attention: Sesame", as the design reads (DEC-073); a
+        // screen reader hears the kind too.
+        await expect(card.getByText("Needs attention:")).toBeVisible();
         await expect(
             card.getByRole("list", { name: "Needs attention" }),
         ).toContainText("Allergy: Sesame");
