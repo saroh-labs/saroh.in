@@ -139,7 +139,7 @@ export function AttentionSuggestions({
                 </span>
                 <span className="text-pretty text-[12px] text-muted-foreground">
                     Check it with them, then add it to Needs attention so the
-                    team sees it on their record.
+                    team sees it on every booking.
                 </span>
             </div>
             {shown.map((s) => (

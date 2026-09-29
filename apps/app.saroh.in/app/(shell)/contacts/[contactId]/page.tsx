@@ -17,6 +17,7 @@ import { loadContactHoldings } from "@/lib/contacts/holdings";
 import { contactPanels } from "@/lib/contacts/panels";
 import type { Holdings } from "@/lib/contacts/removal";
 import { getContact } from "@/lib/contacts/service";
+import { contactSourceLabel } from "@/lib/contacts/source";
 import {
     contactEmail,
     contactName,
@@ -24,7 +25,6 @@ import {
     isRemovedContact,
     LEAD_STATUS,
 } from "@/lib/crm/format";
-import { formatStatus } from "@/lib/format/status";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadStatus } from "@/lib/leads/service";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -83,7 +83,10 @@ export default async function ContactDetailPage({
         // An empty string is a field someone cleared: shown as not given.
         ["Phone", contact.phone?.trim() ? contact.phone : null],
         ["Company", contact.company?.trim() ? contact.company : null],
-        ["Came from", contact.source ? formatStatus(contact.source) : null],
+        [
+            "Came from",
+            contact.source ? contactSourceLabel(contact.source) : null,
+        ],
     ];
 
     return (
