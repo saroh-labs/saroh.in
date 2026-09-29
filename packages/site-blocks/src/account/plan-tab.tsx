@@ -64,6 +64,11 @@ export interface PlanTabProps {
      * the site shows none (no "See plans").
      */
     plansHref?: string | null;
+    /**
+     * The public API a checkout's return is posted to (P1), so buying a
+     * pack or turning autopay on moves on without waiting for the webhook.
+     */
+    apiUrl?: string;
 }
 
 /** What is being done, to which plan: one thing at a time. */
@@ -82,6 +87,7 @@ export function PlanTab({
     api,
     packs: shop = null,
     plansHref = null,
+    apiUrl,
 }: PlanTabProps) {
     const router = useRouter();
     const [tab, setTab] = useState(initial);
@@ -265,6 +271,7 @@ export function PlanTab({
                     businessName={account.businessName}
                     customer={{ name: account.name, email: account.email }}
                     api={shop.api}
+                    apiUrl={apiUrl}
                     onBought={(message) => {
                         setOpen(null);
                         setProblem(null);
@@ -283,6 +290,7 @@ export function PlanTab({
                     start={api.startAutopay}
                     businessName={account.businessName}
                     customer={{ name: account.name, email: account.email }}
+                    apiUrl={apiUrl}
                 />
             ) : null}
             <PauseSheet

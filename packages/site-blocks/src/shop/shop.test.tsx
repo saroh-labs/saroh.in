@@ -335,6 +335,7 @@ function setup(
                 signIn,
             }}
             openCheckout={openCheckout}
+            apiUrl="https://api.test"
         />,
     );
     return { quote, start, standing, openCheckout };
@@ -392,7 +393,11 @@ describe("the header's bag", () => {
         });
         expect(request.key).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
         expect(openCheckout).toHaveBeenCalledWith(
-            expect.objectContaining({ handoff: STARTED.payment }),
+            expect.objectContaining({
+                handoff: STARTED.payment,
+                // The window's return goes to the API (P1).
+                apiUrl: "https://api.test",
+            }),
         );
         expect(standing).toHaveBeenCalledWith("o-1");
         expect(readBag(SITE)).toEqual([]);

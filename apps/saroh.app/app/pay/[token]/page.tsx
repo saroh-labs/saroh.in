@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { SiteTheme } from "@saroh/site-blocks";
 
 import { InvoicePay } from "@/components/invoice-pay";
+import { publicApiUrl } from "@/lib/api-url";
 import { getPayInvoice } from "@/lib/invoice-pay";
 
 /**
@@ -64,7 +65,11 @@ export default async function PayPage({
     return (
         <main className="min-h-screen bg-site-bg text-site-body">
             {invoice.theme ? <SiteTheme variables={invoice.theme} /> : null}
-            <InvoicePay token={token} invoice={invoice} />
+            <InvoicePay
+                token={token}
+                invoice={invoice}
+                apiUrl={publicApiUrl()}
+            />
         </main>
     );
 }

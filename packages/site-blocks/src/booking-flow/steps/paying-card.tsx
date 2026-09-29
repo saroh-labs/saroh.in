@@ -42,6 +42,7 @@ export function PayingCard({
     onDesk,
     onBack,
     onPaid,
+    apiUrl,
 }: {
     phase: Extract<Phase, { kind: "paying" }>;
     now: number | null;
@@ -57,6 +58,8 @@ export function PayingCard({
     onBack: () => void;
     /** The provider's window closed on a payment. */
     onPaid: () => void;
+    /** Where the window's return is posted (P1). */
+    apiUrl?: string;
 }) {
     const request: CheckoutRequest | null =
         phase.handoff && !phase.payError
@@ -65,6 +68,7 @@ export function PayingCard({
                   business,
                   description: `${serviceName} · ${phase.when}`,
                   booker,
+                  apiUrl,
               }
             : null;
     const checkout = useCheckout(request, onPaid);

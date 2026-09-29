@@ -216,7 +216,12 @@ describe("Join on the Plans block", () => {
     it("signs in first, then joins: the design's sheet, the provider window, joined once the server says so", async () => {
         const { prices, join, standing } = actions();
         render(
-            <PlansSection content={PLANS} feed={plansFeed()} prices={prices} />,
+            <PlansSection
+                content={PLANS}
+                feed={plansFeed()}
+                prices={prices}
+                apiUrl="https://api.test"
+            />,
         );
 
         await press(
@@ -250,6 +255,8 @@ describe("Join on the Plans block", () => {
                 handoff: HANDOFF,
                 business: "Pulse Fitness",
                 booker: { name: "Asha", email: "asha@example.in" },
+                // The window's return goes to the API (P1).
+                apiUrl: "https://api.test",
             }),
         );
 
@@ -410,7 +417,12 @@ describe("the Class packs block", () => {
     it("signs in first, then buys through A11's sheet, and says it's bought", async () => {
         const { prices, packs } = actions();
         render(
-            <PacksSection content={PACKS} feed={packsFeed()} prices={prices} />,
+            <PacksSection
+                content={PACKS}
+                feed={packsFeed()}
+                prices={prices}
+                apiUrl="https://api.test"
+            />,
         );
         await press(screen.getByRole("button", { name: "Buy: 10 classes" }));
         await signInAsAsha();
@@ -421,6 +433,10 @@ describe("the Class packs block", () => {
             within(sheet).getByRole("button", { name: "Buy · ₹4,500" }),
         );
         expect(packs.buy).toHaveBeenCalledWith("pack_10", expect.any(String));
+        // The window's return goes to the API (P1).
+        expect(pageWindow.open).toHaveBeenCalledWith(
+            expect.objectContaining({ apiUrl: "https://api.test" }),
+        );
         expect(
             await screen.findByText(
                 "10 classes bought. Book a class to use one.",

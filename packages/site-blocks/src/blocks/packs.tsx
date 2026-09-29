@@ -152,6 +152,7 @@ export default function PacksSection({
                 title={title}
                 feed={feed}
                 prices={prices}
+                apiUrl={apiUrl}
             />
         );
     }
@@ -283,11 +284,14 @@ function PackCards({
     feed,
     prices = null,
     canvas = false,
+    apiUrl,
 }: {
     content: RenderedPacks;
     title: string;
     feed: PacksFeed;
     prices?: PricesActions | null;
+    /** Where a checkout's return is posted (P1). */
+    apiUrl?: string;
     /** Drawn in the editor: the button shows its words but goes nowhere. */
     canvas?: boolean;
 }) {
@@ -385,6 +389,7 @@ function PackCards({
                             businessName={prices.businessName}
                             customer={flow.customer}
                             api={prices.packs}
+                            apiUrl={apiUrl}
                             onBought={(message) => {
                                 setBuying(null);
                                 setDone(message);

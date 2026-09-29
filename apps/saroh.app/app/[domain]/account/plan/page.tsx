@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AccountCard, PlanTab } from "@saroh/site-blocks";
 
 import { getAccount, getPacksOnSale, getPlanTab } from "@/lib/account-area";
+import { publicApiUrl } from "@/lib/api-url";
 import { pricesPageHref } from "@/lib/module-pages";
 import { getSiteForHost } from "@/lib/publication";
 
@@ -54,6 +55,7 @@ export default async function AccountPlanPage({
         <PlanTab
             account={lookup.account}
             tab={tab}
+            apiUrl={publicApiUrl()}
             plansHref={
                 site ? pricesPageHref(site.snapshot.pages, site.modules) : null
             }

@@ -44,6 +44,7 @@ export function CheckoutPay({
     onBack,
     onClose,
     openCheckout = openProviderCheckout,
+    apiUrl,
 }: {
     started: CheckoutStarted;
     api: ShopCheckoutApi;
@@ -63,6 +64,8 @@ export function CheckoutPay({
     onClose: () => void;
     /** The provider window; replaced in tests. */
     openCheckout?: OpenCheckout;
+    /** Where the window's return is posted, so paying moves on at once (P1). */
+    apiUrl?: string;
 }) {
     const [phase, setPhase] = useState<Phase>({
         kind: "window",
@@ -78,6 +81,7 @@ export function CheckoutPay({
             business: businessName,
             description: `Order ${started.orderNumber}`,
             booker: { name: customer.name ?? "", email: customer.email },
+            apiUrl,
         });
         session.current = opened;
         void opened.outcome.then((outcome) => {

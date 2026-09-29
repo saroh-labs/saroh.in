@@ -210,6 +210,7 @@ export default function PlansSection({
                 title={title}
                 feed={feed}
                 prices={prices}
+                apiUrl={apiUrl}
             />
         );
     }
@@ -343,11 +344,14 @@ function PlanCards({
     feed,
     prices = null,
     canvas = false,
+    apiUrl,
 }: {
     content: RenderedPlans;
     title: string;
     feed: PlansFeed;
     prices?: PricesActions | null;
+    /** Where a checkout's return is posted (P1). */
+    apiUrl?: string;
     /** Drawn in the editor: the button shows its words but goes nowhere. */
     canvas?: boolean;
 }) {
@@ -467,6 +471,7 @@ function PlanCards({
                             businessName={prices.businessName}
                             customer={flow.customer}
                             api={prices.join}
+                            apiUrl={apiUrl}
                             autopayMethods={feed.autopayMethods ?? []}
                             onJoined={(message) => {
                                 setJoining(null);

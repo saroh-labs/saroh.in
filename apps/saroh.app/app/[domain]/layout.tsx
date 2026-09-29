@@ -5,6 +5,7 @@ import type { SignInOptions } from "@saroh/site-blocks";
 import { AccountEntry, ShopBag, SiteTheme } from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
+import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { customerReader } from "@/lib/customer-reader";
@@ -164,6 +165,7 @@ export default async function SiteLayout({
                     start: startCheckout,
                     standing: checkoutStanding,
                 }}
+                apiUrl={publicApiUrl()}
                 account={{
                     customer,
                     options: signInOptions ?? {

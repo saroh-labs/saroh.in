@@ -12,14 +12,18 @@ import type { PaymentHandoff } from "./api";
  * on, so neither the checkout nor the order sets any.
  *
  * What the window says is only ever a hint. "Paid" here means the provider's
- * window closed on a payment; the booking is confirmed by the provider's
- * webhook, which the page keeps polling the hold for. Nothing on the page
- * says "booked" until the API does.
+ * window closed on a payment. Nothing on the page says "booked" until the
+ * API does. The window's own return is posted to the API first (P1,
+ * {@link postCheckoutReturn}) — Razorpay's signed `razorpay_payment_id`,
+ * `razorpay_order_id` and `razorpay_signature`, or Cashfree's order — and
+ * the API checks it with the provider and settles the payment then, so the
+ * page's next read already says so. The provider's webhook stays the
+ * backup: whichever reaches the API first settles it.
  */
 
 /** What the provider's window ended with. */
 export type CheckoutOutcome =
-    /** The window closed on a payment; the webhook confirms it. */
+    /** The window closed on a payment; its return has been posted. */
     | "paid"
     /** The provider refused the payment. The hold is kept. */
     | "failed"
@@ -35,6 +39,75 @@ export interface CheckoutRequest {
     /** What is being paid for: the service and when. */
     description: string;
     booker: { name: string; email: string; phone?: string };
+    /**
+     * The public API the window's return is posted to (P1). Every
+     * merchant-site checkout passes it; without one the page waits for the
+     * webhook alone, as before.
+     */
+    apiUrl?: string;
+}
+
+/** What the provider's window handed back on a payment (P1). */
+export interface CheckoutReturn {
+    provider: string;
+    providerOrderId: string;
+    providerPaymentId?: string;
+    signature?: string;
+}
+
+/** How long "Paid" waits for the API to check the return. */
+export const RETURN_TIMEOUT_MS = 8_000;
+
+/**
+ * Post the window's return to the API (`POST /public/payments/return`),
+ * which verifies it with the business's own key, asks the provider for the
+ * payment and settles it. Resolves true when the API has it settled; false
+ * on anything else — a refusal, a network error, a slow answer — and the
+ * page then waits for the webhook as before. Never throws.
+ */
+export async function postCheckoutReturn(
+    apiUrl: string,
+    body: CheckoutReturn,
+    timeoutMs = RETURN_TIMEOUT_MS,
+): Promise<boolean> {
+    const controller =
+        typeof AbortController === "undefined" ? null : new AbortController();
+    const timer = controller
+        ? setTimeout(() => controller.abort(), timeoutMs)
+        : null;
+    try {
+        const res = await fetch(`${apiUrl}/public/payments/return`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+            credentials: "omit",
+            referrerPolicy: "no-referrer",
+            ...(controller ? { signal: controller.signal } : {}),
+        });
+        if (!res.ok) return false;
+        const answer = (await res.json()) as { confirmed?: unknown };
+        return answer.confirmed === true;
+    } catch {
+        return false;
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
+/** Razorpay Checkout's `handler` argument, as far as the page reads it. */
+function razorpayReturn(response: unknown): CheckoutReturn | null {
+    if (typeof response !== "object" || response === null) return null;
+    const r = response as Record<string, unknown>;
+    const order = text(r.razorpay_order_id);
+    const payment = text(r.razorpay_payment_id);
+    const signature = text(r.razorpay_signature);
+    if (!order || !payment || !signature) return null;
+    return {
+        provider: "RAZORPAY",
+        providerOrderId: order,
+        providerPaymentId: payment,
+        signature,
+    };
 }
 
 export interface CheckoutSession {
@@ -126,9 +199,15 @@ function httpsUrl(v: unknown): string | null {
     }
 }
 
+/** An answer from the window, with its return when it is a payment. */
+type Settle = (
+    outcome: CheckoutOutcome,
+    returned?: CheckoutReturn | null,
+) => void;
+
 function openRazorpay(
     request: CheckoutRequest,
-    settle: (outcome: CheckoutOutcome) => void,
+    settle: Settle,
     /** Takes the checkout, or false when the page has closed it meanwhile. */
     onOpen: (checkout: RazorpayCheckout) => boolean,
 ): void {
@@ -194,7 +273,10 @@ function openRazorpay(
                     // A refusal comes back to the page, which says so and
                     // offers another try on the same order.
                     retry: { enabled: false },
-                    handler: () => settle("paid"),
+                    // Paid: Checkout hands back the payment, the order and
+                    // their signature, which the API checks (P1).
+                    handler: (response: unknown) =>
+                        settle("paid", razorpayReturn(response)),
                     modal: { ondismiss: () => settle("closed") },
                 });
                 checkout.on("payment.failed", () => {
@@ -213,11 +295,13 @@ function openRazorpay(
 /** Cashfree says "closed" and "failed" through one `error`; its words tell. */
 const CLOSED_WORDS = /clos|abort|cancel|dismiss|dropped/i;
 
-function openCashfree(
-    request: CheckoutRequest,
-    settle: (outcome: CheckoutOutcome) => void,
-): void {
+function openCashfree(request: CheckoutRequest, settle: Settle): void {
     const session = text(request.handoff.clientParams.paymentSessionId);
+    // Cashfree's drop-in returns no signature: its order is the cue for the
+    // API to ask Cashfree itself (P1).
+    const order =
+        text(request.handoff.clientParams.cashfreeOrderId) ??
+        text(request.handoff.providerIntentId);
     if (!session) {
         settle("unavailable");
         return;
@@ -248,7 +332,19 @@ function openCashfree(
                                 );
                                 return;
                             }
-                            settle(result.paymentDetails ? "paid" : "closed");
+                            if (!result.paymentDetails) {
+                                settle("closed");
+                                return;
+                            }
+                            settle(
+                                "paid",
+                                order
+                                    ? {
+                                          provider: "CASHFREE",
+                                          providerOrderId: order,
+                                      }
+                                    : null,
+                            );
                         },
                         () => settle("failed"),
                     );
@@ -270,9 +366,18 @@ export const openProviderCheckout: OpenCheckout = (request) => {
     let closed = false;
     // The first answer stands; a close from the page answers nothing.
     let settled = false;
-    const once = (value: CheckoutOutcome) => {
+    const once: Settle = (value, returned) => {
         if (settled || closed) return;
         settled = true;
+        // Paid: the return goes to the API before the page is told, so
+        // what the page reads next is already settled (P1). A return the
+        // API can't check leaves the page waiting for the webhook.
+        if (value === "paid" && returned && request.apiUrl) {
+            void postCheckoutReturn(request.apiUrl, returned).then(() => {
+                if (!closed) settle(value);
+            });
+            return;
+        }
         settle(value);
     };
 
