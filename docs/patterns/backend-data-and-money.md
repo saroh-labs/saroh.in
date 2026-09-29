@@ -85,6 +85,12 @@
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row
   mixing two businesses.
+- **Current** — **An order's number comes from `nextOrderNumberInTx`, in the
+  order's transaction** (DEC-066, P3). One `ORD-` series per business across
+  its storefronts, counted in `OrderNumberSequence`; never `count + 1`, which
+  gave each storefront its own ORD-001. A seed that writes fixed numbers calls
+  `alignOrderNumberSequence` after. `@@unique([storeId, orderId])` is still
+  the only unique index: the per-business one is the contract step.
 - **Current** — **An order line bills a product or a service, never both**
   (DEC-050, round-2 E9). `OrderItem.productId` is nullable beside
   `serviceId`, and `OrderItem_bills_one_thing` CHECKs exactly one. A
