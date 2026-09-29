@@ -59,6 +59,9 @@
 # Measured 2026-09-29 (12-core Mac, a batch 209 files ahead): the hook 3s on a
 # tree that passed, 19–32s after a code change (was 75s); --int 95s (was
 # ~7 min); --all 10.7 min (was ~25), nearly all of it the browser specs.
+# Targeted, on a commit touching one screen and one api module: --e2e 105s
+# for 2 spec files (was 657s for 25), the integration step 9s for 10 specs
+# (was 84s for 381).
 #
 # Integration needs TEST_DATABASE_URL naming a database with "test" in it (and a
 # changed migration needs REPLAY_DATABASE_URL, a throwaway one; the browser step

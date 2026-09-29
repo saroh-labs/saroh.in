@@ -74,6 +74,32 @@ width, so a resize to 320 silently gives 500. Use viewport emulation.
 rather than sleeping a fixed number of seconds; a cold Next server on a runner
 is not reliably up in any particular time.
 
+## Every spec says what it covers
+
+The first line of every `e2e/tests/*.spec.ts` names what it exercises. The
+local gate (`pnpm prepush --e2e`) runs only the specs whose keys a batch's
+changes reach; CI runs them all.
+
+```ts
+// @covers accounts:/login app:/open app:/commerce/orders api:orders api:payments
+```
+
+- `app:/<route>`, `site:/<route>`, `accounts:/<route>`: a route the spec
+  visits, route groups dropped. For the renderer, drop `[domain]`, so
+  `${SITE}/shop` is `site:/shop`. A list key covers its dynamic children
+  (`app:/customers` covers `/customers/[id]`) but not a static sibling, so a
+  spec on `/billing/plans/new` names that route too.
+- `api:<module>`: each module behind a screen it drives or an endpoint it
+  calls, by folder under `apps/api.saroh.in/src/modules`.
+- `pkg:<package>`: a shared package it renders, such as `pkg:site-blocks`
+  for anything on a merchant site.
+
+Name what the spec depends on, not everything the page imports. The import
+scan in `scripts/e2e-affected.mjs` already follows components and `lib/` to
+routes. `pnpm run check:e2e-covers` fails a spec with no line or a key that
+names nothing real. To see what a diff would run:
+`node scripts/e2e-affected.mjs --base origin/development --why`.
+
 ## Rules
 
 - Specs share one seeded Organization, so the config runs them serially. A spec

@@ -200,6 +200,36 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
   repo's checkouts, plus their children), print what they stopped and the
   command that started it. `PREPUSH_KEEP_DEV=1` leaves it running. The quick
   run never stops anything.
+- **Targeted integration and browser runs** (2026-09-29). Locally `--int`,
+  `--e2e` and `--all` run only what the batch reaches. CI still runs
+  everything, and `--full` does the same locally (on its own it means
+  `--all --full`).
+    - **Integration:** `jest --findRelatedTests` over the changed api files and
+      the api files that import a changed workspace package. It always adds
+      the permission, RLS and `module-annotations` specs. A change under
+      `packages/database` or `packages/auth`, the api's `common/`, `src/*.ts`,
+      `test/`, jest config, `package.json` or the lockfile runs the whole
+      suite. The selected specs are sharded as before, about three to a shard.
+    - **Browser:** every spec's first line names what it exercises:
+      `// @covers app:/commerce/orders api:orders site:/shop pkg:site-blocks`.
+      `scripts/e2e-affected.mjs` maps changed files onto those keys and prints
+      each chosen spec with its reason. App, renderer and accounts files go
+      through an import scan to the routes that use them; a layout reaches
+      the routes beneath it. An api file reaches its own module and the
+      modules that import it (one step, not `*.module.ts` wiring). A package
+      reaches `pkg:` and whatever imports it. The schema, seed, `ui`, `auth`,
+      tooling, CI, the playwright config and root configs pick every spec.
+    - `pnpm run check:e2e-covers` (in the gate and CI's static job) fails a
+      spec with no `@covers` line or a key that names no real route, module
+      or package. Try a diff with
+      `node scripts/e2e-affected.mjs --base <ref> --why`, or
+      `--files <paths…>`.
+    - A full pass counts for a targeted one, never the other way round.
+    - Measured on a commit that touches one screen and one api module:
+      `--e2e` picked 2 of 34 spec files (24 tests) and took 105s end to end
+      instead of 657s. `--int` picked 10 of 381 specs (4 related, 6 always)
+      and its integration step took 9s instead of 84s. The whole run took
+      66s, most of it lint, which ran beside another browser run.
 - **Not mirrored:** CI also runs the integration suite under RLS
   (`TEST_RLS=on`); the local gate runs it plain only.
 
@@ -212,6 +242,10 @@ development (the browser step picked 25 spec files):
 | `--int`               | ~7 min  | 95s (int 84s: 16 shards on 3 databases) | 4s              | 3 min        |
 | `--e2e`               | ~17 min | 11 min (build ~1 min, specs ~10 min)    | cached on pass  | —            |
 | `--all`               | ~25 min | 10.7 min (browser run is the long pole) | cached on pass  | —            |
+
+These are full runs. A batch that changes the schema, seed or CI still gets
+them, as batch 2 did. For a batch that touches a few screens and modules,
+see the targeted timings above.
 
 A small app change costs about 30s because ESLint over `app.saroh.in` takes
 27s on its own. ESLint's `--cache` would cut that to seconds, but the config
