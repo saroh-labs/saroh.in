@@ -1,3 +1,5 @@
+import { cleanAddressInput } from "@/lib/organizations/address";
+
 import { blockerSentence } from "./blocker-copy";
 import { isHiddenByRollout } from "./rollout";
 import type { ModuleView } from "./schema";
@@ -242,12 +244,12 @@ export function openDays(draft: TurnOnDraft): DayDraft[] {
     return draft.APPOINTMENTS.days.filter((d) => d.on);
 }
 
-/** "My Shop!" → "my-shop": what an address can hold, as it is typed. */
+/**
+ * "My Shop!" → "my-shop": what an address can hold, as it is typed — the
+ * setup form's rule, so `--` never shows and it stops at 57 (DEC-071).
+ */
 export function tidyAddress(typed: string): string {
-    return typed
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "");
+    return cleanAddressInput(typed);
 }
 
 /** What `PUT …/modules/:key` is sent as `setup`. */
@@ -284,7 +286,8 @@ export function setupFor(key: string, draft: TurnOnDraft): object {
 }
 
 const PRICE = /^\d{1,7}(\.\d{1,2})?$/;
-const ADDRESS = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/;
+// 3 to 57 characters (DEC-071), never `--`; the API judges again.
+const ADDRESS = /^[a-z0-9](?:[a-z0-9-]{1,55}[a-z0-9])$/;
 
 /**
  * What must be fixed before sending, by module and field path (the same
@@ -347,11 +350,18 @@ export function problemsOf(
         if (!w.siteName.trim()) {
             put("WEBSITE", "siteName", "Give your site a name.");
         }
-        if (!ADDRESS.test(w.address.trim())) {
+        const address = w.address.trim();
+        if (!ADDRESS.test(address)) {
             put(
                 "WEBSITE",
                 "address",
-                "Use 3 to 63 letters, numbers or hyphens, not starting or ending with a hyphen.",
+                "Use 3 to 57 letters, numbers or hyphens, not starting or ending with a hyphen.",
+            );
+        } else if (address.includes("--")) {
+            put(
+                "WEBSITE",
+                "address",
+                "An address can't have two hyphens in a row.",
             );
         }
     }

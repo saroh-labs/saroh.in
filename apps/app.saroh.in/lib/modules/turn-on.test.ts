@@ -265,6 +265,9 @@ describe("the draft and what it sends", () => {
     it("tidies an address as it is typed", () => {
         expect(tidyAddress("My Shop!")).toBe("my-shop");
         expect(tidyAddress("Café 24")).toBe("caf-24");
+        // Never two hyphens in a row, never past 57 (DEC-071).
+        expect(tidyAddress("my--shop")).toBe("my-shop");
+        expect(tidyAddress("a".repeat(70))).toHaveLength(57);
     });
 });
 
@@ -291,6 +294,19 @@ describe("problems found before sending", () => {
             "siteName",
             "address",
         ]);
+    });
+
+    it("refuses a web address the API would: two hyphens, or past 57 (DEC-071)", () => {
+        const d = draft();
+        d.WEBSITE.siteName = "Rye";
+        d.WEBSITE.address = "my--shop";
+        expect(problemsOf(d, ["WEBSITE"]).WEBSITE).toEqual({
+            address: "An address can't have two hyphens in a row.",
+        });
+        d.WEBSITE.address = "a".repeat(58);
+        expect(problemsOf(d, ["WEBSITE"]).WEBSITE?.address).toMatch(/3 to 57/);
+        d.WEBSITE.address = "a".repeat(57);
+        expect(problemsOf(d, ["WEBSITE"])).toEqual({});
     });
 
     it("only judges the modules being turned on", () => {
