@@ -57,8 +57,8 @@ export function shownCatalogue(
     return {
         ...catalogue,
         capabilities: catalogue.capabilities.filter((c) => {
-            const module = moduleOfAction(c.action);
-            return module === null || shown.has(module);
+            const owner = moduleOfAction(c.action);
+            return owner === null || shown.has(owner);
         }),
     };
 }

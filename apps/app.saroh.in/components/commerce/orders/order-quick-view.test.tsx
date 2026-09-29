@@ -130,7 +130,7 @@ describe("QuickViewBody — the customer (DEC-073)", () => {
                 order={order({
                     customer: null,
                     walkIn: { name: "Asha", phone: null },
-                } as unknown as Partial<OrderRead>)}
+                })}
             />,
         );
         expect(html).toContain("Walk-in · Asha");

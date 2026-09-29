@@ -41,7 +41,7 @@ const render = (attention: OrderAttention | null | undefined): string =>
             attention={attention}
             address={null}
             shipment={null}
-            onChangeTracking={() => {}}
+            onChangeTracking={() => undefined}
             orderNote={null}
         />,
     );
