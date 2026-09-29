@@ -4,7 +4,6 @@ import Link from "next/link";
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import {
     Select,
     SelectContent,
@@ -12,7 +11,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
-import { Switch } from "@saroh/ui/switch";
 import { Textarea } from "@saroh/ui/textarea";
 
 import type { ServicesListContent } from "@/lib/sites/service";
@@ -23,6 +21,12 @@ import {
     withCtaAction,
     withCtaLabel,
 } from "./cta-action-fields";
+import {
+    DisplayOptions,
+    hiddenFlag,
+    unlessDefault,
+    wordsOrAbsent,
+} from "./display-options";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 import { ServicesLoadNotice } from "./services-load-notice";
@@ -234,20 +238,32 @@ export function ServicesListFields({
                 )}
             </Field>
 
-            <div className="flex items-center justify-between gap-3">
-                <Label htmlFor={`${section.key ?? "services"}-prices`}>
-                    Show prices
-                </Label>
-                <Switch
-                    id={`${section.key ?? "services"}-prices`}
-                    checked={c.showPrices !== false}
-                    onCheckedChange={(on) =>
-                        patch({ showPrices: on ? undefined : false })
-                    }
-                />
-            </div>
+            <DisplayOptions
+                // A list is how services have always shown, so it is absent.
+                layout={c.layout ?? "list"}
+                onLayout={(v) => patch({ layout: unlessDefault(v, "list") })}
+                descriptions={{
+                    value: c.showDescriptions !== false,
+                    onChange: (on) =>
+                        patch({ showDescriptions: hiddenFlag(on) }),
+                }}
+                prices={{
+                    value: c.showPrices !== false,
+                    onChange: (on) => patch({ showPrices: hiddenFlag(on) }),
+                }}
+                button={{
+                    value: c.buttonLabel ?? "",
+                    onChange: (v) => patch({ buttonLabel: wordsOrAbsent(v) }),
+                    placeholder: "Choose a time",
+                    note: "On each service, opening your booking page at it. Leave empty to keep each service's own “Book”.",
+                }}
+            />
 
-            <Field label="Button label">
+            {/*
+             * The section's own button, under the list (#207), kept apart
+             * from each service's: it goes wherever the merchant points it.
+             */}
+            <Field label="Button below the list">
                 <Input
                     value={c.cta?.label ?? ""}
                     onChange={(e) =>
