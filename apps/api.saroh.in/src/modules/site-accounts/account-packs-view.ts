@@ -21,6 +21,8 @@ export interface AccountPackOnSale {
     validityDays: number;
     price: string;
     currency: string;
+    /** Classes, or one-to-one sessions: how the sheet counts the credits. */
+    kind: "CLASSES" | "ONE_TO_ONE";
 }
 
 /** The packs a customer can buy here, and whether they can pay online. */
@@ -64,6 +66,7 @@ export function packOnSaleView(pack: {
     validityDays: number;
     price: { toString(): string };
     currency: string;
+    kind: string;
 }): AccountPackOnSale {
     const description = pack.description?.trim() ?? "";
     return {
@@ -74,6 +77,7 @@ export function packOnSaleView(pack: {
         validityDays: pack.validityDays,
         price: toMoneyString(pack.price.toString()),
         currency: pack.currency,
+        kind: pack.kind === "ONE_TO_ONE" ? "ONE_TO_ONE" : "CLASSES",
     };
 }
 

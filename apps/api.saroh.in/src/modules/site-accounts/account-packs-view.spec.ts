@@ -31,6 +31,7 @@ describe("a pack on sale", () => {
             validityDays: 60,
             price: { toString: () => "4500" },
             currency: "INR",
+            kind: "CLASSES",
             status: "ACTIVE",
             pendingChanges: { price: "9" },
             revisedById: "user_1",
@@ -43,7 +44,23 @@ describe("a pack on sale", () => {
             validityDays: 60,
             price: "4500.00",
             currency: "INR",
+            kind: "CLASSES",
         });
+    });
+
+    it("says a one-to-one pack is one, so the sheet counts sessions", () => {
+        expect(
+            packOnSaleView({
+                id: "p",
+                name: "5 sessions",
+                description: null,
+                credits: 5,
+                validityDays: 90,
+                price: { toString: () => "5000" },
+                currency: "INR",
+                kind: "ONE_TO_ONE",
+            }).kind,
+        ).toBe("ONE_TO_ONE");
     });
 
     it("reads an empty description as none", () => {
@@ -56,6 +73,7 @@ describe("a pack on sale", () => {
                 validityDays: 7,
                 price: { toString: () => "100.5" },
                 currency: "INR",
+                kind: "CLASSES",
             }).description,
         ).toBeNull();
     });

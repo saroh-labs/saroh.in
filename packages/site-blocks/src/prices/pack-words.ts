@@ -53,13 +53,27 @@ function count(n: number, one: string, many: string): string {
     return `${n} ${n === 1 ? one : many}`;
 }
 
+/** What a pack's credits are for. Unknown (an older API) reads as classes. */
+export type PackKind = PublicPack["kind"];
+
+/** "class", or "session" for a one-to-one pack. */
+export function packUnit(kind: PackKind | null | undefined): string {
+    return kind === "ONE_TO_ONE" ? "session" : "class";
+}
+
+/** "10 classes", "1 class"; "5 sessions" for a one-to-one pack. */
+export function packCount(
+    credits: number,
+    kind: PackKind | null | undefined,
+): string {
+    return kind === "ONE_TO_ONE"
+        ? count(credits, "session", "sessions")
+        : count(credits, "class", "classes");
+}
+
 /** "10 classes · use within 60 days"; sessions for a one-to-one pack. */
 export function packEyebrow(pack: PublicPack): string {
-    const what =
-        pack.kind === "ONE_TO_ONE"
-            ? count(pack.credits, "session", "sessions")
-            : count(pack.credits, "class", "classes");
-    return `${what} · use within ${count(pack.validityDays, "day", "days")}`;
+    return `${packCount(pack.credits, pack.kind)} · use within ${count(pack.validityDays, "day", "days")}`;
 }
 
 /**
@@ -70,7 +84,7 @@ export function packPerClass(pack: PublicPack): string | null {
     const price = Number(pack.price);
     if (!Number.isFinite(price) || pack.credits <= 0) return null;
     const each = Math.round(price / pack.credits);
-    const unit = pack.kind === "ONE_TO_ONE" ? "session" : "class";
+    const unit = packUnit(pack.kind);
     const line = `${accountMoney(String(each), pack.currency)} a ${unit}`;
     const single = pack.singlePrice === null ? NaN : Number(pack.singlePrice);
     return Number.isFinite(single) && single > each

@@ -356,6 +356,7 @@ describe("the packs on sale", () => {
                     validityDays: 60,
                     price: "4500.00",
                     currency: "INR",
+                    kind: "CLASSES",
                 },
             ],
         });
