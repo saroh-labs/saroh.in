@@ -160,18 +160,56 @@ function daysLate(dueAt: string, now: Date): number {
     return Math.floor((now.getTime() - Date.parse(dueAt)) / DAY);
 }
 
-/** Why a failed renewal is failed, in words: it is not paid, and how late. */
+/**
+ * Why a failed renewal is failed, in words: it is not paid, and how late —
+ * or, before its due date, that autopay didn't collect it (D13).
+ */
 export function failWhy(
     sub: Pick<Subscription, "failedCharge" | "currency" | "price">,
     now: Date,
 ): string {
     const charge = sub.failedCharge;
     if (!charge) return "The latest renewal isn't paid and is past due";
-    const late = charge.dueAt ? daysLate(charge.dueAt, now) : 0;
     const amount = money(charge.total, sub.currency);
+    if (charge.dueAt && Date.parse(charge.dueAt) > now.getTime()) {
+        return `Renewal of ${amount} wasn't collected by autopay`;
+    }
+    const late = charge.dueAt ? daysLate(charge.dueAt, now) : 0;
     return late > 0
         ? `Renewal of ${amount} isn't paid — ${late} ${late === 1 ? "day" : "days"} past due`
         : `Renewal of ${amount} isn't paid — past due`;
+}
+
+/**
+ * "Autopay charge in progress · 14 Oct" while a charge is under way (D13),
+ * the day being when the debit is asked for; null when none is.
+ */
+export function chargingText(
+    sub: Pick<Subscription, "autopayCharge" | "timezone">,
+    now: Date,
+): string | null {
+    const at = sub.autopayCharge?.at;
+    return at
+        ? `Autopay charge in progress · ${dayText(at, sub.timezone, now)}`
+        : null;
+}
+
+/**
+ * The Retry a failed renewal offers (D13, default 35): "Charge autopay
+ * again" when their mandate can take it, else "Retry with a new pay link"
+ * for someone who may make one. None while a charge is under way.
+ */
+export function retryOffer(
+    sub: Pick<Subscription, "autopayCharge" | "retryVia" | "failedCharge">,
+    canPayLink: boolean,
+): { label: string; via: "MANDATE" | "PAY_LINK" } | null {
+    if (sub.autopayCharge) return null;
+    if (sub.retryVia === "MANDATE") {
+        return { label: "Charge autopay again", via: "MANDATE" };
+    }
+    // Absent: an API older than D13, where Retry is a pay link.
+    if (sub.retryVia === null || !sub.failedCharge || !canPayLink) return null;
+    return { label: "Retry with a new pay link", via: "PAY_LINK" };
 }
 
 /**
@@ -361,13 +399,16 @@ export function headline(
         ? { tone: "accent" as const, label: `Ends ${d(ending)}` }
         : { tone: TAB_TONE[tab], label: TAB_LABEL[tab] };
     const next = sub.pendingPlan ?? sub;
+    const charging = chargingText(sub, now);
     if (tab === "failed") {
         const due = sub.failedCharge?.dueAt;
         return {
             pill,
             big: money(sub.failedCharge?.total ?? sub.price, sub.currency),
             when: due ? `failed ${d(due)}` : "failed",
-            line: `${failWhy(sub, now)}. Nothing is collected until it's paid.`,
+            line: charging
+                ? `${charging}. Nothing else can be charged until the bank answers.`
+                : `${failWhy(sub, now)}. Nothing is collected until it's paid.`,
         };
     }
     if (tab === "paused") {
@@ -410,7 +451,9 @@ export function headline(
         pill,
         big: money(next.price, next.currency),
         when: on,
-        line: `${money(next.price, next.currency)} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
+        line: charging
+            ? `${charging} for this period. Next: ${money(next.price, next.currency)} on ${on}`
+            : `${money(next.price, next.currency)} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
     };
 }
 

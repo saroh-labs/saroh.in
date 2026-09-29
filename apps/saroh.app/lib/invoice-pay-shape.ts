@@ -46,6 +46,12 @@ export interface PayInvoice {
      * null: not a plan's invoice, or no autopay with this business.
      */
     autopay?: PayAutopay | null;
+    /**
+     * An autopay charge is under way on this invoice (D13): the page says so
+     * with the day their bank is asked, and offers no payment (the API
+     * would refuse it). Null or absent: none.
+     */
+    autopayCharging?: { at: string } | null;
 }
 
 export interface PayAutopay {
@@ -74,6 +80,13 @@ export function payAutopayOf(v: unknown): PayAutopay | null {
             : null,
         checks: autopayChecksOf(v.checks),
     };
+}
+
+/** A charge under way (D13), checked; anything strange reads as none. */
+export function payChargingOf(v: unknown): { at: string } | null {
+    return isRecord(v) && isString(v.at) && !Number.isNaN(Date.parse(v.at))
+        ? { at: v.at }
+        : null;
 }
 
 /** What the page calls the paper: "Bill of supply" when it is one (D15). */

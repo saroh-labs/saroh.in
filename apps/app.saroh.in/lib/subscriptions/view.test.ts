@@ -4,9 +4,11 @@ import type { Plan, Subscription, SubscriptionCharge } from "./service";
 import {
     autopayLine,
     chargeRow,
+    chargingText,
     classesText,
     collectionRows,
     dayText,
+    failWhy,
     gstNote,
     headline,
     listTab,
@@ -17,6 +19,7 @@ import {
     payRows,
     paysBy,
     ranLine,
+    retryOffer,
     rowWhen,
     screenTabFromQuery,
     tabFromQuery,
@@ -518,6 +521,62 @@ describe("autopayLine (D12)", () => {
         );
         expect(autopayLine({ ...base, state: "ON", check: null })).toBe(
             "Autopay on · UPI · mo•••@okicici · limit ₹1,500",
+        );
+    });
+});
+
+describe("autopay's retry (D13)", () => {
+    const failed = {
+        id: "inv_1",
+        number: "INV-0012",
+        dueAt: "2026-09-25T00:00:00.000Z",
+        total: "1200.00",
+    };
+
+    it("says a charge is under way with the day it is asked for, and offers no Retry", () => {
+        const s = sub({
+            paymentFailed: true,
+            failedCharge: failed,
+            autopayCharge: { at: "2026-09-19T10:00:00.000Z" },
+            retryVia: null,
+        });
+        expect(chargingText(s, NOW)).toBe(
+            "Autopay charge in progress · 19 Sep",
+        );
+        expect(retryOffer(s, true)).toBeNull();
+        expect(headline(s, null, NOW).line).toMatch(
+            /^Autopay charge in progress · 19 Sep\./,
+        );
+    });
+
+    it("charges autopay again when the API offers it, else a new link for someone who may make one", () => {
+        expect(
+            retryOffer(
+                sub({ failedCharge: failed, retryVia: "MANDATE" }),
+                false,
+            ),
+        ).toEqual({ label: "Charge autopay again", via: "MANDATE" });
+        expect(
+            retryOffer(
+                sub({ failedCharge: failed, retryVia: "PAY_LINK" }),
+                true,
+            ),
+        ).toEqual({ label: "Retry with a new pay link", via: "PAY_LINK" });
+        expect(
+            retryOffer(
+                sub({ failedCharge: failed, retryVia: "PAY_LINK" }),
+                false,
+            ),
+        ).toBeNull();
+        // An API older than D13: a pay link, as before.
+        expect(retryOffer(sub({ failedCharge: failed }), true)?.via).toBe(
+            "PAY_LINK",
+        );
+    });
+
+    it("a renewal autopay didn't collect before its due date says so, not 'past due'", () => {
+        expect(failWhy(sub({ failedCharge: failed }), NOW)).toBe(
+            "Renewal of ₹1,200 wasn't collected by autopay",
         );
     });
 });

@@ -35,9 +35,15 @@ export async function pauseSubscription(id: string, choice: PauseChoice) {
 export async function setMembersCanPause(on: boolean) {
     return then(api.setMembersCanPause(on));
 }
-/** A new pay link for a failed renewal (F4's Retry by pay link). */
-export async function retrySubscription(id: string) {
-    return then(api.retrySubscription(id));
+/**
+ * Retry a failed renewal: a new pay link (F4's Retry by pay link), or a new
+ * charge on their autopay (D13).
+ */
+export async function retrySubscription(
+    id: string,
+    via: api.RetryVia = "PAY_LINK",
+) {
+    return then(api.retrySubscription(id, via));
 }
 export async function resumeSubscription(id: string) {
     return then(api.resumeSubscription(id));

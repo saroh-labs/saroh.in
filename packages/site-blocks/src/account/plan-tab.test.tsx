@@ -156,6 +156,26 @@ describe("PlanTab", () => {
         expect(screen.queryByText("Class packs")).toBeNull();
     });
 
+    it("says an autopay charge is under way, with its day, and offers no Pay now (D13)", () => {
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf([
+                    {
+                        ...SUB,
+                        payNow: null,
+                        autopayCharging: { at: "2026-10-18T04:30:00.000Z" },
+                    },
+                ])}
+                api={api()}
+            />,
+        );
+        expect(
+            screen.getByText("Autopay charge in progress · 18 Oct 2026"),
+        ).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Pay now" })).toBeNull();
+    });
+
     it("with pausing off, there is no Pause button and Cancel offers no pause instead", async () => {
         render(
             <PlanTab

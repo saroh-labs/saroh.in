@@ -27,6 +27,7 @@ const SUB = {
     canCancel: true,
     autopay: null,
     autopayPays: null,
+    autopayCharging: null,
 };
 
 const PACK = {
@@ -105,6 +106,27 @@ describe("planTabResult", () => {
         // An API from before D12 offers none.
         const { autopayMethods: _, ...older } = TAB;
         expect(planTabResult(older)?.autopayMethods).toEqual([]);
+    });
+
+    it("reads an autopay charge under way (D13), anything strange as none", () => {
+        const tab = planTabResult({
+            ...TAB,
+            subscriptions: {
+                ok: true,
+                value: [
+                    {
+                        ...SUB,
+                        autopayCharging: { at: "2026-10-02T10:00:00.000Z" },
+                    },
+                    { ...SUB, ref: "sub_2", autopayCharging: { at: 7 } },
+                ],
+            },
+        });
+        const subs = tab?.subscriptions;
+        expect(subs?.ok && subs.value[0].autopayCharging).toEqual({
+            at: "2026-10-02T10:00:00.000Z",
+        });
+        expect(subs?.ok && subs.value[1].autopayCharging).toBeNull();
     });
 
     it("reads the ₹1 check (D12B): each method's before, each plan's after, anything strange as none", () => {

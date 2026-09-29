@@ -114,6 +114,10 @@ describe("what is said after", () => {
         expect(failedText(inline({ kind: "RETRY" }))).toBe(
             "No new pay link was made.",
         );
+        // D13: a retry by autopay.
+        expect(failedText(inline({ kind: "RETRY", via: "MANDATE" }))).toBe(
+            "Autopay wasn't charged.",
+        );
         expect(failedText(inline({ kind: "REPLY" }))).toBe(
             "Your reply wasn't sent.",
         );

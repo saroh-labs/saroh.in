@@ -365,8 +365,14 @@ export function planTabResult(v: unknown): AccountPlanTab | null {
 function withAutopay(s: AccountSubscription): AccountSubscription {
     const r = s as unknown as Rec;
     const pays = r.autopayPays;
+    const charging = r.autopayCharging;
     return {
         ...s,
+        // A charge under way (D13); anything strange reads as none.
+        autopayCharging:
+            isRecord(charging) && isString(charging.at)
+                ? { at: charging.at }
+                : null,
         autopay: autopayStateOf(r.autopay),
         autopayPays:
             isRecord(pays) && isString(pays.total) && isString(pays.currency)

@@ -92,7 +92,12 @@ export function InvoiceDetail({
     /** The order that owns it: its money moves there, never here. */
     orderHref: string | null;
     editHref: string;
-    online: { providerConnected: boolean; payLinkActive: boolean } | null;
+    online: {
+        providerConnected: boolean;
+        payLinkActive: boolean;
+        /** An autopay charge under way (D13): the pay link is held. */
+        autopayCharge?: { at: string } | null;
+    } | null;
     /** Whether it can be sent, and how; null from an API before D17. */
     send: InvoiceSend | null;
     /** Its sends and reminders, newest first. */
@@ -113,7 +118,9 @@ export function InvoiceDetail({
     const s = invoice.standing;
     const credit = invoice.kind === "CREDIT_NOTE";
     const owed = (s === "ISSUED" || s === "OVERDUE") && !credit && !orderHref;
-    const canLink = owed && (online?.providerConnected ?? false);
+    // While autopay is charging it (D13), no link: the customer would pay twice.
+    const charging = owed ? (online?.autopayCharge ?? null) : null;
+    const canLink = owed && (online?.providerConnected ?? false) && !charging;
     const sendable = canWrite && canSend(send);
     const reminding = wasSent(sent);
     const nextReminderAt = send?.nextReminderAt ?? null;
@@ -331,7 +338,17 @@ export function InvoiceDetail({
                         <p className="text-[13px] leading-[1.5] text-foreground">
                             {payLine}
                         </p>
-                        {owed ? (
+                        {charging ? (
+                            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                                <span className="font-semibold text-foreground">
+                                    Autopay charge in progress ·{" "}
+                                    <ViewerDate iso={charging.at} />
+                                </span>
+                                . The pay link and reminders are held until{" "}
+                                {invoice.who}&apos;s bank answers, so
+                                they&apos;re never charged twice.
+                            </p>
+                        ) : owed ? (
                             url ? (
                                 <div className="mt-2 flex min-w-0 items-center gap-2">
                                     <code className="min-w-0 flex-1 break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">

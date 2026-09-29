@@ -217,10 +217,27 @@ export function useInlineActions() {
 
     async function retry(need: HomeNeed, inline: HomeInline) {
         setBusy(need.id);
-        const res = await retrySubscription(inline.target);
+        const res = await retrySubscription(
+            inline.target,
+            inline.via ?? "PAY_LINK",
+        );
         setBusy(null);
         if (!res.ok) {
             showError(failedText(inline), res.error);
+            return;
+        }
+        // By autopay (D13): no link to copy; their bank tells them first.
+        if (!res.data.url) {
+            const text = res.data.paid
+                ? "Already paid by autopay"
+                : inline.done;
+            setDone(need.id, { text });
+            showSuccess(
+                text,
+                res.data.paid
+                    ? undefined
+                    : "Their bank tells them a day ahead, so the payment lands in a day or two.",
+            );
             return;
         }
         setDone(need.id, { text: inline.done, link: res.data.url });
