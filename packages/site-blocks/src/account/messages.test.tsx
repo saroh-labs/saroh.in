@@ -196,3 +196,27 @@ describe("the Messages tab's dot", () => {
         ).toBeTruthy();
     });
 });
+
+describe("the tab bar's labels", () => {
+    it("each keeps to its column, so six tabs on a phone never run together", () => {
+        pathname = "/account";
+        render(
+            <AccountTabBar
+                tabs={[
+                    { key: "home", label: "Home" },
+                    { key: "bookings", label: "Appointments" },
+                    { key: "orders", label: "Orders" },
+                    { key: "plan", label: "Plan" },
+                    { key: "messages", label: "Messages" },
+                    { key: "me", label: "Me" },
+                ]}
+            />,
+        );
+        const link = screen.getByRole("link", { name: "Appointments" });
+        // The whole word is still its name; on screen it ends in "…".
+        const label = link.querySelector("span");
+        expect(label?.textContent).toBe("Appointments");
+        expect(label?.className).toMatch(/\btruncate\b/);
+        expect(label?.className).toMatch(/\bw-full\b/);
+    });
+});
