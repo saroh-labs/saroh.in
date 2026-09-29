@@ -145,7 +145,12 @@ export function BusinessSection({
                                     <span
                                         className={cn(
                                             "whitespace-pre-line text-[13.5px] [overflow-wrap:anywhere]",
-                                            row.mono && "font-mono",
+                                            // Mono is for the measured value
+                                            // only; the words that stand in
+                                            // for a missing one are prose.
+                                            row.mono &&
+                                                row.value !== "" &&
+                                                "font-mono",
                                             !row.value &&
                                                 "text-muted-foreground",
                                         )}

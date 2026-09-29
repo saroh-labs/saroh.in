@@ -101,7 +101,7 @@ const ROLE_LABEL: Record<OrganizationRole, string> = {
 const ROLE_BLURB: Record<OrganizationRole, string> = {
     OWNER: "Can open and change everything. A business always has at least one owner, so it can never be locked out.",
     ADMIN: "Can do everything an owner can, except close the business or change or remove an owner.",
-    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves kitchen orders along. Can see settings, but can't change them or see money.",
+    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves kitchen orders along. No money, and no business settings.",
     REVIEWER:
         "Can look at the websites they're invited to, comment and sign them off. Nothing else in the business.",
 };
@@ -110,7 +110,7 @@ const ROLE_BLURB: Record<OrganizationRole, string> = {
 const ROLE_PLAIN: Record<OrganizationRole, string> = {
     OWNER: "can open everything",
     ADMIN: "everything except removing an owner",
-    MEMBER: "runs the day · can see settings, can't change them or see money",
+    MEMBER: "runs the day — no money or settings",
     REVIEWER: "invited websites, nothing else",
 };
 
@@ -257,7 +257,10 @@ export function TeamScreen({
         .find((m) => (m.roleKey ?? m.role) === "OWNER" && m.name?.trim())
         ?.name?.trim()
         .split(/\s+/)[0];
-    const readOnlyNote = canManage
+    // On Roles, it is the role editor's own permission that counts: a
+    // custom role holding `member:role:update` may edit roles (within its
+    // reach) without being able to manage people, so it isn't read-only.
+    const readOnlyNote = (tab === "roles" ? canEditRoles : canManage)
         ? undefined
         : `Only owners and admins can change this.${ownerFirstName ? ` Ask ${ownerFirstName} if something needs updating.` : ""}`;
 
