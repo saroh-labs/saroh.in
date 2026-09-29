@@ -58,7 +58,7 @@ export function PublishBanner({
 }) {
     return (
         <>
-            <div className="sticky top-[61px] z-10 flex flex-wrap items-center gap-3 border-b border-border bg-background px-6 py-3 max-[759px]:px-4">
+            <div className="sticky top-[61px] z-10 flex flex-wrap items-center gap-3 border-b border-border bg-card px-6 py-3 dark:bg-background max-[759px]:px-4">
                 <div className="min-w-0 flex-[1_1_260px]">
                     <div className="flex flex-wrap items-center gap-2.5">
                         <h1 className="m-0 min-w-0 break-words font-display text-[22px] font-semibold tracking-[-0.02em]">
@@ -198,7 +198,7 @@ export function PhoneActionBar({
     return (
         <div
             ref={bar}
-            className="sticky bottom-[var(--tab-bar-inset)] z-10 hidden flex-wrap items-center gap-2 border-t border-border bg-background px-4 py-3 max-[759px]:flex"
+            className="sticky bottom-[var(--tab-bar-inset)] z-10 hidden flex-wrap items-center gap-2 border-t border-border bg-card px-4 py-3 dark:bg-background max-[759px]:flex"
         >
             <ActionButtons
                 actions={actions}

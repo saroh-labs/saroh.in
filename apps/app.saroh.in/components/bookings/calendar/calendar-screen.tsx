@@ -23,6 +23,7 @@ import { runsClasses } from "@/lib/services/booking-calendar";
 import type { BookingPeople } from "@/lib/services/booking-pay";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
+import { callName } from "@/lib/services/call-name";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
 import {
     addDays,
@@ -596,7 +597,7 @@ export function CalendarScreen({
                                                     : "text-muted-foreground hover:text-foreground active:bg-card/60",
                                             )}
                                         >
-                                            {c.name.split(" ")[0]} · {n}
+                                            {callName(c.name)} · {n}
                                         </button>
                                     );
                                 })}

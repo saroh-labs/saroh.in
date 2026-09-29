@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/format/money";
 import type { ModuleView } from "@/lib/modules/schema";
 import { updateService } from "@/lib/services/actions";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
+import { callName } from "@/lib/services/call-name";
 import type { Service } from "@/lib/services/service";
 import {
     lengthLine,
@@ -190,7 +191,7 @@ export function ServicesScreen({
                                     {staff === null
                                         ? "Who takes it couldn't be loaded"
                                         : who.length
-                                          ? `With ${who.map((p) => p.name.split(" ")[0]).join(", ")}`
+                                          ? `With ${who.map((p) => callName(p.name)).join(", ")}`
                                           : "Nobody takes it yet — it books in its own hours"}
                                 </div>
                                 <div className="mt-2 border-t border-border/60 pt-2 text-[12px] text-muted-foreground">
