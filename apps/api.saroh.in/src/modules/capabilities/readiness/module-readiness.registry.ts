@@ -13,6 +13,11 @@ import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { lacksWebhookSecret } from "../../payments/webhook-setup";
+import {
+    SHOP_AWAITS_SELLS_FROM,
+    sellsFromHref,
+    siteAwaitingSellsFrom,
+} from "../../sites/sells-from-awaiting";
 import type { ModuleKey } from "../module-registry";
 import { deactivationImpactOf } from "./module-deactivation-impact";
 import type {
@@ -66,6 +71,9 @@ function attention(
 
 /** Providers the merchant connected and has not switched off. */
 const CONNECTED = "CONNECTED";
+
+/** A live site's shop could serve, but "Sells from" is unanswered (P4). */
+export const WEBSITE_SHOP_NOT_CHOSEN = "WEBSITE_SHOP_NOT_CHOSEN";
 
 /** Payments connected, but no payment through them can be confirmed (DEC-063). */
 export const PAYMENTS_WEBHOOK_SECRET_MISSING =
@@ -132,8 +140,21 @@ export class ModuleReadinessRegistry {
             key: "WEBSITE",
             evaluate: async ({ organizationId }) => {
                 const where = { organizationId };
-                if ((await this.db.publication.count({ where })) > 0)
-                    return active();
+                if ((await this.db.publication.count({ where })) > 0) {
+                    // Live, but its shop waits on "Sells from" (P4): said
+                    // only while the shop could serve (DEC-057).
+                    const waiting = await siteAwaitingSellsFrom(
+                        this.db,
+                        organizationId,
+                    );
+                    return waiting
+                        ? setup(
+                              WEBSITE_SHOP_NOT_CHOSEN,
+                              SHOP_AWAITS_SELLS_FROM,
+                              sellsFromHref(waiting),
+                          )
+                        : active();
+                }
                 if ((await this.db.site.count({ where })) > 0)
                     return setup(
                         "WEBSITE_NO_PUBLICATION",

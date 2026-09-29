@@ -2,7 +2,13 @@ import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { SiteFooterContent } from "./site-chrome";
-import { footerLine, SiteFooter, SiteHeader, siteMenu } from "./site-chrome";
+import {
+    footerLine,
+    SiteFooter,
+    SiteHeader,
+    siteMenu,
+    withShopLink,
+} from "./site-chrome";
 
 /**
  * The customer site's v2 header and footer (G17): one row with the name,
@@ -562,6 +568,52 @@ describe("the menu follows the modules (G19)", () => {
         const homeOnly = [{ label: "Home", href: "/" }];
         expect(siteMenu(homeOnly, { SHOP: "off" })).toEqual(homeOnly);
         expect(siteMenu(NAV, { SHOP: "off", BOOK: "off" })).toEqual(NAV);
+    });
+});
+
+describe("a Shop link in the header while the shop serves (P4)", () => {
+    const SHOP = { label: "Shop", href: "/shop", kind: "SHOP" };
+
+    it("adds Shop after Home when the shop serves", () => {
+        expect(withShopLink(NAV, true).map((i) => i.label)).toEqual([
+            "Home",
+            "Shop",
+            "Classes",
+            "About",
+        ]);
+        render(<SiteHeader name="Rye" navigation={NAV} shopServes />);
+        const row = screen.getByRole("navigation", { name: "Site" });
+        expect(linkTexts(row)).toEqual(["Home", "Shop", "Classes", "About"]);
+        const shop = Array.from(row.querySelectorAll("a")).find(
+            (a) => a.textContent === "Shop",
+        );
+        expect(shop).toHaveAttribute("href", "/shop");
+    });
+
+    it("gives a site with no menu Home · Shop", () => {
+        expect(withShopLink([], true)).toEqual([
+            { label: "Home", href: "/" },
+            SHOP,
+        ]);
+    });
+
+    it("keeps a menu that already opens the shop as it is", () => {
+        const own = [
+            { label: "Home", href: "/" },
+            { label: "Bakery", href: "/shop/" },
+        ];
+        expect(withShopLink(own, true)).toEqual(own);
+        const page = [{ label: "Home", href: "/" }, SHOP];
+        expect(withShopLink(page, true)).toEqual(page);
+    });
+
+    it("adds nothing while the shop doesn't serve", () => {
+        expect(withShopLink(NAV, false)).toEqual(NAV);
+        expect(withShopLink([], false)).toEqual([]);
+        render(<SiteHeader name="Rye" navigation={NAV} />);
+        expect(
+            linkTexts(screen.getByRole("navigation", { name: "Site" })),
+        ).toEqual(["Home", "Classes", "About"]);
     });
 });
 

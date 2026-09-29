@@ -75,6 +75,7 @@ import {
     sellsFromView,
     shopRolloutOn,
 } from "./sells-from";
+import { awaitsSellsFrom, shopCouldServe } from "./sells-from-awaiting";
 import {
     assertPageInSite,
     assertPathIsFree,
@@ -450,6 +451,13 @@ export interface SiteDetailView {
      * flag, off until checkout ships): the settings show no row then.
      */
     sellsFrom: SellsFromView | null;
+    /**
+     * The shop could serve (`SITE_SHOP`, Commerce rolled out and on) and a
+     * storefront with products could be chosen, but Sells from is
+     * unanswered, so `/shop` isn't live (P4). The Shop settings say so.
+     * False whenever the shop isn't open for the business (DEC-057).
+     */
+    shopAwaitsSellsFrom: boolean;
 }
 
 /**
@@ -1030,6 +1038,11 @@ export class SitesService {
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
             sellsFrom,
+            // Asked only when it could be true: Commerce's gate is a read.
+            shopAwaitsSellsFrom:
+                sellsFrom !== null &&
+                awaitsSellsFrom(sellsFrom) &&
+                (await shopCouldServe(ctx.organizationId)),
             addablePageKinds: allows(ctx, "site:update")
                 ? await addableModulePageKinds(
                       ctx.organizationId,

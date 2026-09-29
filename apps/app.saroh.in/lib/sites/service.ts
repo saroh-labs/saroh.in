@@ -528,6 +528,12 @@ export interface SiteDetail extends SiteSummary {
      */
     sellsFrom?: SellsFrom | null;
     /**
+     * The shop could serve (SITE_SHOP, Commerce on) and a storefront with
+     * products could be chosen, but Sells from is unanswered, so `/shop`
+     * isn't live yet (P4). Absent from an older API: not said.
+     */
+    shopAwaitsSellsFrom?: boolean;
+    /**
      * The module pages this caller could add now (G14): kinds whose module is
      * on and that the site doesn't have yet, in menu order. Empty without
      * `site:update`; a module that isn't rolled out is never listed

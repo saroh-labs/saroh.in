@@ -142,8 +142,18 @@ export type {
 } from "./shop/api";
 export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
 export { ShopBag } from "./shop/bag";
+// The order confirmation page after a shop payment (P4).
 export type { ShopBagProps } from "./shop/bag";
 export type { BagItem } from "./shop/bag-store";
+export {
+    OrderConfirmation,
+    orderConfirmationHref,
+} from "./shop/order-confirmation";
+export type {
+    OrderConfirmationData,
+    OrderConfirmationLine,
+    OrderConfirmationLookup,
+} from "./shop/order-confirmation";
 
 // Not a page block either: the booking page on a merchant's site (U19),
 // `/<domain>/book` — every service, two weeks of times, pay now or at the desk.
@@ -339,7 +349,13 @@ export { PayOption } from "./booking-flow/steps/pay-option";
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
-export { SiteFooter, SiteHeader, footerLine, siteMenu } from "./site-chrome";
+export {
+    SiteFooter,
+    SiteHeader,
+    footerLine,
+    siteMenu,
+    withShopLink,
+} from "./site-chrome";
 export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
