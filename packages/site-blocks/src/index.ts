@@ -299,6 +299,8 @@ export type { JoinSheetProps, JoinablePlan } from "./prices/join-sheet";
 export type { AutopayStartResult } from "./account/plan-api";
 export {
     AUTOPAY_METHODS,
+    autopayCheckStateOf,
+    autopayChecksOf,
     autopayMethodsOf,
     autopayOutcomeOf,
     autopayStartOf,
@@ -306,6 +308,9 @@ export {
     isAutopayMethod,
 } from "./autopay/api";
 export type {
+    AutopayCheck,
+    AutopayCheckState,
+    AutopayChecks,
     AutopayMethod,
     AutopayOutcome,
     AutopayStart,
@@ -320,6 +325,9 @@ export type { AutopayWindowOutcome } from "./autopay/choice";
 export { AutopayDone } from "./autopay/done";
 export type { AutopayDoneProps, AutopayDoneState } from "./autopay/done";
 export {
+    autopayCheckAfter,
+    autopayCheckBefore,
+    autopayCheckLine,
     autopayMethodLabel,
     autopayMethodSub,
     autopayStateLine,

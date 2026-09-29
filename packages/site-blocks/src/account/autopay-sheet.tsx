@@ -3,12 +3,17 @@
 import { useRef, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
-import type { AutopayMethod, AutopayStart } from "../autopay/api";
+import type {
+    AutopayChecks,
+    AutopayMethod,
+    AutopayStart,
+} from "../autopay/api";
 import {
     AutopayMethodChoice,
     landOnBusinessSite,
     openAutopayWindow,
 } from "../autopay/choice";
+import { autopayCheckBefore } from "../autopay/words";
 import type { OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
 import { cn } from "../lib/utils";
@@ -23,12 +28,15 @@ import { Sheet, sheetButton } from "./sheet";
  * "Set up autopay" and "Change how autopay pays" on My plan (round-2 D12):
  * every method the business's provider offers, by its plain name, and the
  * provider's window. With something owed, UPI and card pay it in the same
- * window; eMandate authorises alone (nothing is taken). Once approved, the
- * customer lands on the business's own page that says how autopay stands.
+ * window; eMandate authorises alone (nothing is taken). With nothing owed,
+ * UPI and card take a ₹1 check that is refunded straight away (DEC-064),
+ * and the sheet says so before they pay. Once approved, the customer lands
+ * on the business's own page that says how autopay stands.
  */
 export function AutopaySheet({
     plan,
     methods,
+    checks = {},
     onClose,
     start,
     businessName,
@@ -38,6 +46,8 @@ export function AutopaySheet({
     /** The plan to set autopay up on; null keeps the sheet closed. */
     plan: AccountSubscription | null;
     methods: readonly AutopayMethod[];
+    /** The check each method takes with nothing owed (DEC-064). */
+    checks?: AutopayChecks;
     onClose: () => void;
     start: NonNullable<PlanApi["startAutopay"]>;
     businessName: string;
@@ -58,6 +68,7 @@ export function AutopaySheet({
                     key={plan.ref}
                     plan={plan}
                     methods={methods}
+                    checks={checks}
                     start={start}
                     businessName={businessName}
                     customer={customer}
@@ -71,6 +82,7 @@ export function AutopaySheet({
 function Choose({
     plan,
     methods,
+    checks,
     start,
     businessName,
     customer,
@@ -78,6 +90,7 @@ function Choose({
 }: {
     plan: AccountSubscription;
     methods: readonly AutopayMethod[];
+    checks: AutopayChecks;
     start: NonNullable<PlanApi["startAutopay"]>;
     businessName: string;
     customer: { name: string | null; email: string };
@@ -95,6 +108,8 @@ function Choose({
     const owed = plan.autopayPays ?? null;
     // UPI and card pay what is owed in the same window; eMandate doesn't.
     const pays = owed && method && method !== "EMANDATE" ? owed : null;
+    // Nothing owed: UPI and card take the ₹1 check, refunded (DEC-064).
+    const check = !owed && method ? (checks[method] ?? null) : null;
     const off = busy || method === null;
 
     async function submit() {
@@ -152,6 +167,11 @@ function Choose({
                     ? `This pays the ${accountMoney(pays.total, pays.currency)} owed now, and each renewal after it is paid automatically.`
                     : "Each renewal is paid automatically. Cancel any time by asking the business."}
             </p>
+            {check ? (
+                <p className="text-site-body mt-2 text-[12.5px] leading-normal">
+                    {autopayCheckBefore(check)}
+                </p>
+            ) : null}
             {said ? (
                 <p role="status" className="text-site-body mt-3 text-sm">
                     {said}

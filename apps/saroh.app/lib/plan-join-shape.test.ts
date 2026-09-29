@@ -51,6 +51,7 @@ describe("starting to join (G20)", () => {
             ref: "m_1",
             method: "UPI",
             mode: "PAY_AND_AUTHORISE",
+            check: null,
             limit: "3800.00",
             currency: "INR",
             handoff: {

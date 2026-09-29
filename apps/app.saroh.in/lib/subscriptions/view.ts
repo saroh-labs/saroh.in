@@ -550,11 +550,36 @@ const AUTOPAY_FAILED: Record<string, string> = {
  * what the customer set up: "Autopay on · UPI · mo•••@okicici · limit
  * ₹1,500", "Autopay pending · UPI — waiting for them to approve it",
  * "Autopay failed · card — they didn't approve it". Null: no autopay.
+ *
+ * A set-up that took the ₹1 check (D12B, DEC-064) says where its refund
+ * is — "· ₹1 check refunded", "· ₹1 check being refunded" — so the merchant
+ * never reads it as money in.
  */
 export function autopayLine(
     autopay: SubscriptionAutopay | null | undefined,
 ): string | null {
     if (!autopay) return null;
+    const line = autopayStateText(autopay);
+    const check = autopay.check ? autopayCheckText(autopay.check) : null;
+    return check ? `${line} · ${check}` : line;
+}
+
+const CHECK_STATE: Record<
+    NonNullable<SubscriptionAutopay["check"]>["state"],
+    string
+> = {
+    REFUNDED: "refunded",
+    REFUNDING: "being refunded",
+    NOT_REFUNDED: "not refunded — refund it from your payment provider",
+};
+
+function autopayCheckText(
+    check: NonNullable<SubscriptionAutopay["check"]>,
+): string {
+    return `${money(check.amount, check.currency)} check ${CHECK_STATE[check.state]}`;
+}
+
+function autopayStateText(autopay: SubscriptionAutopay): string {
     const method = autopay.method ? AUTOPAY_METHOD[autopay.method] : null;
     const how = [method, autopay.hint].filter(Boolean).join(" · ");
     const withHow = (head: string) => (how ? `${head} · ${how}` : head);

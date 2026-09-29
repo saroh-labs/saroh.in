@@ -25,15 +25,37 @@ export function autopayMethodsOf(v: unknown): AutopayMethod[] {
     return out;
 }
 
+/**
+ * The check a method takes to switch autopay on when nothing is owed
+ * (DEC-064: UPI and card ₹1 at Razorpay), refunded straight away.
+ */
+export interface AutopayCheck {
+    /** "1.00" */
+    amount: string;
+    currency: string;
+}
+
+/** The check each method takes; a method not here takes none. */
+export type AutopayChecks = Partial<Record<AutopayMethod, AutopayCheck>>;
+
+/** How a taken check stands: its refund on the way, back, or refused. */
+export interface AutopayCheckState extends AutopayCheck {
+    state: "REFUNDING" | "REFUNDED" | "NOT_REFUNDED";
+    refundedAt: string | null;
+}
+
 /** A started set-up: the provider's window to open, and where to land after. */
 export interface AutopayStart {
     ref: string;
     method: AutopayMethod;
     /**
      * PAY_AND_AUTHORISE: this one window pays and turns autopay on (UPI,
-     * card). AUTHORISE: it only authorises; nothing is taken now.
+     * card). AUTHORISE: it only authorises; nothing is kept (the ₹1
+     * `check` is refunded).
      */
     mode: "PAY_AND_AUTHORISE" | "AUTHORISE";
+    /** The ₹1 check this window takes, refunded (DEC-064); null: none. */
+    check?: AutopayCheck | null;
     limit: string;
     currency: string;
     handoff: PaymentHandoff;
@@ -48,6 +70,8 @@ export interface AutopayState {
     state: "ON" | "PAUSED" | "PENDING" | "FAILED";
     method: AutopayMethod | null;
     hint: string | null;
+    /** The ₹1 check its set-up took (DEC-064); null or absent: none. */
+    check?: AutopayCheckState | null;
 }
 
 /** What the page after set-up shows. */
@@ -80,6 +104,40 @@ function isHandoff(v: unknown): v is PaymentHandoff {
     );
 }
 
+function isCheck(v: unknown): v is AutopayCheck {
+    return isRecord(v) && isText(v.amount) && isText(v.currency);
+}
+
+/** Checks per method from an answer; anything strange is left out. */
+export function autopayChecksOf(v: unknown): AutopayChecks {
+    const out: AutopayChecks = {};
+    if (!isRecord(v)) return out;
+    for (const m of AUTOPAY_METHODS) {
+        const c = v[m];
+        if (isCheck(c)) out[m] = { amount: c.amount, currency: c.currency };
+    }
+    return out;
+}
+
+/** A taken check, checked; null when there is none or it is strange. */
+export function autopayCheckStateOf(v: unknown): AutopayCheckState | null {
+    if (
+        !isCheck(v) ||
+        !isRecord(v) ||
+        (v.state !== "REFUNDING" &&
+            v.state !== "REFUNDED" &&
+            v.state !== "NOT_REFUNDED")
+    ) {
+        return null;
+    }
+    return {
+        amount: v.amount,
+        currency: v.currency,
+        state: v.state,
+        refundedAt: isText(v.refundedAt) ? v.refundedAt : null,
+    };
+}
+
 /** An API's start, checked; null when it isn't one. */
 export function autopayStartOf(v: unknown): AutopayStart | null {
     if (
@@ -99,6 +157,9 @@ export function autopayStartOf(v: unknown): AutopayStart | null {
         ref: v.ref,
         method: v.method,
         mode: v.mode,
+        check: isCheck(v.check)
+            ? { amount: v.check.amount, currency: v.check.currency }
+            : null,
         limit: v.limit,
         currency: v.currency,
         handoff: {
@@ -129,6 +190,7 @@ export function autopayStateOf(v: unknown): AutopayState | null {
         state: v.state,
         method: isAutopayMethod(v.method) ? v.method : null,
         hint: isText(v.hint) ? v.hint : null,
+        check: autopayCheckStateOf(v.check),
     };
 }
 

@@ -1,4 +1,10 @@
-import type { AutopayMethod, AutopayState } from "./api";
+import { accountDate, accountMoney } from "../account/model";
+import type {
+    AutopayCheck,
+    AutopayCheckState,
+    AutopayMethod,
+    AutopayState,
+} from "./api";
 
 /**
  * Autopay in the customer's words (round-2 D12): each method by a plain
@@ -55,4 +61,44 @@ export function autopayStateLine(
         case "FAILED":
             return "Autopay didn't turn on";
     }
+}
+
+/**
+ * The ₹1 check (DEC-064), before they pay: switching autopay on with
+ * nothing owed by UPI or card takes it, and it comes straight back.
+ */
+export function autopayCheckBefore(check: AutopayCheck): string {
+    const m = accountMoney(check.amount, check.currency);
+    return `To switch on autopay, your bank needs a ${m} check. We refund the ${m} straight away — it's back in your account in 5–7 working days.`;
+}
+
+/** The check afterwards, as a sentence: where its refund is. */
+export function autopayCheckAfter(
+    check: AutopayCheckState,
+    timezone: string,
+    business: string,
+): string {
+    const m = accountMoney(check.amount, check.currency);
+    switch (check.state) {
+        case "REFUNDED":
+            return check.refundedAt
+                ? `The ${m} check was refunded on ${accountDate(check.refundedAt, timezone)}.`
+                : `The ${m} check was refunded.`;
+        case "REFUNDING":
+            return `The ${m} check is being refunded — it reaches you in 5–7 working days.`;
+        case "NOT_REFUNDED":
+            return `The ${m} check hasn't been refunded yet. ${business} will return it — ask them if it doesn't arrive.`;
+    }
+}
+
+/** The check on My plan, short: "Autopay check · ₹1 · Refunded". */
+export function autopayCheckLine(check: AutopayCheckState): string {
+    const m = accountMoney(check.amount, check.currency);
+    const where =
+        check.state === "REFUNDED"
+            ? "Refunded"
+            : check.state === "REFUNDING"
+              ? "Refund on its way"
+              : "Not refunded yet";
+    return `Autopay check · ${m} · ${where}`;
 }

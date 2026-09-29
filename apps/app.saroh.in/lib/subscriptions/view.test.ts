@@ -483,4 +483,41 @@ describe("autopayLine (D12)", () => {
         expect(autopayLine(null)).toBeNull();
         expect(autopayLine(undefined)).toBeNull();
     });
+
+    it("says where the ₹1 check's refund is (D12B), never as money in", () => {
+        const check = { amount: "1.00", currency: "INR", refundedAt: null };
+        expect(
+            autopayLine({
+                ...base,
+                state: "ON",
+                check: { ...check, state: "REFUNDED" },
+            }),
+        ).toBe(
+            "Autopay on · UPI · mo•••@okicici · limit ₹1,500 · ₹1 check refunded",
+        );
+        expect(
+            autopayLine({
+                ...base,
+                state: "PENDING",
+                hint: null,
+                check: { ...check, state: "REFUNDING" },
+            }),
+        ).toBe(
+            "Autopay pending · UPI — waiting for them to approve it · ₹1 check being refunded",
+        );
+        expect(
+            autopayLine({
+                ...base,
+                state: "FAILED",
+                hint: null,
+                failure: "NOT_APPROVED",
+                check: { ...check, state: "NOT_REFUNDED" },
+            }),
+        ).toBe(
+            "Autopay failed · UPI — they didn't approve it · ₹1 check not refunded — refund it from your payment provider",
+        );
+        expect(autopayLine({ ...base, state: "ON", check: null })).toBe(
+            "Autopay on · UPI · mo•••@okicici · limit ₹1,500",
+        );
+    });
 });

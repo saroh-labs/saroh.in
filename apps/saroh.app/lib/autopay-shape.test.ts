@@ -20,6 +20,7 @@ const START = {
     ref: "m_1",
     method: "UPI",
     mode: "PAY_AND_AUTHORISE",
+    check: null,
     limit: "3800.00",
     currency: "INR",
     handoff: {
@@ -36,7 +37,12 @@ const START = {
 
 const OUTCOME = {
     plan: "Monthly unlimited",
-    autopay: { state: "ON", method: "UPI", hint: "mo•••@okicici" },
+    autopay: {
+        state: "ON",
+        method: "UPI",
+        hint: "mo•••@okicici",
+        check: null,
+    },
     paid: true,
     nextPaymentAt: "2026-11-01T18:30:00.000Z",
     nextAmount: "2500.00",
@@ -135,7 +141,12 @@ describe("the pay page's autopay", () => {
                 methods: ["UPI", "EMANDATE", "WALLET"],
                 on: null,
             }),
-        ).toEqual({ plan: "Monthly", methods: ["UPI", "EMANDATE"], on: null });
+        ).toEqual({
+            plan: "Monthly",
+            methods: ["UPI", "EMANDATE"],
+            on: null,
+            checks: {},
+        });
         expect(
             payAutopayOf({
                 plan: "Monthly",
@@ -146,7 +157,26 @@ describe("the pay page's autopay", () => {
             plan: "Monthly",
             methods: [],
             on: { method: "CARD", hint: "•••• 4242" },
+            checks: {},
         });
         expect(payAutopayOf(null)).toBeNull();
+    });
+
+    it("keeps the ₹1 check each method takes on a paid invoice (D12B)", () => {
+        expect(
+            payAutopayOf({
+                plan: "Monthly",
+                methods: ["UPI", "CARD", "EMANDATE"],
+                on: null,
+                checks: {
+                    UPI: { amount: "1.00", currency: "INR" },
+                    CARD: { amount: "1.00", currency: "INR" },
+                    EMANDATE: "none",
+                },
+            })?.checks,
+        ).toEqual({
+            UPI: { amount: "1.00", currency: "INR" },
+            CARD: { amount: "1.00", currency: "INR" },
+        });
     });
 });

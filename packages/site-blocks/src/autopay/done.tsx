@@ -5,13 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import { accountDate, accountMoney } from "../account/model";
 import { buttonClasses } from "../account/parts";
 import type { AutopayOutcome } from "./api";
-import { autopayWith } from "./words";
+import { autopayCheckAfter, autopayWith } from "./words";
 
 /**
  * The page a customer lands on after setting up autopay (round-2 D12), on
  * the business's own site — never Saroh's or the provider's: "You're on
  * ‹plan›. Autopay is on with UPI (mo•••@okicici). Next payment ‹date›."
- * with the way back to their account.
+ * with the way back to their account. A set-up that took the ₹1 check
+ * (DEC-064) says it is being refunded, then the day it was.
  *
  * While the provider hasn't confirmed, it says "Being confirmed" and asks
  * again by itself. A set-up that didn't go through says whether the
@@ -124,22 +125,26 @@ export function AutopayDone({
                     ? ` Next payment ${accountMoney(o.nextAmount, o.currency)} on ${accountDate(o.nextPaymentAt, o.timezone)}.`
                     : "";
             const a = o.autopay;
+            // The ₹1 check (DEC-064): where its refund is, after the rest.
+            const check = a?.check
+                ? ` ${autopayCheckAfter(a.check, o.timezone, businessName)}`
+                : "";
             if (a && (a.state === "ON" || a.state === "PAUSED")) {
                 title = `You're on ${o.plan}.`;
                 body =
                     a.state === "ON"
-                        ? `Autopay is on with ${autopayWith(a)}.${next}`
-                        : `Autopay is set up with ${autopayWith(a)}, and paused in your UPI app.${next}`;
+                        ? `Autopay is on with ${autopayWith(a)}.${check}${next}`
+                        : `Autopay is set up with ${autopayWith(a)}, and paused in your UPI app.${check}${next}`;
             } else if (a?.state === "PENDING") {
                 title = "Being confirmed";
                 body = late
-                    ? `${o.paid ? "Your payment went through. " : ""}Autopay is still being confirmed with the payment provider. It shows in your account as soon as it's on.`
-                    : `${o.paid ? "Your payment went through. " : ""}We're confirming autopay with the payment provider. This page updates by itself.`;
+                    ? `${o.paid ? "Your payment went through. " : ""}Autopay is still being confirmed with the payment provider. It shows in your account as soon as it's on.${check}`
+                    : `${o.paid ? "Your payment went through. " : ""}We're confirming autopay with the payment provider. This page updates by itself.${check}`;
             } else {
                 title = "Autopay isn't on";
                 body = o.paid
-                    ? `Your payment went through — ${o.plan} is paid. Autopay didn't turn on, so your next payment comes as a link to pay.`
-                    : `Your payment hasn't gone through, and autopay isn't on for ${o.plan}.`;
+                    ? `Your payment went through — ${o.plan} is paid. Autopay didn't turn on, so your next payment comes as a link to pay.${check}`
+                    : `Your payment hasn't gone through, and autopay isn't on for ${o.plan}.${check}`;
                 live = "alert";
                 actions = (
                     <>

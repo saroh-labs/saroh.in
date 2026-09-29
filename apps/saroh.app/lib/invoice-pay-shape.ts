@@ -1,5 +1,9 @@
-import type { AutopayMethod } from "@saroh/site-blocks";
-import { autopayMethodsOf, isAutopayMethod } from "@saroh/site-blocks";
+import type { AutopayChecks, AutopayMethod } from "@saroh/site-blocks";
+import {
+    autopayChecksOf,
+    autopayMethodsOf,
+    isAutopayMethod,
+} from "@saroh/site-blocks";
 
 /**
  * The public invoice a pay link shows, and the checks that narrow it. Kept
@@ -48,6 +52,11 @@ export interface PayAutopay {
     plan: string;
     methods: AutopayMethod[];
     on: { method: AutopayMethod | null; hint: string | null } | null;
+    /**
+     * The check each method takes when the invoice is already paid (D12B,
+     * DEC-064: UPI and card ₹1, refunded). Empty from an older API.
+     */
+    checks: AutopayChecks;
 }
 
 /** The invoice's autopay, checked; null when it has none or it is strange. */
@@ -63,6 +72,7 @@ export function payAutopayOf(v: unknown): PayAutopay | null {
                   hint: isString(on.hint) ? on.hint : null,
               }
             : null,
+        checks: autopayChecksOf(v.checks),
     };
 }
 
