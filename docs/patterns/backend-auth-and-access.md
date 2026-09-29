@@ -198,6 +198,14 @@ what the API allows.
 - **Current** — **Three control planes, never conflated** (ADR-003): feature flags
   are Saroh's rollout, entitlements are what a plan permits, modules are what an
   Organization has chosen.
+- **Current** (DEC-068) — **Turning a module on creates its minimum in the
+  switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
+  checks `module:manage` and then the action for each thing it creates
+  (`store:create`, `service:write`, `pipeline:manage`, `site:create`); without
+  `setup` it behaves as before. The API never turns a dependency on — the app
+  enables each first. Whether Saroh has rolled a module out is one function,
+  `moduleRolledOut`, which also treats a `hidden` module (Automations) as not
+  rolled out. `modules/capabilities/README.md` has the payloads.
 - **Current** — **State-changing requests are origin-checked.** `OriginGuard`
   rejects an untrusted **or missing** `Origin` (falling back to `Referer`) on
   POST, PUT, PATCH and DELETE (#50). **A frontend's server-side call to the

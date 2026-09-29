@@ -70,6 +70,8 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/readiness/module-readiness.registry.spec.ts",
         // #115 module API controller (mocked services).
         "<rootDir>/src/modules/capabilities/capabilities.controller.spec.ts",
+        // DEC-068 Turn on: the setup payload's shapes (pure, no DB).
+        "<rootDir>/src/modules/capabilities/setup/module-setup.parse.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
         // #274 the same guard with the REAL availability service, per role:

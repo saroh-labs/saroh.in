@@ -87,6 +87,13 @@ export interface ModuleDescriptor {
     projectSelectable: boolean;
     /** Saroh-side rollout kill switch (separate from installation/entitlement/authz). */
     rolloutFlag: FlagKeyType;
+    /**
+     * Hidden from every business whatever its rollout flag says (DEC-068):
+     * the module has no screen yet, so it reads as not rolled out — never
+     * listed, never turned on, and a business that already had it on keeps
+     * its setting. {@link moduleRolledOut} is the one place that reads it.
+     */
+    hidden?: true;
     /** Optional commercial-entitlement key gating the module. */
     entitlementKey?: keyof EntitlementMap;
     /** Identifier for the module's readiness adapter (Task 4). */
@@ -236,6 +243,9 @@ export const MODULES: readonly ModuleDescriptor[] = [
         dependencies: ["CRM"],
         projectSelectable: true,
         rolloutFlag: FlagKey.MODULE_AUTOMATIONS,
+        // No screen yet (DEC-068): hidden as a module Saroh hasn't rolled
+        // out is (DEC-057), whatever MODULE_AUTOMATIONS says.
+        hidden: true,
         readinessAdapter: "AUTOMATIONS",
         deactivationPolicy: "AUTOMATIONS",
     },
@@ -413,6 +423,27 @@ function assertAcyclic(modules: readonly ModuleDescriptor[]): void {
 export const MODULE_BY_KEY: ReadonlyMap<ModuleKey, ModuleDescriptor> = new Map(
     MODULES.map((m) => [m.key, m]),
 );
+
+/**
+ * Whether Saroh has rolled a module out to a business (DEC-057): its rollout
+ * flag is on and it isn't hidden (DEC-068). Every reader of the rollout
+ * gate — availability, enable, impact — asks here, so a hidden module reads
+ * exactly as one whose flag is off: `ROLLOUT_DISABLED` in the list, which
+ * the app's `rolledOut` hides, and a refusal in words on enable. Without a
+ * flag reader (unit tests) only `hidden` counts.
+ */
+export async function moduleRolledOut(
+    flags:
+        | { isEnabled(key: FlagKeyType, orgId?: string): Promise<boolean> }
+        | undefined,
+    moduleKey: ModuleKey,
+    organizationId: string,
+): Promise<boolean> {
+    const descriptor = MODULE_BY_KEY.get(moduleKey);
+    if (!descriptor || descriptor.hidden) return false;
+    if (!flags) return true;
+    return flags.isEnabled(descriptor.rolloutFlag, organizationId);
+}
 
 /** True when `key` is a registered module key. */
 export function isModuleKey(key: string): key is ModuleKey {
