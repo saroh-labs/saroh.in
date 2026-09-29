@@ -11,6 +11,7 @@ import { buildProvidersView } from "@/lib/providers/rows";
 import {
     listCommsProviders,
     listPaymentProviders,
+    listPaymentWebhooks,
 } from "@/lib/providers/service";
 import { requireSession } from "@/lib/session";
 import { listCheckoutProviders } from "@/lib/stores/storefronts";
@@ -30,14 +31,17 @@ export default async function ProvidersSettingsPage() {
     const result = await listProviderHealth();
     // Everything else is only read once the health read has shown this
     // person may manage providers.
-    const [payments, messaging, domains, checkout] =
+    const [payments, messaging, domains, checkout, webhooks] =
         result.status === "denied"
-            ? [null, null, null, []]
+            ? [null, null, null, [], null]
             : await Promise.all([
                   listPaymentProviders(),
                   listCommsProviders(),
                   listOrgDomains(),
                   listCheckoutProviders(),
+                  // The address to register and the last payment update
+                  // (DEC-063). Best-effort: it never fails the page.
+                  listPaymentWebhooks(),
               ]);
     const view =
         result.status === "denied"
@@ -48,6 +52,7 @@ export default async function ProvidersSettingsPage() {
                   messaging,
                   domains,
                   checkout,
+                  webhooks,
               });
 
     return (
@@ -78,6 +83,7 @@ export default async function ProvidersSettingsPage() {
                     view={view}
                     payments={payments ?? []}
                     messaging={messaging ?? []}
+                    webhooks={webhooks}
                 />
             )}
         </SettingsPanel>
