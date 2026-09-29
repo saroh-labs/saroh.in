@@ -610,3 +610,13 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: **`customer:sensitive` is its own capability.** Owner and Admin hold it; Member and Reviewer don't; nothing implies it. `canSeeSensitive` asks for it, and every surface that shows sensitive notes follows it.
 - Consequences: custom roles saved before C13 that hold `contact:write` no longer see sensitive notes. No migration grants the capability back; a business re-grants it in Team › Roles. This is on purpose: the matrix's front-desk template exists so that it doesn't see medical notes.
 - Migration: none.
+
+## DEC-062 Joining a plan online is pay-first
+
+**Status: Accepted — 2026-09-29** · round-2 plans G (G20) and D (D12)
+
+- Context: a customer joining a plan from the site's Prices page or Plans block could either be put on the plan at once and invoiced (subscribe-then-invoice), or be put on it only once the first period is paid (pay-first).
+- Decision: **pay-first.** Starting to join makes a numberless DRAFT invoice (source SUBSCRIPTION), priced by the server from the plan as it is on sale, with the plan's terms snapshotted on it. Nobody is on the plan until the payment's webhook arrives; then, under the invoice's row lock, the subscription starts from the snapshot and the invoice is numbered PAID as its first period's invoice. An unpaid draft is voided after 24 hours, and an account has at most three open joins. This is the same shape as buying a class pack online (A11).
+- Why: an abandoned join leaves nothing behind — no member who hasn't paid, no numbered invoice to credit-note, no gap in the series (DEC-023) — and nobody books classes on a plan they haven't paid for. It also lets D12 pay the first period and set up autopay in one flow at join.
+- Consequences: a business with no online payments shows "Ask about joining" instead of Join; staff still add members by hand for "join now, pay at the desk". Renewals after the first period are invoiced as any member's are until D12/D13 add autopay.
+- Migration: `20261018100000_plan_join_online` (G20), additive.
