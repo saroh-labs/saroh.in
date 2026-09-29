@@ -27,6 +27,9 @@ pnpm (`pnpm@9`) + Turborepo monorepo.
 - **Organization is the tenant root**, not Store (ADR-001).
 - **Merchant sites never inherit Saroh's brand**; the `--site-*` token layer is
   separate by design.
+- **Never push a unit branch or open a PR per unit.** Work lands in a local
+  `batch-<date>-<n>` branch and goes up once per batch — every push burns five
+  Vercel builds. `docs/patterns/devops-tooling-and-deploy.md`.
 - Shared tokens live in `packages/ui/src/globals.css` and
   `tooling/tailwind-config`. `--accent` is a shadcn neutral, not a brand
   accent — renaming it breaks components.
@@ -73,6 +76,7 @@ the right-hand files **before** writing code.
 | Handle a credential, or find one where it should not be                                                    | `docs/patterns/devops-secrets.md`                                                              |
 | Add logging, a degraded path, a health check or error tracking                                             | `docs/patterns/devops-observability.md`                                                        |
 | Change lint, TypeScript, CI, tests or dependencies, or ship the API                                        | `docs/patterns/devops-tooling-and-deploy.md`                                                   |
+| Start work, create a branch, push, open a PR or release                                                    | `docs/patterns/devops-tooling-and-deploy.md` → Branches, batches and pull requests             |
 
 ## Before you finish
 
