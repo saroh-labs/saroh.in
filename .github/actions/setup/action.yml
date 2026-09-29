@@ -11,6 +11,13 @@ inputs:
       replays instead of running. Empty skips the cache.
     required: false
     default: ""
+  turbo-save:
+    description: >-
+      "false" only restores the named Turbo cache and never writes it: for a job
+      that reads another job's cache (the integration shards replay the unit
+      job's builds of the api's packages).
+    required: false
+    default: "true"
   prisma:
     description: Generate the Prisma client (anything that builds or tests @saroh/database needs it).
     required: false
@@ -26,6 +33,17 @@ inputs:
       Uses the turbo-cache name.
     required: false
     default: "false"
+
+# Who writes the build caches. The repository has 10 GB of Actions cache, and
+# a run used to write about 1.3 GB of Turbo and Next caches (per job, per
+# commit) from every push to every PR. Past 10 GB GitHub evicts the least
+# recently used, and what went first was the pnpm store and the Playwright
+# browser, which every job needs: a run then downloaded 1,800 packages and
+# 300 MB of Chromium again. So only a run on a branch everyone restores from (a
+# push to main or development, the weekly run, a manual run) saves the Turbo
+# and Next caches. A pull request restores the newest of those and writes
+# nothing. A PR can read its base branch's caches, so it still replays every
+# package its change didn't touch.
 
 runs:
   using: composite
@@ -50,11 +68,12 @@ runs:
       shell: bash
       run: pnpm --filter @saroh/database generate
 
-    # Turbo's local cache (.turbo/cache). Restored from the newest run of the
-    # same job and saved under this commit, so an unchanged package's lint,
-    # typecheck, test or build is replayed from cache rather than run again.
+    # Turbo's local cache (.turbo/cache). Restored from the newest saving run
+    # of the same job and, on a saving run, saved under this commit, so an
+    # unchanged package's lint, typecheck, test or build is replayed from cache
+    # rather than run again.
     - name: Turbo cache
-      if: inputs.turbo-cache != ''
+      if: inputs.turbo-cache != '' && inputs.turbo-save != 'false' && github.event_name != 'pull_request'
       uses: actions/cache@v4
       with:
         path: .turbo/cache
@@ -62,10 +81,31 @@ runs:
         restore-keys: |
           turbo-${{ runner.os }}-${{ inputs.turbo-cache }}-
 
+    - name: Turbo cache (restore only)
+      if: inputs.turbo-cache != '' && (inputs.turbo-save == 'false' || github.event_name == 'pull_request')
+      uses: actions/cache/restore@v4
+      with:
+        path: .turbo/cache
+        key: turbo-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ runner.os }}-${{ inputs.turbo-cache }}-
+
+    # Turbo never deletes from its local cache, and each saving run restored
+    # the last one and added to it, so it only grew. Entries older than a week
+    # are dropped before this run adds its own; one still in use is rebuilt
+    # once and cached again.
+    - name: Prune the Turbo cache
+      if: inputs.turbo-cache != '' && inputs.turbo-save != 'false' && github.event_name != 'pull_request'
+      shell: bash
+      run: |
+        if [ -d .turbo/cache ]; then
+          find .turbo/cache -type f -mtime +7 -delete
+        fi
+
     # Turbo replays a build whose inputs are unchanged; when they did change,
     # Next's own cache still skips recompiling the modules that didn't.
     - name: Next build cache
-      if: inputs.next-cache == 'true'
+      if: inputs.next-cache == 'true' && github.event_name != 'pull_request'
       uses: actions/cache@v4
       with:
         path: apps/*/.next/cache
@@ -73,16 +113,36 @@ runs:
         restore-keys: |
           next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
-    # The browser binary is ~150 MB; keyed on the lockfile so it is downloaded
-    # again only when Playwright's version moves. The system libraries it needs
+    - name: Next build cache (restore only)
+      if: inputs.next-cache == 'true' && github.event_name == 'pull_request'
+      uses: actions/cache/restore@v4
+      with:
+        path: apps/*/.next/cache
+        key: next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+        restore-keys: |
+          next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+    # The browser is about 300 MB. Keyed on the installed Playwright version,
+    # not the lockfile: any dependency bump changed the lockfile's hash and
+    # threw away a browser that had not changed. The system libraries it needs
     # (`--with-deps`) are apt packages and are installed every time.
+    - name: Playwright version
+      if: inputs.playwright == 'true'
+      id: playwright-version
+      shell: bash
+      run: |
+        set -euo pipefail
+        version=$(pnpm --filter @saroh/e2e exec playwright --version | awk '{print $2}')
+        [ -n "$version" ]
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+
     - name: Playwright browser cache
       if: inputs.playwright == 'true'
       id: playwright-cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
     - name: Install Playwright browser
       if: inputs.playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'

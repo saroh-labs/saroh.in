@@ -854,3 +854,40 @@ retries and a fresh database break that order.
 **Fix**: The spec makes its own invoice by hand through the API. A spec
 never depends on another spec's leftovers.
 **Category**: e2e · `e2e/tests/invoices.spec.ts`
+
+## CI — every job re-downloaded the pnpm store and Chromium ("cache is not found")
+
+**Problem**: CI runs were slow for no visible reason. A push to development
+logged "pnpm cache is not found", installed 1,868 packages from the registry
+(22s instead of 11s) and downloaded 300 MB of Chromium (29s) in each browser
+shard. The Next build caches missed too.
+**Root cause**: The repository's Actions cache was at 12.2 GB against a 10 GB
+limit, so GitHub evicted the least recently used entries. Every run saved
+about 1.3 GB of Turbo and Next caches, keyed per job and per commit, on every
+PR push as well as on development. The Turbo cache also only grew, because
+each run restored the last one and added to it. The pnpm store and the
+Playwright browser were the entries evicted first, and every job needs them.
+The browser's key was the lockfile hash, so any dependency bump discarded it
+anyway.
+**Fix**: `.github/actions/setup` saves the Turbo and Next caches only on
+runs outside a pull request (pushes to main or development, the weekly run
+and manual runs). A PR restores its base branch's newest caches and writes
+none. A saving run drops Turbo entries older than a week. The Playwright
+browser is keyed on the installed Playwright version.
+Check `gh api repos/saroh-labs/saroh.in/actions/cache/usage` when CI slows
+down: close to 10 GB means entries are being evicted.
+**Category**: CI · caching · `.github/actions/setup/action.yml`,
+`docs/patterns/devops-tooling-and-deploy.md` → CI
+
+## CI — `pg_isready` over the socket can pass before Postgres is ready
+
+**Problem**: None yet. The risk appeared while shortening the Postgres
+service's health interval from 10s to 2s.
+**Root cause**: The `postgres` image initialises the database with a
+temporary server that listens only on the Unix socket, then restarts.
+`pg_isready` without `-h` checks the socket, so a quick poll can report
+ready during initialisation, before the real server restarts. The 10s
+interval had hidden this.
+**Fix**: The health check is `pg_isready -h 127.0.0.1`. It checks over TCP,
+which only the real server listens on.
+**Category**: CI · services · `.github/workflows/ci.yml`
