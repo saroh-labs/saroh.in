@@ -22,7 +22,7 @@ import type {
     AccountPacksOnSale,
     PacksApi,
 } from "./packs-api";
-import { packTermsLine } from "./packs-api";
+import { boughtMessage, classesText, packTermsLine } from "./packs-api";
 import type { PlanApi } from "./plan-api";
 import { PlanTab } from "./plan-tab";
 
@@ -380,6 +380,62 @@ describe("BuyPackSheet", () => {
             ),
         ).toBeTruthy();
         expect(screen.queryByRole("button", { name: /^Buy/ })).toBeNull();
+    });
+});
+
+describe("a one-to-one pack's words (A11)", () => {
+    const PT: AccountPackOnSale = {
+        ref: "pack_pt",
+        name: "PT 5",
+        description: null,
+        credits: 5,
+        validityDays: 90,
+        price: "5000.00",
+        currency: "INR",
+        kind: "ONE_TO_ONE",
+    };
+
+    it("counts sessions, not classes, in the choice, the window and the thanks", async () => {
+        const api = packsApi({
+            buy: vi.fn().mockResolvedValue({
+                ok: true,
+                data: {
+                    ...STARTED,
+                    pack: { name: "PT 5", credits: 5, validityDays: 90 },
+                },
+            }),
+            standing: vi.fn().mockResolvedValue({
+                ok: true,
+                data: { ...BOUGHT, pack: { name: "PT 5", credits: 5 } },
+            }),
+        });
+        const { win, onBought } = sheet(
+            { payOnline: true, packs: [PT, TEN] },
+            api,
+        );
+        const group = screen.getByRole("radiogroup", { name: "Pack" });
+        expect(group.textContent).toContain("5 sessions · use within 90 days");
+        expect(group.textContent).toContain("10 classes · use within 60 days");
+        expect(group.textContent).not.toContain("5 classes");
+
+        await press(screen.getByRole("button", { name: "Buy · ₹5,000" }));
+        expect(win.requests[0]?.description).toBe("PT 5 · 5 sessions");
+
+        await win.answer("paid");
+        await waitFor(() =>
+            expect(onBought).toHaveBeenCalledWith(
+                "PT 5 bought. Book a session to use one.",
+            ),
+        );
+    });
+
+    it("reads a pack an older API sent without a kind as classes", () => {
+        expect(classesText(1)).toBe("1 class");
+        expect(classesText(3, "ONE_TO_ONE")).toBe("3 sessions");
+        expect(classesText(1, "ONE_TO_ONE")).toBe("1 session");
+        expect(boughtMessage("Pack")).toBe(
+            "Pack bought. Book a class to use one.",
+        );
     });
 });
 

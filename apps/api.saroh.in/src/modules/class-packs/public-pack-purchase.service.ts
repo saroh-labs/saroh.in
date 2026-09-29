@@ -116,6 +116,7 @@ export class PublicPackPurchaseService {
                     validityDays: true,
                     price: true,
                     currency: true,
+                    kind: true,
                 },
             }),
             takesOnlinePayment(organizationId),
