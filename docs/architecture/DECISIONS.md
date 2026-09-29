@@ -858,6 +858,14 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
         - removal asks for the name, as the design does;
         - C15's copy is accepted.
     - **GST:** see DEC-072. A rate shows only when one applies.
+    - **Bookings:**
+        - Kavi's calendar shows Orders, Bookings and Invoices: treatment orders (E9) replace the Payments layer, which appears only without Commerce.
+        - Pack Detail's receipts show "name · date", because the purchase read carries no invoice number.
+        - "On the booking page" is plain text until DEC-069's share links give the app the page's address.
+        - The rail says "Class packs" (the module's name) and the pack kind says "One-to-one".
+        - The Packs summary and Extend copy say what the API does.
+        - The editor's first-pack hint names the pack's kind.
+        - E17's "Each sale" card is accepted.
 - **Fixed to match the design, or to correct a small error:**
     1. Order Detail's customer card reads "Needs attention: Sesame", since the card covers every kind of entry, not just allergies.
     2. A treatment order shows Needs attention in the customer card as well as the Visits card.
