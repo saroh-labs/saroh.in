@@ -773,3 +773,30 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - An address change needs a redirect table and a reserved-until date.
     - A site created with no address because the slug was taken can no longer happen silently: creation asks for a free address instead.
 - Migration: to be planned. The address history and redirects are an additive table. `Store.slug` and `CustomDomain` are dropped in a later contract release.
+
+## DEC-070 Saroh is for businesses, people working for themselves, and people showing their work
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · ships before launch
+
+- Context:
+    - Onboarding says "Name your business", suggests Sell first and pre-selects it.
+    - Checklists nudge everyone toward a registered address, a business type and a logo "for receipts", even someone with only a website.
+    - The one site template is written for a business.
+    - Nothing at setup actually requires business details, and the Organization model is neutral. The internal strategy note says the target audience must not be built into the architecture.
+- Decision:
+    - **Setup starts with "What are you setting up?"** It has three answers and is stored as a _kind_ on the Organization, which the owner can change later in Settings:
+        - **A business** (shop, studio, practice): today's flow.
+        - **Just me** (freelancer, consultant, creator): clients, bookings, invoices.
+        - **A site for my work** (portfolio, blog, projects): website first.
+    - **The kind drives wording and defaults only, not features.** Every module stays available to every kind.
+        - It sets the words ("your business" / "you", "customers" / "clients" / "readers"), the name field ("Your name or brand"), the order of the first-run jobs, and the starter template.
+        - Sell is pre-selected only for a business.
+    - **Checklists appear only when they apply.** The registered address, business type and logo nudges appear once something that invoices or takes money is on, not for everyone.
+    - **New site templates:** Portfolio, Blog/writing, and Personal/consultant, plus a **Projects block** (image, title, summary, link) for portfolios. The starter template's copy stops assuming a business.
+    - **Invoices work on their own.** Issuing, sending and marking an invoice or receipt paid doesn't need the Payments module; an online pay link still needs a connected provider. This changes DEC-019's "invoices under Payments" for invoicing itself.
+- Consequences:
+    - PRODUCT.md and saroh-product.md widen "who it's for".
+    - An additive `Organization.kind` (default BUSINESS for everyone existing).
+    - The copy layer reads the kind.
+    - The invoices module gate moves off PAYMENTS for issue, send and record-paid.
+    - Before launch: the question, copy, first-run order, conditional checklists and invoices-without-Payments. The templates and Projects block follow right after if they aren't ready.
