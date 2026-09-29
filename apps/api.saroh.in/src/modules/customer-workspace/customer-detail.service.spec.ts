@@ -1,5 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
 
+import { structuredLogger } from "../../common/logging/structured-logger";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { reservedAccountEmail } from "../contacts/contact-email";
@@ -685,7 +686,10 @@ describe("CustomerDetailService", () => {
             }
         });
 
-        it("reads the plan's number for a row never set (the fallback)", async () => {
+        it("logs a row never set and reads its plan's number (Z1's guard)", async () => {
+            const logged = jest
+                .spyOn(structuredLogger, "error")
+                .mockImplementation(() => undefined);
             const { svc, db } = make();
             db.customerSubscription.findFirst.mockResolvedValue(
                 member({ classesPerPeriod: null, classesPerPeriodSetAt: null }),
@@ -693,9 +697,14 @@ describe("CustomerDetailService", () => {
             const m = (await svc.detail(OWNER, "c1")).stats.classesLeft
                 ?.allowance;
             expect(m).toMatchObject({ perMonth: 10, nextPeriod: null });
+            expect(logged).toHaveBeenCalledWith(
+                "subscription_allowance_unset",
+                expect.anything(),
+            );
+            logged.mockRestore();
         });
 
-        it("finds a membership by its own allowance, or its plan's while unset", async () => {
+        it("finds a membership by its own allowance, or an unset row's plan so it is logged", async () => {
             const { svc, db } = make();
             db.customerSubscription.findFirst.mockResolvedValue(null);
             await svc.detail(OWNER, "c1");

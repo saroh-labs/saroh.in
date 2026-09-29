@@ -193,7 +193,7 @@ one exists.
 
 | ID | Step | When |
 |---|---|---|
-| Z1 | Remove D10's allowance fallback, once a query finds no unset rows | After CP-2, wave 4 or later |
+| Z1 | **Done** (`r2/z1z2`, 2026-09-29). Remove D10's allowance fallback, once a query finds no unset rows. An unset row now logs `subscription_allowance_unset` (ERROR) and is served its plan's number, never unlimited; the pre-deploy gate (backfill prints `set now: 0, still unset: 0`, and the unset-row query returns 0) is in `ROUND_2_PHASE_2_ROLLOUT.md`, "Z1" | After CP-2, wave 4 or later |
 | Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows) | Wave 4 or later |
 | Z3 | Remove the calendar's month-query alias | After E20 is live |
 | F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 |

@@ -246,9 +246,70 @@ creates or renews meanwhile is left unset or stale:
   under this release, so a plan whose classes changed during the rollback
   reaches those members one renewal late.
 
-**Before deploying this release again, run the backfill once more** (step 4) and check step 6. After Z1 has removed the fallback, rolling back below
-this release means running the backfill before re-deploying, or members
-the old API added would read as unlimited.
+**Before deploying this release again, run the backfill once more** (step 4)
+and check step 6. After Z1, rolling back below this release means running
+the backfill before re-deploying: until it runs, each member the old API
+added is served their plan's number and logged as
+`subscription_allowance_unset` (see Z1).
+
+## Z1: the classes allowance has no fallback (after CP-2; a manual gate)
+
+Plan: the waves plan's "Deferred to follow-up work", Z1; payments plan
+§D10 ("A later release removes the fallback once a query shows no live
+subscription with a null `classesPerPeriodSetAt`"). No migration: the
+columns stay. From this release a subscription's own `classesPerPeriod` is
+the only designed read (`subscriptions/classes-allowance.ts`). A row with a
+null `classesPerPeriodSetAt` is no longer an expected state: the API logs
+`subscription_allowance_unset` at ERROR with the subscription's id and,
+rather than fail or read unlimited, serves the plan's classes as they
+stand (what D10's plan documents for such a row). Any volume of that event
+means an API below D10 wrote rows: run the D10 backfill.
+
+### Before deploying (a gate: do not deploy until both pass)
+
+1. **Run the D10 backfill once more** against production, from a checkout
+   of this release (read the D10 section, step 4, for what it does; it
+   writes only live rows still unset, and is safe while any image serves):
+
+    ```bash
+    DATABASE_URL=... DATABASE_TARGET_CONFIRM=<database> \
+      pnpm --filter @saroh/database exec tsx src/backfill/classes-per-period.cli.ts
+    ```
+
+    It **must print `set now: 0, still unset: 0`**:
+
+    ```text
+    [classes-per-period] <database>: live subscriptions unset: 0, set now: 0, still unset: 0
+    ```
+
+    If "set now" is not 0, something below D10 wrote rows since the last
+    run (a rollback, or an old image still serving): find out what, stop it,
+    and run again until it prints 0 and 0. Record the line in the release
+    issue.
+
+2. **The query finds no unset row** (read-only; must return 0):
+
+    ```sql
+    SELECT count(*) FROM "CustomerSubscription"
+    WHERE status <> 'CANCELLED' AND "classesPerPeriodSetAt" IS NULL;
+    ```
+
+### Deploy
+
+The usual API deploy; wait for `/health/ready`. No workspace change.
+
+### Verify
+
+3. No `subscription_allowance_unset` event in the API's logs in the first
+   hour (any one means run the backfill, then find what wrote the row).
+4. Step 2's query still returns 0.
+
+### Rollback
+
+Deploy the previous API tag. It reads the same columns the same way for
+every set row, so nothing moves. Rolling back **below D10** (not this
+release) is what makes unset rows: run the backfill before deploying D10
+or later again, and expect the ERROR event until it has run.
 
 ## D5: the plan draft writers (wave 3; CP-3 keeps them apart from D7)
 
