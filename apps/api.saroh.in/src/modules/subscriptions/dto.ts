@@ -275,3 +275,17 @@ export class RetryPaymentDto {
     @IsIn(["MANDATE", "PAY_LINK"])
     via?: "MANDATE" | "PAY_LINK";
 }
+
+/**
+ * "Send a set-up link" (D14): the method the provider's page is for — one
+ * of the business's own (the read's `autopayCard.methods`) — and whether to
+ * email it through the business's email provider as well.
+ */
+export class AutopayLinkDto {
+    @IsIn(["UPI", "CARD", "EMANDATE"])
+    method!: "UPI" | "CARD" | "EMANDATE";
+
+    @IsOptional()
+    @IsBoolean()
+    email?: boolean;
+}

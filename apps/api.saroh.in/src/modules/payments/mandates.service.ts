@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { SubscriptionActor } from "../subscriptions/subscription-events";
 import type {
     MandateCancelReason,
     MandateScope,
@@ -37,6 +38,12 @@ export interface MandateCancelResult extends MarkedCancelled {
      * removal (C11) refuses to go ahead while this isn't zero.
      */
     unconfirmed: number;
+    /**
+     * Of those, the ones the provider refused to cancel, or Saroh couldn't
+     * ask: asking again won't help (D14 tells staff to check the provider's
+     * dashboard). The rest are unsure, and the job keeps asking.
+     */
+    refused: number;
 }
 
 interface Row {
@@ -74,15 +81,22 @@ export class MandatesService {
      * skipped, and one still unconfirmed is asked again. When the provider
      * doesn't confirm them all, a `mandate.cancel` job keeps asking.
      *
+     * Staff's "Cancel autopay" on one subscription (D14) calls it too, with
+     * the team member as `actor`, so the log says who.
+     *
      * The subscription paths and a merge don't call this: they hold a
      * transaction, and use `cancelMandatesInTx` with its job instead.
      */
     async cancelFor(
         scope: MandateScope,
         reason: MandateCancelReason,
+        opts: { actor?: SubscriptionActor } = {},
     ): Promise<MandateCancelResult> {
         const marked = await prisma.$transaction((tx) =>
-            cancelMandatesInTx(tx, scope, reason, { queue: false }),
+            cancelMandatesInTx(tx, scope, reason, {
+                queue: false,
+                ...(opts.actor ? { actor: opts.actor } : {}),
+            }),
         );
         const settled = await this.settle(scope);
         const unconfirmed = settled.unsure + settled.refused;
@@ -91,7 +105,7 @@ export class MandatesService {
                 enqueueMandateCancelInTx(tx, scope),
             );
         }
-        return { ...marked, unconfirmed };
+        return { ...marked, unconfirmed, refused: settled.refused };
     }
 
     /**

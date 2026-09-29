@@ -23,6 +23,7 @@ import {
 } from "../capabilities/require-module.decorator";
 import { payLinkUrl } from "../invoices/pay-link-url";
 import {
+    AutopayLinkDto,
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
@@ -40,6 +41,7 @@ import {
     SubscribeDto,
     SubscriptionSettingsDto,
 } from "./dto";
+import { SubscriptionAutopayService } from "./subscription-autopay.service";
 import { SubscriptionsService } from "./subscriptions.service";
 
 /**
@@ -185,7 +187,10 @@ export class SubscriptionPlansController {
 @RequireModule("PAYMENTS")
 @IgnoreModuleReadiness()
 export class SubscriptionsController {
-    constructor(private readonly subscriptions: SubscriptionsService) {}
+    constructor(
+        private readonly subscriptions: SubscriptionsService,
+        private readonly autopay: SubscriptionAutopayService,
+    ) {}
 
     @Get()
     list(
@@ -213,6 +218,16 @@ export class SubscriptionsController {
         @Body() dto: SubscriptionSettingsDto,
     ) {
         return this.subscriptions.updateSettings(ctx, dto);
+    }
+
+    /**
+     * Whether this business offers autopay now, and by which methods (D14):
+     * the workspace's copy promises autopay only when it does. Before
+     * `:subscriptionId` too.
+     */
+    @Get("autopay")
+    autopayOffer(@OrgContext() ctx: OrganizationContext) {
+        return this.autopay.offer(ctx);
     }
 
     @Get(":subscriptionId")
@@ -353,5 +368,35 @@ export class SubscriptionsController {
             ...done,
             url: done.token ? payLinkUrl(done.token) : null,
         };
+    }
+
+    /**
+     * "Send a set-up link" (D14): the provider's page to approve autopay on
+     * for one method, answered once and never stored; emailed as well when
+     * asked and the business can. 403 while the business doesn't offer
+     * autopay (its provider can't, or the rollout flag is off).
+     */
+    @Post(":subscriptionId/autopay/link")
+    @HttpCode(201)
+    @Header("Cache-Control", "no-store")
+    autopayLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+        @Body() dto: AutopayLinkDto,
+    ) {
+        return this.autopay.sendLink(ctx, id, dto);
+    }
+
+    /**
+     * "Cancel autopay" (D14): ends its mandate, asking the provider first
+     * (DEC-026). The subscription goes on, invoiced with a pay link.
+     */
+    @Post(":subscriptionId/autopay/cancel")
+    @HttpCode(200)
+    cancelAutopay(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+    ) {
+        return this.autopay.cancel(ctx, id);
     }
 }

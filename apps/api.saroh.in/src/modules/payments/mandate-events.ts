@@ -320,13 +320,14 @@ async function activate(
  * Who set a mandate up, for the log (D12): the customer from their site
  * account (the Prices page or the account), the customer from a pay link
  * (no account: whoever holds the link is taken as the customer the invoice
- * is for), or Saroh when nothing says.
+ * is for) or from a set-up link staff sent them (D14, the same), or Saroh
+ * when nothing says.
  */
 function setUpBy(
     row: Pick<MandateRow, "setupSource" | "setupAccountId">,
 ): SubscriptionActor {
     if (row.setupAccountId) return customerActor(row.setupAccountId);
-    if (row.setupSource === "PAY_LINK") {
+    if (row.setupSource === "PAY_LINK" || row.setupSource === "SETUP_LINK") {
         return {
             actorKind: "CUSTOMER",
             actorUserId: null,

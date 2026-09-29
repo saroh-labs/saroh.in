@@ -659,6 +659,51 @@ first turn the flag's override off and let queued charges be let go, or
 mark open charge intents CANCELLED. A debit already asked for (PROCESSING)
 is still settled by its payment webhook on the old image.
 
+## D14: autopay in the workspace (wave 8)
+
+Subscription Detail's Plan card says how autopay stands and how it was set
+up, "Autopay limit too low", a cancel still being confirmed and a charge
+under way, and — with `subscription:write` — offers "Send a set-up link"
+and "Cancel autopay". The Subscriptions list marks a row "UPI Autopay ·
+…". The plan and subscribe dialogs promise autopay only where the
+business offers it (`GET subscriptions/autopay`); otherwise "It renews
+with an invoice each period".
+
+- **No migration.** `setupSource` gains `SETUP_LINK` and the log gains
+  `MANDATE_LINK_SENT` (both strings); `AUTOPAY_SET_UP_LINK` is a new
+  Message template.
+- **Behind `RAZORPAY_AUTOPAY`.** Off, nothing offers or promises autopay:
+  no "Send a set-up link", and `POST …/autopay/link` answers 403. A
+  mandate already made still shows on its subscription and can still be
+  cancelled (the flag's own rule).
+- **API before app, either is safe.** New read fields (`autopayCard`,
+  `autopayOn`) are ignored by the previous app, which keeps D12's line.
+  The new app on the previous API sees no card: today's line, no actions,
+  and the copy says "renews with an invoice" (the offer read 404s, so it
+  reads as not offered).
+- **Not done here:** the customer isn't sent a notice when staff cancel
+  their autopay — no notice template fits (A14's are about bookings and
+  orders), and their next renewal arrives as an invoice with its pay link.
+  Home's "Autopay limit too low" row still offers Retry by pay link; the
+  set-up link is sent from Subscription Detail.
+
+### Verify
+
+With the flag on for a development business: on a subscription without
+autopay, "Send a set-up link" → pick UPI → the link opens Razorpay's
+registration page for UPI (₹1 check, refunded); approving it turns the
+card to "Autopay on · UPI · …, set up by ‹name› from a set-up link ‹you›
+sent". "Cancel autopay" → "Autopay cancelled"; the next renewal is
+invoiced with a pay link and no `subscription.charge` job is queued. With
+the flag off, neither button shows and the dialogs say "renews with an
+invoice each period".
+
+### Rollback
+
+Deploy the previous API and app. PENDING mandates made by a set-up link
+stay and lapse after a week; one approved in the meantime is an ordinary
+ACTIVE mandate (D12's rules).
+
 ## Date-range indexes (review follow-up)
 
 **Migration** `20261015100000_calendar_range_indexes`: `Order
