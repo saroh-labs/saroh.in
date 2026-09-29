@@ -7,6 +7,8 @@ jest.mock("../../env", () => ({
     env: {
         PAYMENTS_ENC_KEY:
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        // The webhook address is built from it (d3e78c8f), never guessed.
+        API_PUBLIC_URL: "https://api.example.test",
     },
 }));
 
