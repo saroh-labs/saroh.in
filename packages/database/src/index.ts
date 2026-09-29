@@ -41,3 +41,6 @@ export * from "./backfill/classes-per-period";
 // integration suite can run it twice, and for the API's storefront invite
 // accept, which runs its per-person rule (`joinTeamFromStorefront`).
 export * from "./backfill/store-members-to-memberships";
+// The F10b business-type backfill (`company` → `pvt`), exported so the API's
+// integration suite can run it twice and check what it did.
+export * from "./backfill/business-type-pvt";

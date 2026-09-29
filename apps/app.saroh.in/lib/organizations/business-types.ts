@@ -3,11 +3,12 @@
  * default 60): the six the API validates (`business-type.ts` there), or
  * Not set.
  *
- * Today's `company` is a private limited company, spelled `pvt` from now on.
- * The rename runs readers first (release boundary 9): this release reads
- * both spellings as Private limited, and still SENDS `company` for it, which
- * every API in production accepts. The follow-up F10b sends `pvt` and moves
- * the stored rows; Z4 then drops `company`.
+ * `company` was a private limited company, spelled `pvt` from F10 on. The
+ * rename runs readers first (release boundary 9): F10 read both spellings
+ * and still sent `company`; F10b (this release) sends `pvt`, which every API
+ * in production since F10 accepts, and a backfill moves the stored rows. The
+ * app still reads `company` as Private limited, so an API rolled back to F10
+ * before the backfill ran still names it; Z4 drops `company`.
  */
 
 export const BUSINESS_TYPE_OPTIONS = [
@@ -27,7 +28,7 @@ export const BUSINESS_TYPE_VALUES = BUSINESS_TYPE_OPTIONS.map(
     (o) => o.value,
 ) as [BusinessTypeValue, ...BusinessTypeValue[]];
 
-/** The old spelling of `pvt`, which the API still stores (see above). */
+/** The old spelling of `pvt`, read until Z4 (see above). */
 const LEGACY_PRIVATE_LIMITED = "company";
 
 /**
@@ -48,9 +49,4 @@ export function businessTypeLabel(
     const value = businessTypeOf(stored);
     if (!value) return null;
     return BUSINESS_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? null;
-}
-
-/** What a save sends for a type: Private limited as `company`, this release. */
-export function businessTypeForApi(value: BusinessTypeValue): string {
-    return value === "pvt" ? LEGACY_PRIVATE_LIMITED : value;
 }

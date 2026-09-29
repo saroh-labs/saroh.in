@@ -337,13 +337,13 @@ describe("OrganizationSettingsService", () => {
                 );
             });
 
-            it("keeps a private limited company as company this release, whichever spelling is sent", async () => {
+            it("stores a private limited company as pvt, whichever spelling is sent (F10b)", async () => {
                 for (const sent of ["pvt", "company"] as const) {
                     profileUpsert.mockClear();
                     await service.update(ctx(), { profile: { type: sent } });
                     expect(profileUpsert).toHaveBeenCalledWith(
                         expect.objectContaining({
-                            update: { type: "company" },
+                            update: { type: "pvt" },
                         }),
                     );
                 }
@@ -376,9 +376,9 @@ describe("OrganizationSettingsService", () => {
                 ]);
             });
 
-            it("reads a stored company back as it is, for the app to name", async () => {
+            it("answers a stored company as pvt until the backfill reaches it (F10b)", async () => {
                 const settings = await service.get(ctx());
-                expect(settings.profile?.type).toBe("company");
+                expect(settings.profile?.type).toBe("pvt");
             });
         });
 

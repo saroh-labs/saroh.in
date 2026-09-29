@@ -315,7 +315,7 @@ model BusinessProfile {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   legalName    String?
-  type         String? // individual, partnership, llp, pvt, public, trust; `company` = pvt until F10b (business-type.ts)
+  type         String? // individual, partnership, llp, pvt, public, trust; an old `company` = pvt until the F10b backfill rewrites it; accepted until Z4 (business-type.ts)
   country      String?
   taxId        String?
   contactEmail String?

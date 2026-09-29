@@ -191,15 +191,15 @@ one exists.
 
 ## Deferred to follow-up work (the contract steps)
 
-| ID | Step | When |
-|---|---|---|
-| Z1 | Remove D10's allowance fallback, once a query finds no unset rows | After CP-2, wave 4 or later |
-| Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows) | Wave 4 or later |
-| Z3 | Remove the calendar's month-query alias | After E20 is live |
-| F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 |
-| Z4 | Remove the `company` business-type alias | A release after F10b |
-| Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it |
-| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 |
+| ID | Step | When | Done |
+|---|---|---|---|
+| Z1 | Remove D10's allowance fallback, once a query finds no unset rows | After CP-2, wave 4 or later | |
+| Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows) | Wave 4 or later | |
+| Z3 | Remove the calendar's month-query alias | After E20 is live | |
+| F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 | [x] 2026-09-29 (backfill CLI `business-type-pvt.cli.ts`; rollout doc F10b) |
+| Z4 | Remove the `company` business-type alias | A release after F10b | |
+| Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it | |
+| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 | |
 
 ## Risks and open questions
 
