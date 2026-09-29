@@ -797,11 +797,14 @@ export function OrganizationSettingsForm({
                     render={({ field }) => (
                         // The go-live checklist's "Choose your business
                         // type" lands here (`#business-type`).
+                        // Half the card, as the design draws it: the time
+                        // zone below takes its own row, so a growing Type
+                        // would stretch a seven-word choice across it.
                         <FormItem
-                            {...at("220px")}
+                            {...at("220px", false)}
                             id={BUSINESS_TYPE_ANCHOR}
                             className={cn(
-                                at("220px").className,
+                                at("220px", false).className,
                                 "scroll-mt-24",
                             )}
                         >

@@ -1,4 +1,4 @@
-import { rolledOutKeys } from "@/lib/modules/rollout";
+import { rolledOut, rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 
 /**
@@ -106,4 +106,17 @@ export function firstRunJobs(modules: ModuleView[]): FirstRunJob[] {
         if (!order.every((k) => byKey.get(k)?.canManage)) return [];
         return [{ ...job, pulls: order.filter((k) => k !== job.key) }];
     });
+}
+
+/**
+ * Whether the business has turned on something this person's role doesn't
+ * reach. Home then says it isn't open to them, never that the business
+ * picked nothing (F16: a Storefront team member reaches no module).
+ */
+export function onButNotOpen(modules: readonly ModuleView[]): boolean {
+    return rolledOut(modules).some(
+        (m) =>
+            m.lifecycle === "ENABLED" &&
+            m.blockers.some((b) => b.code === "UNAUTHORIZED"),
+    );
 }

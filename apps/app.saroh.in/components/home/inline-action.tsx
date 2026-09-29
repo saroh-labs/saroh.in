@@ -6,7 +6,12 @@ import Link from "next/link";
 import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { REPLY_MAX, replyLabel, replyReady } from "@/lib/home/inline-actions";
+import {
+    replyLabel,
+    replyMax,
+    replyReady,
+    writesReply,
+} from "@/lib/home/inline-actions";
 import type { HomeInline, HomeNeed, HomeRowLink } from "@/lib/home/service";
 
 import type { DoneRow, InlineActions } from "./use-inline-actions";
@@ -133,9 +138,9 @@ export function InlineConfirm({
 }) {
     const yesRef = useRef<HTMLButtonElement>(null);
     const boxRef = useRef<HTMLTextAreaElement>(null);
-    const isReply = inline.kind === "REPLY";
+    const isReply = writesReply(inline);
     const draft = actions.drafts[need.id] ?? "";
-    const off = isReply && !replyReady(draft);
+    const off = isReply && !replyReady(draft, replyMax(inline));
 
     useEffect(() => {
         (isReply ? boxRef.current : yesRef.current)?.focus();
@@ -161,7 +166,7 @@ export function InlineConfirm({
                         ref={boxRef}
                         rows={2}
                         value={draft}
-                        maxLength={REPLY_MAX}
+                        maxLength={replyMax(inline)}
                         onChange={(e) =>
                             actions.setDraft(need.id, e.target.value)
                         }
