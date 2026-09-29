@@ -288,15 +288,24 @@ async function retireBusinesses(ctx: Context) {
     }
 }
 
-/** The business's zone (ADR-007): what renewals and "today" are counted in. */
-async function setTimezone(ctx: Context, key: string, orgId: string) {
+/**
+ * The business's zone (ADR-007): what renewals and "today" are counted in;
+ * and its registered address, which its invoices print (DEC-068).
+ */
+async function setProfile(
+    ctx: Context,
+    key: string,
+    orgId: string,
+    address: ShowcaseBusiness["registeredAddress"],
+) {
+    const profile = { timezone: TIMEZONE, ...address };
     await ctx.prisma.businessProfile.upsert({
         where: { organizationId: orgId },
-        update: { timezone: TIMEZONE },
+        update: profile,
         create: {
             id: sid(key, "profile"),
             organizationId: orgId,
-            timezone: TIMEZONE,
+            ...profile,
         },
     });
 }
@@ -930,7 +939,7 @@ async function seedBusiness(
         },
     });
     const orgId = org.id;
-    await setTimezone(ctx, key, orgId);
+    await setProfile(ctx, key, orgId, biz.registeredAddress);
 
     // --- team
     const ownerId = biz.owner

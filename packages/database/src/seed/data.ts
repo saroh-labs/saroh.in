@@ -34,6 +34,17 @@ export const REVIEWER_PASSWORD = "demo-password-123";
 
 export const ORG_SLUG = "demo-org";
 export const ORG_NAME = "Northwind Supply";
+/**
+ * The registered address Northwind's invoices print (DEC-068). Not
+ * GST-registered: its state is the address's, Karnataka. A browser spec that
+ * changes it puts these values back.
+ */
+export const NORTHWIND_ADDRESS = {
+    addressLine1: "Plot 12, Peenya Industrial Area",
+    city: "Bengaluru",
+    postalCode: "560058",
+    gstState: "29",
+} as const;
 export const STORE_SLUG = "demo-store";
 export const CURRENCY = "INR";
 
