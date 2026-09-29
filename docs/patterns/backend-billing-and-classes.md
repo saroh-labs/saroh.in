@@ -349,11 +349,14 @@
   member's allowance only through `subscriptions/classes-allowance.ts`
   (`classesAllowance`, `HAS_ALLOWANCE_WHERE`): booking with the membership
   and Customer Detail's "Classes left" do, and the detail names the next
-  period's number when it differs. A null stamp is a row the previous image
-  wrote and reads the plan's number (the one-release fallback; follow-up Z1
-  removes it once no live row is unset); the backfill is
-  `backfill/classes-per-period.cli.ts` (`ROUND_2_PHASE_2_ROLLOUT.md`, D10).
-  A seed writing subscriptions sets both columns.
+  period's number when it differs. Since Z1 a set stamp is the only
+  designed state: the subscription's own value, null included, is
+  authoritative. A null stamp can only come from an API below D10 (a
+  rollback with no backfill after it); it is logged at ERROR as
+  `subscription_allowance_unset` and served the plan's number, never
+  unlimited, and the fix is the backfill
+  `backfill/classes-per-period.cli.ts` (`ROUND_2_PHASE_2_ROLLOUT.md`, D10
+  and Z1). A seed writing subscriptions sets both columns.
 - **Only an ACTIVE plan is on sale** (round-2 D21). A plan's `status` is a
   String, and a DRAFT (D5) isn't published yet. Every path that sells a plan
   — subscribe, a plan change, and a sign-up from the site — calls

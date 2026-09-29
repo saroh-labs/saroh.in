@@ -1,12 +1,13 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { structuredLogger } from "../../common/logging/structured-logger";
 import { useMembershipInTx } from "./use-membership";
 
 /**
  * Paying a class with a membership reads the period's allowance (D10): the
  * subscription's own classes a month, or — for a row the previous image
- * wrote, never set — the plan's, never unlimited. Mocked transaction; the
+ * wrote, never set — the plan's, logged by name (Z1), never unlimited. Mocked transaction; the
  * real rows are in subscriptions/subscription-classes.db.spec.ts.
  */
 
@@ -74,7 +75,10 @@ describe("a class paid with a membership (D10)", () => {
         expect(count).not.toHaveBeenCalled();
     });
 
-    it("reads the plan's 8 for a row never set, not unlimited", async () => {
+    it("logs a row never set and reads the plan's 8, not unlimited (Z1)", async () => {
+        const logged = jest
+            .spyOn(structuredLogger, "error")
+            .mockImplementation(() => undefined);
         findFirst.mockResolvedValue(
             membership({ classesPerPeriod: null, classesPerPeriodSetAt: null }),
         );
@@ -82,6 +86,11 @@ describe("a class paid with a membership (D10)", () => {
         const attempt = useMembershipInTx(tx, USE);
         await expect(attempt).rejects.toBeInstanceOf(ConflictException);
         await expect(attempt).rejects.toThrow("includes 8 classes a month");
+        expect(logged).toHaveBeenCalledWith(
+            "subscription_allowance_unset",
+            expect.objectContaining({ subscriptionId: "sub_1" }),
+        );
+        logged.mockRestore();
     });
 
     it("locks the membership before counting", async () => {
