@@ -188,6 +188,30 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             ORDER,
             { method: "RECORDED" },
         );
+        // Paid at the counter: its pay link stops working, so nobody can
+        // pay twice (B11, DEC-067).
+        expect(
+            (prisma.order as unknown as { updateMany: jest.Mock }).updateMany,
+        ).toHaveBeenCalledWith({
+            where: { id: ORDER, payTokenHash: { not: null } },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
+        });
+    });
+
+    it("re-recording an order already paid leaves its link alone", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PENDING",
+            paymentStatus: "PAID",
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "PAID",
+        });
+        expect(
+            (prisma.order as unknown as { updateMany: jest.Mock }).updateMany,
+        ).not.toHaveBeenCalled();
     });
 
     it("a refund recorded by hand credits what is left of the invoice", async () => {
