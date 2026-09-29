@@ -10,6 +10,8 @@ import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { holdsPlace } from "../bookings/booking-hold";
 import { bookingDueCents, bookingPrice } from "../bookings/booking-money";
+import type { BookingPaperRow } from "../bookings/desk-take";
+import { paidAtDesk } from "../bookings/desk-take";
 import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -1234,11 +1236,19 @@ export class CalendarService {
                 bookerEmail: true,
                 service: { select: { name: true } },
                 // Its own invoice (ADR-008): what was paid online for it,
-                // and whether a pay link still asks for the rest.
+                // and whether a pay link still asks for the rest; and what
+                // was taken at the desk, a deposit's balance with it (P2).
                 invoices: {
-                    where: { kind: "INVOICE", source: "BOOKING" },
+                    where: {
+                        kind: { in: ["INVOICE", "SUPPLEMENTARY"] },
+                        source: "BOOKING",
+                    },
                     select: {
+                        kind: true,
                         status: true,
+                        paymentMethod: true,
+                        total: true,
+                        paidAt: true,
                         paymentIntents: {
                             where: { status: "SUCCEEDED" },
                             select: { amountCents: true },
@@ -1257,6 +1267,7 @@ export class CalendarService {
             const date = dayOf(b.startAt, zone);
             const { priceCents, currency } = bookingPrice(b.snapshot);
             const owes = this.bookingOwes(b, held, date >= today);
+            const desk = paidAtDesk(b.invoices);
             return {
                 layer: "bookings" as const,
                 date,
@@ -1278,7 +1289,13 @@ export class CalendarService {
                     subtitle:
                         [
                             b.staff ? `With ${b.staff.name}` : null,
-                            !held && b.paidWith ? PAID_WITH[b.paidWith] : null,
+                            held
+                                ? null
+                                : desk.cents > 0
+                                  ? "Paid at the desk"
+                                  : b.paidWith
+                                    ? PAID_WITH[b.paidWith]
+                                    : null,
                         ]
                             .filter(Boolean)
                             .join(" · ") || null,
@@ -1310,21 +1327,26 @@ export class CalendarService {
             outcome: string | null;
             paidWith: string | null;
             snapshot: unknown;
-            invoices: {
-                status: string;
+            invoices: (BookingPaperRow & {
                 paymentIntents: { amountCents: number }[];
-            }[];
+            })[];
         },
         held: boolean,
         ahead: boolean,
     ): DatedItem["owes"] {
         if (held || !ahead || b.outcome === "NO_SHOW") return undefined;
-        if (b.invoices.some((i) => i.status === "ISSUED")) return undefined;
-        const paidOnline = b.invoices
+        const own = b.invoices.filter((i) => i.kind === "INVOICE");
+        if (own.some((i) => i.status === "ISSUED")) return undefined;
+        const paidOnline = own
             .filter((i) => i.status === "PAID" || i.status === "CREDITED")
             .flatMap((i) => i.paymentIntents)
             .reduce((n, p) => n + p.amountCents, 0);
-        const due = bookingDueCents(b, paidOnline);
+        // Taken at the desk (P2) is paid, as online is.
+        const due = bookingDueCents(
+            b,
+            paidOnline,
+            paidAtDesk(b.invoices).cents,
+        );
         const { currency } = bookingPrice(b.snapshot);
         return due && currency
             ? { kind: "booking_due", currency, cents: due }

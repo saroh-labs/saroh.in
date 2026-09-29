@@ -1037,7 +1037,11 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                     },
                     invoices: [
                         {
+                            kind: "INVOICE",
                             status: "PAID",
+                            paymentMethod: "ONLINE",
+                            total: "500.00",
+                            paidAt: new Date("2026-09-01T04:30:00Z"),
                             paymentIntents: [{ amountCents: 50000 }],
                         },
                     ],
@@ -1107,7 +1111,16 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                     ...base,
                     id: "linked",
                     startAt: new Date("2026-09-24T04:30:00Z"),
-                    invoices: [{ status: "ISSUED", paymentIntents: [] }],
+                    invoices: [
+                        {
+                            kind: "INVOICE",
+                            status: "ISSUED",
+                            paymentMethod: null,
+                            total: "1500.00",
+                            paidAt: null,
+                            paymentIntents: [],
+                        },
+                    ],
                 },
                 {
                     ...base,

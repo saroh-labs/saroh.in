@@ -23,6 +23,8 @@ import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
 import type { CancelledBooking } from "./booking-cancel";
 import { cancelFoundBooking, sendCancelRefund } from "./booking-cancel";
+import type { DeskPayment } from "./booking-desk-pay";
+import { takeDeskPaymentInTx } from "./booking-desk-pay";
 import { isExpiredHold } from "./booking-hold";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { intakeNoteFor } from "./booking-intake";
@@ -41,6 +43,12 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
+import type { TakeDeskPaymentDto } from "./desk-pay.dto";
+import {
+    BOOKING_PAPER,
+    BOOKING_PAPER_PAYMENTS,
+    BOOKING_PAPER_SELECT,
+} from "./desk-take";
 import type {
     AvailabilityRuleDto,
     BookingOutcome,
@@ -160,6 +168,18 @@ const diarySelect = {
     // A visit of a treatment (E10): "Visit 2 of 3" and its order.
     visitNumber: true,
     order: { select: treatmentOrderSelect },
+    // Taking payment at the desk (P2): what it was booked at, what pays for
+    // it, and its own paper with the payments on it.
+    snapshot: true,
+    orderId: true,
+    courseEnrollmentId: true,
+    invoices: {
+        where: BOOKING_PAPER,
+        select: {
+            ...BOOKING_PAPER_SELECT,
+            paymentIntents: BOOKING_PAPER_PAYMENTS,
+        },
+    },
 } satisfies Prisma.BookingSelect;
 
 export type {
@@ -1210,6 +1230,38 @@ export class BookingsService {
             }),
         );
         return { token };
+    }
+
+    /**
+     * "Take ₹X" at the desk (round-2 P2): record what the desk took, by
+     * cash, UPI at the counter or card, on the booking's invoice — made or
+     * found here (`booking-desk-pay.ts`). The same pair as a pay link
+     * (permission matrix): the booking is the desk's, the invoice is paper.
+     */
+    async takeDeskPayment(
+        ctx: OrganizationContext,
+        bookingId: string,
+        dto: TakeDeskPaymentDto,
+        now: Date = new Date(),
+    ): Promise<DeskPayment> {
+        requireBookingPower(ctx, "booking:write");
+        requireBookingPower(
+            ctx,
+            "invoice:write",
+            "Your role can't take payment for bookings, because it can't issue invoices.",
+        );
+        await this.requireOwnedBooking(ctx, bookingId);
+        return prisma.$transaction((tx) =>
+            takeDeskPaymentInTx(tx, {
+                organizationId: ctx.organizationId,
+                bookingId,
+                actorUserId: ctx.userId,
+                method: dto.method,
+                amountCents: dto.amountCents,
+                receivedCents: dto.receivedCents ?? null,
+                now,
+            }),
+        );
     }
 
     /**
