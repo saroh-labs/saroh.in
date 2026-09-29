@@ -121,10 +121,13 @@ a note saying so.
   this round. An adapter may name a `rolloutFlag` (Razorpay:
   `RAZORPAY_AUTOPAY`, D19): `MandateSetupService.mandateMethods` offers it
   only where that flag is on, so a screen asks that, never
-  `supportsMandates` alone; reading, charging and cancelling a mandate
-  already made never wait on the flag. The capability has `mandateMethods`,
-  `createSetup`, `get`, `prepareCharge`, `getPreDebit`, `charge` and
-  `cancel`; the fake implements all of it (`providers/fake.provider.ts`).
+  `supportsMandates` alone. A renewal's charge waits on it too (D13,
+  `payments/mandate-charge-gate.ts`): off, renewals are invoiced with a pay
+  link as before; reading and cancelling a mandate already made never
+  wait on the flag. The capability has `mandateMethods`,
+  `createSetup`, `get`, `prepareCharge`, `getPreDebit`, `charge`,
+  `findCharge` (D13: what became of a debit, so an unsure answer is looked
+  up before anything is charged again) and `cancel`; the fake implements all of it (`providers/fake.provider.ts`).
   Adapters throw `MandateCallError` with `REFUSED`, `UNKNOWN` or `NOT_YET`
   (the provider won't debit yet; nothing was charged); cancelling a
   mandate the provider has already cancelled is a success. Saroh marks a

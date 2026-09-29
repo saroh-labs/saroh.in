@@ -10,6 +10,10 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { authorize } from "../organizations/organization-policy";
+import {
+    autopayChargeInProgress,
+    chargeUnderWayOn,
+} from "../payments/charge-under-way";
 import type {
     CreditInvoiceDto,
     InvoiceInputDto,
@@ -244,6 +248,10 @@ export class InvoicesService {
             throw new ConflictException(
                 "Connect a payment provider to take payment online.",
             );
+        }
+        // One charge at a time (D13): no link while autopay is charging it.
+        if (await chargeUnderWayOn(db, ctx.organizationId, id)) {
+            throw autopayChargeInProgress();
         }
         const { token, tokenHash } = mintPayToken();
         const { count } = await db.invoice.updateMany({
@@ -933,7 +941,7 @@ export class InvoicesService {
         organizationId: string,
         invoiceId: string,
     ): Promise<InvoiceOnlineView> {
-        const [connected, link, intents] = await Promise.all([
+        const [connected, link, intents, charging] = await Promise.all([
             prisma.merchantPaymentProvider.count({
                 where: { organizationId, status: "CONNECTED" },
             }),
@@ -958,8 +966,10 @@ export class InvoicesService {
                     refunds: { select: { status: true } },
                 },
             }),
+            chargeUnderWayOn(prisma, organizationId, invoiceId),
         ]);
         return {
+            autopayCharge: charging ? { at: charging.at.toISOString() } : null,
             providerConnected: connected > 0,
             payLinkActive: Boolean(link?.payTokenHash),
             payments: intents.map((i) => ({

@@ -594,8 +594,70 @@ handle; one charge's notice is delivered, the debit is asked after
 
 ### Rollback
 
-Turn the flag's override off: no new set-ups. Mandates already made are
-still charged and cancelled; to stop charging too, deploy the previous API.
+Turn the flag's override off: no new set-ups, and from D13 no renewal is
+charged either (it is invoiced with a pay link; a charge already queued is
+let go before its debit). Mandates already made can still be cancelled.
+
+## D13: renewals charge the mandate (wave 6a; after CP-5)
+
+A renewal whose subscription has an ACTIVE mandate queues its charge in the
+renewal's transaction (a CREATED `PaymentIntent` under
+`inv_<invoiceId>_<attempt>` and a `subscription.charge` job); the job makes
+the provider's order with its pre-debit notice, debits once the notice is
+delivered and `debitAfter` has passed, and the payment's webhook pays the
+invoice (CHARGED). A decline writes RENEWAL_FAILED and opens the pay link
+again; an invoice above the limit writes MANDATE_LIMIT_LOW and is not
+charged; Retry charges again (a new key) or makes a pay link.
+
+- **No migration.** It writes the columns D11 added.
+- **CP-5 is met** (D20 in production, #708), so no mandate is charged after
+  its subscription ends.
+- **Gate.** Nothing is charged unless the provider's charging is on for the
+  business (`RAZORPAY_AUTOPAY` for Razorpay,
+  `payments/mandate-charge-gate.ts`); off, a renewal is invoiced with a pay
+  link exactly as before, and a charge already queued is let go before its
+  debit.
+- **API before app, either is safe.** `POST subscriptions/:id/retry` takes an
+  optional `via` (absent: a pay link, as the previous app sends it) and
+  answers `url: null` for an autopay retry. New read fields
+  (`autopayCharge`, `retryVia`, `online.autopayCharge`,
+  `autopayCharging`, send reason `AUTOPAY_PENDING`) are ignored by the
+  previous app and site. The previous app on the new API shows no
+  "Autopay charge in progress" line, but its pay link and Send are refused
+  (409) while a charge is under way, so nobody pays twice.
+- **Lead time.** The renewal invoice is raised on the renewal date as
+  before and falls due 7 days later; the debit is asked for 26 hours after
+  (Razorpay's 25-hour notice plus a margin), leaving room for one Retry by
+  autopay before it is overdue.
+
+### Verify
+
+With `RAZORPAY_AUTOPAY` on for a development business and a UPI mandate
+ACTIVE: renew its subscription (move `currentPeriodEnd` into the past on a
+test row); the invoice reads "Autopay charge in progress · ‹date›" on
+Subscription Detail and Invoice Detail, "Copy pay link" and Send are gone,
+and `POST …/pay-link` answers 409. After the notice is delivered and
+`payment_after` passes, the debit goes and `payment.captured` marks the
+invoice PAID with a CHARGED event. Charges waiting or stuck (expect only
+recent rows):
+
+```sql
+SELECT i.status, i."preDebitStatus", i."debitAfter", i."updatedAt"
+FROM "PaymentIntent" i
+WHERE i."viaMandateId" IS NOT NULL AND i.purpose IS NULL
+  AND i.status IN ('CREATED', 'REQUIRES_PAYMENT', 'PROCESSING')
+ORDER BY i."updatedAt";
+```
+
+### Rollback
+
+Deploy the previous API. Queued `subscription.charge` jobs dead-letter on
+the old image (no handler); their intents stay CREATED or REQUIRES_PAYMENT
+and are never debited (the old image has no charge path), but the old
+image doesn't know them and would let a pay link be made alongside — so
+first turn the flag's override off and let queued charges be let go, or
+mark open charge intents CANCELLED. A debit already asked for (PROCESSING)
+is still settled by its payment webhook on the old image.
 
 ## Date-range indexes (review follow-up)
 

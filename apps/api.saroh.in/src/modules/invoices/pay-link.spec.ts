@@ -171,6 +171,8 @@ describe("making a pay link", () => {
             merchantPaymentProvider: {
                 count: jest.fn().mockResolvedValue(1),
             },
+            // D13: no autopay charge under way.
+            paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
         };
         const { token } = await service.createPayLinkInTx(
             own as never,
@@ -184,6 +186,45 @@ describe("making a pay link", () => {
         );
         expect(db.invoice.findFirst).not.toHaveBeenCalled();
         expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("one charge at a time (D13)", () => {
+    it("refuses a pay link while an autopay charge is under way", async () => {
+        db.paymentIntent.findMany?.mockResolvedValue([
+            {
+                id: "pi_m",
+                invoiceId: "inv_1",
+                debitAfter: new Date("2026-10-02T10:00:00Z"),
+                createdAt: new Date("2026-10-01T10:00:00Z"),
+            },
+        ]);
+        const attempt = service.createPayLink(owner, "inv_1");
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow("Autopay charge in progress");
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("says so on the invoice read, with when the debit is asked for", async () => {
+        db.paymentIntent.findMany?.mockImplementation(
+            (args: { where: { status?: unknown } }) =>
+                Promise.resolve(
+                    args.where.status === "SUCCEEDED"
+                        ? []
+                        : [
+                              {
+                                  id: "pi_m",
+                                  invoiceId: "inv_1",
+                                  debitAfter: new Date("2026-10-02T10:00:00Z"),
+                                  createdAt: new Date("2026-10-01T10:00:00Z"),
+                              },
+                          ],
+                ),
+        );
+        const view = await service.get(owner, "inv_1");
+        expect(view.online?.autopayCharge).toEqual({
+            at: "2026-10-02T10:00:00.000Z",
+        });
     });
 });
 
@@ -223,6 +264,7 @@ describe("the invoice read", () => {
         );
         const view = await service.get(owner, "inv_1");
         expect(view.online).toEqual({
+            autopayCharge: null,
             providerConnected: true,
             payLinkActive: true,
             payments: [],

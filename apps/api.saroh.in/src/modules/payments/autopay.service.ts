@@ -10,6 +10,7 @@ import { prisma } from "@saroh/database";
 import { fromMinor, toMinor } from "../../common/money";
 import type { CheckView } from "./authorisation-check";
 import { CHECK_VIEW_SELECT, checkViewOf } from "./authorisation-check";
+import { autopayChargeInProgress, chargeUnderWayOn } from "./charge-under-way";
 import { mandateLimitCents } from "./mandate-rules";
 import type { MandateSetupSource } from "./mandate-setup.service";
 import { MandateSetupService } from "./mandate-setup.service";
@@ -47,7 +48,7 @@ export const AUTOPAY_NOT_OFFERED =
     "Autopay isn't available with this business. Pay this time as usual.";
 
 /** A charge through autopay is under way on the invoice (D13). */
-export const AUTOPAY_CHARGE_IN_PROGRESS = "Autopay charge in progress";
+export { AUTOPAY_CHARGE_IN_PROGRESS } from "./charge-under-way";
 
 /** What the site needs to open the provider's window. Never a secret. */
 export interface AutopayHandoff {
@@ -163,8 +164,6 @@ export interface StartForSubscriptionInput {
     now?: Date;
 }
 
-const LIVE_INTENT = ["CREATED", "REQUIRES_PAYMENT", "PROCESSING"];
-
 @Injectable()
 export class AutopayService {
     private readonly logger = new Logger(AutopayService.name);
@@ -247,10 +246,7 @@ export class AutopayService {
             if (replay) return replay;
         }
         if (await chargeUnderWay(organizationId, invoice.id)) {
-            throw new ConflictException({
-                message: AUTOPAY_CHARGE_IN_PROGRESS,
-                details: { reason: "autopay-pending" },
-            });
+            throw autopayChargeInProgress();
         }
         const subscription = await this.liveSubscription(
             organizationId,
@@ -745,16 +741,7 @@ export async function chargeUnderWay(
     organizationId: string,
     invoiceId: string,
 ): Promise<boolean> {
-    const found = await prisma.paymentIntent.findFirst({
-        where: {
-            organizationId,
-            invoiceId,
-            viaMandateId: { not: null },
-            status: { in: LIVE_INTENT },
-        },
-        select: { id: true },
-    });
-    return found !== null;
+    return (await chargeUnderWayOn(prisma, organizationId, invoiceId)) !== null;
 }
 
 interface MandateRow {

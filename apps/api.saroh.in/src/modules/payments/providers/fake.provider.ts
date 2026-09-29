@@ -33,7 +33,8 @@ export type FakeMandateOp =
     | "get"
     | "prepareCharge"
     | "getPreDebit"
-    | "charge";
+    | "charge"
+    | "findCharge";
 
 /** One authorisation the fake has started, as its provider would keep it. */
 export interface FakeMandateSetup {
@@ -60,6 +61,8 @@ export interface FakeMandateCharge {
     debitAfter: Date;
     preDebitStatus: PreDebitStatus;
     providerPaymentRef: string | null;
+    /** What became of the debit, once asked for (D13's look-up reads it). */
+    paymentStatus: "PENDING" | "SUCCEEDED" | "FAILED" | null;
 }
 
 /** Razorpay refuses a UPI debit sooner than this after its notice (D11 spike). */
@@ -152,6 +155,17 @@ export class FakeMerchantProvider implements MerchantProvider {
             }),
         charge: (input) =>
             this.mandateCall("charge", input, () => this.debit(input)),
+        findCharge: (input) =>
+            this.mandateCall("findCharge", input, () => {
+                const charge = this.mandateCharges.get(input.providerIntentId);
+                if (!charge) {
+                    throw new MandateCallError("no such order", "REFUSED");
+                }
+                return {
+                    status: charge.paymentStatus ?? "NONE",
+                    providerPaymentRef: charge.providerPaymentRef,
+                };
+            }),
         cancel: (input) => {
             this.mandateCancelCalls.push(input);
             if (this.cancelledMandates.has(input.providerMandateId)) {
@@ -272,6 +286,23 @@ export class FakeMerchantProvider implements MerchantProvider {
         const queue = this.mandateFailures.get(op) ?? [];
         queue.push({ outcome, madeAnyway: !!opts.madeAnyway });
         this.mandateFailures.set(op, queue);
+    }
+
+    /**
+     * The bank answers a debit (D13): captured or declined at the provider.
+     * A test may then send the payment's webhook, or leave it lost and let
+     * a look-up find it.
+     */
+    answerCharge(
+        providerIntentId: string,
+        status: "SUCCEEDED" | "FAILED",
+    ): FakeMandateCharge {
+        const charge = this.mandateCharges.get(providerIntentId);
+        if (!charge?.providerPaymentRef) {
+            throw new Error(`fake: no debit on ${providerIntentId}`);
+        }
+        charge.paymentStatus = status;
+        return charge;
     }
 
     /**
@@ -439,6 +470,7 @@ export class FakeMerchantProvider implements MerchantProvider {
             debitAfter: needsNotice ? input.debitAt : this.now(),
             preDebitStatus: needsNotice ? "PENDING" : "NOT_NEEDED",
             providerPaymentRef: null,
+            paymentStatus: null,
         };
         this.mandateCharges.set(providerIntentId, charge);
         return preparedView(charge);
@@ -470,6 +502,7 @@ export class FakeMerchantProvider implements MerchantProvider {
             throw new MandateCallError("pre-debit notice not sent", "NOT_YET");
         }
         charge.providerPaymentRef = `fake_mandate_pay_${charge.reference}`;
+        charge.paymentStatus = "PENDING";
         return {
             providerPaymentRef: charge.providerPaymentRef,
             status: "PENDING",

@@ -296,7 +296,12 @@ async function wordFailed(
     const [intent, invoice] = await Promise.all([
         tx.paymentIntent.findFirst({
             where: { id: p.paymentIntentId, organizationId },
-            select: { status: true, amountCents: true, currency: true },
+            select: {
+                status: true,
+                amountCents: true,
+                currency: true,
+                viaMandateId: true,
+            },
         }),
         tx.invoice.findFirst({
             where: { id: p.invoiceId, organizationId },
@@ -326,7 +331,10 @@ async function wordFailed(
         notificationId: null,
         type: PAYMENT_FAILED_NOTIFICATION_TYPE,
         title: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
-        body: `${who}'s payment of ${amount} didn't go through. They can try again from the same link.`,
+        // An autopay charge (D13) has no link they tried: the merchant retries.
+        body: intent.viaMandateId
+            ? `${who}'s autopay charge of ${amount} didn't go through. Retry it, or send them a pay link.`
+            : `${who}'s payment of ${amount} didn't go through. They can try again from the same link.`,
         path: `/billing/invoices/${invoice.id}`,
         skipUserId: null,
     };

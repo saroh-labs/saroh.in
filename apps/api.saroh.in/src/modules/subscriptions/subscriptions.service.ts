@@ -20,7 +20,13 @@ import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { AutopayLine } from "../payments/autopay.service";
 import { AutopayService } from "../payments/autopay.service";
+import {
+    autopayChargeInProgress,
+    chargeUnderWayOn,
+    subscriptionChargesUnderWay,
+} from "../payments/charge-under-way";
 import { cancelMandatesInTx } from "../payments/mandate-cancel-job";
+import { MandateChargesService } from "../payments/mandate-charges.service";
 import { allowanceData } from "./classes-allowance";
 import type { UpcomingCollection } from "./collections";
 import {
@@ -227,6 +233,36 @@ export interface SubscriptionView {
      * Only Subscription Detail's read carries it.
      */
     autopay?: AutopayLine | null;
+    /**
+     * An autopay charge is under way on one of its unpaid invoices (D13):
+     * "Autopay charge in progress · ‹date›", `at` being when the debit is
+     * asked for. No Retry and no pay link meanwhile. Only Subscription
+     * Detail's read carries it; null: none.
+     */
+    autopayCharge?: { at: string } | null;
+    /**
+     * How Retry would go now (D13, default 35): `MANDATE` charges their
+     * autopay again ("Charge autopay again"), `PAY_LINK` makes a new pay
+     * link. Null: nothing to retry, or a charge is under way. Only
+     * Subscription Detail's read carries it.
+     */
+    retryVia?: RetryVia | null;
+}
+
+/** How a failed renewal is retried (D13). */
+export type RetryVia = "MANDATE" | "PAY_LINK";
+
+/** What Retry did (D13). */
+export interface RetryResult {
+    invoiceId: string;
+    via: RetryVia;
+    /** The new pay link's token (PAY_LINK), shown once; null for MANDATE. */
+    token: string | null;
+    /**
+     * The charge was already captured at the provider, found when Retry
+     * asked first (DEC-026): the invoice is paid now, nothing was charged.
+     */
+    paid?: boolean;
 }
 
 /**
@@ -311,6 +347,7 @@ interface InvoiceRowLite {
     total: { toString(): string };
     dueAt: Date | null;
     paidAt: Date | null;
+    issuedAt: Date | null;
 }
 
 /** A subscription's invoices, as its row needs them. */
@@ -318,6 +355,11 @@ interface SubscriptionInvoices {
     /** Issued and unpaid, oldest first. */
     unpaid: InvoiceRowLite[];
     latest: InvoiceRowLite | null;
+    /**
+     * When its autopay last failed or found the limit too low (D13's
+     * RENEWAL_FAILED or MANDATE_LIMIT_LOW), or null.
+     */
+    chargeFailedAt: Date | null;
 }
 
 /** What a period is billed at: the subscription's terms, or its new plan's. */
@@ -349,6 +391,9 @@ export class SubscriptionsService {
         // The autopay line on Subscription Detail (D12); absent where a test
         // builds the service by hand.
         @Optional() private readonly autopay?: AutopayService,
+        // A renewal charges the customer's autopay (D13); absent where a
+        // test builds the service by hand, and then renewals only invoice.
+        @Optional() private readonly charges?: MandateChargesService,
     ) {}
 
     // — Plans ——————————————————————————————————————————————————————
@@ -525,7 +570,19 @@ export class SubscriptionsService {
         const autopay = this.autopay
             ? await this.autopay.line(ctx.organizationId, id)
             : null;
-        return { ...view, autopay };
+        // A charge under way, and how Retry would go (D13).
+        const charging = (
+            await subscriptionChargesUnderWay(prisma, ctx.organizationId, [id])
+        ).get(id);
+        const retryVia = charging
+            ? null
+            : await this.retryVia(ctx.organizationId, id, new Date());
+        return {
+            ...view,
+            autopay,
+            autopayCharge: charging ? { at: charging.at.toISOString() } : null,
+            retryVia,
+        };
     }
 
     /** What was done to it and by whom, newest first (D9). */
@@ -1358,39 +1415,139 @@ export class SubscriptionsService {
     }
 
     /**
-     * "Retry now" on a failed charge: a new pay link for the unpaid, overdue
-     * latest invoice, replacing the old one. Nothing is charged — there is
-     * no card on file — the link is what the customer pays through.
-     * Needs `invoice:write` as well, as any pay link does.
+     * Retry a failed renewal (D13; default 35). A charge still open on it
+     * is asked about first (DEC-026): one the provider captured settles the
+     * invoice and nothing more is done; one still in flight is a 409
+     * "Autopay charge in progress". Then, as asked:
+     *
+     * - `MANDATE`: a new autopay charge (a new attempt key, so a new order
+     *   and pre-debit notice), when the subscription's mandate is ACTIVE,
+     *   its provider's charging is on and the invoice is within its limit;
+     *   otherwise 409.
+     * - `PAY_LINK` (the default, as before D13): a new pay link, replacing
+     *   the old one; needs `invoice:write`, as any pay link does.
+     *
+     * The failed renewal is its latest invoice, unpaid and past due, or
+     * whose autopay charge failed (RENEWAL_FAILED, MANDATE_LIMIT_LOW).
      */
     async retryPayment(
         ctx: OrganizationContext,
         id: string,
-    ): Promise<{ invoiceId: string; token: string }> {
+        via: RetryVia = "PAY_LINK",
+    ): Promise<RetryResult> {
         authorize(ctx, "subscription:write");
-        // One transaction under the subscription's lock: the link and its
-        // RETRIED commit together, and a refused link records nothing.
+        const { organizationId } = ctx;
+        const now = new Date();
+        // Ask the provider about an open charge first, outside the lock.
+        const target = await this.retryTarget(organizationId, id, now);
+        if (target && this.charges) {
+            const open = await chargeUnderWayOn(prisma, organizationId, target);
+            if (open) {
+                const found = await this.charges.lookUp({
+                    organizationId,
+                    intentId: open.intentId,
+                });
+                if (found === "PAID") {
+                    return {
+                        invoiceId: target,
+                        via: "MANDATE",
+                        token: null,
+                        paid: true,
+                    };
+                }
+            }
+        }
+        // One transaction under the subscription's lock: the charge or the
+        // link and its RETRIED commit together; a refusal records nothing.
         return prisma.$transaction(async (tx) => {
-            const row = await this.lock(tx, ctx.organizationId, id);
-            const invoices = await this.invoicesFor(
-                ctx.organizationId,
-                [id],
-                tx,
-            );
-            const failed = failedCharge(row, invoices.get(id), new Date());
+            await this.lock(tx, organizationId, id);
+            const failed = await this.retryTarget(organizationId, id, now, tx);
             if (!failed) {
                 throw new ConflictException(
                     "The latest charge is not overdue, so there is nothing to retry.",
                 );
             }
+            if (await chargeUnderWayOn(tx, organizationId, failed)) {
+                throw autopayChargeInProgress();
+            }
+            if (via === "MANDATE") {
+                const queued = this.charges
+                    ? await this.charges.queueInTx(tx, {
+                          organizationId,
+                          subscriptionId: id,
+                          invoiceId: failed,
+                          now,
+                      })
+                    : ({ status: "NONE" } as const);
+                if (queued.status !== "QUEUED") {
+                    throw new ConflictException({
+                        message:
+                            queued.status === "LIMIT_LOW"
+                                ? "This renewal is more than their autopay covers. Make a pay link instead."
+                                : "Autopay can't take this charge now. Make a pay link instead.",
+                        details: { reason: "autopay-unavailable" },
+                    });
+                }
+                await this.log(
+                    tx,
+                    ctx,
+                    id,
+                )("RETRIED", {
+                    invoiceId: failed,
+                    data: { via: "MANDATE" },
+                });
+                return { invoiceId: failed, via: "MANDATE", token: null };
+            }
             const { token } = await this.invoices.createPayLinkInTx(
                 tx,
                 ctx,
-                failed.id,
+                failed,
             );
-            await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed.id });
-            return { invoiceId: failed.id, token };
+            await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed });
+            return { invoiceId: failed, via: "PAY_LINK", token };
         });
+    }
+
+    /**
+     * The invoice Retry acts on: the failed renewal (`failedCharge`), or
+     * null. A cancelled subscription has none.
+     */
+    private async retryTarget(
+        organizationId: string,
+        id: string,
+        now: Date,
+        db: Tx = prisma,
+    ): Promise<string | null> {
+        const row = await db.customerSubscription.findFirst({
+            where: { id, organizationId },
+            select: { status: true },
+        });
+        if (!row) notFound("Subscription");
+        const invoices = await this.invoicesFor(organizationId, [id], db);
+        return failedCharge(row, invoices.get(id), now)?.id ?? null;
+    }
+
+    /**
+     * How Retry would go now (D13): by the customer's autopay when it can
+     * take this invoice, else a pay link. Null: nothing to retry.
+     */
+    private async retryVia(
+        organizationId: string,
+        id: string,
+        now: Date,
+    ): Promise<RetryVia | null> {
+        const row = await prisma.customerSubscription.findFirst({
+            where: { id, organizationId },
+            select: { status: true },
+        });
+        if (!row) return null;
+        const invoices = await this.invoicesFor(organizationId, [id]);
+        const failed = failedCharge(row, invoices.get(id), now);
+        if (!failed) return null;
+        const byMandate = this.charges
+            ? await this.charges.mandateRetryable(organizationId, [id])
+            : new Set<string>();
+        return byMandate.has(id) ? "MANDATE" : "PAY_LINK";
     }
 
     /** The business's subscription settings (A8). */
@@ -1634,6 +1791,15 @@ export class SubscriptionsService {
                 createdByUserId: null,
             });
             await renewed(invoiceId);
+            // With autopay on, the charge is queued in this transaction
+            // (D13): its intent and first step, or MANDATE_LIMIT_LOW. With
+            // none, or its provider's charging off, the pay link as before.
+            await this.charges?.queueInTx(tx, {
+                organizationId: sub.organizationId,
+                subscriptionId: id,
+                invoiceId,
+                now,
+            });
             return "renewed";
         });
     }
@@ -2015,13 +2181,29 @@ export class SubscriptionsService {
                 total: true,
                 dueAt: true,
                 paidAt: true,
+                issuedAt: true,
             },
         });
+        // Autopay's failures (D13): a failed charge before its due date.
+        const failures = await db.subscriptionEvent.findMany({
+            where: {
+                organizationId,
+                subscriptionId: { in: subscriptionIds },
+                kind: { in: ["RENEWAL_FAILED", "MANDATE_LIMIT_LOW"] },
+            },
+            orderBy: { createdAt: "desc" },
+            distinct: ["subscriptionId"],
+            select: { subscriptionId: true, createdAt: true },
+        });
+        const failedAt = new Map(
+            failures.map((f) => [f.subscriptionId, f.createdAt]),
+        );
         for (const r of rows) {
             if (!r.subscriptionId) continue;
             const entry = byId.get(r.subscriptionId) ?? {
                 unpaid: [],
                 latest: null,
+                chargeFailedAt: failedAt.get(r.subscriptionId) ?? null,
             };
             if (r.status === "ISSUED") entry.unpaid.push(r);
             entry.latest = r;
@@ -2162,9 +2344,10 @@ export class SubscriptionsService {
 }
 
 /**
- * Payment failed: the latest charge is still unpaid and past its due date.
- * Derived, like "overdue", through the one rule (`isPastDue`); a cancelled
- * subscription has no failed charge to act on.
+ * Payment failed: the latest charge is still unpaid, and past its due date
+ * or its autopay charge failed since it was issued (D13's RENEWAL_FAILED
+ * or MANDATE_LIMIT_LOW). Derived, like "overdue", through the one rule
+ * (`isPastDue`); a cancelled subscription has no failed charge to act on.
  */
 function failedCharge(
     row: { status: string },
@@ -2173,7 +2356,14 @@ function failedCharge(
 ): InvoiceRowLite | null {
     const latest = invoices?.latest ?? null;
     if (row.status === "CANCELLED" || !latest) return null;
-    return isPastDue(latest, now) ? latest : null;
+    if (isPastDue(latest, now)) return latest;
+    const failedAt = invoices?.chargeFailedAt ?? null;
+    const autopayFailed =
+        latest.status === "ISSUED" &&
+        failedAt !== null &&
+        latest.issuedAt !== null &&
+        failedAt >= latest.issuedAt;
+    return autopayFailed ? latest : null;
 }
 
 /** A plan as an event names it, money as the wire says it. */

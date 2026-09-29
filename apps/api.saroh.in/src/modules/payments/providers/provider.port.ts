@@ -345,6 +345,23 @@ export interface GetPreDebitInput {
     credentials: ProviderCredentials;
 }
 
+/** Look up what became of a charge's debit (D13: Retry asks first). */
+export interface FindMandateChargeInput {
+    /** The prepared order (the intent's `providerIntentId`). */
+    providerIntentId: string;
+    credentials: ProviderCredentials;
+}
+
+/**
+ * The debit on a prepared order, as the provider has it now (D13).
+ * `NONE`: no debit was made on it — asking for one is safe. `PENDING`:
+ * made, not answered yet. `SUCCEEDED` / `FAILED`: answered.
+ */
+export interface FoundMandateCharge {
+    status: "NONE" | "PENDING" | "SUCCEEDED" | "FAILED";
+    providerPaymentRef: string | null;
+}
+
 /**
  * Hours ahead of a debit Saroh asks for the pre-debit notice: Razorpay's
  * 25-hour minimum (D11 spike) plus a margin for the clocks and the job.
@@ -362,9 +379,11 @@ export interface MandateCapability {
     /**
      * The rollout flag a business needs on before autopay is offered
      * through this adapter (Razorpay: `RAZORPAY_AUTOPAY`, D19, waves plan
-     * boundary 6). It gates offering and set-up only
-     * (`MandateSetupService.mandateMethods`); reading, charging and
-     * cancelling a mandate already made never wait on it. None: no gate.
+     * boundary 6). It gates offering and set-up
+     * (`MandateSetupService.mandateMethods`) and a renewal's charge (D13,
+     * `mandateChargingOn`): off, renewals are invoiced with a pay link as
+     * before. Reading and cancelling a mandate already made never wait on
+     * it. None: no gate.
      */
     readonly rolloutFlag?: FlagKey;
     /**
@@ -396,6 +415,11 @@ export interface MandateCapability {
     getPreDebit(input: GetPreDebitInput): Promise<PreDebitStatus>;
     /** Charge step two: the debit. `NOT_YET` until the notice allows it. */
     charge(input: MandateChargeInput): Promise<MandateChargeResult>;
+    /**
+     * What became of the debit on a prepared order (D13), so an unsure
+     * answer is looked up rather than charged again (DEC-026).
+     */
+    findCharge(input: FindMandateChargeInput): Promise<FoundMandateCharge>;
     /** Resolves once the provider says the mandate is cancelled. */
     cancel(input: CancelMandateInput): Promise<void>;
 }

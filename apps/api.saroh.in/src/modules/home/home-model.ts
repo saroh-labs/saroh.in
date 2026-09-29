@@ -133,11 +133,11 @@ export interface HomeUnavailable {
 export type HomeInlineKind = "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
 
 /**
- * How a Retry is made (F4). Only a fresh pay link today; D13 adds
- * `MANDATE`, a charge on the customer's autopay, and hides Retry while such
- * a charge is PENDING ("Autopay charge in progress").
+ * How a Retry is made (F4, D13): `PAY_LINK`, a fresh pay link; `MANDATE`,
+ * a new charge on the customer's autopay. No Retry is offered while such a
+ * charge is under way ("Autopay charge in progress").
  */
-export type HomeRetryVia = "PAY_LINK";
+export type HomeRetryVia = "PAY_LINK" | "MANDATE";
 
 /**
  * What an inline action on a Needs-you row will do (F4), decided by the API

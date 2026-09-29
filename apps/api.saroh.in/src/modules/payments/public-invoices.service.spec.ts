@@ -19,7 +19,12 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             findUnique: jest.fn(),
         },
-        paymentIntent: { findUnique: jest.fn(), create: jest.fn() },
+        paymentIntent: {
+            findUnique: jest.fn(),
+            create: jest.fn(),
+            // D13: an autopay charge under way on the invoice.
+            findMany: jest.fn(),
+        },
         paymentAttempt: { create: jest.fn(), findFirst: jest.fn() },
     };
     return {
@@ -137,6 +142,7 @@ beforeEach(() => {
             ),
     );
     siteFindFirst.mockResolvedValue(null);
+    (prisma.paymentIntent.findMany as jest.Mock).mockResolvedValue([]);
 });
 
 describe("PublicInvoicesService.read", () => {
