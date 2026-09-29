@@ -107,15 +107,37 @@ a note saying so.
   `UNKNOWN` (network, timeout, 5xx, 429, 409, a duplicate id — the row stays
   PENDING, money held). Try-again asks the provider first (`findRefund`) and
   re-sends only when it has none. Never match a refund by amount alone.
-- **Current** (D20) — **Autopay is an optional capability of the merchant
-  port.** `MerchantProvider.mandates?: MandateCapability`; a provider
-  without it never offers autopay (`supportsMandates`). So far it has only
-  `cancel` (D11 adds set-up, charge and status; D19 the Razorpay adapter),
-  and the fake implements it. Adapters throw `MandateCallError` with
-  `REFUSED` or `UNKNOWN`, as refunds do; cancelling a mandate the provider
-  has already cancelled is a success. Saroh marks a mandate CANCELLED before
-  it asks, so an unsure answer never leaves it chargeable
-  (`payments/mandates.service.ts`).
+- **Current** (D20, D11) — **Autopay is an optional capability of the
+  merchant port.** `MerchantProvider.mandates?: MandateCapability`; a
+  provider without it never offers autopay (`supportsMandates`) — Razorpay
+  until D19, Cashfree this round. The capability has `mandateMethods`,
+  `createSetup`, `get`, `prepareCharge`, `getPreDebit`, `charge` and
+  `cancel`; the fake implements all of it (`providers/fake.provider.ts`).
+  Adapters throw `MandateCallError` with `REFUSED`, `UNKNOWN` or `NOT_YET`
+  (the provider won't debit yet; nothing was charged); cancelling a
+  mandate the provider has already cancelled is a success. Saroh marks a
+  mandate CANCELLED before it asks, so an unsure answer never leaves it
+  chargeable (`payments/mandates.service.ts`). Set-up is
+  `mandate-setup.service.ts`, the charge `mandate-charges.service.ts`, and
+  what a provider reports (webhook or read) is applied by
+  `mandate-events.ts` in the caller's transaction.
+- **Current** (D11) — **The customer picks the autopay method from all the
+  account offers.** A provider's authorisation takes exactly one method, so
+  `mandateMethods` returns what the business's account can set up (UPI,
+  CARD, EMANDATE) and the customer chooses; Saroh never narrows the list
+  (DEC-059). The mandate stores the method and only a displayable hint (a
+  masked UPI handle, a card's last four — `safeDisplayHint` drops anything
+  else), never a card or bank detail.
+- **Current** (D11) — **A mandate charge is two steps.** `prepareCharge`
+  makes the provider's order with a pre-debit notice and records it on the
+  invoice's PaymentIntent (`viaMandateId`, `debitAfter`, `preDebitStatus`,
+  `preDebitRef`); `charge` asks for the debit only when the mandate is
+  still ACTIVE and the invoice's subscription is its own, the invoice is
+  ISSUED and within the limit, the notice is DELIVERED (or NOT_NEEDED) and
+  `debitAfter` has passed. It claims the intent (REQUIRES_PAYMENT →
+  PROCESSING) before the call, so it is asked once; the payment's own
+  webhook settles the invoice as a pay link's does. Ask for a debit at
+  least `PRE_DEBIT_LEAD_HOURS` (26) ahead: `earliestDebitAt`.
 - **Current** — **The refund webhook settles at the provider's amount**
   (#508 U2). Adapters normalise the refunded amount in paise, Saroh's
   reference and a `REFUND_FAILED` outcome (Razorpay `refund.failed`; Cashfree
@@ -143,3 +165,58 @@ a note saying so.
   shared outcome classification.
 - **Adopted** — **No fallback that can produce a plausible wrong answer.** When a
   wrong result is costly, fail loudly. Not audited across adapters.
+
+## Razorpay recurring payments (D11 spike) — **Current**
+
+Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
+[authorisation](https://razorpay.com/docs/api/payments/recurring-payments/upi/create-authorization-transaction/),
+[subsequent payments](https://razorpay.com/docs/payments/payment-gateway/s2s-integration/recurring-payments/upi/subsequent-payments/),
+[tokens](https://razorpay.com/docs/api/payments/recurring-payments/upi/tokens/),
+[webhooks](https://razorpay.com/docs/api/payments/recurring-payments/webhooks/).
+
+- **Objects.** A mandate is a **token** (`token_…`) on a **customer**
+  (`cust_…`), made by an authorisation payment on an order carrying a
+  `token{max_amount, expire_at, frequency}` block. Not a Razorpay
+  Subscription. Saroh keeps `providerCustomerId` and `providerMandateId`
+  (the token id). A registration link (`POST
+/subscription_registration/auth_links`, `inv_…`) gives a hosted
+  `short_url`; the paid link's payment names the `token_id` and
+  `customer_id`, so the token is found without a webhook.
+- **One method per authorisation.** An order carries `upi`, `card` or
+  `emandate` (`nach` needs a paper form: out of scope). Without one,
+  Checkout with `recurring: "1"` shows cards only.
+- **First payment.** UPI and card: a real charge of at least ₹1 (captured;
+  in test mode its fee was more than the amount). eMandate: ₹0. D12 makes
+  the invoice's payment the authorisation's own.
+- **The charge is two-phase for UPI.** `POST /payments/create/recurring`
+  on an order without `notification` answers 400. The order must carry
+  `notification{token_id, payment_after}` with `payment_after` at least 25
+  hours ahead ("Debit can be attempted 25 hours after sending the pre-debit
+  notification"); the debit asked before the notice is delivered answers
+  400 `pre_debit_notification_not_sent` (`NOT_YET`). **Razorpay sends the
+  pre-debit notice** to the customer's UPI app; Saroh sends none. A
+  renewal's invoice must be raised at least ~26 hours before its charge.
+- **Unanswered charges.** A UPI debit can take 24–36 hours to be answered,
+  more when the notice fails; some banks leave the payment `created`.
+  Razorpay doesn't retry a failed debit on an order with `notification`;
+  don't create another debit until the previous one is answered.
+- **Webhook events** to subscribe to: `token.confirmed` (ACTIVE),
+  `token.rejected` (FAILED), `token.paused` (PAUSED, UPI only),
+  `token.cancelled` (CANCELLED), `order.notification.delivered` /
+  `.failed` (the notice), `payment.authorized` / `.captured` / `.failed`,
+  `order.paid`, and `invoice.paid` / `.expired` for a registration link.
+  The docs have no `token.resumed`: a resumed mandate is expected as
+  `token.confirmed` (not yet seen).
+- **Displayable.** The token's `vpa{username, handle}` → a masked hint
+  (`te•••@razorpay`); a card token's last four.
+- **Limit and headroom.** UPI `max_amount` is ₹1–₹99,999 for most
+  businesses; Razorpay advises keeping it near the real charge. Saroh asks
+  for `mandateLimitCents(price)`: half again, rounded up to ₹100
+  (`mandate-rules.ts`); an invoice above it isn't charged (D13).
+- **Cancel** is `PUT /customers/:c/tokens/:t/cancel`, confirmed by
+  `token.cancelled`; `DELETE …/tokens/:t` does not cancel the mandate and
+  is never used.
+- **Still open** (D19's test-mode run): the notice's delivery and the debit
+  after `payment_after` in test mode, a debit above `max_amount`, a cancel
+  answered twice, and whether card and eMandate debits need the notice
+  step at all — the port lets a method answer `NOT_NEEDED`.
