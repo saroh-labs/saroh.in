@@ -180,6 +180,25 @@ test.describe("the booking page", () => {
     // Each test is a different customer, from an address of their own.
     test.beforeEach(({ page }) => asNewVisitor(page));
 
+    test("the header names the clinic's place and phone, read on the server (E6)", async ({
+        page,
+    }) => {
+        // Read only: Kavi Dental is a film set. The page reads the public
+        // visit on the server; the check it ran came from a "use client"
+        // module, so every header fell back to the business's name alone.
+        const renderer = new URL(urls.RENDERER_URL);
+        await page.goto(
+            `${renderer.protocol}//kavi-dental.${renderer.host}/book`,
+        );
+        const header = page.locator("section").first();
+        await expect(
+            header.getByText(/12th Main, Indiranagar, Bengaluru/),
+        ).toBeVisible();
+        await expect(
+            header.getByRole("link", { name: "+91 80409 92210" }),
+        ).toHaveAttribute("href", "tel:+918040992210");
+    });
+
     test("pay at the desk: signed in at the last step, booked, and in the team's calendar as paid at the desk", async ({
         page,
     }, testInfo) => {

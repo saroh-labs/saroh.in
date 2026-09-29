@@ -189,7 +189,7 @@ describe("BusinessCalendar: days off and the team filter (E24)", () => {
 
         expect(panel()).toContain("Root canal");
         expect(panel()).not.toContain("Cleaning");
-        expect(cell("2026-09-22")?.textContent).toContain("1 booking");
+        expect(cell("2026-09-22")?.textContent).toContain("1 appointment");
         const the23rd = cell("2026-09-23");
         expect(the23rd?.textContent).toContain("Off");
         expect(the23rd?.className).toContain("repeating-linear-gradient");

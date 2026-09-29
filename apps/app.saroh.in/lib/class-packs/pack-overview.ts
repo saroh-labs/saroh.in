@@ -12,7 +12,6 @@ import {
     each,
     people,
     runningOut,
-    serviceList,
     totals,
 } from "./pack-detail";
 import type { PackDetail, PackHolder } from "./pack-detail-data";
@@ -31,11 +30,23 @@ export interface Tile {
     sub: string;
 }
 
-/** Sold, Still to use, Running out and Lost to expiry. */
+/**
+ * Can be sold now, Sold, Still to use and Running out — the design's four.
+ * What ran out unused is said on the Who has it card below.
+ */
 export function overviewTiles(pack: PackDetail): Tile[] {
     const o = pack.overview;
-    const units = unitWord(packKind(pack), 2);
+    const head = detailHeader(pack);
     return [
+        {
+            k: "Can be sold now",
+            v: head.onSale ? "Yes" : "No",
+            sub: head.onSale
+                ? "At the desk and on the booking page"
+                : head.draft
+                  ? "Draft"
+                  : "Archived",
+        },
         {
             k: "Sold",
             v: String(o.sold),
@@ -59,11 +70,6 @@ export function overviewTiles(pack: PackDetail): Tile[] {
                 o.runningOut > 0
                     ? `within ${RUNNING_OUT_DAYS} days`
                     : "Nobody close",
-        },
-        {
-            k: "Lost to expiry",
-            v: String(o.lostToExpiry),
-            sub: o.lostToExpiry > 0 ? `${units} never used` : "None",
         },
     ];
 }
@@ -195,13 +201,13 @@ export function linkedCards(
         key: "booking",
         k: "Booking page",
         v: header.onSale
-            ? `Shown when booking a ${unitWord(kind, 1)}`
+            ? `Offered when booking a ${unitWord(kind, 1)}`
             : "Hidden",
         lines: [
             {
                 text: header.onSale
                     ? pack.firstPackOnly
-                        ? "Only to people who haven't had one"
+                        ? "Only to people who haven't bought one"
                         : `To anyone without ${units} left`
                     : header.draft
                       ? "Draft — not on sale"
@@ -253,7 +259,9 @@ export function aboutRows(
         },
         {
             k: "Good for",
-            v: serviceList(pack.services) || "Nothing chosen yet",
+            v:
+                pack.services.map((s) => s.name).join(", ") ||
+                "Nothing chosen yet",
         },
     ];
     const second: AboutRow[] = [
@@ -267,7 +275,7 @@ export function aboutRows(
             : []),
         {
             k: "Unused credits",
-            v: `End with the pack; you can extend a use-by by up to ${MAX_EXTEND_DAYS} days at a time`,
+            v: `End with the pack; you can extend a use-by by up to ${MAX_EXTEND_DAYS} days`,
         },
     ];
     if (opts.freeCancelHours !== undefined) {
@@ -276,7 +284,7 @@ export function aboutRows(
             v:
                 opts.freeCancelHours === null
                     ? `A ${unit} cancelled before it starts gives the credit back`
-                    : `A ${unit} cancelled ${count(opts.freeCancelHours, "hour", "hours")} or earlier gives the credit back`,
+                    : `A ${unit} cancelled ${count(opts.freeCancelHours, "hour", "hours")} before or earlier gives the credit back`,
         });
     }
     return [first, second];

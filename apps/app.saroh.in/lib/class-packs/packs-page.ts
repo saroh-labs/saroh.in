@@ -67,3 +67,28 @@ export async function readMembershipPlans(): Promise<MembershipPlan[] | null> {
             subscriberCount,
         }));
 }
+
+/** Dates on the cards read in India's zone when the business's is unread. */
+export const FALLBACK_ZONE = "Asia/Kolkata";
+
+/**
+ * The business's time zone, for the cards' "runs out 25 Sep". An extra: a
+ * settings read this person can't make leaves India's zone, the business
+ * default (DEC-033), and never fails the page.
+ */
+export async function readBusinessZone(): Promise<string> {
+    const base = await orgBase();
+    if (!base) return FALLBACK_ZONE;
+    try {
+        const res = await apiFetch(`${base}/settings`);
+        if (!res.ok) return FALLBACK_ZONE;
+        const body = (await res.json()) as {
+            profile?: { timezone?: string | null } | null;
+        };
+        const zone = body.profile?.timezone?.trim();
+        if (!zone) return FALLBACK_ZONE;
+        return zone;
+    } catch {
+        return FALLBACK_ZONE;
+    }
+}

@@ -11,6 +11,7 @@ import { useState, useTransition } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { setPackArchived } from "@/lib/class-packs/actions";
+import type { CardNote } from "@/lib/class-packs/pack-card-notes";
 import type { PackListItem } from "@/lib/class-packs/pack-cards";
 import { orderForList, packCard } from "@/lib/class-packs/pack-cards";
 import type { MembershipPlan } from "@/lib/class-packs/packs-page";
@@ -43,6 +44,7 @@ function archiveToast(pack: PackListItem, archived: boolean): string {
  */
 export function PacksScreen({
     packs,
+    notes,
     contacts,
     held,
     canWrite,
@@ -54,6 +56,8 @@ export function PacksScreen({
     openSell,
 }: {
     packs: PackListItem[];
+    /** Each card's lines under its figures, by pack id (running out first). */
+    notes?: Record<string, CardNote[]>;
     contacts: ContactOption[];
     /** The purchases the page read, for first-pack-only and "Has 4 left". */
     held: HeldPack[];
@@ -179,6 +183,7 @@ export function PacksScreen({
                         <li key={p.id} className="min-w-0">
                             <PackCard
                                 card={packCard(p, canWrite)}
+                                notes={notes?.[p.id] ?? []}
                                 canWrite={canWrite}
                                 canSell={canSell}
                                 busy={busyId === p.id}
