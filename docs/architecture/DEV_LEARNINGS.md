@@ -981,3 +981,34 @@ of one Indian day (`PREPUSH_E2E_TEMPLATE_HOURS`), CI's dump for one 4-hour
 window. Don't key either on the files alone.
 **Category**: e2e · tooling · `.agents/skills/saroh-browser-tests/SKILL.md`,
 `docs/patterns/devops-tooling-and-deploy.md` → CI and How the gate stays fast
+
+## E2E — the browser suite could only run one test at a time
+
+**Problem**: 34 spec files on desk and phone took 553s on one worker, and CI's
+shards split them by file (135s against 195s). Turning on parallel workers
+failed on data, not code: the deposit test switched the walkthrough to
+deposits and every other booking lost Pay at the desk; desk and phone
+changed the same invoice prefix at once; two tests archived Rye's one
+Sourdough plan; booking tests took "the third free time" from a list that
+shrank as the others booked ("That time has just gone"); earlier, the
+trolley's stock ran out and D18 leaned on another test's invoice. Four
+tests had been skipped on every fresh seed and so never ran at all (Mark
+ready from the quick view, the bulk Undo, both extra-hours journeys).
+**Root cause**: Specs wrote to shared seeded records — Northwind's settings,
+a named customer, "the first Preparing order", Rye's and Pulse's own data —
+and read counts and first rows other specs were changing. One worker hid it.
+**Fix**: Every test makes what it changes, through the API, with a stamp
+unique to the test, project and worker (`e2e/fixtures/own-data.ts`); orders
+are of one untracked product the setup project makes once. Lists and counts
+are read on Rye, which nothing writes to; writes moved off Rye and Pulse to
+Northwind. Business-wide changes are tagged `@serial` and run alone after
+the rest (`e2e/run.mjs`: setup, parallel, serial). Each booking test takes a
+day of its own. `fullyParallel` on 4 workers: ~220s end to end, four
+back-to-back runs with no retry. `prepush --e2e` takes a lock so a second run
+waits, and its teardown stops only its own servers.
+**Gotcha**: A test that was skipped "because the seed has none" is not
+coverage — make the record. And a long email pushed the phone's Link button
+off-screen in "Link a commerce customer" (the test keeps emails short; the
+dialog does not wrap).
+**Category**: e2e · tooling · `.agents/skills/saroh-browser-tests/SKILL.md`,
+`docs/patterns/devops-tooling-and-deploy.md`, `scripts/prepush.sh`

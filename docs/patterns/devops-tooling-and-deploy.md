@@ -107,6 +107,17 @@ seconds). Shared setup is `.github/actions/setup`.
 - **Current** (2026-09-29) — **Specs sign in once per person.** The
   Playwright `setup` project runs in every shard and signs the four seeded
   people in; the specs reuse the sessions (browser-tests skill).
+- **Current** (2026-09-29) — **Browser shards run the suite in parallel.**
+  Each shard runs `pnpm --filter @saroh/e2e test:e2e --shard=N/4`
+  (`e2e/run.mjs`): `setup` once, then `desk` and `phone` `fullyParallel` on
+  `PW_WORKERS=2` (the stack shares the runner's two vCPUs), then that
+  shard's `@serial` tests on one worker. With `fullyParallel` Playwright
+  shards by test, not by file: 88–89 parallel and 8–9 serial tests a shard,
+  and the local timings put the four within ~20% of each other (was 135s
+  on shards 1 and 3 against 195s on 2 and 4, where desk and phone split
+  by file). Each phase keeps its traces under `e2e/test-results/<phase>/`,
+  all uploaded on failure. Every spec owns its data
+  (browser-tests skill), which is what makes this safe.
 - **Current** — **Postgres services poll `pg_isready -h 127.0.0.1` every 2s.**
   The check goes over TCP because the image's init server listens on the
   socket only.
@@ -254,6 +265,17 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
   `PREPUSH_E2E_TEMPLATE_HOURS` (default 4), copies the template in about a
   second and only builds. `--no-cache` reseeds. The template's name keeps
   "test" in it, and nothing but this connects to it.
+- **Parallel browser specs, one browser run per machine** (2026-09-29).
+  The browser step runs `e2e/run.mjs` on `PW_WORKERS` (default 4): all 34
+  spec files on desk and phone in ~220s end to end on a template hit
+  (parallel phase 2.0 min, serial phase 1.4 min), against 553s one at a
+  time. Two runs share CI's ports, `$E2E_DIR` and the E2E database, so the
+  background job first takes `<git common dir>/prepush-e2e.lock` (a
+  directory holding its PID; one whose PID is dead is taken over). A second
+  `--e2e` says whose run it waits on and waits up to
+  `PREPUSH_E2E_LOCK_WAIT` seconds (1800), then fails clearly; it checks the
+  ports only once it holds the lock. Teardown stops the PIDs its own run
+  started and their children, never "whatever listens on 3000".
 - **Not mirrored:** CI also runs the integration suite under RLS
   (`TEST_RLS=on`); the local gate runs it plain only.
 
