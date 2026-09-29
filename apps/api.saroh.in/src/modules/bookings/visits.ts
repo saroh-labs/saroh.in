@@ -112,7 +112,7 @@ export async function requireTreatmentStorefront(
 
 /** Why a service of more than one visit can't be saved (E10). */
 export const TREATMENT_NEEDS_STOREFRONT =
-    "Treatments are sold as orders — add a storefront first.";
+    "Treatments are sold as orders — add a location first.";
 
 /**
  * The Service Editor's rule (E10): a service of more than one visit is a

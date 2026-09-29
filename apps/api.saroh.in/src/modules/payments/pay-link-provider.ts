@@ -33,7 +33,7 @@ function opensCheckout(row: MerchantPaymentProvider): boolean {
 /** Why a connection can't take a pay link's payment, in the merchant's words. */
 function notReady(row: MerchantPaymentProvider | null, pinned: string): string {
     if (row?.status !== "CONNECTED") {
-        return `This storefront takes payment through ${label(pinned)}, which isn't connected. Connect it, or pick another in Sell › Storefronts.`;
+        return `This location takes payment through ${label(pinned)}, which isn't connected. Connect it, or pick another in Sell › Locations.`;
     }
     return `Your ${label(row.provider)} connection needs its public key id before it can take a pay link. Add it in Settings › Providers.`;
 }

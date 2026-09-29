@@ -94,7 +94,7 @@ describe("StoresService.createForUser — storefronts up to the plan", () => {
             status: 403,
             response: {
                 message:
-                    "Your plan includes 2 storefronts. A bigger plan adds more.",
+                    "Your plan includes 2 locations. A bigger plan adds more.",
             },
         });
         expect(storeFindUnique).not.toHaveBeenCalled();

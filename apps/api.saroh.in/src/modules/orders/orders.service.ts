@@ -220,7 +220,7 @@ export class OrdersService {
             dto.currency !== settings.currency
         ) {
             throw new BadRequestException({
-                message: `This storefront takes orders in ${settings.currency}.`,
+                message: `This location takes orders in ${settings.currency}.`,
                 field: "currency",
             });
         }

@@ -131,7 +131,7 @@ export async function priceOrderLines(
                 message: currencyMismatch({
                     product: product.name,
                     productCurrency: product.currency,
-                    storefront: store?.name ?? "this storefront",
+                    storefront: store?.name ?? "this location",
                     storefrontCurrency: currency,
                 }),
                 field: "items",
@@ -153,7 +153,7 @@ export async function priceOrderLines(
             }
             if (variant.listings.length === 0) {
                 throw new BadRequestException({
-                    message: `That option of ${product.name} isn't sold at this storefront.`,
+                    message: `That option of ${product.name} isn't sold at this location.`,
                     field: "items",
                 });
             }

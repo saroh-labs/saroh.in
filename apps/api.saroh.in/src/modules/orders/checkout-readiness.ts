@@ -48,6 +48,6 @@ export async function checkoutReadiness(
 /** What the editor tells the merchant when their site can't take orders. */
 export function readinessMessage(reason: "paused" | "no-provider"): string {
     return reason === "paused"
-        ? "Your storefront is paused, so your site can't take orders. Customers see “Ask about ordering” instead."
+        ? "The location your online shop sells from is paused, so your site can't take orders. Customers see “Ask about ordering” instead."
         : "Connect payments to take orders online. Until then, customers see “Ask about ordering” instead.";
 }

@@ -79,7 +79,7 @@ export class CatalogueAccess {
         }
         if (!writable.organizationId) {
             throw new BadRequestException(
-                "This storefront belongs to no business.",
+                "This location belongs to no business.",
             );
         }
         return writable.organizationId;

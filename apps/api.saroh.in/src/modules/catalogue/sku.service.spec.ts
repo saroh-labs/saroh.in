@@ -134,7 +134,7 @@ describe("SKU pattern (DB)", () => {
                 .then((org) =>
                     sku.save(org, { pattern: "{NAME3}{N}", suggest: true }),
                 ),
-        ).rejects.toThrow("Store not found");
+        ).rejects.toThrow("Location not found");
         await prisma.user.delete({ where: { id: strangerId } });
     });
 });

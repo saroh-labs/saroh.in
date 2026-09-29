@@ -428,7 +428,7 @@ export class CustomersListService {
             where: { id: storeId, organizationId },
             select: { id: true },
         });
-        if (!store) throw new NotFoundException("Storefront not found");
+        if (!store) throw new NotFoundException("Location not found");
     }
 
     /** "Spent" per contact and currency, by the rule Customer Detail reads. */

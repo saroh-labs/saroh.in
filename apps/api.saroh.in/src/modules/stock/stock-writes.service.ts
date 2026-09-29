@@ -283,7 +283,7 @@ export class StockWritesService {
                     organizationId: actor.organizationId,
                 },
             });
-            if (to === 0) throw new NotFoundException("Store not found");
+            if (to === 0) throw new NotFoundException("Location not found");
             const moved = await whileTracked(
                 tx,
                 actor.organizationId,

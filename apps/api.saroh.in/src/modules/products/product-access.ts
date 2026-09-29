@@ -172,7 +172,7 @@ export class ProductAccess {
         // Every storefront belongs to a business (Store.organizationId is
         // required); a product must carry it (#510).
         if (!writable?.organizationId) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
         if (productId) await this.assertListed(storeId, productId);
         return {
@@ -233,7 +233,7 @@ export class ProductAccess {
         const store = await this.stores.getForUser(storeId, userId);
         const canWrite = await this.stores.canWrite(storeId, userId);
         if (!(await this.canStockViaStore(storeId, userId, canWrite))) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
         await this.assertListed(storeId, productId);
         return {
@@ -285,7 +285,7 @@ export class ProductAccess {
                 where: { id: storefront, organizationId, deletedAt: null },
                 select: { id: true },
             });
-            if (!store) throw new NotFoundException("Store not found");
+            if (!store) throw new NotFoundException("Location not found");
             return store.id;
         }
         if (productId) {
@@ -308,11 +308,11 @@ export class ProductAccess {
         });
         const [first] = open;
         if (open.length === 0) {
-            throw new NotFoundException("This business has no storefront yet.");
+            throw new NotFoundException("This business has no location yet.");
         }
         if (whenUnnamed === "refuse" && open.length > 1) {
             throw new BadRequestException({
-                message: "Pick the storefront that sells it.",
+                message: "Pick the location that sells it.",
                 field: "storefront",
             });
         }
