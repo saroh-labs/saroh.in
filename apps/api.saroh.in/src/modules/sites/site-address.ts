@@ -101,3 +101,45 @@ export async function addressTaken(
     if (site && site.organizationId !== organizationId) return true;
     return false;
 }
+
+/** How many numbered variants {@link freeAddress} tries before giving up. */
+const VARIANTS = 50;
+
+/**
+ * A free address like `wanted` (DEC-069: creation asks for a free address
+ * rather than making a site with none): `wanted` itself when it is free,
+ * else `wanted-2`, `wanted-3`, … — each checked against the shape, the
+ * reserved words, other businesses' reservations and every site, this
+ * business's own included (a site's address is unique). Null when none of
+ * the first {@link VARIANTS} is free.
+ */
+export async function freeAddress(
+    db: Reader,
+    wanted: string,
+    organizationId: string,
+): Promise<string | null> {
+    let base = wanted
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-");
+    while (base.startsWith("-")) base = base.slice(1);
+    while (base.endsWith("-")) base = base.slice(0, -1);
+    if (base.length < 3) base = base ? `${base}-site` : "my-site";
+    // Room for "-50" within a DNS label's 63 characters.
+    base = base.slice(0, 59);
+    while (base.endsWith("-")) base = base.slice(0, -1);
+
+    for (let n = 1; n <= VARIANTS; n++) {
+        const candidate = n === 1 ? base : `${base}-${n}`;
+        if (addressProblem(candidate)) continue;
+        const [taken, site] = await Promise.all([
+            addressTaken(db, candidate, organizationId),
+            db.site.findUnique({
+                where: { subdomain: candidate },
+                select: { id: true },
+            }),
+        ]);
+        if (!taken && !site) return candidate;
+    }
+    return null;
+}
