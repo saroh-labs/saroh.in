@@ -7,6 +7,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { mintPayToken } from "../invoices/pay-token";
 import { assertPaymentsOn } from "../invoices/payments-on";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -46,6 +47,8 @@ export class OrderPayLinkService {
             authorize(ctx, "order:edit");
         }
         await assertPaymentsOn(prisma, ctx.organizationId, "make a pay link");
+        // A way to take money online: the business details first (DEC-068).
+        await assertBusinessDetails(prisma, ctx.organizationId);
         return prisma.$transaction((tx) =>
             issueOrderPayLinkInTx(tx, ctx.organizationId, orderId, now),
         );

@@ -15,6 +15,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { hashPayToken } from "../invoices/pay-token";
 import { BookingsService } from "./bookings.service";
@@ -135,6 +136,7 @@ beforeAll(async () => {
             data: { name: "Another clinic", slug: `p2-desk-o-${process.pid}` },
         }),
     ]);
+    await giveBusinessDetails(org.id);
     const user = await prisma.user.create({
         data: { email: `p2-desk-${process.pid}@example.in` },
     });

@@ -21,6 +21,7 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrderKitchenService } from "../orders/order-kitchen.service";
@@ -84,6 +85,7 @@ beforeAll(async () => {
             timezone: "Asia/Kolkata",
         },
     });
+    await giveBusinessDetails(orgId);
     storeId = (
         await prisma.store.create({
             data: {

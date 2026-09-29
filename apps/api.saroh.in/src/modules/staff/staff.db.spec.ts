@@ -8,6 +8,7 @@
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingsService } from "../bookings/bookings.service";
 import { ClassPacksService } from "../class-packs/class-packs.service";
@@ -100,6 +101,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.organizationId, timezone: "UTC" },
     });
+    await giveBusinessDetails(created.id);
     // One-to-ones with no rules of their own: the people's hours decide.
     ptId = await makeService("PT session", 1, false);
     massageId = await makeService("Sports massage", 1, false);

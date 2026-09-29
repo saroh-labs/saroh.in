@@ -20,6 +20,7 @@ import { createHmac } from "node:crypto";
 
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "../invoices/invoices.service";
 import { SubscriptionsService } from "../subscriptions/subscriptions.service";
@@ -70,6 +71,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Pulse", slug: `d11c-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: user.id, role: "OWNER" };
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",

@@ -13,6 +13,7 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ClassPacksService } from "../class-packs/class-packs.service";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -58,6 +59,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "UTC" },
     });
+    await giveBusinessDetails(org.id);
     const service = (
         name: string,
         capacity: number,

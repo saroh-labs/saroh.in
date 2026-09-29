@@ -10,6 +10,16 @@ jest.mock("../communications/account-thread", () => ({
     accountThreadOn: jest.fn().mockResolvedValue(true),
 }));
 
+// The business-details refusal (DEC-068) has its own specs
+// (`business-details.spec.ts`, `business-details.db.spec.ts`); here
+// the business has its address.
+jest.mock("./business-details", () => ({
+    ...jest.requireActual<typeof import("./business-details")>(
+        "./business-details",
+    ),
+    assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const client = {
         invoice: { findFirst: jest.fn() },

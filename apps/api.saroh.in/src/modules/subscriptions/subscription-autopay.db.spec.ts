@@ -21,6 +21,7 @@ jest.mock("../../env", () => ({
 import { HttpException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
 import { CommunicationsService } from "../communications/communications.service";
@@ -85,6 +86,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "Asia/Kolkata" },
     });
+    await giveBusinessDetails(org.id);
     await prisma.featureFlag.upsert({
         where: { key: "MODULE_PAYMENTS" },
         create: { key: "MODULE_PAYMENTS", enabledByDefault: false },

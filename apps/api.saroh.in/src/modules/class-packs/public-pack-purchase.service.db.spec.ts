@@ -31,6 +31,7 @@ import { Test } from "@nestjs/testing";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
 import { validationPipeOptions } from "../../common/validation";
@@ -157,6 +158,7 @@ async function studio(
     const org = await prisma.organization.create({
         data: { name: "Pulse Fitness", slug: `a11-${next()}` },
     });
+    await giveBusinessDetails(org.id);
     await prisma.featureFlagOverride.create({
         data: {
             flagKey: "MODULE_CLASS_PACKS",

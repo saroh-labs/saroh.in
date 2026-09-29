@@ -12,6 +12,16 @@ jest.mock("../../env", () => ({
     },
 }));
 
+// The business-details refusal (DEC-068) has its own specs
+// (`business-details.spec.ts`, `business-details.db.spec.ts`); here
+// the business has its address.
+jest.mock("../invoices/business-details", () => ({
+    ...jest.requireActual<typeof import("../invoices/business-details")>(
+        "../invoices/business-details",
+    ),
+    assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {

@@ -27,6 +27,7 @@ import { createHmac } from "node:crypto";
 
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import {
     authLink,
     authPayment,
@@ -131,6 +132,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Northwind", slug: `d13r-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: user.id, role: "OWNER" };
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",

@@ -12,6 +12,7 @@ import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { BookingsService } from "../bookings/bookings.service";
+import { assertBusinessDetails } from "../invoices/business-details";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -552,6 +553,11 @@ export class CoursesService {
             },
         });
         if (!contact) notFound("Contact", "contactId");
+        // With Payments on it issues an invoice still to be paid: the
+        // business details first (DEC-068).
+        if (await paymentsOn(prisma, organizationId)) {
+            await assertBusinessDetails(prisma, organizationId);
+        }
 
         const enrollmentId = await this.serializable(async (tx) => {
             await lockCourse(tx, organizationId, courseId);

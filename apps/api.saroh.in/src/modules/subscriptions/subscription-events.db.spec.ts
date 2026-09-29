@@ -7,6 +7,7 @@
  */
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "../invoices/invoices.service";
 import type { OrgAction } from "../organizations/organization-actions";
@@ -24,6 +25,7 @@ async function namedOrg(slug: string): Promise<OrganizationContext> {
     const org = await prisma.organization.create({
         data: { name: slug, slug: `${slug}-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     const user = await prisma.user.create({
         data: { email: `${slug}-${process.pid}@example.com`, name: "Priya" },
     });

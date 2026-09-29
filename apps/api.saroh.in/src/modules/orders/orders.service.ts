@@ -12,6 +12,7 @@ import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { formatMoney } from "../invoices/invoice-send.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
@@ -708,6 +709,9 @@ export class OrdersService {
             );
         }
         await assertPaymentsOn(prisma, organizationId, "make a pay link");
+        // A pay link takes money online: the business details first
+        // (DEC-068), before the order is made.
+        await assertBusinessDetails(prisma, organizationId);
     }
 
     /**

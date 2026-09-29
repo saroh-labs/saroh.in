@@ -15,6 +15,7 @@ import { Test } from "@nestjs/testing";
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -103,6 +104,7 @@ async function business(name = "Pulse Fitness"): Promise<Business> {
     const org = await prisma.organization.create({
         data: { name, slug: `a8-${next()}` },
     });
+    await giveBusinessDetails(org.id);
     const subdomain = `a8x${seq}x${process.pid}`;
     const site = await prisma.site.create({
         data: {

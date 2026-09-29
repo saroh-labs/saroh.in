@@ -28,6 +28,7 @@ import {
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { hashPayToken } from "../invoices/pay-token";
@@ -77,6 +78,7 @@ async function business(name: string) {
     const org = await prisma.organization.create({
         data: { name, slug: `order-pay-${name.toLowerCase()}-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     const store = await prisma.store.create({
         data: {
             name,
