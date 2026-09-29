@@ -891,3 +891,29 @@ interval had hidden this.
 **Fix**: The health check is `pg_isready -h 127.0.0.1`. It checks over TCP,
 which only the real server listens on.
 **Category**: CI · services · `.github/workflows/ci.yml`
+
+## Tooling — the pre-push gate took 75s, and `--all` over 20 minutes
+
+**Problem**: `git push` sat for about 75s on the quick gate, even straight
+after `pnpm prepush --all` had passed on the same commit. `--int` took about
+7 min and `--e2e` about 17, one after the other, so a batch spent close to
+half an hour on its gate, and each push ran it again.
+**Root cause**: Nothing remembered a pass. lint, typecheck, every unit suite
+and vitest ran whole on every run, whatever changed. The integration suite
+ran its eleven module groups one after another on one database, and the
+browser run waited for all of it. A first attempt to test only what changed
+(`turbo run test -- --changed=<sha>`) was slower still: turbo hashes a run's
+pass-through arguments into every task in it, the `^build`s included, so
+each new sha rebuilt every package the tests import.
+**Fix**: `scripts/prepush.sh` records each passed step against
+`HEAD^{tree}` and skips it on that tree (or one that differs only in docs).
+lint, typecheck and tests go through turbo for the affected packages only.
+The builds they import run once, then the checks run with `--only`. The
+hook's tests run only what changed since the last passing commit. The
+integration suite runs in 16 jest shards on three databases at once, with
+the browser run building beside it. Measured on the same
+batch: the hook takes 3s on a tree that already passed, and 19–32s after a
+code change. `--int` takes 95s, and `--all` 10.7 min, most of it the
+browser specs.
+**Category**: tooling · `scripts/prepush.sh`,
+`docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast

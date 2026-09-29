@@ -151,25 +151,79 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
    branch. **Never push a unit branch, and never open a PR per unit.**
 4. **Run `pnpm prepush --all` on the batch** before it leaves the machine.
    It runs gitleaks, lint, typecheck, the `check:*` scripts, unit tests and
-   vitest, then the API integration tests in module groups (a full `test:int`
-   run can crash a worker), then the browser specs for the screens the batch
+   vitest, then the API integration tests in shards (a full `test:int` run
+   can crash a worker), and the browser specs for the screens the batch
    touched on both `desk` and `phone`. The browser step is a copy of CI's
    seeded-stack job, not of `pnpm dev`: from a detached worktree of HEAD it
    re-creates `E2E_DATABASE_URL` (a throwaway `*test*` database), migrates
-   it, seeds the showcase, builds the api, accounts, app and renderer, and
-   starts them on CI's bare ports (3333, 3000, 3003, 3005) with CI's
-   placeholder env and `CI=1`. It tests committed work only and leaves the
-   portless dev stack alone. A spec run against `saroh-dev` fails on data
-   drift, not code (DEV_LEARNINGS). Push only when it ends with ALL PASS.
-5. **Push once and open one PR into `development`.** Do it when a feature is
-   complete, not on a timer. Merge when CI is green, then check the change on
-   the development stack. Anything unfinished carries over into the next
-   batch.
-6. **Release when ready.** Don't hold finished work back for a later day.
-   Open the `development` → `main` release PR as soon as development is
-   verified. **A person merges `main`; an agent never does.** After that
-   merge, the API is deployed as described under Shipping the API, with any
-   backfills the release names.
+   it, seeds the showcase while building the api, accounts, app and
+   renderer, and starts them on CI's bare ports (3333, 3000, 3003, 3005)
+   with CI's placeholder env and `CI=1`. It tests committed work only. A spec
+   run against `saroh-dev` fails on data drift, not code (DEV_LEARNINGS).
+   Push only when it ends with ALL PASS.
+
+### How the gate stays fast — **Current** (2026-09-29)
+
+`scripts/prepush.sh` never does the same work twice:
+
+- **Pass cache.** A passed step is recorded as
+  `<git common dir>/prepush-cache/<HEAD^{tree}>-<step>`, only when no tracked
+  file is modified. The next run on that tree prints `PASS (cached)`. Steps
+  are recorded one by one, so `--int` reuses the quick run's lint, and a full
+  unit pass counts for the hook's changed-only one. A tree that differs from
+  a passed one only in `docs/` or `*.md` counts as passed, as CI's `changes`
+  job treats it. Secrets are never cached: a leak lives in history. The
+  browser step is keyed on HEAD's tree, since that is what it builds.
+  `--no-cache` runs everything and bypasses turbo's cache too.
+- **Turbo, affected packages only.** lint, typecheck, the api's unit tests
+  (`test:unit`) and every vitest suite (`test`) run through turbo with
+  CI's `--filter=...[<merge base>]` and turbo's local cache, which turbo
+  shares between a checkout and its worktrees. The builds they import run
+  once first and the checks run with `--only`. A run's pass-through
+  arguments go into every task's hash, so `-- --changed=<sha>` made every
+  `^build` miss the cache.
+- **Changed-only tests in the hook.** The quick run uses jest
+  `--changedSince` and vitest `--changed`, counted from the newest commit on
+  the branch whose tree passed that step (else the merge base). `--int` and
+  `--all` run the full suites.
+- **Parallel integration.** `jest --shard=k/16` on `PREPUSH_INT_DBS`
+  (default 3) databases named after `TEST_DATABASE_URL` plus `-1`, `-2`, …,
+  created if missing. Each worker owns one database and its own `TMPDIR`,
+  and each shard's globalSetup resets it. A shard that dies without a jest
+  summary (the segfault) is retried once. The replay check runs alongside on
+  `REPLAY_DATABASE_URL`, which it drops and re-creates.
+- **Browser beside integration.** Under `--all` the browser stack builds and
+  runs in the background from the start. It has its own database and CI's
+  ports, and the integration specs bind none (they listen on port 0).
+  `--e2e` and `--all` first stop this repo's `pnpm dev` stack (turbo dev,
+  next dev, nest watch, matched by command line and a path under one of the
+  repo's checkouts, plus their children), print what they stopped and the
+  command that started it. `PREPUSH_KEEP_DEV=1` leaves it running. The quick
+  run never stops anything.
+- **Not mirrored:** CI also runs the integration suite under RLS
+  (`TEST_RLS=on`); the local gate runs it plain only.
+
+Measured on the 12-core Mac on 2026-09-29, on a batch 209 files ahead of
+development (the browser step picked 25 spec files):
+
+| Mode                  | Before  | New tree                                | Same tree again | `--no-cache` |
+| --------------------- | ------- | --------------------------------------- | --------------- | ------------ |
+| `pnpm prepush` (hook) | 75s     | 19s api change, 32s app change, 3s docs | 3s              | 73s          |
+| `--int`               | ~7 min  | 95s (int 84s: 16 shards on 3 databases) | 4s              | 3 min        |
+| `--e2e`               | ~17 min | 11 min (build ~1 min, specs ~10 min)    | cached on pass  | —            |
+| `--all`               | ~25 min | 10.7 min (browser run is the long pole) | cached on pass  | —            |
+
+A small app change costs about 30s because ESLint over `app.saroh.in` takes
+27s on its own. ESLint's `--cache` would cut that to seconds, but the config
+uses type-aware rules, and a cached file can miss an error that a change in
+another file caused, so the gate does not use it. 5. **Push once and open one PR into `development`.** Do it when a feature is
+complete, not on a timer. Merge when CI is green, then check the change on
+the development stack. Anything unfinished carries over into the next
+batch. 6. **Release when ready.** Don't hold finished work back for a later day.
+Open the `development` → `main` release PR as soon as development is
+verified. **A person merges `main`; an agent never does.** After that
+merge, the API is deployed as described under Shipping the API, with any
+backfills the release names.
 
 On each unit's GitHub issue, comment when the unit lands on development.
 

@@ -90,6 +90,9 @@ pnpm prepush --all    # before a push: + API integration (TEST_DATABASE_URL)
                       #   on CI's seeded stack built from HEAD (E2E_DATABASE_URL)
 ```
 
+A step that passed on a tree is never re-run on it (`--no-cache` forces it);
+`--all` stops the local `pnpm dev` stack first and says how to restart it.
+
 `git push` runs the quick gate itself (`.husky/pre-push`); `--no-verify`
 is for emergencies only. CI is the last net, not the first: every CI round trip is a push, five
 Vercel builds and twenty minutes. `scripts/prepush.sh` runs what CI runs.
