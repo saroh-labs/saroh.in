@@ -442,6 +442,72 @@ export interface MerchantProvider {
      * Throws {@link RefundCallError} (`UNKNOWN`) when it could not say.
      */
     findRefund(input: FindRefundInput): Promise<RefundResult | null>;
+    /**
+     * The payments made on one of the provider's orders, as the provider
+     * reports them now (P1). What settles a capture whose webhook never
+     * came — the checkout's signed return, the pending sweep, and
+     * `payments reconcile` all ask this, and never the browser, for a
+     * payment's amount and state. An empty list is "no payment yet". Throws
+     * a plain error when the provider could not say; the caller settles
+     * nothing then. An adapter without it is never looked up.
+     */
+    findOrderPayments?(input: FindOrderPaymentsInput): Promise<OrderPayment[]>;
+    /**
+     * Whether a checkout's own return is signed by this business's account
+     * (P1). Razorpay's Checkout hands back `razorpay_signature`, the hex
+     * HMAC-SHA256 of `order_id|payment_id` keyed by the key secret. A
+     * provider whose window returns no signature (Cashfree) has none: its
+     * return is only a cue to ask {@link findOrderPayments}.
+     */
+    verifyCheckoutReturn?(input: CheckoutReturnInput): boolean;
+}
+
+/** Ask the provider which payments were made on one of its orders (P1). */
+export interface FindOrderPaymentsInput {
+    /** The provider's order id (`PaymentIntent.providerIntentId`). */
+    providerIntentId: string;
+    /**
+     * The merchant reference the order was made under — the Order's or
+     * Invoice's id — for a provider that looks orders up by it (Cashfree).
+     * Null on an intent that has neither (an autopay check).
+     */
+    merchantRef: string | null;
+    credentials: ProviderCredentials;
+}
+
+/** One payment on a provider's order, in Saroh's words (P1). */
+export interface OrderPayment {
+    /** The provider's payment id (Razorpay `pay_…`, Cashfree `cf_payment_id`). */
+    providerPaymentRef: string;
+    /**
+     * CAPTURED: the money is taken — the only state that settles anything.
+     * AUTHORIZED: approved but not yet captured. PENDING: under way.
+     * FAILED: refused or dropped. OTHER: anything else (refunded, unknown).
+     */
+    status: "CAPTURED" | "AUTHORIZED" | "PENDING" | "FAILED" | "OTHER";
+    /** In minor units, as the provider reports it; null when unreadable. */
+    amountCents: number | null;
+    currency: string | null;
+    /** What the provider kept, in minor units, when it reports it. */
+    feeCents?: number;
+    /**
+     * An authorisation's payment names the recurring token it made (D19):
+     * the fields a webhook's mandate link is read from.
+     */
+    recurring?: {
+        tokenId: string;
+        customerId?: string;
+        method?: string;
+        invoiceId?: string;
+    };
+}
+
+/** A checkout's return, as the provider's window handed it to the page. */
+export interface CheckoutReturnInput {
+    providerIntentId: string;
+    providerPaymentRef: string;
+    signature: string;
+    credentials: ProviderCredentials;
 }
 
 /**

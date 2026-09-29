@@ -41,6 +41,7 @@ export function InvoiceAutopay({
     payable,
     onJustPay,
     justPayBusy,
+    apiUrl,
 }: {
     token: string;
     autopay: PayAutopay;
@@ -53,6 +54,11 @@ export function InvoiceAutopay({
     /** The page's own Pay, for "Just pay this invoice". */
     onJustPay: () => void;
     justPayBusy: boolean;
+    /**
+     * The public API the window's return is posted to (P1), so the payment
+     * is settled without waiting for the webhook.
+     */
+    apiUrl?: string;
 }) {
     const [autopayOn, setAutopayOn] = useState(true);
     const [method, setMethod] = useState<AutopayMethod | null>(
@@ -81,6 +87,7 @@ export function InvoiceAutopay({
         business: businessName,
         description: `Autopay for ${autopay.plan}`,
         booker: { name: billedTo ?? "", email: "" },
+        apiUrl,
     };
 
     function after(outcome: string, start: AutopayStart) {
@@ -131,6 +138,7 @@ export function InvoiceAutopay({
                 business: businessName,
                 description: autopay.plan,
                 booker: request.booker,
+                apiUrl,
             }).outcome;
             if (paid !== "paid") {
                 setBusy(false);

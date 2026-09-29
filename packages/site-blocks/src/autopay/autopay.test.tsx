@@ -417,6 +417,7 @@ describe("My plan's autopay (D12)", () => {
                     autopayPays: { total: "2500.00", currency: "INR" },
                 })}
                 api={planApi(start)}
+                apiUrl="https://api.test"
             />,
         );
         await press(screen.getByRole("button", { name: "Set up autopay" }));
@@ -433,6 +434,10 @@ describe("My plan's autopay (D12)", () => {
         );
         await settle();
         expect(start).toHaveBeenCalledWith("sub_1", "UPI", expect.any(String));
+        // The window's return goes to the API (P1).
+        expect(pageWindow.open).toHaveBeenCalledWith(
+            expect.objectContaining({ apiUrl: "https://api.test" }),
+        );
         expect(assign).toHaveBeenCalledWith(
             "https://pulse.saroh.app/autopay?plan=sub_1",
         );

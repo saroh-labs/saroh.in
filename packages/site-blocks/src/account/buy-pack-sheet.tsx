@@ -65,6 +65,8 @@ export interface BuyPackSheetProps {
     onBought: (message: string) => void;
     /** The provider window; replaced in tests. */
     openCheckout?: OpenCheckout;
+    /** Where the window's return is posted, so paying moves on at once (P1). */
+    apiUrl?: string;
 }
 
 export function BuyPackSheet(props: BuyPackSheetProps) {
@@ -99,6 +101,7 @@ function BuyPack({
     onBought,
     onClose,
     openCheckout = openProviderCheckout,
+    apiUrl,
 }: BuyPackSheetProps) {
     const [chosen, setChosen] = useState<AccountPackOnSale | null>(
         onSale.packs[0] ?? null,
@@ -117,6 +120,7 @@ function BuyPack({
             business: businessName,
             description: `${started.pack.name} · ${classesText(started.pack.credits)}`,
             booker: { name: customer.name ?? "", email: customer.email },
+            apiUrl,
         });
         session.current = opened;
         setPhase({ kind: "window", started, status: "open" });

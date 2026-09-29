@@ -1,8 +1,12 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PaymentHandoff } from "./api";
 import type { CheckoutRequest } from "./checkout";
-import { openProviderCheckout, RAZORPAY_SDK } from "./checkout";
+import {
+    openProviderCheckout,
+    postCheckoutReturn,
+    RAZORPAY_SDK,
+} from "./checkout";
 
 /**
  * The provider's window (E11), against stand-ins for the providers' browser
@@ -12,7 +16,7 @@ import { openProviderCheckout, RAZORPAY_SDK } from "./checkout";
  */
 
 type Options = Record<string, unknown> & {
-    handler: () => void;
+    handler: (response?: unknown) => void;
     modal: { ondismiss: () => void };
 };
 
@@ -277,5 +281,142 @@ describe("autopay's authorisation window (D12)", () => {
         await flush();
         expect(razorpay[0].options).not.toHaveProperty("recurring");
         expect(razorpay[0].options).not.toHaveProperty("customer_id");
+    });
+});
+
+describe("the window's return, posted to the API (P1)", () => {
+    const API = "https://api.test";
+    const SIGNED = {
+        razorpay_payment_id: "pay_1",
+        razorpay_order_id: "order_1",
+        razorpay_signature: "ab".repeat(32),
+    };
+    let posted: { url: string; init: RequestInit }[];
+    let reply: () => Promise<Response>;
+
+    beforeEach(() => {
+        posted = [];
+        reply = () =>
+            Promise.resolve(
+                new Response(JSON.stringify({ confirmed: true }), {
+                    status: 200,
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        vi.stubGlobal(
+            "fetch",
+            vi.fn((url: string, init: RequestInit) => {
+                posted.push({ url, init });
+                return reply();
+            }),
+        );
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("posts Razorpay's signed return before the page is told it's paid", async () => {
+        fakeRazorpay();
+        let told = false;
+        const session = openProviderCheckout({ ...request(), apiUrl: API });
+        void session.outcome.then(() => {
+            told = true;
+        });
+        await flush();
+        let answer: (r: Response) => void = () => undefined;
+        reply = () =>
+            new Promise<Response>((resolve) => {
+                answer = resolve;
+            });
+        razorpay[0]?.options.handler(SIGNED);
+        await flush();
+        expect(posted).toHaveLength(1);
+        expect(told).toBe(false);
+
+        answer(new Response(JSON.stringify({ confirmed: true })));
+        await expect(session.outcome).resolves.toBe("paid");
+        const [{ url, init }] = posted;
+        expect(url).toBe("https://api.test/public/payments/return");
+        expect(init.method).toBe("POST");
+        expect(init.credentials).toBe("omit");
+        expect(JSON.parse(init.body as string)).toEqual({
+            provider: "RAZORPAY",
+            providerOrderId: "order_1",
+            providerPaymentId: "pay_1",
+            signature: "ab".repeat(32),
+        });
+        // Never an amount: the API reads it from the provider.
+        expect(init.body as string).not.toMatch(/amount/);
+    });
+
+    it("still says paid when the API refuses or can't be reached; the webhook is the backup", async () => {
+        fakeRazorpay();
+        reply = () => Promise.resolve(new Response("{}", { status: 400 }));
+        const refused = openProviderCheckout({ ...request(), apiUrl: API });
+        await flush();
+        razorpay[0]?.options.handler(SIGNED);
+        await expect(refused.outcome).resolves.toBe("paid");
+
+        reply = () => Promise.reject(new TypeError("offline"));
+        const offline = openProviderCheckout({ ...request(), apiUrl: API });
+        await flush();
+        razorpay[1]?.options.handler(SIGNED);
+        await expect(offline.outcome).resolves.toBe("paid");
+        expect(posted).toHaveLength(2);
+    });
+
+    it("posts nothing without an API, or without a whole signed return", async () => {
+        fakeRazorpay();
+        const noApi = openProviderCheckout(request());
+        await flush();
+        razorpay[0]?.options.handler(SIGNED);
+        await expect(noApi.outcome).resolves.toBe("paid");
+
+        const unsigned = openProviderCheckout({ ...request(), apiUrl: API });
+        await flush();
+        razorpay[1]?.options.handler({ razorpay_payment_id: "pay_1" });
+        await expect(unsigned.outcome).resolves.toBe("paid");
+        expect(posted).toHaveLength(0);
+    });
+
+    it("posts Cashfree's order, which the API checks with Cashfree itself", async () => {
+        (window as unknown as { Cashfree: unknown }).Cashfree = () => ({
+            checkout: () =>
+                Promise.resolve({ paymentDetails: { paymentMessage: "ok" } }),
+        });
+        const session = openProviderCheckout({
+            ...request({
+                provider: "CASHFREE",
+                providerIntentId: "2149460581",
+                publicKey: null,
+                clientParams: {
+                    paymentSessionId: "session_1",
+                    cashfreeOrderId: "2149460581",
+                },
+            }),
+            apiUrl: API,
+        });
+        await expect(session.outcome).resolves.toBe("paid");
+        expect(JSON.parse(posted[0]?.init.body as string)).toEqual({
+            provider: "CASHFREE",
+            providerOrderId: "2149460581",
+        });
+    });
+
+    it("reads the API's answer: confirmed or not", async () => {
+        await expect(
+            postCheckoutReturn(API, {
+                provider: "RAZORPAY",
+                providerOrderId: "order_1",
+            }),
+        ).resolves.toBe(true);
+        reply = () =>
+            Promise.resolve(new Response(JSON.stringify({ confirmed: false })));
+        await expect(
+            postCheckoutReturn(API, {
+                provider: "RAZORPAY",
+                providerOrderId: "order_1",
+            }),
+        ).resolves.toBe(false);
     });
 });

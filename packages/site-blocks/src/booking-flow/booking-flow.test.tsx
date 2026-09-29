@@ -1068,6 +1068,8 @@ describe("online checkout (E11)", () => {
             name: "Asha Rao",
             email: "asha@example.in",
         });
+        // The window's return goes to the API (P1).
+        expect(request.apiUrl).toBe(API);
 
         await answer("paid");
         expect(screen.getByText("Paying…")).toBeInTheDocument();
@@ -1096,6 +1098,26 @@ describe("online checkout (E11)", () => {
         expect(
             calls.filter((c) => c.url.endsWith("/payment-intent")),
         ).toHaveLength(1);
+    });
+
+    it("moves on as soon as the window's return has settled it, without waiting for the next poll (P1)", async () => {
+        const hold = servePayNow();
+        await payNow();
+        const reads = () =>
+            calls.filter((c) => c.url.includes("/public/services/holds/"))
+                .length;
+        const before = reads();
+
+        // The return was posted and settled before the window said "paid".
+        hold.state = "CONFIRMED";
+        await answer("paid");
+        await waitFor(() =>
+            expect(
+                screen.getByRole("heading", { name: "You're booked, Asha." }),
+            ).toBeInTheDocument(),
+        );
+        // Read once, straight away — not on the 4-second tick.
+        expect(reads()).toBe(before + 1);
     });
 
     it("the provider refuses: says so, keeps the hold, and tries again on the same payment", async () => {

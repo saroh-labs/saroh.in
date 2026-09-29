@@ -42,6 +42,7 @@ export function AutopaySheet({
     businessName,
     customer,
     openCheckout = openProviderCheckout,
+    apiUrl,
 }: {
     /** The plan to set autopay up on; null keeps the sheet closed. */
     plan: AccountSubscription | null;
@@ -53,6 +54,8 @@ export function AutopaySheet({
     businessName: string;
     customer: { name: string | null; email: string };
     openCheckout?: OpenCheckout;
+    /** Where the window's return is posted (P1). */
+    apiUrl?: string;
 }) {
     const on =
         plan?.autopay?.state === "ON" || plan?.autopay?.state === "PAUSED";
@@ -73,6 +76,7 @@ export function AutopaySheet({
                     businessName={businessName}
                     customer={customer}
                     openCheckout={openCheckout}
+                    apiUrl={apiUrl}
                 />
             ) : null}
         </Sheet>
@@ -87,6 +91,7 @@ function Choose({
     businessName,
     customer,
     openCheckout,
+    apiUrl,
 }: {
     plan: AccountSubscription;
     methods: readonly AutopayMethod[];
@@ -95,6 +100,7 @@ function Choose({
     businessName: string;
     customer: { name: string | null; email: string };
     openCheckout: OpenCheckout;
+    apiUrl?: string;
 }) {
     const [method, setMethod] = useState<AutopayMethod | null>(
         methods[0] ?? null,
@@ -134,6 +140,7 @@ function Choose({
             business: businessName,
             description: `Autopay for ${plan.name}`,
             booker: { name: customer.name ?? "", email: customer.email },
+            apiUrl,
         });
         if (outcome === "redirected") return;
         if (outcome === "paid" && landOnBusinessSite(started)) return;

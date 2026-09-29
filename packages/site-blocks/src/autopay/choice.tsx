@@ -53,6 +53,8 @@ export async function openAutopayWindow(
         business: string;
         description: string;
         booker: { name: string; email: string };
+        /** Where the window's return is posted (P1). */
+        apiUrl?: string;
     },
 ): Promise<AutopayWindowOutcome> {
     const session = request.openCheckout({
@@ -60,6 +62,7 @@ export async function openAutopayWindow(
         business: request.business,
         description: request.description,
         booker: request.booker,
+        apiUrl: request.apiUrl,
     });
     const outcome = await session.outcome;
     if (outcome === "unavailable" && start.authorisationUrl) {

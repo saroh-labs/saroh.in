@@ -84,6 +84,8 @@ export interface JoinSheetProps {
     autopayMethods?: readonly AutopayMethod[];
     /** The provider window; replaced in tests. */
     openCheckout?: OpenCheckout;
+    /** Where the window's return is posted, so paying moves on at once (P1). */
+    apiUrl?: string;
 }
 
 export function JoinSheet(props: JoinSheetProps) {
@@ -115,6 +117,7 @@ function Join({
     onClose,
     autopayMethods = [],
     openCheckout = openProviderCheckout,
+    apiUrl,
 }: JoinSheetProps & { plan: JoinablePlan }) {
     const [phase, setPhase] = useState<Phase>({ kind: "ready" });
     const [busy, setBusy] = useState(false);
@@ -140,6 +143,7 @@ function Join({
             business: businessName,
             description: plan.name,
             booker: { name: customer.name ?? "", email: customer.email },
+            apiUrl,
         });
         session.current = opened;
         void opened.outcome.then((outcome) => {

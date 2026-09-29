@@ -1,17 +1,25 @@
 import { Logger } from "@nestjs/common";
 
 import type {
+    CheckoutReturnInput,
     CreateOrderIntentInput,
     CreateOrderIntentResult,
+    FindOrderPaymentsInput,
     FindRefundInput,
     MandateCapability,
     MerchantProvider,
+    OrderPayment,
     ProviderCredentials,
     RefundInput,
     RefundResult,
 } from "./provider.port";
 import { readRefundAnswer, RefundCallError } from "./provider.port";
 import { RazorpayMandates } from "./razorpay-mandates";
+import type { RazorpayPaymentEntity } from "./razorpay-order-payments";
+import {
+    toOrderPayment,
+    verifyRazorpaySignature,
+} from "./razorpay-order-payments";
 
 /**
  * Razorpay adapter (S5-002).
@@ -201,6 +209,53 @@ export class RazorpayProvider implements MerchantProvider {
                 r.id && (r.receipt === reference || noteRef(r) === reference),
         );
         return found ? toResult(found) : null;
+    }
+
+    /**
+     * The payments on an order (`GET /orders/{order_id}/payments`, P1).
+     * Errors keep only the HTTP status — never the auth header or the body.
+     */
+    async findOrderPayments(
+        input: FindOrderPaymentsInput,
+    ): Promise<OrderPayment[]> {
+        const { providerIntentId, credentials } = input;
+        let res: Response;
+        try {
+            res = await fetch(
+                `${this.baseUrl}/orders/${encodeURIComponent(providerIntentId)}/payments`,
+                {
+                    headers: {
+                        Authorization: `Basic ${basicAuth(credentials)}`,
+                    },
+                },
+            );
+        } catch {
+            throw new Error("Razorpay payment lookup failed: network error");
+        }
+        if (!res.ok) {
+            this.logger.warn(
+                `Razorpay payment lookup failed with HTTP ${res.status}`,
+            );
+            throw new Error(
+                `Razorpay payment lookup failed (HTTP ${res.status})`,
+            );
+        }
+        let body: { items?: RazorpayPaymentEntity[] };
+        try {
+            body = (await res.json()) as { items?: RazorpayPaymentEntity[] };
+        } catch {
+            throw new Error(
+                "Razorpay payment lookup failed: unreadable response",
+            );
+        }
+        return (body.items ?? [])
+            .map(toOrderPayment)
+            .filter((p): p is OrderPayment => p !== null);
+    }
+
+    /** Checkout's `razorpay_signature` over `order_id|payment_id` (P1). */
+    verifyCheckoutReturn(input: CheckoutReturnInput): boolean {
+        return verifyRazorpaySignature(input);
     }
 }
 

@@ -32,9 +32,12 @@ import { payDate, payMoney, payTitle } from "@/lib/invoice-pay-shape";
 export function InvoicePay({
     token,
     invoice,
+    apiUrl,
 }: {
     token: string;
     invoice: PayInvoice;
+    /** Where an autopay window's return is posted (P1). */
+    apiUrl?: string;
 }) {
     const router = useRouter();
     const [intent, setIntent] = useState<CheckoutIntent | null>(null);
@@ -189,6 +192,7 @@ export function InvoicePay({
                             payable
                             onJustPay={pay}
                             justPayBusy={pending}
+                            apiUrl={apiUrl}
                         />
                     ) : (
                         <button
@@ -263,6 +267,7 @@ export function InvoicePay({
                             payable={false}
                             onJustPay={pay}
                             justPayBusy={pending}
+                            apiUrl={apiUrl}
                         />
                     ) : null}
                 </div>

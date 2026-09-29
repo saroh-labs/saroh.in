@@ -4,6 +4,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import { discardStalePackDrafts } from "../class-packs/pack-checkout";
 import { discardStalePlanJoins } from "../subscriptions/plan-join";
+import { PaymentLookupService } from "../webhooks/payment-lookup.service";
 import { RELEASE_HOLDS_TYPE, releaseHoldInTx } from "./booking-hold";
 import { deleteOldEntries, expireLapsedOffers } from "./waitlist-offer";
 
@@ -14,6 +15,15 @@ export const RELEASE_EVERY_MS = 5 * 60 * 1000;
 
 /** Holds released per run; past that, the next run starts straight away. */
 export const RELEASE_BATCH = 200;
+
+/**
+ * How long a hold whose provider could not say whether it was paid is kept
+ * past its time, asked about again each run, before it is released anyway
+ * (P1). A hold past its time already holds nothing, so keeping it costs
+ * nothing; a payment that settles it later still confirms it when the
+ * place is free (`confirmHoldInTx`).
+ */
+export const UNANSWERED_HOLD_GRACE_MS = 60 * 60 * 1000;
 
 /**
  * Releases pay-now holds nobody paid for (U19): each PENDING booking whose
@@ -34,6 +44,14 @@ export const RELEASE_BATCH = 200;
 @Injectable()
 export class ReleaseHoldsHandler {
     private readonly logger = new Logger(ReleaseHoldsHandler.name);
+
+    /**
+     * @param payments asks the provider about a hold's payment before the
+     *   hold is released (P1). Nest always gives it; only a test that builds
+     *   the handler by hand leaves it out, and then a hold is released on
+     *   its time alone, as before.
+     */
+    constructor(private readonly payments?: PaymentLookupService) {}
 
     readonly handle = async (_job: Job): Promise<void> => {
         let full = false;
@@ -120,17 +138,36 @@ export class ReleaseHoldsHandler {
     /**
      * Release one batch of holds that ran out by `now`. True when the batch
      * was full, so there may be more.
+     *
+     * Each hold's payment is asked about first (P1): money the provider has
+     * but whose webhook never came settles the hold through the webhook's
+     * own path — confirmed when its place is still free, owed back when not
+     * — so a paid hold is never released as unpaid. A provider that can't
+     * say keeps the hold for the next run, up to
+     * {@link UNANSWERED_HOLD_GRACE_MS} past its time.
      */
     async releaseExpired(now: Date): Promise<boolean> {
         const due = await prisma.booking.findMany({
             where: { status: "PENDING", holdExpiresAt: { lte: now } },
             orderBy: { holdExpiresAt: "asc" },
             take: RELEASE_BATCH,
-            select: { id: true },
+            select: { id: true, holdExpiresAt: true },
         });
         let released = 0;
-        for (const { id } of due) {
+        for (const { id, holdExpiresAt } of due) {
             try {
+                const paid = await this.payments?.confirmHoldPayment(id);
+                // Settled: the payment confirmed it, or released it and
+                // recorded the money as owed back. Either way, done.
+                if (paid === "PAID") continue;
+                if (
+                    paid === "UNKNOWN" &&
+                    holdExpiresAt &&
+                    now.getTime() - holdExpiresAt.getTime() <
+                        UNANSWERED_HOLD_GRACE_MS
+                ) {
+                    continue;
+                }
                 // Re-read under the booking's lock inside: a payment that
                 // confirmed it a moment ago wins, and nothing is released.
                 if (

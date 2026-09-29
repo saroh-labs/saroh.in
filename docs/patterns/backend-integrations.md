@@ -63,8 +63,24 @@ a note saying so.
   the handoff's order with the business's _public key_, or Cashfree's drop-in
   on its payment session. Razorpay's is set to UPI and
   card only; Cashfree's shows what the account has on. What the
-  window says is a hint ("Paying…"); only the webhook confirms the booking.
+  window says is a hint ("Paying…"); the API confirms the booking.
   The invoice pay page still shows the handoff, not the window.
+- **Current** (P1, #710) — **A payment is confirmed by asking the
+  provider, with the webhook as backup.** Every merchant-site window posts
+  its return (`CheckoutRequest.apiUrl`) to `POST /public/payments/return`:
+  Razorpay's `razorpay_signature` (HMAC-SHA256 of `order_id|payment_id` by
+  the key secret, `verifyCheckoutReturn`) is checked first — a bad one is a
+  400 and writes nothing — then the order's payments are read from the
+  provider (`MerchantProvider.findOrderPayments`), never from the browser.
+  Only a CAPTURED payment at the intent's exact amount and currency
+  settles, through `WebhooksService.settleLookedUp` — the webhook's own
+  reconciliation, so whichever comes first settles and the other finds it
+  settled. The `payments.confirm-pending` sweep asks about open intents on
+  a pause that grows with their age (`webhooks/payment-lookup-schedule.ts`),
+  the hold release asks before letting a hold go, and `payments reconcile`
+  (`src/cli/payments-reconcile.cli.ts`) asks for one business on demand.
+  A provider failure the look-up sees is left to its webhook. Code:
+  `webhooks/payment-lookup.service.ts`.
 - **Current** (D22, DEC-054) — **Razorpay's key id is its public key.**
   Setup checks the key id (`rzp_live_…` / `rzp_test_…`) and the secret, and
   stores the key id as the connection's `publicKey` beside the sealed pair

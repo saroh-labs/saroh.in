@@ -1,8 +1,10 @@
 import type {
     CancelMandateInput,
+    CheckoutReturnInput,
     CreateMandateSetupInput,
     CreateOrderIntentInput,
     CreateOrderIntentResult,
+    FindOrderPaymentsInput,
     FindRefundInput,
     GetMandateInput,
     MandateCapability,
@@ -11,6 +13,7 @@ import type {
     MandateMethod,
     MandateSetupResult,
     MerchantProvider,
+    OrderPayment,
     PreDebitStatus,
     PreparedMandateCharge,
     PrepareMandateChargeInput,
@@ -25,6 +28,7 @@ import {
     MandateCallError,
     RefundCallError,
 } from "./provider.port";
+import { verifyRazorpaySignature } from "./razorpay-order-payments";
 
 /** The mandate calls the fake answers, for {@link FakeMerchantProvider.failNextMandateCall}. */
 export type FakeMandateOp =
@@ -245,6 +249,54 @@ export class FakeMerchantProvider implements MerchantProvider {
     findRefund(input: FindRefundInput): Promise<RefundResult | null> {
         this.findCalls.push(input);
         return Promise.resolve(this.refunds.get(input.reference) ?? null);
+    }
+
+    /**
+     * The payments each provider order has (P1), as a test sets them with
+     * {@link payOrder}. An order it never heard of has none.
+     */
+    readonly orderPayments = new Map<string, OrderPayment[]>();
+    /** Every look-up asked for, answered or not. */
+    readonly orderPaymentCalls: FindOrderPaymentsInput[] = [];
+    private orderPaymentFailures = 0;
+
+    findOrderPayments(input: FindOrderPaymentsInput): Promise<OrderPayment[]> {
+        this.orderPaymentCalls.push(input);
+        if (this.orderPaymentFailures > 0) {
+            this.orderPaymentFailures -= 1;
+            return Promise.reject(new Error("fake payment lookup failed"));
+        }
+        return Promise.resolve([
+            ...(this.orderPayments.get(input.providerIntentId) ?? []),
+        ]);
+    }
+
+    /** Razorpay's scheme, real HMAC: `order_id|payment_id` by the key secret. */
+    verifyCheckoutReturn(input: CheckoutReturnInput): boolean {
+        return verifyRazorpaySignature(input);
+    }
+
+    /**
+     * Record a payment on a provider order, as the customer's checkout made
+     * it: CAPTURED at `amountCents` in INR unless the test says otherwise.
+     */
+    payOrder(
+        providerIntentId: string,
+        payment: Partial<OrderPayment> & { providerPaymentRef: string },
+    ): void {
+        const list = this.orderPayments.get(providerIntentId) ?? [];
+        list.push({
+            status: "CAPTURED",
+            amountCents: null,
+            currency: "INR",
+            ...payment,
+        });
+        this.orderPayments.set(providerIntentId, list);
+    }
+
+    /** Make the next `count` look-ups fail, as a provider that can't answer. */
+    failNextOrderLookup(count = 1): void {
+        this.orderPaymentFailures += count;
     }
 
     /**

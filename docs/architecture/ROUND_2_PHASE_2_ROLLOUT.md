@@ -955,6 +955,77 @@ Below F10, the API refuses `pvt` and would not name those rows: don't, once
 the backfill has run. Z4 must wait until the query above reads 0 in
 production.
 
+## P1: a payment confirmed without its webhook (#710)
+
+A booking paid in Razorpay's test mode stayed "Awaiting payment" because
+its webhook never came (no secret configured), and the 15-minute hold ran
+out with the money taken. From this release the webhook is the backup,
+not the only way money is seen (`webhooks/payment-lookup.service.ts`):
+
+- **The checkout's signed return.** Every merchant-site window (booking
+  page, shop bag, plan join, pack purchase, the autopay window) posts what
+  the provider handed back to `POST /public/payments/return`. The API
+  checks Razorpay's `razorpay_signature` with the business's own key
+  secret (a bad one is a 400 and writes nothing), then **reads the payment
+  from Razorpay** — its order, `captured` status and amount must match the
+  intent — and settles it through the webhook's own reconciliation. A
+  Cashfree return is only the cue to ask Cashfree. Rate-limited per caller
+  and per provider order.
+- **The pending sweep** (`payments.confirm-pending`, every minute): open
+  intents are asked about from 3 minutes old, every 3 minutes while young,
+  then every 30 minutes, then every 6 hours, for 3 days. The hold release
+  asks about a hold's payment before letting it go; a provider that can't
+  answer keeps the hold up to an hour past its time.
+- **`payments reconcile`** for one business (below).
+
+Whichever of these and the webhook comes first settles the payment; the
+rest change nothing. A capture on a hold already released goes the
+existing way: confirmed when its place is still free, otherwise recorded
+as owed back (Home raises it until a refund is recorded).
+
+**Migration** `20261018230000_payment_intent_last_lookup`: nullable
+`PaymentIntent.lastLookupAt`, an index on `PaymentIntent (status,
+createdAt)`, and the partial unique index that keeps one waiting run of the
+sweep. Additive; the old API never reads or writes them.
+
+### Order
+
+**API first, then saroh.app.** The new pages post the return; on the old
+API that route is a 404, and the page waits for the webhook as before. The
+old pages never post it, and the new API's sweep still settles their
+payments.
+
+### Reconcile a stuck payment (the 2026-09-29 test booking)
+
+After the API is deployed, inside the API's own container (it needs the
+same database and the key that opens provider credentials):
+
+    node apps/api.saroh.in/dist/cli/payments-reconcile.cli.js <organization id or slug>
+
+It asks the provider about every open payment intent of that business and
+settles what the provider has. It prints counts only:
+
+    [payments-reconcile] open intents asked: <n>, settled: <n>, already settled: <n>, not paid: <n>, amount mismatch: <n>, no connection: <n>, provider errors: <n>
+
+Safe to run more than once and beside live webhooks; a second run asks
+only about what is still open. Exit 1 means a provider couldn't answer for
+some intent — run it again later. For the Northwind 15:00 booking: its hold
+was released, so the capture is recorded as owed back unless the slot was
+still free — then the booking is confirmed. Check Bookings and Home after.
+
+### Verify
+
+In Razorpay test mode on Northwind, with the webhook secret left unset:
+book a pay-now slot and pay. The booking page reads "You're booked" within
+a few seconds of the window closing, and the booking shows Paid online. Then
+set the webhook up and pay another: still one payment recorded (Order or
+invoice timeline shows one capture).
+
+### Rollback
+
+Deploy the previous API and app. Nothing to undo: the column and indexes
+stay, unread. A payment the new API settled stays settled.
+
 ## Before switching a flag on (advisory)
 
 These browser suites are skipped in CI while their features are off. Run

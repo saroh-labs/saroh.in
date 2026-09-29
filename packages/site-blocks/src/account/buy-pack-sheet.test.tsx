@@ -236,6 +236,7 @@ describe("Buy a pack on the Plan tab", () => {
                 tab={EMPTY_TAB}
                 api={PLAN_API}
                 packs={{ onSale: { payOnline: true, packs: [TEN] }, api }}
+                apiUrl="https://api.test"
             />,
         );
         await press(screen.getByRole("button", { name: "Buy a pack" }));
@@ -249,6 +250,8 @@ describe("Buy a pack on the Plan tab", () => {
         );
         expect(screen.queryByRole("dialog")).toBeNull();
         expect(router.refresh).toHaveBeenCalled();
+        // The window's return goes to the API (P1).
+        expect(win.requests[0]?.apiUrl).toBe("https://api.test");
     });
 });
 
