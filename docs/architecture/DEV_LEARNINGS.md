@@ -787,3 +787,25 @@ walk-in helper read the radios before they drew — `9a372faa`).
 (`db:push --force-reset`, `db:seed:showcase`) before it runs. A failure
 against `saroh-dev` is a data question before it is a code question.
 **Category**: e2e · local dev · `scripts/prepush.sh`
+
+## API — rules the round-2 audit found only one side kept (DEC-042, B11, B9, C7)
+
+**Problem**: The audit found four gaps: a contact with orders or invoices
+could still be hard-deleted through the API (only the ⋯ menu stopped it);
+an invoice's pay link was minted for a Razorpay connection that couldn't
+open checkout, so its page refused; a site checkout's order made dearer
+after payment could never take the difference; and Customer Detail's
+Classes left card vanished for a member when Class packs was off.
+**Root cause**: Each rule lived in one place and a sibling path copied an
+older, looser check — the UI instead of the service, `count(CONNECTED)`
+instead of `pay-link-provider.ts`, a `placedOnline` exception that guarded
+the stock hold in the wrong layer, and a stat built only inside its
+module's branch.
+**Fix**: `contacts/contact-records.ts` refuses the delete (409) before
+autopay and again under the lock; `businessPayLinkProvider` is the one
+provider rule for an invoice's link and its page; the webhook skips the
+hold when another payment already held the units (`heldByAnotherPayment`),
+so `payLinkStanding` compares received with the total for every order; a
+membership fills Classes left on its own.
+**Category**: api · a rule the UI shows is enforced by the API too; a
+payment path reuses the rule its sibling uses, never a copy

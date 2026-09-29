@@ -14,6 +14,7 @@ import {
     autopayChargeInProgress,
     chargeUnderWayOn,
 } from "../payments/charge-under-way";
+import { businessPayLinkProvider } from "../payments/pay-link-provider";
 import type {
     CreditInvoiceDto,
     InvoiceInputDto,
@@ -241,14 +242,11 @@ export class InvoicesService {
                     : this.notIssued(current.status, "paid"),
             );
         }
-        const connected = await db.merchantPaymentProvider.count({
-            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
-        });
-        if (connected === 0) {
-            throw new ConflictException(
-                "Connect a payment provider to take payment online.",
-            );
-        }
+        // A provider that can open the checkout window, by the rule the pay
+        // page starts its payment with (B11, D22): a Razorpay connection
+        // missing its public key id counts as none, and the 409 says what
+        // it needs.
+        await businessPayLinkProvider(db, ctx.organizationId);
         // One charge at a time (D13): no link while autopay is charging it.
         if (await chargeUnderWayOn(db, ctx.organizationId, id)) {
             throw autopayChargeInProgress();

@@ -220,6 +220,9 @@ async function connectProvider(organizationId: string): Promise<void> {
         data: {
             organizationId,
             provider: "RAZORPAY",
+            // Its key id: a pay link needs a connection that can open the
+            // checkout window (B11, D22).
+            publicKey: "rzp_test_Account1",
             encryptedCredentials: "x",
             credentialsIv: "x",
             credentialsAuthTag: "x",

@@ -32,7 +32,7 @@ import { assertOrganizationOpen } from "../organizations/organization-lifecycle.
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
-import { payLinkProvider } from "./pay-link-provider";
+import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
 import type {
     MerchantProvider,
     ProviderCredentials,
@@ -1472,14 +1472,17 @@ export class PaymentsService {
             },
             options.idempotencyKey,
             // A pinned provider must be connected; otherwise the business's
-            // first connected one. An invoice has no storefront to say which,
-            // and two connected providers must not leave it unpayable.
+            // first connection that can open the checkout window — the rule
+            // its pay link was minted by (B11, D22). An invoice has no
+            // storefront to say which, and two connected providers must not
+            // leave it unpayable.
             () =>
-                this.resolveConnectedProvider(
-                    invoice.organizationId,
-                    options.provider,
-                    { firstWhenSeveral: true },
-                ),
+                options.provider
+                    ? this.resolveConnectedProvider(
+                          invoice.organizationId,
+                          options.provider,
+                      )
+                    : businessPayLinkProvider(prisma, invoice.organizationId),
         );
     }
 
@@ -1930,7 +1933,6 @@ export class PaymentsService {
     private async resolveConnectedProvider(
         organizationId: string,
         pinned?: string,
-        { firstWhenSeveral = false }: { firstWhenSeveral?: boolean } = {},
     ): Promise<MerchantPaymentProvider> {
         if (pinned) {
             const name = pinned.toUpperCase();
@@ -1964,7 +1966,7 @@ export class PaymentsService {
                 "No connected payment provider for this organization",
             );
         }
-        if (connected.length > 1 && !firstWhenSeveral) {
+        if (connected.length > 1) {
             throw new ConflictException(
                 "Multiple providers connected — specify which provider to use",
             );

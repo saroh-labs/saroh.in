@@ -595,12 +595,14 @@ export class OrdersService {
             if (paymentChanging && nextPayment === "REFUNDED") {
                 await creditRestOfOrder(tx, orderId, "Refunded", userId);
             }
-            // Cancelled or refunded: its pay link stops working (B11). Paid
-            // by hand, it stays readable, so a customer who opens it is told
-            // the order is paid — and it can start no payment.
+            // Cancelled, refunded or paid at the counter: its pay link stops
+            // working (B11, DEC-067), so nobody can pay twice. The page says
+            // the link is no longer needed; a balance later owed gets a new
+            // link.
             if (
                 (statusChanging && nextStatus === "CANCELLED") ||
-                (paymentChanging && nextPayment === "REFUNDED")
+                (paymentChanging &&
+                    (nextPayment === "REFUNDED" || nextPayment === "PAID"))
             ) {
                 await retireOrderPayLinkInTx(tx, orderId);
             }

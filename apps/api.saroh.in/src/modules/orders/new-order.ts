@@ -18,6 +18,7 @@ import {
 } from "./fulfilment";
 import type { CounterPayment } from "./new-order.dto";
 import { COUNTER_PAYMENTS } from "./new-order.dto";
+import { RETIRED_PAY_LINK } from "./order-pay-link";
 import {
     contactByPhone,
     lockWalkInPhone,
@@ -392,7 +393,8 @@ export function cashReceivedCents(
  * as a payment recorded by hand is (DEC-023), and its timeline says how.
  * The note carries no amount, since whoever works the order reads the
  * timeline without money; what was handed over is the step's amount, which
- * only a money reader sees.
+ * only a money reader sees. Any pay link it had stops working (B11,
+ * DEC-067), so nobody can pay twice.
  */
 export async function takeCounterPaymentInTx(
     tx: Tx,
@@ -408,7 +410,7 @@ export async function takeCounterPaymentInTx(
     const { orderId, organizationId, userId, kind, at } = input;
     await tx.order.update({
         where: { id: orderId },
-        data: { paymentStatus: "PAID", paidAt: at },
+        data: { paymentStatus: "PAID", paidAt: at, ...RETIRED_PAY_LINK },
     });
     await ensureOrderInvoice(tx, orderId, { at, method: kind });
     if (!organizationId) return;

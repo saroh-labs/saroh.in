@@ -25,7 +25,7 @@ const GONE: Record<
 > = {
     missing: {
         title: "This link no longer works",
-        body: "If you've just paid, you're done — the business has it. Otherwise the order may have been cancelled, or they sent you a newer link. Ask them for the latest one.",
+        body: "If you've paid, here or in person, you're done — the business has it, and this link isn't needed any more. Otherwise the order may have been cancelled, or they sent you a newer link. Ask them for the latest one.",
     },
     busy: {
         title: "Too many tries at once",

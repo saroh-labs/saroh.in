@@ -714,6 +714,22 @@ export class CustomerDetailService {
                           allowance: membership?.allowance ?? null,
                       }
                     : null;
+        } else if (wants.bookings && on.has("PAYMENTS")) {
+            // Memberships count on their own (C7): with Class packs off, a
+            // member's classes this month are still the card. Someone with
+            // no membership that includes classes has no card; a failed
+            // read is no figure, and its source is already named.
+            const allowance = membership?.allowance ?? null;
+            if (membership === null) stats.classesLeft = null;
+            else if (allowance) {
+                stats.classesLeft = {
+                    total: allowance.left,
+                    packs: 0,
+                    membership: allowance.left,
+                    nextExpiry: null,
+                    allowance,
+                };
+            }
         }
         if (money) {
             // A total with a missing part is not the total: null, and the

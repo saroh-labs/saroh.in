@@ -20,8 +20,9 @@ export const PAY_LINK_ORDER_SELECT = {
     storeId: true,
     status: true,
     paymentStatus: true,
-    // A site checkout's order (G13) holds its stock on its first payment,
-    // so a second one would hold again: its difference isn't taken by link.
+    // A site checkout's order (G13) holds its stock on its first payment;
+    // a later one for its balance (B9) is routed past the hold by the
+    // webhook (`online-order-payment.ts` `heldByAnotherPayment`).
     placedOnline: true,
     total: true,
     currency: true,
@@ -73,18 +74,18 @@ export type PayLinkStanding = "DUE" | "PAID" | "CLOSED";
 /**
  * Due: unpaid, or its payment failed, with money still owed — or paid
  * online and changed since to cost more (B9: a dearer way to fulfil it, or
- * an edit), so the difference is owed. Paid: paid, by hand or online, with
- * nothing more owed; paid by hand, the counter settles any difference.
- * Closed: cancelled or refunded — there is nothing to pay.
+ * an edit), so what was received falls short of the current total and the
+ * balance is owed. That holds for a site checkout's order too. Paid: paid,
+ * by hand or online, with nothing more owed; paid by hand, the counter
+ * settles any difference. Closed: cancelled or refunded — there is nothing
+ * to pay.
  */
 export function payLinkStanding(order: PayLinkOrder): PayLinkStanding {
     if (order.status === "CANCELLED" || order.paymentStatus === "REFUNDED") {
         return "CLOSED";
     }
     if (order.paymentStatus === "PAID") {
-        return !order.placedOnline &&
-            order.paymentIntents.length > 0 &&
-            dueCentsOf(order) > 0
+        return order.paymentIntents.length > 0 && dueCentsOf(order) > 0
             ? "DUE"
             : "PAID";
     }

@@ -1004,6 +1004,89 @@ describe("CustomerDetailService", () => {
             expect(detail.bookings?.upcoming).toHaveLength(1);
         });
 
+        describe("with Class packs off, a membership counts on its own (C7)", () => {
+            const PACKS_OFF = ALL_ON.map((v) =>
+                v.key === "CLASS_PACKS" ? { ...v, readiness: "DISABLED" } : v,
+            );
+
+            it("shows a member's classes this month as classes left", async () => {
+                const { svc, db } = make(PACKS_OFF);
+                db.customerSubscription.findFirst.mockResolvedValue({
+                    id: "sub_m",
+                    status: "ACTIVE",
+                    timezone: "Asia/Kolkata",
+                    plan: { name: "Monthly membership", classesPerMonth: 8 },
+                });
+
+                const detail = await svc.detail(OWNER, "c1");
+
+                expect(detail).not.toHaveProperty("packs");
+                expect(db.packPurchase.findMany).not.toHaveBeenCalled();
+                expect(detail.stats.classesLeft).toEqual({
+                    total: 5,
+                    packs: 0,
+                    membership: 5,
+                    nextExpiry: null,
+                    allowance: expect.objectContaining({
+                        subscriptionId: "sub_m",
+                        perMonth: 8,
+                        used: 3,
+                        left: 5,
+                    }),
+                });
+            });
+
+            it("a paused membership still shows, with none left", async () => {
+                const { svc, db } = make(PACKS_OFF);
+                db.customerSubscription.findFirst.mockResolvedValue({
+                    id: "sub_m",
+                    status: "PAUSED",
+                    timezone: "Asia/Kolkata",
+                    plan: { name: "Monthly membership", classesPerMonth: 8 },
+                });
+
+                const detail = await svc.detail(OWNER, "c1");
+
+                expect(detail.stats.classesLeft).toMatchObject({
+                    total: 0,
+                    allowance: expect.objectContaining({ paused: true }),
+                });
+            });
+
+            it("a failed membership read is no figure, and is named", async () => {
+                const { svc, db } = make(PACKS_OFF);
+                db.customerSubscription.findFirst.mockRejectedValue(
+                    new Error("timeout"),
+                );
+
+                const detail = await svc.detail(OWNER, "c1");
+
+                expect(detail.stats.classesLeft).toBeNull();
+                expect(detail.unavailable).toEqual(
+                    expect.arrayContaining([
+                        expect.objectContaining({ source: "membership" }),
+                    ]),
+                );
+            });
+
+            it("no card with Payments off: there are no memberships", async () => {
+                const { svc, db } = make(
+                    PACKS_OFF.map((v) =>
+                        v.key === "PAYMENTS"
+                            ? { ...v, readiness: "DISABLED" }
+                            : v,
+                    ),
+                );
+                db.customerSubscription.findFirst.mockRejectedValue(
+                    new Error("timeout"),
+                );
+
+                const detail = await svc.detail(OWNER, "c1");
+
+                expect(detail.stats).not.toHaveProperty("classesLeft");
+            });
+        });
+
         it("reads no packs without pack:read, even with the diary", async () => {
             const { svc, db } = make();
             const desk: OrganizationContext = {
