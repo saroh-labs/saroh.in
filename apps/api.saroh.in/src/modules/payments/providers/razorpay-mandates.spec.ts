@@ -2,7 +2,9 @@
 // the D11 spike recorded in Razorpay test mode, so every call's request
 // and how each answer is read are asserted without a live call (D19).
 import {
+    authCustomer,
     authLink,
+    authOrder,
     authPayment,
     cardToken,
     chargeOrder,
@@ -93,11 +95,123 @@ describe("Razorpay takes autopay, behind its rollout flag", () => {
     });
 });
 
-describe("createSetup", () => {
+describe("createSetup: in the site's window (CHECKOUT, the default)", () => {
+    function answers(order: Record<string, unknown> = {}) {
+        fetchMock
+            .mockReturnValueOnce(answer(200, authCustomer()))
+            .mockReturnValueOnce(answer(200, authOrder(order)));
+    }
+
+    it("makes the customer, then the authorisation order the invoice is paid on", async () => {
+        answers();
+
+        const result = await mandates.createSetup({
+            ...SETUP,
+            firstAmountCents: 250_000,
+            returnUrl: "https://pulse.saroh.app/autopay?pay=t",
+        });
+
+        const customer = call(0);
+        expect(customer.url).toBe("https://api.razorpay.com/v1/customers");
+        expect(customer.method).toBe("POST");
+        expect(customer.body).toEqual({
+            name: "Asha Rao",
+            email: "asha@example.in",
+            contact: "+919000090000",
+            fail_existing: "0",
+        });
+        const order = call(1);
+        expect(order.url).toBe("https://api.razorpay.com/v1/orders");
+        expect(order.method).toBe("POST");
+        expect(order.body).toEqual({
+            amount: 250_000,
+            currency: "INR",
+            customer_id: RZP.customerId,
+            method: "upi",
+            receipt: SETUP.reference,
+            payment_capture: true,
+            notes: { saroh_mandate_id: SETUP.reference },
+            token: {
+                max_amount: 180_000,
+                expire_at: 2106259200,
+                frequency: "as_presented",
+            },
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(result).toEqual({
+            providerCustomerId: RZP.customerId,
+            setupReference: RZP.authOrderId,
+            authorisationUrl: null,
+            clientParams: {
+                razorpayOrderId: RZP.authOrderId,
+                razorpayCustomerId: RZP.customerId,
+                recurring: true,
+                method: "upi",
+                callbackUrl: "https://pulse.saroh.app/autopay?pay=t",
+            },
+        });
+    });
+
+    it("card takes the frequency; eMandate is for 0 and its token takes none", async () => {
+        answers();
+        await mandates.createSetup({ ...SETUP, method: "CARD" });
+        expect(call(1).body).toMatchObject({
+            method: "card",
+            amount: 100,
+            token: { frequency: "as_presented" },
+        });
+
+        answers({ method: "emandate", amount: 0 });
+        await mandates.createSetup({
+            ...SETUP,
+            method: "EMANDATE",
+            firstAmountCents: 0,
+        });
+        const body = call(3).body as { amount: number; token: object };
+        expect(body).toMatchObject({ method: "emandate", amount: 0 });
+        expect(body.token).not.toHaveProperty("frequency");
+    });
+
+    it("no return page: no callbackUrl", async () => {
+        answers();
+        const result = await mandates.createSetup(SETUP);
+        expect(result.clientParams).not.toHaveProperty("callbackUrl");
+    });
+
+    it("a ₹0 UPI authorisation Razorpay refuses is REFUSED (the caller says so)", async () => {
+        fetchMock
+            .mockReturnValueOnce(answer(200, authCustomer()))
+            .mockReturnValueOnce(
+                refusal(400, "input_validation_failed", "amount too low"),
+            );
+        const err = await outcome(
+            mandates.createSetup({ ...SETUP, firstAmountCents: 0 }),
+        );
+        expect(err.outcome).toBe("REFUSED");
+        expect(err.message).not.toContain("amount too low");
+    });
+
+    it("a yes that names no customer, or no order, is UNKNOWN", async () => {
+        fetchMock.mockReturnValueOnce(answer(200, {}));
+        expect((await outcome(mandates.createSetup(SETUP))).outcome).toBe(
+            "UNKNOWN",
+        );
+        fetchMock
+            .mockReturnValueOnce(answer(200, authCustomer()))
+            .mockReturnValueOnce(answer(200, { status: "created" }));
+        expect((await outcome(mandates.createSetup(SETUP))).outcome).toBe(
+            "UNKNOWN",
+        );
+    });
+});
+
+describe("createSetup: a hosted link (HOSTED_LINK)", () => {
+    const LINK = { ...SETUP, handoff: "HOSTED_LINK" as const };
+
     it("makes a registration link for the picked method and hands back its page", async () => {
         fetchMock.mockReturnValue(answer(200, authLink()));
 
-        const result = await mandates.createSetup(SETUP);
+        const result = await mandates.createSetup(LINK);
 
         const sent = call(0);
         expect(sent.url).toBe(
@@ -133,10 +247,22 @@ describe("createSetup", () => {
             clientParams: {
                 razorpayOrderId: RZP.authOrderId,
                 razorpayCustomerId: RZP.customerId,
-                recurring: "1",
+                recurring: true,
                 method: "upi",
             },
         });
+    });
+
+    it("hands the return page to a window on the link's order, never to the link", async () => {
+        fetchMock.mockReturnValue(answer(200, authLink()));
+        const result = await mandates.createSetup({
+            ...LINK,
+            returnUrl: "https://pulse.saroh.app/autopay?pay=t",
+        });
+        expect(call(0).body).not.toHaveProperty("callback_url");
+        expect(result.clientParams.callbackUrl).toBe(
+            "https://pulse.saroh.app/autopay?pay=t",
+        );
     });
 
     it.each([
@@ -145,7 +271,7 @@ describe("createSetup", () => {
     ] as const)("sends %s as Razorpay's %s", async (method, sentAs) => {
         fetchMock.mockReturnValue(answer(200, authLink()));
         await mandates.createSetup({
-            ...SETUP,
+            ...LINK,
             method,
             firstAmountCents: method === "EMANDATE" ? 0 : 100,
         });
@@ -159,7 +285,7 @@ describe("createSetup", () => {
     it("leaves out a customer's missing email and phone", async () => {
         fetchMock.mockReturnValue(answer(200, authLink()));
         await mandates.createSetup({
-            ...SETUP,
+            ...LINK,
             customer: { name: "Asha", email: null, phone: null },
         });
         expect((call(0).body as { customer: unknown }).customer).toEqual({
@@ -171,7 +297,7 @@ describe("createSetup", () => {
         fetchMock.mockReturnValue(
             refusal(400, "input_validation_failed", "asha@example.in is bad"),
         );
-        const err = await outcome(mandates.createSetup(SETUP));
+        const err = await outcome(mandates.createSetup(LINK));
         expect(err.outcome).toBe("REFUSED");
         expect(err.message).toBe(
             "Razorpay set-up failed (HTTP 400, input_validation_failed)",
@@ -182,22 +308,22 @@ describe("createSetup", () => {
 
     it("a network error, 5xx or 429 is UNKNOWN", async () => {
         fetchMock.mockRejectedValueOnce(new Error("socket hang up"));
-        expect((await outcome(mandates.createSetup(SETUP))).outcome).toBe(
+        expect((await outcome(mandates.createSetup(LINK))).outcome).toBe(
             "UNKNOWN",
         );
         fetchMock.mockReturnValueOnce(answer(502));
-        expect((await outcome(mandates.createSetup(SETUP))).outcome).toBe(
+        expect((await outcome(mandates.createSetup(LINK))).outcome).toBe(
             "UNKNOWN",
         );
         fetchMock.mockReturnValueOnce(answer(429));
-        expect((await outcome(mandates.createSetup(SETUP))).outcome).toBe(
+        expect((await outcome(mandates.createSetup(LINK))).outcome).toBe(
             "UNKNOWN",
         );
     });
 
     it("a yes that names no link is UNKNOWN (it may exist)", async () => {
         fetchMock.mockReturnValue(answer(200, { status: "issued" }));
-        expect((await outcome(mandates.createSetup(SETUP))).outcome).toBe(
+        expect((await outcome(mandates.createSetup(LINK))).outcome).toBe(
             "UNKNOWN",
         );
     });
@@ -256,6 +382,56 @@ describe("get", () => {
         );
         expect(mandate.status).toBe("ACTIVE");
         expect(mandate.providerMandateId).toBe(RZP.tokenId);
+    });
+
+    it("an in-page set-up: the order's payment that made a token → the token", async () => {
+        fetchMock
+            .mockReturnValueOnce(
+                answer(200, {
+                    entity: "collection",
+                    count: 2,
+                    items: [
+                        authPayment({ id: "pay_failed1", status: "failed" }),
+                        authPayment({ invoice_id: null }),
+                    ],
+                }),
+            )
+            .mockReturnValueOnce(answer(200, token("confirmed")));
+
+        const mandate = await mandates.get({
+            providerMandateId: null,
+            providerCustomerId: null,
+            setupReference: RZP.authOrderId,
+            credentials: CREDS,
+        });
+
+        expect(call(0).url).toMatch(
+            /\/orders\/order_ThhazXS1mGWn0o\/payments$/,
+        );
+        expect(call(1).url).toMatch(
+            /\/customers\/cust_ThhaxvYyvDmc6j\/tokens\/token_ThhcIlf7TwGA9c$/,
+        );
+        expect(mandate).toMatchObject({
+            status: "ACTIVE",
+            providerMandateId: RZP.tokenId,
+            providerCustomerId: RZP.customerId,
+        });
+    });
+
+    it("an in-page set-up nobody has paid yet is PENDING", async () => {
+        fetchMock.mockReturnValueOnce(answer(200, { count: 0, items: [] }));
+        const mandate = await mandates.get({
+            providerMandateId: null,
+            providerCustomerId: RZP.customerId,
+            setupReference: RZP.authOrderId,
+            credentials: CREDS,
+        });
+        expect(mandate).toMatchObject({
+            status: "PENDING",
+            providerMandateId: null,
+            providerCustomerId: RZP.customerId,
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it("an unpaid link is PENDING; an expired one FAILED", async () => {

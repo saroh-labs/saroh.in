@@ -112,6 +112,20 @@ function loadScript(
 const text = (v: unknown): string | null =>
     typeof v === "string" && v.trim() ? v.trim() : null;
 
+/** The API's `recurring: true` (or Razorpay's own `"1"`). */
+const isRecurring = (v: unknown): boolean => v === true || v === "1";
+
+/** Only an https address is handed to the provider as a return page. */
+function httpsUrl(v: unknown): string | null {
+    const s = text(v);
+    if (!s) return null;
+    try {
+        return new URL(s).protocol === "https:" ? s : null;
+    } catch {
+        return null;
+    }
+}
+
 function openRazorpay(
     request: CheckoutRequest,
     settle: (outcome: CheckoutOutcome) => void,
@@ -155,7 +169,9 @@ function openRazorpay(
                     },
                     // Autopay's authorisation order (D12): Checkout takes
                     // it as a recurring payment for the provider's customer.
-                    ...(handoff.clientParams.recurring === true
+                    // Where it must leave the page (a bank's eMandate page),
+                    // it comes back to the business's own site.
+                    ...(isRecurring(handoff.clientParams.recurring)
                         ? {
                               recurring: "1",
                               ...(text(handoff.clientParams.razorpayCustomerId)
@@ -163,6 +179,13 @@ function openRazorpay(
                                         customer_id: text(
                                             handoff.clientParams
                                                 .razorpayCustomerId,
+                                        ),
+                                    }
+                                  : {}),
+                              ...(httpsUrl(handoff.clientParams.callbackUrl)
+                                  ? {
+                                        callback_url: httpsUrl(
+                                            handoff.clientParams.callbackUrl,
                                         ),
                                     }
                                   : {}),

@@ -16,6 +16,7 @@ import {
     nextMandateStatus,
     safeDisplayHint,
     safeFailureReason,
+    SETUP_TTL_MS,
 } from "./mandate-rules";
 import { isMandateMethod } from "./providers/provider.port";
 
@@ -400,7 +401,10 @@ function isWholePositive(value: unknown): value is number {
  * never tie to a link or order. Writes the id (and the provider's
  * customer) onto the PENDING mandate whose set-up it paid, once — only
  * while it has none, so a later or repeated payment changes nothing.
- * Returns the mandate linked and when it was made, or null.
+ * Returns the mandate linked and when its set-up started, or null: the
+ * row's making, or earlier for a plan joined with autopay (D12), whose row
+ * is made only when the payment lands — its set-up started a set-up TTL
+ * before `setupExpiresAt`.
  */
 export async function linkMandateSetupInTx(
     tx: Tx,
@@ -411,7 +415,7 @@ export async function linkMandateSetupInTx(
         providerCustomerId?: string;
         setupReferences: string[];
     },
-): Promise<{ mandateId: string; createdAt: Date } | null> {
+): Promise<{ mandateId: string; startedAt: Date } | null> {
     if (link.setupReferences.length === 0) return null;
     const row = await tx.paymentMandate.findFirst({
         where: {
@@ -421,7 +425,7 @@ export async function linkMandateSetupInTx(
             providerMandateId: null,
             setupReference: { in: link.setupReferences },
         },
-        select: { id: true, createdAt: true },
+        select: { id: true, createdAt: true, setupExpiresAt: true },
         orderBy: { createdAt: "desc" },
     });
     if (!row) return null;
@@ -434,7 +438,14 @@ export async function linkMandateSetupInTx(
                 : {}),
         },
     });
-    return count > 0 ? { mandateId: row.id, createdAt: row.createdAt } : null;
+    if (count === 0) return null;
+    const setupStarted = row.setupExpiresAt
+        ? new Date(row.setupExpiresAt.getTime() - SETUP_TTL_MS)
+        : row.createdAt;
+    return {
+        mandateId: row.id,
+        startedAt: setupStarted < row.createdAt ? setupStarted : row.createdAt,
+    };
 }
 
 /**

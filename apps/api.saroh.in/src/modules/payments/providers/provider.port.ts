@@ -205,8 +205,20 @@ export interface CreateMandateSetupInput {
      * never Saroh's or the provider's. Absent: the adapter's default.
      */
     returnUrl?: string;
+    /**
+     * How the customer reaches the provider. `CHECKOUT` (the default, D12):
+     * the provider's window on the business's own page, opened with
+     * `clientParams`; for UPI and card `setupReference` is then the order
+     * the first payment is taken on. `HOSTED_LINK`: the provider's own page
+     * (`authorisationUrl`), for a set-up link sent to the customer
+     * (D13/D14); Razorpay's is a registration link, whose `inv_…` is the
+     * reference.
+     */
+    handoff?: MandateSetupHandoff;
     credentials: ProviderCredentials;
 }
+
+export type MandateSetupHandoff = "CHECKOUT" | "HOSTED_LINK";
 
 export interface MandateSetupResult {
     providerCustomerId: string;
@@ -224,9 +236,10 @@ export interface MandateSetupResult {
     authorisationUrl: string | null;
     /**
      * Non-secret parameters a checkout window needs instead. For Razorpay
-     * (D19): `razorpayOrderId`, `razorpayCustomerId` and `recurring: true`,
-     * which the site's window turns into Checkout's `order_id`,
-     * `customer_id` and `recurring: "1"`.
+     * (D19): `razorpayOrderId`, `razorpayCustomerId`, `recurring: true` and,
+     * given a `returnUrl`, `callbackUrl`, which the site's window turns into
+     * Checkout's `order_id`, `customer_id`, `recurring: "1"` and
+     * `callback_url`.
      */
     clientParams: Record<string, unknown>;
 }

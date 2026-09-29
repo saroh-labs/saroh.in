@@ -180,12 +180,15 @@ async function setUp() {
         order_id: ids.order,
         customer_id: ids.customer,
     });
+    // The hosted registration link (a set-up link sent to the customer);
+    // the in-page window's order is D12's, in autopay.razorpay.db.spec.ts.
     const view = await setups.createSetup({
         organizationId: owner.organizationId,
         subscriptionId,
         method: "UPI",
         maxAmountCents: 180_000,
         firstAmountCents: 100,
+        handoff: "HOSTED_LINK",
     });
     const payment = authPayment({
         id: ids.payment,

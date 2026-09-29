@@ -25,6 +25,7 @@ import {
 import type {
     MandateFrequency,
     MandateMethod,
+    MandateSetupHandoff,
     ProviderFactory,
 } from "./providers/provider.port";
 import {
@@ -215,6 +216,7 @@ export class MandateSetupService {
                 setupExpiresAt,
                 description: `Autopay for ${subscription.plan.name}`,
                 ...(input.returnUrl ? { returnUrl: input.returnUrl } : {}),
+                ...(input.handoff ? { handoff: input.handoff } : {}),
                 credentials: connection.credentials,
             });
             await prisma.paymentMandate.update({
@@ -251,6 +253,22 @@ export class MandateSetupService {
                 },
             });
             const at = providerName(connection.provider);
+            // TODO(D12 open question): a UPI or card authorisation with
+            // nothing owed goes out for ₹0, which Razorpay likely refuses
+            // (its minimum is ₹1). Until the user decides (take ₹1, or
+            // something else), the refusal fails safe: FAILED above, and
+            // the customer (who started it: `source`) is told to turn it
+            // on when they next pay.
+            if (
+                outcome === "REFUSED" &&
+                input.source !== undefined &&
+                refusedForNoPayment(method, firstAmountCents)
+            ) {
+                throw new ConflictException({
+                    message: AUTOPAY_NEEDS_A_PAYMENT,
+                    details: { reason: "needs-payment" },
+                });
+            }
             if (outcome === "REFUSED") {
                 throw new ConflictException(
                     `${at} didn't accept the autopay set-up. Try another way to pay, or pay this time without autopay`,
@@ -442,6 +460,21 @@ export class MandateSetupService {
     }
 }
 
+/**
+ * What the customer is told when a UPI or card authorisation with nothing
+ * to pay is refused (the D12 open question on ₹0 authorisations).
+ */
+export const AUTOPAY_NEEDS_A_PAYMENT =
+    "Couldn't start autopay without a payment — turn it on when you next pay";
+
+/** A refusal of an authorisation that took no payment, where one needs one. */
+function refusedForNoPayment(
+    method: MandateMethod,
+    firstAmountCents: number,
+): boolean {
+    return firstAmountCents === 0 && method !== "EMANDATE";
+}
+
 /** A provider a customer can set up autopay through, and its methods. */
 export interface MandateOffer {
     provider: string;
@@ -468,6 +501,11 @@ export interface CreateSetupInput {
     accountId?: string | null;
     /** The page on the business's site the provider sends them back to. */
     returnUrl?: string;
+    /**
+     * The provider's window on the site (the default, D12), or its hosted
+     * page for a set-up link sent to the customer (D13/D14).
+     */
+    handoff?: MandateSetupHandoff;
     now?: Date;
 }
 

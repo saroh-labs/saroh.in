@@ -26,12 +26,17 @@ import { MandateCallError } from "./provider.port";
  * of the calls the D11 spike saw work in test mode
  * (`docs/patterns/backend-integrations.md`, "Razorpay recurring payments"):
  *
- * - set-up: a registration link (`POST /subscription_registration/auth_links`)
- *   for the method the customer picked, whose hosted `short_url` they
- *   approve on. Its `inv_…` is the set-up reference, and its order and
- *   customer are handed back for a Checkout window too;
+ * - set-up, in the site's window (D12, the default): a customer
+ *   (`POST /customers`) and an authorisation order (`POST /orders` with
+ *   `method` and a `token` block) that Checkout opens with `recurring: "1"`.
+ *   The order is the set-up reference, and for UPI and card its payment is
+ *   the invoice's;
+ * - set-up by a hosted link (`HOSTED_LINK`): a registration link
+ *   (`POST /subscription_registration/auth_links`) for the method the
+ *   customer picked, whose `short_url` they approve on. Its `inv_…` is the
+ *   set-up reference;
  * - read: the token (`GET /customers/:c/tokens/:t`), or before one is
- *   known, the link → its payment → the token;
+ *   known, the order's (or link's) payment → the token;
  * - charge: an order carrying `notification{token_id, payment_after}` for
  *   UPI (the pre-debit notice), then `POST /payments/create/recurring`;
  * - cancel: `PUT /customers/:c/tokens/:t/cancel` (never `DELETE`, which
@@ -72,12 +77,105 @@ export class RazorpayMandates implements MandateCapability {
         return Promise.resolve([...RAZORPAY_MANDATE_METHODS]);
     }
 
-    async createSetup(
+    createSetup(input: CreateMandateSetupInput): Promise<MandateSetupResult> {
+        return input.handoff === "HOSTED_LINK"
+            ? this.createLinkSetup(input)
+            : this.createCheckoutSetup(input);
+    }
+
+    /**
+     * The in-page set-up (D12): Razorpay's customer, then the authorisation
+     * ORDER for the picked method with its `token` block, opened in
+     * Checkout with `recurring: "1"`. The order is the set-up reference:
+     * for UPI and card its first payment (`firstAmountCents`) is the
+     * invoice's, so that payment's `payment.captured` both pays the invoice
+     * (by its order, the invoice intent's `providerIntentId`) and names the
+     * token (`mandate-link.ts`). eMandate's order is for 0.
+     *
+     * TODO(D12 open question, ₹0 UPI/card authorisation): from My plan with
+     * nothing owed D12 sends `firstAmountCents` 0 for UPI and card, which
+     * Razorpay is expected to refuse (its minimum is ₹1). It is sent as it
+     * is; a refusal marks the set-up FAILED and the customer is told to
+     * turn autopay on when they next pay (`MandateSetupService`). Whether
+     * to take ₹1, or offer only eMandate there, is the user's to decide.
+     */
+    private async createCheckoutSetup(
         input: CreateMandateSetupInput,
     ): Promise<MandateSetupResult> {
-        const customer: Json = { name: input.customer.name.slice(0, 50) };
-        if (input.customer.email) customer.email = input.customer.email;
-        if (input.customer.phone) customer.contact = input.customer.phone;
+        const made = await this.call(
+            "set-up",
+            input.credentials,
+            "POST",
+            "/customers",
+            // "0": the customer Razorpay already has for this email and
+            // phone comes back, rather than a refusal.
+            { ...customerOf(input), fail_existing: "0" },
+        );
+        const providerCustomerId = text(made.id);
+        if (!providerCustomerId) {
+            throw new MandateCallError(
+                "Razorpay set-up: missing customer id",
+                "UNKNOWN",
+            );
+        }
+        const method = input.method.toLowerCase();
+        const order = await this.call(
+            "set-up",
+            input.credentials,
+            "POST",
+            "/orders",
+            {
+                amount: input.firstAmountCents,
+                currency: input.currency,
+                customer_id: providerCustomerId,
+                method,
+                receipt: input.reference,
+                payment_capture: true,
+                notes: { saroh_mandate_id: input.reference },
+                token: {
+                    max_amount: input.maxAmountCents,
+                    expire_at: unix(input.expiresAt),
+                    // eMandate's token takes no frequency.
+                    ...(input.method === "EMANDATE"
+                        ? {}
+                        : { frequency: input.frequency.toLowerCase() }),
+                },
+            },
+        );
+        const setupReference = text(order.id);
+        if (!setupReference) {
+            // It said yes without naming what it made: it may exist.
+            throw new MandateCallError(
+                "Razorpay set-up: missing order id",
+                "UNKNOWN",
+            );
+        }
+        return {
+            providerCustomerId,
+            setupReference,
+            authorisationUrl: null,
+            clientParams: {
+                razorpayOrderId: setupReference,
+                razorpayCustomerId: providerCustomerId,
+                recurring: true,
+                method,
+                // Where Checkout sends the customer when it has to leave
+                // the page (a bank's eMandate page): the business's site.
+                ...(input.returnUrl ? { callbackUrl: input.returnUrl } : {}),
+            },
+        };
+    }
+
+    /**
+     * A hosted registration link (`HOSTED_LINK`, for a set-up link sent to
+     * the customer, D13/D14): its `short_url` is the page to approve on,
+     * its `inv_…` the reference, and its order and customer are handed back
+     * for a Checkout window too.
+     */
+    private async createLinkSetup(
+        input: CreateMandateSetupInput,
+    ): Promise<MandateSetupResult> {
+        const customer = customerOf(input);
 
         const link = await this.call(
             "set-up",
@@ -96,6 +194,10 @@ export class RazorpayMandates implements MandateCapability {
                 // second, unbranded one.
                 sms_notify: false,
                 email_notify: false,
+                // No `callback_url`: the D11 spike didn't see a registration
+                // link take one, and an unknown field is a 400. The return
+                // page rides in `clientParams` for a window on this link's
+                // order; D13/D14 confirm it before sending links.
                 subscription_registration: {
                     method: input.method.toLowerCase(),
                     max_amount: input.maxAmountCents,
@@ -122,8 +224,9 @@ export class RazorpayMandates implements MandateCapability {
             clientParams: {
                 ...(orderId ? { razorpayOrderId: orderId } : {}),
                 razorpayCustomerId: providerCustomerId,
-                recurring: "1",
+                recurring: true,
                 method: input.method.toLowerCase(),
+                ...(input.returnUrl ? { callbackUrl: input.returnUrl } : {}),
             },
         };
     }
@@ -133,7 +236,37 @@ export class RazorpayMandates implements MandateCapability {
         let customerId = input.providerCustomerId;
         let tokenId = input.providerMandateId;
 
-        if (!tokenId && input.setupReference) {
+        if (!tokenId && input.setupReference?.startsWith("order_")) {
+            // An in-page set-up (D12): the order's payment that made a token.
+            const payments = await this.call(
+                "read",
+                credentials,
+                "GET",
+                `/orders/${encodeURIComponent(input.setupReference)}/payments`,
+            );
+            const items = Array.isArray(payments.items)
+                ? (payments.items as Json[])
+                : [];
+            const paid = items.find(
+                (p) =>
+                    text(p.token_id) &&
+                    (p.status === "captured" || p.status === "authorized"),
+            );
+            if (!paid) {
+                return {
+                    status: "PENDING",
+                    providerMandateId: null,
+                    providerCustomerId: customerId ?? null,
+                    method: null,
+                    displayHint: null,
+                    maxAmountCents: null,
+                    expiresAt: null,
+                    failureReason: null,
+                };
+            }
+            tokenId = text(paid.token_id) ?? null;
+            customerId = text(paid.customer_id) ?? customerId;
+        } else if (!tokenId && input.setupReference) {
             const link = await this.call(
                 "read",
                 credentials,
@@ -494,6 +627,14 @@ function outcomeFor(
     if (reason === "pre_debit_notification_not_sent") return "NOT_YET";
     if (status === 409 || status === 429 || status >= 500) return "UNKNOWN";
     return "REFUSED";
+}
+
+/** Who authorises, as Razorpay's customer: only what it needs to reach them. */
+function customerOf(input: CreateMandateSetupInput): Json {
+    const customer: Json = { name: input.customer.name.slice(0, 50) };
+    if (input.customer.email) customer.email = input.customer.email;
+    if (input.customer.phone) customer.contact = input.customer.phone;
+    return customer;
 }
 
 function tokenPath(customerId: string, tokenId: string): string {

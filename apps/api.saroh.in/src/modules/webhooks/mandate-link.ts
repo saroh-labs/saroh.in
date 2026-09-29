@@ -46,7 +46,9 @@ export async function linkMandateInTx(
             organizationId,
             provider,
             status: { in: ["IGNORED", "RECEIVED"] },
-            createdAt: { gte: linked.createdAt },
+            // From when the set-up started: a join's row (D12) is made only
+            // when its payment lands, after a token event that came first.
+            createdAt: { gte: linked.startedAt },
         },
         orderBy: { createdAt: "asc" },
         take: CATCH_UP_LIMIT,
