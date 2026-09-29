@@ -34,6 +34,7 @@ import {
     ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
     PauseSubscriptionDto,
+    PlanChargeTimingDto,
     PlanDraftDto,
     PlanInputDto,
     RetryPaymentDto,
@@ -147,6 +148,23 @@ export class SubscriptionPlansController {
         @Query() query: DeleteDraftQueryDto,
     ): Promise<void> {
         await this.subscriptions.deletePlanDraft(ctx, id, query.revision);
+    }
+
+    /**
+     * The plan's own "When autopay charges" (D13B), or null for the
+     * business's setting. Straight onto the plan, not its draft.
+     */
+    @Patch(":planId/autopay-timing")
+    setChargeTiming(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Body() dto: PlanChargeTimingDto,
+    ) {
+        return this.subscriptions.setPlanChargeTiming(
+            ctx,
+            id,
+            dto.autopayChargeTiming,
+        );
     }
 
     /**

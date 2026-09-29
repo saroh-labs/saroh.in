@@ -134,7 +134,10 @@ export function changeWhat(
         case "COLLECTION_UNSKIPPED":
             return `Un-skipped ${day(data.date, true)}`;
         case "INVOICED":
-            return `Invoiced ${periodText(data, sub.timezone, now)}${invoice}`;
+            // D13B: two days early, so autopay charges on the renewal date.
+            return data.early === true
+                ? `Invoiced ${periodText(data, sub.timezone, now)} early, for autopay on the renewal date${invoice}`
+                : `Invoiced ${periodText(data, sub.timezone, now)}${invoice}`;
         case "RENEWED":
             return data.uncharged === true
                 ? "Renewed — nothing charged, every collection skipped"
@@ -178,6 +181,17 @@ export function changeWhat(
         }
         case "CHARGED":
             return `Paid by autopay${invoice}`;
+        case "EARLY_INVOICE_CANCELLED": {
+            // D13B: the early renewal invoice, dropped before its period.
+            const how = data.by === "CREDITED" ? "Credited" : "Voided";
+            const why =
+                data.reason === "PAUSED"
+                    ? "paused"
+                    : data.reason === "PLAN_CHANGED"
+                      ? "plan changed"
+                      : "cancelled";
+            return `${how} the early renewal invoice — ${why} before the renewal, autopay not charged${invoice}`;
+        }
         default:
             return "Changed";
     }

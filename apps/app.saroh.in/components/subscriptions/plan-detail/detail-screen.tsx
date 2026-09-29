@@ -9,6 +9,7 @@ import { useRef, useState, useTransition } from "react";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import type { CappedList } from "@/lib/lists/capped";
 import { loadPlanEvents, setPlanArchived } from "@/lib/subscriptions/actions";
+import type { AutopayTimingSettings } from "@/lib/subscriptions/autopay-timing";
 import { archiveToast } from "@/lib/subscriptions/plan-cards";
 import type { DetailTab } from "@/lib/subscriptions/plan-detail";
 import {
@@ -33,6 +34,7 @@ import { Pill } from "../pill";
 import { PlanDialog } from "../plan-dialog";
 import { PlanHistory } from "./history";
 import { PlanOverview } from "./overview";
+import { PlanAutopayTiming } from "./plan-autopay-timing";
 import { PlanSubscribers } from "./subscribers";
 
 /** An Undo toast lasts ten seconds (round-2 default 136). */
@@ -59,6 +61,7 @@ export function PlanDetail({
     initialTab,
     nowIso,
     autopayOffered = false,
+    autopay = null,
 }: {
     plan: Plan;
     subscriptions: Optional<CappedList<Subscription>>;
@@ -70,6 +73,8 @@ export function PlanDetail({
     nowIso: string;
     /** The business offers autopay (D14): the edit copy may say so. */
     autopayOffered?: boolean;
+    /** "When autopay charges" (D13B); null when autopay can't charge. */
+    autopay?: AutopayTimingSettings | null;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -269,6 +274,19 @@ export function PlanDetail({
                         classes={included.classes}
                         pays={payRows(plan)}
                         glance={glanceRows(plan, firstPage)}
+                        autopay={
+                            autopay?.available ? (
+                                <PlanAutopayTiming
+                                    planId={plan.id}
+                                    planTiming={
+                                        plan.autopayChargeTiming ?? null
+                                    }
+                                    settings={autopay}
+                                    canWrite={canWrite}
+                                    nowIso={nowIso}
+                                />
+                            ) : null
+                        }
                     />
                 ) : tab === "subscribers" ? (
                     <PlanSubscribers

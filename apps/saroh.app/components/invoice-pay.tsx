@@ -53,6 +53,9 @@ export function InvoicePay({
     // While autopay is charging it (D13) there is nothing to pay here: the
     // customer would be charged twice.
     const charging = invoice.autopayCharging ?? null;
+    // When autopay next takes money (D13B): this invoice's queued charge,
+    // or once it's paid, the next renewal's.
+    const nextCharge = invoice.autopayNextCharge ?? null;
     const payable =
         (invoice.status === "ISSUED" || invoice.status === "OVERDUE") &&
         !charging;
@@ -217,7 +220,9 @@ export function InvoicePay({
                         className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
                     >
                         <p className="font-semibold text-site-fg">
-                            Autopay charge in progress · {payDate(charging.at)}
+                            {nextCharge
+                                ? `Next autopay charge: ${payDate(nextCharge.at)}`
+                                : `Autopay charge in progress · ${payDate(charging.at)}`}
                         </p>
                         <p className="mt-1 text-sm text-site-muted">
                             Your autopay is paying this invoice. Your bank lets
@@ -241,6 +246,11 @@ export function InvoicePay({
                                 ? `This invoice is paid. Thank you — there's nothing more to do.`
                                 : `This invoice is no longer payable. If you think that's a mistake, ask ${invoice.businessName}.`}
                         </p>
+                        {invoice.status === "PAID" && nextCharge ? (
+                            <p className="mt-1 text-sm text-site-muted">
+                                Next autopay charge: {payDate(nextCharge.at)}
+                            </p>
+                        ) : null}
                     </div>
                     {invoice.status === "PAID" && autopay ? (
                         // Paid, and the plan can still turn autopay on (D12).

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { voidInvoice as voidInvoiceApi } from "@/lib/invoices/service";
 
+import type { AutopayChargeTiming } from "./autopay-timing";
 import type { PlanValues } from "./plan-drafts";
 import * as drafts from "./plan-drafts";
 import type { PauseChoice, PlanInput, SubscribeInput } from "./service";
@@ -34,6 +35,17 @@ export async function pauseSubscription(id: string, choice: PauseChoice) {
 /** "Members can pause from their account" (A8). */
 export async function setMembersCanPause(on: boolean) {
     return then(api.setMembersCanPause(on));
+}
+/** "When autopay charges", for the business (D13B). */
+export async function setAutopayChargeTiming(timing: AutopayChargeTiming) {
+    return then(api.setAutopayChargeTiming(timing));
+}
+/** A plan's own "When autopay charges" (D13B); null: the business's. */
+export async function setPlanChargeTiming(
+    planId: string,
+    timing: AutopayChargeTiming | null,
+) {
+    return then(api.setPlanChargeTiming(planId, timing));
 }
 /**
  * Retry a failed renewal: a new pay link (F4's Retry by pay link), or a new

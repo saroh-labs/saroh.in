@@ -18,15 +18,21 @@ import type { Prisma } from "@saroh/database";
  * - `LOOK`: what the provider made of the debit, when its webhook hasn't
  *   said — the same look-up Retry does first (DEC-026).
  *
- * **Lead time.** The renewal invoice is raised on the renewal date, as
- * before D13, and falls due `DEFAULT_DUE_DAYS` (7) days later. The
- * debit is asked for `PRE_DEBIT_LEAD_HOURS` (26) after the invoice is
- * raised — Razorpay's 25-hour notice plus a margin — so the pre-debit
- * notice always lands at least 26 hours before the debit and about six
- * days before the due date, which leaves room for a Retry by mandate
- * (another 26 hours) before the invoice is overdue. Raising the invoice
- * earlier was rejected: it would bill a period before its end, ahead of a
- * cancel at period end or a pause booked meanwhile (ADR-007).
+ * **Lead time: the merchant's choice** (D13B, DEC-065,
+ * `autopay-timing.ts`). By default (DAY_AFTER_RENEWAL, D13 as it shipped)
+ * the renewal invoice is raised on the renewal date and falls due
+ * `DEFAULT_DUE_DAYS` (7) days later, and the debit is asked for
+ * `PRE_DEBIT_LEAD_HOURS` (26) after — Razorpay's 25-hour notice plus a
+ * margin — leaving room for a Retry by mandate before it is overdue.
+ * ON_RENEWAL_DATE raises the invoice two days early so the debit lands on
+ * the renewal date (an early invoice dropped if the subscription is
+ * cancelled, paused or changes plan first: `early-renewal.ts`);
+ * ON_DUE_DATE debits at the start of the due date. Under those two the
+ * planned debit is written on the charge's intent when it is queued
+ * (`debitAfter` on the CREATED intent), PREPARE waits until two days
+ * before it, and a method that needs no notice is still not debited
+ * before it — so changing the setting never moves a charge already
+ * queued.
  */
 
 export const SUBSCRIPTION_CHARGE_TYPE = "subscription.charge";

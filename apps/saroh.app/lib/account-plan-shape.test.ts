@@ -28,6 +28,7 @@ const SUB = {
     autopay: null,
     autopayPays: null,
     autopayCharging: null,
+    autopayNextCharge: null,
 };
 
 const PACK = {
@@ -127,6 +128,29 @@ describe("planTabResult", () => {
             at: "2026-10-02T10:00:00.000Z",
         });
         expect(subs?.ok && subs.value[1].autopayCharging).toBeNull();
+    });
+
+    it("reads when autopay next charges (D13B), anything strange as none", () => {
+        const tab = planTabResult({
+            ...TAB,
+            subscriptions: {
+                ok: true,
+                value: [
+                    {
+                        ...SUB,
+                        autopayNextCharge: { at: "2026-10-29T18:30:00.000Z" },
+                    },
+                    { ...SUB, ref: "sub_2", autopayNextCharge: { at: "soon" } },
+                    { ...SUB, ref: "sub_3" },
+                ],
+            },
+        });
+        const subs = tab?.subscriptions;
+        expect(subs?.ok && subs.value[0].autopayNextCharge).toEqual({
+            at: "2026-10-29T18:30:00.000Z",
+        });
+        expect(subs?.ok && subs.value[1].autopayNextCharge).toBeNull();
+        expect(subs?.ok && subs.value[2].autopayNextCharge).toBeNull();
     });
 
     it("reads the ₹1 check (D12B): each method's before, each plan's after, anything strange as none", () => {

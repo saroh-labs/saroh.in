@@ -342,10 +342,16 @@ function PlanCard({
         : planLine(plan);
     const classes = planClassesLine(plan);
     const autopay = autopayStateLine(plan.autopay);
-    // A charge under way (D13): said, and nothing else to pay meanwhile.
-    const charging = plan.autopayCharging
-        ? `Autopay charge in progress · ${accountDate(plan.autopayCharging.at, plan.timezone)}`
+    // When autopay next takes money (D13B): a charge queued for a later
+    // day, or the next renewal's by the business's timing.
+    const nextCharge = plan.autopayNextCharge
+        ? `Next autopay charge: ${accountDate(plan.autopayNextCharge.at, plan.timezone)}`
         : null;
+    // A charge under way (D13): said, and nothing else to pay meanwhile.
+    const charging =
+        plan.autopayCharging && !nextCharge
+            ? `Autopay charge in progress · ${accountDate(plan.autopayCharging.at, plan.timezone)}`
+            : null;
     // The ₹1 check its set-up took, and where its refund is (DEC-064).
     const check = plan.autopay?.check
         ? autopayCheckLine(plan.autopay.check)
@@ -427,6 +433,9 @@ function PlanCard({
                         ) : null}
                         {charging ? (
                             <span className="mt-0.5 block">{charging}</span>
+                        ) : null}
+                        {nextCharge ? (
+                            <span className="mt-0.5 block">{nextCharge}</span>
                         ) : null}
                         {check ? (
                             <span className="mt-0.5 block">{check}</span>

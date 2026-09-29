@@ -253,6 +253,7 @@ export function SubscriptionsScreen({
                         showClasses={showClasses}
                         settings={settings}
                         autopayOffered={autopayOffered}
+                        nowIso={nowIso}
                     />
                 ) : (
                     <>

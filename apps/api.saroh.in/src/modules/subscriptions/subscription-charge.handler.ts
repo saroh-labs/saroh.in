@@ -26,6 +26,9 @@ import {
     PREPARE_RETRY_MS,
     PREPARE_TRIES,
 } from "./charge-job";
+import type { EarlyDropReason } from "./early-renewal";
+import { dropEarlyRenewalInTx } from "./early-renewal";
+import { JOB, subscriptionEventLog } from "./subscription-events";
 
 export { SUBSCRIPTION_CHARGE_TYPE } from "./charge-job";
 
@@ -91,20 +94,30 @@ export class SubscriptionChargeHandler {
     ): Promise<void> {
         const intent = await this.intentOf(organizationId, p);
         if (!intent || !OPEN_MANDATE_CHARGE.includes(intent.status)) return;
-        if (!(await this.stillCharging(organizationId, p, intent.id))) return;
+        if (!(await this.stillCharging(organizationId, p, intent.id, now))) {
+            return;
+        }
 
+        // The merchant's timing (D13B) planned the debit when the charge was
+        // queued; the setting changing since never moves it.
+        const planned = intent.debitAfter;
+        const soonest = earliestDebitAt(now);
         const result = await this.charges.prepareCharge({
             organizationId,
             mandateId: p.mandateId,
             invoiceId: p.invoiceId,
             key: p.key,
-            debitAt: earliestDebitAt(now),
+            debitAt: planned && planned > soonest ? planned : soonest,
+            notBefore: planned,
         });
         switch (result.status) {
             case "PREPARED": {
+                // No notice to wait on: at once, or at the planned debit.
                 const debitAt =
                     result.preDebitStatus === "NOT_NEEDED"
-                        ? now
+                        ? result.debitAfter > now
+                            ? result.debitAfter
+                            : now
                         : result.debitAfter;
                 await prisma.$transaction((tx) =>
                     enqueueChargeStepInTx(
@@ -158,7 +171,9 @@ export class SubscriptionChargeHandler {
     ): Promise<void> {
         const intent = await this.intentOf(organizationId, p);
         if (!intent || !OPEN_MANDATE_CHARGE.includes(intent.status)) return;
-        if (!(await this.stillCharging(organizationId, p, intent.id))) return;
+        if (!(await this.stillCharging(organizationId, p, intent.id, now))) {
+            return;
+        }
 
         const result = await this.charges.charge({
             organizationId,
@@ -279,7 +294,7 @@ export class SubscriptionChargeHandler {
                 viaMandateId: p.mandateId,
                 purpose: null,
             },
-            select: { id: true, status: true },
+            select: { id: true, status: true, debitAfter: true },
         });
     }
 
@@ -287,19 +302,52 @@ export class SubscriptionChargeHandler {
      * Whether this charge may still go ahead: its provider's charging is
      * on, and the subscription hasn't ended. If not, it is let go (a
      * charge not yet asked for is CANCELLED) and the pay link stands.
+     *
+     * An early renewal invoice (D13B) whose subscription has since been
+     * set to end, paused or cancelled before its period began is dropped
+     * here too — voided or credited, its charge cancelled — should the
+     * write that stopped it not have dropped it already.
      */
     private async stillCharging(
         organizationId: string,
         p: ChargeJobPayload,
         intentId: string,
+        now: Date,
     ): Promise<boolean> {
         const invoice = await prisma.invoice.findFirst({
             where: { id: p.invoiceId, organizationId },
             select: {
                 subscriptionId: true,
-                subscription: { select: { status: true } },
+                periodStart: true,
+                subscription: {
+                    select: {
+                        status: true,
+                        cancelAtPeriodEnd: true,
+                        currentPeriodEnd: true,
+                    },
+                },
             },
         });
+        const sub = invoice?.subscription;
+        // Early: the next period's invoice, before that period begins.
+        if (
+            invoice?.subscriptionId &&
+            sub &&
+            invoice.periodStart &&
+            invoice.periodStart > now &&
+            invoice.periodStart.getTime() === sub.currentPeriodEnd.getTime() &&
+            (sub.status !== "ACTIVE" || sub.cancelAtPeriodEnd)
+        ) {
+            await this.dropEarly(
+                organizationId,
+                invoice.subscriptionId,
+                invoice.periodStart,
+                sub.status === "PAUSED" ? "PAUSED" : "CANCELLED",
+                now,
+            );
+            await this.letGo(organizationId, intentId);
+            return false;
+        }
         const live =
             invoice?.subscriptionId &&
             invoice.subscription?.status !== "CANCELLED" &&
@@ -310,6 +358,32 @@ export class SubscriptionChargeHandler {
         if (live && live.id === p.mandateId) return true;
         await this.letGo(organizationId, intentId);
         return false;
+    }
+
+    /** The early invoice dropped under its subscription's lock (D13B). */
+    private async dropEarly(
+        organizationId: string,
+        subscriptionId: string,
+        periodStart: Date,
+        reason: EarlyDropReason,
+        now: Date,
+    ): Promise<void> {
+        await prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${subscriptionId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+            await dropEarlyRenewalInTx(tx, {
+                organizationId,
+                subscriptionId,
+                periodStart,
+                reason,
+                now,
+                log: subscriptionEventLog(
+                    tx,
+                    organizationId,
+                    subscriptionId,
+                    JOB,
+                ),
+            });
+        });
     }
 
     /** A charge not yet asked for is let go: CANCELLED, so the pay link opens. */

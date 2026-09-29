@@ -5,6 +5,12 @@ import { toFailure } from "@/lib/api/failure";
 import type { CappedList } from "@/lib/lists/capped";
 import { withLive } from "@/lib/lists/capped";
 
+import type {
+    AutopayChargeTiming,
+    AutopayTimingSettings,
+} from "./autopay-timing";
+import { autopayTimingSettingsOf } from "./autopay-timing";
+
 /**
  * Plans and the people on them (ADR-007), through the org-nested
  * `/subscription-plans` and `/subscriptions` routes. Server-only.
@@ -38,6 +44,11 @@ export interface Plan {
     /** What its running (not paused) members pay in a month, in its currency. */
     monthlyFromMembers: string;
     createdAt: string;
+    /**
+     * When autopay charges its renewals (D13B); null or absent: the
+     * business's setting.
+     */
+    autopayChargeTiming?: AutopayChargeTiming | null;
 }
 
 /** One price people on a plan pay, and how many pay it. */
@@ -563,12 +574,17 @@ export async function getRenewals(): Promise<Renewals | null> {
     return getJson<Renewals>(`${base}/subscriptions/renewals`);
 }
 
-/** The business's subscription settings (round-2 A8). */
+/** The business's subscription settings (round-2 A8; D13B). */
 export interface SubscriptionSettings {
     /** "Members can pause from their account": on by default. */
     membersCanPause: boolean;
     /** Whether customers have an account on the business's site yet. */
     accountArea: boolean;
+    /**
+     * "When autopay charges" (D13B). Null from an older API, or when the
+     * block is strange: the setting isn't shown.
+     */
+    autopay: AutopayTimingSettings | null;
 }
 
 /**
@@ -581,12 +597,13 @@ export async function getSubscriptionSettings(): Promise<SubscriptionSettings | 
     try {
         const res = await apiFetch(`${base}/subscriptions/settings`);
         if (!res.ok) return null;
-        const body = (await res.json()) as Partial<SubscriptionSettings>;
+        const body = (await res.json()) as Record<string, unknown>;
         return typeof body.membersCanPause === "boolean" &&
             typeof body.accountArea === "boolean"
             ? {
                   membersCanPause: body.membersCanPause,
                   accountArea: body.accountArea,
+                  autopay: autopayTimingSettingsOf(body.autopay),
               }
             : null;
     } catch {
@@ -602,6 +619,31 @@ export function setMembersCanPause(
         "PATCH",
         { membersCanPause: on },
         "Couldn't save that. Try again.",
+    );
+}
+
+/** "When autopay charges" for the business (D13B). */
+export function setAutopayChargeTiming(
+    timing: AutopayChargeTiming,
+): Promise<ApiResult<SubscriptionSettings>> {
+    return send<SubscriptionSettings>(
+        "/subscriptions/settings",
+        "PATCH",
+        { autopayChargeTiming: timing },
+        "Couldn't save when autopay charges. Try again.",
+    );
+}
+
+/** A plan's own "When autopay charges" (D13B); null: the business's. */
+export function setPlanChargeTiming(
+    planId: string,
+    timing: AutopayChargeTiming | null,
+): Promise<ApiResult<Plan>> {
+    return send<Plan>(
+        `${plan(planId)}/autopay-timing`,
+        "PATCH",
+        { autopayChargeTiming: timing },
+        "Couldn't save when autopay charges for this plan. Try again.",
     );
 }
 

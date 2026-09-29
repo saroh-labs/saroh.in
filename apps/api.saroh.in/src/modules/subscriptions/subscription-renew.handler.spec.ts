@@ -29,8 +29,10 @@ const jobCount = prisma.job.count as jest.Mock;
 const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
 
 const renewOne = jest.fn();
+const renewEarlyOne = jest.fn();
 const handler = new SubscriptionRenewHandler({
     renewOne,
+    renewEarlyOne,
 } as unknown as SubscriptionsService);
 
 const JOB = {} as never;
@@ -148,9 +150,13 @@ describe("subscription.renew", () => {
 
     it("leaves out pauses already refused for Payments being off (review S-4)", async () => {
         const now = new Date("2026-10-01T02:00:00Z");
-        queryRaw.mockResolvedValue([{ id: "parked_1" }, { id: "parked_2" }]);
+        queryRaw.mockResolvedValueOnce([
+            { id: "parked_1" },
+            { id: "parked_2" },
+        ]);
         await handler.handle(JOB);
-        expect(queryRaw).toHaveBeenCalledTimes(1);
+        // Once for the refused pauses; the second is D13B's early pass.
+        expect(queryRaw).toHaveBeenCalledTimes(2);
         const ors = findMany.mock.calls[0]![0].where.OR;
         expect(ors[2]).toEqual({
             status: "PAUSED",
@@ -233,6 +239,40 @@ describe("subscription.renew", () => {
     it("finishes quietly when the next run is already waiting", async () => {
         jobCreate.mockRejectedValue(duplicate());
         await expect(handler.handle(JOB)).resolves.toBeUndefined();
+    });
+
+    it("invoices early the renewals that charge on the renewal date (D13B), one failing never stopping the rest", async () => {
+        queryRaw
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([{ id: "early_1" }, { id: "early_2" }]);
+        renewEarlyOne
+            .mockRejectedValueOnce(new Error("deadlock"))
+            .mockResolvedValueOnce("issued");
+        const error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => undefined);
+        await handler.handle(JOB);
+        expect(renewEarlyOne.mock.calls.map((c) => c[0])).toEqual([
+            "early_1",
+            "early_2",
+        ]);
+        expect(error).toHaveBeenCalledWith(
+            expect.stringContaining("early_1 was not invoiced early"),
+        );
+        expect(jobCreate).toHaveBeenCalled();
+        error.mockRestore();
+    });
+
+    it("a failed early pass still leaves the next run waiting", async () => {
+        queryRaw
+            .mockResolvedValueOnce([])
+            .mockRejectedValueOnce(new Error("connection refused"));
+        const error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => undefined);
+        await expect(handler.handle(JOB)).resolves.toBeUndefined();
+        expect(jobCreate).toHaveBeenCalled();
+        error.mockRestore();
     });
 });
 

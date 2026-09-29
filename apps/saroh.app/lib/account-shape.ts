@@ -366,12 +366,20 @@ function withAutopay(s: AccountSubscription): AccountSubscription {
     const r = s as unknown as Rec;
     const pays = r.autopayPays;
     const charging = r.autopayCharging;
+    const nextCharge = r.autopayNextCharge;
     return {
         ...s,
         // A charge under way (D13); anything strange reads as none.
         autopayCharging:
             isRecord(charging) && isString(charging.at)
                 ? { at: charging.at }
+                : null,
+        // When autopay next charges (D13B), checked the same way.
+        autopayNextCharge:
+            isRecord(nextCharge) &&
+            isString(nextCharge.at) &&
+            !Number.isNaN(Date.parse(nextCharge.at))
+                ? { at: nextCharge.at }
                 : null,
         autopay: autopayStateOf(r.autopay),
         autopayPays:
