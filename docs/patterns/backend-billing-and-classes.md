@@ -484,8 +484,43 @@
   isn't CANCELLED and the mandate is still chargeable, or lets the charge
   go (CANCELLED). Outcomes are written by `payments/mandate-charge-outcome.ts`
   (CHARGED; RENEWAL_FAILED with `data.reason`; the team's "Payment failed"
-  alert on a decline). The invoice is raised on the renewal date as ever;
-  the debit is 26 hours later, inside the 7-day due window.
+  alert on a decline). When the debit happens is the merchant's choice
+  (next point).
+- **The merchant chooses when autopay debits** (round-2 D13B, DEC-065;
+  `subscriptions/autopay-timing.ts`). `BusinessProfile.autopayChargeTiming`,
+  overridden by `SubscriptionPlan.autopayChargeTiming` when set (the booked
+  plan's for a renewal that switches plan): `DAY_AFTER_RENEWAL` (default,
+  D13 as it shipped: invoice on the renewal date, debit 26 hours later, at
+  once for a card or eMandate), `ON_RENEWAL_DATE` (the invoice and notice
+  `AUTOPAY_LEAD_DAYS` = 2 days early, the debit on the renewal date; every
+  method gets the early invoice) or `ON_DUE_DATE` (the debit at the start
+  of the due date, the notice 2 days before; no room for a Retry). Rules
+  every reader must keep:
+    - The planned debit is written on the charge's CREATED intent
+      (`debitAfter`) by `queueInTx`'s `schedule`, PREPARE is enqueued for 2
+      days before it, and `prepareCharge`'s `notBefore` keeps a no-notice
+      method from being debited sooner. **A setting changed later never moves
+      a queued charge.** DAY_AFTER_RENEWAL and Retry plan nothing (null).
+    - The early invoice comes from the renewal job's second pass
+      (`SubscriptionRenewHandler.renewEarly` → `renewEarlyOne`): ACTIVE, not
+      set to end, Payments on, a chargeable mandate, and **no invoice at all
+      yet for the next period**. On the renewal date `renewOne` finds it live
+      and advances without another.
+    - **Anything that stops the next period being billed as invoiced drops
+      the early invoice** (`subscriptions/early-renewal.ts`,
+      `dropEarlyRenewalInTx`): cancel (now or at period end), pause, and a
+      plan change booked or undone call it under the row lock; the charge
+      job's `stillCharging` calls it too before any step. It cancels the open
+      charge (never one PROCESSING), voids the invoice — or credits it in full
+      for a GST-registered business (DEC-023) — and writes
+      EARLY_INVOICE_CANCELLED. A new write that ends, pauses or re-terms a
+      subscription must call it.
+    - A VOID or CREDITED invoice is not a period's live invoice (`renewOne`,
+      and the `Invoice_one_live_per_period` index), so a subscription kept
+      after its early invoice was dropped is invoiced on the renewal date.
+    - The customer's "Next autopay charge" (`subscriptions/next-autopay-charge.ts`)
+      is a queued charge's planned debit, else the next renewal's projected
+      from the renewal date, the timing and the mandate's method.
 - **One charge at a time per invoice** (D13). While a mandate charge is
   under way (`payments/charge-under-way.ts`: open and either PROCESSING or
   on an ACTIVE mandate; sales only, never D12B's ₹1 check), a pay link,

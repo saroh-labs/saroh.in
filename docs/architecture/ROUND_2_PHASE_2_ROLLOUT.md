@@ -625,10 +625,71 @@ charged; Retry charges again (a new key) or makes a pay link.
   previous app and site. The previous app on the new API shows no
   "Autopay charge in progress" line, but its pay link and Send are refused
   (409) while a charge is under way, so nobody pays twice.
-- **Lead time.** The renewal invoice is raised on the renewal date as
-  before and falls due 7 days later; the debit is asked for 26 hours after
-  (Razorpay's 25-hour notice plus a margin), leaving room for one Retry by
-  autopay before it is overdue.
+- **Lead time.** By default the renewal invoice is raised on the renewal
+  date as before and falls due 7 days later; the debit is asked for 26
+  hours after (Razorpay's 25-hour notice plus a margin), leaving room for
+  one Retry by autopay before it is overdue. D13B (below) lets the merchant
+  choose otherwise.
+
+### D13B: the merchant chooses when autopay debits (DEC-065)
+
+"When autopay charges" on the Plans tab (and per plan on Plan Detail):
+on the renewal date (invoice and notice 2 days early), the day after
+renewal (the default, D13 unchanged) or on the due date.
+
+- **Migration** `20261018200000_autopay_charge_timing`, additive: the
+  business's setting (default `DAY_AFTER_RENEWAL`, so nothing changes until
+  a merchant picks), the plan's nullable override, CHECK constraints, and
+  `Invoice_one_live_per_period` rebuilt to leave CREDITED invoices out as
+  it does VOID ones (a SHARE lock on "Invoice" while it builds; writes
+  wait). The previous API never reads the columns and treats a CREDITED
+  invoice as live, so it never issues beside one.
+- **API before app, either is safe.** New fields (`autopay` on the
+  settings read, `autopayChargeTiming` on plans, `autopayNextCharge` on the
+  account and pay page) are ignored by the previous app and site;
+  `PATCH …/subscriptions/settings` still takes `membersCanPause` alone.
+  The previous app shows no setting, so every business stays on the
+  default until the new app ships.
+- **Gate.** The setting shows only where autopay can charge (a connected
+  provider that takes mandates, `RAZORPAY_AUTOPAY` on). The early pass only
+  touches subscriptions with an ACTIVE mandate whose provider's charging is
+  on.
+- **Early invoices.** Under "on the renewal date" the renewal job invoices
+  two days early. A cancel, pause or plan change before the renewal date
+  voids that invoice (a GST business gets a credit note) and cancels its
+  charge before any debit; the customer may already have had the bank's
+  notice, which the provider can't take back.
+- **A changed setting never moves a queued charge**: its planned debit is
+  on its intent.
+
+#### Verify
+
+With `RAZORPAY_AUTOPAY` on for a development business and a UPI mandate
+ACTIVE: pick "Charge on the renewal date" on the Plans tab; move the test
+subscription's `currentPeriodEnd` to 47 hours ahead; after the next renewal
+run the invoice is ISSUED with the renewal date as its period start and
+its charge's intent has `debitAfter` = the renewal date. Cancel it at
+period end: the invoice reads VOID, the intent CANCELLED, and the log says
+"Voided the early renewal invoice". Charges planned ahead:
+
+```sql
+SELECT i.status, i."debitAfter", inv."periodStart", inv.status AS invoice
+FROM "PaymentIntent" i JOIN "Invoice" inv ON inv.id = i."invoiceId"
+WHERE i."viaMandateId" IS NOT NULL AND i.purpose IS NULL
+  AND i.status = 'CREATED' AND i."debitAfter" IS NOT NULL
+ORDER BY i."debitAfter";
+```
+
+#### Rollback
+
+Deploy the previous API and app; leave the columns. The old image runs a
+queued charge's steps when they fall due but ignores its planned debit: it
+asks for the debit 26 hours after preparing (a card at once), so no charge
+is lost but one may come earlier than the merchant chose. An early invoice already issued stays
+the period's invoice and is charged as D13 would; a cancel or pause on the
+old image doesn't void it, so void those by hand (the SQL above, where
+`periodStart` is still ahead). Dropping the columns is a later contract
+step.
 
 ### Verify
 
