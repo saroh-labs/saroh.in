@@ -119,13 +119,10 @@ export default async function CustomerDetailPage({
                 initialTab={tabFromQuery(query.tab, tabs)}
                 bizName={organization?.name ?? null}
                 // Linked store customers are read only where the business
-                // sells, so their presence says it does. The counter's roles
-                // (a stage but no order read) are refused Sell › Customers
-                // (R7, #508), so their crumb says Contacts, as their rail does.
-                sells={
-                    detail.linkedCustomers !== undefined &&
-                    !(may("order:stage") && !may("order:read"))
-                }
+                // sells, so their presence says it does. Sell › Customers
+                // follows contact:read alone (B16, matrix W-1), a Member's
+                // included, so the crumb says what their rail does.
+                sells={detail.linkedCustomers !== undefined}
                 canWrite={canWrite}
                 canMerge={canMerge}
                 canRemove={canRemove}

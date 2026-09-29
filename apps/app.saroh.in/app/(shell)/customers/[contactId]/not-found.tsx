@@ -18,10 +18,10 @@ export default function NotFound() {
                 </div>
                 <div className="mt-3 flex justify-center">
                     <Link
-                        href="/contacts"
+                        href="/commerce/customers"
                         className="inline-flex h-8 items-center rounded-[9px] border border-border bg-card px-3 text-[12.5px] font-semibold text-foreground hover:bg-muted coarse:h-11"
                     >
-                        Back to contacts
+                        Back to Customers
                     </Link>
                 </div>
             </div>

@@ -251,14 +251,14 @@ test.describe("customer detail, as a Member", () => {
             page.getByRole("heading", { name: "Priya Raman" }),
         ).toBeVisible();
         await expect(tab(page, /^Notes/)).toBeVisible();
-        // Sell › Customers is refused to the counter (R7, #508): the crumb
-        // leads back to Contacts instead.
+        // Sell › Customers follows contact:read (B16), a Member's included:
+        // the crumb leads back there, as the rail does.
         const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });
         await expect(
-            crumbs.getByRole("link", { name: "Contacts" }),
+            crumbs.getByRole("link", { name: "Customers" }),
         ).toBeVisible();
         await expect(
-            crumbs.getByRole("link", { name: "Customers" }),
+            crumbs.getByRole("link", { name: "Contacts" }),
         ).toHaveCount(0);
         for (const name of [/^Invoices/, /^Subscriptions/, /^Orders/])
             await expect(tab(page, name)).toHaveCount(0);

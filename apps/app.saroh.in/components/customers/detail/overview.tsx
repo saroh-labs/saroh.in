@@ -58,6 +58,9 @@ export function Overview({
 }) {
     const rows = d.orders?.rows ?? [];
     const orders = d.orders !== undefined;
+    // A treatment order has no product lines, so there may be nothing to
+    // list: the card is left out rather than drawn empty.
+    const usual = favourites(rows);
     return (
         <div className="flex flex-col gap-4">
             {attention}
@@ -90,27 +93,29 @@ export function Overview({
                         ))}
                     </div>
                     <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))]">
-                        <section className={CARD} aria-label="Usually buys">
-                            <div className={cn(LABEL, "mb-2")}>
-                                Usually buys
-                            </div>
-                            {favourites(rows).map((f) => (
-                                <div
-                                    key={f.productId}
-                                    className="flex gap-2.5 border-b border-foreground/10 py-[7px] text-[13.5px]"
-                                >
-                                    <Link
-                                        href={`/commerce/products/${f.productId}`}
-                                        className="min-w-0 flex-1 text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                                    >
-                                        {f.name}
-                                    </Link>
-                                    <span className="text-muted-foreground">
-                                        {f.note}
-                                    </span>
+                        {usual.length > 0 ? (
+                            <section className={CARD} aria-label="Usually buys">
+                                <div className={cn(LABEL, "mb-2")}>
+                                    Usually buys
                                 </div>
-                            ))}
-                        </section>
+                                {usual.map((f) => (
+                                    <div
+                                        key={f.productId}
+                                        className="flex gap-2.5 border-b border-foreground/10 py-[7px] text-[13.5px]"
+                                    >
+                                        <Link
+                                            href={`/commerce/products/${f.productId}`}
+                                            className="min-w-0 flex-1 text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                        >
+                                            {f.name}
+                                        </Link>
+                                        <span className="text-muted-foreground">
+                                            {f.note}
+                                        </span>
+                                    </div>
+                                ))}
+                            </section>
+                        ) : null}
                         <section
                             className={CARD}
                             aria-label="How they get orders"
