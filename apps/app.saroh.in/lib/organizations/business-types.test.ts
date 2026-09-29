@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
     BUSINESS_TYPE_OPTIONS,
-    businessTypeForApi,
     businessTypeLabel,
     businessTypeOf,
 } from "./business-types";
 
-describe("business types (F10)", () => {
+describe("business types (F10, F10b)", () => {
     it("offers the design's six, after Not set", () => {
         expect(BUSINESS_TYPE_OPTIONS.map((o) => o.label)).toEqual([
             "Not set",
@@ -34,9 +33,11 @@ describe("business types (F10)", () => {
         expect(businessTypeLabel("cooperative")).toBeNull();
     });
 
-    it("sends Private limited as company this release, the rest as chosen", () => {
-        expect(businessTypeForApi("pvt")).toBe("company");
-        expect(businessTypeForApi("llp")).toBe("llp");
-        expect(businessTypeForApi("")).toBe("");
+    it("never offers the old company spelling, so a save sends pvt (F10b)", () => {
+        const values: readonly string[] = BUSINESS_TYPE_OPTIONS.map(
+            (o) => o.value,
+        );
+        expect(values).toContain("pvt");
+        expect(values).not.toContain("company");
     });
 });

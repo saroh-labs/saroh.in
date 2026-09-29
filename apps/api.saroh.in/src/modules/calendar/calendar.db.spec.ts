@@ -9,6 +9,7 @@
  * (TEST_DATABASE_URL).
  */
 import { prisma } from "@saroh/database";
+import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -17,6 +18,15 @@ import {
     issueCreditNote,
 } from "../invoices/order-invoicing";
 import { CalendarService } from "./calendar.service";
+
+/** A whole month as the `from`/`to` range the app asks for (E20; Z3). */
+function monthRange(month: string): { from: string; to: string } {
+    const first = DateTime.fromISO(`${month}-01`, { zone: "UTC" });
+    return {
+        from: first.toFormat("yyyy-MM-dd"),
+        to: first.endOf("month").toFormat("yyyy-MM-dd"),
+    };
+}
 
 const tag = `${process.pid}-${Date.now()}`;
 const NOW = new Date("2026-09-20T06:00:00Z");
@@ -350,7 +360,7 @@ describe("Business Calendar month (DB)", () => {
     });
 
     it("lays the month out in the business's zone, its own rows only", async () => {
-        const month = await calendar.month(ctx, "2026-09", NOW);
+        const month = await calendar.read(ctx, monthRange("2026-09"), NOW);
         const day = (d: string) => month.days.find((x) => x.date === d);
 
         expect(month.timezone).toBe("Asia/Kolkata");
@@ -373,7 +383,7 @@ describe("Business Calendar month (DB)", () => {
             where: { id: ctx.organizationId },
             select: { createdAt: true },
         });
-        const month = await calendar.month(ctx, "2026-09", NOW);
+        const month = await calendar.read(ctx, monthRange("2026-09"), NOW);
         expect(month.joinedAt).toBe(
             new Intl.DateTimeFormat("en-CA", {
                 timeZone: "Asia/Kolkata",
@@ -382,7 +392,7 @@ describe("Business Calendar month (DB)", () => {
     });
 
     it("dates the weekly collections, the skipped week left out", async () => {
-        const month = await calendar.month(ctx, "2026-09", NOW);
+        const month = await calendar.read(ctx, monthRange("2026-09"), NOW);
         const collected = month.days
             .filter((d) => (d.layers.collections?.count ?? 0) > 0)
             .map((d) => d.date);
@@ -394,12 +404,12 @@ describe("Business Calendar month (DB)", () => {
     });
 
     it("a pay-later order is on the day it was placed, its money on the day it was paid", async () => {
-        const september = await calendar.month(ctx, "2026-09", NOW);
+        const september = await calendar.read(ctx, monthRange("2026-09"), NOW);
         const thirtieth = september.days.find((d) => d.date === "2026-09-30");
         expect(thirtieth?.layers.orders?.count).toBe(1);
         expect(thirtieth?.takings).toEqual([]);
 
-        const october = await calendar.month(ctx, "2026-10", NOW);
+        const october = await calendar.read(ctx, monthRange("2026-10"), NOW);
         const day = (d: string) => october.days.find((x) => x.date === d);
         expect(day("2026-10-02")?.layers.orders?.count).toBe(0);
         expect(day("2026-10-02")?.takings).toEqual([
@@ -421,7 +431,7 @@ describe("Business Calendar month (DB)", () => {
     });
 
     it("money in, out and due match a hand sum (E19)", async () => {
-        const october = await calendar.month(ctx, "2026-10", NOW);
+        const october = await calendar.read(ctx, monthRange("2026-10"), NOW);
         const day = (d: string) => october.days.find((x) => x.date === d);
         // ₹1,000 in; out is the ₹300 refund plus the ₹23.60 fee.
         expect(day("2026-10-06")?.money).toEqual([
@@ -456,7 +466,7 @@ describe("Business Calendar month (DB)", () => {
         // September: ₹750 in on the 5th (orders from before invoicing);
         // due is the ₹4,000 invoice (overdue, still owed) and ₹300 on each
         // renewal the Subscriptions layer shows (the 25th and the 26th).
-        const september = await calendar.month(ctx, "2026-09", NOW);
+        const september = await calendar.read(ctx, monthRange("2026-09"), NOW);
         const renewals = september.days
             .flatMap((d) => d.layers.subscriptions?.items ?? [])
             .filter((i) => i.kind === "renewal");
@@ -472,16 +482,16 @@ describe("Business Calendar month (DB)", () => {
             },
         ]);
 
-        const member = await calendar.month(
+        const member = await calendar.read(
             { ...ctx, role: "MEMBER" },
-            "2026-10",
+            monthRange("2026-10"),
             NOW,
         );
         expect(member).not.toHaveProperty("money");
     });
 
     it("a hold shows as held while it lasts and is gone once it has run out", async () => {
-        const month = await calendar.month(ctx, "2026-09", NOW);
+        const month = await calendar.read(ctx, monthRange("2026-09"), NOW);
         const day = month.days.find((d) => d.date === "2026-09-22");
 
         const bookings = day?.layers.bookings?.items ?? [];
@@ -504,9 +514,9 @@ describe("Business Calendar month (DB)", () => {
     });
 
     it("a Member gets the diary layers and no money", async () => {
-        const month = await calendar.month(
+        const month = await calendar.read(
             { ...ctx, role: "MEMBER" },
-            "2026-09",
+            monthRange("2026-09"),
             NOW,
         );
         expect(month.layers).toEqual(["bookings", "classes"]);

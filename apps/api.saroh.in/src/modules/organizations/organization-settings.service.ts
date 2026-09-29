@@ -30,7 +30,7 @@ import {
     taxView,
     touchesTax,
 } from "./business-tax-settings";
-import { businessTypeWrite } from "./business-type";
+import { businessTypeRead, businessTypeWrite } from "./business-type";
 import type { UpdateOrganizationDto } from "./dto";
 import { authorize } from "./organization-policy";
 import { settingsChanges, settingsSnapshot } from "./settings-audit";
@@ -171,7 +171,8 @@ function splitProfile(
         ...profile
     } = p;
     return {
-        profile,
+        // A row the F10b backfill hasn't reached yet still says `company`.
+        profile: { ...profile, type: businessTypeRead(profile.type) },
         tax: taxView(p, counters),
         registeredAddress: addressView(p),
         logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,
@@ -273,8 +274,8 @@ export class OrganizationSettingsService {
 
         const profileData = reduceProfile(dto.profile);
         const timezone = zoneWrite(profileData.timezone);
-        // "" clears it; a private limited company is still kept as
-        // `company` this release (`business-type.ts`, boundary 9).
+        // "" clears it; an old client's `company` is stored as `pvt`
+        // (`business-type.ts`, F10b).
         const typeValue = businessTypeWrite(profileData.type);
         const businessType = typeValue === undefined ? {} : { type: typeValue };
         // Checked and made E.164 before anything is written; "" clears it.

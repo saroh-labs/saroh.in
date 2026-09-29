@@ -417,8 +417,8 @@ SELECT count(*) FROM "ClassPack" WHERE status = 'DRAFT';
 ## E20: the calendar reads a range (wave 3)
 
 `GET organizations/:org/calendar` takes `from`/`to` (local dates, both
-inclusive, at most 62 days) as well as `month` (`calendar/range.ts`). No
-migration.
+inclusive, at most 62 days) as well as `month` until Z3 (below)
+(`calendar/range.ts`). No migration.
 
 - **API before app.** The new workspace asks for `from`/`to`, which the old
   API refuses (400), so deploy the API first. The old workspace sends
@@ -447,6 +447,21 @@ business joined>` opens the joined month, with no error page.
 
 Roll the workspace back first (it asks for `from`/`to`), then the API.
 Nothing is stored.
+
+### Z3: the `month` alias is removed (done, batch 2026-09-29)
+
+E20 went to production in #708, so no workspace that sends `month` is live.
+The API now answers `from`/`to` only; `?month=` is a 400 ("property month
+should not exist"). Before this release, confirmed that nothing calls the
+alias: the workspace reads `calendar?from=&to=` (`lib/calendar/service.ts`;
+its own `/calendar?month=` is a page URL, not the API), and neither
+`saroh.app`, `site-blocks` nor `e2e` reads the calendar. No migration.
+
+- **Rolling the API back** below this release is fine: the E20 API answers
+  both.
+- **Rolling the workspace back below E20 now breaks the calendar** (it
+  would send `month`, which this API refuses). Roll the API back with it,
+  to #708 or earlier.
 
 ## E9: a treatment sold as one order (wave 2)
 
@@ -801,6 +816,83 @@ reminder; Undo within ten seconds sends nothing. A Member sees no buttons.
 ### Rollback
 
 Deploy the previous API or app; nothing is stored.
+
+## Z5: Home's old fields are removed (done, batch 2026-09-29)
+
+F3, F5, F6 and F7 served `GET /home`'s old fields beside the new ones for
+one release (default 130). B2d and those units are in production (#708), so
+Z5 removes the two no live app reads: **`primaryAction`** and **`numbers`**
+(with the reads behind them only: the CRM lead and contact counts, and the
+upcoming bookings count). No migration.
+
+- **Confirmed unused** before removing: neither is read by `app.saroh.in`
+  (in this branch or in #708's), `saroh.app`, `site-blocks` or `e2e` (only
+  the permissions API mock sent them; it no longer does).
+- **Kept on purpose:** `actions` (the workspace rail's badges read its
+  OVERDUE rows, `components/shared/app-shell.tsx`), `upcoming` (Needs you's
+  "Next" line) and `hasAnyModule` (the first-run screen). They are not
+  legacy while the app reads them.
+
+### Rollback
+
+Rolling the API back below this release is fine (it sends the two fields
+again, which the app ignores). **Rolling the workspace back below F5/F6
+(to an app from before #708) now breaks Home**: that app draws the numbers
+band from `home.numbers`, which this API no longer sends. Roll the API back
+with it.
+
+## F10b: a private limited company is stored as `pvt` (follow-up to F10)
+
+F10 (#708) shipped the readers: every API and app since reads `company` and
+`pvt` alike as Private limited, and still stored and sent `company`
+(boundary 9). F10b:
+
+- **The API stores `pvt`** for either spelling (`business-type.ts`), and
+  answers a row still stored as `company` as `pvt`. It still **accepts**
+  `company`, so an F10 app keeps saving; follow-up Z4 drops that a release
+  later.
+- **The app sends `pvt`.** It still reads `company` as Private limited
+  until Z4, in case the API is rolled back to F10 before the backfill runs.
+- **No migration.** A backfill CLI rewrites the stored rows
+  (`packages/database/src/backfill/business-type-pvt.ts`): only
+  `BusinessProfile.type = 'company'`, to `pvt`. Idempotent; prints counts
+  only.
+
+### Deploy
+
+1. **The API first.** F10's app sends `company`, which this API takes.
+2. **Then run the backfill** once the old image has stopped serving (it
+   stores `company` until then):
+
+    ```bash
+    DATABASE_URL=<production url> DATABASE_TARGET_CONFIRM=<database> \
+      pnpm --filter @saroh/database exec tsx src/backfill/business-type-pvt.cli.ts
+    ```
+
+    It prints
+    `[business-type-pvt] <database>: stored as company: <n>, rewritten to pvt: <n>, still company: <n>`.
+    "Still company" must be 0; if not, run it again.
+
+3. **Then the workspace** (`app.saroh.in`), which sends `pvt`.
+
+### Verify
+
+```sql
+SELECT count(*) FROM "BusinessProfile" WHERE type = 'company';  -- 0
+SELECT count(*) FROM "BusinessProfile" WHERE type = 'pvt';
+```
+
+A business that was `company` shows Private limited company in Settings, and
+saving another type records `type: pvt → <new>` in Activity.
+
+### Rollback
+
+Rolling the API back to F10 is safe: F10 reads `pvt` rows and stores
+`company` again, so re-run the backfill after re-deploying F10b. Rolling the
+app back to F10 is safe (it sends `company`, which this API maps to `pvt`).
+Below F10, the API refuses `pvt` and would not name those rows: don't, once
+the backfill has run. Z4 must wait until the query above reads 0 in
+production.
 
 ## Before switching a flag on (advisory)
 

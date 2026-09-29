@@ -1,11 +1,11 @@
-// The legal form's two spellings of a private limited company, while the
-// rename from `company` to `pvt` runs readers first (release boundary 9).
+// The legal form's two spellings of a private limited company: F10b stores
+// `pvt` and still accepts an old client's `company` until Z4.
 import { businessTypeRead, businessTypeWrite } from "./business-type";
 
 describe("businessTypeWrite", () => {
-    it("keeps a private limited company as company this release", () => {
-        expect(businessTypeWrite("pvt")).toBe("company");
-        expect(businessTypeWrite("company")).toBe("company");
+    it("stores a private limited company as pvt, whichever spelling is sent", () => {
+        expect(businessTypeWrite("pvt")).toBe("pvt");
+        expect(businessTypeWrite("company")).toBe("pvt");
     });
 
     it("stores the other types as sent", () => {

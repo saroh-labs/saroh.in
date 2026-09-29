@@ -85,7 +85,8 @@ describe("OrganizationOnboardingService.onboard", () => {
             data: {
                 organizationId: "org_1",
                 legalName: "Acme Inc",
-                type: "company",
+                // An old client's spelling is stored as `pvt` (F10b).
+                type: "pvt",
                 country: "US",
                 taxId: undefined,
                 contactEmail: undefined,
@@ -97,13 +98,13 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
     });
 
-    it("keeps a private limited company as company this release, and takes a new type as sent (F10)", async () => {
+    it("stores a private limited company as pvt, and takes a new type as sent (F10b)", async () => {
         await service.onboard("user_1", {
             name: "Acme",
             profile: { type: "pvt" },
         });
         expect(profileCreate).toHaveBeenLastCalledWith({
-            data: expect.objectContaining({ type: "company" }),
+            data: expect.objectContaining({ type: "pvt" }),
         });
 
         await service.onboard("user_1", {

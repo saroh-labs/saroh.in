@@ -70,11 +70,9 @@ import {
     phoneLabel,
     phoneProblem,
 } from "@/lib/organizations/business-phone";
-import type { BusinessTypeValue } from "@/lib/organizations/business-types";
 import {
     BUSINESS_TYPE_OPTIONS,
     BUSINESS_TYPE_VALUES,
-    businessTypeForApi,
     businessTypeLabel,
     businessTypeOf,
 } from "@/lib/organizations/business-types";
@@ -476,12 +474,6 @@ export function OrganizationSettingsForm({
                 values[key]?.trim() ?? "",
             ]),
         );
-        // Private limited goes as the spelling every API takes (F10).
-        if ("type" in profile) {
-            profile.type = businessTypeForApi(
-                profile.type as BusinessTypeValue,
-            );
-        }
         const tax = {
             ...(dirtyFields.gstRegistered
                 ? { registered: values.gstRegistered }

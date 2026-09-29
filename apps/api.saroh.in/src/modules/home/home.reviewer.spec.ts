@@ -222,10 +222,10 @@ describe("Home for a Reviewer (F9)", () => {
 
         expect(read).toEqual([]);
         expect(home.actions).toEqual([]);
-        expect(home.primaryAction).toBeNull();
+        expect(home).not.toHaveProperty("primaryAction");
         expect(home.needs).toEqual([]);
         expect(home.needsTotal).toBe(0);
-        expect(home.numbers).toEqual([]);
+        expect(home).not.toHaveProperty("numbers");
         expect(home.upcoming).toEqual([]);
         expect(home.today).toBeNull();
         const keys = keysOf(JSON.parse(JSON.stringify(home)));

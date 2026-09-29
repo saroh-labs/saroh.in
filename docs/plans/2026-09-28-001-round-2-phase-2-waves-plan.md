@@ -191,16 +191,16 @@ one exists.
 
 ## Deferred to follow-up work (the contract steps)
 
-| ID | Step | When |
-|---|---|---|
-| Z1 | **Done** (`r2/z1z2`, 2026-09-29). Remove D10's allowance fallback, once a query finds no unset rows. An unset row now logs `subscription_allowance_unset` (ERROR) and is served its plan's number, never unlimited; the pre-deploy gate (backfill prints `set now: 0, still unset: 0`, and the unset-row query returns 0) is in `ROUND_2_PHASE_2_ROLLOUT.md`, "Z1" | After CP-2, wave 4 or later |
-| Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows). **Blocked (checked 2026-09-29, `r2/z1z2`): the table is still live, so it needs Z2a first.** The API writes it (`contact-notes.service.ts` create/update) and reads it (the note view's `allergens`/`matchAllergens` in Customer Detail; `catalogue/allergens.service.ts` refuses deleting an allergen that notes name); the workspace sends and shows it (`customers/detail/notes.tsx` picker, Order Detail's banner in `lib/orders/lifecycle.ts`); `packages/database` reads or writes it in the C1 backfill, the catalogue-settings backfill, the seed and the showcase seed/check. Nothing in e2e, `saroh.app`, the privacy-removal or merge rule tables (rows go with their note, `noteId` ON DELETE CASCADE) or later RLS migrations. Every API image to date reads it, so dropping it now breaks notes and Customer Detail on the serving image and on any rollback | Two deploys after Z2a |
-| Z2a | Stop reading and writing `ContactNoteAllergen`: notes carry text only, allergens live on Needs attention (C1); the note picker, the note view's allergens and Order Detail's note banner move to Attention entries; the allergen-delete check counts Attention only; seeds and backfills stop touching it. A product change to the notes screen: agree it with the user first | Before Z2 |
-| Z3 | Remove the calendar's month-query alias | After E20 is live |
-| F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 |
-| Z4 | Remove the `company` business-type alias | A release after F10b |
-| Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it |
-| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 |
+| ID | Step | When | Done |
+|---|---|---|---|
+| Z1 | **Done** (`r2/z1z2`, 2026-09-29). Remove D10's allowance fallback, once a query finds no unset rows. An unset row now logs `subscription_allowance_unset` (ERROR) and is served its plan's number, never unlimited; the pre-deploy gate (backfill prints `set now: 0, still unset: 0`, and the unset-row query returns 0) is in `ROUND_2_PHASE_2_ROLLOUT.md`, "Z1" | After CP-2, wave 4 or later | [x] 2026-09-29 (`r2/z1z2`) |
+| Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows). **Blocked (checked 2026-09-29, `r2/z1z2`): the table is still live, so it needs Z2a first.** The API writes it (`contact-notes.service.ts` create/update) and reads it (the note view's `allergens`/`matchAllergens` in Customer Detail; `catalogue/allergens.service.ts` refuses deleting an allergen that notes name); the workspace sends and shows it (`customers/detail/notes.tsx` picker, Order Detail's banner in `lib/orders/lifecycle.ts`); `packages/database` reads or writes it in the C1 backfill, the catalogue-settings backfill, the seed and the showcase seed/check. Nothing in e2e, `saroh.app`, the privacy-removal or merge rule tables (rows go with their note, `noteId` ON DELETE CASCADE) or later RLS migrations. Every API image to date reads it, so dropping it now breaks notes and Customer Detail on the serving image and on any rollback | Two deploys after Z2a |  |
+| Z2a | Stop reading and writing `ContactNoteAllergen`: notes carry text only, allergens live on Needs attention (C1); the note picker, the note view's allergens and Order Detail's note banner move to Attention entries; the allergen-delete check counts Attention only; seeds and backfills stop touching it. A product change to the notes screen: agree it with the user first | Before Z2 |  |
+| Z3 | Remove the calendar's month-query alias | After E20 is live | [x] 2026-09-29 (`?month=` is a 400; rollout doc E20) |
+| F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 | [x] 2026-09-29 (backfill CLI `business-type-pvt.cli.ts`; rollout doc F10b) |
+| Z4 | Remove the `company` business-type alias | A release after F10b |  |
+| Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it | [x] 2026-09-29 (`primaryAction`, `numbers`; `actions`, `upcoming` kept: the app reads them; rollout doc Z5) |
+| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 | Waits for D7's app side (`r2/d7`, not yet merged) |
 
 ## Risks and open questions
 
