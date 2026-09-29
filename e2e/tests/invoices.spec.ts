@@ -144,10 +144,12 @@ test.describe("invoices", () => {
         await signIn(page);
         await page.goto(`/open/${ORG}`);
 
-        // The chips show only when there are two sources or more. Northwind
-        // sells; an invoice written by hand is made here, not borrowed from
-        // the test above, so this test runs alone or on any shard.
+        // The chips show only when there are two sources or more. Both are
+        // made here — an order paid (its invoice is written as it is paid)
+        // and an invoice by hand — never borrowed from another test, so this
+        // runs alone, on any shard, on a freshly seeded database.
         const org = await northwind(page);
+        await paidOrder(page, org);
         const { id } = await draftFor(page, org, "d18");
         await api(page, org).post(`/invoices/${id}/issue`);
 
@@ -253,6 +255,54 @@ function api(page: Page, org: string) {
                 failOnStatusCode: false,
             }),
     };
+}
+
+/**
+ * A Northwind order, paid, so it has an invoice from an order (ADR-008: the
+ * order's invoice is written when it is paid). Northwind's fixed seed ids,
+ * with a unit received first so the shelf never runs out.
+ */
+async function paidOrder(page: Page, org: string): Promise<void> {
+    const headers = { "x-organization-id": org, origin: urls.APP_URL };
+    for (const variantId of [null, "seed_variant_11_0"]) {
+        const received = await page.request.post(
+            `${urls.API_URL}/organizations/${org}/stock/adjust`,
+            {
+                headers,
+                data: {
+                    storeId: "seed_store",
+                    productId: "seed_product_11",
+                    variantId,
+                    units: 1,
+                    note: "e2e: stock for an invoiced order",
+                },
+            },
+        );
+        if (received.ok()) break;
+    }
+    const made = await page.request.post(
+        `${urls.API_URL}/stores/seed_store/orders`,
+        {
+            headers,
+            data: {
+                customerId: "seed_customer_6",
+                items: [
+                    {
+                        productId: "seed_product_11",
+                        variantId: "seed_variant_11_0",
+                        quantity: 1,
+                    },
+                ],
+            },
+        },
+    );
+    expect(made.ok(), await made.text()).toBe(true);
+    const { id } = (await made.json()) as { id: string };
+    const marked = await page.request.patch(
+        `${urls.API_URL}/stores/seed_store/orders/${id}`,
+        { headers, data: { paymentStatus: "PAID" } },
+    );
+    expect(marked.ok(), await marked.text()).toBe(true);
 }
 
 /** A contact with an email, and a draft invoice to them, made for the test. */
