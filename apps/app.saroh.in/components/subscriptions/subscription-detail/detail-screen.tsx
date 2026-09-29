@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { autopayPanel } from "@/lib/subscriptions/autopay";
 import { pauseNote, pauseOptions } from "@/lib/subscriptions/pause";
 import type {
     Optional,
@@ -17,7 +18,6 @@ import type {
     SubscriptionEventsPage,
 } from "@/lib/subscriptions/service";
 import {
-    autopayLine,
     chargeRow,
     chargingText,
     collectionRows,
@@ -40,6 +40,7 @@ import { Pill } from "../pill";
 import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-sheets";
 import { ActionSheet } from "./action-sheets";
+import { AutopayActions } from "./autopay-panel";
 import { ChangesCard } from "./changes-card";
 import {
     ChargesCard,
@@ -234,6 +235,7 @@ export function SubscriptionDetail({
         sub.pendingPlan && tab !== "cancelled" ? sub.pendingPlan : null;
     const how = charges.state === "ok" ? paysBy(charges.data) : null;
     const head = headline(sub, how, now);
+    const autopay = autopayPanel(sub, { canWrite, paysBy: how, now });
     const older = olderPrice(sub, plans);
     const plan = plans.find((p) => p.id === sub.plan.id);
     const rows = collectionRows(sub, now);
@@ -426,14 +428,19 @@ export function SubscriptionDetail({
                                     ? `Keeps ${money(sub.price, sub.currency)} — the plan is ${money(older.listPrice, sub.currency)} for new sign-ups`
                                     : null
                             }
-                            paysBy={
-                                // What the customer set up (D12) comes first.
-                                autopayLine(sub.autopay) ??
-                                (how
-                                    ? `Pays by ${how}`
-                                    : "Each renewal is invoiced with a pay link")
-                            }
-                        />
+                            // What the customer set up (D12) comes first;
+                            // staff manage it from here (D14).
+                            paysBy={autopay.line}
+                        >
+                            <AutopayActions
+                                subscriptionId={sub.id}
+                                panel={autopay}
+                                card={sub.autopayCard ?? null}
+                                firstName={first}
+                                timeZone={tz}
+                                now={now}
+                            />
+                        </PlanCard>
                         <ChangesCard
                             // A fresh page after an action starts the card over.
                             key={
@@ -477,6 +484,7 @@ export function SubscriptionDetail({
                     contacts={contacts}
                     plans={plans}
                     initialContactId={sub.contact.id}
+                    autopayOffered={sub.autopayCard?.offered ?? false}
                     initialPlanId={
                         plan?.status === "ACTIVE" ? sub.plan.id : undefined
                     }

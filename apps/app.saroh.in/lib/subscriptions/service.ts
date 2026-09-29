@@ -159,10 +159,84 @@ export interface Subscription {
      * is under way. Absent from an API older than D13 (a pay link).
      */
     retryVia?: RetryVia | null;
+    /**
+     * The autopay card staff manage it from (D14). Only Subscription
+     * Detail's read has it; absent from an API older than D14.
+     */
+    autopayCard?: AutopayCard | null;
+    /** Its autopay on the list (D14); only the list has it. */
+    autopayOn?: AutopayBadge | null;
 }
 
 /** How a failed renewal is retried (D13). */
 export type RetryVia = "MANDATE" | "PAY_LINK";
+
+/** A way to pay autopay by, as the business's provider offers it. */
+export type AutopayMethod = "UPI" | "CARD" | "EMANDATE";
+
+/** Whether the business offers autopay now, and by what (D14). */
+export interface AutopayOffer {
+    /**
+     * Its provider takes autopay and the rollout flag is on: only then may
+     * the workspace offer it or promise it.
+     */
+    offered: boolean;
+    /** Every method its account offers — never narrowed (DEC-059). */
+    methods: AutopayMethod[];
+    /** The ₹1 check a method takes when nothing is owed (DEC-064). */
+    checks: Partial<
+        Record<AutopayMethod, { amount: string; currency: string }>
+    >;
+    /** "Razorpay", when autopay is offered. */
+    provider: string | null;
+}
+
+/** Subscription Detail's autopay card (D14), beside D12's `autopay` line. */
+export interface AutopayCard extends AutopayOffer {
+    /** How the current mandate came to be; null without one. */
+    setUp: {
+        source: "PAY_LINK" | "PRICES" | "ACCOUNT" | "SETUP_LINK" | null;
+        at: string;
+        /** Who on the team sent the set-up link it came from. */
+        sentBy: string | null;
+    } | null;
+    /** The last mandate was cancelled and nothing replaced it. */
+    ended: { at: string; reason: string | null; confirmed: boolean } | null;
+    /** D13's "Autopay limit too low", while it holds. */
+    limitLow: {
+        limit: string | null;
+        amount: string;
+        currency: string;
+        at: string;
+    } | null;
+    /** Where Saroh would email a set-up link; null: copy it instead. */
+    emailTo: string | null;
+}
+
+/** A subscription's autopay on the list (D14). */
+export interface AutopayBadge {
+    method: AutopayMethod | null;
+    hint: string | null;
+    paused: boolean;
+}
+
+/** What "Send a set-up link" made; the link is shown once. */
+export interface AutopayLink {
+    url: string;
+    method: AutopayMethod;
+    limit: string;
+    currency: string;
+    check: { amount: string; currency: string } | null;
+    expiresAt: string;
+    emailed: { status: "QUEUED" | "SUPPRESSED"; to: string } | null;
+    emailProblem: string | null;
+}
+
+/** What "Cancel autopay" did (D14). */
+export interface AutopayCancelled {
+    outcome: "CANCELLED" | "CONFIRMING" | "REFUSED" | "ALREADY_OFF";
+    provider: string | null;
+}
 
 export interface UpcomingCollection {
     /** Its local date, YYYY-MM-DD. */
@@ -609,6 +683,58 @@ export function retrySubscription(id: string, via: RetryVia = "PAY_LINK") {
         via === "PAY_LINK"
             ? "Couldn't make a new pay link. Nothing changed."
             : "Autopay wasn't charged. Nothing changed.",
+    );
+}
+
+/**
+ * Whether the business offers autopay now (D14), for the copy that may
+ * promise it. Unknown (an older API, a failed read) reads as not offered,
+ * so nothing promises what may not be there.
+ */
+export async function getAutopayOffer(): Promise<AutopayOffer | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/subscriptions/autopay`);
+        if (!res.ok) return null;
+        const body = (await res.json()) as Partial<AutopayOffer>;
+        return typeof body.offered === "boolean" && Array.isArray(body.methods)
+            ? {
+                  offered: body.offered,
+                  methods: body.methods,
+                  checks: body.checks ?? {},
+                  provider: body.provider ?? null,
+              }
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * "Send a set-up link" (D14): the provider's page to approve autopay on,
+ * for `method`; emailed as well when `email` and the business can.
+ */
+export function sendAutopayLink(
+    id: string,
+    method: AutopayMethod,
+    email: boolean,
+) {
+    return send<AutopayLink>(
+        `${sub(id)}/autopay/link`,
+        "POST",
+        { method, email },
+        "Couldn't make a set-up link. Nothing was sent.",
+    );
+}
+
+/** "Cancel autopay" (D14): the provider is asked first. */
+export function cancelAutopay(id: string) {
+    return send<AutopayCancelled>(
+        `${sub(id)}/autopay/cancel`,
+        "POST",
+        {},
+        "Couldn't cancel autopay. Nothing changed — try again.",
     );
 }
 

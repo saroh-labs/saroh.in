@@ -253,5 +253,24 @@ describe("autopay set up by the customer (D12)", () => {
         expect(changeWho(setUp("ACCOUNT"), SUB, null)).toBe(
             "Meera, from their account",
         );
+        // D14: approved on the provider's page from a link staff sent.
+        expect(changeWho(setUp("SETUP_LINK"), SUB, null)).toBe(
+            "Meera, from a set-up link",
+        );
+    });
+
+    it("says a set-up link was made, and emailed (D14), and a replaced autopay", () => {
+        expect(
+            what({ kind: "MANDATE_LINK_SENT", data: { method: "UPI" } }),
+        ).toBe("Autopay set-up link made for UPI");
+        expect(
+            what({
+                kind: "MANDATE_LINK_SENT",
+                data: { method: "CARD", emailed: true },
+            }),
+        ).toBe("Autopay set-up link made for card and emailed");
+        expect(
+            what({ kind: "MANDATE_CANCELLED", data: { reason: "REPLACED" } }),
+        ).toBe("Autopay replaced — they approved a new one");
     });
 });

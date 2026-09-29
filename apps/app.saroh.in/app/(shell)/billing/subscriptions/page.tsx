@@ -8,6 +8,7 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
 import {
+    getAutopayOffer,
     getRenewals,
     getSubscriptionSettings,
     listChargesBySubscription,
@@ -59,11 +60,13 @@ export default async function SubscriptionsPage({
             listPlansOptional(),
             modulesOrUnknown(),
         ]);
-    const [contacts, renewals, charges, settings] = await Promise.all([
+    const [contacts, renewals, charges, settings, autopay] = await Promise.all([
         canWrite ? contactPickerOptions() : Promise.resolve([]),
         getRenewals().catch(() => null),
         listChargesBySubscription(),
         getSubscriptionSettings(),
+        // Whether the copy may promise autopay (D14).
+        getAutopayOffer(),
     ]);
     const plans = planRead.state === "ok" ? planRead.data : null;
     const appointments = modules
@@ -100,6 +103,7 @@ export default async function SubscriptionsPage({
                 openSubscribe={canWrite && params.subscribe === "1"}
                 nowIso={now.toISOString()}
                 settings={settings}
+                autopayOffered={autopay?.offered ?? false}
             />
         </PageContainer>
     );

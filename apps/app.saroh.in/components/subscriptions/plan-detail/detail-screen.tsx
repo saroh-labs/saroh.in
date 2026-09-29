@@ -58,6 +58,7 @@ export function PlanDetail({
     canWrite,
     initialTab,
     nowIso,
+    autopayOffered = false,
 }: {
     plan: Plan;
     subscriptions: Optional<CappedList<Subscription>>;
@@ -67,6 +68,8 @@ export function PlanDetail({
     canWrite: boolean;
     initialTab: DetailTab;
     nowIso: string;
+    /** The business offers autopay (D14): the edit copy may say so. */
+    autopayOffered?: boolean;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -299,7 +302,11 @@ export function PlanDetail({
             </div>
 
             {editing ? (
-                <PlanDialog plan={plan} onClose={() => setEditing(false)} />
+                <PlanDialog
+                    plan={plan}
+                    onClose={() => setEditing(false)}
+                    autopayOffered={autopayOffered}
+                />
             ) : null}
         </>
     );

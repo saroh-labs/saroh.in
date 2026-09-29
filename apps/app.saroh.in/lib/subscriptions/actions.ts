@@ -45,6 +45,21 @@ export async function retrySubscription(
 ) {
     return then(api.retrySubscription(id, via));
 }
+/**
+ * "Send a set-up link" (D14): the provider's page to approve autopay on,
+ * answered once; emailed as well when asked and the business can.
+ */
+export async function sendAutopayLink(
+    id: string,
+    method: api.AutopayMethod,
+    email: boolean,
+) {
+    return then(api.sendAutopayLink(id, method, email));
+}
+/** "Cancel autopay" (D14): the subscription carries on, invoiced by link. */
+export async function cancelAutopay(id: string) {
+    return then(api.cancelAutopay(id));
+}
 export async function resumeSubscription(id: string) {
     return then(api.resumeSubscription(id));
 }
