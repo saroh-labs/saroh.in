@@ -1110,6 +1110,80 @@ describe("OrganizationSettingsService", () => {
             });
         });
 
+        describe("what is being set up (DEC-070)", () => {
+            const withKind = (kind?: string) => ({
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                ...(kind === undefined ? {} : { kind }),
+                businessProfile: null,
+            });
+
+            it("reads the kind back, and a row with none as a business", async () => {
+                orgFindUnique.mockResolvedValue(withKind("WORK"));
+                expect((await service.get(ctx())).kind).toBe("WORK");
+                orgFindUnique.mockResolvedValue(withKind());
+                expect((await service.get(ctx())).kind).toBe("BUSINESS");
+            });
+
+            it("changes it on the organization and records it as it was and became", async () => {
+                orgFindUnique
+                    .mockResolvedValueOnce(withKind("BUSINESS"))
+                    .mockResolvedValue(withKind("SOLO"));
+
+                const saved = await service.update(ctx("ADMIN"), {
+                    kind: "SOLO",
+                });
+
+                expect(saved.kind).toBe("SOLO");
+                expect(orgUpdate).toHaveBeenCalledWith({
+                    where: { id: "org_1" },
+                    data: { kind: "SOLO" },
+                });
+                expect(profileUpsert).not.toHaveBeenCalled();
+                expect(record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        action: AuditAction.ProfileUpdate,
+                        metadata: {
+                            fields: ["kind"],
+                            changes: [
+                                {
+                                    field: "kind",
+                                    before: "BUSINESS",
+                                    after: "SOLO",
+                                },
+                            ],
+                        },
+                    }),
+                );
+            });
+
+            it("writes the name and the kind in one organization update", async () => {
+                await service.update(ctx(), { name: "Asha Rao", kind: "WORK" });
+                expect(orgUpdate).toHaveBeenCalledTimes(1);
+                expect(orgUpdate).toHaveBeenCalledWith({
+                    where: { id: "org_1" },
+                    data: { name: "Asha Rao", kind: "WORK" },
+                });
+            });
+
+            it("leaves it alone when a save does not send it", async () => {
+                await service.update(ctx(), { name: "Acme Global" });
+                expect(orgUpdate).toHaveBeenCalledWith({
+                    where: { id: "org_1" },
+                    data: { name: "Acme Global" },
+                });
+            });
+
+            it("needs org:update: a Member is refused and nothing is written", async () => {
+                await expect(
+                    service.update(ctx("MEMBER"), { kind: "SOLO" }),
+                ).rejects.toBeInstanceOf(ForbiddenException);
+                expect(orgUpdate).not.toHaveBeenCalled();
+                expect(record).not.toHaveBeenCalled();
+            });
+        });
+
         it("never re-slugs on rename — the slug is the stable public identifier", async () => {
             await service.update(ctx(), { name: "Totally Different Name" });
 

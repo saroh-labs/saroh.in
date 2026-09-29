@@ -29,6 +29,8 @@ import {
 
 import type { AcceptedBusinessType } from "./business-type";
 import { ACCEPTED_BUSINESS_TYPES } from "./business-type";
+import type { OrganizationKind } from "./organization-kind";
+import { ORGANIZATION_KINDS } from "./organization-kind";
 
 export { BUSINESS_TYPES, type BusinessType } from "./business-type";
 
@@ -136,6 +138,17 @@ export class OnboardOrganizationDto {
     @IsString()
     @MaxLength(63)
     address?: string;
+
+    /**
+     * What is being set up (DEC-070): BUSINESS, SOLO ("Just me") or WORK
+     * ("A site for my work"). It changes words and defaults only. Absent
+     * (an app from before it), the business is a BUSINESS.
+     */
+    @IsOptional()
+    @IsIn(ORGANIZATION_KINDS, {
+        message: "kind must be BUSINESS, SOLO or WORK",
+    })
+    kind?: OrganizationKind;
 }
 
 const DIGITS_MESSAGE = `The counter is ${MIN_COUNTER_DIGITS} to ${MAX_COUNTER_DIGITS} digits.`;
@@ -290,6 +303,17 @@ export class UpdateOrganizationDto {
     @ValidateNested()
     @Type(() => RegisteredAddressDto)
     registeredAddress?: RegisteredAddressDto;
+
+    /**
+     * What is being set up (DEC-070): BUSINESS, SOLO ("Just me") or WORK
+     * ("A site for my work"). It changes words and defaults only. Absent, it
+     * is left as it is.
+     */
+    @IsOptional()
+    @IsIn(ORGANIZATION_KINDS, {
+        message: "kind must be BUSINESS, SOLO or WORK",
+    })
+    kind?: OrganizationKind;
 }
 
 /**

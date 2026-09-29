@@ -2,13 +2,18 @@
 // the global ValidationPipe runs.
 import "reflect-metadata";
 
+import type { BadRequestException } from "@nestjs/common";
+import { ValidationPipe } from "@nestjs/common";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
+import { validationPipeOptions } from "../../common/validation";
 import {
     BUSINESS_TYPES,
     BusinessProfileDto,
     InvoiceNumberFormatDto,
+    OnboardOrganizationDto,
+    UpdateOrganizationDto,
 } from "./dto";
 
 async function refused(body: unknown): Promise<string[]> {
@@ -138,5 +143,43 @@ describe("an invoice number format's shape", () => {
         expect(await refusedFormat({ ...ok, restart: "WEEK" })).toEqual([
             "restart",
         ]);
+    });
+});
+
+describe("what is being set up (DEC-070)", () => {
+    // Through the API's own ValidationPipe, as a request would be.
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const refusal = async (metatype: new () => object, body: unknown) =>
+        pipe
+            .transform(body, { type: "body", metatype })
+            .then(() => null)
+            .catch((e: BadRequestException) => e.getResponse());
+
+    it.each(["BUSINESS", "SOLO", "WORK"])(
+        "takes %s at setup and in settings",
+        async (kind) => {
+            expect(
+                await refusal(OnboardOrganizationDto, { name: "Asha", kind }),
+            ).toBeNull();
+            expect(await refusal(UpdateOrganizationDto, { kind })).toBeNull();
+        },
+    );
+
+    it("takes no kind at all, as an older app sends", async () => {
+        expect(
+            await refusal(OnboardOrganizationDto, { name: "Asha" }),
+        ).toBeNull();
+        expect(await refusal(UpdateOrganizationDto, {})).toBeNull();
+    });
+
+    it("refuses one it does not know with a 400 naming kind", async () => {
+        for (const dto of [OnboardOrganizationDto, UpdateOrganizationDto]) {
+            const response = await refusal(dto, {
+                name: "Asha",
+                kind: "SHOP",
+            });
+            expect(response).toMatchObject({ statusCode: 400 });
+            expect(JSON.stringify(response)).toContain("kind must be");
+        }
     });
 });

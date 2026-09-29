@@ -168,6 +168,7 @@ describe("OrganizationContextService.listForUser", () => {
                     name: "Beta",
                     slug: "beta",
                     lifecycleStatus: "SUSPENDED",
+                    kind: "WORK",
                 },
             },
         ]);
@@ -175,7 +176,14 @@ describe("OrganizationContextService.listForUser", () => {
         const result = await service.listForUser("user_1");
 
         expect(result).toMatchObject([
-            { id: "org_1", name: "Acme", slug: "acme", role: "OWNER" },
+            {
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                role: "OWNER",
+                // No kind on the row reads as a business (DEC-070).
+                kind: "BUSINESS",
+            },
             {
                 id: "org_2",
                 name: "Beta",
@@ -183,6 +191,8 @@ describe("OrganizationContextService.listForUser", () => {
                 role: "MEMBER",
                 // So the person's list can say why it is not taking changes.
                 lifecycleStatus: "SUSPENDED",
+                // So the switcher's words fit before it is opened.
+                kind: "WORK",
             },
         ]);
         // Each membership carries what the actor may do there, so the rail
@@ -231,17 +241,39 @@ describe("OrganizationContextService.getSummary", () => {
         jest.clearAllMocks();
     });
 
-    it("returns the org identity", async () => {
+    it("returns the org identity, with what is being set up", async () => {
         organizationFindUnique.mockResolvedValue({
             id: "org_1",
             name: "Acme",
             slug: "acme",
+            kind: "SOLO",
         });
         expect(await service.getSummary("org_1")).toEqual({
             id: "org_1",
             name: "Acme",
             slug: "acme",
+            kind: "SOLO",
         });
+        expect(organizationFindUnique).toHaveBeenCalledWith({
+            where: { id: "org_1" },
+            select: { id: true, name: true, slug: true, kind: true },
+        });
+    });
+
+    it("reads a row with no kind, or an unknown one, as a business", async () => {
+        organizationFindUnique.mockResolvedValue({
+            id: "org_1",
+            name: "Acme",
+            slug: "acme",
+        });
+        expect((await service.getSummary("org_1")).kind).toBe("BUSINESS");
+        organizationFindUnique.mockResolvedValue({
+            id: "org_1",
+            name: "Acme",
+            slug: "acme",
+            kind: "SHOP",
+        });
+        expect((await service.getSummary("org_1")).kind).toBe("BUSINESS");
     });
 
     it("throws NotFound when the org is gone", async () => {

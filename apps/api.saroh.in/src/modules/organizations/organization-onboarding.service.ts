@@ -16,6 +16,7 @@ import {
 import { addressProblem, addressTaken } from "../sites/site-address";
 import { businessTypeWrite } from "./business-type";
 import type { OnboardOrganizationDto } from "./dto";
+import { DEFAULT_ORGANIZATION_KIND } from "./organization-kind";
 import { slugify } from "./slug";
 
 /** What onboarding returns to the caller: the new org's identity. */
@@ -80,6 +81,10 @@ export class OrganizationOnboardingService {
             });
         }
 
+        // What is being set up (DEC-070). An app from before it sends none,
+        // and the business is a BUSINESS, as every business was.
+        const kind = dto.kind ?? DEFAULT_ORGANIZATION_KIND;
+
         const onboarded = await prisma.$transaction(async (tx) => {
             /*
              * Fail fast on a taken address with a clear 409 rather than a raw
@@ -95,7 +100,7 @@ export class OrganizationOnboardingService {
             }
 
             const organization = await tx.organization.create({
-                data: { name: dto.name, slug },
+                data: { name: dto.name, slug, kind },
                 select: { id: true, slug: true },
             });
 
@@ -133,7 +138,7 @@ export class OrganizationOnboardingService {
             targetType: "organization",
             targetId: onboarded.id,
             outcome: AuditOutcome.Success,
-            metadata: { slug: onboarded.slug },
+            metadata: { slug: onboarded.slug, kind },
         });
 
         // t0 of the activation funnel (#176). Same placement and same tradeoff
