@@ -39,6 +39,43 @@ vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
 }));
 
+/*
+ * Each open day's two times are a Radix Select of 48 options, and Radix
+ * builds every option's node even while it is closed: Bookings' twelve of
+ * them made each render take a quarter of a second in jsdom, and under a
+ * loaded prepush the file ran past its timeout. The times are the time
+ * select's own tests' (`@saroh/ui`); here a plain select stands in, so the
+ * sheet's tests measure the sheet.
+ */
+vi.mock("@saroh/ui/time-select", () => ({
+    TimeSelect: ({
+        value,
+        onValueChange,
+        id,
+        disabled,
+        "aria-label": label,
+    }: {
+        value?: string;
+        onValueChange?: (v: string) => void;
+        id?: string;
+        disabled?: boolean;
+        "aria-label"?: string;
+    }) => (
+        <select
+            id={id}
+            aria-label={label}
+            value={value ?? ""}
+            disabled={disabled}
+            onChange={(e) => onValueChange?.(e.target.value)}
+        >
+            <option value={value ?? ""}>{value ?? "Time"}</option>
+        </select>
+    ),
+}));
+
+// A loaded machine is slower, never stuck: no test here waits on a timer.
+vi.setConfig({ testTimeout: 15_000 });
+
 const NEEDS: Record<string, string[]> = {
     WEBSITE: [],
     CRM: [],
