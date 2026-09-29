@@ -3,6 +3,7 @@ title: "feat: Plans & modules catalogue (admin) and Marketing Site V2"
 type: feat
 status: active
 date: 2026-09-29
+reviewed: 2026-09-29
 ---
 
 # feat: Plans & modules catalogue (admin) and Marketing Site V2
@@ -52,7 +53,7 @@ The designs define the target: `Saroh Admin Plans v2` (a tabbed catalogue editor
 
 **Waitlist (interim ask, user 2026-09-29)**
 - R19. A `/waitlist` page to the `Saroh Waitlist` design: business name, kind of business, email, city, the source (`?src=`) and a referral link (`?ref=`); the confirmation shows the place on the list and the business's own referral link. It is the site's ask until launch and teaches us who is interested and why.
-- R20. While in waitlist mode every "Start free" / "Choose ‹plan›" CTA goes to `/waitlist` (keeping the chosen plan); one launch switch moves them all to sign-up (U27). The launch offer on the page ("3 months of Grow free" from the opening date) is honoured: invites create accounts with a 90-day Grow trial (U31).
+- R20. While in waitlist mode every "Start free" / "Choose ‹plan›" CTA goes to `/waitlist` (keeping the chosen plan); one launch switch (`launchMode`) moves them all to sign-up (U27); the waitlist stays reachable until it is removed in a later release. The launch offer on the page ("3 months of Grow free" from the opening date) is honoured through invites (U31; mechanism is Open Question OQ-1).
 
 ---
 
@@ -101,22 +102,33 @@ The designs define the target: `Saroh Admin Plans v2` (a tabbed catalogue editor
 ## Key Technical Decisions
 
 - **KTD-1. A shared pure package, `packages/pricing-catalog`.** Types and a zod schema for a catalogue snapshot, the design's seed catalogue, and the pure rules from `saroh-catalog.js`: `cardLines`, `diff` (change wording verbatim), `resolveAccess` (plan/version → overrides → add-ons → state, limit, upgradeTo), `limitNotice` (nothing < 80%, warn ≥ 80%, blocked at 100%), price helpers (GST 18%, yearly "pay for N months"), and the move-date rule. The API, admin, merchant app and saroh.in all import it; it never imports `@saroh/database` (frontends may use it — AGENTS.md rule holds). One implementation of each rule means the admin preview, the pricing page and enforcement can't disagree.
-- **KTD-2. Versions are immutable JSON snapshots validated by the schema; billing keeps its `Plan` rows.** A new `PricingCatalogVersion` table holds `{version, catalog, goLiveAt, policy, note, changes, publishedBy}`. On publish, the API also writes one `Plan` row per catalogue plan (`key` = catalogue plan id, `version` = catalogue version, price, entitlements derived from the cells) so `Subscription.planId` keeps pointing at an immutable billable thing. The live version is the newest whose `goLiveAt` has passed, resolved at read time (no cron needed to "go live").
+- **KTD-2. Versions are immutable JSON snapshots validated by the schema; billing keeps its `Plan` rows.** A new `PricingCatalogVersion` table holds `{version, catalog, goLiveAt, policy, note, changes, publishedBy}`. On publish, the API also writes one `Plan` row per catalogue plan **and billing cycle** (`key` = `catalog.<planId>`, `version` = catalogue version, `interval` = month|year, price in integer paise, entitlements derived from the cells) so `Subscription.planId` keeps pointing at an immutable billable thing. The `Plan` unique key becomes `(key, version, interval)` via expand/contract in U1 (today it is `@@unique([key, version])`, which cannot hold both cycles). The `catalog.` prefix keeps catalogue rows clear of the legacy `free`/`pro`/`business` rows (the seed already has `free@1`). The live version is the newest whose `goLiveAt` has passed, resolved at read time; a job enqueued at `goLiveAt` only fires side effects (saroh.in revalidation, move notices), never decides what is live.
 - **KTD-3. One shared draft with a revision number.** The design autosaves one shared draft; keep that, and add a `revision` so a second editor's stale save is a 409 naming who saved since (the D5 plan-draft pattern). No per-staff drafts.
 - **KTD-4. "Move them" is per subscription, not "the 1st of the month".** The prototype assumes every business renews on the 1st; real renewal dates are per subscription (ADR-007). A move is scheduled for each business at its first billing date at least 7 days after go-live (or after publish), stored on `Subscription` as a pending plan version and date, applied by the renewal path, and announced to the business 7 days before.
 - **KTD-5. Add-ons are versioned with the catalogue; purchases live on the subscription.** The prototype reads add-on definitions from the live catalogue even for businesses on older versions — an inconsistency. Add-on definitions belong to the version a business is on; bought quantities are a `SubscriptionAddon` row. Coupons are global (outside versions, as designed) with a redemption table enforcing one use per business and unique codes (the prototype enforces neither).
-- **KTD-6. Overrides generalise `EntitlementOverride`.** Add a `kind` (raise, grant, remove, limit, price, plan) and a module key; keep the current raise-only rows working. A `plan` override is how grandfathering works (KTD-7). Overrides apply in order and last until removed or expired.
+- **KTD-6. Overrides generalise `EntitlementOverride`.** Add a `kind` (raise, grant, remove, limit, price, plan) and a module key; `expiresAt` becomes nullable (additive) so an override can last until removed; `kind = raise` keeps today's raise-only path (`applyOverrides` takes the highest live value) untouched. A `plan` override is how grandfathering works (KTD-7). How the new kinds combine (order, and how legacy `Plan` keys map to catalogue plans) is Open Question OQ-3; the recommended rule is written there and U2 implements it once agreed.
 - **KTD-7. Grandfathering = a time-bound "plan: grow" override for every existing business**, written by a backfill and removed on the date the user sets; new businesses start on the published Free. The hard-coded `FREE_ENTITLEMENTS` fallback is replaced by the published Free plan only after the backfill has run (release order in Operational Notes).
 - **KTD-8. Catalogue modules map onto product modules and limits explicitly.** The catalogue's rows (website, themes, review, blog, products, orders, subscriptions, bookings, invoicing, members, roles, integrations) are not the registry's modules (WEBSITE, COMMERCE, APPOINTMENTS…). A mapping table in `packages/pricing-catalog` names, for each catalogue row, the registry module and/or the metered limit key it governs and the menu entry it locks (`menu`/`child`). DEC-057's rollout gate is evaluated first; a module rolled out off is hidden whatever the plan says.
 - **KTD-9. Metering counts from the existing tables, with per-month windows in the business's time zone.** Products (active, non-archived), orders placed this month, bookings made this month, blog posts published, team members (memberships + pending invites), integrations (connected providers). Enforcement throws the existing 403 shape with a catalogue-worded message and a stable code; "over the limit" on a plan change leaves existing things readable, blocks creating more.
-- **KTD-10. Pricing on saroh.in is statically generated with revalidation.** Pages fetch `GET /public/pricing` at build and revalidate (ISR, e.g. 5 minutes) plus on-demand revalidation called by the API when a version is published or goes live. Draft preview uses a short-lived signed token minted by the admin console (`?preview=<token>`), so saroh.in never needs a staff session.
+- **KTD-10. Pricing on saroh.in is statically generated with revalidation.** Pages fetch `GET /public/pricing` at build and revalidate (ISR, 5 minutes). On-demand revalidation: the API calls saroh.in's hook **after the publish transaction commits** (with retries) and again from a job enqueued at `goLiveAt` for scheduled versions. Hook contract: `POST` only, secret in a header compared in constant time, a fixed list of paths (no path parameter), a new secret in both environments (`devops-secrets.md`). If the API is unreachable on a **first** build, pages render from the `packages/pricing-catalog` seed snapshot bundled at build time (never an empty page); later failures keep the last good ISR page.
+  **Draft preview:** a token signed with a dedicated secret, at most 15 minutes of life, bound to the draft revision, minted only with `pricing:read`. saroh.in swaps the token for an HttpOnly cookie on first hit and redirects to strip it from the URL; the preview route is dynamic, `Cache-Control: no-store`, `noindex`, `Referrer-Policy: no-referrer`, and GA does not load on it. saroh.in never needs a staff session.
 - **KTD-11. Screenshots are captured, not copied.** A Playwright capture script signs in to the local stack's demo businesses and shoots the ~35 named views at fixed viewports, writing optimised images under `apps/saroh.in/public/shots/v2/` with a manifest mapping the design's shot keys to files. Re-run whenever the app changes.
 - **KTD-12. The tour video is optional content.** "See it in action · 2 min" buttons and the `#video` section render only when a video is configured in content; until then they are hidden rather than showing the design's placeholder slot.
 - **KTD-13. Marketing content is typed data mirroring the design's data blocks.** `F`, `LINE`, `SOL`, `S`, `FAQ_ALL`, `FAQ_ONE`, Home's `modules`/`kinds`/`faq` become typed files; templates render them. Plan names and prices on the site come from the catalogue; plan *summaries* in teasers come from the catalogue's card lines, not duplicated copy.
 - **KTD-14. Light only; Saroh tokens.** The V2 palette (paper `#F5F2EC`, ink `#1C1C1A`, saffron `#D98A15` / button `#F0A92B`, link `#91550C`, body `#43403A`, muted `#6B665A`, lines `#D9D6CC`/`#BCB8AC`) maps onto the ADR-005 tokens in `packages/ui/src/globals.css` where they match; site-only values go in `apps/saroh.in/app/site.css`. `--accent` is not renamed. The theme provider is forced to light for this app only.
-- **KTD-16. A single launch switch.** `apps/saroh.in` reads one setting (`launchMode: waitlist | open`, from env) that every CTA builder uses; waitlist mode sends CTAs to `/waitlist?plan=…&src=…`, open mode to sign-up. The waitlist page's opening date and offer are content, not hard-coded copy.
-- **KTD-17. The waitlist is data, not a mailing list.** Entries store business, kind, email (normalised, unique), city, source, referrer and position; referrals are counted per referrer; the admin console's existing `/waitlist` screen gains filters and counts by kind, city and source so the team can learn from it. Invites are sent once, on the opening date, as the page promises.
-- **KTD-15. Admin screen uses the design's dark admin palette through the console's existing tokens** and URL-driven tabs (`?tab=plans|modules|offers|versions|publish`) so a tab can be linked and survives reload.
+- **KTD-15. Admin screen uses the design's dark admin palette through the console's existing tokens** and URL-driven tabs (`?tab=plans|modules|offers|versions|publish`) so a tab can be linked and survives reload. The design's own variable names are mapped, never copied — in particular the design's `--accent` is saffron, while ours is a shadcn neutral that must not change (AGENTS.md):
+
+  | Design variable | Console token (new names are console-scoped, in the admin app's CSS) |
+  |---|---|
+  | `--accent` (saffron buttons, `color: #1C1C1A`) | `--console-action` / `--console-action-foreground` |
+  | `--warn-text` | `--console-warn` |
+  | `--danger-text` | `--destructive` (existing) |
+  | `--invert-bg` | `--console-invert` |
+
+  `--accent` is never set or overridden by this screen.
+- **KTD-16. A single launch switch.** `apps/saroh.in` reads one setting (`launchMode: waitlist | open`, from env) that one CTA builder in `apps/saroh.in/lib/links.ts` uses; the builder returns **both label and URL**. Waitlist mode: URL `/waitlist?plan=…&src=…`, label "Join the waitlist" (plan CTAs: "Get early access · ‹Plan›"), and "Sign in" in the nav is kept only as a small link for existing merchants. Open mode: sign-up URL with `?plan=&cycle=`, the design's labels ("Start free", "Start N-day trial"). No page hard-codes a CTA target or label. The waitlist page's opening date and offer are content, not hard-coded copy. Launch (U27) flips `launchMode=open`; it does not delete the waitlist.
+- **KTD-17. The waitlist is data, not a mailing list.** Entries store business, kind, email (normalised: lower-cased, gmail-style dots and `+tags` removed), city, source, referrer and position; referrals are counted per referrer, excluding self-referrals (same normalised email, same ipHash). The API never reveals whether an email is already listed: a repeat join gets the same generic "You're on the list — check your email" done state, not a position or referral link. The client IP comes from the edge (Vercel's own header), never a client-sent `X-Forwarded-For`. The form shows consent text; entries have a retention rule (deleted 12 months after launch unless they joined) and a deletion path on request. Admin views need `waitlist:read`. Invites are sent once, on the opening date, as the page promises; invite tokens are single-use, bound to the entry's email, and expire.
+- **KTD-18. Money is integer paise and derived on the server.** Every price, add-on, coupon and invoice amount is integer paise. GST is computed once per line and rounded half-up to the paisa; the provider plan amount is GST-inclusive paise. The client only ever sends keys (`plan`, `cycle`, add-on ids, coupon code); the amount charged is computed on the server from plan@version, cycle, add-ons and coupon.
 
 ---
 
@@ -129,6 +141,9 @@ The designs define the target: `Saroh Admin Plans v2` (a tabbed catalogue editor
 - Existing businesses: grandfathered on Grow; new sign-ups on Free (user).
 - Overrides: on the business page, not a Businesses tab (user).
 - Sign-up: open (user); dark mode: off (user); screenshots: captured from the app (user).
+
+- Plan unique key: add `interval` to `(key, version)` via expand/contract (U1); catalogue rows use `catalog.<planId>` keys.
+- Launch gates: two gates, W (waitlist) and O (open) — see Phased Delivery.
 
 ### Deferred to Implementation
 
@@ -220,11 +235,11 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 **Requirements:** R1, R4, R5, R9
 
-**Dependencies:** None
+**Dependencies:** U2 (the migration inlines U2's seed snapshot)
 
 **Files:**
-- Modify: `packages/database/prisma/schema.prisma` (`PricingCatalogVersion`, `PricingCatalogDraft`, `PricingCoupon`, `PricingCouponRedemption`, `SubscriptionAddon`; `Subscription.pendingPlanId`/`pendingFrom`/`billingCycle`; `EntitlementOverride.kind`/`moduleKey`, nullable `value` for non-numeric kinds)
-- Create: `packages/database/prisma/migrations/<ts>_pricing_catalogue/migration.sql` (additive; seeds version 1 = the design's catalogue, go-live now, policy "keep"; RLS on tenant-readable tables like `SubscriptionAddon`)
+- Modify: `packages/database/prisma/schema.prisma` (`PricingCatalogVersion`, `PricingCatalogDraft`, `PricingCoupon` with `maxRedemptions`, `expiresAt`, `discountPaise`, `months`, `PricingCouponRedemption`, `SubscriptionAddon`; `Subscription.pendingPlanId`/`pendingFrom`/`billingCycle`; `EntitlementOverride.kind`/`moduleKey`, nullable `value` for non-numeric kinds, **nullable `expiresAt`**; `Plan` unique key expanded to `(key, version, interval)`)
+- Create: `packages/database/prisma/migrations/<ts>_pricing_catalogue/migration.sql` (additive; seeds version 1 = the design's catalogue, go-live now, policy "keep", **and version 1's `Plan` rows** `catalog.free|grow|pro` × month/year, so subscriptions can point at v1; RLS on tenant-readable tables `SubscriptionAddon` and `PricingCouponRedemption`). The `Plan` unique-key change is expand (new unique index) then contract (drop the old one) in a later release.
 - Test: `packages/database/src/**/pricing-catalogue*.test.ts` or API db specs in U3/U4
 
 **Approach:**
@@ -235,7 +250,9 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 **Patterns to follow:** `20260923150000_products_v2` (RLS policy shape), `backend-data-and-money.md`.
 
 **Test scenarios:**
-- Happy path: migrate an empty DB → version 1 exists, live, matching the seed's plan ids `free/grow/pro`.
+- Happy path: migrate an empty DB → version 1 exists, live, matching the seed's plan ids `free/grow/pro`; `Plan` rows `catalog.grow@1` month and year both exist.
+- Edge case: the legacy seed row `free@1` coexists with `catalog.free@1` (no unique violation).
+- Edge case: an `EntitlementOverride` with `expiresAt = null` is accepted.
 - Edge case: an existing `EntitlementOverride` row reads as kind `raise` after migration.
 - Error path: inserting two coupons with codes `launch500` and `LAUNCH500` → unique violation.
 - Integration: `db:verify:replay` passes from empty.
@@ -248,15 +265,15 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 **Requirements:** R1, R6, R7, R13
 
-**Dependencies:** None (parallel with U1)
+**Dependencies:** None (lands before U1)
 
 **Files:**
 - Create: `packages/pricing-catalog/{package.json,tsconfig.json}`, `src/{schema,seed,card-lines,diff,access,limit-notice,price,moves,module-map,index}.ts`
 - Test: `packages/pricing-catalog/src/*.test.ts`
 
 **Approach:**
-- Port the logic of `docs/prototypes/marketing-site-v2/saroh-catalog.js.txt` minus storage: `cardLines`, `diff` (wording verbatim — it is the change log), `resolveAccess` (plan@version → overrides in order → add-ons from the business's version), `limitNotice`, `price` (GST 18%, yearly `paid` months, `en-IN` formatting), `moveDateFor(billingDate, goLiveAt)` (first renewal ≥ 7 days after), `module-map` (KTD-8).
-- The schema validates snapshots: exactly one featured plan at most, trial days 1–60 on paid plans only, yearly `paid` 1–12, cell limits positive integers, add-on kinds and modes from the design.
+- Port the logic of `docs/prototypes/marketing-site-v2/saroh-catalog.js.txt` minus storage: `cardLines`, `diff` (wording verbatim — it is the change log), `resolveAccess` (plan@version → overrides in order → add-ons from the business's version), `limitNotice`, `price` (integer paise; GST 18% per line, rounded half-up to the paisa; yearly `paid` months; `en-IN` formatting — KTD-18), `moveDateFor(billingDate, goLiveAt)` (first renewal ≥ 7 days after), `module-map` (KTD-8).
+- The schema validates snapshots: exactly one featured plan at most, trial days 1–60 on paid plans only (the 90-day launch offer is not a catalogue trial — OQ-1), yearly `paid` 1–12, cell limits positive integers, add-on kinds and modes from the design.
 - No imports of `@saroh/database`; ESLint boundary stays green.
 
 **Patterns to follow:** existing pure packages (`packages/block-contract`).
@@ -265,7 +282,8 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Happy path: `cardLines(seed, "grow")` → lead "Everything in Free, plus:" and lines that differ from Free (e.g. "Your website on your own domain", "100 products").
 - Happy path: `diff(v1, v1 with Grow ₹1,200)` → `["Grow: ₹1,000 → ₹1,200 a month"]`.
 - Happy path: `resolveAccess` for a Free business on `invoicing` → locked, upgradeTo "Grow" ₹1,000.
-- Edge case: a `grant` override then a `remove` for the same module → removed (order matters); a `limit` override on products → the override value with period kept.
+- Edge case: override combination per the rule agreed in OQ-3 (recommended: plan, then remove, then grant, then limit, then raise; same kind by `createdAt`) — a `grant` then a `remove` for the same module → removed; a `limit` override on products → the override value with period kept; a `raise` never lowers.
+- Edge case: GST on ₹833.33/month-equivalent rounds once per line, half-up, in paise.
 - Edge case: a products add-on pack (qty 100) bought twice on Grow → limit 300.
 - Edge case: `limitNotice` at 79% → off; 80% → warning copy "You've used 80 of 100 products on Grow"; 100% → blocked copy.
 - Edge case: `moveDateFor(renews 3 Oct, goLive 1 Oct)` → the renewal after 8 Oct.
@@ -283,11 +301,11 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 **Files:**
 - Create: `apps/api.saroh.in/src/modules/pricing/{pricing.module,public-pricing.controller,admin-pricing.controller,catalogue.service,impact.service}.ts`
-- Modify: `apps/api.saroh.in/src/modules/admin/admin-permissions.ts` (`pricing:read`, `pricing:edit`, `pricing:publish`, `coupons:manage`; Billing role gets read/edit, Platform Owner all), `admin.controller.permissions.spec.ts`
+- Modify: `apps/api.saroh.in/src/modules/admin/admin-permissions.ts` (`pricing:read` only — each write permission is added in the unit that adds its endpoint, because `admin.controller.permissions.spec.ts` requires every permission to be used), `admin.controller.permissions.spec.ts`
 - Test: `pricing/public-pricing.db.spec.ts`, `pricing/admin-pricing.db.spec.ts`, `pricing/impact.spec.ts`
 
 **Approach:**
-- `GET /public/pricing` → the live snapshot (plans not retired, modules not hidden, offers, add-ons), with `ETag` and cache headers; `?preview=<token>` verifies a short-lived signed token (minted by `POST /admin/pricing/preview-token`) and serves the draft.
+- `GET /public/pricing` → the live snapshot (plans not retired, modules not hidden, offers, add-ons), with `ETag` and cache headers; `?preview=<token>` verifies the preview token (KTD-10: dedicated secret, ≤15 minutes, bound to the draft revision; minted by `POST /admin/pricing/preview-token`, which requires `pricing:read`) and serves the draft with `Cache-Control: no-store`.
 - `GET /admin/pricing` → live version, draft (with revision, who/when), versions (newest first, status Live/Scheduled/Earlier, businesses on it and moving to it), per-plan business counts, per-module usage lines ("3 of 4 use it · highest 64 · 1 over the limit") computed from real counts (U13 metering where available; counts that don't exist yet return null and the UI hides the line).
 - `GET /admin/pricing/impact` → the design's impact items (Takes away / Check / Gives more / Pricing page) and revenue now → next, computed on the server from real subscriptions and usage; price-overridden businesses excluded from the revenue change.
 
@@ -296,7 +314,8 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 **Test scenarios:**
 - Happy path: public read returns version 1 with 3 plans; ETag stable across calls; a retired plan is absent.
 - Happy path: a scheduled version with goLive tomorrow → public still serves the previous one; admin shows it as Scheduled.
-- Error path: `?preview=` with an expired or forged token → 404, never the draft.
+- Error path: `?preview=` with an expired or forged token, or one for an older draft revision → 404, never the draft.
+- Error path: the preview response is never cacheable (`no-store`).
 - Error path: admin read without `pricing:read` → 403.
 - Integration: impact for a draft lowering Grow products to 50 lists the Grow businesses with >50 products under "Takes away".
 
@@ -313,25 +332,29 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 **Files:**
 - Modify: `apps/api.saroh.in/src/modules/pricing/{admin-pricing.controller,catalogue.service}.ts`
 - Create: `pricing/coupons.service.ts`, `pricing/moves.service.ts`
-- Modify: `apps/api.saroh.in/src/modules/billing/plans.service.ts` (Plan rows per version)
+- Modify: `apps/api.saroh.in/src/modules/billing/plans.service.ts` (Plan rows per version and cycle)
+- Modify: `apps/api.saroh.in/src/modules/admin/admin-permissions.ts` (`pricing:edit`, `pricing:publish`, `coupons:manage`; Billing role gets `pricing:edit`, Platform Owner all; `coupons:manage` held by Platform Owner and Billing lead)
+- Create: `pricing/revalidate-site.job.ts` (post-commit and `goLiveAt` revalidation calls, KTD-10)
 - Test: `pricing/catalogue-writes.db.spec.ts`, `pricing/coupons.db.spec.ts`, `pricing/moves.db.spec.ts`
 
 **Approach:**
 - `PUT /admin/pricing/draft {catalog, revision}` validates with the schema; stale revision → 409 naming who saved since; `DELETE /admin/pricing/draft` discards.
-- `POST /admin/pricing/publish {goLiveAt?, policy: keep|move, note, idempotencyKey, reason}` → new version with `changes = diff(live, draft)`, `Plan` rows per plan (KTD-2), per-subscription moves when `move` (KTD-4) with the 7-day notice notification queued, draft cleared. `DELETE /admin/pricing/versions/:v` cancels a scheduled version and its moves. `POST /admin/pricing/versions/:v/rollback` republishes that snapshot as the next version, policy keep; refused while a draft exists (design rule).
-- Coupons: `POST/PATCH/DELETE /admin/pricing/coupons` apply immediately (outside versions), with a confirmation step in the UI; code uniqueness enforced.
+- `POST /admin/pricing/publish {goLiveAt?, policy: keep|move, note, idempotencyKey, reason}` → new version with `changes = diff(live, draft)`, `Plan` rows per plan (KTD-2), per-subscription moves when `move` (KTD-4) with the 7-day notice notification queued, draft cleared. `DELETE /admin/pricing/versions/:v` cancels a scheduled version and its moves. `POST /admin/pricing/versions/:v/rollback` republishes that snapshot as the next version, policy keep; refused while a draft exists (design rule). Draft save needs `pricing:edit`; publish, cancel and rollback all need `pricing:publish` (rollback does not bypass review). After the transaction commits, the revalidation job calls saroh.in; scheduled versions also enqueue a job at `goLiveAt`.
+- Coupons: `POST/PATCH/DELETE /admin/pricing/coupons` (need `coupons:manage`) apply immediately (outside versions), with a confirmation step in the UI; code uniqueness enforced. Every coupon has `maxRedemptions`, an optional `expiresAt`, and a discount capped at the plan price for its cycle (validated on save).
 - Every write: `IdempotencyService.run` + `AdminAuditService.write` in the same transaction, with the reason.
 
 **Patterns to follow:** flags writes (`PUT /admin/flags/:key` with reason + idempotency), D5 plan drafts (revision 409).
 
 **Test scenarios:**
-- Happy path: save draft (rev 0→1), publish now with policy keep → version 2 live, Plan rows `grow@2` etc., draft gone, audit row with reason.
+- Happy path: save draft (rev 0→1), publish now with policy keep → version 2 live, Plan rows `catalog.grow@2` (month and year) etc., draft gone, audit row with reason; revalidation job called after commit.
 - Happy path: publish with policy move → each subscription gets a pending version at its first renewal ≥7 days away; notification queued 7 days before.
 - Edge case: publish scheduled for tomorrow → public keeps serving v1 until then; cancel schedule → version and pending moves removed.
 - Edge case: roll back to v1 → v3 = v1's snapshot, policy keep; refused (409) while a draft exists.
 - Error path: stale draft revision → 409 with the other editor's name; same idempotency key with a different body → 409.
 - Error path: invalid catalogue (two featured plans) → 400 with the schema's message.
-- Integration: a coupon code created lower-case is stored upper-case; a second coupon with the same code → 409; deleting requires `coupons:manage`.
+- Integration: a coupon code created lower-case is stored upper-case; a second coupon with the same code → 409; deleting requires `coupons:manage`; a discount above the plan price → 400.
+- Error path: rollback or cancel with only `pricing:edit` → 403.
+- Edge case: revalidation hook down at publish → publish still succeeds; the job retries.
 
 **Verification:** the Versions list shows the full history with changes; nothing changes without an audit row.
 
@@ -359,7 +382,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 **Test scenarios:**
 - Happy path: 3 orgs without subscriptions → 3 grandfather overrides; a second run adds 0.
 - Edge case: an org with an active paid subscription → untouched.
-- Integration: a grandfathered org resolves to Grow (products 100, invoicing on) until `expiresAt`, then to Free with over-limit items read-only.
+- Integration: the override is written with the user's end date, and `entitlement.service` honours a `plan` override over the subscription's plan. (Resolution through the catalogue is tested in U12; over-limit read-only in U13.)
 
 **Verification:** backfill counts reported; no business reads as Free that didn't sign up after the release.
 
@@ -381,7 +404,9 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Tabs from the design: **Plans · Modules · Offers · Versions · N · Review & publish · N**, URL-driven (`?tab=`), keyboard accessible (Radix tabs from `packages/ui`), scrolling tab row on small screens.
 - The draft store: the first edit clones live into a draft; autosave debounced to the draft endpoint with the revision; conflict shows who saved and offers reload.
 - "Preview pricing page ↗" mints a preview token and opens `https://saroh.in/pricing?preview=<token>` (env-based site URL).
-- Dark admin palette via the console's tokens; standing rules (pointer cursor, hover/focus/pressed, accessible names, 320px).
+- Dark admin palette via the console's tokens (KTD-15 map; `--accent` untouched); standing rules (pointer cursor, hover/focus/pressed, accessible names, 320px).
+- States per `saroh-product-states`: a skeleton while `GET /admin/pricing` loads; a failed read shows an error block with "Try again" (never an empty editor that could be saved over live).
+- "Discard draft" asks to confirm, naming who else has edited the shared draft (design deviation D-2).
 
 **Patterns to follow:** `app/flags/page.tsx` (searchParams-driven inspector), `operator-dialog.tsx`, `settings-tabs.tsx` (route tabs).
 
@@ -390,6 +415,8 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Edge case: `?tab=versions` loads the Versions tab directly; unknown tab → Plans.
 - Error path: autosave 409 → a notice naming the other editor with "Reload draft".
 - Error path: staff without `pricing:edit` → fields read-only, no Review & publish button.
+- Error path: `GET /admin/pricing` fails → error block with "Try again"; no fields rendered.
+- Edge case: loading → skeleton, no status bar flash.
 
 **Verification:** matches the design at desktop and 320px; tabs linkable.
 
@@ -449,7 +476,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Create: `apps/admin.saroh.in/components/plans/{tab-offers,offer-yearly,offer-gst,offer-trials,addons-panel,coupons-panel}.tsx`
 - Test: `tab-offers.test.tsx`
 
-**Approach:** Three cards (Yearly "Pay for [10] months, get 12" clamped 6–12 as the input says; GST "Visitors can switch … Choose which they see first."; Free trials per paid plan, 1–60 days, with the design's explanation), Add-ons panel (kinds with the design's presets; module add-ons list only modules some plan lacks; "No add-ons yet."), Coupons panel ("Not part of a version: changes here apply straight away…", "+ New coupon" starting inactive, Pause/Resume, Delete **with a confirmation** (the design has none; deletion is irreversible), uses count from redemptions).
+**Approach:** Three cards (Yearly "Pay for [10] months, get 12" clamped 6–12 as the input says; GST "Visitors can switch … Choose which they see first."; Free trials per paid plan, 1–60 days, with the design's explanation), Add-ons panel (kinds with the design's presets; module add-ons list only modules some plan lacks; "No add-ons yet."), Coupons panel ("Not part of a version: changes here apply straight away…", "+ New coupon" starting inactive, fields for max uses, expiry and discount (capped at the plan price), Pause/Resume, Delete **with a confirmation** (design deviation D-1), uses count from redemptions).
 
 **Test scenarios:**
 - Happy path: turn yearly on with 10 → draft changes "Yearly billing on"; preview shows "Yearly · 2 months free".
@@ -494,12 +521,13 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Modify: `apps/api.saroh.in/src/modules/admin/{admin-lifecycle.service,admin-organizations.controller}.ts`
 - Test: `admin/admin-overrides.db.spec.ts`
 
-**Approach:** Extend "Plan and limits": show the business's catalogue version and plan, resolved module states (from `resolveAccess`), and actions — Grant a module, Remove a module, Set a limit (up or down, optional end date), Custom price, Move to the live version now or at next renewal, Remove an override. Each through `OperatorDialog` with a reason; audit + the business's own audit event.
+**Approach:** Extend "Plan and limits": show the business's catalogue version and plan, resolved module states (from `resolveAccess`), and actions — Grant a module, Remove a module, Set a limit (up or down, optional end date), Custom price, Move to the live version now or at next renewal, Remove an override. Each through `OperatorDialog` with a reason; audit + the business's own audit event. Permissions: grant/remove/limit/move need a new `pricing:override`; custom price needs `pricing:override` **and** `pricing:publish`; both added here with their endpoints.
 
 **Test scenarios:**
 - Happy path: grant Invoicing to a Free business → resolves on; audit row with reason.
 - Edge case: set products limit below current count → allowed with a warning that existing products stay read-only.
 - Error path: custom price on a provider-managed subscription → refused as changePlan is today.
+- Error path: grant without `pricing:override` → 403; custom price with only `pricing:override` → 403.
 
 **Verification:** the business page reflects the resolved access after each change.
 
@@ -521,7 +549,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 **Test scenarios:**
 - Happy path: Free business → invoicing locked, subscriptions locked, products limit 5.
 - Edge case: rollout flag off for COMMERCE → orders hidden even on Pro.
-- Edge case: grandfathered business → Grow until `expiresAt`.
+- Edge case: grandfathered business → Grow (products 100, invoicing on) until `expiresAt`, then Free (moved from U5).
 - Integration: a pending move whose date has passed → access follows the new version.
 
 **Verification:** `GET …/billing/access` matches `resolveAccess` for the demo businesses.
@@ -536,7 +564,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 **Files:**
 - Create: `apps/api.saroh.in/src/modules/billing/metering.service.ts`
-- Modify: enforcement points in `products/*.service.ts` (create), `orders/*` (place, incl. public checkout — refuse on the site with a friendly message, never lose a paid order: check before payment), `bookings/*` (book, incl. public), `sites/journal` (publish post), `members`/`invitations` (invite), payment/messaging provider connect (integrations), roles (custom role create), site themes/review gates
+- Modify: enforcement points in `products/*.service.ts` (create), `orders/*` (place, incl. public checkout — behaviour for the site is Open Questions OQ-7/OQ-8; never lose a paid order), `bookings/*` (book, incl. public), `sites/journal` (publish post), `members`/`invitations` (invite), payment/messaging provider connect (integrations), roles (custom role create), site themes/review gates
 - Test: `billing/metering.db.spec.ts`, per-module `*.limits.db.spec.ts`
 
 **Approach:** Counts per KTD-9 with the business's time zone for monthly windows; checks throw the existing 403 shape with a stable code (`PLAN_LIMIT_REACHED`, `MODULE_LOCKED`) and catalogue wording; "over after a downgrade" leaves existing things readable and blocks creating more. Public flows (booking page, shop checkout) check before taking money.
@@ -547,10 +575,13 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Edge case: month boundary in Asia/Kolkata → the 11th booking on the 1st succeeds.
 - Error path: invite a 2nd team member on Free → 403; pending invites count.
 - Integration: downgrade Grow→Free with 40 products → products readable, edit allowed, create refused.
+- Integration: a grandfathered org past `expiresAt` with 40 products → over-limit items read-only (moved from U5).
 
 **Verification:** every catalogue limit has an enforcement test.
 
 ### U14. Merchant app: locks, upgrade panel, limit notices, Settings › Plan
+
+**Status:** Blocked on design (OQ-10) — no design file shows the upgrade panel, limit notices, plan chooser, coupon field, trial or checkout states.
 
 **Goal:** Merchants see what their plan gives and how to get more.
 
@@ -571,7 +602,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Edge case: grandfathered business sees "Grow, free until {date}".
 - Error path: a raw `PLAN_LIMIT_REACHED` from a create → rendered as the notice, not a toast of the API text.
 
-**Verification:** matches the design's upgrade panel and notice styles; DEC-057 respected.
+**Verification:** matches the design produced for OQ-10 (four-scenes, DEC-057 respected).
 
 ### U15. Saroh billing: provider plans, subscribe and change plan
 
@@ -586,7 +617,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Create: `billing/provider-plan-sync.service.ts` (catalogue version × plan × cycle → provider plan id), `billing/checkout.service.ts`
 - Test: `billing/checkout.db.spec.ts`, `billing/provider-plan-sync.spec.ts`, Razorpay fixtures
 
-**Approach:** Start with a Razorpay test-mode spike on the platform account (plans, subscriptions, `start_at` for trials, add-ons, offers vs our coupons; webhook events) and record answers in `backend-integrations.md`. On publish, sync provider plans for each paid plan and cycle. Subscribe/change plan from Settings › Plan: upgrade immediately (charge the difference or start a new subscription per the spike), downgrade at period end; provider-managed subscriptions change only through this path. Webhooks move `Subscription` status; failed renewal → PAST_DUE then Free per the design's trial rule.
+**Approach:** Start with a Razorpay test-mode spike on the platform account (plans, subscriptions, `start_at` for trials, add-ons, offers vs our coupons; webhook events) and record answers in `backend-integrations.md`. On publish, sync provider plans for each paid plan and cycle. Subscribe/change plan from Settings › Plan: upgrade immediately (charge the difference or start a new subscription per the spike), downgrade at period end; provider-managed subscriptions change only through this path. Webhooks move `Subscription` status, deduplicated by provider event id (`BillingWebhookEvent`) and ignored when older than the last applied event (provider timestamp), so an out-of-order event can't re-activate a cancelled subscription; failed renewal → PAST_DUE then Free per the design's trial rule. The amount is always computed on the server (KTD-18); `?plan=&cycle=` from the site only preselects.
 
 **Execution note:** start with the test-mode spike; don't build the port before the answers are written down.
 
@@ -595,6 +626,8 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Edge case: Grow → Free requested mid-period → effective at renewal.
 - Error path: payment failed → PAST_DUE; after the retry window → Free with over-limit items read-only.
 - Integration: a published price change with policy keep leaves existing subscriptions on their provider plan.
+- Error path: a client posting an amount or price → ignored; charge equals the server-derived amount.
+- Edge case: `subscription.activated` replayed after `subscription.cancelled` → no change.
 
 **Verification:** a real test-mode upgrade on local Northwind.
 
@@ -610,11 +643,13 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Modify: `billing/checkout.service.ts`, `billing/billing.controller.ts`, `pricing/coupons.service.ts`
 - Test: `billing/offers.db.spec.ts`
 
-**Approach:** Trials: card or UPI Autopay first, charged at trial end, drop to Free if that charge fails (design copy). Yearly: "pay for N months, get 12". Coupons: code entry at checkout, one use per business, applies ₹ off for N months, monthly and yearly. Add-ons: buy/remove from Settings › Plan, billed monthly with the plan; limits rise immediately.
+**Approach:** Trials: card or UPI Autopay first, charged at trial end, drop to Free if that charge fails (design copy). Yearly: "pay for N months, get 12". Coupons: code entry at checkout, one use per business, within `maxRedemptions` and before `expiresAt`; applies ₹ off for N months on monthly; on yearly the discount is N months' worth taken once from the first yearly charge, capped at that charge. Coupon checks are rate-limited per organization and per IP. The redemption row is written when the payment webhook confirms the charge, in the same transaction — not at checkout start. Add-ons: buy/remove from Settings › Plan, billed monthly with the plan; limits rise immediately.
 
 **Test scenarios:**
 - Happy path: Grow with a 14-day trial → trialing; at day 14 charge succeeds → ACTIVE.
-- Edge case: coupon used twice by one business → second refused; inactive coupon → refused.
+- Edge case: coupon used twice by one business → second refused; inactive, expired or fully used coupon → refused.
+- Edge case: abandoned checkout with a coupon → no redemption recorded.
+- Error path: 20 coupon checks in a minute from one org → rate-limited.
 - Error path: trial end charge fails → Free, notice shown.
 - Integration: buy a products pack → limit +100 in access immediately.
 
@@ -633,7 +668,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Modify: Settings › Plan (invoices list, download)
 - Test: `billing/saroh-invoices.db.spec.ts`
 
-**Approach:** A numbered Saroh invoice series with Saroh's GSTIN and SAC (confirm details with the user), GST split by the merchant's state, PDF via the D16 renderer, emailed on payment; failed-payment and trial-ending emails.
+**Approach:** A numbered Saroh invoice series with Saroh's GSTIN and SAC (confirm details with the user), GST split by the merchant's state (state and optional GSTIN captured at checkout), amounts in integer paise rounded once per line (KTD-18), PDF via the D16 renderer, emailed on payment; failed-payment and trial-ending emails.
 
 **Test scenarios:**
 - Happy path: a paid renewal → invoice numbered in series, GST split (CGST+SGST within Karnataka, IGST otherwise).
@@ -651,12 +686,12 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 **Dependencies:** U2 (types for plan teasers)
 
 **Files:**
-- Modify: `apps/saroh.in/app/layout.tsx` (light only, GA kept, fonts incl. Plus Jakarta Sans 600 for the wordmark via `next/font`), `app/site.css`, `env.ts` (sign-up and sign-in URLs, `API_URL`), `lib/links.ts`
+- Modify: `apps/saroh.in/app/layout.tsx` (light only, GA kept, fonts incl. Plus Jakarta Sans 600 for the wordmark and JetBrains Mono for the waitlist date via `next/font`), `app/site.css`, `env.ts` (sign-up and sign-in URLs, `API_URL`), `lib/links.ts`
 - Create: `apps/saroh.in/components/v2/{container,eyebrow,section-heading,button,pill,card-link,screenshot-frame,lightbox,cta-band,faq}.tsx`, `apps/saroh.in/content/{types,home,features,solutions,faq,shots}.ts`
 - Delete (end of Track B, in U26): V1 pages and components not reused
 - Test: `apps/saroh.in/content/content.test.ts` (add vitest to `web`)
 
-**Approach:** Max width 1280, gutters `clamp(20px, 5vw, 56px)`, the design's type scale (Space Grotesk 700 display with its letter-spacing; Geist body), buttons (ink primary, outline secondary, saffron on dark bands), screenshot frame (radius 14/18, shadows), lightbox (click to enlarge, Esc/click to close, focus trapped), FAQ with `<details>`. Content files mirror the design's data blocks (KTD-13).
+**Approach:** Max width 1280, gutters `clamp(20px, 5vw, 56px)`, the design's type scale (Space Grotesk 700 display with its letter-spacing; Geist body), buttons (ink primary, outline secondary, saffron on dark bands), screenshot frame (radius 14/18, shadows), lightbox (click to enlarge, Esc/click to close, focus trapped), FAQ with `<details>`. Content files mirror the design's data blocks (KTD-13). A small `lib/analytics.ts` sends GA4 events: `cta_click {plan, page, mode}`, `waitlist_join {kind, src, plan, ref}`, `referral_copy`, `pricing_toggle {yearly|gst, value}` (no PII in event params).
 
 **Test scenarios:**
 - Happy path: every feature/solution slug in content has headline, sub, steps with shot keys that exist in the shot manifest.
@@ -711,7 +746,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 **Requirements:** R11, R13, R14
 
-**Dependencies:** U18, U19, U20, U24's plan teaser component
+**Dependencies:** U18, U19, U20, U24's plan teaser component (U21 lands in batch 3 with U24)
 
 **Files:**
 - Modify: `apps/saroh.in/app/page.tsx`
@@ -752,7 +787,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 **Requirements:** R11, R13
 
-**Dependencies:** U18–U20, U24's plan teaser
+**Dependencies:** U18–U20; lands in batch 2 with a temporary teaser reading U3 directly, swapped for U24's `plan-teaser` in batch 3
 
 **Files:**
 - Create: `apps/saroh.in/app/solutions/[slug]/page.tsx`, `components/v2/solution/*`
@@ -776,70 +811,24 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 **Files:**
 - Create: `apps/saroh.in/app/pricing/page.tsx`, `components/v2/pricing/{plan-cards,billing-toggle,gst-toggle,addons,compare-table,preview-banner,plan-teaser}.tsx`, `lib/pricing.ts` (fetch + revalidate)
-- Create: `apps/saroh.in/app/api/revalidate/route.ts` (secret-guarded on-demand revalidation called by the API on publish/go-live)
+- Create: `apps/saroh.in/app/api/revalidate/route.ts` (KTD-10 contract: POST, header secret compared in constant time, fixed path list), `apps/saroh.in/app/pricing/preview/route.ts` (token → cookie swap, dynamic, `no-store`, `noindex`, `Referrer-Policy: no-referrer`, no GA)
 - Test: `components/v2/pricing/*.test.tsx`
 
-**Approach:** Header copy as designed; Monthly/Yearly radiogroup (only when yearly is on), "Show prices with GST" checkbox (default from catalogue), plan cards (tagline, price, per, sub "Free for good / + GST / Incl. GST / About ₹X a month", CTA — "Start N-day trial" when a trial is on, lead + trial + `cardLines`), footnote; "Need a little more?" add-ons; "Compare the plans" table by group with "Coming soon" pills and the featured column tint; CTA band. `?preview=<token>` renders the draft with the amber "Draft preview. Visitors still see the published pricing." banner (no link back unless staff). CTAs go to sign-up with `?plan=<id>&cycle=<month|year>`.
+**Approach:** Header copy as designed; Monthly/Yearly radiogroup (only when yearly is on), "Show prices with GST" checkbox (default from catalogue), plan cards (tagline, price, per, sub "Free for good / + GST / Incl. GST / About ₹X a month", CTA — "Start N-day trial" when a trial is on, lead + trial + `cardLines`), footnote; "Need a little more?" add-ons; "Compare the plans" table by group with "Coming soon" pills and the featured column tint; CTA band. `?preview=<token>` renders the draft with the amber "Draft preview. Visitors still see the published pricing." banner (no link back unless staff). Every CTA's label and URL come from the KTD-16 builder (waitlist or open mode). On a first build with the API down, the page renders from the bundled seed snapshot (KTD-10). Zero shown plans is impossible by schema; if the snapshot fails validation, the build fails rather than publishing an empty page.
 
 **Test scenarios:**
 - Happy path: seed catalogue → 3 cards; Grow featured; Pro lead "Everything in Grow, plus:".
 - Happy path: yearly on (paid 10) → toggle shows "Yearly · 2 months free"; Grow yearly ₹10,000 "About ₹833 a month + GST".
 - Edge case: GST on → prices ×1.18 and footnote "Prices include 18% GST."
 - Edge case: a module "Coming soon" → pill in the table and "(coming soon)" on the card.
-- Error path: API down at build → the last successful static page keeps serving (no empty pricing).
+- Error path: API down on a first build → renders from the seed snapshot; API down on revalidation → the last good page keeps serving.
+- Happy path: in waitlist mode, "Choose Grow" reads "Get early access · Grow" and links to `/waitlist?plan=grow`.
+- Error path: revalidate hook with a wrong secret or GET → 401/405; no path parameter accepted.
+- Edge case: preview URL → token stripped from the URL after the cookie is set; response `no-store`.
 
 **Verification:** matches the design; changes published in admin appear after revalidation.
 
-### U25. (reserved — merged into U24)
-
-### U30. Waitlist page and API
-
-**Goal:** `/waitlist` to the design, stored properly, as the site's ask until launch.
-
-**Requirements:** R19, R20
-
-**Dependencies:** U18 (primitives), U19 not used (the page has its own header/footer per the design)
-
-**Files:**
-- Create: `apps/saroh.in/app/waitlist/page.tsx`, `components/v2/waitlist/{waitlist-form,waitlist-done,referral-link}.tsx`, `content/waitlist.ts` (opening date, offer text, kinds)
-- Modify: `apps/saroh.in/app/api/waitlist/route.ts` (new fields; keep the `{status}` contract, X-Forwarded-For and 500-when-`API_URL`-unset behaviour), `apps/saroh.in/lib/links.ts` (KTD-16)
-- Modify: `apps/api.saroh.in/src/modules/waitlist/*` (business name, kind, city, source, referrer, position; unique normalised email → re-joining returns the same position; referral count), migration `<ts>_waitlist_v2` (additive columns)
-- Modify: `apps/admin.saroh.in/app/waitlist/page.tsx` (filters and counts by kind, city, source; top referrers)
-- Test: `apps/saroh.in/components/v2/waitlist/*.test.tsx`, `apps/api.saroh.in/src/modules/waitlist/waitlist.db.spec.ts`
-
-**Approach:** Match the design (header with mark + "Saroh" and the mono "Opens Tue 27 Oct"; hero with the saffron initials and "Made in India, priced in ₹."; "For people who run" chips; the form card with its validation messages "Add your business name.", "Pick the closest one.", "Enter an email like name@shop.in."; the done state "YOU'RE IN", "‹Business› is #N on the list.", referral link with Copy/Copied, "Add another business"; footer "सारोह · sa (with) + aaroh (rising) · Let's rise together."). The position comes from the API (not the prototype's `311 + n`). Referral links use a stable short id per entry, not the business-name slug (collisions). Noto Sans Devanagari for the footer word. Rate-limit the endpoint; no email is sent on join (the page promises one email, on opening day).
-
-**Test scenarios:**
-- Happy path: valid entry → done state with the API's position and a referral link; admin shows the entry with kind and city.
-- Edge case: same email again → same position, no duplicate; `?ref=<id>` credits the referrer once.
-- Edge case: `?src=instagram` stored as source; missing → `direct`.
-- Error path: invalid email / no kind / no name → the design's messages, nothing sent; API down → a retry message, form kept.
-- Integration: a Pricing "Choose Grow" click in waitlist mode lands on `/waitlist?plan=grow` and the plan is stored.
-
-**Verification:** side-by-side with the design at 1280 and 320; entries visible in admin.
-
-### U31. Opening-day invites and the launch offer
-
-**Goal:** Keep the waitlist's promise when Saroh opens.
-
-**Requirements:** R20, R9
-
-**Dependencies:** U27 (open sign-up), U16 (trials), U30
-
-**Files:**
-- Create: `apps/api.saroh.in/src/modules/waitlist/invites.service.ts` (+ job), email template "Your Saroh invite"
-- Modify: `apps/admin.saroh.in/app/waitlist/page.tsx` (send invites in bulk with a dry run — `BulkAction`)
-- Modify: accounts sign-up / onboarding (an invite token pre-fills business and email and marks the offer)
-- Test: `waitlist/invites.db.spec.ts`
-
-**Approach:** On the opening date staff send invites in bulk (dry run first, one email per entry, idempotent). Signing up through an invite starts **Grow with a 90-day trial**: payment details added at start, nothing charged for 3 months, can move to Free any time (the page's words), using U16's trial mechanics; the entry is marked joined. Referral counts stay for later thanks.
-
-**Test scenarios:**
-- Happy path: invite → sign-up → business on Grow trialing, trial ends in 90 days.
-- Edge case: sending invites twice → the second run sends none.
-- Error path: invite token used by a different email → refused politely.
-
-**Verification:** a test invite end to end on dev.
+### U25. (retired — merged into U24; the ID is not reused)
 
 ### U26. Routes, redirects, SEO and V1 removal
 
@@ -855,7 +844,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Delete: `app/[job]`, `app/how-it-works`, `app/coming-soon`, V1 components and `lib/site-content.ts`
 - Test: `apps/saroh.in/redirects.test.ts`
 
-**Approach:** Redirects (301): `/sell → /features/orders`, `/website → /` (no V2 website page), `/bookings → /features/bookings`, `/contacts → /features/customers`, `/insights → /features/insights`, `/how-it-works → /`, `/coming-soon → /pricing`, and repoint the existing `/modules/*` and `/about` rules straight to their final targets (no chains). Sitemap lists `/`, `/pricing`, 8 features, 3 solutions. Canonicals on `https://www.saroh.in`. JSON-LD: Organization, and a SoftwareApplication with offers from the catalogue. Update the stale `apps/saroh.in/README.md` and `DESIGN.md`.
+**Approach:** Redirects (301): `/sell → /features/orders`, `/website → /` (no V2 website page), `/bookings → /features/bookings`, `/contacts → /features/customers`, `/insights → /features/insights`, `/how-it-works → /`, `/coming-soon → /pricing`, and repoint the existing `/modules/*` and `/about` rules straight to their final targets (no chains). Sitemap lists `/`, `/pricing`, 8 features, 3 solutions, and `/waitlist` while in waitlist mode (indexed, with its own meta description and Open Graph image). Canonicals on `https://www.saroh.in`. JSON-LD: Organization, and a SoftwareApplication with offers from the catalogue. Update the stale `apps/saroh.in/README.md` and `DESIGN.md`.
 
 **Test scenarios:**
 - Happy path: every old sitemap URL returns one 301 to a 200 page.
@@ -876,12 +865,13 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 - Modify: `apps/saroh.in/lib/links.ts`
 - Test: `e2e/tests/signup-from-marketing.spec.ts`
 
-**Approach:** Find and remove the gate (commit `8f009575` made the waitlist the ask); verify the accounts sign-up and onboarding flow end to end; carry plan intent; paid intents land on checkout after onboarding (or Free if they skip). Waitlist UI removed from the site; the API route stays one release (Deferred).
+**Approach:** Find and remove the gate (commit `8f009575` made the waitlist the ask); verify the accounts sign-up and onboarding flow end to end; carry plan intent; paid intents land on checkout after onboarding (or Free if they skip). Launch flips `launchMode=open` (KTD-16) so every CTA moves at once; the waitlist page and API stay and are removed in a later release (Deferred).
 
 **Test scenarios:**
 - Happy path: Start free → sign-up → onboarding → workspace on Free.
 - Happy path: Choose Grow → after onboarding → checkout for Grow monthly.
 - Edge case: already signed in → Start free goes to the workspace.
+- Integration: with `launchMode=open` every CTA on Home, Pricing, Features and Solutions points at sign-up; `/waitlist` still renders.
 
 **Verification:** a new account can be created in production-like local and dev.
 
@@ -920,9 +910,61 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 **Test scenarios:**
 - Happy path: all 14 routes pass smoke; axe reports no serious violations.
-- Edge case: Pricing smoke with the API stubbed down still renders the static page.
+- Edge case: Pricing smoke with the API stubbed down during revalidation keeps serving the last good page; a fresh build with the API down renders the seed snapshot.
+- Happy path (before Gate O): re-run the U20 capture after U14 lands and diff the shots; demo businesses resolve to Pro or a grandfathered plan so no lock icons appear.
 
 **Verification:** CI green including the new jobs.
+
+### U30. Waitlist page and API
+
+**Goal:** `/waitlist` to the design, stored properly, as the site's ask until launch.
+
+**Requirements:** R19, R20
+
+**Dependencies:** U18 (primitives), U19 not used (the page has its own header/footer per the design)
+
+**Files:**
+- Create: `apps/saroh.in/app/waitlist/page.tsx`, `components/v2/waitlist/{waitlist-form,waitlist-done,referral-link}.tsx`, `content/waitlist.ts` (opening date, offer text, kinds)
+- Modify: `apps/saroh.in/app/api/waitlist/route.ts` (new fields; keep the `{status}` contract and 500-when-`API_URL`-unset behaviour; forward only the edge's own client-IP header, never a client-sent `X-Forwarded-For`), `apps/saroh.in/lib/links.ts` (KTD-16)
+- Modify: `apps/api.saroh.in/src/modules/waitlist/*` (business name, kind, city, source, referrer, position; unique normalised email per KTD-17; a repeat join returns the generic done state, never position or link; self-referrals excluded; referral count; retention job), migration `<ts>_waitlist_v2` (additive columns)
+- Modify: `apps/admin.saroh.in/app/waitlist/page.tsx` (filters and counts by kind, city, source; top referrers; needs `waitlist:read`, added here)
+- Test: `apps/saroh.in/components/v2/waitlist/*.test.tsx`, `apps/api.saroh.in/src/modules/waitlist/waitlist.db.spec.ts`
+
+**Approach:** Match the design (header with mark + "Saroh" and the mono "Opens Tue 27 Oct"; hero with the saffron initials and "Made in India, priced in ₹."; "For people who run" chips; the form card with its validation messages "Add your business name.", "Pick the closest one.", "Enter an email like name@shop.in."; the done state "YOU'RE IN", "‹Business› is #N on the list.", referral link with Copy/Copied, "Add another business"; footer "सारोह · sa (with) + aaroh (rising) · Let's rise together." plus "@sarohlabs · Instagram · X · YouTube · LinkedIn"; done-state copy "Your 3 months of Grow start when you set up." and the note "You'll add payment details…" verbatim from the design; city optional, with no validation message). Consent line under the button naming what is stored and why. The position comes from the API (not the prototype's `311 + n`). Referral links use a stable short id per entry, not the business-name slug (collisions). Noto Sans Devanagari for the footer word; JetBrains Mono for the date (U18). Rate-limit the endpoint; no email is sent on join (the page promises one email, on opening day).
+
+**Test scenarios:**
+- Happy path: valid entry → done state with the API's position and a referral link; admin shows the entry with kind and city.
+- Edge case: same email again (or `A.B+x@gmail.com` for `ab@gmail.com`) → generic done state, no position or link, no duplicate; `?ref=<id>` credits the referrer once; a self-referral is not counted.
+- Error path: a spoofed `X-Forwarded-For` does not change the rate-limit key.
+- Happy path: `waitlist_join` GA event fires with kind, src, plan and ref, and no email.
+- Edge case: `?src=instagram` stored as source; missing → `direct`.
+- Error path: invalid email / no kind / no name → the design's messages, nothing sent; API down → a retry message, form kept.
+- Integration: a Pricing "Choose Grow" click in waitlist mode lands on `/waitlist?plan=grow` and the plan is stored.
+
+**Verification:** side-by-side with the design at 1280 and 320; entries visible in admin.
+
+### U31. Opening-day invites and the launch offer
+
+**Goal:** Keep the waitlist's promise when Saroh opens.
+
+**Requirements:** R20, R9
+
+**Dependencies:** U27 (open sign-up), U30; U5's override mechanism if OQ-1 goes as recommended (otherwise U16)
+
+**Files:**
+- Create: `apps/api.saroh.in/src/modules/waitlist/invites.service.ts` (+ job), email template "Your Saroh invite"
+- Modify: `apps/admin.saroh.in/app/waitlist/page.tsx` (send invites in bulk with a dry run — `BulkAction`)
+- Modify: accounts sign-up / onboarding (an invite token pre-fills business and email and marks the offer)
+- Test: `waitlist/invites.db.spec.ts`
+
+**Approach:** On the opening date staff send invites in bulk (dry run first, one email per entry, idempotent). Signing up through an invite starts **Grow with a 90-day trial**: payment details added at start, nothing charged for 3 months, can move to Free any time (the page's words), implemented as OQ-1 decides (recommended: a 90-day time-bound `plan: grow` override, no payment details up front, which takes U16 off the critical path); the entry is marked joined. Invite tokens are single-use, bound to the entry's email, and expire after 30 days. Referral counts stay for later thanks.
+
+**Test scenarios:**
+- Happy path: invite → sign-up → business on Grow trialing, trial ends in 90 days.
+- Edge case: sending invites twice → the second run sends none.
+- Error path: invite token used by a different email → refused politely; a used or expired token → refused with "ask for a new invite".
+
+**Verification:** a test invite end to end on dev.
 
 ---
 
@@ -930,7 +972,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 
 - **Interaction graph:** catalogue publish → Plan rows, provider plan sync, pending moves, notifications, saroh.in revalidation; access resolution → module availability, enforcement in products/orders/bookings/journal/members/providers/roles/themes/review, merchant rail and screens.
 - **Error propagation:** limit and lock refusals carry stable codes and catalogue wording to the merchant app (never raw API text); public flows refuse before payment.
-- **State lifecycle risks:** scheduled versions and per-subscription moves (cancellation must clear pending moves); grandfather expiry (a job or read-time check); trials ending (charge or drop to Free); coupons redeemed once.
+- **State lifecycle risks:** scheduled versions and per-subscription moves (cancellation must clear pending moves); grandfather expiry (read-time check, fail-safe; notices and kill switch per OQ-4); trials ending (charge or drop to Free); coupons redeemed once.
 - **API surface parity:** the merchant app, admin console and saroh.in all read the same resolved data; `packages/pricing-catalog` is the single rule source.
 - **Integration coverage:** publish → public read → site revalidation; plan change → access → enforcement; webhook → subscription → access.
 - **Unchanged invariants:** DEC-057 (rollout-off modules never shown), DEC-013/016 (flags, pricing, configuration independent), merchant sites' `--site-*` tokens, `--accent` name, frontends never import `@saroh/database`.
@@ -942,7 +984,7 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 | Risk | Mitigation |
 |------|------------|
 | Enforcing new limits blocks existing businesses | Grandfather first (U5), enforcement ships after the backfill; "over" stays readable |
-| Pricing promises something not enforced or not sold | Launch gate: Pricing goes live only with U12–U16 in production; claims ledger (U28) |
+| Pricing promises something not enforced or not sold | Gate W: in waitlist mode Pricing is a statement of what Saroh will charge from the opening date, and no CTA sells anything. Gate O: open-mode CTAs only with U12–U16 in production. Claims ledger (U28) for both |
 | Razorpay Subscriptions behaviour differs from assumptions | U15 starts with a test-mode spike; answers recorded before building |
 | Two admins edit the draft at once | Revision + 409 naming the other editor (KTD-3) |
 | Plan key rename confuses old code | Keys are labels; old `Plan` rows kept for existing subscriptions; mapping recorded; comments updated |
@@ -960,12 +1002,15 @@ Two tracks. **A** = catalogue, admin, enforcement, billing. **B** = saroh.in V2.
 | 2 | U4, U5, U6 | U22, U23 (with a temporary teaser reading U3) |
 | 3 | U7, U8, U9, U10, U11 | U21, U24 |
 | 4 | U12, U13 | U26, U29 |
-| 5 | U14, U15 | U27 (Free sign-up can open here) |
+| 5 | U14 (after OQ-10 design), U15 | U27 built behind `launchMode` (whether Free opens here: OQ-13) |
 | 6 | U16, U17 | Launch: U27 switch to open mode, U31 invites, paid CTAs on |
 
-**Early go-live in waitlist mode:** once Batches 1–4 of Track B are in (V2 pages, Pricing reading the catalogue, U26 redirects, U29 checks, U30 waitlist) and the claims ledger (U28) is settled, saroh.in can switch to V2 with every CTA pointing to `/waitlist`. Pricing then shows what Saroh will charge, with the opening date. The later launch (open sign-up, paid plans) is only the U27 switch plus U31.
+**Two launch gates.**
 
-Each batch: full checks → one push → PR into development → dev checks in the browser → production when the batch is safe on its own (API before apps). Track B pages can merge to development early but the public switch-over (U26 redirects) waits for the launch gate.
+- **Gate W — V2 live in waitlist mode.** Needs Track B U18–U24, U26 (redirects and sitemap), U28 settled for the pages shown, U29 green and U30, plus Track A U1–U3 in production (the public catalogue read). `launchMode=waitlist`: every CTA goes to `/waitlist`; Pricing shows what Saroh will charge from the opening date. Nothing from U12–U16 is needed.
+- **Gate O — open mode.** Needs U12–U16 in production, U27 and U31, the claims ledger resolved for open-mode claims, and the U29 screenshot re-capture. Launch is flipping `launchMode=open` plus sending U31 invites.
+
+Each batch: full checks → one push → PR into development → dev checks in the browser → production when the batch is safe on its own (API before apps). U26's redirects go live at Gate W; open-mode CTAs only at Gate O.
 
 ---
 
@@ -973,9 +1018,47 @@ Each batch: full checks → one push → PR into development → dev checks in t
 
 - **Release order for the catalogue:** API with U1–U4 (catalogue v1 live, nothing reads it for enforcement) → run the grandfather backfill (U5) with the user's end date → API with U12 (access from the catalogue; `FREE_ENTITLEMENTS` retired only now) → U13 enforcement → apps (U14) → billing (U15–U17) with provider plans synced.
 - **Waitlist-mode go-live:** V2 pages + U26 redirects + U30, with `launchMode=waitlist`; claims ledger settled for the pages shown. Resubmit the sitemap.
-- **Marketing launch gate (open mode):** U12–U16 in production, the claims ledger resolved, sign-up open (U27), visual and smoke checks green. Then deploy saroh.in with U26 redirects and resubmit the sitemap.
+- **Gate W (waitlist mode):** see Phased Delivery; resubmit the sitemap.
+- **Gate O (open mode):** U12–U16 in production, the claims ledger resolved, U27 and U31 ready, screenshots re-captured, visual and smoke checks green. Flip `launchMode=open`.
 - **Monitoring:** log `pricing_published`, `pricing_move_applied`, `plan_limit_reached` (by limit key), `checkout_failed`; watch limit refusals in the first week after enforcement.
-- **Rollback:** catalogue versions roll back through the admin (a new version); enforcement can be switched off by rolling the API back to before U13 (reads stay); saroh.in rolls back as a normal Vercel deploy (redirects included).
+- **Rollback:** catalogue versions roll back through the admin (a new version); enforcement has a kill switch (recommended in OQ-4) rather than relying on rolling the API back; saroh.in rolls back as a normal Vercel deploy (redirects included).
+
+---
+
+## Design deviations (for one-time sign-off)
+
+The build matches the designs exactly except for these. The user approves the table once; anything added later comes back for approval.
+
+| ID | Where | Design | Build | Why |
+|---|---|---|---|---|
+| D-1 | Admin › Offers › Coupons | Delete with no confirmation | Confirmation dialog | Deleting is irreversible and applies at once |
+| D-2 | Admin status bar | "Discard draft" with no confirmation | Confirmation naming the draft's other editors | The draft is shared (KTD-3) |
+| D-3 | saroh.in hero and feature pages | "See it in action · 2 min" and video slot | Hidden until a video is set | No video yet (KTD-12) |
+| D-4 | Waitlist done state | Position `311 + n` | Position from the API | Real data |
+| D-5 | Waitlist referral link | Business-name slug | Stable short id per entry | Name slugs collide |
+| D-6 | Admin Review & publish | "Move them on the 1st" | Per-subscription move date (first renewal ≥ 7 days) | Renewals aren't on the 1st (KTD-4) |
+| D-7 | saroh.in CTAs in waitlist mode | "Start free", "Start N-day trial" | "Join the waitlist", "Get early access · ‹Plan›" | A "Start free" button that lands on a waitlist breaks R16 |
+| D-8 | Waitlist repeat join | Shows the same position again | Generic "check your email" state | Stops anyone looking up an email's place and link |
+
+---
+
+## Open Questions (need the user)
+
+Each has a recommended answer; the affected units wait only where marked.
+
+- **OQ-1. The 90-day launch offer.** Recommended: a time-bound `plan: grow` override for 90 days (U5's mechanism), with no payment details up front. The alternative is a catalogue trial, which would need the 1–60-day trial rule widened and card or UPI Autopay first. The recommendation takes U16 off U31's path.
+- **OQ-2. A Free Subscription row for every organization.** Recommended: yes, per DEC-014. Every org gets `catalog.free@version` at sign-up and in the U5 backfill, so "keep their terms" and the impact view have somewhere to live. Otherwise, orgs without a row always follow the live version, and the impact view says so.
+- **OQ-3. How overrides combine, and the legacy key map.** Recommended order: plan, then remove, then grant, then limit, then raise, with the same kind ordered by `createdAt`; `raise` stays raise-only. Legacy map in `module-map`: `business → grow`, legacy `pro → grow`, legacy `free → free`, with a db spec for each legacy key so a paying customer never resolves as Free.
+- **OQ-4. When the grandfather period ends.** Recommended: notices at 30, 7 and 1 days (a job); an in-app countdown (U14); per-business extension in admin; enforcement behind a kill-switch flag; read-time expiry that fails safe (treat as still grandfathered on error).
+- **OQ-5. Provider sync.** Recommended: an outbox job with retries that stores a `providerPlanId` per plan and cycle. Go-live and move application wait until it exists, and Versions shows the sync status.
+- **OQ-6. Razorpay mandate caps when a plan moves.** Recommended: the U15 spike settles how a plan change is made on Razorpay. A move whose new price is above the mandate's maximum asks the merchant to authorise again, and is not applied silently.
+- **OQ-7. What counts toward public limits.** Recommended: count only confirmed or paid orders and bookings. Once a payment is captured, never refuse it; record it and flag the overage. Rate-limit public creates.
+- **OQ-8. Public checkout at the monthly cap.** Recommended: a soft cap. The site keeps taking orders, and the merchant gets a notice and an upgrade prompt, rather than customers being refused and sales lost.
+- **OQ-9. Split into separate plans?** Recommended: keep one document but track it as three epics: A (catalogue, admin, enforcement: U1–U14), Billing (U15–U17, U31) and B (saroh.in: U18–U30). Split U13 per limit family when it's built.
+- **OQ-10. Merchant upgrade surfaces need a design.** Recommended: a design step before U14 covering the upgrade panel, the 80% and 100% notices, Settings › Plan (chooser, yearly, trial, coupon, add-ons, pending move, invoices) and the checkout states. U14 is blocked until then.
+- **OQ-11. "Add another business" vs one entry per email.** Recommended: entries unique on (email, normalised business name), so an owner with two businesses can list both.
+- **OQ-12. The "Opens Tue 27 Oct" date.** Recommended: keep the date as content and confirm it only once Gate O is scheduled; until then show "Opening soon". Otherwise the one public promise rests on the longest path.
+- **OQ-13. Does Free sign-up open in batch 5?** Recommended: no. Keep a single switch at Gate O, so the site never has a mix of waitlist and sign-up CTAs.
 
 ---
 
