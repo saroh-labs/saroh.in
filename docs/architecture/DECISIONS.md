@@ -892,3 +892,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     6. C12's booking-note card uses the customer's full name, and names the roles that can see a sensitive note.
     7. Settings › Business's "Address" tab is "Registered address" (DEC-069 names the four addresses apart).
     8. Permission lists hide the permissions of modules hidden from the business ("Manage automations" while DEC-068 hides Automations).
+
+## DEC-074 A location's team sees and moves that location's orders
+
+**Status: Accepted — 2026-09-29** · user · amends F16
+
+- Context: F16 lets storefront staff join the team with a storefront role, but that role opens nothing in the workspace. Sell needs `order:read` or `order:stage`, so their rail is empty.
+- Decision: a storefront (location) role sees and moves the orders of **its own location only**: read and stage, with no money, refunds, pay links or cancelling. It's like the kitchen and Member view, scoped to one location. Sell appears in their rail with those orders, and other locations' orders are refused by the API.
+- Consequences: the order permissions gain a location scope for this role. The B16 permission tests extend to it.
