@@ -216,6 +216,55 @@ describe("what each role is offered", () => {
         ).not.toContain("/commerce/stock");
     });
 
+    it("offers a Storefront team holder Sell with Orders alone (DEC-074)", () => {
+        const storefrontTeam = [
+            "org:read",
+            "member:read",
+            "module:read",
+            "media:read",
+            "store:read",
+            "product-review:read",
+            "order:stage",
+        ];
+        const groups = navFor({
+            role: "MEMBER",
+            roleKey: "storefront-team",
+            actions: storefrontTeam,
+            moduleKeys: AVAILABLE_TO.OWNER,
+            stockTracked: true,
+        });
+        const offered = hrefs(groups);
+        expect(offered).toContain("/commerce/orders");
+        for (const other of [
+            "/commerce/products",
+            "/commerce/stock",
+            "/commerce/storefronts",
+            "/commerce",
+        ]) {
+            expect(offered).not.toContain(other);
+        }
+        // Sell lands on Orders, not on the Storefronts it no longer offers.
+        const sell = groups
+            .flatMap((g) => g.items)
+            .find((i) => i.label === "Sell");
+        expect(sell?.href).toBe("/commerce/orders");
+        expect(sell?.children?.map((c) => c.href)).toEqual([
+            "/commerce/orders",
+        ]);
+        // The same permissions in any other role keep Sell as it was.
+        expect(
+            hrefs(
+                navFor({
+                    role: "MEMBER",
+                    roleKey: "front-desk",
+                    actions: storefrontTeam,
+                    moduleKeys: AVAILABLE_TO.OWNER,
+                    stockTracked: true,
+                }),
+            ),
+        ).toContain("/commerce/products");
+    });
+
     it("offers a new site only to a business that has none (ADR-006)", () => {
         const offeredWith = (sites: typeof SITES) =>
             hrefs(
