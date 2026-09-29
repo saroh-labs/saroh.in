@@ -1,6 +1,7 @@
 /**
  * The invoice pay link end to end against a real Postgres (ADR-007, U13):
- * the token's life (made, replaced, revoked on void and on contact deletion),
+ * the token's life (made, replaced, revoked on void, kept when deleting the
+ * contact is refused),
  * a payment started for the stored total, and every webhook outcome routed to
  * the invoice — paid, a duplicate, void-then-success and cash-then-success
  * (captured, recorded as owed back), a failure, and a refund.
@@ -17,7 +18,7 @@ jest.mock("../../env", () => ({
     },
 }));
 
-import { NotFoundException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
@@ -142,7 +143,7 @@ describe("the pay link token (real database)", () => {
         );
     });
 
-    it("is revoked when the contact is deleted, though the invoice stays", async () => {
+    it("keeps working when deleting the contact is refused (DEC-042)", async () => {
         const other = await prisma.contact.create({
             data: {
                 organizationId: owner.organizationId,
@@ -152,20 +153,18 @@ describe("the pay link token (real database)", () => {
         });
         const id = await issued(other.id);
         const { token } = await invoices.createPayLink(owner, id);
-        await contacts.remove(owner, other.id);
-
-        await expect(publicInvoices.read(token)).rejects.toBeInstanceOf(
-            NotFoundException,
+        // Someone with an invoice keeps their record: the delete is
+        // refused, and their pay link is untouched.
+        await expect(contacts.remove(owner, other.id)).rejects.toBeInstanceOf(
+            ConflictException,
         );
+
+        expect((await publicInvoices.read(token)).status).toBe("ISSUED");
         const kept = await prisma.invoice.findUniqueOrThrow({
             where: { id },
-            select: { status: true, billToName: true, payTokenHash: true },
+            select: { status: true, contactId: true },
         });
-        expect(kept).toEqual({
-            status: "ISSUED",
-            billToName: "Ravi",
-            payTokenHash: null,
-        });
+        expect(kept).toEqual({ status: "ISSUED", contactId: other.id });
     });
 });
 

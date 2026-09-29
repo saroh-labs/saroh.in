@@ -31,11 +31,19 @@ jest.mock("@saroh/database", () => {
             customerSubscription: { count: jest.fn() },
             packPurchase: { count: jest.fn() },
             courseEnrollment: { count: jest.fn(), deleteMany: jest.fn() },
-            invoice: { updateMany: jest.fn() },
+            // A delete counts their orders and invoices first (DEC-042).
+            invoice: {
+                updateMany: jest.fn(),
+                count: jest.fn().mockResolvedValue(0),
+            },
             auditEvent: { create: jest.fn() },
             customerIdentityLink: { findMany: jest.fn() },
             customer: { findMany: jest.fn() },
-            order: { groupBy: jest.fn(), findMany: jest.fn() },
+            order: {
+                groupBy: jest.fn(),
+                findMany: jest.fn(),
+                count: jest.fn().mockResolvedValue(0),
+            },
             // D20: a delete asks about autopay first, under the contact's lock.
             paymentMandate: { findFirst: jest.fn().mockResolvedValue(null) },
             $queryRaw: jest.fn().mockResolvedValue([]),
@@ -643,6 +651,104 @@ describe("ContactsService.remove", () => {
         packCount.mockResolvedValue(0);
         courseCount.mockResolvedValue(0);
         bookingFindMany.mockResolvedValue([]);
+        linkFindMany.mockResolvedValue([]);
+    });
+
+    describe("someone with orders or invoices (DEC-042)", () => {
+        const orderCount = prisma.order.count as jest.Mock;
+        const invoiceCount = prisma.invoice.count as jest.Mock;
+        afterEach(() => {
+            orderCount.mockResolvedValue(0);
+            invoiceCount.mockResolvedValue(0);
+        });
+
+        it("refuses with the merchant's words when they have an invoice, and touches nothing", async () => {
+            findUnique.mockResolvedValue({
+                id: "c_1",
+                organizationId: "org_1",
+            });
+            invoiceCount.mockResolvedValue(1);
+            const cancelFor = jest.fn();
+            const service = new ContactsService({
+                cancelFor,
+            } as unknown as ConstructorParameters<typeof ContactsService>[0]);
+
+            await expect(service.remove(ctx(), "c_1")).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    message:
+                        "They have orders or invoices. Remove their details instead.",
+                    details: {
+                        reason: "keeps_records",
+                        orders: 0,
+                        invoices: 1,
+                    },
+                },
+            });
+            // Refused before autopay was asked to end, or anything went.
+            expect(cancelFor).not.toHaveBeenCalled();
+            expect(contactDelete).not.toHaveBeenCalled();
+            expect(invoiceUpdateMany).not.toHaveBeenCalled();
+            expect(invoiceCount).toHaveBeenCalledWith({
+                where: {
+                    organizationId: "org_1",
+                    NOT: {
+                        source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
+                        number: null,
+                    },
+                    OR: [{ contactId: "c_1" }],
+                },
+            });
+        });
+
+        it("counts real orders through their linked store customers", async () => {
+            findUnique.mockResolvedValue({
+                id: "c_1",
+                organizationId: "org_1",
+            });
+            linkFindMany.mockResolvedValue([{ customerId: "cu_1" }]);
+            orderCount.mockResolvedValue(2);
+
+            await expect(
+                new ContactsService().remove(ctx(), "c_1"),
+            ).rejects.toMatchObject({
+                response: {
+                    details: { reason: "keeps_records", orders: 2 },
+                },
+            });
+            expect(orderCount).toHaveBeenCalledWith({
+                where: expect.objectContaining({
+                    customerId: { in: ["cu_1"] },
+                    // Never an abandoned site checkout.
+                    NOT: expect.objectContaining({ placedOnline: true }),
+                }),
+            });
+            // The invoices of those orders count too.
+            expect(invoiceCount).toHaveBeenCalledWith({
+                where: expect.objectContaining({
+                    OR: [
+                        { contactId: "c_1" },
+                        { order: { customerId: { in: ["cu_1"] } } },
+                    ],
+                }),
+            });
+            expect(contactDelete).not.toHaveBeenCalled();
+        });
+
+        it("checks again under the contact's lock, for an invoice issued meanwhile", async () => {
+            findUnique.mockResolvedValue({
+                id: "c_1",
+                organizationId: "org_1",
+            });
+            leadCount.mockResolvedValue(0);
+            invoiceCount.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+
+            await expect(
+                new ContactsService().remove(ctx(), "c_1"),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(invoiceCount).toHaveBeenCalledTimes(2);
+            expect(contactDelete).not.toHaveBeenCalled();
+        });
     });
 
     it("deletes an owned contact and says how many leads went with them", async () => {
