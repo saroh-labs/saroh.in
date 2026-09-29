@@ -1127,3 +1127,9 @@ Conflict notes:
 - L13 — `capabilities(L13): Selling online leaves the shop ready to publish`
 - L14 — `stores(L14): Remove the storefront "Web address" (expand)`
 - L15 — `database(L15): Drop Store.slug and CustomDomain (contract)`
+
+## Resolved open questions (user, 2026-09-29)
+
+The user accepted every recommendation in "Risks and open questions" above as written ("all as recommended"). Treat each recommendation as the decision.
+
+Cross-plan (from DEC-071): L1 also bans `--` in any address, reserves `test`, and caps new addresses at 57 characters so `test--<address>` stays a valid DNS label. L1 owns these rules; DEC-071 does not add them again.

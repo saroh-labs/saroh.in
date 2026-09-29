@@ -863,3 +863,7 @@ run `publish-template` for the catalogue.
 - K13 — `sites(K13): Blog and writing template`
 - K14 — `sites(K14): Personal and consultant template`
 - K15 — `sites(K15): A new site starts from the kind's template`
+
+## Resolved open questions (user, 2026-09-29)
+
+The user accepted every recommendation in "Risks and open questions" above as written ("all as recommended"). Treat each recommendation as the decision.

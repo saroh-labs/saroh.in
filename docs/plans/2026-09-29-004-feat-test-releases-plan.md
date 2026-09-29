@@ -1141,3 +1141,7 @@ be none) are renamed by hand with the owner. T1's migration reports them.
 - T11 — `app(T11): Test releases in the site editor: make, share, schedule, go live`
 - T12 — `app(T12): Review a test release, and show releases in version history`
 - T13 — `app(T13): Site setting "Publishing needs approval"`
+
+## Resolved open questions (user, 2026-09-29)
+
+The user accepted every recommendation in "Risks and open questions" above as written ("all as recommended"). Treat each recommendation as the decision.
