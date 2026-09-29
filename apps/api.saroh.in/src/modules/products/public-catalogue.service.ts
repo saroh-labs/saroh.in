@@ -31,6 +31,7 @@ import {
     allergenText,
     blurbOf,
     fieldText,
+    madeByLine,
     money,
     onTheShop,
     priceOf,
@@ -378,7 +379,6 @@ export class PublicCatalogueService {
                     howToUse: true,
                     materials: true,
                     keyPoints: true,
-                    madeHere: true,
                     maker: true,
                     madeIn: true,
                     warranty: true,
@@ -440,16 +440,7 @@ export class PublicCatalogueService {
                     name: a.allergen.name,
                 })),
             );
-            const maker = p.madeHere
-                ? shown("maker")
-                    ? scope.storefront.name
-                    : null
-                : [
-                      shown("maker") ? p.maker : null,
-                      shown("madeIn") ? p.madeIn : null,
-                  ]
-                      .filter(Boolean)
-                      .join(", ") || null;
+            const maker = madeByLine(p);
 
             return {
                 slug: p.slug,
