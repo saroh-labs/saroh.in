@@ -385,11 +385,13 @@ stop_stack() {
     kids=$(cat "$E2E_LOGS/pids")
     while [ -n "$kids" ]; do
         all="$all $kids"; more=""
-        for p in $kids; do more="$more $(pgrep -P "$p" 2>/dev/null | tr '\n' ' ')"; done
+        for p in $kids; do more="$more $(pgrep -P "$p" 2>/dev/null | tr '\n' ' ' || true)"; done
         kids=$(echo "$more" | xargs)
     done
+    # A server already gone makes kill answer 1: under the caller's `set -e`
+    # that would fail a green run from inside its EXIT trap.
     # shellcheck disable=SC2086
-    [ -n "$all" ] && kill $all 2>/dev/null
+    if [ -n "$all" ]; then kill $all 2>/dev/null || true; fi
     rm -f "$E2E_LOGS/pids"
     return 0
 }
