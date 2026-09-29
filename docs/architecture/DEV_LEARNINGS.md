@@ -690,3 +690,84 @@ would have silently turned their orders into walk-ins.
 always been (`schema.prisma`), and `db:verify:replay` passes. When a
 required relation becomes optional, say its `onDelete` explicitly.
 **Category**: database · migrations · `packages/database/prisma/schema.prisma`
+
+## API — Subscription Detail "could not be loaded" in CI, fine locally (D14)
+
+**Problem**: Every showcase subscription's page failed in the CI browser
+suite with "This subscription could not be loaded"; locally it opened.
+**Root cause**: The detail read builds D14's autopay card, which opened the
+business's Razorpay connection and decrypted its keys _before_ checking the
+`RAZORPAY_AUTOPAY` flag. CI has a connected Razorpay but no
+`PAYMENTS_ENC_KEY`, so decryption threw and took the whole read down with
+it. Locally the key is set, so nothing failed.
+**Fix**: The flag is checked before any credential is opened, and a
+connection that can't be opened means "no autopay offered", logged — never a
+failed read (`mandate-setup.service.ts`, `e43cd94b`). Rule: an optional
+panel on a read — anything a flag, a provider or a module decides — degrades
+to "not offered"; it never fails the page it sits on. Check the flag first,
+open credentials last. When a test passes locally and fails in CI, diff the
+environments before the code.
+**Category**: API · providers · `docs/patterns/backend-integrations.md`
+
+## E2E — the phone project timed out on a button the desk found at once (D7)
+
+**Problem**: The Plan Editor spec passed on `desk` and timed out on `phone`
+waiting to click "Publish changes"; the button was in the page snapshot.
+**Root cause**: Two things, found one CI round apart. The editor draws its
+actions twice — in the header (hidden below 760px) and in a sticky phone bar
+— and `.first()` picked the hidden one. Then the "…is open for sign-ups."
+toast, which rises from the foot of the screen, sat on the phone bar and
+swallowed the tap: a real bug a merchant would have hit.
+**Fix**: Locators for controls drawn once per layout use
+`.filter({ visible: true })` (`1ef40ec2`). A sticky bottom bar reports its
+height through `useBottomBarInset` and the Toaster's offsets add it
+(`f98043a1`). Run a changed screen's spec on **both** projects before
+pushing — `pnpm prepush --e2e` does.
+**Category**: e2e · frontend · `apps/app.saroh.in/lib/hooks/use-bottom-bar-inset.ts`
+
+## CI — gitleaks failed the batch on test webhook secrets (D12, D13, G20)
+
+**Problem**: The secret scan failed a batch PR on six "generic-api-key" hits.
+**Root cause**: Specs signed their fake Razorpay webhooks with made-up
+secrets like `whsec_d13…`, random-looking enough for gitleaks' entropy rule.
+Nobody ran gitleaks before pushing.
+**Fix**: Reviewed fingerprints in `.gitleaksignore` (`66bc5e66`). Better: a
+fixture secret that reads as one (`test-webhook-secret-d13`) is never
+flagged. `pnpm prepush` runs gitleaks over the branch's commits.
+**Category**: CI · secrets · `.gitleaksignore`
+
+## Tests — a new public controller failed the module-enforcement spec (P1)
+
+**Problem**: One integration spec failed after P1 landed:
+`module-annotations.spec.ts` › "names every controller under src/modules".
+**Root cause**: The spec requires every controller to be module-gated or
+listed as exempt with a reason. P1 added `checkout-return.controller.ts`
+and ran only its own module's tests.
+**Fix**: Listed with its reason (`48ea390e`). A new controller means a row
+in that spec's lists; the full integration run (`pnpm prepush --int`) is
+what catches it, not the unit's own folder.
+**Category**: tests · `apps/api.saroh.in/src/modules/capabilities/module-annotations.spec.ts`
+
+## Tests — 28 subscription specs failed at random, then passed alone
+
+**Problem**: A grouped integration run failed 28 subscription tests; the same
+group passed when run again.
+**Root cause**: A second run was started on the same test database while the
+first was still going. Each resets the database, so they wiped each other's
+rows.
+**Fix**: One database per concurrent run — each unit agent has its own
+`saroh-test-r2-<unit>`. Never start a test run against a database another
+run is using.
+**Category**: tests · local dev
+
+## Repo — an internal pricing plan was pushed to the public repo
+
+**Problem**: A plan with prices, plan limits and the pricing designs went up
+on a batch branch of `saroh-labs/saroh.in`, which is **public**.
+**Root cause**: `docs/plans` and `docs/prototypes` are where plans live, and
+nothing said this one was internal.
+**Fix**: Removed before it reached development (`f6f806d7`); it stays in the
+branch history. Internal material — prices, plan limits, anything the user
+calls internal — lives outside the repo (the user names where). Before a
+push, read the file list of what is going up.
+**Category**: repo · `AGENTS.md` → Rules that bite

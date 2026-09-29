@@ -88,10 +88,12 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
 3. **Land units locally.** Merge each finished unit into the batch branch
    with `--no-ff` and a message naming the unit, then remove its worktree and
    branch. **Never push a unit branch, and never open a PR per unit.**
-4. **Run the full checks on the batch** before it leaves the machine: lint,
-   typecheck, unit tests, the integration tests (run them in module groups,
-   since a full `test:int` run can crash a worker) and the `check:*` scripts
-   from AGENTS.md → Before you finish.
+4. **Run `pnpm prepush --all` on the batch** before it leaves the machine.
+   It runs gitleaks, lint, typecheck, the `check:*` scripts, unit tests and
+   vitest, then the API integration tests in module groups (a full `test:int`
+   run can crash a worker), then the browser specs for the screens the batch
+   touched on both `desk` and `phone`, against the running stack. Push only
+   when it ends with ALL PASS.
 5. **Push once and open one PR into `development`.** Do it when a feature is
    complete, not on a timer. Merge when CI is green, then check the change on
    the development stack. Anything unfinished carries over into the next
