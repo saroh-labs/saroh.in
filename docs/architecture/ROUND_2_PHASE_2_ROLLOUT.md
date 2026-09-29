@@ -849,11 +849,24 @@ with an invoice each period".
   The new app on the previous API sees no card: today's line, no actions,
   and the copy says "renews with an invoice" (the offer read 404s, so it
   reads as not offered).
-- **Not done here:** the customer isn't sent a notice when staff cancel
-  their autopay — no notice template fits (A14's are about bookings and
-  orders), and their next renewal arrives as an invoice with its pay link.
-  Home's "Autopay limit too low" row still offers Retry by pay link; the
-  set-up link is sent from Subscription Detail.
+- **Telling the customer (batch 2026-09-29, fix-pay).** "Cancel autopay"
+  on autopay the customer had on emails them through D17's path
+  (`AUTOPAY_CANCELLED`, a new Message template: the business's own email
+  provider, their bill-to or account address; a revoked consent suppresses
+  it) and posts in their account thread only where it is live
+  (`SITE_ACCOUNT_AREA` and `ACCOUNT_THREAD`). The cancel's answer gains
+  `told`; the previous app ignores it. A set-up never approved tells
+  nobody.
+- **Home's "Autopay limit too low" row** offers "Send a set-up link" beside
+  Retry by pay link (fix-pay): a row link to Subscription Detail with
+  `?do=autopay-link`, which opens the set-up sheet there. Only for
+  `subscription:write`, only while autopay is offered. The previous app
+  ignores the row's `link`; the new app on the previous API shows Retry
+  only.
+- **The Plan Editor** warns "Autopay covers up to ₹X; N members will need
+  to authorise again" when the price typed is above the autopay limit of
+  members booked to switch to the plan (D13, fix-pay). The plan's draft
+  read gains `autopayLimits`; an older API sends none and no warning shows.
 
 ### Verify
 
@@ -1162,6 +1175,134 @@ back; run the backfill again afterwards.
 Once no previous image can run, run the backfill once more (it must print
 nothing to change), then add a unique index on (organization, number). It
 is in the waves plan's follow-up table as Z7.
+
+## WHSECRET: a payment connection needs its webhook signing secret (DEC-063)
+
+Razorpay signs its webhooks with a secret the merchant chooses when adding
+the webhook in its dashboard, separate from the key secret. Setup marked it
+"optional", so a connection could be saved without it, and every webhook
+for that business was then refused. From this release:
+
+- **Connecting Razorpay without the webhook secret is refused** (400: "Add
+  the webhook signing secret from Razorpay › Webhooks, so Saroh can confirm
+  payments."). Setup is guided steps: the keys, the business's webhook URL
+  with Copy and the events to tick, then the secret with "Generate one".
+  Cashfree signs with the key secret already entered and asks for nothing
+  more; a Cashfree connection with no saved webhook secret is now verified
+  with its key secret (until now every Cashfree webhook was refused too).
+- **No migration and no backfill.** The secret is the merchant's to add:
+  Saroh never had it. The flag comes from opening the sealed credentials in
+  memory (`webhook-setup.ts`, `lacksWebhookSecret`); a blob that can't be
+  opened (a seed's placeholder) isn't flagged.
+
+### What happens to existing connections
+
+A Razorpay connection saved before this, with no webhook secret, keeps its
+status (CONNECTED) and keeps taking payments:
+
+- **Settings › Providers** shows it as **Needs attention**: "Needs its
+  webhook signing secret — payments can't be confirmed until you add it",
+  with **Add webhook secret**, which reopens setup. The providers list
+  carries `webhookSecretMissing: true` for it.
+- **Payments readiness drops to `ATTENTION_REQUIRED`**
+  (`PAYMENTS_WEBHOOK_SECRET_MISSING`) when no connected provider can
+  confirm a payment, so the ready checklist reads "Finish connecting
+  payments — Add your webhook signing secret" and doesn't count payments as
+  ready. A business with a second, working connection stays `ACTIVE`.
+- **Checkout still opens on it.** Its payments are still confirmed without
+  the webhook since P1 (the checkout's signed return and the pending sweep,
+  above), so customers who pay are not left "Awaiting payment". What stays
+  unconfirmed without the webhook is what only the webhook reports: a
+  refund's `refund.processed` / `refund.failed`, and autopay's mandate
+  events. Blocking checkout on a connection with no secret is a follow-up,
+  not this release (waves plan, follow-up Z8): it can't be a query filter
+  (the secret is sealed), and turning it on at deploy would stop those
+  businesses taking online payments until each adds its secret.
+
+**API before app, either is safe.** The previous app's connect form sends
+the secret only when typed: on the new API a Razorpay connect without it is
+the 400 above, whose message says what to add. The previous app ignores
+`webhookSecretMissing` and the new readiness code (it shows a generic
+"needs attention" for `ATTENTION_REQUIRED`).
+
+### Before deploying: count the connections affected (read-only)
+
+The secret is sealed, so SQL can't read it. This counts the connected
+Razorpay accounts and, among them, those that **have never had a verified
+payment update**: the webhook inbox keeps only deliveries whose signature
+checked out, so every connection without a secret is in the second number
+(a new connection with no payments yet is too). Run it against production,
+read-only, and record both numbers in the release issue:
+
+```sql
+SELECT count(*) AS connected_razorpay,
+       count(*) FILTER (
+           WHERE NOT EXISTS (
+               SELECT 1 FROM "WebhookEvent" w
+               WHERE w."organizationId" = m."organizationId"
+                 AND w.provider = 'RAZORPAY'
+           )
+       ) AS never_confirmed_by_webhook
+FROM "MerchantPaymentProvider" m
+WHERE m.provider = 'RAZORPAY' AND m.status = 'CONNECTED';
+```
+
+The exact number is what the new API flags. After the deploy, count the
+businesses whose Settings › Providers reads Needs attention for Razorpay;
+the providers list for each (`GET organizations/:org/payment-providers`)
+carries `webhookSecretMissing`.
+
+### Telling merchants
+
+Before the deploy, list who to tell (read-only; names and ids only, no
+credentials):
+
+```sql
+SELECT o.id, o.name, o.slug
+FROM "MerchantPaymentProvider" m
+JOIN "Organization" o ON o.id = m."organizationId"
+WHERE m.provider = 'RAZORPAY' AND m.status = 'CONNECTED'
+  AND NOT EXISTS (
+      SELECT 1 FROM "WebhookEvent" w
+      WHERE w."organizationId" = m."organizationId"
+        AND w.provider = 'RAZORPAY'
+  )
+ORDER BY o.name;
+```
+
+- **In Saroh, from the deploy:** Settings › Providers' Needs attention row
+  and its **Add webhook secret**, and the ready checklist's "Finish
+  connecting payments". Nothing else is sent by Saroh.
+- **By the team, the same day:** write to each business's owner (from the
+  list above, after the deploy only those the API flags): "Saroh confirms
+  your Razorpay payments through a webhook. Open Settings › Providers in
+  Saroh, choose Add webhook secret on Razorpay, and follow the steps: add
+  the webhook URL shown there in Razorpay › Webhooks, tick the events
+  listed, and paste the same secret into both. Until then payments still
+  go through, but refunds aren't confirmed in Saroh automatically."
+- Record who was told and when in the release issue.
+
+### Verify
+
+1. With Razorpay test keys on a development business: connecting without a
+   webhook secret is refused with the message above; with one, it connects.
+2. A connection saved without a secret (the old way) reads Needs attention
+   with Add webhook secret, and Payments readiness is
+   `ATTENTION_REQUIRED` with `PAYMENTS_WEBHOOK_SECRET_MISSING`.
+3. Add the secret through Add webhook secret, register the URL in
+   Razorpay's test dashboard, pay a test booking: Settings › Providers
+   reads "Last payment update from Razorpay: …" a moment ago, and
+   readiness is `ACTIVE`.
+4. After a day, the "never confirmed" query's second number has dropped by
+   each business that added its secret and has since taken a payment.
+
+### Rollback
+
+Deploy the previous API and app. Nothing was written: secrets merchants
+added in the meantime stay sealed in their connections and keep working,
+since the previous API already verifies with a saved webhook secret.
+(A Cashfree connection without one goes back to refusing its webhooks; P1
+still confirms its payments.)
 
 ## Before switching a flag on (advisory)
 

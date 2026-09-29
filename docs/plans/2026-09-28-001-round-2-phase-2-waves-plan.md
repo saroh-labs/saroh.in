@@ -202,6 +202,7 @@ one exists.
 | Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it | [x] 2026-09-29 (`primaryAction`, `numbers`; `actions`, `upcoming` kept: the app reads them; rollout doc Z5) |
 | Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 | D7 merged to development 2026-09-29 (#716); do it the release after D7 reaches production |
 | Z7 | P3's contract step: a unique index on (organization, order number), after the backfill's second run prints nothing to change | Once no pre-P3 API image can run | |
+| Z8 | DEC-063's follow-up: no checkout opens on a connection with no webhook secret. Not small or safe now (checked 2026-09-29, fix-pay): the secret is sealed, so it can't join `OPENS_CHECKOUT`, the filter the booking page, pay links, the site checkout's readiness and the booking pay link read; each would decrypt instead, and `payments.service`'s intent create would refuse as it does for a missing key id (DEC-054). And since P1 confirms payments without the webhook, turning it on at deploy would stop every flagged business taking online payment until it adds its secret, with no backfill possible. Do it once the WHSECRET outreach (rollout doc) has run and the "never confirmed" count is down to businesses the team has told, with Settings › Providers saying checkout is off until the secret is added | After the WHSECRET outreach | |
 
 ## Risks and open questions
 
