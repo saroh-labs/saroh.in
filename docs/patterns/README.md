@@ -43,7 +43,7 @@ for the reason, so the enforcement is not mistaken for bureaucracy and removed.
 | [devops-environments-and-flags.md](devops-environments-and-flags.md) | Adding an env variable, an environment check or a feature flag                                                                              |
 | [devops-secrets.md](devops-secrets.md)                               | Handling a credential, or finding one where it should not be                                                                                |
 | [devops-observability.md](devops-observability.md)                   | Adding logging, a degraded path, a health check or error tracking                                                                           |
-| [devops-tooling-and-deploy.md](devops-tooling-and-deploy.md)         | Changing lint, TypeScript, CI, tests or dependencies, or shipping the API                                                                   |
+| [devops-tooling-and-deploy.md](devops-tooling-and-deploy.md)         | Changing lint, TypeScript, CI, tests or dependencies, shipping the API, or branching, pushing and opening PRs (daily batch branches)        |
 
 ## Not adopted from the library
 
