@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/billing/subscriptions app:/billing/plans app:/billing/plans/new api:subscriptions
+// @covers accounts:/login app:/open app:/billing/subscriptions app:/billing/plans app:/billing/plans/new app:/customers api:subscriptions api:customer-workspace
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -419,6 +419,9 @@ test.describe("the Plan Editor (D7)", () => {
         await expect(
             page.getByText("Not saved yet — start with a name"),
         ).toBeVisible();
+        // The editor shell is the page's one main landmark; the page used
+        // to wrap it in a second <main> (axe: landmark-no-duplicate-main).
+        await expect(page.getByRole("main")).toHaveCount(1);
 
         await page.getByLabel("Name").fill(name);
         await expect(
@@ -486,6 +489,53 @@ test.describe("the Plan Editor (D7)", () => {
             await expect(
                 page.getByText(/^Archived — nobody new can join/),
             ).toBeVisible();
+        }
+    });
+
+    test("a live plan's new classes reach a member at their next renewal (D10)", async ({
+        page,
+    }) => {
+        const s = ownStamp(test.info());
+        await onNorthwind(page);
+        const nw = northwind(page.request);
+        const plan = await nw.post<{ id: string }>("/subscription-plans", {
+            name: `E2E classes ${s}`,
+            price: "900",
+            currency: "INR",
+            interval: "MONTH",
+            classesPerMonth: 8,
+        });
+        const who = await makeContact(page.request, {
+            firstName: "Classes",
+            lastName: s,
+            email: `classes-${s}@example.test`,
+        });
+        await nw.post("/subscriptions", {
+            contactId: who.id,
+            planId: plan.id,
+        });
+        try {
+            await page.goto(`/billing/plans/${plan.id}/edit`);
+            await page
+                .getByRole("radiogroup", { name: "Classes included" })
+                .getByText("12", { exact: true })
+                .click();
+            await expect(page.getByText("Changes not live")).toBeVisible();
+            await page
+                .getByRole("button", { name: "Publish changes" })
+                .filter({ visible: true })
+                .first()
+                .click();
+            await expect(page.getByText("Changes published.")).toBeVisible();
+
+            // The member keeps 8 until their renewal; the new number shows
+            // with the day it starts.
+            await page.goto(`/customers/${who.id}`);
+            const card = page.getByRole("region", { name: "Classes left" });
+            await expect(card).toContainText(/12 a month from \d+ \w{3}/);
+            await expect(card).toContainText("8");
+        } finally {
+            await archivePlan(page, plan.id);
         }
     });
 
