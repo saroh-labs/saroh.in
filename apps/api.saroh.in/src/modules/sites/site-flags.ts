@@ -25,6 +25,7 @@
 import type { PageKind } from "@saroh/database";
 import { BLOCK_META, exampleTextIn, resolveVariant } from "@saroh/database";
 
+import { trimTrailingSlashes } from "../../common/paths";
 import {
     isModulePageKind,
     reservedAgainst,
@@ -493,7 +494,7 @@ function checkCtaTarget(
 function isBrokenInternalLink(href: string, pagePaths: Set<string>): boolean {
     if (!href.startsWith("/")) return false;
     // Compare the path alone: /about#hours and /about are the same page.
-    const path = href.split(/[?#]/)[0].replace(/\/+$/, "");
+    const path = trimTrailingSlashes(href.split(/[?#]/)[0]);
     return !pagePaths.has(path === "" ? "/" : path);
 }
 

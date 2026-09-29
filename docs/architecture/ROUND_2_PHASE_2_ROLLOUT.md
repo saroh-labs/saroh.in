@@ -299,6 +299,15 @@ the drafts first:
 SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
 ```
 
+### Release #708 carries D5 and D7 together (user, 2026-09-29)
+
+CP-3 wasn't released on its own, so D5's writers and D7's Plan Editor reach
+production in one release. The API still deploys before the apps. Rolling
+the API back below D5 after this release: **roll the Vercel apps back with
+it**, and first archive or delete any DRAFT plan (the query above), so the
+old Plans list doesn't draw one as a live card. Nothing can sell a draft
+either way (D21).
+
 ## E14: pack drafts (wave 4; the Pack Editor, E18, ships in a later release)
 
 The Pack Editor's API, the same shape as D5's for plans:

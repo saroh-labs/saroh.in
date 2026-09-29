@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PageSections } from "../section-renderer";
 import type { JournalPost } from "./journal";
-import JournalSection, { postExcerpt, postEyebrow } from "./journal";
+import JournalSection, {
+    postExcerpt,
+    postEyebrow,
+    withoutScriptsAndStyles,
+    withoutTags,
+} from "./journal";
 
 /** Four live posts, newest first, as the public read returns them. */
 const POSTS: JournalPost[] = [
@@ -362,5 +367,40 @@ describe("the words on a card", () => {
     it("names the author and the day, or just the day", () => {
         expect(postEyebrow(POSTS[0])).toBe("Asha · 20 Sep 2026");
         expect(postEyebrow(POSTS[2])).toBe("4 Sep 2026");
+    });
+});
+
+describe("withoutScriptsAndStyles", () => {
+    it("cuts scripts and styles, in any case, and keeps the rest", () => {
+        expect(
+            withoutScriptsAndStyles(
+                "<p>Hi</p><SCRIPT>x()</SCRIPT><style>p{}</style><p>there</p>",
+            ),
+        ).toBe("<p>Hi</p>  <p>there</p>");
+    });
+
+    it("runs an unclosed one to the end", () => {
+        expect(withoutScriptsAndStyles("Hi<style>p{}")).toBe("Hi ");
+    });
+
+    it("stays fast on many unclosed <style", () => {
+        const input = "<style".repeat(50_000);
+        const started = Date.now();
+        withoutScriptsAndStyles(input);
+        expect(Date.now() - started).toBeLessThan(200);
+    });
+});
+
+describe("withoutTags", () => {
+    it("replaces each tag with a space and keeps a stray <", () => {
+        expect(withoutTags("<p>Hi <b>there</b></p>")).toBe(" Hi  there  ");
+        expect(withoutTags("1 < 2")).toBe("1 < 2");
+    });
+
+    it("stays fast on many < with no >", () => {
+        const input = "<".repeat(100_000);
+        const started = Date.now();
+        expect(withoutTags(input)).toBe(input);
+        expect(Date.now() - started).toBeLessThan(200);
     });
 });
