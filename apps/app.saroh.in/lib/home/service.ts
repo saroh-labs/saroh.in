@@ -113,15 +113,6 @@ export interface HomeBooking {
     href: string;
 }
 
-/** A count whose `href` lands on exactly the rows it counts. */
-export interface HomeNumber {
-    key: string;
-    label: string;
-    value: number;
-    href: string;
-    moduleKey?: string;
-}
-
 /**
  * A part of Home that could not be read (#177, §30).
  *
@@ -293,14 +284,14 @@ export interface HomeModel {
     staff: HomeStaff | null;
     /** A Reviewer's sites (F9); only on `view: "reviewer"`. */
     reviews?: HomeReviewSite[];
+    /** The ranked actions; the rail's badges read the OVERDUE ones. */
     actions: HomeAction[];
-    primaryAction: HomeAction | null;
     hasAnyModule: boolean;
+    /** The next confirmed bookings; Needs you's "Next" line reads them. */
     upcoming: HomeBooking[];
-    numbers: HomeNumber[];
     /** Empty on a healthy read; non-empty means what is shown is incomplete. */
     unavailable: HomeUnavailable[];
-    /** Needs you, flat and ranked (F3). `actions` stays for one release. */
+    /** Needs you, flat and ranked (F3). */
     needs: HomeNeed[];
     /** How many things need doing; a "3 more" row counts as three. */
     needsTotal: number;
@@ -316,10 +307,8 @@ const EMPTY: HomeModel = {
     view: "business",
     staff: null,
     actions: [],
-    primaryAction: null,
     hasAnyModule: false,
     upcoming: [],
-    numbers: [],
     unavailable: [],
     needs: [],
     needsTotal: 0,

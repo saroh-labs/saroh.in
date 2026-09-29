@@ -61,15 +61,12 @@ const MEMBER = {
 const OWNER = { organizationId: "org_1", organizationRole: "OWNER" as const };
 
 describe("HomeService lead bands", () => {
-    it("offers a Member no open-leads number and never counts leads", async () => {
+    it("never counts leads for a Member", async () => {
         const { service, db } = build();
 
-        const home = await service.build(MEMBER);
+        await service.build(MEMBER);
 
-        expect(home.numbers.map((n) => n.key)).not.toContain("OPEN_LEADS");
         expect(db.lead.count).not.toHaveBeenCalled();
-        // The people band stays: that is what a Member reaches CRM for.
-        expect(home.numbers.map((n) => n.key)).toContain("CONTACTS");
     });
 
     it("keeps overdue follow-ups, and their lead titles, from a Member", async () => {
@@ -82,12 +79,11 @@ describe("HomeService lead bands", () => {
         expect(db.activity.findMany).not.toHaveBeenCalled();
     });
 
-    it("still gives an owner both", async () => {
+    it("still gives an owner the overdue follow-ups", async () => {
         const { service } = build();
 
         const home = await service.build(OWNER);
 
-        expect(home.numbers.map((n) => n.key)).toContain("OPEN_LEADS");
         expect(home.actions.map((a) => a.code)).toContain(
             "CRM_OVERDUE_FOLLOWUPS",
         );

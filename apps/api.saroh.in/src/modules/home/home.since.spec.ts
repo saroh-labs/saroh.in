@@ -372,7 +372,7 @@ describe("HomeService: the header", () => {
     });
     afterEach(() => jest.useRealTimers());
 
-    it("sends the header in the business's day beside every old field", async () => {
+    it("sends the header in the business's day beside the fields the app reads", async () => {
         const model = await home(db({ anything: true, orders: 1 })).build(
             owner,
         );
@@ -384,17 +384,13 @@ describe("HomeService: the header", () => {
             fresh: false,
         });
         expect(model.lastDay.items.map((i) => i.kind)).toEqual(["ORDERS"]);
-        // Default 130: the old fields still travel.
-        for (const key of [
-            "actions",
-            "primaryAction",
-            "upcoming",
-            "numbers",
-            "needs",
-            "today",
-        ]) {
+        // The rail reads `actions`, the Next line `upcoming` (default 130's
+        // other old fields went in Z5).
+        for (const key of ["actions", "upcoming", "needs", "today"]) {
             expect(model).toHaveProperty(key);
         }
+        expect(model).not.toHaveProperty("primaryAction");
+        expect(model).not.toHaveProperty("numbers");
     });
 
     it("names the strip when its read fails, and keeps the greeting", async () => {

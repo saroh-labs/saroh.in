@@ -1,12 +1,13 @@
 import type { prisma } from "@saroh/database";
 
-import type { HomeEvidence, HomeNumber } from "./home-model";
+import type { HomeEvidence } from "./home-model";
 import { EVIDENCE_LIMIT, overdueTag, personName } from "./home-model";
 
 /**
- * Home's CRM sources: follow-ups past their due date, and the counts that
- * lead to Leads and Contacts. Moved out of `HomeService` unchanged beside
- * F2's people sources, so the service stays the composition of them.
+ * Home's CRM source: follow-ups past their due date. (The counts that led
+ * to Leads and Contacts fed the numbers band, removed in Z5.) Moved out of
+ * `HomeService` unchanged beside F2's people sources, so the service stays
+ * the composition of them.
  */
 
 type Db = typeof prisma;
@@ -56,44 +57,4 @@ export async function overdueFollowUps(
                 : {}),
         })),
     };
-}
-
-/** Counts that are destinations: open leads, and everyone on file. */
-export async function crmNumbers(
-    db: Db,
-    organizationId: string,
-    canReadLeads: boolean,
-): Promise<HomeNumber[]> {
-    const [openLeads, contacts] = await Promise.all([
-        canReadLeads
-            ? db.lead.count({
-                  where: { organizationId, status: "OPEN" },
-              })
-            : Promise.resolve(0),
-        db.contact.count({ where: { organizationId } }),
-    ]);
-
-    const out: HomeNumber[] = [];
-    if (openLeads > 0) {
-        out.push({
-            key: "OPEN_LEADS",
-            label: "Open leads",
-            value: openLeads,
-            // `?view=` is the DataView filter contract: this lands on Leads
-            // with the open filter already applied, not on a list the
-            // merchant has to narrow again by hand.
-            href: "/leads?view=open",
-            moduleKey: "CRM",
-        });
-    }
-    if (contacts > 0) {
-        out.push({
-            key: "CONTACTS",
-            label: "Contacts",
-            value: contacts,
-            href: "/contacts",
-            moduleKey: "CRM",
-        });
-    }
-    return out;
 }

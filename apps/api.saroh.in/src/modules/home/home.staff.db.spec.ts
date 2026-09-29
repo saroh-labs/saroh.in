@@ -304,7 +304,7 @@ describe("a staff member's diary (F11)", () => {
             ].sort(),
         );
         const schedule = await readSchedule(prisma, orgId, NOW, narrow);
-        expect(schedule.total).toBe(2);
+        expect(schedule.upcoming).toHaveLength(2);
     });
 
     it("gives someone not on the diary the whole day", async () => {

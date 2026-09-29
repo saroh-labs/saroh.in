@@ -711,6 +711,30 @@ reminder; Undo within ten seconds sends nothing. A Member sees no buttons.
 
 Deploy the previous API or app; nothing is stored.
 
+## Z5: Home's old fields are removed (done, batch 2026-09-29)
+
+F3, F5, F6 and F7 served `GET /home`'s old fields beside the new ones for
+one release (default 130). B2d and those units are in production (#708), so
+Z5 removes the two no live app reads: **`primaryAction`** and **`numbers`**
+(with the reads behind them only: the CRM lead and contact counts, and the
+upcoming bookings count). No migration.
+
+- **Confirmed unused** before removing: neither is read by `app.saroh.in`
+  (in this branch or in #708's), `saroh.app`, `site-blocks` or `e2e` (only
+  the permissions API mock sent them; it no longer does).
+- **Kept on purpose:** `actions` (the workspace rail's badges read its
+  OVERDUE rows, `components/shared/app-shell.tsx`), `upcoming` (Needs you's
+  "Next" line) and `hasAnyModule` (the first-run screen). They are not
+  legacy while the app reads them.
+
+### Rollback
+
+Rolling the API back below this release is fine (it sends the two fields
+again, which the app ignores). **Rolling the workspace back below F5/F6
+(to an app from before #708) now breaks Home**: that app draws the numbers
+band from `home.numbers`, which this API no longer sends. Roll the API back
+with it.
+
 ## F10b: a private limited company is stored as `pvt` (follow-up to F10)
 
 F10 (#708) shipped the readers: every API and app since reads `company` and

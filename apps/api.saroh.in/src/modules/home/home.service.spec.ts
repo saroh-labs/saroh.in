@@ -301,8 +301,8 @@ describe("HomeService ranking", () => {
             { key: "COMMERCE", label: "Commerce", readiness: "ACTIVE" },
         ]);
         const model = await svc.build(INPUT);
-        expect(model.primaryAction?.severity).toBe("ATTENTION");
-        expect(model.primaryAction?.moduleKey).toBe("PAYMENTS");
+        expect(model.actions[0]?.severity).toBe("ATTENTION");
+        expect(model.actions[0]?.moduleKey).toBe("PAYMENTS");
     });
 
     it("puts an overdue follow-up before a generic analytics nudge", async () => {
@@ -314,7 +314,7 @@ describe("HomeService ranking", () => {
             { activities: [OVERDUE_TASK], activityCount: 3 },
         );
         const model = await svc.build(INPUT);
-        expect(model.primaryAction?.code).toBe("CRM_OVERDUE_FOLLOWUPS");
+        expect(model.actions[0]?.code).toBe("CRM_OVERDUE_FOLLOWUPS");
         const codes = model.actions.map((a) => a.code);
         expect(codes.indexOf("CRM_OVERDUE_FOLLOWUPS")).toBeLessThan(
             codes.indexOf("INSIGHTS_VIEW"),
@@ -339,7 +339,7 @@ describe("HomeService ranking", () => {
             { orders: [OPEN_ORDER] },
         );
         const model = await svc.build(INPUT);
-        expect(model.primaryAction?.code).toBe("COMMERCE_OPEN_ORDERS");
+        expect(model.actions[0]?.code).toBe("COMMERCE_OPEN_ORDERS");
         const codes = model.actions.map((a) => a.code);
         expect(
             model.actions.findIndex((a) => a.severity === "OVERDUE"),
@@ -371,7 +371,7 @@ describe("HomeService ranking", () => {
         ]);
         const model = await svc.build(INPUT);
         expect(model.hasAnyModule).toBe(false);
-        expect(model.primaryAction).toBeNull();
+        expect(model.actions).toEqual([]);
     });
 
     it("surfaces open orders as overdue work when Commerce is active", async () => {
@@ -380,8 +380,8 @@ describe("HomeService ranking", () => {
             { orders: [OPEN_ORDER], orderCount: 2 },
         );
         const model = await svc.build(INPUT);
-        expect(model.primaryAction?.code).toBe("COMMERCE_OPEN_ORDERS");
-        expect(model.primaryAction?.title).toContain("2");
+        expect(model.actions[0]?.code).toBe("COMMERCE_OPEN_ORDERS");
+        expect(model.actions[0]?.title).toContain("2");
     });
 });
 
@@ -391,7 +391,7 @@ describe("HomeService evidence", () => {
             activities: [OVERDUE_TASK],
         });
         const model = await svc.build(INPUT);
-        const row = model.primaryAction?.evidence?.[0];
+        const row = model.actions[0]?.evidence?.[0];
 
         expect(row?.title).toBe("Bulk order enquiry");
         expect(row?.subtitle).toBe("Ananya Rao");
@@ -410,7 +410,7 @@ describe("HomeService evidence", () => {
             { orders: [OPEN_ORDER] },
         );
         const model = await svc.build(INPUT);
-        const row = model.primaryAction?.evidence?.[0];
+        const row = model.actions[0]?.evidence?.[0];
 
         expect(row?.amountMinor).toBe(125050);
         expect(row?.currency).toBe("INR");
@@ -426,39 +426,28 @@ describe("HomeService evidence", () => {
             { orders: [OPEN_ORDER], orderCount: 23 },
         );
         const model = await svc.build(INPUT);
-        expect(model.primaryAction?.count).toBe(23);
-        expect(model.primaryAction?.evidence).toHaveLength(1);
+        expect(model.actions[0]?.count).toBe(23);
+        expect(model.actions[0]?.evidence).toHaveLength(1);
     });
 });
 
-describe("HomeService numbers and schedule", () => {
-    it("links a count to the filtered view of exactly what it counts", async () => {
+describe("HomeService schedule", () => {
+    it("sends none of the old Home's primaryAction and numbers (Z5)", async () => {
         const svc = build([{ key: "CRM", label: "CRM", readiness: "ACTIVE" }], {
             leadCount: 12,
             contactCount: 24,
         });
         const model = await svc.build(INPUT);
 
-        expect(model.numbers).toEqual([
-            {
-                key: "OPEN_LEADS",
-                label: "Open leads",
-                value: 12,
-                href: "/leads?view=open",
-                moduleKey: "CRM",
-            },
-            {
-                key: "CONTACTS",
-                label: "Contacts",
-                value: 24,
-                href: "/contacts",
-                moduleKey: "CRM",
-            },
-        ]);
+        expect(model).not.toHaveProperty("primaryAction");
+        expect(model).not.toHaveProperty("numbers");
+        // The rail's badges still read `actions`; the Next line `upcoming`.
+        expect(model).toHaveProperty("actions");
+        expect(model).toHaveProperty("upcoming");
     });
 
-    it("emits no numbers for a module the actor cannot see", async () => {
-        // Numbers are as much of a leak as actions: "8 upcoming bookings" tells
+    it("lists no bookings for a module the actor cannot see", async () => {
+        // A schedule is as much of a leak as an action: bookings on Home tell
         // a merchant with Appointments off that the data exists.
         const svc = build(
             [
@@ -472,7 +461,6 @@ describe("HomeService numbers and schedule", () => {
             { leadCount: 12, contactCount: 24, bookingCount: 8 },
         );
         const model = await svc.build(INPUT);
-        expect(model.numbers).toEqual([]);
         expect(model.upcoming).toEqual([]);
     });
 
@@ -509,14 +497,11 @@ describe("HomeService numbers and schedule", () => {
         const model = await svc.build(INPUT);
 
         expect(model.upcoming).toHaveLength(1);
-        expect(model.numbers.some((n) => n.key === "UPCOMING_BOOKINGS")).toBe(
-            true,
-        );
     });
 
     it("does not push order work through a module that is not ready", async () => {
-        // The number is reference; the action sends someone at a door. A door
-        // that does not open must not be pointed at.
+        // The action sends someone at a door. A door that does not open must
+        // not be pointed at.
         const svc = build(
             [
                 {
@@ -530,7 +515,6 @@ describe("HomeService numbers and schedule", () => {
         );
         const model = await svc.build(INPUT);
 
-        expect(model.numbers.some((n) => n.key === "OPEN_ORDERS")).toBe(true);
         expect(
             model.actions.some((a) => a.code === "COMMERCE_OPEN_ORDERS"),
         ).toBe(false);
