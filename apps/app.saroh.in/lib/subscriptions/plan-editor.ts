@@ -4,7 +4,7 @@ import type {
     EditorRecord,
 } from "@/lib/editor-shell/types";
 
-import type { PlanEditorRecord, PlanValues } from "./plan-drafts";
+import type { AutopayLimit, PlanEditorRecord, PlanValues } from "./plan-drafts";
 import type { Interval, Plan } from "./service";
 import { classesText, money } from "./view";
 
@@ -315,6 +315,38 @@ export function everyNote(form: PlanForm, autopay = false): string {
     if (form.interval === "MONTH" || form.interval === "WEEK") return invoiced;
     const cur = form.currency || "INR";
     return `Works out to ${money(Math.round(price * PER_MONTH[form.interval]), cur)} a month. ${invoiced}`;
+}
+
+/**
+ * D13's warning under the price: the members booked to switch to this plan
+ * whose autopay covers less than the price typed. Their renewal onto it is
+ * never charged above what they authorised (MANDATE_LIMIT_LOW), so they
+ * will need to authorise again. ₹X is the highest of their limits: none of
+ * them covers more. "" when nobody's autopay falls short.
+ */
+export function autopayLimitWarning(
+    form: PlanForm,
+    limits: readonly AutopayLimit[] | undefined,
+    currency: string,
+): string {
+    const price = parsePrice(form.price);
+    if (!price || !limits?.length) return "";
+    const priceMinor = toMinorUnits(price);
+    const short = limits.filter((l) => toMinorUnits(l.limit) < priceMinor);
+    const members = short.reduce((n, l) => n + l.members, 0);
+    if (!members) return "";
+    const cap = short.reduce(
+        (hi, l) => (toMinorUnits(l.limit) > toMinorUnits(hi) ? l.limit : hi),
+        short[0].limit,
+    );
+    const who = members === 1 ? "1 member" : `${members} members`;
+    return `Autopay covers up to ${money(cap, currency || "INR")}; ${who} will need to authorise again`;
+}
+
+/** "1500.5" as 150050: compared in whole paise, never as floats. */
+function toMinorUnits(amount: string): number {
+    const [whole, frac = ""] = amount.split(".");
+    return Number(whole) * 100 + Number((frac + "00").slice(0, 2));
 }
 
 /** The figures the side panel reads: absent for a plan not saved yet. */

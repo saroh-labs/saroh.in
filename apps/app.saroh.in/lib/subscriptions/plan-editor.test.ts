@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { PlanEditorRecord } from "./plan-drafts";
 import type { PlanForm, ProblemContext } from "./plan-editor";
 import {
+    autopayLimitWarning,
     changesNote,
     clashOf,
     editorRecordOf,
@@ -208,6 +209,50 @@ describe("the publish banner", () => {
         );
         expect(publishedText("Monthly", true, 12)).toBe(
             "Changes published. The 12 already on it keep what they pay now.",
+        );
+    });
+});
+
+describe("the autopay limit warning (D13)", () => {
+    const limits = [
+        { limit: "1300.00", members: 1 },
+        { limit: "1500.00", members: 2 },
+    ];
+
+    it("counts the switchers whose autopay covers less than the price", () => {
+        expect(
+            autopayLimitWarning(form({ price: "1800" }), limits, "INR"),
+        ).toBe(
+            "Autopay covers up to ₹1,500; 3 members will need to authorise again",
+        );
+        expect(
+            autopayLimitWarning(form({ price: "1400" }), limits, "INR"),
+        ).toBe(
+            "Autopay covers up to ₹1,300; 1 member will need to authorise again",
+        );
+    });
+
+    it("says nothing when every limit covers the price, to the paisa", () => {
+        expect(
+            autopayLimitWarning(form({ price: "1300" }), limits, "INR"),
+        ).toBe("");
+        expect(
+            autopayLimitWarning(form({ price: "1300.01" }), limits, "INR"),
+        ).toMatch(/^Autopay covers up to ₹1,300; 1 member/);
+    });
+
+    it("says nothing with no switchers, no price, or an older API", () => {
+        expect(autopayLimitWarning(form({ price: "9000" }), [], "INR")).toBe(
+            "",
+        );
+        expect(
+            autopayLimitWarning(form({ price: "9000" }), undefined, "INR"),
+        ).toBe("");
+        expect(autopayLimitWarning(form({ price: "" }), limits, "INR")).toBe(
+            "",
+        );
+        expect(autopayLimitWarning(form({ price: "abc" }), limits, "INR")).toBe(
+            "",
         );
     });
 });

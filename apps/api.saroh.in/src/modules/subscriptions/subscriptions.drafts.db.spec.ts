@@ -529,3 +529,80 @@ describe("the staff Plans list and other businesses (D5)", () => {
         ).rejects.toBeInstanceOf(NotFoundException);
     });
 });
+
+describe("the editor knows what switchers' autopay covers (D13)", () => {
+    let mandates = 0;
+    /** A member on `from`, booked to switch to `to`, with autopay up to `cap`. */
+    async function switcher(
+        from: string,
+        to: string,
+        cap: number,
+        status = "ACTIVE",
+    ): Promise<string> {
+        const contactId = await person();
+        const sub = await service.subscribe(asha, { contactId, planId: from });
+        await service.changePlan(asha, sub.id, { planId: to });
+        mandates += 1;
+        await prisma.paymentMandate.create({
+            data: {
+                organizationId: asha.organizationId,
+                contactId,
+                subscriptionId: sub.id,
+                provider: "RAZORPAY",
+                providerMandateId: `token_d13w_${mandates}_${process.pid}`,
+                status,
+                method: "UPI",
+                maxAmountCents: cap,
+            },
+        });
+        return sub.id;
+    }
+
+    it("groups the limits of members booked to switch, lowest first", async () => {
+        const from = await livePlan("1000");
+        const to = await livePlan("1200");
+        await switcher(from, to, 150_000);
+        await switcher(from, to, 150_000);
+        await switcher(from, to, 130_000);
+        const editor = await service.getPlanEditor(asha, to);
+        expect(editor.autopayLimits).toEqual([
+            { limit: "1300.00", members: 1 },
+            { limit: "1500.00", members: 2 },
+        ]);
+        // Every draft route answers with the same view.
+        const saved = await service.savePlanDraft(asha, to, {
+            price: "1800",
+            revision: editor.revision,
+        });
+        expect(saved.autopayLimits).toEqual(editor.autopayLimits);
+    });
+
+    it("leaves out members already on the plan: they keep their price", async () => {
+        const id = await livePlan("1200");
+        const other = await livePlan("900");
+        // On the plan with autopay, and booked to switch away from it.
+        await switcher(id, other, 150_000);
+        expect((await service.getPlanEditor(asha, id)).autopayLimits).toEqual(
+            [],
+        );
+    });
+
+    it("leaves out autopay that no longer charges, and an ended subscription", async () => {
+        const from = await livePlan("1000");
+        const to = await livePlan("1200");
+        await switcher(from, to, 150_000, "CANCELLED");
+        const ended = await switcher(from, to, 150_000);
+        await prisma.customerSubscription.update({
+            where: { id: ended },
+            data: { status: "CANCELLED" },
+        });
+        expect((await service.getPlanEditor(asha, to)).autopayLimits).toEqual(
+            [],
+        );
+    });
+
+    it("a draft has none: nobody can switch to it", async () => {
+        const draft = await service.createPlanDraft(asha, { name: "Fresh" });
+        expect(draft.autopayLimits).toEqual([]);
+    });
+});
