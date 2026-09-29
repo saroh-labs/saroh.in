@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { ModuleView } from "@/lib/modules/schema";
 
-import { firstRunJobs, sidebarName, turnOnOrder } from "./first-run";
+import {
+    firstRunJobs,
+    onButNotOpen,
+    sidebarName,
+    turnOnOrder,
+} from "./first-run";
 
 function mod(key: string, over: Partial<ModuleView> = {}): ModuleView {
     return {
@@ -111,5 +116,44 @@ describe("sidebarName", () => {
 
     it("falls back to the module's own label", () => {
         expect(sidebarName(ALL, "PAYMENTS")).toBe("PAYMENTS");
+    });
+});
+
+describe("onButNotOpen", () => {
+    const off = { code: "UNAUTHORIZED" } as const;
+
+    it("is true when the business runs a module this role doesn't reach", () => {
+        // A Storefront team member (F16): Sell is on, but not for them.
+        expect(
+            onButNotOpen([
+                mod("COMMERCE", {
+                    lifecycle: "ENABLED",
+                    canManage: false,
+                    blockers: [off],
+                }),
+            ]),
+        ).toBe(true);
+    });
+
+    it("is false when nothing is on for the business", () => {
+        expect(
+            onButNotOpen([
+                mod("COMMERCE", {
+                    canManage: false,
+                    blockers: [off, { code: "ORG_MODULE_DISABLED" }],
+                }),
+            ]),
+        ).toBe(false);
+    });
+
+    it("ignores a module Saroh hasn't rolled out", () => {
+        expect(
+            onButNotOpen([
+                mod("COMMERCE", {
+                    lifecycle: "ENABLED",
+                    blockers: [off, { code: "ROLLOUT_DISABLED" }],
+                }),
+            ]),
+        ).toBe(false);
     });
 });

@@ -35,10 +35,23 @@ export function keepsUndo(inline: HomeInline): boolean {
 /** The longest reply the thread takes (A13's `MESSAGE_MAX`). */
 export const REPLY_MAX = 2_000;
 
-/** A reply can go once it says something, and not past the thread's limit. */
-export function replyReady(draft: string): boolean {
+/** The longest reply a review takes (the reviews API's `ReplyDto`). */
+export const REVIEW_REPLY_MAX = 1_000;
+
+/** Whether the row's action is a reply written in place: a thread or a review. */
+export function writesReply(inline: Pick<HomeInline, "kind">): boolean {
+    return inline.kind === "REPLY" || inline.kind === "REVIEW_REPLY";
+}
+
+/** The longest reply this action's endpoint takes. */
+export function replyMax(inline: Pick<HomeInline, "kind">): number {
+    return inline.kind === "REVIEW_REPLY" ? REVIEW_REPLY_MAX : REPLY_MAX;
+}
+
+/** A reply can go once it says something, and not past its limit. */
+export function replyReady(draft: string, max: number = REPLY_MAX): boolean {
     const text = draft.trim();
-    return text.length > 0 && text.length <= REPLY_MAX;
+    return text.length > 0 && text.length <= max;
 }
 
 /** What the row's reply box is called, for a screen reader. */
@@ -60,6 +73,8 @@ export function undoneText(inline: HomeInline, told: boolean): string {
             return "Not sent. The reminder didn't go.";
         case "REPLY":
             return "Not sent. Your reply is still in the box.";
+        case "REVIEW_REPLY":
+            return "Not posted. Your reply is still in the box.";
         case "RETRY":
             return "Undone.";
     }
@@ -78,6 +93,8 @@ export function failedText(inline: HomeInline): string {
             return "The reminder wasn't sent.";
         case "REPLY":
             return "Your reply wasn't sent.";
+        case "REVIEW_REPLY":
+            return "Your reply wasn't posted.";
     }
 }
 

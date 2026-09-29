@@ -19,6 +19,7 @@ import {
     replyWords,
     retryMandateWords,
     retryWords,
+    reviewReplyWords,
 } from "./home-inline-words";
 import type {
     HomeAction,
@@ -127,6 +128,10 @@ export class HomeInlineService {
             this.step("Reply", () =>
                 this.reply(of("CRM_UNANSWERED_MESSAGES"), input),
             ),
+            this.step("Reply to review", () => {
+                reviewReplyOn(of("COMMERCE_LOW_STAR_REVIEWS"), input);
+                return Promise.resolve();
+            }),
         ]);
     }
 
@@ -383,6 +388,28 @@ export class HomeInlineService {
                 };
             }),
         );
+    }
+}
+
+/**
+ * Reply to a low-star review (F2): `product-review:write`, the reply
+ * endpoint's own permission. Every row on that list is a published review
+ * with no reply yet, so each can take one; no read of its own.
+ */
+export function reviewReplyOn(
+    evidence: HomeEvidence[],
+    input: HomeInput,
+): void {
+    if (!holds(input, "product-review:write")) return;
+    for (const ev of evidence) {
+        const person = firstNameOf(ev.subtitle);
+        ev.inline = {
+            kind: "REVIEW_REPLY",
+            ...reviewReplyWords(person),
+            undoable: true,
+            target: ev.id,
+            person,
+        };
     }
 }
 

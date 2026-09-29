@@ -181,8 +181,12 @@ export class HomeService {
         const stores = narrow.storeIds;
         const actions: HomeAction[] = [];
 
-        // Setup / attention actions straight from module readiness.
-        for (const view of views) {
+        // Setup / attention actions straight from module readiness. A staff
+        // member (F11) sees them only if they may set modules up: "Create a
+        // pipeline" or "Connect a provider" on a Member's Home is a row they
+        // can't act on, and the design's staff Home draws none.
+        const offersSetup = !staffView || holds(input, "module:manage");
+        for (const view of offersSetup ? views : []) {
             if (view.readiness === "ATTENTION_REQUIRED") {
                 // SETUP/ATTENTION readiness always carries at least one blocker.
                 const blocker = view.blockers[0];
