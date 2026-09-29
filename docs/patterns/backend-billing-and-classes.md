@@ -288,6 +288,25 @@
   business's `returnCredit` override refunds it only with `payment:manage`.
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
+- **Money taken at the desk is the booking's paper, paid by hand** (round-2
+  P2, DEC-023): `POST services/bookings/:id/desk-payment` (`booking:write`
+  and `invoice:write`, the pay link's pair) takes cash, UPI or card. With
+  no invoice it issues the booking's own (source BOOKING) and writes it
+  PAID with the method; a pay link already out is that ISSUED invoice paid
+  instead, its token cleared; after a deposit only the rest is taken, on a
+  SUPPLEMENTARY invoice against the deposit's (source BOOKING, `bookingId`
+  set). Nothing is charged, so nothing is refundable online: the booking's
+  `paidAtDeskCents` and `deskMethod` read PAID booking paper whose method
+  is one of `PAYMENT_METHODS` — so "Mark it paid" on the invoice counts
+  too — and `dueCents` subtracts it. What "Take ₹X" may take, and why not
+  (cancelled, a hold, a treatment's visit, a course's session, a pack or
+  membership, a payment PROCESSING, a voided invoice, no price, paid), is
+  one pure rule, `bookings/desk-take.ts`, shared by the booking read, the
+  diary and the write. The write takes the cancel's lock order, refuses an
+  `amountCents` that differs from what it works out, and answers a repeat
+  of the last take (same method and amount, within ten minutes) as it did.
+  A `PAID_AT_DESK` BookingEvent names who took it. No Undo: the invoice
+  is issued paper.
 - **Cancel and move have one write each, whoever acts** (A6):
   `bookings/booking-cancel.ts` and `booking-move.ts`. The team calls them
   from `BookingsService`, the customer from their account

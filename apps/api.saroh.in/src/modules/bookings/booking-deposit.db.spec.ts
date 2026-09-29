@@ -192,6 +192,10 @@ describe("a deposit at booking (E8, real database)", () => {
             refundableCents: 40_000,
             refundInTimeCancels: true,
             treatmentOrderId: null,
+            // The rest is taken at the desk (P2); a link never bills a balance.
+            paidAtDeskCents: 0,
+            deskMethod: null,
+            take: { cents: 40_000, byLink: false },
         });
     });
 

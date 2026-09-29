@@ -77,6 +77,7 @@ export interface AvailabilityRule {
 // below AND re-exported, so server callers still have one place to look.
 import type { BookingMoney, CancelMoney } from "./booking-money";
 import type { BookingOutcome, BookingStatus } from "./booking-state";
+import type { DeskPayment, DeskPaymentInput } from "./desk-pay";
 
 /** A cancelled booking, and what the cancel did with its money (E8). */
 export type CancelledBooking = Booking & { money?: CancelMoney };
@@ -124,7 +125,13 @@ export interface Booking {
 /** What has happened to a booking, in order (#121). */
 export interface BookingEvent {
     id: string;
-    type: "BOOKED" | "RESCHEDULED" | "CANCELLED" | "ATTENDED" | "NO_SHOW";
+    type:
+        | "BOOKED"
+        | "RESCHEDULED"
+        | "CANCELLED"
+        | "ATTENDED"
+        | "NO_SHOW"
+        | "PAID_AT_DESK";
     /** Null when the booker did it themselves through the public form. */
     actor: { name: string | null } | null;
     fromStartAt: string | null;
@@ -592,6 +599,19 @@ export function createBookingPayLink(
         "POST",
         undefined,
         "Couldn't make the pay link",
+    );
+}
+
+/** "Take ₹X" at the desk (P2): cash, UPI at the counter or card. */
+export function takeDeskPayment(
+    bookingId: string,
+    input: DeskPaymentInput,
+): Promise<ApiResult<DeskPayment>> {
+    return send<DeskPayment>(
+        `/bookings/${bookingId}/desk-payment`,
+        "POST",
+        input,
+        "Couldn't record the payment",
     );
 }
 

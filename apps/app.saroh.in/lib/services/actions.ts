@@ -1,5 +1,6 @@
 "use server";
 
+import type { DeskPaymentInput } from "./desk-pay";
 import type { PeekPerson } from "./peek";
 import { readPeekPerson } from "./peek-person";
 import type {
@@ -23,6 +24,7 @@ import {
     recordBookingOutcome as recordBookingOutcomeApi,
     replaceRules as replaceRulesApi,
     rescheduleBooking as rescheduleBookingApi,
+    takeDeskPayment as takeDeskPaymentApi,
     updateService as updateServiceApi,
 } from "./service";
 
@@ -45,6 +47,14 @@ export async function bookVisit(
     input: { visitNumber: number; startAt: string; staffId?: string },
 ) {
     return bookVisitApi(orderId, input);
+}
+
+/** "Take ₹X" at the desk for a booking (P2). */
+export async function takeDeskPayment(
+    bookingId: string,
+    input: DeskPaymentInput,
+) {
+    return takeDeskPaymentApi(bookingId, input);
 }
 
 /** "Send a pay link" for a booking just made (E4). */
