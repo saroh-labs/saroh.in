@@ -800,3 +800,31 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - The copy layer reads the kind.
     - The invoices module gate moves off PAYMENTS for issue, send and record-paid.
     - Before launch: the question, copy, first-run order, conditional checklists and invoices-without-Payments. The templates and Projects block follow right after if they aren't ready.
+
+## DEC-071 Test releases: a frozen version on a test address, then "Go live"
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · amends DEC-047 (approval stays advisory unless the business turns it on)
+
+- Context:
+    - Publishing is one step: the whole draft becomes the live snapshot (ADR-002).
+    - Preview links show the draft as it is at that moment, so a reviewer's view changes as the merchant keeps editing, and Publish ships whatever the draft is now, not what was approved.
+    - Preview links live on `saroh.app/preview/<token>` and have no shop, booking, checkout or account pages.
+    - There's no scheduling, and approval never blocks publishing.
+- Decision:
+    - **"Make a test release"** freezes the current draft into a named Publication that isn't live, with an optional note. It's built by the same `buildSnapshot` and stored without repointing `currentPublicationId`.
+    - **Each test release has its own address:** `test--<address>.saroh.app`, and `test.<custom domain>` when the business has a verified one.
+        - It shows the whole site, including the shop, booking and account pages, with a "Test release" bar.
+        - Live products, prices and times are shown, but it **never takes a real order, booking or payment**.
+        - Only people with the link can open it (a token), and it's `noindex`.
+        - An address containing `--` can never be claimed by a business.
+    - **Review and approval attach to the test release** (its fingerprint), not to the moving draft.
+    - **"Go live" publishes exactly the tested version**, now or **at a scheduled time** in the business's time zone, even if the draft has moved on since.
+        - A scheduled go-live can be cancelled until it runs, and the merchant is told when it happens.
+        - Going live is a pointer flip like restore. It records the review standing (#279) and switches the live form fields (#281).
+    - **Direct publishing stays**, unless the business turns on **"Publishing needs approval"** (off by default). With it on, only an approved test release can go live. An owner can still override, and the override is recorded.
+- Consequences:
+    - A test-host lookup mode in the renderer and API.
+    - A scheduled job for go-live.
+    - A setting on the site.
+    - Shop, booking and checkout routes in test mode, with writes refused.
+    - Things that don't go through a publish stay live and outside test releases: products, prices, stock, plans and packs (they have their own publish), hours, "Sells from", posts and modules. The test release says so.
