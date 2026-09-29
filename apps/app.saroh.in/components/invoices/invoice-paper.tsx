@@ -7,6 +7,7 @@ import {
     lineGstNote,
     paperFooter,
     paperTitle,
+    showsGstTotals,
 } from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
 import { billedTo, spacedCode } from "@/lib/invoices/status";
@@ -72,14 +73,16 @@ export function InvoicePaper({
     const buyerGstin = i.billTo?.gstin ?? i.billToGst?.gstin ?? null;
     const typedTax = !gst && Number(i.tax) > 0;
 
-    const sums: [string, string][] = taxed
+    // No line with a rate set: no GST rows, just the total (DEC-072).
+    const gstRows = taxed && showsGstTotals(i) ? taxed : null;
+    const sums: [string, string][] = gstRows
         ? [
               ["Taxable value", money(i.subtotal)],
-              ...(taxed.taxType === "INTER"
-                  ? ([["IGST", money(taxed.igst)]] as [string, string][])
+              ...(gstRows.taxType === "INTER"
+                  ? ([["IGST", money(gstRows.igst)]] as [string, string][])
                   : ([
-                        ["CGST", money(taxed.cgst)],
-                        ["SGST", money(taxed.sgst)],
+                        ["CGST", money(gstRows.cgst)],
+                        ["SGST", money(gstRows.sgst)],
                     ] as [string, string][])),
           ]
         : typedTax
@@ -258,7 +261,7 @@ export function InvoicePaper({
                         </span>
                         <span className="tabular-nums">{money(i.total)}</span>
                     </div>
-                    {taxed ? (
+                    {gstRows ? (
                         <p className="mt-1 text-[11.5px] text-muted-foreground">
                             Prices include GST.
                         </p>

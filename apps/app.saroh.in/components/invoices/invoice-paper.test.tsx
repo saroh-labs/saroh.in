@@ -166,3 +166,45 @@ describe("InvoicePaper line GST (DEC-072)", () => {
         expect(out).not.toContain("CGST");
     });
 });
+
+describe("InvoicePaper GST totals (DEC-072)", () => {
+    const rated = (rate: string) =>
+        line({
+            description: "Celebration cake",
+            gst: {
+                hsnSac: "19059010",
+                rate,
+                taxableValue: "1200.00",
+                cgst: "0.00",
+                sgst: "0.00",
+                igst: "0.00",
+            },
+        });
+
+    it("no line with a rate set: just the total, no GST rows", () => {
+        const out = html(invoice({ tax: "0.00", total: "1200.00" }));
+        expect(out).toContain("Tax invoice");
+        expect(out).toContain("Total");
+        expect(out).not.toContain("Taxable value");
+        expect(out).not.toMatch(/>(CGST|SGST|IGST)</);
+        expect(out).not.toContain("Prices include GST");
+    });
+
+    it("an inter-state paper with no rate set has no IGST row either", () => {
+        const out = html(
+            invoice({ gst: { ...GST, taxType: "INTER" }, tax: "0.00" }),
+        );
+        expect(out).not.toMatch(/>IGST</);
+        expect(out).not.toContain("Taxable value");
+    });
+
+    it("one rated line, even at 0%, keeps the rows", () => {
+        for (const rate of ["18.00", "0.00"]) {
+            const out = html(invoice({ lines: [line(), rated(rate)] }));
+            expect(out).toContain("Taxable value");
+            expect(out).toMatch(/>CGST</);
+            expect(out).toMatch(/>SGST</);
+            expect(out).toContain("Prices include GST.");
+        }
+    });
+});

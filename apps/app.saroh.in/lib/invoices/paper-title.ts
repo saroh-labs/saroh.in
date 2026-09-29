@@ -28,6 +28,23 @@ export function isExemptPaper(i: Pick<Invoice, "gst" | "exempt">): boolean {
     return Boolean(i.gst && i.exempt);
 }
 
+/**
+ * Whether a registered business's paper shows its GST totals (DEC-072) —
+ * the taxable value, CGST and SGST or IGST, and "Prices include GST":
+ * only when at least one line has a rate set, 0% included. A paper whose
+ * every line has no rate set (a plan renewal's, on Rye) charges no GST it
+ * can name, so it shows just its total. Lines not read yet keep the rows.
+ * The API's `showsGstTotals` (`invoices/invoice-paper-view.ts`) says the
+ * same on the PDF.
+ */
+export function showsGstTotals(i: Pick<Invoice, "lines">): boolean {
+    if (!i.lines) return true;
+    return i.lines.some((l) => {
+        const rate = l.gst?.rate;
+        return rate != null && rate.trim() !== "";
+    });
+}
+
 /** The line at the foot of the paper: the law it is issued under, and how it stands. */
 export function paperFooter(
     i: Pick<

@@ -189,6 +189,49 @@ describe("a plan renewal's paper (registered, rate never set)", () => {
     });
 });
 
+describe("GST totals on a registered paper (DEC-072)", () => {
+    const rated = (gstRate: string) =>
+        line({
+            description: "Celebration cake",
+            gstRate,
+            taxableValue: "1200.00",
+        });
+
+    it("no line with a rate set: just the total, no GST rows", () => {
+        const v = view(registered([line(), line()]));
+        expect(v.title).toBe("Tax invoice");
+        expect(v.sums).toEqual([]);
+        expect(v.inclusive).toBeNull();
+        expect(v.total).toBe("₹1,200");
+    });
+
+    it("inter-state with no rate set has no IGST row either", () => {
+        expect(view(registered([line()], { taxType: "INTER" })).sums).toEqual(
+            [],
+        );
+    });
+
+    it("one rated line, even at 0%, keeps the rows", () => {
+        for (const rate of ["18.00", "0"]) {
+            const v = view(registered([line(), rated(rate)]));
+            expect(v.sums.map(([k]) => k)).toEqual([
+                "Taxable value",
+                "CGST",
+                "SGST",
+            ]);
+            expect(v.inclusive).toBe("Prices include GST.");
+        }
+    });
+
+    it("its PDF has no Taxable value, CGST, SGST or Prices include GST", async () => {
+        const text = await pdfText(registered([line()]));
+        expect(text).not.toContain("Taxable value");
+        expect(text).not.toMatch(/^(CGST|SGST|IGST)\b/m);
+        expect(text).not.toContain("Prices include GST");
+        expect(text).toContain("Total");
+    });
+});
+
 describe("an unregistered business's paper", () => {
     it("says nothing about GST on a line, even one holding a rate", () => {
         const v = view(

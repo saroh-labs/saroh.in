@@ -11,7 +11,11 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { createPayLink, readInvoice } from "@/lib/invoices/actions";
 import { customerHref, invoiceHref, sourceHref } from "@/lib/invoices/links";
-import { isExemptPaper, paperTitle } from "@/lib/invoices/paper-title";
+import {
+    isExemptPaper,
+    paperTitle,
+    showsGstTotals,
+} from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
 import {
     billedTo,
@@ -310,7 +314,7 @@ export function InvoiceQuickLook({
     );
 }
 
-function TaxRows({
+export function TaxRows({
     invoice: i,
     money,
     businessName,
@@ -319,6 +323,9 @@ function TaxRows({
     businessName: string;
     money: (a: string) => string;
 }) {
+    // A registered business's paper with no line rated: just the total
+    // (DEC-072).
+    if (i.gst && !isExemptPaper(i) && !showsGstTotals(i)) return null;
     const rows: [string, string][] = isExemptPaper(i)
         ? [["Exempt from GST — no tax is charged", ""]]
         : i.gst

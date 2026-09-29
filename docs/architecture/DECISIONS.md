@@ -838,6 +838,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - **A business that isn't GST-registered charges no GST, so no GST appears anywhere** on its invoice, receipt or PDF: no rate, no tax columns, no "Nil-rated".
     - **A registered business's line with no rate set** (`gstRate` null) shows no GST rate: no "Nil-rated", no "0%".
     - **Only a line whose rate really is 0%** (a nil-rated or exempt supply, recorded as 0) may be labelled "Nil-rated".
+    - **A registered business's paper with no line rated** (every `gstRate` null, like Rye's renewals) shows no GST totals — no Taxable value, CGST, SGST or IGST rows and no "Prices include GST" — just the total, on the paper, the PDF and the quick look (`showsGstTotals`); one rated line, 0% included, keeps them. Its title stays D15's "Tax invoice".
 - Consequences: presentation only. Stored data and totals are unchanged (a null rate is already taxed at nothing and never counts toward a bill of supply). The rule is `lineGstNote`, once in the API for the PDF and once in the app for the paper. The draft editor's hint no longer says a line with no rate is nil-rated.
 - Migration: none.
 
