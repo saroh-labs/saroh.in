@@ -2,12 +2,12 @@
 
 import { pagePathResolver, toRendered } from "@saroh/block-contract";
 import type {
-    ModulePageTopContent,
     Section as RenderedSection,
     SiteFooterContent,
 } from "@saroh/site-blocks";
 import {
     ModulePageTop,
+    modulePageTopOf,
     PageSections,
     SiteFooter,
     SiteHeader,
@@ -96,14 +96,14 @@ export function DraftPreview({
     siteId,
     onOpenPage,
     onFormBlocked,
-    top = null,
+    page: current = null,
 }: {
     /**
-     * A module page's title (DEC-073 #9), drawn above its blocks as the
-     * live site draws it; its rich-text intro then lines up with the cards.
-     * Null on a free-form page.
+     * The page being drawn. A module page's title (DEC-073 #9) is drawn
+     * above its blocks as the live site draws it, and its rich-text intro
+     * lines up with the cards. Omitted, the blocks alone.
      */
-    top?: ModulePageTopContent | null;
+    page?: Pick<SitePage, "kind" | "title"> | null;
     /**
      * The site being drawn, so blocks that read live data (Visit us, G8)
      * show the real values on the canvas. Omitted, they say where the real
@@ -179,6 +179,7 @@ export function DraftPreview({
      * that document IS the merchant's site; this one is a panel inside a Saroh
      * screen, and `:root` here would repaint the editor around it.
      */
+    const top = current ? modulePageTopOf(current) : null;
     const vars =
         style && styleOptions
             ? resolveStyleVariables(style, styleOptions)
