@@ -4270,12 +4270,24 @@ model PaymentIntent {
   // provider reported none — never an estimate.
   feeCents Int?
 
+  // A charge through an autopay mandate (D11, D13). Such a charge is two
+  // steps: the provider's order is made with a pre-debit notice, and the
+  // debit is asked for only once the notice is delivered and `debitAfter`
+  // has passed. `preDebitStatus`: PENDING | DELIVERED | FAILED | NOT_NEEDED;
+  // null on every other intent. `preDebitRef` is the provider's notice id.
+  viaMandateId   String?
+  viaMandate     PaymentMandate? @relation(fields: [viaMandateId], references: [id], onDelete: SetNull)
+  debitAfter     DateTime?
+  preDebitStatus String?
+  preDebitRef    String?
+
   @@unique([orderId, idempotencyKey])
   @@unique([invoiceId, idempotencyKey])
   @@index([organizationId])
   @@index([orderId])
   @@index([invoiceId])
   @@index([provider, providerIntentId])
+  @@index([viaMandateId])
 }
 
 // PaymentAttempt — one interaction with the provider for an intent.
@@ -5919,7 +5931,7 @@ model PaymentMandate {
   status            String    @default("PENDING")
   activatedAt       DateTime?
   cancelledAt       DateTime?
-  // CUSTOMER | STAFF | SUBSCRIPTION_ENDED | PRIVACY_REMOVAL | MERGED | PROVIDER
+  // CUSTOMER | STAFF | SUBSCRIPTION_ENDED | PRIVACY_REMOVAL | MERGED | PROVIDER | REPLACED
   cancelReason      String?
   // When the provider confirmed the cancel. Null on a CANCELLED row: Saroh
   // stopped charging it, and is still confirming with the provider.
@@ -5928,11 +5940,35 @@ model PaymentMandate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Set-up, status and limit (D11). What the customer authorised: the
+  // method they picked (UPI | CARD | EMANDATE; never a card or bank
+  // detail), the most one charge may take, in minor units, and how often.
+  method         String?
+  maxAmountCents Int?
+  currency       String    @default("INR")
+  // AS_PRESENTED: Saroh says when to charge (renewal dates move).
+  frequency      String?
+  // The provider's set-up object (Razorpay: the registration link or the
+  // authorisation order), so a webhook finds the row before the token is
+  // named; and when an unanswered set-up stops being worth waiting for.
+  setupReference String?
+  setupExpiresAt DateTime?
+  // When the provider says the authority ends.
+  expiresAt      DateTime?
+  pausedAt       DateTime?
+  failedAt       DateTime?
+  // The provider's reason code for a FAILED set-up, sanitised; never shown raw.
+  failureReason  String?
+  // Charges taken through it (D13).
+  intents        PaymentIntent[]
+
   // A subscription has at most one ACTIVE mandate.
   @@unique([subscriptionId], map: "PaymentMandate_one_active_per_subscription", where: raw("status = 'ACTIVE'"))
+  @@unique([organizationId, provider, providerMandateId])
   @@index([organizationId])
   @@index([organizationId, subscriptionId, status])
   @@index([organizationId, contactId, status])
+  @@index([organizationId, provider, setupReference])
 }
 
 /// One notice about a customer's own booking or order, handled once
