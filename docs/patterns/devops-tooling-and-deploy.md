@@ -7,6 +7,13 @@
 
 ## Workspace — **Current**
 
+- **Adopted, implementation pending** — Saroh-managed client sites use one
+  Saroh-owned Vercel multi-tenant project for `*.saroh.app` and verified custom
+  domains. Next.js customer-facing server routes call the Saroh API; only the
+  API accesses the database. Content publications are tenant-specific but code
+  releases are shared. See [ADR-009](../architecture/adr/ADR-009-vercel-managed-multi-tenant-sites.md)
+  and DEC-025 before changing this hosting boundary.
+
 - pnpm workspaces (`apps/*`, `packages/*`, `tooling/*`, `e2e`) with pnpm
   catalogs, and Turborepo: `build`, `dev`, `lint` and `typecheck` depend on
   `^build`, so shared packages build first.

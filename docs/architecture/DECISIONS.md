@@ -254,6 +254,15 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: Order Detail shows a Member the stepper, items, notes and allergy banner, and no money column, refund or edit controls. A business that wants Members kept off orders makes a custom role.
 - Migration: none; built-in role permissions live in code (`organization-policy.ts`).
 
+## DEC-025 Vercel for Saroh-managed multi-tenant sites
+
+**Status: Accepted — 2026-09-24; implementation pending** — see [ADR-009](./adr/ADR-009-vercel-managed-multi-tenant-sites.md)
+
+- Context: businesses need customer-facing sites using Saroh modules without managing hosting accounts or repositories.
+- Decision: one Saroh-owned Vercel project serves `*.saroh.app` and verified custom domains from the shared Next.js application. Customer-facing server routes call the Saroh business API; only that API accesses the database. R2 remains the storage integration.
+- Consequences: content publishing is tenant-specific; runtime releases are shared. Sessions, caches and authorization must isolate tenants. Customer authentication and portal APIs still need implementation. Client-owned hosting is an optional future path, not a prerequisite; fully independent client backends are not selected.
+- Migration: no schema or infrastructure change in this decision; DNS/TLS, deployment and customer API work follows separately.
+
 ## DEC-026 A refund carries Saroh's reference, and an unsure answer holds the money
 
 **Status: Accepted — 2026-09-24** — issue #508 (U1) · extends [ADR-008](./adr/ADR-008-operations-staff-gst-kitchen.md)
