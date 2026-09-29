@@ -159,7 +159,8 @@ export function ts(at: Date): Prisma.Sql {
 }
 
 /**
- * The search: an order number (with or without "#") or a customer's name;
+ * The search: an order number (with or without "#", its number before P3
+ * renumbered it too) or a customer's name;
  * their email or phone only with `contact:read`, so a caller without it
  * cannot learn whether a number belongs to a customer.
  */
@@ -168,6 +169,8 @@ export function searchSql(q: string, view: OrderListView): Prisma.Sql {
     const pattern = `%${likeEscape(text)}%`;
     const parts: Prisma.Sql[] = [
         Prisma.sql`o."orderId" ILIKE ${pattern}`,
+        // The number it had before P3 renumbered it (DEC-066).
+        Prisma.sql`o."renumberedFrom" ILIKE ${pattern}`,
         Prisma.sql`CONCAT_WS(' ', c."firstName", c."lastName") ILIKE ${pattern}`,
         // A walk-in is found by the name they gave (B13).
         Prisma.sql`o."walkInName" ILIKE ${pattern}`,

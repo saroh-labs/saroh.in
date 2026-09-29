@@ -1,9 +1,9 @@
 /**
  * One read of a customer (U8) against a real Postgres: orders join only
  * through a confirmed link, an unlinked same-email store customer is only a
- * possible match, notes keep their allergens and match the same-named
- * allergen on every storefront, and an allergen a note names cannot be
- * removed from the list. Runs in the integration project
+ * possible match, notes are text only (Z2a), Needs attention's allergen
+ * matches the same-named allergen on every storefront, and only Needs
+ * attention holds an allergen on the list. Runs in the integration project
  * (TEST_DATABASE_URL).
  */
 import { prisma } from "@saroh/database";
@@ -203,27 +203,38 @@ describe("Customer detail (DB)", () => {
         expect(detail.unavailable).toEqual([]);
     });
 
-    it("keeps a note's allergens, and refuses to remove one a note names", async () => {
+    it("saves a note's text only, and refuses to remove an allergen only for Needs attention (Z2a)", async () => {
         const [nuts] = await allergens.add(ctx.organizationId, ["Nuts"]);
 
+        // An app from before Z2a still sends the allergen with the note.
         const note = await notes.create(ctx, contactId, {
             body: "Severe nut allergy",
             allergenIds: [nuts.id],
         });
-        expect(note.allergens).toEqual([{ id: nuts.id, name: "Nuts" }]);
+        expect(note.body).toBe("Severe nut allergy");
+        expect(note.allergens).toEqual([]);
+        expect(note.matchAllergens).toEqual([]);
+        expect(
+            await prisma.contactNoteAllergen.count({
+                where: { noteId: note.id },
+            }),
+        ).toBe(0);
 
+        // The allergen is on Needs attention instead, where the detail's
+        // allergens come from.
         const detail = await details.detail(ctx, contactId);
         expect(detail.allergens).toEqual([{ id: nuts.id, name: "Nuts" }]);
+        expect(detail.notes?.rows.map((n) => n.allergens)).toEqual([[]]);
 
-        await expect(
-            allergens.remove(ctx.organizationId, nuts.id),
-        ).rejects.toThrow(
-            "Nuts is in 1 customer note — take it off them first.",
-        );
-
-        // The note put Nuts on Needs attention too (C1); that entry holds
-        // the allergen on the list until it is taken off as well.
-        await notes.remove(ctx, contactId, note.id);
+        // A note that names it from before Z2a doesn't hold it on the list;
+        // the Needs attention entry does.
+        await prisma.contactNoteAllergen.create({
+            data: {
+                noteId: note.id,
+                allergenId: nuts.id,
+                organizationId: ctx.organizationId,
+            },
+        });
         await expect(
             allergens.remove(ctx.organizationId, nuts.id),
         ).rejects.toThrow(
@@ -235,12 +246,54 @@ describe("Customer detail (DB)", () => {
         await expect(
             allergens.remove(ctx.organizationId, nuts.id),
         ).resolves.toEqual({ id: nuts.id, name: "Nuts" });
+        // The old row went with it; the note keeps its words.
+        expect(
+            await prisma.contactNoteAllergen.count({
+                where: { allergenId: nuts.id },
+            }),
+        ).toBe(0);
+        expect(
+            (await prisma.contactNote.findUnique({ where: { id: note.id } }))
+                ?.body,
+        ).toBe("Severe nut allergy");
+
+        await notes.remove(ctx, contactId, note.id);
     });
 
-    it("matches a note's allergen on every storefront that lists the same name", async () => {
+    it("leaves out a note from before Z2a that held only allergens", async () => {
+        const [sesame] = await allergens.add(ctx.organizationId, ["Sesame"]);
+        const bare = await prisma.contactNote.create({
+            data: {
+                organizationId: ctx.organizationId,
+                contactId,
+                body: "",
+            },
+        });
+        await prisma.contactNoteAllergen.create({
+            data: {
+                noteId: bare.id,
+                allergenId: sesame.id,
+                organizationId: ctx.organizationId,
+            },
+        });
+        const worded = await notes.create(ctx, contactId, {
+            body: "Collects on Saturdays",
+        });
+
+        const detail = await details.detail(ctx, contactId);
+        expect(detail.notes?.rows.map((n) => n.id)).toEqual([worded.id]);
+        // Nothing reads the old row: no allergen, from the notes or anywhere.
+        expect(detail.allergens).toEqual([]);
+
+        await prisma.contactNote.delete({ where: { id: bare.id } });
+        await notes.remove(ctx, contactId, worded.id);
+        await allergens.remove(ctx.organizationId, sesame.id);
+    });
+
+    it("matches Needs attention's allergen on every storefront that lists the same name", async () => {
         // Storefronts kept their own lists (#508 R6); until the #529 backfill
-        // merges them a business can hold two "Peanuts", and a note written
-        // against one must still warn on an order that names the other.
+        // merges them a business can hold two "Peanuts", and an allergy
+        // named against one must still warn on an order that names the other.
         const [peanuts, sesame] = await allergens.add(ctx.organizationId, [
             "Peanuts",
             "Sesame",
@@ -260,61 +313,32 @@ describe("Customer detail (DB)", () => {
             },
         });
 
+        const entry = await attention.create(ctx, contactId, {
+            kind: "ALLERGY",
+            allergenId: peanuts.id,
+        });
+        // An older app naming the stall's Peanuts on a note: still one entry.
         const note = await notes.create(ctx, contactId, {
-            body: "Peanut allergy",
-            allergenIds: [peanuts.id],
-        });
-        expect(note.allergens).toEqual([{ id: peanuts.id, name: "Peanuts" }]);
-        expect(ids(note.matchAllergens)).toEqual(
-            [peanuts.id, stallPeanuts.id].sort(),
-        );
-
-        // A storefront opened after the note was written matches too.
-        const later = await prisma.store.create({
-            data: {
-                name: "Rye Pop-up",
-                slug: `detail-popup-${tag}`,
-                organizationId: ctx.organizationId,
-            },
-        });
-        const popupPeanuts = await prisma.storeAllergen.create({
-            data: {
-                storeId: later.id,
-                organizationId: ctx.organizationId,
-                name: "PEANUTS",
-            },
-        });
-        // A second note naming the stall's Peanuts: still one Peanuts.
-        const second = await notes.create(ctx, contactId, {
             body: "Carries an EpiPen",
             allergenIds: [stallPeanuts.id],
         });
 
         const detail = await details.detail(ctx, contactId);
-        const rows = detail.notes?.rows ?? [];
-        expect(rows.map((n) => n.allergens)).toEqual([
-            [{ id: stallPeanuts.id, name: " peanuts " }],
-            [{ id: peanuts.id, name: "Peanuts" }],
-        ]);
-        const everywhere = [
-            peanuts.id,
-            stallPeanuts.id,
-            popupPeanuts.id,
-        ].sort();
-        for (const row of rows) {
-            expect(ids(row.matchAllergens)).toEqual(everywhere);
-            expect(ids(row.matchAllergens)).not.toContain(sesame.id);
-            expect(ids(row.matchAllergens)).not.toContain(stallMustard.id);
-        }
-        expect(detail.allergens).toEqual([
-            { id: stallPeanuts.id, name: " peanuts " },
-        ]);
+        expect(detail.allergens).toEqual([{ id: peanuts.id, name: "Peanuts" }]);
+        const entries = detail.attention?.entries ?? [];
+        expect(entries.map((e) => e.id)).toEqual([entry.id]);
+        expect(ids(entries[0].matchAllergens)).toEqual(
+            [peanuts.id, stallPeanuts.id].sort(),
+        );
+        expect(ids(entries[0].matchAllergens)).not.toContain(sesame.id);
+        expect(ids(entries[0].matchAllergens)).not.toContain(stallMustard.id);
+        expect(detail.notes?.rows.map((n) => n.matchAllergens)).toEqual([[]]);
 
-        await notes.remove(ctx, contactId, second.id);
         await notes.remove(ctx, contactId, note.id);
+        await attention.remove(ctx, contactId, entry.id);
     });
 
-    it("refuses an allergen from another organization's list", async () => {
+    it("saves the note but names nothing from another organization's list", async () => {
         const otherStore = await prisma.store.create({
             data: {
                 name: "Elsewhere",
@@ -329,12 +353,26 @@ describe("Customer detail (DB)", () => {
                 name: "Mustard",
             },
         });
+        const before = await prisma.contactAttention.count({
+            where: { contactId, removedAt: null },
+        });
 
-        await expect(
-            notes.create(ctx, contactId, { allergenIds: [mustard.id] }),
-        ).rejects.toThrow(/not on your allergen list/);
-        expect(await prisma.contactNote.count({ where: { contactId } })).toBe(
-            0,
-        );
+        const note = await notes.create(ctx, contactId, {
+            body: "Mustard?",
+            allergenIds: [mustard.id],
+        });
+
+        expect(note.allergens).toEqual([]);
+        expect(
+            await prisma.contactAttention.count({
+                where: { contactId, removedAt: null },
+            }),
+        ).toBe(before);
+        expect(
+            await prisma.contactNoteAllergen.count({
+                where: { allergenId: mustard.id },
+            }),
+        ).toBe(0);
+        await notes.remove(ctx, contactId, note.id);
     });
 });

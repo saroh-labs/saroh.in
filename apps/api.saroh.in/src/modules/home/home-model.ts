@@ -58,6 +58,19 @@ export interface HomeEvidence {
     detail?: string;
     /** The action the row offers in place (F4), set by `home-inline.ts`. */
     inline?: HomeInline;
+    /** A second action the row opens elsewhere, set by `home-inline.ts`. */
+    link?: HomeRowLink;
+}
+
+/**
+ * A step a Needs-you row opens where it is taken, beside its inline action:
+ * "Send a set-up link" on a renewal whose autopay limit is too low (D14)
+ * opens Subscription Detail's own set-up sheet, where the method is picked.
+ */
+export interface HomeRowLink {
+    /** The button: "Send a set-up link". */
+    label: string;
+    href: string;
 }
 
 export interface HomeAction {
@@ -191,6 +204,7 @@ export interface HomeNeed {
     href: string;
     moduleKey?: string;
     inline?: HomeInline;
+    link?: HomeRowLink;
 }
 
 /**

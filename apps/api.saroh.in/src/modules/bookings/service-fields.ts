@@ -6,9 +6,13 @@ import { DEPOSIT_MODES } from "./dto";
 
 /*
  * The round-2 service fields (E1): visits, the deposit and "Show on booking
- * page". Columns land before behaviour — nothing takes a deposit until E8 or
- * books more than one visit until E9/E10 — so these only store, check and
- * serve them to staff.
+ * page". These store, check and serve them to staff; what they do lives
+ * elsewhere. The booking page takes the deposit worked out here online
+ * when the service is booked (E8, `public-bookings.service.ts`,
+ * `reservation.ts`); a service of more than one visit is a treatment, sold
+ * as one order and booked visit by visit (E9/E10, `visits.ts`); and a
+ * service hidden from the booking page is left off it
+ * (`public-booking-page.ts`).
  */
 
 /** Each deposit's share of the price, in percent. */

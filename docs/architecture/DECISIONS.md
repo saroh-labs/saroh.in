@@ -667,3 +667,46 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - **Changing the setting never moves a charge already queued or prepared.** The planned debit is written on the charge's intent when it is queued; the new setting applies to renewals queued from then on. Retry charges as soon as the notice allows, whatever the setting.
 - Consequences: the setting shows on the Plans tab and a plan's own on Plan Detail, only where autopay can charge (a provider that takes mandates with `RAZORPAY_AUTOPAY` on; DEC-057's spirit), to whoever holds `subscription:write`. The account's Plan tab and the pay page say "Next autopay charge: ‹date›" by the effective setting. The renewal job adds an early pass; a period with any invoice at all is never invoiced early twice.
 - Migration: `20261018200000_autopay_charge_timing`, additive — `BusinessProfile.autopayChargeTiming` (default `DAY_AFTER_RENEWAL`), `SubscriptionPlan.autopayChargeTiming` (nullable), CHECK constraints for the three values, and the one-live-invoice-per-period index widened to leave CREDITED invoices out as it does VOID ones.
+
+## DEC-066 P3: order numbers are one series per business
+
+**Status: Accepted — 2026-09-29** · user · unit P3 (#712)
+
+- Context: found on 2026-09-29. Every storefront counted its own orders from ORD-001 (`count + 1` per storefront), so a business with two storefronts had two #ORD-001s in one Orders list. The choice was a series per business, or a storefront prefix on each number.
+- Decision: **one order-number series per business (the Organization, the tenant root), across every storefront.** The `ORD-` format and its three-digit padding stay. Every order a business takes gets its number from one allocator, `nextOrderNumberInTx` (`packages/database/src/order-number.ts`): a site's checkout, New order and walk-ins, and a treatment booked online or at the desk. It increments the business's `OrderNumberSequence` row in the order's own transaction. The row lock keeps two orders from taking one number, whatever the isolation level. A failed order rolls its number back. The business's first order after P3 starts the row after its highest ORD-number. A number already taken moves the counter past the highest. A coded order's serializable transaction, and a treatment's booking, retry when another order took the next number.
+- Existing duplicates: the backfill (`packages/database/src/backfill/order-numbers.cli.ts [--dry-run] [--org <id>]`) sets each business's counter to its highest number, never lowering it. For each number two orders share, the older order keeps it and each later order takes the business's next number. The old number is kept in `Order.renumberedFrom`, and the Orders list search and global search find an order by it. Nothing links to an order by its number, only by its id. The backfill is idempotent.
+- Consequences: a business's second storefront no longer starts at ORD-001. Some orders at a business with several storefronts change number once. A customer who quotes the old number is still found. Seeds align each business's counter with their fixtures.
+- **Rollout:** additive, so the API before P3 keeps working. Run the backfill after the migration, then again once the previous API image no longer serves: while it serves, it still numbers per storefront and can repeat a number. The new API steps past any number it took. **The contract step comes later:** a unique index on the business and number, added once the previous image is gone and the backfill's second run finds nothing. It is not added now because the previous image, running beside it or restored by a rollback, would fail every order at a business's second storefront.
+- Migration: `20261019100000_order_number_sequence`, additive: `OrderNumberSequence` (organizationId key, RLS, `org_isolation`) and `Order.renumberedFrom` (nullable).
+
+## DEC-067 Round 2's open questions, settled
+
+**Status: Accepted — 2026-09-29** · user ("go with your recommendations for all the decisions") · round-2 audit
+
+- Context: the round-2 audit (2026-09-29) listed product questions left open by units B5–F18. The user accepted each recommendation below as written.
+- **B5 (Orders on a phone):** Orders gets a Filters button that opens a sheet, and a row opens a quick-view sheet, instead of the stacked selects and the full page. Neither is in the design: this is a recorded deviation, following the desk quick view's content.
+- **B6:** build the design's bulk "Print tickets (N)".
+- **B9:** a cancel is done when the provider accepts the refund. The refund line reads "Refund on its way" until the webhook confirms it; a refund the provider later fails becomes a Needs attention row (DEC-026: an unsure answer holds the money).
+- **B11:** paying at the counter voids the order's outstanding pay link, so nobody can pay twice.
+- **B14:** build "Next ‹date›" on the Orders row for appointment orders.
+- **B15:** the tag reads "Sesame", as the design shows, with the accessible name "Allergy: Sesame".
+- **C7:** keep the Packs tab on Customer Detail; it shows only when Class packs is on.
+- **C14:** hand-added customers are listed, marked "Added by hand".
+- **D16:** Download PDF shows on every issued invoice, due and overdue included; a merchant sends an invoice before it is paid.
+- **E6 (DEC-052):** half-hour starts apply to one-to-one services only.
+- **E8:** confirmed as superseded by DEC-058: a refund is never more than what was received.
+- **E20:** the calendar shows orders to anyone who can stage them (`order:stage`, e.g. Members), without money.
+- **E23:** Due counts from today, as the design shows; unpaid days before today count as Overdue.
+- **F2:** a low-star review is 3 stars or fewer.
+- **F11:** takings follow `payment:read` alone.
+- **F13:** switching a module off never switches off another one without naming it in the confirmation.
+- **F17:** a Reviewer gets no extra permissions.
+- **F18:** the current Member role stays at launch; the default bundles wait for the permission matrix answers.
+- **Cashfree:** UPI and card only, for now.
+- **Flags:** switch on in this order, each after its browser specs pass on development and a check on Northwind in production:
+    1. `MODULE_CLASS_PACKS` with the next release.
+    2. `SITE_SHOP` after `site-shop.spec.ts` and the Razorpay test-mode run.
+    3. `SITE_ACCOUNT_AREA` after `site-account.spec.ts`.
+    4. `ACCOUNT_THREAD` once A13 and A14 are live.
+- **Brand v2** (H2–H11) starts after the launch-readiness work, with the plan's default pairings and palettes.
+- Consequences: B5, B6, B11, B14, B15, E20, E23 and F13 need code; the rest are recorded behaviour. DEC-052 is amended by the E6 line above.

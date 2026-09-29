@@ -960,9 +960,6 @@ async function clearVolume(prisma: Db) {
     await prisma.subscriptionSkip.deleteMany({ where });
     await prisma.customerSubscription.deleteMany({ where });
     await prisma.customerIdentityLink.deleteMany({ where });
-    await prisma.contactNoteAllergen.deleteMany({
-        where: { noteId: { startsWith: RYE.prefix } },
-    });
     await prisma.contactAttention.deleteMany({
         where: {
             OR: [
@@ -1632,10 +1629,10 @@ export interface World {
     skips: Prisma.SubscriptionSkipCreateManyInput[];
     links: Prisma.CustomerIdentityLinkCreateManyInput[];
     notes: Prisma.ContactNoteCreateManyInput[];
-    noteAllergens: Prisma.ContactNoteAllergenCreateManyInput[];
     /**
      * Needs attention (C1): Priya's sesame allergy as an entry, which Order
-     * Detail's allergy check and the Orders list's tag read (B15).
+     * Detail's allergy check and the Orders list's tag read (B15). Notes
+     * carry text only (Z2a).
      */
     attention: Prisma.ContactAttentionCreateManyInput[];
     docs: DocSpec[];
@@ -1682,7 +1679,6 @@ export function planWorld(input: PlanInput): World {
         skips: [],
         links: [],
         notes: [],
-        noteAllergens: [],
         attention: [],
         docs: [],
     };
@@ -2589,13 +2585,8 @@ export function planWorld(input: PlanInput): World {
             updatedAt: noteAt(21, 18 * 60 + 40),
         },
     );
-    w.noteAllergens.push({
-        noteId: sid("note", "priya", 0),
-        allergenId: input.allergenId.Sesame,
-        organizationId: orgId,
-    });
-    // The same allergy on her Needs attention, as the C1 backfill makes it
-    // from the note: what the order screens read (B15).
+    // The allergy itself is on her Needs attention: what the order screens
+    // read (B15). The note is only its text (Z2a).
     w.attention.push({
         id: sid("attention", "priya", 0),
         organizationId: orgId,
@@ -2648,7 +2639,6 @@ async function writeWorld(prisma: Db, orgId: string, w: World) {
     await prisma.subscriptionSkip.createMany({ data: w.skips });
     await prisma.customerIdentityLink.createMany({ data: w.links });
     await prisma.contactNote.createMany({ data: w.notes });
-    await prisma.contactNoteAllergen.createMany({ data: w.noteAllergens });
     await prisma.contactAttention.createMany({ data: w.attention });
     await writeDocuments(prisma, orgId, w.docs);
 }

@@ -38,7 +38,18 @@ export interface PlanValues {
 export type PlanEditorRecord = EditorRecord<PlanValues> & {
     problems: EditorProblem[];
     pendingChangedAt: string | null;
+    /**
+     * What the autopay of members booked to switch to this plan covers
+     * (D13), lowest first. Absent from an API before it; empty for a draft.
+     */
+    autopayLimits?: AutopayLimit[];
 };
+
+/** Members whose autopay covers up to `limit` ("1500.00"). */
+export interface AutopayLimit {
+    limit: string;
+    members: number;
+}
 
 const plans = "/subscription-plans";
 const plan = (id: string) => `${plans}/${encodeURIComponent(id)}`;

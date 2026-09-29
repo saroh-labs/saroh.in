@@ -39,13 +39,13 @@ import {
     HAS_ALLOWANCE_WHERE,
 } from "../subscriptions/classes-allowance";
 import type { AttentionEntryView } from "./attention-read";
-import { attentionFor, attentionSuggestionsFor } from "./attention-read";
-import type { ContactNoteView } from "./contact-notes.service";
 import {
-    allergenChoices,
-    loadContactNotes,
-    notedAllergens,
-} from "./contact-notes.service";
+    attentionAllergens,
+    attentionFor,
+    attentionSuggestionsFor,
+} from "./attention-read";
+import type { ContactNoteView } from "./contact-notes.service";
+import { allergenChoices, loadContactNotes } from "./contact-notes.service";
 import { requireCustomerPower } from "./customer-access";
 import type { DetailPack } from "./customer-detail-packs";
 import { readContactPacks } from "./customer-detail-packs";
@@ -351,12 +351,16 @@ export interface CustomerDetail {
     notes: {
         from: "contact";
         rows: ContactNoteView[];
-        /** The allergens a new note may name (the storefronts' lists). */
+        /**
+         * The business's allergens, one per name: what a Needs attention
+         * entry may name (an app from before Z2a offers them on a note).
+         */
         allergenChoices: { id: string; name: string }[];
     } | null;
     /**
-     * Every allergen the notes name, once per name. Order Detail checks each
-     * note's `matchAllergens` instead, which cross storefronts.
+     * Every allergen the person's Needs attention Allergy entries name, once
+     * per name (Z2a; the notes' before it); null when that couldn't be read.
+     * Order Detail checks each entry's `matchAllergens` instead.
      */
     allergens: { id: string; name: string }[] | null;
     /**
@@ -710,6 +714,22 @@ export class CustomerDetailService {
                           allowance: membership?.allowance ?? null,
                       }
                     : null;
+        } else if (wants.bookings && on.has("PAYMENTS")) {
+            // Memberships count on their own (C7): with Class packs off, a
+            // member's classes this month are still the card. Someone with
+            // no membership that includes classes has no card; a failed
+            // read is no figure, and its source is already named.
+            const allowance = membership?.allowance ?? null;
+            if (membership === null) stats.classesLeft = null;
+            else if (allowance) {
+                stats.classesLeft = {
+                    total: allowance.left,
+                    packs: 0,
+                    membership: allowance.left,
+                    nextExpiry: null,
+                    allowance,
+                };
+            }
         }
         if (money) {
             // A total with a missing part is not the total: null, and the
@@ -761,7 +781,7 @@ export class CustomerDetailService {
                           allergenChoices: notes[1],
                       }
                     : null,
-            allergens: noteRows ? notedAllergens(noteRows) : null,
+            allergens: attention ? attentionAllergens(attention.entries) : null,
             attention,
             ...(links === undefined ? {} : { linkedCustomers: links }),
             ...(possibleMatches === undefined ? {} : { possibleMatches }),

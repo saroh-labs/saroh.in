@@ -24,6 +24,14 @@ a note saying so.
 
 ## Rules
 
+- **Current** — **An optional panel never fails the read it sits on.** Anything
+  a flag, a provider or a module decides (an autopay offer, a pay link, a
+  provider status) degrades to "not offered" and is logged. Check the flag
+  first and open credentials last: an environment with connected providers
+  and no `PAYMENTS_ENC_KEY` (CI's browser stack, until 2026-09-29) had a
+  decrypt throw and take Subscription Detail down
+  (`mandate-setup.service.ts`, DEV_LEARNINGS "Subscription Detail could not be
+  loaded").
 - **Current** — **Merchant payments and Saroh billing never share** records,
   credentials, webhooks or contracts (DEC-010).
 - **Current** — **The Organization connects its own messaging provider** for real

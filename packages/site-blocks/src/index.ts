@@ -28,6 +28,7 @@ export { default as ContactSection } from "./blocks/contact";
 export { CtaButton, default as CtaSection, ctaClasses } from "./blocks/cta";
 export type { CtaSurface } from "./blocks/cta";
 export { default as EnquirySection } from "./blocks/enquiry";
+export type { EnquiryThread } from "./blocks/enquiry";
 export { default as FaqSection } from "./blocks/faq";
 export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";

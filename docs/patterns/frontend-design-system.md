@@ -123,6 +123,11 @@
 
 ## Touch, reflow and accessibility
 
+- **Current** — **A sticky bottom bar reports its height.** Anything stuck to
+  the foot of the screen (an editor's phone bar, a count's Save, a settings
+  Save) calls `useBottomBarInset(ref)` (`lib/hooks/use-bottom-bar-inset.ts`);
+  the Toaster adds `--bottom-bar-inset` to its offsets, so a toast never
+  covers, and swallows the tap on, the button the merchant reaches for next.
 - **Current** — **Touch targets reach 44px on a touch pointer.** Every `Button`
   size grows through the `coarse:` variant (`default` and `icon` 40→44px, `sm`
   32→44px) and keeps its desk height under a mouse; `coarse:` is a pointer

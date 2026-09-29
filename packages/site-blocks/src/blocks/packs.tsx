@@ -76,6 +76,7 @@ function onSale(pack: PublicPack): AccountPackOnSale {
         validityDays: pack.validityDays,
         price: pack.price,
         currency: pack.currency,
+        kind: pack.kind,
     };
 }
 

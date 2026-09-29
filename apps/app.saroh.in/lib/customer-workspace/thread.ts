@@ -37,6 +37,7 @@ export const REPLY_MAX = 2_000;
 const EVENT_WORDS = new Map([
     ["INVOICE_SENT", "Invoice sent"],
     ["INVOICE_REMINDER", "Invoice reminder"],
+    ["AUTOPAY_CANCELLED", "Autopay cancelled"],
 ]);
 
 /**

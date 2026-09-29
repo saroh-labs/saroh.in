@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type { CrmResult } from "@/lib/api/http";
 import type { Hold } from "@/lib/hold-undo";
 import { HOLD_UNDO_MS, secondsLeft, startHold } from "@/lib/hold-undo";
+import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { useClock } from "@/lib/hooks/use-clock";
 import type { BulkAction, StageBatch } from "@/lib/orders/bulk";
 import {
@@ -21,6 +22,11 @@ import {
 } from "@/lib/orders/bulk";
 import { holdBatch, sendBatchNow, undoBatch } from "@/lib/orders/bulk-actions";
 import type { OrderRow } from "@/lib/orders/business-service";
+import {
+    printableRows,
+    printTicketsLabel,
+    ticketsHref,
+} from "@/lib/orders/tickets";
 
 /**
  * The Orders list's bulk bar and its held batch (plan B, B6), after the
@@ -34,6 +40,14 @@ import type { OrderRow } from "@/lib/orders/business-service";
  * handover go through at once, with Undo all on the toast, as the design
  * has them. Every result is said in words: what moved, what couldn't and
  * why, and whether a customer had already been told.
+ *
+ * "Print tickets (N)" opens the selected orders' tickets in a new tab, one
+ * to a page, oldest first (`/commerce/orders/tickets`), so the selection
+ * and any held batch stay here. N counts the orders that have a ticket.
+ *
+ * The bar sticks to the foot of the screen, so it lifts the toasts above
+ * itself (`useBottomBarInset`): "3 orders preparing · Undo all" never lands
+ * on the bar's own buttons.
  */
 
 interface Held {
@@ -62,6 +76,8 @@ export function BulkBar({
     const [busy, startTransition] = useTransition();
     const [held, setHeld] = useState<Held | null>(null);
     const hold = useRef<Hold | null>(null);
+    const bar = useRef<HTMLDivElement>(null);
+    useBottomBarInset(bar, held !== null || selected.length > 0);
 
     // Leaving the page drops the local clock; the server still commits.
     useEffect(
@@ -72,6 +88,7 @@ export function BulkBar({
     );
 
     const { actions, note } = bulkActions(selected, held !== null);
+    const printable = printableRows(selected);
 
     function nameMap(action: BulkAction) {
         const names = new Map(
@@ -179,7 +196,10 @@ export function BulkBar({
     if (!held && selected.length === 0) return null;
 
     return (
-        <div className="pointer-events-none sticky bottom-[22px] z-20 flex flex-col-reverse gap-2.5 pt-3.5 max-[759px]:bottom-[74px]">
+        <div
+            ref={bar}
+            className="pointer-events-none sticky bottom-[22px] z-20 flex flex-col-reverse gap-2.5 pt-3.5 max-[759px]:bottom-[74px]"
+        >
             {selected.length > 0 ? (
                 <div
                     role="region"
@@ -209,6 +229,24 @@ export function BulkBar({
                                 {action.label}
                             </button>
                         ))}
+                        {printable.length > 0 ? (
+                            <a
+                                href={ticketsHref(printable.map((r) => r.id))}
+                                target="_blank"
+                                rel="noopener"
+                                title={
+                                    printable.length < selected.length
+                                        ? `${selected.length - printable.length} of these have no ticket to print`
+                                        : "Opens the tickets to print, oldest first"
+                                }
+                                className={cn(
+                                    BAR_BUTTON,
+                                    "inline-flex items-center border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15",
+                                )}
+                            >
+                                {printTicketsLabel(printable.length)}
+                            </a>
+                        ) : null}
                         <button
                             type="button"
                             onClick={onClear}

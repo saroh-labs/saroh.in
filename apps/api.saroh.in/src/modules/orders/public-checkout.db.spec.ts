@@ -28,8 +28,10 @@ import type { INestApplication } from "@nestjs/common";
 import { ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import type { Job } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { prisma, runInOrgContext } from "@saroh/database";
 import { createHmac } from "node:crypto";
+
+import { isRlsTestMode } from "../../../test/rls-mode";
 
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
@@ -57,6 +59,10 @@ import {
     FakeWebhookProviderFactory,
 } from "../webhooks/providers/fake.webhook";
 import { WebhooksService } from "../webhooks/webhooks.service";
+import { priceBag } from "./checkout-bag";
+import type { SiteAccount } from "./checkout-order";
+import { createCheckoutOrder } from "./checkout-order";
+import type { CheckoutStartDto } from "./checkout.dto";
 import { CloseAbandonedCheckoutHandler } from "./close-abandoned-checkout.handler";
 import {
     CHECKOUT_NOT_COMPLETED,
@@ -911,3 +917,302 @@ describe("a payment that can't hold (G13)", () => {
         ).toEqual({ status: "PENDING", paymentStatus: "PAID" });
     });
 });
+
+/**
+ * Row-level security as its own guarantee (G13's integration scenario): the
+ * policies as the migrations write them (USING and WITH CHECK), with
+ * enforcement on and a role WITHOUT BYPASSRLS, in site A's business context.
+ * Reads with no organization filter at all see only A's rows, the checkout's
+ * own writes land in A, and a write naming another business is refused by
+ * the database even when the app got the business wrong.
+ */
+(isRlsTestMode() ? describe.skip : describe)(
+    "site checkout under row-level security (G13)",
+    () => {
+        const ROLE = "saroh_g13_rls_probe";
+        const TABLES = [
+            "Product",
+            "ProductListing",
+            "StockLevel",
+            "Contact",
+            "CustomerAccount",
+            "Customer",
+            "CustomerIdentityLink",
+            "Order",
+        ];
+
+        beforeAll(async () => {
+            await prisma.$executeRawUnsafe(`DO $$ BEGIN
+                CREATE ROLE ${ROLE} NOLOGIN NOBYPASSRLS;
+            EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+            await prisma.$executeRawUnsafe(
+                `GRANT USAGE ON SCHEMA public TO ${ROLE}`,
+            );
+            await prisma.$executeRawUnsafe(
+                `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${ROLE}`,
+            );
+            await prisma.$executeRawUnsafe(
+                `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${ROLE}`,
+            );
+            for (const table of TABLES) {
+                await prisma.$executeRawUnsafe(
+                    `ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`,
+                );
+                await prisma.$executeRawUnsafe(
+                    `DROP POLICY IF EXISTS "org_isolation" ON "${table}"`,
+                );
+                await prisma.$executeRawUnsafe(`CREATE POLICY "org_isolation" ON "${table}"
+                USING (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
+                       OR "organizationId" = current_setting('app.current_organization_id', true))
+                WITH CHECK (NULLIF(current_setting('app.current_organization_id', true), '') IS NULL
+                       OR "organizationId" = current_setting('app.current_organization_id', true))`);
+            }
+        });
+
+        afterAll(async () => {
+            for (const table of TABLES) {
+                await prisma.$executeRawUnsafe(
+                    `DROP POLICY IF EXISTS "org_isolation" ON "${table}"`,
+                );
+                await prisma.$executeRawUnsafe(
+                    `ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`,
+                );
+            }
+            await prisma.$executeRawUnsafe(
+                `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${ROLE}`,
+            );
+            await prisma.$executeRawUnsafe(
+                `REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${ROLE}`,
+            );
+            await prisma.$executeRawUnsafe(
+                `REVOKE USAGE ON SCHEMA public FROM ${ROLE}`,
+            );
+            await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${ROLE}`);
+        });
+
+        /** Run `fn` in one transaction as the probe role, in `orgId`'s context. */
+        async function asProbe<T>(
+            orgId: string,
+            fn: () => Promise<T>,
+        ): Promise<T> {
+            const before = process.env.RLS_ENFORCEMENT;
+            // eslint-disable-next-line no-restricted-properties -- the proxy reads this live
+            process.env.RLS_ENFORCEMENT = "on";
+            try {
+                return await runInOrgContext(orgId, () =>
+                    prisma.$transaction(async (tx) => {
+                        await tx.$executeRawUnsafe(`SET LOCAL ROLE ${ROLE}`);
+                        return fn();
+                    }),
+                );
+            } finally {
+                // eslint-disable-next-line no-restricted-properties -- restore what the test changed
+                if (before === undefined) delete process.env.RLS_ENFORCEMENT;
+                // eslint-disable-next-line no-restricted-properties -- restore what the test changed
+                else process.env.RLS_ENFORCEMENT = before;
+            }
+        }
+
+        /** Two shops, a signed-in buyer on each, and one checkout on B. */
+        async function twoShops() {
+            const [a, b] = [await shop(), await shop()];
+            const buyerA = await signIn(a.host);
+            const buyerB = await signIn(b.host);
+            const onB = await start(b, buyerB.token);
+            expect(onB.status).toBe(201);
+            const account = await prisma.customerAccount.findFirstOrThrow({
+                where: {
+                    organizationId: a.organizationId,
+                    email: buyerA.email,
+                },
+                select: { id: true, email: true, contactId: true },
+            });
+            const siteAccount: SiteAccount = {
+                accountId: account.id,
+                email: account.email,
+                contactId: account.contactId,
+                firstName: null,
+                lastName: null,
+            };
+            return { a, b, siteAccount };
+        }
+
+        const scopeOf = (s: Shop, organizationId = s.organizationId) => ({
+            organizationId,
+            storefront: { id: s.storeId, name: "Online" },
+        });
+
+        const startDto = (s: Shop) =>
+            ({
+                lines: [{ listingId: s.listingId, quantity: 1 }],
+                fulfilment: "PICKUP",
+                key: `rls_${next()}`.replace(/[^A-Za-z0-9_-]/g, "_"),
+            }) as CheckoutStartDto;
+
+        const oneOf = (s: Shop) => [
+            { listingId: s.listingId, variantId: null, quantity: 1 },
+        ];
+
+        it("site A's checkout reads none of site B's listings or customers, with no app filter at all", async () => {
+            const { a, b } = await twoShops();
+
+            const seen = await asProbe(a.organizationId, async () => ({
+                listings: await prisma.productListing.findMany({
+                    select: { id: true },
+                }),
+                products: await prisma.product.findMany({
+                    select: { id: true },
+                }),
+                customers: await prisma.customer.findMany({
+                    select: { organizationId: true },
+                }),
+                contacts: await prisma.contact.findMany({
+                    select: { organizationId: true },
+                }),
+                orders: await prisma.order.findMany({
+                    select: { organizationId: true },
+                }),
+                // B's listing, asked for by id on A's checkout.
+                quoted: await priceBag(scopeOf(a), oneOf(b), null),
+            }));
+
+            const listings = seen.listings.map((l) => l.id);
+            expect(listings).toContain(a.listingId);
+            expect(listings).not.toContain(b.listingId);
+            expect(seen.products.map((p) => p.id)).not.toContain(b.productId);
+            expect(seen.contacts.length).toBeGreaterThan(0);
+            for (const rows of [seen.customers, seen.contacts, seen.orders]) {
+                expect(
+                    rows.every((r) => r.organizationId === a.organizationId),
+                ).toBe(true);
+            }
+            expect(seen.quoted.quote.ready).toBe(false);
+            expect(seen.quoted.quote.lines.map((l) => l.state)).toEqual([
+                "gone",
+            ]);
+
+            // B's rows are really there: only RLS kept them out.
+            expect(
+                await prisma.order.count({
+                    where: { organizationId: b.organizationId },
+                }),
+            ).toBe(1);
+        });
+
+        it("writes the checkout's customer, link, order and close job in site A's business", async () => {
+            const { a, b, siteAccount } = await twoShops();
+
+            const orderId = await asProbe(a.organizationId, async () => {
+                const { lines } = await priceBag(
+                    scopeOf(a),
+                    oneOf(a),
+                    "PICKUP",
+                );
+                return createCheckoutOrder(scopeOf(a), siteAccount, {
+                    lines,
+                    type: "PICKUP",
+                    shippingCents: 0,
+                    currency: "INR",
+                    dto: startDto(a),
+                });
+            });
+
+            const order = await prisma.order.findUniqueOrThrow({
+                where: { id: orderId },
+                select: {
+                    organizationId: true,
+                    storeId: true,
+                    placedOnline: true,
+                    customer: { select: { id: true, organizationId: true } },
+                },
+            });
+            expect(order).toMatchObject({
+                organizationId: a.organizationId,
+                storeId: a.storeId,
+                placedOnline: true,
+                customer: { organizationId: a.organizationId },
+            });
+            const link = await prisma.customerIdentityLink.findFirstOrThrow({
+                where: { customerId: order.customer!.id },
+                select: { organizationId: true, contactId: true },
+            });
+            expect(link).toEqual({
+                organizationId: a.organizationId,
+                contactId: siteAccount.contactId,
+            });
+            const job = await prisma.job.findFirstOrThrow({
+                where: {
+                    type: CLOSE_ABANDONED_CHECKOUT_TYPE,
+                    payload: { equals: { orderId } },
+                },
+                select: { organizationId: true },
+            });
+            expect(job.organizationId).toBe(a.organizationId);
+            // Nothing new in B: only B's own checkout is there.
+            expect(
+                await prisma.order.count({
+                    where: { organizationId: b.organizationId },
+                }),
+            ).toBe(1);
+        });
+
+        it("refuses a checkout write naming another business, even when the app got the business wrong", async () => {
+            const { a, b, siteAccount } = await twoShops();
+            const customersBefore = await prisma.customer.count();
+
+            // A's storefront and buyer, but B's business on the scope: the
+            // database refuses the rows it would write under A's context.
+            await expect(
+                asProbe(a.organizationId, async () => {
+                    const { lines } = await priceBag(
+                        scopeOf(a),
+                        oneOf(a),
+                        "PICKUP",
+                    );
+                    return createCheckoutOrder(
+                        scopeOf(a, b.organizationId),
+                        siteAccount,
+                        {
+                            lines,
+                            type: "PICKUP",
+                            shippingCents: 0,
+                            currency: "INR",
+                            dto: startDto(a),
+                        },
+                    );
+                }),
+            ).rejects.toThrow(/row-level security/);
+
+            // And a direct write of an order into B, from A's context.
+            await expect(
+                asProbe(a.organizationId, () =>
+                    prisma.order.create({
+                        data: {
+                            organizationId: b.organizationId,
+                            storeId: b.storeId,
+                            orderId: `rls-${next()}`,
+                            currency: "INR",
+                            subtotal: "1.00",
+                            tax: "0.00",
+                            shipping: "0.00",
+                            discount: "0.00",
+                            total: "1.00",
+                            placedOnline: true,
+                        },
+                    }),
+                ),
+            ).rejects.toThrow(/row-level security/);
+
+            expect(await prisma.customer.count()).toBe(customersBefore);
+            expect(
+                await prisma.order.count({
+                    where: {
+                        organizationId: {
+                            in: [a.organizationId, b.organizationId],
+                        },
+                    },
+                }),
+            ).toBe(1);
+        });
+    },
+);

@@ -7,43 +7,32 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { allergenKey, allergensByName } from "./allergen-match";
+import { allergenKey } from "./allergen-match";
 import { ensureAllergyEntries } from "./attention-allergy";
 import { requireCustomerPower } from "./customer-access";
 import type { ContactNoteDto } from "./dto";
 
 /**
- * Notes about a customer (U8): what the team has written down, and the
- * allergens a note names.
+ * Notes about a customer (U8): what the team has written down. Text only
+ * (Z2a): an allergy lives on Needs attention (C1), which Order Detail's
+ * banner, the kitchen and bookings read.
  *
- * Allergens are ids from the storefront's own list (#483), never typed text,
- * so Order Detail's allergy banner can match a product's "Contains" / "May
- * contain" exactly. Each id is checked against the organization's list
- * before anything is written; a note needs text, an allergen, or both.
+ * Notes once named allergens too (`ContactNoteAllergen`). Nothing reads or
+ * writes those rows now: the C1 backfill copied them to Needs attention, and
+ * the table is dropped two deploys later (Z2). For an app from before Z2a the
+ * view still carries empty `allergens` / `matchAllergens`, and allergens it
+ * sends with a note go on Needs attention rather than being lost. A note that
+ * held only allergens (no text) is left out of the list.
  *
- * The allergen list is the business's (#529): one "Peanuts", whatever
- * storefront sells the product, so a note's allergen warns on an order from
- * any storefront. Storefronts kept their own lists before that (#508 R6), and
- * until the #529 backfill has merged them a business can still hold two rows
- * of one name; so when a note is read, each named allergen is widened to
- * every allergen of the same name in the business (`matchAllergens`).
- *
- * A note's allergens are also put on the person's Needs attention list as
- * Allergy entries (C1, for one release): see `attention-allergy.ts`.
- *
- * Reading needs `contact:read` — a Member at the counter must see an allergy.
- * Writing needs `contact:write` (Owner/Admin today).
+ * Reading needs `contact:read`. Writing needs `contact:write` (Owner/Admin
+ * today).
  */
 export interface ContactNoteView {
     id: string;
     body: string;
-    /** As written: one per name, what the note shows as chips. */
+    /** Always empty since Z2a; kept for an app from before it. */
     allergens: { id: string; name: string }[];
-    /**
-     * What an order is checked against: each named allergen's id on every
-     * storefront in the business that lists the same name (trimmed, any
-     * case). Never written back; the note keeps the ids it was written with.
-     */
+    /** Always empty since Z2a; kept for an app from before it. */
     matchAllergens: { id: string; name: string }[];
     createdByUserId: string | null;
     /** Who wrote it, by name; null when they have no name or have left. */
@@ -58,10 +47,6 @@ const NOTE_SELECT = {
     createdByUserId: true,
     createdAt: true,
     updatedAt: true,
-    allergens: {
-        orderBy: { allergen: { position: "asc" } },
-        select: { allergen: { select: { id: true, name: true } } },
-    },
 } as const;
 
 interface NoteRow {
@@ -70,14 +55,13 @@ interface NoteRow {
     createdByUserId: string | null;
     createdAt: Date;
     updatedAt: Date;
-    allergens: { allergen: { id: string; name: string } }[];
 }
 
 function noteView(row: NoteRow): ContactNoteView {
     return {
         id: row.id,
         body: row.body,
-        allergens: row.allergens.map((a) => a.allergen),
+        allergens: [],
         matchAllergens: [],
         createdByUserId: row.createdByUserId,
         author: null,
@@ -86,46 +70,21 @@ function noteView(row: NoteRow): ContactNoteView {
     };
 }
 
-/** A contact's notes, newest first. The detail read uses it as a source. */
+/**
+ * A contact's notes, newest first. The detail read uses it as a source. A
+ * note with no text held only allergens, which are on Needs attention now.
+ */
 export async function loadContactNotes(
     db: typeof prisma,
     organizationId: string,
     contactId: string,
 ): Promise<ContactNoteView[]> {
     const rows = await db.contactNote.findMany({
-        where: { organizationId, contactId },
+        where: { organizationId, contactId, body: { not: "" } },
         orderBy: { createdAt: "desc" },
         select: NOTE_SELECT,
     });
-    return withMatches(
-        db,
-        organizationId,
-        await withAuthors(db, rows.map(noteView)),
-    );
-}
-
-/**
- * Widen each note's allergens to every allergen of the same name in the
- * business, so matching stays by id (ADR-008) and covers rows of one name
- * the #529 backfill has not merged yet. Read fresh each time.
- */
-async function withMatches(
-    db: typeof prisma,
-    organizationId: string,
-    notes: ContactNoteView[],
-): Promise<ContactNoteView[]> {
-    if (!notes.some((n) => n.allergens.length > 0)) return notes;
-    const byName = await allergensByName(db, organizationId);
-    return notes.map((n) => {
-        const matches = new Map<string, { id: string; name: string }>();
-        for (const a of n.allergens) {
-            // The note's own id always counts, whatever the list read says.
-            matches.set(a.id, a);
-            for (const same of byName.get(allergenKey(a.name)) ?? [])
-                matches.set(same.id, same);
-        }
-        return { ...n, matchAllergens: [...matches.values()] };
-    });
+    return withAuthors(db, rows.map(noteView));
 }
 
 /** Put the writer's name on each note: the team reads "Nisha, 12 Sep". */
@@ -156,10 +115,9 @@ async function withAuthors(
 }
 
 /**
- * The allergens a note may name: the business's list, one per name (the
- * first row's id wins where two share a name), in list order. The chosen id
- * stands for the name: a read widens it to every allergen of that name
- * (`withMatches`).
+ * The allergens a Needs attention entry may name: the business's list, one
+ * per name (the first row's id wins where two share a name), in list order.
+ * Customer Detail sends it beside the notes; the attention sheet reads it.
  */
 export async function allergenChoices(
     db: typeof prisma,
@@ -178,22 +136,6 @@ export async function allergenChoices(
     return [...seen.values()];
 }
 
-/**
- * Every allergen the notes name, once per name, in the order first named —
- * two notes naming two rows of "Peanuts" list it once.
- */
-export function notedAllergens(
-    notes: ContactNoteView[],
-): { id: string; name: string }[] {
-    const seen = new Map<string, { id: string; name: string }>();
-    for (const note of notes)
-        for (const a of note.allergens) {
-            const key = allergenKey(a.name);
-            if (!seen.has(key)) seen.set(key, a);
-        }
-    return [...seen.values()];
-}
-
 @Injectable()
 export class ContactNotesService {
     constructor(@Optional() private readonly db: typeof prisma = prisma) {}
@@ -205,10 +147,7 @@ export class ContactNotesService {
     ): Promise<ContactNoteView> {
         requireCustomerPower(ctx, "contact:write");
         await this.requireContact(ctx, contactId);
-        const body = dto.body ?? "";
-        const allergenIds = [...new Set(dto.allergenIds ?? [])];
-        this.requireSomething(body, allergenIds);
-        await this.checkAllergens(ctx, allergenIds);
+        const body = this.requireText(dto.body ?? "");
 
         const id = await this.db.$transaction(async (tx) => {
             const note = await tx.contactNote.create({
@@ -221,30 +160,16 @@ export class ContactNotesService {
                 },
                 select: { id: true },
             });
-            await tx.contactNoteAllergen.createMany({
-                data: allergenIds.map((allergenId) => ({
-                    noteId: note.id,
-                    allergenId,
-                    organizationId: ctx.organizationId,
-                })),
-            });
-            // Also on Needs attention, for one release (C1).
-            await ensureAllergyEntries(tx, {
-                organizationId: ctx.organizationId,
-                contactId,
-                userId: ctx.userId,
-                allergenIds,
-            });
+            await this.toAttention(tx, ctx, contactId, dto);
             await this.audit(tx, ctx, "contact.note.created", note.id, {
                 contactId,
-                allergens: allergenIds.length,
             });
             return note.id;
         });
         return this.read(ctx, contactId, id);
     }
 
-    /** Fields given replace what the note had; fields left out are kept. */
+    /** The text given replaces what the note had; none keeps it. */
     async update(
         ctx: OrganizationContext,
         contactId: string,
@@ -253,40 +178,16 @@ export class ContactNotesService {
     ): Promise<ContactNoteView> {
         requireCustomerPower(ctx, "contact:write");
         const current = await this.read(ctx, contactId, noteId);
-        const body = dto.body ?? current.body;
-        const allergenIds = dto.allergenIds
-            ? [...new Set(dto.allergenIds)]
-            : current.allergens.map((a) => a.id);
-        this.requireSomething(body, allergenIds);
-        if (dto.allergenIds) await this.checkAllergens(ctx, allergenIds);
+        const body = this.requireText(dto.body ?? current.body);
 
         await this.db.$transaction(async (tx) => {
             await tx.contactNote.update({
                 where: { id: noteId },
                 data: { body, updatedByUserId: ctx.userId },
             });
-            if (dto.allergenIds) {
-                await tx.contactNoteAllergen.deleteMany({ where: { noteId } });
-                await tx.contactNoteAllergen.createMany({
-                    data: allergenIds.map((allergenId) => ({
-                        noteId,
-                        allergenId,
-                        organizationId: ctx.organizationId,
-                    })),
-                });
-                // Only the allergens this edit adds: one the note already
-                // named and the team took off Needs attention stays off.
-                const had = new Set(current.allergens.map((a) => a.id));
-                await ensureAllergyEntries(tx, {
-                    organizationId: ctx.organizationId,
-                    contactId,
-                    userId: ctx.userId,
-                    allergenIds: allergenIds.filter((id) => !had.has(id)),
-                });
-            }
+            await this.toAttention(tx, ctx, contactId, dto);
             await this.audit(tx, ctx, "contact.note.updated", noteId, {
                 contactId,
-                allergens: allergenIds.length,
             });
         });
         return this.read(ctx, contactId, noteId);
@@ -322,42 +223,41 @@ export class ContactNotesService {
             select: NOTE_SELECT,
         });
         if (!row) throw new NotFoundException("Note not found");
-        const views = await withMatches(
-            this.db,
-            ctx.organizationId,
-            await withAuthors(this.db, [noteView(row)]),
-        );
+        const views = await withAuthors(this.db, [noteView(row)]);
         return views[0] ?? noteView(row);
     }
 
-    private requireSomething(body: string, allergenIds: string[]): void {
-        if (body.trim().length === 0 && allergenIds.length === 0) {
+    /** A note is its text: one without any is refused. */
+    private requireText(body: string): string {
+        if (body.trim().length === 0) {
             throw new BadRequestException({
-                message: "Write a note or pick an allergen.",
+                message: "Write a note.",
                 field: "body",
             });
         }
+        return body;
     }
 
-    /** Every id is on this organization's allergen list. */
-    private async checkAllergens(
+    /**
+     * An app from before Z2a still sends the allergens picked on a note.
+     * They never touch the note; each one on the business's list goes on the
+     * person's Needs attention instead (only ever adds, one per name), so an
+     * allergy picked there is not lost. Ids not on the list are skipped.
+     */
+    private async toAttention(
+        tx: Parameters<typeof ensureAllergyEntries>[0],
         ctx: OrganizationContext,
-        allergenIds: string[],
+        contactId: string,
+        dto: ContactNoteDto,
     ): Promise<void> {
+        const allergenIds = [...new Set(dto.allergenIds ?? [])];
         if (allergenIds.length === 0) return;
-        const found = await this.db.storeAllergen.count({
-            where: {
-                organizationId: ctx.organizationId,
-                id: { in: allergenIds },
-            },
+        await ensureAllergyEntries(tx, {
+            organizationId: ctx.organizationId,
+            contactId,
+            userId: ctx.userId,
+            allergenIds,
         });
-        if (found !== allergenIds.length) {
-            throw new BadRequestException({
-                message:
-                    "An allergen in the note is not on your allergen list.",
-                field: "allergenIds",
-            });
-        }
     }
 
     private async requireContact(ctx: OrganizationContext, contactId: string) {

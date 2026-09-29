@@ -247,6 +247,15 @@ export interface AutopayLink {
 export interface AutopayCancelled {
     outcome: "CANCELLED" | "CONFIRMING" | "REFUSED" | "ALREADY_OFF";
     provider: string | null;
+    /**
+     * How the customer was told (D14); null or absent (an older API) when
+     * nobody was.
+     */
+    told?: {
+        email: string | null;
+        suppressed: boolean;
+        account: boolean;
+    } | null;
 }
 
 export interface UpcomingCollection {

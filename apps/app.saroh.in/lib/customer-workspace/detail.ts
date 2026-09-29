@@ -34,11 +34,8 @@ export interface Storefront {
 
 export interface DetailNote {
     id: string;
+    /** Text only (Z2a): an allergy is on Needs attention. */
     body: string;
-    /** As written: one chip per name. */
-    allergens: { id: string; name: string }[];
-    /** Every storefront's allergen of those names; Order Detail checks these. */
-    matchAllergens: { id: string; name: string }[];
     createdByUserId: string | null;
     author: string | null;
     createdAt: string;
@@ -216,8 +213,10 @@ export interface CustomerDetail {
     notes: {
         from: "contact";
         rows: DetailNote[];
+        /** The business's allergens, one per name: what a Needs attention entry may name. */
         allergenChoices: { id: string; name: string }[];
     } | null;
+    /** The allergens their Needs attention names, once per name. */
     allergens: { id: string; name: string }[] | null;
     /**
      * Needs attention (DEC-040, C1) as this viewer may see it; null when it

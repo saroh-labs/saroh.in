@@ -17,7 +17,7 @@ import type {
  *
  * 1. Late, and someone is waiting: late orders, a note for a visit in the
  *    next two days, a message waiting on a reply, overdue invoices, money
- *    to refund, overdue follow-ups.
+ *    to refund, a refund the provider failed (B9), overdue follow-ups.
  * 2. Blocked: stock short for orders, a renewal not paid, a site not live, a
  *    module that needs fixing.
  * 3. Due: orders not late yet, notes for a later visit, low-rated reviews
@@ -54,6 +54,7 @@ const SOURCE_ORDER = [
     "CRM_UNANSWERED_MESSAGES",
     "PAYMENTS_OVERDUE_INVOICES",
     "PAYMENTS_REFUNDS_OWED",
+    "COMMERCE_REFUNDS_FAILED",
     "CRM_OVERDUE_FOLLOWUPS",
     "COMMERCE_STOCK_SHORT",
     "PAYMENTS_FAILED_RENEWALS",
@@ -138,6 +139,7 @@ function fromEvidence(
         href: ev.href,
         // F4: the action the row offers in place, when it offers one.
         ...(ev.inline ? { inline: ev.inline } : {}),
+        ...(ev.link ? { link: ev.link } : {}),
     };
 }
 
@@ -183,6 +185,20 @@ const ROWERS: Partial<Record<string, Rower>> = {
             tone: "bad",
         }),
         more: (n) => `${n} more payment${n === 1 ? "" : "s"} to refund`,
+    },
+    // B9 (DEC-067): "₹480 refund to Priya Raman failed", the order and
+    // what the provider did under it.
+    COMMERCE_REFUNDS_FAILED: {
+        rank: () => 1,
+        row: (action, ev) => ({
+            ...fromEvidence(action, ev),
+            title: `refund to ${ev.subtitle ?? "a customer"} failed`,
+            sub: joined(`Order ${ev.title}`, ev.detail),
+            amountIn: "title",
+            tag: "Refund failed",
+            tone: "bad",
+        }),
+        more: (n) => `${n} more refund${n === 1 ? "" : "s"} that failed`,
     },
     CRM_OVERDUE_FOLLOWUPS: {
         rank: () => 1,

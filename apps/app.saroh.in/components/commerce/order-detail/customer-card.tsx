@@ -41,8 +41,9 @@ export function CustomerCard({
     customer: NonNullable<OrderRead["customer"]>;
     href: string;
     /**
-     * Notes that name allergens; null when they could not be read. Drawn
-     * only from an API before B15, which sends no `attention`.
+     * Their allergies, from the contact's Needs attention; null when it
+     * could not be read. Drawn only from an API before B15, which sends no
+     * `attention` on the order.
      */
     notes: AllergyNote[] | null;
     /** Their Needs attention, as the API let this viewer see it (B15). */

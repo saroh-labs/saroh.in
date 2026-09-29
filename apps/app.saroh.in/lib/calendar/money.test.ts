@@ -52,7 +52,7 @@ const september: MoneyEntry[] = [
         title: "INV-0007",
         in: 120_000,
     }),
-    // Overdue from earlier this month: still owed, so still Due.
+    // Due earlier this month and not paid: Overdue now, not Due (E23).
     entry({
         date: "2026-09-05",
         kind: "invoice_due",
@@ -71,21 +71,57 @@ const word = (strip: ReturnType<typeof monthStrip>) =>
     strip.map((p) => [p.label, p.value]);
 
 describe("monthStrip", () => {
-    it("the current month reads In so far · Out so far · Net · Due", () => {
+    it("the current month reads In so far · Out so far · Net · Due, and Overdue before today", () => {
         expect(word(monthStrip(september, at("current")))).toEqual([
             ["In so far", "₹5,000"],
             ["Out so far", "₹200"],
             ["Net", "₹4,800"],
-            ["Due", "₹1,200"],
+            // Due counts from today, as the design shows (DEC-067).
+            ["Due", "₹900"],
+            ["Overdue", "₹300"],
         ]);
+        expect(
+            monthStrip(september, at("current")).find(
+                (p) => p.key === "overdue",
+            )?.out,
+        ).toBe(true);
     });
 
-    it("a past month drops 'so far'", () => {
-        expect(monthStrip(september, at("past")).map((p) => p.label)).toEqual([
+    it("a past month drops 'so far', and all it still asks for is Overdue", () => {
+        const strip = monthStrip(september, at("past"));
+        expect(strip.map((p) => p.label)).toEqual([
             "In",
             "Out",
             "Net",
             "Due",
+            "Overdue",
+        ]);
+        expect(word(strip).slice(3)).toEqual([
+            ["Due", "₹0"],
+            ["Overdue", "₹1,200"],
+        ]);
+    });
+
+    it("no Overdue part when nothing due before today is unpaid", () => {
+        const ahead = september.filter((e) => e.date >= "2026-09-18");
+        expect(monthStrip(ahead, at("current")).map((p) => p.key)).toEqual([
+            "in",
+            "out",
+            "net",
+            "due",
+        ]);
+    });
+
+    it("Due counts today itself", () => {
+        const today = entry({
+            date: "2026-09-18",
+            kind: "invoice_due",
+            layer: "invoices",
+            due: 5_000,
+        });
+        expect(word(monthStrip([today], at("current"))).at(-1)).toEqual([
+            "Due",
+            "₹50",
         ]);
     });
 
@@ -129,10 +165,16 @@ describe("stripBreakdown", () => {
         expect(
             stripBreakdown("due", september, { ...at("current"), labelOf })
                 .rows,
-        ).toEqual([
-            { label: "Subscriptions", value: "₹900" },
-            { label: "Invoices", value: "₹300" },
-        ]);
+        ).toEqual([{ label: "Subscriptions", value: "₹900" }]);
+        expect(
+            stripBreakdown("overdue", september, {
+                ...at("current"),
+                labelOf,
+            }),
+        ).toEqual({
+            title: "Overdue by kind:",
+            rows: [{ label: "Invoices", value: "₹300" }],
+        });
     });
 
     it("says nothing when a part holds nothing", () => {

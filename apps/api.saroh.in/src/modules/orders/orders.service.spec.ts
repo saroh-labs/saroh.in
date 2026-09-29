@@ -29,6 +29,8 @@ describe("Orders & inventory (dev DB)", () => {
     let productId = "";
     let orgId = "";
     let customerId = "";
+    // The business's second storefront (P3).
+    let secondStoreId = "";
 
     async function stock() {
         // The product's shelf at the storefront (#510: StockLevel).
@@ -75,13 +77,19 @@ describe("Orders & inventory (dev DB)", () => {
     });
 
     afterAll(async () => {
-        await prisma.orderItem.deleteMany({ where: { order: { storeId } } });
-        await prisma.order.deleteMany({ where: { storeId } });
-        await prisma.stockLevel.deleteMany({ where: { storeId } });
-        await prisma.product.deleteMany({ where: { storeId } });
-        await prisma.customer.deleteMany({ where: { storeId } });
-        await prisma.storeOwner.deleteMany({ where: { storeId } });
-        await prisma.store.deleteMany({ where: { id: storeId } });
+        const both = { in: [storeId, secondStoreId] };
+        await prisma.orderItem.deleteMany({
+            where: { order: { storeId: both } },
+        });
+        await prisma.order.deleteMany({ where: { storeId: both } });
+        await prisma.stockLevel.deleteMany({ where: { storeId: both } });
+        await prisma.productListing.deleteMany({
+            where: { storeId: both },
+        });
+        await prisma.product.deleteMany({ where: { storeId: both } });
+        await prisma.customer.deleteMany({ where: { storeId: both } });
+        await prisma.storeOwner.deleteMany({ where: { storeId: both } });
+        await prisma.store.deleteMany({ where: { id: both } });
         await prisma.organization.deleteMany({ where: { id: orgId } });
         await prisma.user.deleteMany({
             where: { email: { in: [ownerEmail, strangerEmail] } },
@@ -201,6 +209,47 @@ describe("Orders & inventory (dev DB)", () => {
             status: "CANCELLED",
         });
         expect(await stock()).toEqual({ quantity: 7, reserved: 0 });
+    });
+
+    it("numbers an order at the business's second storefront after the first's, never ORD-001 again (P3)", async () => {
+        secondStoreId = (
+            await stores.createForUser(ownerId, orgId, {
+                name: "Orders Test Two",
+                slug: `orders-two-${process.pid}`,
+            })
+        ).id;
+        const there = (
+            await products.create(secondStoreId, ownerId, {
+                name: "Gadget",
+                price: "15.00",
+            })
+        ).id;
+        await inventory.upsert(secondStoreId, there, ownerId, {
+            quantity: 5,
+        });
+        const buyer = (
+            await customers.create(secondStoreId, ownerId, {
+                email: `buyer-two-${process.pid}@example.com`,
+            })
+        ).id;
+        const res = await orders.create(secondStoreId, ownerId, {
+            customerId: buyer,
+            items: [{ productId: there, quantity: 1 }],
+        });
+        expect((await orders.get(secondStoreId, res.id, ownerId)).orderId).toBe(
+            "ORD-003",
+        );
+        // And back at the first storefront, the series carries on.
+        const next = await orders.create(storeId, ownerId, {
+            customerId,
+            items: [{ productId, quantity: 1 }],
+        });
+        expect((await orders.get(storeId, next.id, ownerId)).orderId).toBe(
+            "ORD-004",
+        );
+        await orders.updateStatus(storeId, next.id, ownerId, {
+            status: "CANCELLED",
+        });
     });
 
     it("denies a non-member (404, no leak)", async () => {

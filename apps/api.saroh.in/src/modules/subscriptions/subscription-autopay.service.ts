@@ -14,7 +14,12 @@ import { fromMinor, toMinor } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { TransactionalRecipient } from "../communications/communications.service";
 import { CommunicationsService } from "../communications/communications.service";
-import { renderAutopaySetupLink } from "../communications/transactional";
+import {
+    autopayCancelledSentence,
+    renderAutopayCancelled,
+    renderAutopaySetupLink,
+} from "../communications/transactional";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { formatDay, formatMoney } from "../invoices/invoice-send.service";
 import { authorize } from "../organizations/organization-policy";
 import type { AutopayCheck } from "../payments/autopay.service";
@@ -33,6 +38,8 @@ import { MandateSetupService } from "../payments/mandate-setup.service";
 import { MandatesService } from "../payments/mandates.service";
 import type { MandateMethod } from "../payments/providers/provider.port";
 import { isMandateMethod } from "../payments/providers/provider.port";
+import { noticeChannels } from "../site-accounts/notice-reach";
+import { appendMessage } from "../site-accounts/thread-store";
 import { teamNames } from "./event-actors";
 import {
     recordSubscriptionEvent,
@@ -334,6 +341,14 @@ export class SubscriptionAutopayService {
      * job keeps asking. The subscription goes on, its renewals invoiced
      * with a pay link. Already off: says so and changes nothing. A mandate
      * already made is cancelled even with the rollout flag off.
+     *
+     * The customer is told when autopay they had on (ACTIVE or PAUSED) is
+     * cancelled, whatever the provider answered, since Saroh charges it no
+     * more: by email through D17's transactional path (the business's own
+     * provider, their bill-to or account address, a revoked consent still
+     * stops it), and in their account thread only where it is live
+     * (`ACCOUNT_THREAD`, `notice-reach.ts`). A set-up never approved is not
+     * told. Telling them never fails the cancel.
      */
     async cancel(
         ctx: OrganizationContext,
@@ -356,12 +371,13 @@ export class SubscriptionAutopayService {
                 ],
             },
             orderBy: { createdAt: "desc" },
-            select: { provider: true },
+            select: { provider: true, status: true },
         });
         if (!open) {
             return {
                 outcome: "ALREADY_OFF",
                 provider: null,
+                told: null,
             };
         }
         const result = await this.mandates.cancelFor(
@@ -380,7 +396,98 @@ export class SubscriptionAutopayService {
                 `Subscription ${subscriptionId}: autopay is off in Saroh, but ${open.provider} refused the cancel`,
             );
         }
-        return { outcome, provider: providerName(open.provider) };
+        const wasOn = open.status === "ACTIVE" || open.status === "PAUSED";
+        const told = wasOn
+            ? await this.tellCancelled(ctx, subscriptionId).catch(
+                  (error: unknown) => {
+                      this.logger.warn(
+                          `Subscription ${subscriptionId}: autopay is off, but the customer couldn't be told: ${
+                              error instanceof Error
+                                  ? error.message
+                                  : String(error)
+                          }`,
+                      );
+                      return null;
+                  },
+              )
+            : null;
+        return { outcome, provider: providerName(open.provider), told };
+    }
+
+    /**
+     * Tell the customer their autopay was cancelled (D14): email where the
+     * business's email provider and an address exist, and the account
+     * thread where it is live. One transaction, so the note and its
+     * message commit together.
+     */
+    private async tellCancelled(
+        ctx: OrganizationContext,
+        subscriptionId: string,
+        now: Date = new Date(),
+    ): Promise<AutopayCancelTold> {
+        const { organizationId } = ctx;
+        const sub = await prisma.customerSubscription.findFirst({
+            where: { id: subscriptionId, organizationId },
+            select: {
+                contactId: true,
+                plan: { select: { name: true } },
+                contact: { select: { firstName: true } },
+            },
+        });
+        if (!sub) return { email: null, suppressed: false, account: false };
+        const vars = {
+            business: await businessName(organizationId),
+            firstName: firstNameOf(sub.contact.firstName),
+            plan: sub.plan.name,
+        };
+        return prisma.$transaction(async (tx) => {
+            const channels = await noticeChannels(tx, organizationId);
+            let email: string | null = null;
+            let suppressed = false;
+            if (this.comms && channels.email) {
+                try {
+                    const queued = await this.comms.queueTransactional(
+                        tx,
+                        organizationId,
+                        {
+                            template: "AUTOPAY_CANCELLED",
+                            rendered: renderAutopayCancelled(vars),
+                            recipient: await recipientOf(
+                                tx,
+                                organizationId,
+                                subscriptionId,
+                            ),
+                            createdByUserId: ctx.userId,
+                        },
+                    );
+                    suppressed = queued.status === "SUPPRESSED";
+                    email = suppressed ? null : queued.toAddress;
+                } catch (err) {
+                    // No address to send to: the thread may still tell them.
+                    if (!(err instanceof ConflictException)) throw err;
+                }
+            }
+            let account = false;
+            if (channels.thread) {
+                const contact = await resolveContact(
+                    tx,
+                    sub.contactId,
+                    organizationId,
+                );
+                if (contact && !contact.removed) {
+                    await appendMessage(tx, {
+                        organizationId,
+                        contactId: contact.id,
+                        author: "SYSTEM",
+                        body: autopayCancelledSentence(vars),
+                        event: "AUTOPAY_CANCELLED",
+                        now,
+                    });
+                    account = true;
+                }
+            }
+            return { email, suppressed, account };
+        });
     }
 
     /**
@@ -694,4 +801,19 @@ export interface AutopayCancelResult {
     outcome: "CANCELLED" | "CONFIRMING" | "REFUSED" | "ALREADY_OFF";
     /** "Razorpay"; null when nothing was asked. */
     provider: string | null;
+    /**
+     * How the customer was told (D14); null when nobody was: autopay was
+     * already off, it was never approved, or telling them failed.
+     */
+    told: AutopayCancelTold | null;
+}
+
+/** How a customer heard that staff cancelled their autopay. */
+export interface AutopayCancelTold {
+    /** The address it was emailed to; null: not emailed. */
+    email: string | null;
+    /** They turned email off, so it was recorded and not sent. */
+    suppressed: boolean;
+    /** Posted in their account thread on the business's site. */
+    account: boolean;
 }

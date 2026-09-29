@@ -303,6 +303,8 @@ model Organization {
   orderStageBatches OrderStageBatch[]
   // Each person's alert choices here (round-2 F14).
   notificationPreferences NotificationPreference[]
+  // Its one order-number series, across every storefront (P3, DEC-066).
+  orderNumberSequence OrderNumberSequence?
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -1054,7 +1056,7 @@ model StoreAllergen {
   createdAt DateTime @default(now())
 
   products     ProductAllergen[]
-  // Customers' notes that name it (U8). Removing it is refused while any do.
+  // Customers' notes that named it (U8). Unused since Z2a: dropped with Z2.
   contactNotes ContactNoteAllergen[]
 
   // Needs attention Allergy entries that name it (C1). Removing it is
@@ -1597,6 +1599,13 @@ model Order {
   // a contact needs an email.
   walkInName  String?
   walkInPhone String?
+
+  // The number the order had before the P3 backfill (DEC-066) renumbered it:
+  // two storefronts of one business had each counted from ORD-001, so the
+  // later of two orders with one number took the business's next one. Kept
+  // so a customer quoting the old number still finds it (search, the Orders
+  // list). Null for every order never renumbered.
+  renumberedFrom String?
 
   @@unique([storeId, orderId])
   @@unique([storeId, checkoutKey])
@@ -2619,9 +2628,9 @@ model ContactNote {
   @@index([organizationId])
 }
 
-// One allergen a note names. NoAction on the allergen, as ProductAllergen:
-// removing an allergen from the list is refused in the API while a note names
-// it, so an allergy is never dropped from a customer's record in passing.
+// One allergen a note named. Nothing reads or writes it since Z2a (notes are
+// text only; allergies are ContactAttention entries), and it is dropped with
+// Z2. Removing an allergen clears any rows still naming it (NoAction).
 model ContactNoteAllergen {
   noteId         String
   note           ContactNote   @relation(fields: [noteId], references: [id], onDelete: Cascade)
@@ -5465,6 +5474,20 @@ model InvoiceSequence {
   updatedAt      DateTime     @updatedAt
 
   @@id([organizationId, series])
+}
+
+// The last order number a business issued (P3, DEC-066): one series per
+// business, across every storefront, where each storefront used to count
+// from ORD-001. Allocated with one insert-or-increment statement in the
+// order's own transaction (`nextOrderNumberInTx`, @saroh/database), so two
+// orders never take one number and a failed order gives its number back.
+// The first order after P3 seeds the row from the business's highest
+// ORD-number; the P3 backfill (backfill/order-numbers.ts) seeds it too.
+model OrderNumberSequence {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lastNumber     Int          @default(0)
+  updatedAt      DateTime     @updatedAt
 }
 
 // A fixed series of dated sessions on one service, sold once.

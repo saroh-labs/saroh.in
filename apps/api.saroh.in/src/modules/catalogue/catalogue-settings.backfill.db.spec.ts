@@ -348,12 +348,9 @@ describe("Catalogue settings backfill (#529, DB)", () => {
                 organizationId: two.orgId,
                 contactId: contact.id,
                 body: "Peanut allergy",
+                // A note from before Z2a naming the Peanuts that goes.
                 allergens: {
                     create: [
-                        {
-                            allergenId: hillPeanuts.id,
-                            organizationId: two.orgId,
-                        },
                         {
                             allergenId: onlinePeanuts.id,
                             organizationId: two.orgId,
@@ -518,7 +515,9 @@ describe("Catalogue settings backfill (#529, DB)", () => {
             }),
         ).toEqual({ optionValueId: valueOf(onlineSize, "XL") });
 
-        // Peanuts: one, on the product and once on the note.
+        // Peanuts: one, on the product. Notes are text only (Z2a): the old
+        // row naming the Peanuts that went is cleared, not moved, and the
+        // note keeps its words.
         expect(
             (
                 await prisma.storeAllergen.findMany({
@@ -538,7 +537,13 @@ describe("Catalogue settings backfill (#529, DB)", () => {
                 where: { noteId: note.id },
                 select: { allergenId: true },
             }),
-        ).toEqual([{ allergenId: hillPeanuts.id }]);
+        ).toEqual([]);
+        expect(
+            await prisma.contactNote.findUnique({
+                where: { id: note.id },
+                select: { body: true },
+            }),
+        ).toEqual({ body: "Peanut allergy" });
 
         // Tops under Women and Tops under Men stay two, told apart by name.
         const tops = await prisma.category.findMany({

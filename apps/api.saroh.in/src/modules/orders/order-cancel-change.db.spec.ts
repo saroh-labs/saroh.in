@@ -33,6 +33,7 @@ import {
     FakeMerchantProvider,
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
+import { PublicOrderPayService } from "../payments/public-order-pay.service";
 import { SEND_REFUND_TYPE } from "../payments/send-refund.handler";
 import { count } from "../stock/stock.service";
 import { StoresService } from "../stores/stores.service";
@@ -46,6 +47,7 @@ import { OrderCancelService } from "./order-cancel.service";
 import { OrderFulfilmentChangeService } from "./order-fulfilment-change.service";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { PAY_LINK_ORDER_SELECT, payLinkStanding } from "./order-pay-link";
+import { OrderPayLinkService } from "./order-pay-link.service";
 import { OrdersService } from "./orders.service";
 
 const WEBHOOK_SECRET = "whsec_b9_test";
@@ -416,6 +418,187 @@ describe("change how it's fulfilled (B9, real database)", () => {
                 address: ADDRESS,
             }),
         ).rejects.toThrow(ForbiddenException);
+    });
+});
+
+describe("a site checkout's order that costs more since it was paid (B9)", () => {
+    const payLinks = new OrderPayLinkService();
+    const publicPay = new PublicOrderPayService(payments);
+
+    /** Two loaves bought on the site: nothing held until its payment. */
+    async function paidAtCheckout(): Promise<string> {
+        orderSeq += 1;
+        const made = await prisma.order.create({
+            data: {
+                storeId,
+                organizationId: orgId,
+                customerId,
+                orderId: `B9-SITE-${orderSeq}-${tag}`,
+                currency: "INR",
+                subtotal: "480.00",
+                total: "480.00",
+                placedOnline: true,
+                items: {
+                    create: [{ productId: loaf, quantity: 2, price: "240.00" }],
+                },
+            },
+        });
+        await pay(made.id, 48000, `site_${orderSeq}`);
+        return made.id;
+    }
+
+    async function pay(orderId: string, amountCents: number, ref: string) {
+        const providerIntentId = `prov_b9_${ref}_${tag}`;
+        await prisma.paymentIntent.create({
+            data: {
+                organizationId: orgId,
+                orderId,
+                provider: "RAZORPAY",
+                providerIntentId,
+                amountCents,
+                currency: "INR",
+                status: "REQUIRES_PAYMENT",
+            },
+        });
+        return webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId,
+            providerPaymentRef: `pay_b9_${ref}_${tag}`,
+        });
+    }
+
+    const heldAttempts = (orderId: string) =>
+        prisma.paymentAttempt.count({
+            where: { status: "STOCK_HELD", paymentIntent: { orderId } },
+        });
+
+    it("offers a pay link for the balance, and its payment settles it without holding the loaves again", async () => {
+        const before = await promised();
+        const id = await paidAtCheckout();
+        expect((await orderRow(id)).paymentStatus).toBe("PAID");
+        expect(await promised()).toBe(before + 2);
+
+        // Pick-up → Local delivery, ₹40 more: received 480 of 520.
+        await changes.change(owner, id, {
+            fulfilment: "LOCAL_DELIVERY",
+            shipping: "40",
+            address: ADDRESS,
+        });
+        const payable = await prisma.order.findUniqueOrThrow({
+            where: { id },
+            select: PAY_LINK_ORDER_SELECT,
+        });
+        expect(payLinkStanding(payable)).toBe("DUE");
+
+        const { token } = await payLinks.make(owner, id);
+        const view = await publicPay.read(token);
+        expect(view).toMatchObject({ status: "DUE", due: "40.00" });
+        const intent = await publicPay.createIntent(token, {
+            idempotencyKey: key(),
+        });
+        expect(intent.amountCents).toBe(4000);
+
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: intent.providerIntentId,
+            providerPaymentRef: `pay_b9_balance_${tag}`,
+        });
+
+        // Settled as a second payment: the loaves were held once, by the
+        // checkout's payment, and nothing is owed back.
+        expect(await promised()).toBe(before + 2);
+        expect(await heldAttempts(id)).toBe(1);
+        expect(
+            await prisma.paymentRefund.count({
+                where: { paymentIntent: { orderId: id } },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.paymentIntent.findUniqueOrThrow({
+                where: { id: intent.paymentIntentId },
+                select: { status: true },
+            }),
+        ).toEqual({ status: "SUCCEEDED" });
+        const supplementary = await prisma.invoice.findFirstOrThrow({
+            where: { orderId: id, kind: "SUPPLEMENTARY" },
+            select: { status: true },
+        });
+        expect(supplementary.status).toBe("PAID");
+        expect((await kitchen.read(owner, id)).money?.due).toBe("0.00");
+        // Nothing left to take: the link stops working.
+        expect(
+            await prisma.order.findUniqueOrThrow({
+                where: { id },
+                select: { payTokenHash: true },
+            }),
+        ).toEqual({ payTokenHash: null });
+        const settled = await prisma.order.findUniqueOrThrow({
+            where: { id },
+            select: PAY_LINK_ORDER_SELECT,
+        });
+        expect(payLinkStanding(settled)).toBe("PAID");
+    });
+
+    it("a later balance gets a fresh link; the settled one never comes back", async () => {
+        const id = await paidAtCheckout();
+        await changes.change(owner, id, {
+            fulfilment: "LOCAL_DELIVERY",
+            shipping: "40",
+            address: ADDRESS,
+        });
+        const first = (await payLinks.make(owner, id)).token;
+        const paying = await publicPay.createIntent(first, {
+            idempotencyKey: key(),
+        });
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: paying.providerIntentId,
+            providerPaymentRef: `pay_b9_first_${tag}`,
+        });
+
+        // Local delivery → Shipping, ₹100: ₹60 more.
+        await changes.change(owner, id, {
+            fulfilment: "SHIPPING",
+            shipping: "100",
+            address: ADDRESS,
+        });
+        const second = (await payLinks.make(owner, id)).token;
+        expect(second).not.toBe(first);
+        expect((await publicPay.read(second)).due).toBe("60.00");
+        await expect(publicPay.read(first)).rejects.toThrow();
+    });
+
+    it("the checkout's own payment repeating still reads as held, not as a balance", async () => {
+        const before = await promised();
+        orderSeq += 1;
+        const made = await prisma.order.create({
+            data: {
+                storeId,
+                organizationId: orgId,
+                customerId,
+                orderId: `B9-SITE-${orderSeq}-${tag}`,
+                currency: "INR",
+                subtotal: "480.00",
+                total: "480.00",
+                placedOnline: true,
+                items: {
+                    create: [{ productId: loaf, quantity: 2, price: "240.00" }],
+                },
+            },
+        });
+        await pay(made.id, 48000, `repeat_${orderSeq}`);
+        // Razorpay's second event for the same payment.
+        await webhook({
+            eventType: "order.paid",
+            outcome: "SUCCEEDED",
+            providerIntentId: `prov_b9_repeat_${orderSeq}_${tag}`,
+            providerPaymentRef: `pay_b9_repeat_${orderSeq}_${tag}`,
+        });
+        expect(await promised()).toBe(before + 2);
+        expect(await heldAttempts(made.id)).toBe(1);
     });
 });
 

@@ -219,7 +219,6 @@ function make(views: Views = ALL_ON) {
                     createdByUserId: "user_1",
                     createdAt: PAST,
                     updatedAt: PAST,
-                    allergens: [{ allergen: { id: "alg_nuts", name: "Nuts" } }],
                 },
             ]),
         },
@@ -423,15 +422,19 @@ describe("CustomerDetailService", () => {
             }),
         );
         expect(detail.notes?.rows[0].body).toBe("Severe nut allergy");
-        // One chip, but the order check sees every storefront's "Nuts".
-        expect(detail.notes?.rows[0].allergens).toEqual([
-            { id: "alg_nuts", name: "Nuts" },
-        ]);
-        expect(detail.notes?.rows[0].matchAllergens).toEqual([
+        // Notes are text only (Z2a): the old fields stay, empty, for an app
+        // from before it. The allergy is Needs attention's, which the order
+        // check reads by every allergen of its name.
+        expect(detail.notes?.rows[0].allergens).toEqual([]);
+        expect(detail.notes?.rows[0].matchAllergens).toEqual([]);
+        expect(detail.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
+        expect(
+            detail.attention?.entries.find((e) => e.kind === "ALLERGY")
+                ?.matchAllergens,
+        ).toEqual([
             { id: "alg_nuts", name: "Nuts" },
             { id: "alg_nuts_2", name: "nuts" },
         ]);
-        expect(detail.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
 
         expect(detail.stats).toEqual({
             orders: 1,
@@ -759,6 +762,8 @@ describe("CustomerDetailService", () => {
             { source: "attention", label: "Needs attention" },
         ]);
         expect(detail.notes?.rows).toHaveLength(1);
+        // Its allergens come from Needs attention (Z2a): unknown, not none.
+        expect(detail.allergens).toBeNull();
     });
 
     it("gives a Member no money and no billing blocks", async () => {
@@ -781,8 +786,8 @@ describe("CustomerDetailService", () => {
         expect(db.packPurchase.findMany).not.toHaveBeenCalled();
         expect(spentReads(db, "orders")).toHaveLength(0);
 
-        // What they do see: the diary, and the notes (an allergy matters at
-        // the counter).
+        // What they do see: the diary, and Needs attention's allergies (an
+        // allergy matters at the counter).
         expect(detail.bookings?.upcoming).toHaveLength(1);
         expect(detail.stats.bookings).toBe(7);
         expect(detail.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
@@ -997,6 +1002,89 @@ describe("CustomerDetailService", () => {
             expect(db.packPurchase.findMany).not.toHaveBeenCalled();
             // The diary is still there.
             expect(detail.bookings?.upcoming).toHaveLength(1);
+        });
+
+        describe("with Class packs off, a membership counts on its own (C7)", () => {
+            const PACKS_OFF = ALL_ON.map((v) =>
+                v.key === "CLASS_PACKS" ? { ...v, readiness: "DISABLED" } : v,
+            );
+
+            it("shows a member's classes this month as classes left", async () => {
+                const { svc, db } = make(PACKS_OFF);
+                db.customerSubscription.findFirst.mockResolvedValue({
+                    id: "sub_m",
+                    status: "ACTIVE",
+                    timezone: "Asia/Kolkata",
+                    plan: { name: "Monthly membership", classesPerMonth: 8 },
+                });
+
+                const detail = await svc.detail(OWNER, "c1");
+
+                expect(detail).not.toHaveProperty("packs");
+                expect(db.packPurchase.findMany).not.toHaveBeenCalled();
+                expect(detail.stats.classesLeft).toEqual({
+                    total: 5,
+                    packs: 0,
+                    membership: 5,
+                    nextExpiry: null,
+                    allowance: expect.objectContaining({
+                        subscriptionId: "sub_m",
+                        perMonth: 8,
+                        used: 3,
+                        left: 5,
+                    }),
+                });
+            });
+
+            it("a paused membership still shows, with none left", async () => {
+                const { svc, db } = make(PACKS_OFF);
+                db.customerSubscription.findFirst.mockResolvedValue({
+                    id: "sub_m",
+                    status: "PAUSED",
+                    timezone: "Asia/Kolkata",
+                    plan: { name: "Monthly membership", classesPerMonth: 8 },
+                });
+
+                const detail = await svc.detail(OWNER, "c1");
+
+                expect(detail.stats.classesLeft).toMatchObject({
+                    total: 0,
+                    allowance: expect.objectContaining({ paused: true }),
+                });
+            });
+
+            it("a failed membership read is no figure, and is named", async () => {
+                const { svc, db } = make(PACKS_OFF);
+                db.customerSubscription.findFirst.mockRejectedValue(
+                    new Error("timeout"),
+                );
+
+                const detail = await svc.detail(OWNER, "c1");
+
+                expect(detail.stats.classesLeft).toBeNull();
+                expect(detail.unavailable).toEqual(
+                    expect.arrayContaining([
+                        expect.objectContaining({ source: "membership" }),
+                    ]),
+                );
+            });
+
+            it("no card with Payments off: there are no memberships", async () => {
+                const { svc, db } = make(
+                    PACKS_OFF.map((v) =>
+                        v.key === "PAYMENTS"
+                            ? { ...v, readiness: "DISABLED" }
+                            : v,
+                    ),
+                );
+                db.customerSubscription.findFirst.mockRejectedValue(
+                    new Error("timeout"),
+                );
+
+                const detail = await svc.detail(OWNER, "c1");
+
+                expect(detail.stats).not.toHaveProperty("classesLeft");
+            });
         });
 
         it("reads no packs without pack:read, even with the diary", async () => {

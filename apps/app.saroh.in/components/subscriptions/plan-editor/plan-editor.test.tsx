@@ -357,3 +357,33 @@ describe("the Plan Editor", () => {
         );
     });
 });
+
+describe("the price and members' autopay (D13)", () => {
+    it("warns as a price above switchers' autopay is typed, and clears below it", () => {
+        render(
+            record({
+                autopayLimits: [{ limit: "1500.00", members: 2 }],
+            }),
+        );
+        const price = field("Price");
+        expect(text()).not.toContain("will need to authorise again");
+
+        type(price, "1800");
+        expect(text()).toContain(
+            "Autopay covers up to ₹1,500; 2 members will need to authorise again",
+        );
+        const warning = Array.from(host.querySelectorAll("p")).find((p) =>
+            p.textContent.startsWith("Autopay covers up to"),
+        );
+        expect(price.getAttribute("aria-describedby")).toContain(warning?.id);
+
+        type(price, "1500");
+        expect(text()).not.toContain("will need to authorise again");
+    });
+
+    it("never warns without the API's limits (an older API)", () => {
+        render(record());
+        type(field("Price"), "99999");
+        expect(text()).not.toContain("authorise again");
+    });
+});

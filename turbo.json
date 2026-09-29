@@ -93,8 +93,11 @@
         },
         // The browser E2E job seeds the showcase: its specs are set in Rye & Co.,
         // Pulse Fitness and Leela & Loom, which the base seed does not make.
+        // CI runs it in the same turbo run as the apps' build so the two
+        // overlap; it waits for the package's OWN build too, because that
+        // build's `prisma generate` rewrites the client the seed runs on.
         "db:seed:showcase": {
-            "dependsOn": ["^build"],
+            "dependsOn": ["^build", "build"],
             "cache": false
         },
         "dev": {
@@ -108,11 +111,31 @@
         "lint": {
             "dependsOn": ["^build"]
         },
+        "@saroh/database#lint": {
+            "dependsOn": ["^build", "build"]
+        },
+        "@saroh/database#typecheck": {
+            "dependsOn": ["^build", "build"]
+        },
         "typecheck": {
             "dependsOn": ["^build"]
         },
+        // Tests write nothing worth keeping, so a cache hit replays the log.
         "test": {
-            "dependsOn": ["^build"]
+            "dependsOn": ["^build"],
+            "outputs": []
+        },
+        // As its lint and typecheck: the package's own build runs prisma
+        // generate, which its specs import.
+        "@saroh/database#test": {
+            "dependsOn": ["^build", "build"],
+            "outputs": []
+        },
+        // The api's DB-free jest project (`scripts/prepush.sh` runs it through
+        // turbo for the cache; CI calls the script directly).
+        "test:unit": {
+            "dependsOn": ["^build"],
+            "outputs": []
         }
     }
 }

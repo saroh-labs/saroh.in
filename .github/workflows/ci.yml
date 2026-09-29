@@ -94,14 +94,19 @@ jobs:
             *) everything ;;
           esac
           put base "$base"
-          files=$(git diff --name-only "$base" HEAD)
+          # Anything but docs and Markdown counts as code, and only code decides
+          # which gates run: an app's AGENTS.md or README used to start the
+          # integration shards and both browser suites, none of which reads it.
+          # (The diff on its own line, so a failing diff still fails the job
+          # instead of reading as "nothing changed".)
+          all=$(git diff --name-only "$base" HEAD)
+          files=$(printf '%s\n' "$all" | grep -vE '^(docs/|.*\.md$)' || true)
           has() { printf '%s\n' "$files" | grep -qE "$1"; }
           if has '^(\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|\.nvmrc$|tooling/)'; then
             everything
           fi
           put full false
-          # Anything but docs and Markdown counts as code.
-          if printf '%s\n' "$files" | grep -vqE '^(docs/|.*\.md$)'; then put code true; else put code false; fi
+          if [ -n "$files" ]; then put code true; else put code false; fi
           if has '^(apps/api\.saroh\.in/|packages/)'; then put api true; else put api false; fi
           if has '^packages/database/'; then put db true; else put db false; fi
           if has '^(apps/|packages/|e2e/|scripts/)'; then put e2e true; else put e2e false; fi
@@ -309,17 +314,26 @@ jobs:
           POSTGRES_DB: saroh_test
         ports:
           - 5432:5432
+        # Polled every 2s rather than 10s: the job waits for the first healthy
+        # answer, and at 10s that was a fixed ~10s on every database job. Over
+        # TCP (-h), because the image's init runs a temporary server on the
+        # socket only and restarts it; a socket check could pass on that one.
         options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 30
     steps:
       - uses: actions/checkout@v4
-      # No Turbo cache: the suite runs through jest directly. The globalSetup
-      # runs `prisma db push` in packages/database, which needs the client
-      # generated here and pnpm on PATH.
+      # The globalSetup runs `prisma db push` in packages/database, which needs
+      # the client generated here and pnpm on PATH. The suite itself runs
+      # through jest directly, so the only Turbo work is the build below, and
+      # the shards READ the unit job's cache for it (same packages, same env,
+      # so the same hashes) without writing one of their own.
       - uses: ./.github/actions/setup
+        with:
+          turbo-cache: unit
+          turbo-save: "false"
 
       # The api's workspace dependencies (auth, block-contract, …) are consumed
       # built, as `pnpm run build` would leave them.
@@ -376,10 +390,10 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 30
 
     steps:
       - uses: actions/checkout@v4
@@ -411,8 +425,19 @@ jobs:
   # names exist — see docs/architecture/LOCAL_DEV.md.
   # Split four ways by spec file, each shard with its own Postgres and its
   # own freshly seeded stack, so the specs still run one at a time against
-  # data only they touch (the config keeps workers: 1). About 9.5 minutes of
-  # tests become about 2.5 per shard.
+  # data only they touch (the config keeps workers: 1). About 11 minutes of
+  # tests become 2.2 to 3.5 per shard.
+  #
+  # This is the longest job, so it sets the run's wall clock. Two things that
+  # look faster and are not (measured 2026-09-29):
+  #   - building once in a job the shards `need` and passing them the build:
+  #     the apps here are built with THIS job's env (NEXT_PUBLIC_ROOT_DOMAIN
+  #     is `localhost`, not `saroh.app`), so the Build job's output cannot be
+  #     reused, and a separate build job in front of the shards puts ~3 min of
+  #     setup and build in series with ~5 min of tests;
+  #   - more shards: a run already starts 19 jobs at once, and a second run
+  #     at the same time (a push to development and its PR) queued jobs by up
+  #     to 6 minutes on the account's concurrent-job limit.
   browser-e2e-shard:
     name: Browser E2E (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
@@ -433,10 +458,10 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 30
 
     env:
       SKIP_ENV_VALIDATION: "1"
@@ -484,6 +509,11 @@ jobs:
       SITE_RELAY_SECRET: saroh-dev-insecure-site-relay-secret-not-for-production
       SITE_ACCOUNTS_CODE_SECRET: ci-placeholder-site-code-secret-at-least-32-chars
       SITE_CODES_EMAIL_FAKE: log
+      # Every real environment has a payments key, and sending an invoice
+      # seals its pay link with it (D17): without one, Send answered 500 on
+      # this stack. The same throwaway key the API specs use; it opens
+      # nothing — the seeded connections are fakes.
+      PAYMENTS_ENC_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     steps:
       - uses: actions/checkout@v4
@@ -500,11 +530,18 @@ jobs:
       - name: Apply migrations
         run: pnpm --filter @saroh/database db:migrate:deploy
 
-      # Through turbo, not `pnpm --filter`, so the seed's own build dependency
-      # is honoured. The seed validates every section it writes through the
-      # block contract, which lives in a built package (#252) — and this job
-      # builds the apps two steps LATER, so a direct `pnpm --filter` call
-      # resolved @saroh/block-contract to a dist nobody had made yet.
+      # The seed and the build in ONE turbo run, so they overlap: the seed
+      # (~40s) used to finish before the build (~15s replayed, ~110s cold)
+      # started. Turbo still orders what must be ordered:
+      #   - the seed validates every section it writes through the block
+      #     contract, which lives in a built package (#252), so it waits for
+      #     its dependencies' builds (`^build`) — a direct `pnpm --filter`
+      #     call resolved @saroh/block-contract to a dist nobody had made yet;
+      #   - it also waits for @saroh/database's OWN build (turbo.json), whose
+      #     `prisma generate` rewrites the client the seed is running on.
+      #     Everything after that (api, accounts, app, renderer) only reads it.
+      # Nothing here reads the database while building, so the seed's writes
+      # cannot change a build.
       #
       # The SHOWCASE, not the base seed alone. The bookings, subscriptions,
       # order, customer and product-editor specs are set in Pulse Fitness,
@@ -512,11 +549,11 @@ jobs:
       # (Nisha, Rye's Member); none of that exists after `db:seed`, so those
       # specs failed on a 404 or a sign-in that never landed. The showcase runs
       # the base seed first, so Northwind is still there for everything else.
-      - name: Seed the demo Organizations (showcase)
-        run: pnpm turbo run db:seed:showcase --filter=@saroh/database
-
-      - name: Build the apps under test
-        run: pnpm turbo run build --filter=@saroh/api --filter=auth --filter=application --filter=sites
+      - name: Seed the demo Organizations (showcase) and build the apps under test
+        run: >-
+          pnpm turbo run db:seed:showcase build --log-order=grouped
+          --filter=@saroh/database --filter=@saroh/api --filter=auth
+          --filter=application --filter=sites
 
       # Started detached and polled, rather than trusting a fixed sleep: a cold
       # Next server on a runner is not reliably up in any particular number of

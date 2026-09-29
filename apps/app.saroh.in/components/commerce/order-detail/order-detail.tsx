@@ -121,7 +121,7 @@ export function OrderDetail({
     arrival = null,
 }: {
     order: OrderRead;
-    /** Allergy notes; "unavailable" when they could not be read. */
+    /** Their allergies (Needs attention); "unavailable" when not read. */
     notes: AllergyNote[] | "unavailable";
     payments: OrderPaymentsSummary | null;
     can: OrderPermissions;
@@ -192,15 +192,13 @@ export function OrderDetail({
     // who may change orders. Its address is shown once, to its maker.
     const madeAt = order.payLinkCreatedAt ?? null;
     const payLink = usePayLink({ orderId: order.id, first, madeAt });
-    // Owed: unpaid, or paid online and changed since to cost more (B9) —
-    // not a site checkout's order, whose difference is taken at the counter.
+    // Owed: unpaid, or paid online and changed since to cost more (B9), a
+    // site checkout's order too — its balance is taken by the same link.
     const owed =
         order.status !== "CANCELLED" &&
         (order.paymentStatus === "UNPAID" ||
             order.paymentStatus === "FAILED" ||
-            (order.paymentStatus === "PAID" &&
-                !order.money?.recordedByHand &&
-                !order.placedOnline)) &&
+            (order.paymentStatus === "PAID" && !order.money?.recordedByHand)) &&
         Number(order.money?.due ?? 0) > 0;
     const linkable = can.payLink && owed;
     const changes = useOrderChanges({
@@ -210,10 +208,7 @@ export function OrderDetail({
         refundTo,
         setPanel,
         startHold: kitchen.startHold,
-        onOwed:
-            can.payLink && can.payOnline && !order.placedOnline
-                ? payLink.ask
-                : undefined,
+        onOwed: can.payLink && can.payOnline ? payLink.ask : undefined,
     });
     const change = changeAccess(order, can);
 
@@ -484,9 +479,7 @@ export function OrderDetail({
                                 refundTo={refundTo}
                                 remaining={remaining}
                                 linkable={
-                                    can.payLink &&
-                                    (can.payOnline ?? false) &&
-                                    !order.placedOnline
+                                    can.payLink && (can.payOnline ?? false)
                                 }
                                 format={money ? format : null}
                                 changes={changes}

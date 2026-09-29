@@ -315,7 +315,8 @@ export function quickSteps(
 }
 
 /**
- * The quick view's Payment line, only with money: "Refunded", "₹480 not
+ * The quick view's Payment line, only with money: "Refund on its way"
+ * (B9), "Refunded", "₹480 not
  * paid yet", "Payment failed", "Paid by hand", "Partly refunded" or "Paid".
  */
 export function quickPayment(
@@ -324,6 +325,8 @@ export function quickPayment(
 ): string | null {
     const m = order.money;
     if (!m) return null;
+    // Accepted by the provider, not confirmed yet (B9, DEC-067).
+    if ((m.refundsOnTheWay ?? []).length > 0) return "Refund on its way";
     if (order.refundStanding === "REFUNDED") return "Refunded";
     if (order.paymentStatus === "FAILED") {
         return `Payment failed · ${format(m.due)} to collect`;

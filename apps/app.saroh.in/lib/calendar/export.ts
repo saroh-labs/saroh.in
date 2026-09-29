@@ -1,3 +1,5 @@
+import type { MonthWhen } from "./money";
+import { dueSplit } from "./money";
 import type { LayerKey, MoneyEntry, MoneyKind } from "./types";
 
 /**
@@ -9,6 +11,10 @@ import type { LayerKey, MoneyEntry, MoneyKind } from "./types";
  * One row per amount that came in, went out or is still due, with the
  * design's columns: Date, Kind, What, Who / detail, In, Out, Due. A failed
  * renewal charge is neither — the strip leaves it out, and so does the file.
+ * Due counts from today, as the strip does (E23, DEC-067); money that was
+ * due on a day before today goes in an Overdue column instead, added only
+ * when the month has some, so the file's columns add up to the strip's
+ * parts.
  * Amounts are plain decimals in major units, so a sheet can sum them; a
  * business trading in two currencies gets a Currency column as well.
  */
@@ -53,10 +59,19 @@ function titleOf(entry: MoneyEntry): string {
 export function monthCsv(
     entries: MoneyEntry[],
     labelOf: (layer: LayerKey) => string,
+    /**
+     * Where the month sits against today, to split Due from Overdue as the
+     * strip does; without it, everything owed is Due.
+     */
+    at?: { when: MonthWhen; today: string },
 ): { csv: string; lines: number } {
     const rows = entries.filter((e) => e.in || e.out || e.due);
     const currencies = new Set(rows.map((e) => e.currency));
     const mixed = currencies.size > 1;
+    const late = new Set(
+        at ? dueSplit(rows, at).overdue.filter((e) => e.due) : [],
+    );
+    const overdueColumn = late.size > 0;
     const head = [
         "Date",
         "Kind",
@@ -65,6 +80,7 @@ export function monthCsv(
         "In",
         "Out",
         "Due",
+        ...(overdueColumn ? ["Overdue"] : []),
         ...(mixed ? ["Currency"] : []),
     ];
     const lines = rows.map((e) =>
@@ -75,7 +91,8 @@ export function monthCsv(
             e.subtitle ?? "",
             amount(e.in),
             amount(e.out),
-            amount(e.due),
+            amount(late.has(e) ? 0 : e.due),
+            ...(overdueColumn ? [amount(late.has(e) ? e.due : 0)] : []),
             ...(mixed ? [e.currency] : []),
         ]
             .map(cell)

@@ -48,7 +48,10 @@ import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import { completePlanJoinInTx } from "../subscriptions/plan-join";
 import { linkMandateInTx } from "./mandate-link";
-import { applyOnlineOrderSuccess } from "./online-order-payment";
+import {
+    applyOnlineOrderSuccess,
+    heldByAnotherPayment,
+} from "./online-order-payment";
 import type {
     NormalizedWebhookEvent,
     WebhookHeaders,
@@ -541,12 +544,17 @@ export class WebhooksService {
         // An order the site's checkout started (G13) holds its units only
         // now, and becomes an order only if they held. Read without a lock:
         // `placedOnline` is set when the order is made and never changes,
-        // and the order's lock comes after the intent's (reserve.ts).
+        // and the order's lock comes after the intent's (reserve.ts). Its
+        // balance, once it costs more (B9), holds nothing: another payment
+        // held its units, and this one is settled as any second payment.
         const placed = await tx.order.findUnique({
             where: { id: orderId },
             select: { placedOnline: true },
         });
-        if (placed?.placedOnline) {
+        if (
+            placed?.placedOnline &&
+            !(await heldByAnotherPayment(tx, orderId, intent.id))
+        ) {
             const online = await applyOnlineOrderSuccess(
                 tx,
                 intent,
@@ -598,8 +606,13 @@ export class WebhooksService {
             });
         } else if (intent.status !== "SUCCEEDED") {
             // A second payment on a paid order — an edit's difference —
-            // settles the supplementary invoice that edit wrote.
+            // settles the supplementary invoice that edit wrote, and its pay
+            // link has nothing left to take: a later balance gets a new one.
             await settleSupplementaryInvoices(tx, orderId);
+            await tx.order.updateMany({
+                where: { id: orderId, payTokenHash: { not: null } },
+                data: RETIRED_PAY_LINK,
+            });
         }
 
         if (intent.status !== "SUCCEEDED") {

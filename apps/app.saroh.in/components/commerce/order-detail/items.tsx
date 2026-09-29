@@ -124,9 +124,10 @@ export function OrderItems({
 }
 
 /**
- * "Priya is allergic to sesame" above Items: the customer's note, matched by
- * allergen id to what a line contains or may contain. When the notes could
- * not be read it says so — silence would read as "no allergy".
+ * "Priya is allergic to sesame" above Items: the customer's Needs attention
+ * Allergy entries, matched by allergen id to what a line contains or may
+ * contain. When those could not be read it says so — silence would read as
+ * "no allergy".
  */
 export function AllergyBanner({
     first,
@@ -137,7 +138,7 @@ export function AllergyBanner({
     first: string;
     hits: string;
     named: string[];
-    /** The customer's notes could not be read. */
+    /** The customer's Needs attention could not be read. */
     unchecked: boolean;
 }) {
     if (unchecked) {
@@ -147,11 +148,11 @@ export function AllergyBanner({
                 className="rounded-xl border border-border bg-muted px-4 py-3"
             >
                 <div className="text-[13.5px] font-bold">
-                    Couldn&apos;t check {first}&apos;s allergy notes
+                    Couldn&apos;t check {first}&apos;s allergies
                 </div>
                 <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground">
-                    Their notes didn&apos;t load, so nothing here was checked
-                    against them. Ask {first} before it goes out.
+                    Their Needs attention didn&apos;t load, so nothing here was
+                    checked against it. Ask {first} before it goes out.
                 </p>
             </div>
         );

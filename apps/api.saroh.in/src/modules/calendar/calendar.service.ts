@@ -57,11 +57,12 @@ import type { WorkingHours } from "./working-hours";
  * ## Layers
  *
  * A layer exists only when its module is on (not DISABLED — the same rule
- * the rail and Home use) and the viewer may read it: orders `order:read`;
- * collections and subscriptions `subscription:read`; invoices
- * `invoice:read`; bookings and classes `booking:read`. A Member therefore
- * gets bookings and classes and nothing billed (DEC-020) — the layers are
- * absent, not an error.
+ * the rail and Home use) and the viewer may read it: orders `order:read` or
+ * `order:stage` (E20, DEC-067: whoever moves orders sees them, as the
+ * Orders list lets them); collections and subscriptions
+ * `subscription:read`; invoices `invoice:read`; bookings and classes
+ * `booking:read`. A Member therefore gets orders, bookings and classes and
+ * nothing billed (DEC-020) — the layers are absent, not an error.
  *
  * ## Degrading
  *
@@ -75,8 +76,11 @@ import type { WorkingHours } from "./working-hours";
  * Takings go only to a role that reads the merchant's money (`payment:read`
  * and `invoice:read`, ADR-008), and count each rupee once: orders plus paid
  * invoices that are not an order's own (ADR-008: every order has one).
- * Order amounts need `payment:read`; subscription and invoice amounts ride
- * with their own reads, and a booking's price with `booking:read` (DEC-039).
+ * Order amounts need `payment:read` and the order's own money read,
+ * `order:read`: someone who only stages orders gets them without money, as
+ * the Orders list sends them (DEC-024). Subscription and invoice amounts
+ * ride with their own reads, and a booking's price with `booking:read`
+ * (DEC-039).
  *
  * Money in, out and due (plan 005 E19) go to `payment:read` alone: each
  * item's `in`/`out`/`due`/`failed`, each day's `money` and the month's
@@ -186,6 +190,7 @@ export interface CalendarMonth {
  */
 const LAYER_READS = [
     "order:read",
+    "order:stage",
     "booking:read",
     "subscription:read",
     "invoice:read",
@@ -315,11 +320,16 @@ export class CalendarService {
 
         const money =
             allows(ctx, "payment:read") && allows(ctx, "invoice:read");
-        const orderAmounts = allows(ctx, "payment:read");
+        // An order's money is `order:read`'s: `order:stage` moves it
+        // without seeing it (DEC-024), on the calendar as on Orders.
+        const orderAmounts =
+            allows(ctx, "payment:read") && allows(ctx, "order:read");
         // Money in, out and due: the Payments scope alone (E19).
         const cells = allows(ctx, "payment:read");
         const sees: Record<LayerKey, boolean> = {
-            orders: on.has("COMMERCE") && allows(ctx, "order:read"),
+            orders:
+                on.has("COMMERCE") &&
+                (allows(ctx, "order:read") || allows(ctx, "order:stage")),
             collections: on.has("PAYMENTS") && allows(ctx, "subscription:read"),
             subscriptions:
                 on.has("PAYMENTS") && allows(ctx, "subscription:read"),

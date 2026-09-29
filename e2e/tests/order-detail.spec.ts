@@ -94,6 +94,29 @@ async function freshOrder(
     { paid = true }: { paid?: boolean } = {},
 ): Promise<string> {
     const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
+    // Receive the unit this order takes, so the fixture never sells out.
+    // `product-page-stock.spec.ts` turns tracking on for the trolley and
+    // counts it to 7; with every spec on both projects sharing one database
+    // (`pnpm prepush --e2e`; CI splits them across shards) the orders here
+    // promised all 7 and the next was refused 409. The shelf is the product's
+    // or the variant's, whichever is tracked; a shelf that isn't tracked
+    // refuses the receipt, which is fine — nothing can sell out there.
+    for (const variantId of [null, "seed_variant_11_0"]) {
+        const received = await page.request.post(
+            `${urls.API_URL}/organizations/${NORTHWIND}/stock/adjust`,
+            {
+                headers,
+                data: {
+                    storeId: NW_STORE,
+                    productId: "seed_product_11",
+                    variantId,
+                    units: 1,
+                    note: "e2e: stock for a fresh order",
+                },
+            },
+        );
+        if (received.ok()) break;
+    }
     const made = await page.request.post(
         `${urls.API_URL}/stores/${NW_STORE}/orders`,
         {
@@ -826,5 +849,49 @@ test.describe("visits on a treatment's order (B14)", () => {
         await expect(
             page.getByRole("region", { name: "What happened" }),
         ).toContainText(`Visit ${n} attended`);
+    });
+});
+
+/**
+ * A cancel's refund the provider has accepted reads "Refund on its way"
+ * until its webhook confirms it, never "Refunded" (B9, DEC-067). Read-only,
+ * on Northwind: it looks for such an order and skips when there is none
+ * (in test mode the provider confirms within seconds).
+ */
+test.describe("a refund on its way (B9)", () => {
+    test("Order Detail says Refund on its way, not Refunded, until the provider confirms", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const headers = {
+            "x-organization-id": NORTHWIND,
+            origin: urls.APP_URL,
+        };
+        const base = `${urls.API_URL}/organizations/${NORTHWIND}/orders`;
+        const list = await page.request.get(`${base}?v=2&tab=refunded`, {
+            headers,
+        });
+        expect(list.ok()).toBe(true);
+        const { rows } = (await list.json()) as { rows: { id: string }[] };
+        let found: string | null = null;
+        for (const row of rows.slice(0, 20)) {
+            const res = await page.request.get(`${base}/${row.id}`, {
+                headers,
+            });
+            const read = (await res.json()) as {
+                money: { refundsOnTheWay?: unknown[] } | null;
+            };
+            if ((read.money?.refundsOnTheWay ?? []).length > 0) {
+                found = row.id;
+                break;
+            }
+        }
+        test.skip(!found, "No refund waiting on its provider on Northwind.");
+
+        await page.goto(`/commerce/orders/${found}`);
+        const money = page.getByRole("region", { name: "Money" });
+        await expect(money.getByText(/^Refund on its way · /)).toBeVisible();
+        await expect(money.getByText("Refunded in full")).toHaveCount(0);
     });
 });

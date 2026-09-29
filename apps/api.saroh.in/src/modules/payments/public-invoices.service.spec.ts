@@ -17,6 +17,7 @@ jest.mock("@saroh/database", () => {
         site: { findFirst: jest.fn() },
         merchantPaymentProvider: {
             findMany: jest.fn(),
+            findFirst: jest.fn(),
             findUnique: jest.fn(),
         },
         paymentIntent: {
@@ -65,7 +66,7 @@ import {
 const invoiceFindUnique = prisma.invoice.findUnique as jest.Mock;
 const invoiceFindFirst = prisma.invoice.findFirst as jest.Mock;
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
-const providerFindMany = prisma.merchantPaymentProvider.findMany as jest.Mock;
+const providerFindFirst = prisma.merchantPaymentProvider.findFirst as jest.Mock;
 const providerFindUnique = prisma.merchantPaymentProvider
     .findUnique as jest.Mock;
 const intentFindUnique = prisma.paymentIntent.findUnique as jest.Mock;
@@ -317,7 +318,7 @@ describe("PublicInvoicesService.createIntent", () => {
     it("charges the stored total and ignores an amount in the body", async () => {
         const { service, fake } = makeService();
         invoiceFindFirst.mockResolvedValue(PAYABLE);
-        providerFindMany.mockResolvedValue([connectedRow()]);
+        providerFindFirst.mockResolvedValue(connectedRow());
         intentCreate.mockResolvedValue({ id: "pi_1" });
 
         const result = await service.createIntent(TOKEN, {
@@ -381,22 +382,48 @@ describe("PublicInvoicesService.createIntent", () => {
         expect(fake.calls).toHaveLength(0);
     });
 
-    it("uses the business's first connected provider when it has several", async () => {
+    it("uses the business's first connection that can open the checkout window, as its pay link was minted (B11, D22)", async () => {
         const { service } = makeService();
         invoiceFindFirst.mockResolvedValue(PAYABLE);
-        providerFindMany.mockResolvedValue([
-            connectedRow("CASHFREE", "2026-01-01"),
-            connectedRow("RAZORPAY", "2026-02-01"),
-        ]);
+        // An older Razorpay connection without its key id is passed over.
+        providerFindFirst.mockResolvedValue(
+            connectedRow("CASHFREE", "2026-02-01"),
+        );
         intentCreate.mockResolvedValue({ id: "pi_1" });
 
         const result = await service.createIntent(TOKEN, {});
 
-        expect(providerFindMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", status: "CONNECTED" },
+        expect(providerFindFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                status: "CONNECTED",
+                OR: [
+                    { provider: { not: "RAZORPAY" } },
+                    {
+                        AND: [
+                            { publicKey: { not: null } },
+                            { publicKey: { not: "" } },
+                        ],
+                    },
+                ],
+            },
             orderBy: { createdAt: "asc" },
         });
         expect(result.provider).toBe("CASHFREE");
+    });
+
+    it("says what the Razorpay connection needs when none can open the window", async () => {
+        const { service } = makeService();
+        invoiceFindFirst.mockResolvedValue(PAYABLE);
+        providerFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+            ...connectedRow("RAZORPAY"),
+            publicKey: null,
+        });
+
+        await expect(service.createIntent(TOKEN, {})).rejects.toThrow(
+            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Providers.",
+        );
+        expect(intentCreate).not.toHaveBeenCalled();
     });
 
     it("takes a named provider only if the business connected it", async () => {
@@ -474,7 +501,7 @@ describe("PublicInvoicesService.createIntent — a pay-now hold (U19)", () => {
                 holdExpiresAt: new Date(Date.now() + 10 * 60_000),
             },
         });
-        providerFindMany.mockResolvedValue([connectedRow()]);
+        providerFindFirst.mockResolvedValue(connectedRow());
         intentCreate.mockResolvedValue({ id: "pi_1" });
 
         const result = await service.createIntent(TOKEN, { amount: 1 });

@@ -137,7 +137,7 @@ export function cellMoney(
     };
 }
 
-export type StripKey = "in" | "out" | "net" | "due";
+export type StripKey = "in" | "out" | "net" | "due" | "overdue";
 
 /** Where a month sits against today: whether its money is all in yet. */
 export type MonthWhen = "past" | "current" | "future";
@@ -163,9 +163,7 @@ export interface StripAt {
 
 /**
  * The entries In, Out and Net count: up to today in the current month (the
- * "so far"), all of a past month, none of a month still to come. Due is
- * money still asked for — overdue as well as ahead — so it counts every
- * entry, and the export's rows add up to the strip.
+ * "so far"), all of a past month, none of a month still to come.
  */
 function settled(entries: MoneyEntry[], { when, today }: StripAt) {
     if (when === "future") return [];
@@ -175,13 +173,36 @@ function settled(entries: MoneyEntry[], { when, today }: StripAt) {
 }
 
 /**
+ * Money still asked for, split at today (E23, DEC-067): Due counts from
+ * today on, as the design does — all of a month still to come, none of a
+ * past one — and what was due on a day before today is Overdue. Together
+ * they are every entry's `due`, so nothing owed drops out of the strip,
+ * and the export's Due and Overdue columns add up to the same parts.
+ */
+export function dueSplit(
+    entries: MoneyEntry[],
+    { when, today }: Pick<StripAt, "when" | "today">,
+): { ahead: MoneyEntry[]; overdue: MoneyEntry[] } {
+    if (when === "future") return { ahead: entries, overdue: [] };
+    if (when === "past") return { ahead: [], overdue: entries };
+    return {
+        ahead: entries.filter((e) => e.date >= today),
+        overdue: entries.filter((e) => e.date < today),
+    };
+}
+
+/**
  * The month strip, after the design: "In so far · Out so far · Net · Due".
  * "So far" only on the current month; a month still to come has nothing in
- * or out yet, so it says "—" rather than a zero.
+ * or out yet, so it says "—" rather than a zero. Due counts from today;
+ * money due before today is "Overdue", in red, shown only when there is
+ * some (E23, DEC-067).
  */
 export function monthStrip(entries: MoneyEntry[], at: StripAt): StripPart[] {
     const done = sumEntries(settled(entries, at));
-    const due = sumEntries(entries).due;
+    const split = dueSplit(entries, at);
+    const due = sumEntries(split.ahead).due;
+    const overdue = sumEntries(split.overdue).due;
     const soFar = at.when === "current" ? " so far" : "";
     const ahead = at.when === "future";
     const money = (minor: number) =>
@@ -201,6 +222,16 @@ export function monthStrip(entries: MoneyEntry[], at: StripAt): StripPart[] {
             value: minorMoney(due, at.currency),
             out: false,
         },
+        ...(overdue > 0
+            ? [
+                  {
+                      key: "overdue" as const,
+                      label: "Overdue",
+                      value: minorMoney(overdue, at.currency),
+                      out: true,
+                  },
+              ]
+            : []),
     ];
 }
 
@@ -209,6 +240,7 @@ const STRIP_TITLE: Record<StripKey, string> = {
     out: "Money out",
     net: "Net",
     due: "Due",
+    overdue: "Overdue",
 };
 
 /** The order a breakdown lists its kinds in — the calendar's own. */
@@ -232,9 +264,17 @@ export function stripBreakdown(
     entries: MoneyEntry[],
     at: StripAt & { labelOf: (layer: LayerKey) => string },
 ): { title: string; rows: { label: string; value: string }[] } {
-    const counted = key === "due" ? entries : settled(entries, at);
+    const counted =
+        key === "due"
+            ? dueSplit(entries, at).ahead
+            : key === "overdue"
+              ? dueSplit(entries, at).overdue
+              : settled(entries, at);
+    const field = key === "overdue" ? "due" : key;
     const rows = KIND_ORDER.flatMap((layer) => {
-        const value = sumEntries(counted.filter((e) => e.layer === layer))[key];
+        const value = sumEntries(counted.filter((e) => e.layer === layer))[
+            field
+        ];
         return value
             ? [
                   {

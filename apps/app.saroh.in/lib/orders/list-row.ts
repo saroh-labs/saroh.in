@@ -1,3 +1,4 @@
+import { formatMoment } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 
 import type { OrderRow } from "./business-service";
@@ -96,10 +97,28 @@ export function ageWords(minutes: number): string {
 }
 
 /**
+ * A treatment's next visit in a row's words (B14, DEC-067), after the
+ * design: "Next today, 18:00", "Next 19 Sep, 10:00", in the clinic's zone;
+ * "Next visit not booked" when none is.
+ */
+export function nextVisitWords(
+    next: { startAt: string; timezone: string } | null,
+    now: Date,
+): string {
+    if (!next) return "Next visit not booked";
+    const when = formatMoment(next.startAt, next.timezone, now)
+        .replace(/^Today/, "today")
+        .replace(/^Yesterday/, "yesterday");
+    return `Next ${when}`;
+}
+
+/**
  * How long a row has waited, and "Late · 3 h" once the API says it is late.
  * Only while the order is still on its way: a finished, refunded or
  * cancelled order has nothing to wait for. An appointment goes by its
- * visits, not the clock, so it shows none ("Next 19 Sep" is a follow-up to B14).
+ * visits, not the clock: "Next 19 Sep, 10:00" while one is booked, "Next
+ * visit not booked" while none is (B14), and nothing from an API that
+ * doesn't say.
  */
 export function rowAge(
     row: Pick<
@@ -110,7 +129,9 @@ export function rowAge(
         | "fulfilmentType"
         | "ageMinutes"
         | "late"
-    >,
+    > &
+        Partial<Pick<OrderRow, "nextVisit">>,
+    now: Date = new Date(),
 ): { text: string; late: boolean } | null {
     if (row.standing === "REFUNDED" || row.standing === "CANCELLED") {
         return null;
@@ -119,7 +140,10 @@ export function rowAge(
         row.fulfilmentType === "APPOINTMENT_IN_PERSON" ||
         row.fulfilmentType === "APPOINTMENT_ONLINE"
     ) {
-        return null;
+        if (row.standing === "FULFILLED" || row.nextVisit === undefined) {
+            return null;
+        }
+        return { text: nextVisitWords(row.nextVisit, now), late: false };
     }
     if (row.steps.length > 0 && row.stepIndex >= row.steps.length - 1) {
         return null;

@@ -690,3 +690,230 @@ would have silently turned their orders into walk-ins.
 always been (`schema.prisma`), and `db:verify:replay` passes. When a
 required relation becomes optional, say its `onDelete` explicitly.
 **Category**: database · migrations · `packages/database/prisma/schema.prisma`
+
+## API — Subscription Detail "could not be loaded" in CI, fine locally (D14)
+
+**Problem**: Every showcase subscription's page failed in the CI browser
+suite with "This subscription could not be loaded"; locally it opened.
+**Root cause**: The detail read builds D14's autopay card, which opened the
+business's Razorpay connection and decrypted its keys _before_ checking the
+`RAZORPAY_AUTOPAY` flag. CI has a connected Razorpay but no
+`PAYMENTS_ENC_KEY`, so decryption threw and took the whole read down with
+it. Locally the key is set, so nothing failed.
+**Fix**: The flag is checked before any credential is opened, and a
+connection that can't be opened means "no autopay offered", logged — never a
+failed read (`mandate-setup.service.ts`, `e43cd94b`). Rule: an optional
+panel on a read — anything a flag, a provider or a module decides — degrades
+to "not offered"; it never fails the page it sits on. Check the flag first,
+open credentials last. When a test passes locally and fails in CI, diff the
+environments before the code.
+**Category**: API · providers · `docs/patterns/backend-integrations.md`
+
+## E2E — the phone project timed out on a button the desk found at once (D7)
+
+**Problem**: The Plan Editor spec passed on `desk` and timed out on `phone`
+waiting to click "Publish changes"; the button was in the page snapshot.
+**Root cause**: Two things, found one CI round apart. The editor draws its
+actions twice — in the header (hidden below 760px) and in a sticky phone bar
+— and `.first()` picked the hidden one. Then the "…is open for sign-ups."
+toast, which rises from the foot of the screen, sat on the phone bar and
+swallowed the tap: a real bug a merchant would have hit.
+**Fix**: Locators for controls drawn once per layout use
+`.filter({ visible: true })` (`1ef40ec2`). A sticky bottom bar reports its
+height through `useBottomBarInset` and the Toaster's offsets add it
+(`f98043a1`). Run a changed screen's spec on **both** projects before
+pushing — `pnpm prepush --e2e` does.
+**Category**: e2e · frontend · `apps/app.saroh.in/lib/hooks/use-bottom-bar-inset.ts`
+
+## CI — gitleaks failed the batch on test webhook secrets (D12, D13, G20)
+
+**Problem**: The secret scan failed a batch PR on six "generic-api-key" hits.
+**Root cause**: Specs signed their fake Razorpay webhooks with made-up
+secrets like `whsec_d13…`, random-looking enough for gitleaks' entropy rule.
+Nobody ran gitleaks before pushing.
+**Fix**: Reviewed fingerprints in `.gitleaksignore` (`66bc5e66`). Better: a
+fixture secret that reads as one (`test-webhook-secret-d13`) is never
+flagged. `pnpm prepush` runs gitleaks over the branch's commits.
+**Category**: CI · secrets · `.gitleaksignore`
+
+## Tests — a new public controller failed the module-enforcement spec (P1)
+
+**Problem**: One integration spec failed after P1 landed:
+`module-annotations.spec.ts` › "names every controller under src/modules".
+**Root cause**: The spec requires every controller to be module-gated or
+listed as exempt with a reason. P1 added `checkout-return.controller.ts`
+and ran only its own module's tests.
+**Fix**: Listed with its reason (`48ea390e`). A new controller means a row
+in that spec's lists; the full integration run (`pnpm prepush --int`) is
+what catches it, not the unit's own folder.
+**Category**: tests · `apps/api.saroh.in/src/modules/capabilities/module-annotations.spec.ts`
+
+## Tests — 28 subscription specs failed at random, then passed alone
+
+**Problem**: A grouped integration run failed 28 subscription tests; the same
+group passed when run again.
+**Root cause**: A second run was started on the same test database while the
+first was still going. Each resets the database, so they wiped each other's
+rows.
+**Fix**: One database per concurrent run — each unit agent has its own
+`saroh-test-r2-<unit>`. Never start a test run against a database another
+run is using.
+**Category**: tests · local dev
+
+## Repo — an internal pricing plan was pushed to the public repo
+
+**Problem**: A plan with prices, plan limits and the pricing designs went up
+on a batch branch of `saroh-labs/saroh.in`, which is **public**.
+**Root cause**: `docs/plans` and `docs/prototypes` are where plans live, and
+nothing said this one was internal.
+**Fix**: Removed before it reached development (`f6f806d7`); it stays in the
+branch history. Internal material — prices, plan limits, anything the user
+calls internal — lives outside the repo (the user names where). Before a
+push, read the file list of what is going up.
+**Category**: repo · `AGENTS.md` → Rules that bite
+
+## E2E — 23 local browser failures, none of them a bug (prepush --e2e)
+
+**Problem**: `pnpm prepush --e2e` on batch 2026-09-29-2 failed 23 specs on
+`desk` and `phone`; CI would have passed 21 of them.
+**Root cause**: The stack ran against the long-lived local `saroh-dev`,
+not a fresh seed: Kavi Dental (E29) was never seeded there, a Northwind
+fixture variant was sold out after days of spec runs, the E12
+`MODULE_CLASS_PACKS` row and the C1 Needs attention backfill had never run.
+Two were real test problems (one assumed Z2a's removed allergen picker; a
+walk-in helper read the radios before they drew — `9a372faa`).
+**Fix**: Browser specs run against a database seeded the way CI seeds it —
+`pnpm prepush --e2e` must point the stack at a fresh `saroh-test-e2e`
+(`db:push --force-reset`, `db:seed:showcase`) before it runs. A failure
+against `saroh-dev` is a data question before it is a code question.
+**Category**: e2e · local dev · `scripts/prepush.sh`
+
+## API — rules the round-2 audit found only one side kept (DEC-042, B11, B9, C7)
+
+**Problem**: The audit found four gaps: a contact with orders or invoices
+could still be hard-deleted through the API (only the ⋯ menu stopped it);
+an invoice's pay link was minted for a Razorpay connection that couldn't
+open checkout, so its page refused; a site checkout's order made dearer
+after payment could never take the difference; and Customer Detail's
+Classes left card vanished for a member when Class packs was off.
+**Root cause**: Each rule lived in one place and a sibling path copied an
+older, looser check — the UI instead of the service, `count(CONNECTED)`
+instead of `pay-link-provider.ts`, a `placedOnline` exception that guarded
+the stock hold in the wrong layer, and a stat built only inside its
+module's branch.
+**Fix**: `contacts/contact-records.ts` refuses the delete (409) before
+autopay and again under the lock; `businessPayLinkProvider` is the one
+provider rule for an invoice's link and its page; the webhook skips the
+hold when another payment already held the units (`heldByAnotherPayment`),
+so `payLinkStanding` compares received with the total for every order; a
+membership fills Classes left on its own.
+**Category**: api · a rule the UI shows is enforced by the API too; a
+payment path reuses the rule its sibling uses, never a copy
+
+## Plans — a unit's named work shipped as a "Not done here" note (D13, D14)
+
+**Problem**: The round-2 audit found three things the payments plan named
+missing from production-bound code: D13's Plan Editor warning ("Autopay
+covers up to ₹X; N members will need to authorise again", its exact copy in
+the unit's Files list), Home's "Send a set-up link" on an "Autopay limit too
+low" row, and a notice to the customer when staff cancel their autopay. A
+price rise quietly produced MANDATE_LIMIT_LOW renewals.
+**Root cause**: The units shipped without them and said so only in prose —
+D14's rollout section ("Not done here: …"). Nothing tracked prose, so the
+gap surfaced only when someone read the plan against the code.
+**Fix**: Built on `r2/fix-pay` (the Plan Editor's `autopayLimits`, Home's
+row `link`, `AUTOPAY_CANCELLED`). Rule: anything a unit's plan names that
+the unit doesn't build goes in the waves plan's follow-up table with an ID
+(as DEC-063's checkout block went in as Z8), never only in a rollout note.
+Before calling a unit done, search the code for each copy string its plan
+quotes.
+**Category**: plans · `docs/plans/2026-09-28-001-round-2-phase-2-waves-plan.md` → Deferred to follow-up work
+
+## CI — `@saroh/database#lint` failed on types "that could not be resolved"
+
+**Problem**: CI's lint job failed on dozens of `no-unsafe-*` errors in
+`packages/database` ("Unsafe call of a type that could not be resolved",
+`.businessProfile`, `.$transaction`); the same command passed locally.
+**Root cause**: `lint` and `typecheck` depend on `^build` — the builds of a
+package's _dependencies_, not its own. `@saroh/database`'s own `build`
+starts with `prisma generate`, so in CI's fresh checkout it regenerated
+the client while the package's lint was reading it. Locally the client
+already sat on disk, so the race never showed.
+**Fix**: `turbo.json` makes `@saroh/database#lint` and `#typecheck` wait for
+the package's own `build`. A task that reads generated code depends on the
+task that generates it, in the same package too.
+**Category**: CI · turbo · `turbo.json`
+
+## E2E — a spec passed only when the one above it had run first (D18)
+
+**Problem**: "narrow the list by what each invoice was for" failed now and
+then: the source chips never appeared.
+**Root cause**: The chips show only for two sources or more, and the spec
+relied on the test above having written an invoice by hand. Sharding,
+retries and a fresh database break that order.
+**Fix**: The spec makes its own invoice by hand through the API. A spec
+never depends on another spec's leftovers.
+**Category**: e2e · `e2e/tests/invoices.spec.ts`
+
+## CI — every job re-downloaded the pnpm store and Chromium ("cache is not found")
+
+**Problem**: CI runs were slow for no visible reason. A push to development
+logged "pnpm cache is not found", installed 1,868 packages from the registry
+(22s instead of 11s) and downloaded 300 MB of Chromium (29s) in each browser
+shard. The Next build caches missed too.
+**Root cause**: The repository's Actions cache was at 12.2 GB against a 10 GB
+limit, so GitHub evicted the least recently used entries. Every run saved
+about 1.3 GB of Turbo and Next caches, keyed per job and per commit, on every
+PR push as well as on development. The Turbo cache also only grew, because
+each run restored the last one and added to it. The pnpm store and the
+Playwright browser were the entries evicted first, and every job needs them.
+The browser's key was the lockfile hash, so any dependency bump discarded it
+anyway.
+**Fix**: `.github/actions/setup` saves the Turbo and Next caches only on
+runs outside a pull request (pushes to main or development, the weekly run
+and manual runs). A PR restores its base branch's newest caches and writes
+none. A saving run drops Turbo entries older than a week. The Playwright
+browser is keyed on the installed Playwright version.
+Check `gh api repos/saroh-labs/saroh.in/actions/cache/usage` when CI slows
+down: close to 10 GB means entries are being evicted.
+**Category**: CI · caching · `.github/actions/setup/action.yml`,
+`docs/patterns/devops-tooling-and-deploy.md` → CI
+
+## CI — `pg_isready` over the socket can pass before Postgres is ready
+
+**Problem**: None yet. The risk appeared while shortening the Postgres
+service's health interval from 10s to 2s.
+**Root cause**: The `postgres` image initialises the database with a
+temporary server that listens only on the Unix socket, then restarts.
+`pg_isready` without `-h` checks the socket, so a quick poll can report
+ready during initialisation, before the real server restarts. The 10s
+interval had hidden this.
+**Fix**: The health check is `pg_isready -h 127.0.0.1`. It checks over TCP,
+which only the real server listens on.
+**Category**: CI · services · `.github/workflows/ci.yml`
+
+## Tooling — the pre-push gate took 75s, and `--all` over 20 minutes
+
+**Problem**: `git push` sat for about 75s on the quick gate, even straight
+after `pnpm prepush --all` had passed on the same commit. `--int` took about
+7 min and `--e2e` about 17, one after the other, so a batch spent close to
+half an hour on its gate, and each push ran it again.
+**Root cause**: Nothing remembered a pass. lint, typecheck, every unit suite
+and vitest ran whole on every run, whatever changed. The integration suite
+ran its eleven module groups one after another on one database, and the
+browser run waited for all of it. A first attempt to test only what changed
+(`turbo run test -- --changed=<sha>`) was slower still: turbo hashes a run's
+pass-through arguments into every task in it, the `^build`s included, so
+each new sha rebuilt every package the tests import.
+**Fix**: `scripts/prepush.sh` records each passed step against
+`HEAD^{tree}` and skips it on that tree (or one that differs only in docs).
+lint, typecheck and tests go through turbo for the affected packages only.
+The builds they import run once, then the checks run with `--only`. The
+hook's tests run only what changed since the last passing commit. The
+integration suite runs in 16 jest shards on three databases at once, with
+the browser run building beside it. Measured on the same
+batch: the hook takes 3s on a tree that already passed, and 19–32s after a
+code change. `--int` takes 95s, and `--all` 10.7 min, most of it the
+browser specs.
+**Category**: tooling · `scripts/prepush.sh`,
+`docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast

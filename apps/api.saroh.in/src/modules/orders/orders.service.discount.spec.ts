@@ -40,6 +40,8 @@ jest.mock("@saroh/database", () => {
     };
     return {
         ...actual,
+        // The business's next number (P3): its own specs run it on Postgres.
+        nextOrderNumberInTx: jest.fn().mockResolvedValue("ORD-001"),
         prisma: {
             ...client,
             $transaction: jest.fn((cb: (tx: typeof client) => unknown) =>
@@ -444,13 +446,32 @@ describe("OrdersService.create — discount codes", () => {
         expect(db.discountRedemption!.create).not.toHaveBeenCalled();
     });
 
-    it("turns a serialization failure into a 409 naming the code", async () => {
+    it("tries a serialization failure again: another order may only have taken the next number (P3)", async () => {
         db.$transaction.mockRejectedValueOnce(
             new Prisma.PrismaClientKnownRequestError("conflict", {
                 code: "P2034",
                 clientVersion: "x",
             }),
         );
+        await expect(
+            makeService().create("st_1", "u_1", {
+                ...DTO,
+                discountCode: "MARKETDAY",
+            }),
+        ).resolves.toEqual({ id: "o_1" });
+        expect(db.$transaction).toHaveBeenCalledTimes(2);
+        expect(db.discountRedemption!.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("turns a serialization failure that keeps happening into a 409 naming the code", async () => {
+        for (let i = 0; i < 5; i++) {
+            db.$transaction.mockRejectedValueOnce(
+                new Prisma.PrismaClientKnownRequestError("conflict", {
+                    code: "P2034",
+                    clientVersion: "x",
+                }),
+            );
+        }
         await expect(
             makeService().create("st_1", "u_1", {
                 ...DTO,

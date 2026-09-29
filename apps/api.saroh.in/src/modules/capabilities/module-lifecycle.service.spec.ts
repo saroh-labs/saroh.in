@@ -91,6 +91,63 @@ describe("ModuleLifecycleService", () => {
         );
     });
 
+    it("disable isn't held up by a dependent Saroh hasn't rolled out, and leaves it as it is (F13, DEC-067)", async () => {
+        const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        db.organizationModule.findMany.mockResolvedValue([
+            { moduleKey: "CLASS_PACKS" },
+        ]);
+        const flags = {
+            isEnabled: jest.fn((flag: string) =>
+                Promise.resolve(flag !== "MODULE_CLASS_PACKS"),
+            ),
+        };
+        const svc = new ModuleLifecycleService(
+            makeReadiness(),
+            db as never,
+            undefined,
+            flags as never,
+        );
+        await svc.disable(OWNER, "APPOINTMENTS");
+        // Only Appointments is written: the hidden Class packs keeps its
+        // own setting, never switched off without being named.
+        expect(db.organizationModule.upsert).toHaveBeenCalledTimes(1);
+        expect(db.organizationModule.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId_moduleKey: {
+                        organizationId: "org_1",
+                        moduleKey: "APPOINTMENTS",
+                    },
+                },
+                update: expect.objectContaining({ status: "DISABLED" }),
+            }),
+        );
+    });
+
+    it("a rolled-out dependent still holds the disable up, named", async () => {
+        const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        db.organizationModule.findMany.mockResolvedValue([
+            { moduleKey: "CLASS_PACKS" },
+        ]);
+        const flags = { isEnabled: jest.fn(() => Promise.resolve(true)) };
+        const svc = new ModuleLifecycleService(
+            makeReadiness(),
+            db as never,
+            undefined,
+            flags as never,
+        );
+        await expect(svc.disable(OWNER, "APPOINTMENTS")).rejects.toThrow(
+            "Class packs needs Appointments. Turn off Class packs first.",
+        );
+        expect(db.organizationModule.upsert).not.toHaveBeenCalled();
+    });
+
     it("enable writes an ENABLED row and an audit event in one tx", async () => {
         const db = makeDb();
         const svc = new ModuleLifecycleService(makeReadiness(), db as never);

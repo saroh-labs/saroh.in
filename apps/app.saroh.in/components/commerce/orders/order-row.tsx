@@ -24,17 +24,19 @@ import { AgeText, StepBar, StepPill } from "./step-pill";
  * B3). At the desk it is a grid row: who and what, the step with its bar and
  * age (or "Late"), the unpaid line, when it was placed and the total. On a
  * phone (under 760px, where the tab bar takes over) the row stacks into a
- * card. Either way the whole row is the target (four scenes): at the desk
- * the customer's name opens the quick view (B5) and its hit area covers the
- * row, with the row menu in the last column; on a phone the card is the
- * link to the order, as the design draws it.
+ * card. Either way the whole row is the target (four scenes): the
+ * customer's name opens the quick view (B5) and its hit area covers the
+ * row, with the row menu in the last column at the desk. On a phone the
+ * card opens the quick view as a sheet from the bottom (DEC-067), where the
+ * design had it open the full page; without `onOpen` it still links there.
  *
  * Money shows only when the API sent it (`order:read`); the kitchen's view
  * keeps the pill, the bar and the age.
  *
  * The customer's Needs attention (B15) is a red tag beside their name at the
- * desk and in the card's meta line on a phone: "Allergy: Sesame", "+1" for
- * more, named in full for a screen reader. The API sends only what the
+ * desk and in the card's meta line on a phone: "Sesame", "+1" for more, as
+ * the design draws it, named in full for a screen reader ("Allergy:
+ * Sesame", DEC-067). The API sends only what the
  * viewer may see; "Not available" when it couldn't be read.
  */
 
@@ -247,25 +249,42 @@ export function OrderCard({
     row,
     showStore,
     select,
+    open,
+    onOpen,
 }: {
     row: OrderRow;
     showStore: boolean;
     /** Its selection box (B6), the design's 24px one; absent without `order:stage`. */
     select?: RowSelect;
+    /** Whether its quick view is the one open (B5). */
+    open?: boolean;
+    /** Open its quick view (B5); without it the card links to the page. */
+    onOpen?: () => void;
 }) {
     const v = rowView(row, showStore);
+    const name =
+        "min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground";
     const card = (
         <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex min-w-0 items-baseline gap-2">
-                <Link
-                    href={v.href}
-                    className={cn(
-                        ROW_LINK,
-                        "min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground",
-                    )}
-                >
-                    {v.customer}
-                </Link>
+                {onOpen ? (
+                    <button
+                        type="button"
+                        aria-haspopup="dialog"
+                        onClick={onOpen}
+                        className={cn(
+                            ROW_LINK,
+                            name,
+                            "cursor-pointer text-left",
+                        )}
+                    >
+                        {v.customer}
+                    </button>
+                ) : (
+                    <Link href={v.href} className={cn(ROW_LINK, name)}>
+                        {v.customer}
+                    </Link>
+                )}
                 {v.money.total ? (
                     <span className="font-display text-[14px] font-semibold tabular-nums">
                         {v.money.total}
@@ -290,7 +309,7 @@ export function OrderCard({
         <li
             className={cn(
                 "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
-                select?.checked &&
+                (open === true || select?.checked === true) &&
                     "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
             )}
         >

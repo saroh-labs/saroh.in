@@ -5,6 +5,7 @@ import {
     listWords,
     missingDependencies,
     offImpact,
+    offPlan,
     refusalActionLabel,
     rolledOut,
     setupActionLabel,
@@ -173,5 +174,44 @@ describe("which modules are shown (DEC-057)", () => {
             "APPOINTMENTS",
             "COMMERCE",
         ]);
+    });
+});
+
+describe("offPlan — nothing goes off unnamed (F13, DEC-067)", () => {
+    const all = [
+        ...catalogue(Object.keys(DEPS)),
+        // Class packs needs Appointments, is on, and Saroh hasn't rolled
+        // it out: the business can't see it.
+        {
+            key: "CLASS_PACKS",
+            dependencies: ["APPOINTMENTS"],
+            lifecycle: "ENABLED" as const,
+        },
+    ];
+    const shown = all.filter((m) => m.key !== "CLASS_PACKS");
+
+    it("turns off only what the business can see, every one to be named", () => {
+        expect(offPlan(shown, all, "APPOINTMENTS")).toEqual({
+            off: ["COURSES"],
+            kept: ["CLASS_PACKS"],
+        });
+    });
+
+    it("a hidden module that needs it is kept, never switched off unnamed", () => {
+        const plan = offPlan(shown, all, "CRM");
+        expect(plan.off).not.toContain("CLASS_PACKS");
+        expect(plan.kept).toEqual(["CLASS_PACKS"]);
+        // What goes off is each module the confirmation names.
+        expect(plan.off).toEqual(
+            enabledDependents(all, "CRM").filter((k) => k !== "CLASS_PACKS"),
+        );
+    });
+
+    it("with nothing hidden, it is every module that needs it", () => {
+        const every = catalogue(Object.keys(DEPS));
+        expect(offPlan(every, every, "CRM").off).toEqual(
+            enabledDependents(every, "CRM"),
+        );
+        expect(offPlan(every, every, "CRM").kept).toEqual([]);
     });
 });

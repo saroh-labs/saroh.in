@@ -2,11 +2,12 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
+import Link from "next/link";
 import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { REPLY_MAX, replyLabel, replyReady } from "@/lib/home/inline-actions";
-import type { HomeInline, HomeNeed } from "@/lib/home/service";
+import type { HomeInline, HomeNeed, HomeRowLink } from "@/lib/home/service";
 
 import type { DoneRow, InlineActions } from "./use-inline-actions";
 
@@ -23,6 +24,23 @@ import type { DoneRow, InlineActions } from "./use-inline-actions";
 
 const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+/** The row's quiet 34px outline, as a button or a link. */
+const QUIET =
+    "inline-flex h-[34px] flex-none cursor-pointer items-center rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-foreground transition-[border-color,background-color,transform] duration-fast hover:border-foreground active:scale-[0.97] active:bg-muted disabled:cursor-wait disabled:opacity-60 coarse:min-h-11";
+
+/**
+ * A step the row opens where it is taken (D14's "Send a set-up link"): the
+ * same quiet outline as the inline button, but a link, since the choice it
+ * needs (the autopay method) lives on that screen.
+ */
+export function InlineLink({ link }: { link: HomeRowLink }) {
+    return (
+        <Link href={link.href} className={cn(QUIET, FOCUS)}>
+            {link.label}
+        </Link>
+    );
+}
 
 /** The row's button: the design's quiet 34px outline. */
 export function InlineButton({
@@ -43,10 +61,7 @@ export function InlineButton({
             onClick={onOpen}
             disabled={busy}
             aria-haspopup="dialog"
-            className={cn(
-                "h-[34px] flex-none cursor-pointer rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-foreground transition-[border-color,background-color,transform] duration-fast hover:border-foreground active:scale-[0.97] active:bg-muted disabled:cursor-wait disabled:opacity-60 coarse:min-h-11",
-                FOCUS,
-            )}
+            className={cn(QUIET, FOCUS)}
         >
             {inline.label}
         </button>

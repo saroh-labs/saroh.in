@@ -36,6 +36,26 @@ export function enabledDependents(modules: Node[], key: string): string[] {
 }
 
 /**
+ * What turning `key` off turns off with it (F13, DEC-067): every module that
+ * is on and needs it, in the order to turn them off — and only ones the
+ * business can see (`shown`), so each is named in the confirmation. One
+ * Saroh hasn't rolled out (DEC-057) is left as it is, never switched off
+ * unnamed; `kept` lists them, for a test to say so.
+ */
+export function offPlan(
+    shown: Node[],
+    all: Node[],
+    key: string,
+): { off: string[]; kept: string[] } {
+    const visible = new Set(shown.map((m) => m.key));
+    const every = enabledDependents(all, key);
+    return {
+        off: every.filter((k) => visible.has(k)),
+        kept: every.filter((k) => !visible.has(k)),
+    };
+}
+
+/**
  * Every module `key` needs, directly or through another, that is not on — in
  * the order to turn them on: a module after everything it needs.
  */

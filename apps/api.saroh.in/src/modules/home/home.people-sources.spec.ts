@@ -437,6 +437,8 @@ function home(
         booking: empty(),
         site: empty(),
         paymentIntent: empty(),
+        // B9's failed refunds: none.
+        paymentRefund: empty(),
         subscriptionEvent: empty(),
         invoice: {
             ...empty(),

@@ -7,6 +7,7 @@ import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
 import { PayOption } from "../booking-flow/steps/pay-option";
 import { cn } from "../lib/utils";
+import type { PackKind } from "../prices/pack-words";
 import { accountMoney } from "./model";
 import type {
     AccountPackCheckout,
@@ -112,13 +113,16 @@ function BuyPack({
     const session = useRef<{ close: () => void } | null>(null);
     // One key per pack for this opening: a retry replays the same payment.
     const keys = useRef(new Map<string, string>());
+    // Classes or sessions, for the words once the pack being paid for lands.
+    const buyingKind = useRef<PackKind | undefined>(undefined);
 
-    function launch(started: AccountPackCheckout) {
+    function launch(started: AccountPackCheckout, kind: PackKind | undefined) {
         session.current?.close();
+        buyingKind.current = kind;
         const opened = openCheckout({
             handoff: started.payment,
             business: businessName,
-            description: `${started.pack.name} · ${classesText(started.pack.credits)}`,
+            description: `${started.pack.name} · ${classesText(started.pack.credits, kind)}`,
             booker: { name: customer.name ?? "", email: customer.email },
             apiUrl,
         });
@@ -147,7 +151,7 @@ function BuyPack({
             .buy(chosen.ref, key)
             .catch(() => ({ ok: false as const, message: PACKS_OFFLINE }));
         setBusy(false);
-        if (result.ok) launch(result.data);
+        if (result.ok) launch(result.data, chosen.kind);
         else setProblem(result.message);
     }
 
@@ -180,7 +184,10 @@ function BuyPack({
                     .then((result) => {
                         if (result?.ok && result.data.state === "bought") {
                             latest.current.onBought(
-                                boughtMessage(result.data.pack.name),
+                                boughtMessage(
+                                    result.data.pack.name,
+                                    buyingKind.current,
+                                ),
                             );
                             return;
                         }
@@ -300,7 +307,7 @@ function BuyPack({
                                 key={p.ref}
                                 on={pack?.ref === p.ref}
                                 label={p.name}
-                                sub={`${classesText(p.credits)} · use within ${p.validityDays} days · ${accountMoney(p.price, p.currency)}`}
+                                sub={`${classesText(p.credits, p.kind)} · use within ${p.validityDays} days · ${accountMoney(p.price, p.currency)}`}
                                 onPick={() => {
                                     if (phase.kind === "window") return;
                                     setChosen(p);
@@ -345,7 +352,7 @@ function BuyPack({
                 disabled={off}
                 onClick={() =>
                     phase.kind === "window" && phase.started.ref
-                        ? launch(phase.started)
+                        ? launch(phase.started, buyingKind.current)
                         : void buy()
                 }
                 className={sheetButton(off)}

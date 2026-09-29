@@ -162,30 +162,63 @@ export function methodNote(
 }
 
 /** What the toast says after "Cancel autopay" (D14). */
-export function cancelledText(res: AutopayCancelled): {
+export function cancelledText(
+    res: AutopayCancelled,
+    firstName = "They",
+): {
     title: string;
     detail?: string;
 } {
     const provider = res.provider ?? "your payment provider";
+    const told = toldText(res.told, firstName);
+    const withTold = (detail: string) => (told ? `${detail} ${told}` : detail);
     switch (res.outcome) {
         case "CANCELLED":
             return {
                 title: "Autopay cancelled.",
-                detail: "The next renewal is invoiced with a pay link.",
+                detail: withTold(
+                    "The next renewal is invoiced with a pay link.",
+                ),
             };
         case "CONFIRMING":
             return {
                 title: "Autopay is off — nothing more is charged.",
-                detail: `${provider} hasn't confirmed yet; Saroh keeps asking.`,
+                detail: withTold(
+                    `${provider} hasn't confirmed yet; Saroh keeps asking.`,
+                ),
             };
         case "REFUSED":
             return {
                 title: "Autopay is off in Saroh — nothing more is charged.",
-                detail: `${provider} didn't confirm it. Check it's cancelled in your ${provider} dashboard.`,
+                detail: withTold(
+                    `${provider} didn't confirm it. Check it's cancelled in your ${provider} dashboard.`,
+                ),
             };
         case "ALREADY_OFF":
             return { title: "Autopay was already off." };
     }
+}
+
+/**
+ * How the customer heard their autopay was cancelled (D14), in words that
+ * claim only what happened; "" when nobody was told.
+ */
+export function toldText(
+    told: AutopayCancelled["told"],
+    firstName: string,
+): string {
+    if (!told) return "";
+    const ways = [
+        told.email ? "by email" : null,
+        told.account ? "in their account on your site" : null,
+    ].filter(Boolean);
+    const said = ways.length
+        ? `${firstName} was told ${ways.join(" and ")}.`
+        : "";
+    const quiet = told.suppressed
+        ? `${firstName} has turned off email, so it wasn't emailed.`
+        : "";
+    return [said, quiet].filter(Boolean).join(" ");
 }
 
 /**

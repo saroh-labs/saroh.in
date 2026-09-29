@@ -1,11 +1,11 @@
 /**
  * Needs attention (DEC-040, C1) against a real Postgres: sensitive entries
  * reach only who may read them, Allergy entries name the business's own
- * allergens, the backfill turns note allergens into entries once, and Order
- * Detail's allergy banner — which reads the notes — is unchanged by it.
+ * allergens and alone hold one on the list, and Order Detail's allergy
+ * banner reads them — never the notes, which are text only (Z2a).
  * Runs in the integration project (TEST_DATABASE_URL).
  */
-import { backfillContactAttention, prisma } from "@saroh/database";
+import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -31,25 +31,30 @@ const details = new CustomerDetailService(availability);
 const notes = new ContactNotesService();
 const allergens = new AllergensService();
 
-/** What Order Detail's banner is built from (lib/orders/lifecycle.ts). */
+/**
+ * What Order Detail's banner is built from: each Allergy entry's allergens
+ * (`allergyNotesOf`, apps/app.saroh.in/lib/orders/attention.ts).
+ */
 function bannerInput(
-    rows: {
-        body: string;
-        allergens: { id: string }[];
+    entries: {
+        kind: string;
+        allergen: { id: string } | null;
         matchAllergens: { id: string }[];
     }[],
 ) {
-    return rows
-        .filter((n) => n.allergens.length > 0)
-        .map((n) => ({
-            body: n.body,
-            allergens: (n.matchAllergens.length
-                ? n.matchAllergens
-                : n.allergens
+    return entries
+        .filter((e) => e.kind === "ALLERGY")
+        .map((e) =>
+            (e.matchAllergens.length
+                ? e.matchAllergens
+                : e.allergen
+                  ? [e.allergen]
+                  : []
             )
                 .map((a) => a.id)
                 .sort(),
-        }));
+        )
+        .filter((ids) => ids.length > 0);
 }
 
 describe("Needs attention (DB)", () => {
@@ -272,127 +277,101 @@ describe("Needs attention (DB)", () => {
             )?.id ?? "";
     });
 
-    it("turns note allergens into Allergy entries once, and the banner reads the same", async () => {
-        // Clean slate for this contact's allergies.
+    it("builds the allergy banner from Needs attention, never the notes (Z2a)", async () => {
         await prisma.contactAttention.deleteMany({ where: { contactId } });
 
-        // Notes as they were before C1: written straight to the tables.
-        const older = await prisma.contactNote.create({
+        // A note from before Z2a that names sesame: nothing reads it now.
+        const old = await prisma.contactNote.create({
             data: {
                 organizationId: owner.organizationId,
                 contactId,
                 body: "Sesame allergy",
                 createdByUserId: ownerId,
-                createdAt: new Date("2026-09-01T09:00:00Z"),
             },
         });
-        const newer = await prisma.contactNote.create({
+        await prisma.contactNoteAllergen.create({
+            data: {
+                noteId: old.id,
+                allergenId: sesameId,
+                organizationId: owner.organizationId,
+            },
+        });
+        await attention.create(owner, contactId, {
+            kind: "ALLERGY",
+            allergenId: peanutsId,
+        });
+
+        const read = await details.detail(member, contactId);
+        expect(bannerInput(read.attention?.entries ?? [])).toEqual([
+            [peanutsId],
+        ]);
+        expect(read.allergens).toEqual([{ id: peanutsId, name: "Peanuts" }]);
+        const note = read.notes?.rows.find((n) => n.id === old.id);
+        expect(note).toMatchObject({
+            body: "Sesame allergy",
+            allergens: [],
+            matchAllergens: [],
+        });
+
+        await prisma.contactNote.delete({ where: { id: old.id } });
+        await prisma.contactAttention.deleteMany({ where: { contactId } });
+    });
+
+    it("lets an allergen go that only notes from before Z2a name", async () => {
+        const [mustard] = (
+            await allergens.add(owner.organizationId, ["Mustard"])
+        ).filter((a) => a.name === "Mustard");
+        const old = await prisma.contactNote.create({
             data: {
                 organizationId: owner.organizationId,
                 contactId,
-                body: "Also peanuts — carries an EpiPen",
-                createdAt: new Date("2026-09-10T09:00:00Z"),
+                body: "Mustard, a little",
             },
         });
-        await prisma.contactNoteAllergen.createMany({
-            data: [
-                {
-                    noteId: older.id,
-                    allergenId: sesameId,
-                    organizationId: owner.organizationId,
-                },
-                {
-                    noteId: newer.id,
-                    allergenId: peanutsId,
-                    organizationId: owner.organizationId,
-                },
-                {
-                    noteId: newer.id,
-                    allergenId: sesameId,
-                    organizationId: owner.organizationId,
-                },
-            ],
+        await prisma.contactNoteAllergen.create({
+            data: {
+                noteId: old.id,
+                allergenId: mustard.id,
+                organizationId: owner.organizationId,
+            },
         });
 
-        // Pin the banner's input before.
-        const before = await details.detail(member, contactId);
-        const pinned = bannerInput(before.notes?.rows ?? []);
-        expect(pinned).toHaveLength(2);
-
-        const first = await backfillContactAttention(prisma);
-        expect(first.created).toBeGreaterThanOrEqual(2);
-        const entries = await prisma.contactAttention.findMany({
-            where: { contactId, removedAt: null },
-            orderBy: { label: "asc" },
-        });
+        await expect(
+            allergens.remove(owner.organizationId, mustard.id),
+        ).resolves.toEqual({ id: mustard.id, name: "Mustard" });
         expect(
-            entries.map((e) => ({
-                kind: e.kind,
-                label: e.label,
-                allergenId: e.allergenId,
-                sensitive: e.sensitive,
-                source: e.source,
-                status: e.status,
-            })),
-        ).toEqual([
-            {
-                kind: "ALLERGY",
-                label: "Peanuts",
-                allergenId: peanutsId,
-                sensitive: false,
-                source: "STAFF",
-                status: "ACTIVE",
-            },
-            {
-                kind: "ALLERGY",
-                label: "Sesame",
-                allergenId: sesameId,
-                sensitive: false,
-                source: "STAFF",
-                status: "ACTIVE",
-            },
-        ]);
-        // Added by the oldest note's author, at its time.
-        const sesame = entries.find((e) => e.label === "Sesame");
-        expect(sesame?.createdByUserId).toBe(ownerId);
-        expect(sesame?.createdAt.toISOString()).toBe(
-            "2026-09-01T09:00:00.000Z",
-        );
-
-        // Run twice: nothing changes.
-        const second = await backfillContactAttention(prisma);
-        expect(second.created).toBe(0);
+            await prisma.contactNoteAllergen.count({
+                where: { noteId: old.id },
+            }),
+        ).toBe(0);
         expect(
-            await prisma.contactAttention.count({ where: { contactId } }),
-        ).toBe(2);
+            await prisma.contactNote.findUnique({ where: { id: old.id } }),
+        ).toMatchObject({ body: "Mustard, a little" });
 
-        // An entry the team takes off doesn't come back on a later run.
-        await attention.remove(owner, contactId, sesame!.id);
-        expect((await backfillContactAttention(prisma)).created).toBe(0);
-
-        // Order Detail's banner input is exactly what it was, and the
-        // entries a Member reads cover the notes' allergens.
-        const after = await details.detail(member, contactId);
-        expect(bannerInput(after.notes?.rows ?? [])).toEqual(pinned);
-        expect(after.allergens).toEqual(before.allergens);
-        expect(after.attention?.entries.map((e) => e.allergen?.id)).toEqual([
-            peanutsId,
-        ]);
+        await prisma.contactNote.delete({ where: { id: old.id } });
     });
 
-    it("puts a new note's allergen on Needs attention too, for one release", async () => {
+    it("puts the allergens an older app sends with a note on Needs attention, not the note", async () => {
         await prisma.contactAttention.deleteMany({ where: { contactId } });
 
-        await notes.create(owner, contactId, {
+        const note = await notes.create(owner, contactId, {
             body: "Sesame, badly",
             allergenIds: [sesameId],
         });
-        await notes.create(owner, contactId, { allergenIds: [sesameId] });
+        await expect(
+            notes.create(owner, contactId, { allergenIds: [sesameId] }),
+        ).rejects.toThrow("Write a note.");
 
         const read = await attention.list(owner, contactId);
         expect(
             read.entries.map((e) => [e.kind, e.label, e.allergen?.id]),
         ).toEqual([["ALLERGY", "Sesame", sesameId]]);
+        expect(
+            await prisma.contactNoteAllergen.count({
+                where: { noteId: note.id },
+            }),
+        ).toBe(0);
+        await notes.remove(owner, contactId, note.id);
     });
 
     it("confirms a suggestion onto the record", async () => {

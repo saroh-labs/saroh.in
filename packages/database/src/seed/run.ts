@@ -1,5 +1,6 @@
 import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
+import { alignOrderNumberSequence } from "../order-number";
 import {
     ANALYTICS_DAYS,
     ANALYTICS_PATHS,
@@ -746,6 +747,9 @@ async function seedCommerce(
         organizationId: orgId,
         orderIdPrefix: SEED_PREFIX,
     });
+    // The business's one order-number series (P3, DEC-066) continues from
+    // the fixtures: the next order taken by hand follows the highest.
+    await alignOrderNumberSequence(prisma, orgId);
 
     return store.id;
 }
@@ -1398,14 +1402,13 @@ export async function deleteSeeded(
         () => prisma.reviewInvitation.deleteMany({ where }),
         () => prisma.orderItem.deleteMany({ where }),
         () => prisma.order.deleteMany({ where }),
-        // A customer's link to a contact, and the allergens a note names:
-        // before the storefront, whose allergen list a note's allergens
-        // hold on to (NoAction) — so a store cannot go while a note names one.
+        // A customer's link to a contact, and the team's notes on a person
+        // (U8): they cascade from the contact, but are written with seeded
+        // ids, so removed and counted explicitly. The notes go before the
+        // allergen list: a database seeded before Z2a still has note
+        // allergens, which hold on to it (NoAction) and go with their note.
         () => prisma.customerIdentityLink.deleteMany({ where }),
-        () =>
-            prisma.contactNoteAllergen.deleteMany({
-                where: { noteId: { startsWith: prefix } },
-            }),
+        () => prisma.contactNote.deleteMany({ where }),
         // Needs attention (C1): a seeded contact's entries, and any entry
         // naming a seeded allergen, whatever made it (the backfill's rows
         // don't carry the prefix).
@@ -1468,10 +1471,9 @@ export async function deleteSeeded(
         // seeded ids, so they are removed explicitly and counted.
         () => prisma.bookingEvent.deleteMany({ where }),
         () => prisma.booking.deleteMany({ where }),
-        // Who takes bookings, their hours and the business's rules (U3), and
-        // the team's notes on a person (U8): cascade from their parents, but
-        // written with seeded ids, so removed and counted explicitly.
-        () => prisma.contactNote.deleteMany({ where }),
+        // Who takes bookings, their hours and the business's rules (U3):
+        // cascade from their parents, but written with seeded ids, so
+        // removed and counted explicitly.
         () => prisma.staffService.deleteMany({ where }),
         () => prisma.staffHours.deleteMany({ where }),
         () => prisma.staffTimeOff.deleteMany({ where }),
@@ -1527,6 +1529,10 @@ export async function deleteSeeded(
         // Keyed by its organization, so matched on that.
         () =>
             prisma.invoiceSequence.deleteMany({
+                where: { organizationId: { startsWith: prefix } },
+            }),
+        () =>
+            prisma.orderNumberSequence.deleteMany({
                 where: { organizationId: { startsWith: prefix } },
             }),
         () => prisma.organization.deleteMany({ where }),

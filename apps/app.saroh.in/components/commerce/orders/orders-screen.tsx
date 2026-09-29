@@ -8,6 +8,7 @@ import { useCallback, useState, useTransition } from "react";
 
 import { SinceNotice } from "@/components/shared/since-notice";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
+import { useNarrow } from "@/lib/hooks/use-narrow";
 import type {
     OrderFilterOptions,
     OrderListPage,
@@ -25,6 +26,7 @@ import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";
 import { OrderExport } from "./order-export";
 import { OrderFilters } from "./order-filters";
+import { OrderFiltersSheet } from "./order-filters-sheet";
 import { OrderQuickView } from "./order-quick-view";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderRowMenu } from "./order-row-menu";
@@ -49,10 +51,13 @@ import { useOrderSelection } from "./use-order-selection";
  *
  * The storefront control is a FILTER, not a scope: orders belong to the
  * business. At the desk a row opens its quick view and has a row menu (B5,
- * `order-quick-view.tsx`, `order-row-menu.tsx`); on a phone the card opens
- * the order, as the design draws it. With `order:stage`, rows can be
- * selected and moved a step together (B6, `bulk-bar.tsx`). Loading, failed,
- * locked and every empty list are in `orders-states.tsx` (B7).
+ * `order-quick-view.tsx`, `order-row-menu.tsx`). On a phone (DEC-067, a
+ * recorded deviation from the design) a card opens the same quick view as
+ * a sheet from the bottom, and the filters sit behind a Filters button
+ * (`order-filters-sheet.tsx`) rather than stacked above the first order.
+ * With `order:stage`, rows can be selected and moved a step together, or
+ * their tickets printed (B6, `bulk-bar.tsx`). Loading, failed, locked and
+ * every empty list are in `orders-states.tsx` (B7).
  */
 export function OrdersScreen({
     query,
@@ -112,6 +117,8 @@ export function OrdersScreen({
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
+    // A phone's quick view rises from the bottom (B5).
+    const narrow = useNarrow();
     const many = stores.length > 1;
     const store = stores.find((s) => s.id === query.storefront) ?? null;
     const rows = page.rows;
@@ -195,6 +202,13 @@ export function OrdersScreen({
 
             <div className="flex flex-wrap items-center gap-2.5 pt-3.5">
                 <SearchField query={query} go={go} />
+                {/* A phone: the filters are behind one button (B5). */}
+                <OrderFiltersSheet
+                    query={query}
+                    options={filterOptions}
+                    go={go}
+                    className="min-[760px]:hidden"
+                />
                 {many ? (
                     <StorefrontFilter
                         stores={stores}
@@ -221,7 +235,10 @@ export function OrdersScreen({
                 ) : null}
             </div>
 
-            <OrderFilters query={query} options={filterOptions} go={go} />
+            {/* The desk: the filter bar, on the page. */}
+            <div className="max-[759px]:hidden">
+                <OrderFilters query={query} options={filterOptions} go={go} />
+            </div>
 
             <div aria-busy={navigating} className="pt-3.5">
                 {attentionUnread ? (
@@ -278,6 +295,8 @@ export function OrdersScreen({
                                     select={
                                         selectable ? pick.row(row) : undefined
                                     }
+                                    open={row.id === peekId}
+                                    onOpen={() => setPeekId(row.id)}
                                 />
                             ))}
                         </ul>
@@ -291,6 +310,7 @@ export function OrdersScreen({
             <OrderQuickView
                 row={peek}
                 can={can}
+                side={narrow ? "bottom" : "right"}
                 onOpenChange={(open) => {
                     if (!open) setPeekId(null);
                 }}

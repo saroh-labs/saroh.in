@@ -96,6 +96,8 @@ describe("serializeOrderRead", () => {
             refunded: "120.00",
             due: "0.00",
             refundsBeingConfirmed: [],
+            // Settled by its webhook: not on its way any more (B9).
+            refundsOnTheWay: [],
         });
     });
 
@@ -130,6 +132,10 @@ describe("serializeOrderRead", () => {
         );
         expect(read.money?.refundsBeingConfirmed).toEqual([
             { id: "rf_lost", amount: "120.00" },
+        ]);
+        // Taken by the provider, not confirmed yet: on its way (B9).
+        expect(read.money?.refundsOnTheWay).toEqual([
+            { id: "rf_taken", amount: "50.00" },
         ]);
         // Held: counted as handed back until the provider says.
         expect(read.money?.refunded).toBe("170.00");
