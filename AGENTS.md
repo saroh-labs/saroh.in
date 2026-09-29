@@ -89,7 +89,8 @@ pnpm prepush --all    # before a push: + API integration (TEST_DATABASE_URL)
                       #   and the changed screens' browser specs, desk + phone
 ```
 
-CI is the last net, not the first: every CI round trip is a push, five
+`git push` runs the quick gate itself (`.husky/pre-push`); `--no-verify`
+is for emergencies only. CI is the last net, not the first: every CI round trip is a push, five
 Vercel builds and twenty minutes. `scripts/prepush.sh` runs what CI runs.
 
 ## Learn from every miss
