@@ -398,7 +398,7 @@ function MoreAboutIt({
                 </span>
                 <Link
                     href={manageHref}
-                    className="ml-auto text-[12px] text-brand hover:text-foreground"
+                    className="ml-auto text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                 >
                     Manage fields
                 </Link>

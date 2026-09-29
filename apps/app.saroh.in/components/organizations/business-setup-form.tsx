@@ -315,7 +315,7 @@ export function BusinessSetupForm({
                                                 "rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                                 on
                                                     ? "border-foreground bg-muted"
-                                                    : "border-input hover:bg-muted",
+                                                    : "border-input hover:bg-muted active:bg-accent-active",
                                             )}
                                         >
                                             <span className="block text-[13px] font-semibold">
@@ -361,7 +361,7 @@ export function BusinessSetupForm({
                                         "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                         on
                                             ? "border-foreground bg-foreground text-background"
-                                            : "border-input hover:bg-muted",
+                                            : "border-input hover:bg-muted active:bg-accent-active",
                                     )}
                                 >
                                     <span className="font-mono text-[11px] opacity-70">
@@ -380,7 +380,7 @@ export function BusinessSetupForm({
                                 "inline-flex h-8 items-center rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 otherCountry
                                     ? "border-foreground bg-foreground text-background"
-                                    : "border-input hover:bg-muted",
+                                    : "border-input hover:bg-muted active:bg-accent-active",
                             )}
                         >
                             Another country
@@ -426,7 +426,7 @@ export function BusinessSetupForm({
                     <span className="text-foreground">{email}</span> ·{" "}
                     <button
                         type="button"
-                        className="text-foreground underline-offset-4 hover:underline"
+                        className="text-foreground underline-offset-4 hover:underline active:text-muted-foreground"
                         onClick={() => {
                             void authClient.signOut().then(() => {
                                 window.location.href = accountsLoginUrl;

@@ -231,7 +231,7 @@ export function CustomerPicker({
                     <button
                         type="button"
                         onClick={() => setRetry((n) => n + 1)}
-                        className="font-semibold underline underline-offset-2"
+                        className="font-semibold underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
                     >
                         Try again
                     </button>
@@ -288,7 +288,7 @@ export function CustomerPicker({
                             setWalkIn(false);
                             setAdding(draftFromTyped(query));
                         }}
-                        className="h-8 rounded-full border border-dashed border-border-strong bg-transparent px-[11px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11"
+                        className="h-8 rounded-full border border-dashed border-border-strong bg-transparent px-[11px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:h-11"
                     >
                         {addLabel(query)}
                     </button>

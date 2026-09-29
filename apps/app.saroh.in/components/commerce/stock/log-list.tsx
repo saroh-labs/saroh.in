@@ -279,7 +279,7 @@ export function LogList({
                                                 {e.order ? (
                                                     <Link
                                                         href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
-                                                        className="text-brand hover:text-foreground"
+                                                        className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                                     >
                                                         {who}
                                                     </Link>

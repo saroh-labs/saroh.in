@@ -323,7 +323,7 @@ function SuggestionCard({
                                     CHOICE,
                                     on
                                         ? "border-foreground bg-muted font-semibold"
-                                        : "border-border bg-card font-medium hover:bg-muted",
+                                        : "border-border bg-card font-medium hover:bg-muted active:bg-accent-active",
                                 )}
                             >
                                 {KIND_WORD[k]}

@@ -79,7 +79,7 @@ export function OrdersTab({
                         >
                             <Link
                                 href={`/commerce/orders/${o.id}`}
-                                className="font-mono text-[12px] text-brand hover:text-foreground"
+                                className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 #{o.number}
                             </Link>
@@ -118,7 +118,7 @@ export function OrdersTab({
                     The latest {rows.length} of {count} orders.{" "}
                     <Link
                         href="/commerce/orders"
-                        className="font-semibold text-brand hover:text-foreground"
+                        className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                     >
                         All orders
                     </Link>

@@ -73,7 +73,7 @@ export default async function ProductSettingsPage({
                 actions={
                     <Link
                         href="/commerce/products"
-                        className="text-[12.5px] text-brand hover:text-foreground"
+                        className="text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                     >
                         Back to products
                     </Link>

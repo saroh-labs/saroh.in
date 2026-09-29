@@ -15,7 +15,7 @@ export default function NotFound() {
                 </p>
                 <Link
                     href="/billing/invoices"
-                    className="mt-2.5 inline-block text-[13px] font-semibold text-brand hover:text-foreground"
+                    className="mt-2.5 inline-block text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                 >
                     Back to invoices
                 </Link>

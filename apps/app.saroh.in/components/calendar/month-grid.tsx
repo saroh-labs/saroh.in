@@ -284,7 +284,9 @@ export function MonthGrid({
                                                     : cn(
                                                           "font-semibold text-layer-foreground",
                                                           TONE_FILL[chip.tone],
-                                                          past && "opacity-80",
+                                                          // Past is quieter in colour, not see-through:
+                                                          // 80% opacity took the words under 4.5:1.
+                                                          past && "saturate-50",
                                                       ),
                                             )}
                                         >

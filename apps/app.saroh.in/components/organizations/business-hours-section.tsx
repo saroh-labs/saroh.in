@@ -76,7 +76,8 @@ function Notice({ children }: { children: React.ReactNode }) {
     );
 }
 
-const LINK = "font-semibold text-foreground underline underline-offset-2";
+const LINK =
+    "font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground";
 
 /**
  * Business → Hours ("Saroh Settings" design): when the business is open,

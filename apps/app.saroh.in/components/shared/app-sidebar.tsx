@@ -368,7 +368,7 @@ export function AppSidebar({
                     onClick={toggleCollapsed}
                     aria-label={collapsed ? "Expand menu" : "Collapse menu"}
                     title={collapsed ? "Expand menu" : "Collapse menu"}
-                    className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsed=true]/rail:h-auto group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px]"
+                    className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active group-data-[collapsed=true]/rail:h-auto group-data-[collapsed=true]/rail:flex-col group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:gap-[3px] group-data-[collapsed=true]/rail:px-0.5 group-data-[collapsed=true]/rail:py-[7px]"
                 >
                     {collapsed ? (
                         <PanelLeftOpen

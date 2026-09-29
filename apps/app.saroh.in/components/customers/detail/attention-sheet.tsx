@@ -217,7 +217,7 @@ export function AttentionSheet({
                                             CHOICE,
                                             on
                                                 ? "border-foreground bg-muted font-semibold"
-                                                : "border-border bg-card font-medium hover:bg-muted",
+                                                : "border-border bg-card font-medium hover:bg-muted active:bg-accent-active",
                                         )}
                                     >
                                         {KIND_WORD[k]}
@@ -264,7 +264,7 @@ export function AttentionSheet({
                                                 "h-7 rounded-full border px-2.5 text-[12px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11",
                                                 on
                                                     ? "border-destructive-subtle-foreground bg-destructive-subtle font-semibold text-destructive-subtle-foreground"
-                                                    : "border-border bg-card text-foreground/75 hover:bg-muted",
+                                                    : "border-border bg-card text-foreground/75 hover:bg-muted active:bg-accent-active",
                                             )}
                                         >
                                             {a.name}

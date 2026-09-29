@@ -145,7 +145,7 @@ export function RolesTab({
                     <button
                         type="button"
                         onClick={() => setCreating(true)}
-                        className="flex w-full items-center gap-2 border-t border-border px-[15px] py-2.5 text-left text-[13px] font-medium text-foreground transition-colors duration-fast hover:bg-foreground/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11"
+                        className="flex w-full items-center gap-2 border-t border-border px-[15px] py-2.5 text-left text-[13px] font-medium text-foreground transition-colors duration-fast hover:bg-foreground/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-foreground/[0.07] coarse:min-h-11"
                     >
                         <Plus aria-hidden className="size-4" />
                         New role

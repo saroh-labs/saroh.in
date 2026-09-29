@@ -246,7 +246,7 @@ export function PlanDetail({
                                 "-mb-px border-b-2 px-3 pb-2.5 pt-2 text-[13.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
                                 on
                                     ? "border-foreground font-semibold text-foreground"
-                                    : "border-transparent font-medium text-muted-foreground hover:text-foreground",
+                                    : "border-transparent font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
                             )}
                         >
                             {t.label}

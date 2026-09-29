@@ -427,7 +427,7 @@ function ModuleSwitch({
             aria-describedby={describedBy}
             onClick={onFlip}
             className={cn(
-                "shrink-0 rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "shrink-0 rounded-full p-1 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
                 locked ? "cursor-not-allowed" : "cursor-pointer",
                 locked && !on && "opacity-50",
                 busy && "cursor-progress",

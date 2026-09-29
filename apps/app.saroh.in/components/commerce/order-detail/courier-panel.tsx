@@ -117,7 +117,7 @@ export function CourierPanel({
                                 "h-[30px] rounded-full border px-[11px] text-[12.5px] coarse:h-11",
                                 on
                                     ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                                    : "border-border bg-card font-medium text-neutral-700 dark:text-muted-foreground",
+                                    : "border-border bg-card font-medium text-neutral-700 hover:border-border-strong hover:bg-accent active:bg-accent-active dark:text-muted-foreground",
                             )}
                         >
                             {c}

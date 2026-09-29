@@ -27,7 +27,7 @@ const FOCUS =
 
 /** The row's quiet 34px outline, as a button or a link. */
 const QUIET =
-    "inline-flex h-[34px] flex-none cursor-pointer items-center rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-foreground transition-[border-color,background-color,transform] duration-fast hover:border-foreground active:scale-[0.97] active:bg-muted disabled:cursor-wait disabled:opacity-60 coarse:min-h-11";
+    "inline-flex h-[34px] flex-none cursor-pointer items-center rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-foreground transition-[border-color,background-color] duration-fast hover:border-foreground hover:bg-accent active:bg-accent-active disabled:cursor-wait disabled:opacity-60 coarse:min-h-11";
 
 /**
  * A step the row opens where it is taken (D14's "Send a set-up link"): the
@@ -198,7 +198,7 @@ export function InlineConfirm({
                     type="button"
                     onClick={close}
                     className={cn(
-                        "h-[34px] cursor-pointer rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-neutral-700 transition-[border-color,background-color,transform] duration-fast hover:border-foreground active:scale-[0.97] active:bg-muted coarse:min-h-11 dark:text-neutral-300",
+                        "h-[34px] cursor-pointer rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-neutral-700 transition-[border-color,background-color] duration-fast hover:border-foreground hover:bg-accent active:bg-accent-active coarse:min-h-11 dark:text-neutral-300",
                         FOCUS,
                     )}
                 >

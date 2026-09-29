@@ -331,7 +331,7 @@ export function InvoiceForm({
             "h-8 rounded-full border px-3 text-[12.5px] transition-colors duration-fast coarse:h-11",
             on
                 ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                : "border-border bg-card font-medium text-muted-foreground hover:text-foreground",
+                : "border-border bg-card font-medium text-muted-foreground hover:border-border-strong hover:text-foreground active:bg-accent-active",
         );
 
     return (
@@ -442,7 +442,7 @@ export function InvoiceForm({
                             <button
                                 type="button"
                                 onClick={() => setBuyerOpen(true)}
-                                className="mt-2 py-1 text-[12.5px] font-semibold text-brand hover:text-foreground"
+                                className="mt-2 py-1 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 + Their GSTIN, state and address
                             </button>
@@ -512,7 +512,7 @@ export function InvoiceForm({
                                                           hsnSac: "",
                                                       })
                                             }
-                                            className="grid place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            className="grid place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground active:bg-accent-active"
                                         >
                                             <X aria-hidden className="size-4" />
                                         </button>
@@ -579,7 +579,7 @@ export function InvoiceForm({
                                 hsnSac: "",
                             })
                         }
-                        className="mt-1 py-1.5 text-[12.5px] font-semibold text-brand hover:text-foreground"
+                        className="mt-1 py-1.5 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                     >
                         + Add a line
                     </button>

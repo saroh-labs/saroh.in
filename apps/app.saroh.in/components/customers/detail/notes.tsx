@@ -149,7 +149,7 @@ export function Notes({
                                 <button
                                     type="button"
                                     onClick={() => void remove(n)}
-                                    className="text-[12px] text-muted-foreground hover:text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                                    className="text-[12px] text-muted-foreground hover:text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-destructive-subtle coarse:min-h-11"
                                 >
                                     Delete
                                 </button>
