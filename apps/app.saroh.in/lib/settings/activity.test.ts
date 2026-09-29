@@ -80,7 +80,7 @@ describe("activityLine — settings saves", () => {
                     fields: ["addressLine1", "city", "postalCode"],
                 },
             }),
-        ).toBe("Sanjay updated the registered address → Address");
+        ).toBe("Sanjay updated the registered address → Registered address");
     });
 
     it("lists up to three, then counts the rest", () => {
@@ -213,7 +213,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                     ],
                 },
             }),
-        ).toBe("Sanjay updated the registered address → Address");
+        ).toBe("Sanjay updated the registered address → Registered address");
     });
 
     it("names every field when a save changed several, values or not", () => {

@@ -255,7 +255,7 @@ const SECTIONS = {
         ],
     },
     address: {
-        title: "Address",
+        title: "Registered address",
         lead: "Printed under your legal name",
         fields: [
             "addressLine1",

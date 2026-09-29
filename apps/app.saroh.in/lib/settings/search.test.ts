@@ -45,7 +45,7 @@ describe("searchSettings", () => {
                 },
             ]);
         }
-        // The tab is "Address" now; the setting keeps its full name.
+        // The tab is "Registered address" (DEC-069 names the addresses apart).
         expect(searchSettings("registered address", owner)[0]?.href).toBe(
             "/settings/organization?section=address",
         );
