@@ -123,7 +123,7 @@ function tabLabel(label: string, count: number, current: boolean) {
 const tabClass = (on: boolean, marked = on) =>
     cn(
         // 52px tall, so the target clears 44px with its label under it.
-        "flex min-h-[52px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-[3px] border-0 bg-transparent px-0.5 py-1.5 text-[11px] leading-tight transition-colors duration-fast",
+        "flex min-h-[52px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-[3px] border-0 bg-transparent px-0.5 py-1.5 text-[11px] leading-tight transition-colors duration-fast active:bg-accent-active",
         // Inset: the bar runs to the screen's edge, where an outer ring
         // would be cut off.
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",

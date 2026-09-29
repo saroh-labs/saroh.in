@@ -124,7 +124,7 @@ export function PayLinkBlock({
                 {canManage ? (
                     <Link
                         href="/settings/providers"
-                        className="font-medium text-foreground underline underline-offset-4"
+                        className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
                     >
                         Connect one
                     </Link>

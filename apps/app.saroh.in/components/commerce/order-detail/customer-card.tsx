@@ -230,7 +230,7 @@ export function TrackingRow({
             aria-label={name}
             className={cn(
                 FOCUS,
-                "rounded-sm font-sans text-[12.5px] font-semibold text-foreground underline underline-offset-4 coarse:min-h-11",
+                "rounded-sm font-sans text-[12.5px] font-semibold text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground coarse:min-h-11",
             )}
         >
             {label}
@@ -252,7 +252,7 @@ export function TrackingRow({
                     rel="noreferrer"
                     className={cn(
                         FOCUS,
-                        "min-w-0 truncate font-mono text-[12px] underline underline-offset-4",
+                        "min-w-0 truncate font-mono text-[12px] underline underline-offset-4 hover:decoration-2 active:text-muted-foreground",
                     )}
                 >
                     {shown}

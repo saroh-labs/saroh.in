@@ -11,7 +11,7 @@ export const LABEL = "text-[12.5px] text-muted-foreground";
 
 /** A row that opens a record: the whole card is the target. */
 export const ROW_LINK =
-    "flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-3 text-foreground transition-colors duration-fast hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-3 text-foreground transition-colors duration-fast hover:border-border-strong active:bg-accent-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /** A state pill in a row: sentence case, as the design draws them. */
 export function RowPill({

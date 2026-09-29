@@ -115,7 +115,7 @@ export function FirstRunJobs({
                                     ? `, and ${pulls.map(nameOf).join(" and ")} with it`
                                     : ""
                             }.`}
-                            className="wk-press flex min-h-11 w-full min-w-0 flex-col items-start gap-[5px] rounded-[12px] border border-border bg-card px-[18px] py-[17px] text-left text-foreground transition-colors hover:border-neutral-400 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+                            className="wk-press flex min-h-11 w-full min-w-0 flex-col items-start gap-[5px] rounded-[12px] border border-border bg-card px-[18px] py-[17px] text-left text-foreground transition-colors hover:border-neutral-400 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-wait disabled:opacity-60"
                         >
                             <span className="text-[14px] font-semibold">
                                 {job.verb}

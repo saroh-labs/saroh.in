@@ -19,7 +19,7 @@ import { Empty } from "./parts";
 
 /** A text action under a review: pointer, hover, focus and pressed. */
 const TEXT_ACTION =
-    "cursor-pointer rounded-sm text-[12.5px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70 disabled:cursor-not-allowed disabled:opacity-50 coarse:min-h-11";
+    "cursor-pointer rounded-sm text-[12.5px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-not-allowed disabled:opacity-50 coarse:min-h-11";
 
 /**
  * Customer Detail's Reviews tab (C6, after "Saroh Customer Detail"): what

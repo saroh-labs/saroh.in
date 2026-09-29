@@ -208,7 +208,7 @@ export function LevelsPanel({
                                 <span>
                                     <Link
                                         href={productHref(null, p.productId)}
-                                        className="font-semibold text-brand hover:text-foreground"
+                                        className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                     >
                                         {p.name}
                                     </Link>

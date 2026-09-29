@@ -928,7 +928,7 @@ function MemberDrawer({
                                                 "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
                                                 on
                                                     ? "border-border-strong bg-foreground/[0.03]"
-                                                    : "border-muted hover:border-border-strong",
+                                                    : "border-muted hover:border-border-strong active:bg-accent-active",
                                             )}
                                         >
                                             <RoleDot role={r} />
@@ -1013,7 +1013,7 @@ function MemberDrawer({
                                         setDraft(null);
                                         onRemove(member);
                                     }}
-                                    className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                                 >
                                     Remove from {organizationName}
                                 </button>

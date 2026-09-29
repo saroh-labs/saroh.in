@@ -83,7 +83,7 @@ export function HoldCard({
                     onClick={onUndo}
                     className={cn(
                         FOCUS,
-                        "h-[30px] rounded-lg border bg-card px-3 text-[12.5px] font-semibold coarse:h-11",
+                        "h-[30px] rounded-lg border bg-card px-3 text-[12.5px] font-semibold transition-colors duration-fast hover:bg-accent active:bg-accent-active coarse:h-11",
                         refund
                             ? "border-destructive-subtle-foreground"
                             : "border-highlight-border",
@@ -96,7 +96,7 @@ export function HoldCard({
                     onClick={onNow}
                     className={cn(
                         FOCUS,
-                        "h-[30px] rounded-lg px-3 text-[12.5px] font-semibold coarse:h-11",
+                        "h-[30px] rounded-lg px-3 text-[12.5px] font-semibold hover:underline active:bg-card/60 coarse:h-11",
                         refund
                             ? "text-destructive-subtle-foreground"
                             : "text-brand-subtle-foreground",

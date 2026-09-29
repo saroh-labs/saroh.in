@@ -57,7 +57,7 @@ export default async function NewCoursePage() {
                         yet.{" "}
                         <Link
                             href="/services/new"
-                            className="font-medium text-foreground underline underline-offset-4"
+                            className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
                         >
                             Make a service
                         </Link>{" "}

@@ -1199,7 +1199,7 @@ export function OrganizationSettingsForm({
                                 "flex shrink-0 items-center gap-[7px] whitespace-nowrap px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
                                 on
                                     ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
+                                    : "font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
                             )}
                         >
                             {titleOf(key)}

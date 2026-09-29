@@ -52,7 +52,7 @@ export function WeekView({
                             onClick={() => onDay(d.date)}
                             aria-label={`${d.label}, ${n} ${n === 1 ? "booking" : "bookings"} — open the day`}
                             className={cn(
-                                "border-b border-l border-b-border border-l-border/60 px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                                "border-b border-l border-b-border border-l-border/60 px-2.5 py-2 text-left transition-colors duration-fast hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted",
                                 d.selected ? "bg-muted/60" : "bg-transparent",
                             )}
                         >
@@ -84,7 +84,7 @@ export function WeekView({
                                     onClick={() => onBlock(b, d.date)}
                                     aria-label={`${d.label}, ${blockLabel(b)}`}
                                     className={cn(
-                                        "absolute z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[5px] py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                        "absolute z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[5px] py-0.5 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
                                         blockColour(b),
                                         selected === b.key &&
                                             "ring-2 ring-highlight",

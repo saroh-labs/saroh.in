@@ -273,7 +273,7 @@ export function DayPanel({
                         {more > 0 ? (
                             <Link
                                 href={LAYER_HOME[layer.key]}
-                                className="mt-1 block text-[12px] font-medium text-brand hover:text-foreground"
+                                className="mt-1 block text-[12px] font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 {more} more — open {layer.label}
                             </Link>

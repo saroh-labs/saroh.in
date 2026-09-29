@@ -138,7 +138,7 @@ export function Header({
                         {email ? (
                             <a
                                 href={`mailto:${email}`}
-                                className="text-brand hover:text-foreground"
+                                className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 {email}
                             </a>

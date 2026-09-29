@@ -139,7 +139,7 @@ export function EditPanel({
                                 aria-label={`One fewer ${name}`}
                                 className={cn(
                                     FOCUS,
-                                    "size-[30px] rounded-[7px] border border-border bg-card text-[15px] coarse:size-11",
+                                    "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
                                 )}
                             >
                                 −
@@ -156,7 +156,7 @@ export function EditPanel({
                                 aria-label={`One more ${name}`}
                                 className={cn(
                                     FOCUS,
-                                    "size-[30px] rounded-[7px] border border-border bg-card text-[15px] coarse:size-11",
+                                    "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
                                 )}
                             >
                                 +
@@ -190,7 +190,7 @@ export function EditPanel({
                             aria-label={`Remove ${name}`}
                             className={cn(
                                 FOCUS,
-                                "rounded px-1 text-[12px] font-semibold text-destructive-subtle-foreground coarse:min-h-11",
+                                "rounded px-1 text-[12px] font-semibold text-destructive-subtle-foreground hover:underline active:bg-destructive-subtle coarse:min-h-11",
                             )}
                         >
                             Remove

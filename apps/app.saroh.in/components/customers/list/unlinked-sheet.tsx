@@ -306,7 +306,7 @@ function UnlinkedItem({
                             Their email belongs to{" "}
                             <Link
                                 href={`/customers/${encodeURIComponent(holder.contactId)}`}
-                                className="font-medium text-brand hover:text-foreground"
+                                className="font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 {holderName}
                             </Link>

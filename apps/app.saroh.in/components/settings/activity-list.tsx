@@ -58,7 +58,7 @@ export function ActivityList({
                                 type="button"
                                 onClick={() => setOpenId(line.id)}
                                 aria-haspopup="dialog"
-                                className="min-w-0 text-pretty text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
+                                className="min-w-0 text-pretty text-left underline-offset-2 after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring active:text-muted-foreground"
                             >
                                 <strong className="font-semibold">
                                     {line.who}

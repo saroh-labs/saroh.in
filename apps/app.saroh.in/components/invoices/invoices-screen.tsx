@@ -212,7 +212,7 @@ export function InvoicesScreen({
                                 "inline-flex items-center px-3.5 py-2.5 text-[13px] transition-colors duration-fast coarse:min-h-11",
                                 on
                                     ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
+                                    : "font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
                             )}
                         >
                             {t.label}

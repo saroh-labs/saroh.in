@@ -196,7 +196,7 @@ export function OrderGridRow({
                                 onClick={onOpen}
                                 className={cn(
                                     ROW_LINK,
-                                    "block min-w-0 cursor-pointer truncate text-left text-[13.5px] font-medium text-foreground",
+                                    "block min-w-0 cursor-pointer truncate text-left text-[13.5px] font-medium text-foreground underline-offset-2 hover:underline active:text-muted-foreground",
                                 )}
                             >
                                 {v.customer}
@@ -275,7 +275,7 @@ export function OrderCard({
                         className={cn(
                             ROW_LINK,
                             name,
-                            "cursor-pointer text-left",
+                            "cursor-pointer text-left underline-offset-2 hover:underline active:text-muted-foreground",
                         )}
                     >
                         {v.customer}

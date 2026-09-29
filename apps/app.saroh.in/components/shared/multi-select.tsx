@@ -137,7 +137,7 @@ export function MultiSelect({
                                     disabled={disabled}
                                     onClick={() => toggle(o.id)}
                                     aria-label={`Remove ${o.label}`}
-                                    className="rounded-full p-0.5 hover:bg-foreground/10"
+                                    className="rounded-full p-0.5 hover:bg-foreground/10 active:bg-foreground/[0.15]"
                                 >
                                     <X aria-hidden className="size-3" />
                                 </button>

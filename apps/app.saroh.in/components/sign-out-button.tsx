@@ -8,7 +8,7 @@ export function SignOutButton() {
     return (
         <button
             type="button"
-            className="text-sm underline"
+            className="cursor-pointer text-sm underline hover:decoration-2 active:text-muted-foreground"
             onClick={() =>
                 authClient.signOut().then(() => {
                     window.location.href = accountsLoginUrl;

@@ -101,7 +101,7 @@ export function Overview({
                                 >
                                     <Link
                                         href={`/commerce/products/${f.productId}`}
-                                        className="min-w-0 flex-1 text-brand hover:text-foreground"
+                                        className="min-w-0 flex-1 text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                     >
                                         {f.name}
                                     </Link>
@@ -192,7 +192,7 @@ function OrderTile({
             onClick={() => onOpen(opens)}
             className={cn(
                 box,
-                "transition-colors duration-fast hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "transition-colors duration-fast hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
             )}
         >
             {body}
