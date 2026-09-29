@@ -6,6 +6,7 @@ import {
     lineGstNote,
     paperFooter,
     paperTitle,
+    showsGstTotals,
 } from "./paper-title";
 import type { Invoice, InvoiceGst } from "./service";
 
@@ -176,5 +177,30 @@ describe("lineGstNote (DEC-072)", () => {
         for (const rate of [null, "0", "18.00"]) {
             expect(lineGstNote(false, at(rate), money)).toBeNull();
         }
+    });
+});
+
+describe("showsGstTotals (DEC-072)", () => {
+    const lineAt = (rate: string | null) =>
+        ({
+            gst: { rate },
+        }) as NonNullable<Invoice["lines"]>[number];
+
+    it("hides the rows when no line has a rate set", () => {
+        expect(showsGstTotals({ lines: [lineAt(null), lineAt(" ")] })).toBe(
+            false,
+        );
+        expect(showsGstTotals({ lines: [] })).toBe(false);
+    });
+
+    it("keeps them when any line is rated, 0% included", () => {
+        expect(showsGstTotals({ lines: [lineAt(null), lineAt("0.00")] })).toBe(
+            true,
+        );
+        expect(showsGstTotals({ lines: [lineAt("18.00")] })).toBe(true);
+    });
+
+    it("keeps them while the lines aren't read (a list row)", () => {
+        expect(showsGstTotals({})).toBe(true);
     });
 });

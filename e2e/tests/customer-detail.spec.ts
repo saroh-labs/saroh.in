@@ -2,7 +2,7 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { makeContact, makeOrder, stamp } from "../fixtures/own-data";
+import { makeContact, makeOrder, northwind, stamp } from "../fixtures/own-data";
 import type { Role } from "../fixtures/sessions";
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
@@ -207,6 +207,34 @@ test.describe("customer detail", () => {
         await expect(page.getByText(text)).toHaveCount(0);
     });
 
+    test("a customer added by hand shows their saved address before any order (DEC-073)", async ({
+        page,
+    }, testInfo) => {
+        await signIn(page, NORTHWIND);
+        const s = stamp(testInfo);
+        const api = northwind(page.request);
+        const { contactId } = await api.post<{ contactId: string }>(
+            "/customers",
+            {
+                email: `hand-${s}@example.test`,
+                firstName: "Hand",
+                lastName: s,
+            },
+        );
+        await api.patch(`/contacts/${contactId}`, {
+            addressLine1: `${s} Hill Road`,
+            city: "Mumbai",
+            postalCode: "400050",
+        });
+        await page.goto(`/customers/${contactId}`);
+        await expect(
+            page.getByText("No orders yet", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("region", { name: "Delivery address" }),
+        ).toContainText(`${s} Hill Road, Mumbai 400050`);
+    });
+
     test("a possible match is linked by a person, and its orders come in", async ({
         page,
     }, testInfo) => {
@@ -396,6 +424,18 @@ test.describe("needs attention", () => {
         ).toBeVisible();
         await expect(nameRow(page).getByText("Allergy: Latex")).toBeVisible();
         await expect(page.getByRole("main")).not.toContainText("you can't see");
+
+        // His booking-page note (C12), as the design writes it (DEC-073):
+        // by his full name, and the tick names who can read it.
+        const notes = page.getByRole("region", {
+            name: /from the booking page/,
+        });
+        await expect(notes).toContainText(
+            /Rahul \S+ wrote this when booking online/,
+        );
+        await expect(notes).toContainText(
+            /only people who can see sensitive notes \([^)]*Owner[^)]*\) can read it/,
+        );
     });
 });
 

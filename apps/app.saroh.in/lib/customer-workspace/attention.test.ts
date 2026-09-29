@@ -12,7 +12,9 @@ import {
     hiddenText,
     pickKind,
     picksAllergen,
+    rolesThatSeeSensitive,
     rowTags,
+    sensitiveTickText,
     setAsideText,
     SUGGESTION_KINDS,
     suggestionDraft,
@@ -430,8 +432,9 @@ describe("booking-page notes (C12)", () => {
         expect(suggestionsTitle([rahul, rahul])).toBe(
             "2 notes from the booking page",
         );
-        expect(suggestionWhen("Rahul", rahul, TZ, NOW)).toBe(
-            "Rahul wrote this when booking online, 18 Sep at 10:42",
+        // Their full name, as the design has it (DEC-073).
+        expect(suggestionWhen("Rahul Verma", rahul, TZ, NOW)).toBe(
+            "Rahul Verma wrote this when booking online, 18 Sep at 10:42",
         );
         expect(suggestionWhen(null, rahul, TZ, NOW)).toBe(
             "They wrote this when booking online, 18 Sep at 10:42",
@@ -469,6 +472,58 @@ describe("booking-page notes (C12)", () => {
         );
         expect(tagTitle({ ...added, label: "Takes amlodipine" })).toBe(
             `${rahul.detail} · from the booking page`,
+        );
+    });
+});
+
+describe("who can read a sensitive note (C12, DEC-073)", () => {
+    const role = (
+        label: string,
+        actions: string[],
+        members = 1,
+        grants?: string[],
+    ) => ({ label, actions, members, grants });
+
+    it("names the roles that hold customer:sensitive, alphabetically", () => {
+        expect(
+            rolesThatSeeSensitive([
+                role("Owner", ["org:read", "customer:sensitive"]),
+                role("Member", ["org:read", "contact:read"], 3),
+                role("Dentist", ["customer:sensitive", "contact:read"]),
+            ]),
+        ).toEqual(["Dentist", "Owner"]);
+    });
+
+    it("reads an invented role's grants, implied holds included", () => {
+        expect(
+            rolesThatSeeSensitive([
+                role("Front desk", ["contact:write"], 1, [
+                    "contact:write",
+                    "contact:read",
+                ]),
+                role("Hygienist", [], 1, ["customer:sensitive"]),
+            ]),
+        ).toEqual(["Hygienist"]);
+    });
+
+    it("leaves out a role nobody holds", () => {
+        expect(
+            rolesThatSeeSensitive([
+                role("Admin", ["customer:sensitive"], 0),
+                role("Owner", ["customer:sensitive"]),
+            ]),
+        ).toEqual(["Owner"]);
+    });
+
+    it("says the roles in the tick, and only the rule when they're unknown", () => {
+        expect(sensitiveTickText(["Dentist", "Owner"])).toBe(
+            "Sensitive — only people who can see sensitive notes (Dentist, Owner) can read it",
+        );
+        expect(sensitiveTickText(null)).toBe(
+            "Sensitive — only people who can see sensitive notes can read it",
+        );
+        expect(sensitiveTickText([])).toBe(
+            "Sensitive — only people who can see sensitive notes can read it",
         );
     });
 });

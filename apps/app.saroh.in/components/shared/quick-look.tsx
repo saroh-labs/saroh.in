@@ -40,6 +40,8 @@ export function QuickLook({
     titleClassName,
     leading,
     side = "right",
+    close = "square",
+    closeLabel = "Close",
     children,
 }: {
     open: boolean;
@@ -59,6 +61,13 @@ export function QuickLook({
     leading?: ReactNode;
     /** Where it comes in from: the right (the default), or the bottom. */
     side?: "right" | "bottom";
+    /**
+     * Close as the shared peek's grey square (the default), or a plain X
+     * that greys only on hover — the Orders quick view's (DEC-073).
+     */
+    close?: "square" | "plain";
+    /** Close's name to a screen reader. */
+    closeLabel?: string;
     children: ReactNode;
 }) {
     // What had focus as it opened — the row's button — to return focus to.
@@ -117,9 +126,16 @@ export function QuickLook({
                         ) : null}
                     </div>
                     {status}
-                    <SheetClose className="grid size-[34px] shrink-0 place-items-center rounded-[9px] bg-muted text-muted-foreground ring-offset-background transition-colors duration-fast hover:bg-secondary-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:size-11">
+                    <SheetClose
+                        className={cn(
+                            "grid shrink-0 cursor-pointer place-items-center ring-offset-background transition-colors duration-fast focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:size-11",
+                            close === "plain"
+                                ? "size-8 rounded-lg bg-transparent text-neutral-700 hover:bg-muted hover:text-foreground active:bg-secondary-hover dark:text-muted-foreground"
+                                : "size-[34px] rounded-[9px] bg-muted text-muted-foreground hover:bg-secondary-hover hover:text-foreground",
+                        )}
+                    >
                         <X aria-hidden className="size-4" strokeWidth={2} />
-                        <span className="sr-only">Close</span>
+                        <span className="sr-only">{closeLabel}</span>
                     </SheetClose>
                 </div>
                 <SheetDescription className="sr-only">

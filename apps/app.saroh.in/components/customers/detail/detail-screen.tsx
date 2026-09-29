@@ -71,6 +71,7 @@ export function CustomerDetailScreen({
     canRemove = false,
     canConsent,
     canSensitive,
+    sensitiveRoles = null,
     userId,
     suggestions,
     duplicates,
@@ -96,6 +97,11 @@ export function CustomerDetailScreen({
     canConsent: boolean;
     /** `customer:sensitive`: may mark a Needs attention note sensitive. */
     canSensitive: boolean;
+    /**
+     * The roles whose people can read a sensitive note (C12's tick,
+     * DEC-073); null when they couldn't be read.
+     */
+    sensitiveRoles?: string[] | null;
     userId: string | null;
     suggestions: IdentitySuggestion[];
     /** Other records that look like the same person (C2). */
@@ -318,7 +324,8 @@ export function CustomerDetailScreen({
                         contactId={d.contact.id}
                         suggestions={d.attention.suggestions}
                         choices={d.notes?.allergenChoices ?? []}
-                        firstName={first}
+                        name={name}
+                        sensitiveRoles={sensitiveRoles}
                         timeZone={d.timezone}
                         now={now}
                         canSensitive={canSensitive}

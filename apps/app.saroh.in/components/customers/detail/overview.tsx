@@ -61,6 +61,7 @@ export function Overview({
     // A treatment order has no product lines, so there may be nothing to
     // list: the card is left out rather than drawn empty.
     const usual = favourites(rows);
+    const saved = addressLine(d.contact);
     return (
         <div className="flex flex-col gap-4">
             {attention}
@@ -72,6 +73,14 @@ export function Overview({
                     Totals, favourites and how they get their orders fill in
                     from their first order.
                 </Empty>
+            ) : null}
+            {orders && rows.length === 0 && saved ? (
+                // Their saved address shows before their first order too —
+                // someone added by hand often has one (DEC-073).
+                <section className={CARD} aria-label="Delivery address">
+                    <div className={cn(LABEL, "mb-1.5")}>Delivery address</div>
+                    <div className="text-[13.5px] leading-[1.5]">{saved}</div>
+                </section>
             ) : null}
             {d.bookings !== undefined ? (
                 <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))]">
@@ -130,7 +139,7 @@ export function Overview({
                                 Delivery address
                             </div>
                             <div className="text-[13.5px] leading-[1.5]">
-                                {deliveryAddress(rows, addressLine(d.contact))}
+                                {deliveryAddress(rows, saved)}
                             </div>
                         </section>
                     </div>

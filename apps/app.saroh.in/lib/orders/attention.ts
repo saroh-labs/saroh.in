@@ -1,4 +1,5 @@
 import {
+    KIND_WORD,
     hiddenText,
     tagText,
     tagTitle,
@@ -73,13 +74,20 @@ export function attentionLines(
 }
 
 /**
- * Order Detail's customer card: "Needs attention: Sesame, Pregnant", the
- * entries a printed ticket may carry (never a sensitive one), and the line
- * for what this viewer can't see.
+ * Order Detail's cards: the customer card's "Needs attention: Sesame,
+ * Pregnant" (each entry's own words, DEC-073) and the Visits card's
+ * "Allergy: Sesame." (its kind and words); the entries a printed ticket may
+ * carry (never a sensitive one), and the line for what this viewer can't
+ * see.
  */
 export function cardAttention(attention: OrderAttention): {
     entries: {
         id: string;
+        /** Its own words, as the customer card shows them: "Sesame". */
+        label: string;
+        /** Its kind in words, "Allergy", for a screen reader. */
+        kind: string;
+        /** Its kind and words, "Allergy: Sesame" — never colour alone. */
         text: string;
         title: string;
         /** Left off the printed ticket. */
@@ -90,6 +98,8 @@ export function cardAttention(attention: OrderAttention): {
     return {
         entries: attention.entries.map((e) => ({
             id: e.id,
+            label: e.label,
+            kind: KIND_WORD[e.kind],
             text: tagText(e),
             title: tagTitle(e),
             sensitive: e.sensitive,

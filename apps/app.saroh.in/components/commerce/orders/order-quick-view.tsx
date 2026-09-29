@@ -135,6 +135,8 @@ export function OrderQuickView({
         <QuickLook
             open
             side={side}
+            close="plain"
+            closeLabel="Close quick view"
             onOpenChange={onOpenChange}
             title={`${ref} · ${customer}`}
             titleClassName="font-display text-[20px] font-semibold tracking-[-0.02em]"
@@ -226,7 +228,15 @@ export function OrderQuickView({
     );
 }
 
-function QuickViewBody({ order }: { order: OrderRead }) {
+/**
+ * The customer's name, a Saffron link to Customer Detail as the design
+ * draws it (DEC-073): Ink on hover, a step lighter pressed, and a ring on
+ * keyboard focus.
+ */
+const CUSTOMER_LINK =
+    "cursor-pointer rounded-sm text-brand transition-colors duration-fast hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+export function QuickViewBody({ order }: { order: OrderRead }) {
     const money = order.money;
     const currency = money?.currency ?? "INR";
     const format = (a: string | number) =>
@@ -368,10 +378,7 @@ function QuickViewBody({ order }: { order: OrderRead }) {
                 <dt className="text-muted-foreground">Customer</dt>
                 <dd className="min-w-0">
                     {c && customerLink ? (
-                        <Link
-                            href={customerLink}
-                            className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
+                        <Link href={customerLink} className={CUSTOMER_LINK}>
                             {c.name ?? c.email ?? "Customer"}
                         </Link>
                     ) : walkIn ? (

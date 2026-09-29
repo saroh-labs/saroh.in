@@ -125,7 +125,7 @@ const TAB_LABEL: Record<BusinessTab, string> = {
     contact: "Contact",
     tax: "Tax and invoices",
     hours: "Hours",
-    address: "Address",
+    address: "Registered address",
 };
 
 const BUILT_IN_ROLES: Partial<Record<string, string>> = {

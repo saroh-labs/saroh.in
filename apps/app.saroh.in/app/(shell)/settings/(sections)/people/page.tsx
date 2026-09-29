@@ -1,5 +1,7 @@
 import { TeamScreen } from "@/components/organizations/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
+import { modulesOrUnknown } from "@/lib/modules/guard";
+import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
 import {
     getStorefrontTeamNotice,
     listInvitations,
@@ -46,8 +48,9 @@ export default async function PeoplePage() {
         invitations,
         sites,
         roles,
-        catalogue,
+        fullCatalogue,
         joinedFromStorefronts,
+        modules,
     ] = await Promise.all([
         listMembers(),
         // Empty for anyone who may not see them, rather than an error: this is
@@ -63,7 +66,11 @@ export default async function PeoplePage() {
         // The storefront people the F16 backfill added, for whoever can
         // change their role (DEC-048); empty for everyone else.
         canEditRoles ? getStorefrontTeamNotice() : Promise.resolve([]),
+        // To leave out a hidden module's permissions (DEC-073); null, when
+        // they can't be read, holds nothing back.
+        modulesOrUnknown(),
     ]);
+    const catalogue = shownCatalogue(fullCatalogue, modules);
 
     return (
         <SettingsPanel>

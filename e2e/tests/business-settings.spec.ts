@@ -267,3 +267,21 @@ async function savePrefixInUi(page: Page, prefix: string) {
         timeout: 30_000,
     });
 }
+
+// Read only: nothing here is saved.
+test.describe("business settings tabs", () => {
+    test('the address tab is "Registered address" (DEC-069, DEC-073)', async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        await page.goto("/settings/organization");
+        await expect(
+            page.getByRole("tab", { name: "Address", exact: true }),
+        ).toHaveCount(0);
+        await page.getByRole("tab", { name: "Registered address" }).click();
+        await expect(
+            page.getByRole("region", { name: "Registered address" }),
+        ).toContainText("Printed under your legal name");
+    });
+});

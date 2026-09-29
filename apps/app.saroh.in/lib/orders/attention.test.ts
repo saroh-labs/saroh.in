@@ -135,6 +135,11 @@ describe("cardAttention — Order Detail's customer card", () => {
             ["Allergy: Sesame", false],
             ["Medical: Pregnant", true],
         ]);
+        // The customer card shows each entry's own words (DEC-073).
+        expect(card.entries.map((e) => [e.kind, e.label])).toEqual([
+            ["Allergy", "Sesame"],
+            ["Medical", "Pregnant"],
+        ]);
         expect(card.hidden).toBeNull();
     });
 

@@ -150,10 +150,13 @@ export function CustomerCard({
 }
 
 /**
- * The customer's Needs attention (B15), in the design's red box: each entry
- * as "Allergy: Sesame", with its detail and where it came from ("from the
- * booking page") on hover and to a screen reader. A sensitive entry reaches
- * only a role that may read it, and never the printed ticket. What this
+ * The customer's Needs attention (B15), in the design's red box:
+ * "Needs attention: Sesame, Pregnant" (DEC-073), since the card covers
+ * every kind of entry, not only allergies. A screen reader hears each
+ * entry's kind too ("Allergy: Sesame"), and its detail and where it came
+ * from ("from the booking page") are on hover and to a screen reader. A
+ * sensitive entry reaches only a role that may read it, and never the
+ * printed ticket, so it comes last and its comma goes with it. What this
  * viewer can't see is counted, never shown; a failed read says so.
  */
 function AttentionBlock({ attention }: { attention: OrderAttention | null }) {
@@ -172,33 +175,38 @@ function AttentionBlock({ attention }: { attention: OrderAttention | null }) {
     }
     const card = cardAttention(attention);
     if (card.entries.length === 0 && !card.hidden) return null;
+    // A sensitive entry is left off the printed ticket: last, so what
+    // prints never starts with a comma.
+    const entries = [...card.entries].sort(
+        (a, b) => Number(a.sensitive) - Number(b.sensitive),
+    );
     return (
         <div className="mt-2.5">
-            {card.entries.length > 0 ? (
-                <ul
-                    aria-label="Needs attention"
-                    className="flex flex-wrap gap-x-1 rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] font-semibold leading-[1.45] text-destructive-subtle-foreground"
-                >
-                    {card.entries.map((e, i) => (
-                        <li
-                            key={e.id}
-                            title={e.title}
-                            className={cn(e.sensitive && "print:hidden")}
-                        >
-                            {i > 0 ? (
-                                <span aria-hidden className="pr-1">
-                                    ·
-                                </span>
-                            ) : null}
-                            {e.text}
-                            {e.title !== e.text ? (
-                                <span className="sr-only">
-                                    {`, ${e.title}`}
-                                </span>
-                            ) : null}
-                        </li>
-                    ))}
-                </ul>
+            {entries.length > 0 ? (
+                <div className="rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] font-semibold leading-[1.45] text-destructive-subtle-foreground">
+                    <span aria-hidden>Needs attention: </span>
+                    <ul aria-label="Needs attention" className="inline">
+                        {entries.map((e, i) => (
+                            <li
+                                key={e.id}
+                                title={e.title}
+                                className={cn(
+                                    "inline",
+                                    e.sensitive && "print:hidden",
+                                )}
+                            >
+                                {i > 0 ? <span aria-hidden>, </span> : null}
+                                <span className="sr-only">{`${e.kind}: `}</span>
+                                {e.label}
+                                {e.title !== e.label ? (
+                                    <span className="sr-only">
+                                        {`, ${e.title}`}
+                                    </span>
+                                ) : null}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             ) : null}
             {card.hidden ? (
                 <p className="mt-1 text-[11.5px] text-muted-foreground print:hidden">

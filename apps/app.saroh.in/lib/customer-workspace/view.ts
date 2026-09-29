@@ -793,7 +793,11 @@ export function offersText(
         : `Said yes to offers by email${on}`;
 }
 
-/** Stop is offered while offers may still go: said yes, or never asked. */
+/**
+ * "They asked to stop" is offered only while they have said yes, as the
+ * design has it (DEC-073): with nothing recorded no offers go to them, so
+ * there is nothing to stop, and the card says only "Nothing recorded yet."
+ */
 export function canStopOffers(consent: CustomerDetail["consent"]): boolean {
-    return consent !== null && consent.status !== "REVOKED";
+    return consent?.status === "GRANTED";
 }

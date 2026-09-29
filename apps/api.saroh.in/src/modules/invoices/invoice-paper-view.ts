@@ -154,6 +154,22 @@ export function lineGstNote(
     return `GST ${Number(gst.rate)}% · taxable ${money(gst.taxableValue ?? "0")}`;
 }
 
+/**
+ * Whether a registered business's paper shows its GST totals (DEC-072) —
+ * the taxable value, CGST and SGST or IGST, and "Prices include GST": only
+ * when at least one line has a rate set, 0% included. A paper whose every
+ * line has no rate set (a plan renewal's) shows just its total. The app's
+ * `showsGstTotals` (`lib/invoices/paper-title.ts`) says the same on the
+ * paper.
+ */
+export function showsGstTotals(i: Pick<InvoiceViewModel, "lines">): boolean {
+    if (!i.lines) return true;
+    return i.lines.some((l) => {
+        const rate = l.gst?.rate;
+        return rate != null && rate.trim() !== "";
+    });
+}
+
 /** The line at the foot: the law it is issued under, and how it stands. */
 export function paperFooter(i: InvoiceViewModel, businessName: string): string {
     if (i.gst) {
@@ -222,14 +238,16 @@ export function paperView(
         : "";
 
     const typedTax = !gst && Number(i.tax) > 0;
-    const sums: [string, string][] = taxed
+    // No line with a rate set: no GST rows, just the total (DEC-072).
+    const gstRows = taxed && showsGstTotals(i) ? taxed : null;
+    const sums: [string, string][] = gstRows
         ? [
               ["Taxable value", money(i.subtotal)],
-              ...(taxed.taxType === "INTER"
-                  ? ([["IGST", money(taxed.igst)]] as [string, string][])
+              ...(gstRows.taxType === "INTER"
+                  ? ([["IGST", money(gstRows.igst)]] as [string, string][])
                   : ([
-                        ["CGST", money(taxed.cgst)],
-                        ["SGST", money(taxed.sgst)],
+                        ["CGST", money(gstRows.cgst)],
+                        ["SGST", money(gstRows.sgst)],
                     ] as [string, string][])),
           ]
         : typedTax
@@ -289,7 +307,7 @@ export function paperView(
         sums,
         totalLabel: credit ? "Credited" : "Total",
         total: money(i.total),
-        inclusive: taxed ? "Prices include GST." : null,
+        inclusive: gstRows ? "Prices include GST." : null,
         footer: paperFooter(i, business.name),
     };
 }
