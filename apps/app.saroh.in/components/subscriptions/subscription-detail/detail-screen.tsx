@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { autopayPanel } from "@/lib/subscriptions/autopay";
 import { pauseNote, pauseOptions } from "@/lib/subscriptions/pause";
 import type {
     Optional,
@@ -18,6 +19,7 @@ import type {
 } from "@/lib/subscriptions/service";
 import {
     chargeRow,
+    chargingText,
     collectionRows,
     dayText,
     failWhy,
@@ -29,6 +31,7 @@ import {
     money,
     olderPrice,
     paysBy,
+    retryOffer,
     sortCharges,
 } from "@/lib/subscriptions/view";
 
@@ -37,6 +40,7 @@ import { Pill } from "../pill";
 import { SubscribeDialog } from "../subscribe-dialog";
 import type { Step } from "./action-sheets";
 import { ActionSheet } from "./action-sheets";
+import { AutopayActions } from "./autopay-panel";
 import { ChangesCard } from "./changes-card";
 import {
     ChargesCard,
@@ -128,6 +132,7 @@ export function SubscriptionDetail({
         keep,
         toggleSkip,
         newPayLink,
+        chargeAgain,
     } = useSubscriptionActions(sub, plans, now, () => setStep(null));
 
     // The step came in the address; once opened, a refresh shouldn't reopen it.
@@ -144,16 +149,23 @@ export function SubscriptionDetail({
         : null;
 
     const failedId = sub.failedCharge?.id;
+    // Retry by autopay or by a new link, as the API offers it (D13); none
+    // while a charge is under way.
+    const retry = retryOffer(sub, canPayLink);
+    const charging = chargingText(sub, now);
     const actions: Action[] = !canWrite
         ? []
         : tab === "failed"
           ? [
-                ...(canPayLink && sub.failedCharge
+                ...(retry
                     ? [
                           {
-                              label: "Retry with a new pay link",
+                              label: retry.label,
                               kind: "primary" as const,
-                              go: newPayLink,
+                              go:
+                                  retry.via === "MANDATE"
+                                      ? chargeAgain
+                                      : newPayLink,
                           },
                       ]
                     : []),
@@ -223,6 +235,7 @@ export function SubscriptionDetail({
         sub.pendingPlan && tab !== "cancelled" ? sub.pendingPlan : null;
     const how = charges.state === "ok" ? paysBy(charges.data) : null;
     const head = headline(sub, how, now);
+    const autopay = autopayPanel(sub, { canWrite, paysBy: how, now });
     const older = olderPrice(sub, plans);
     const plan = plans.find((p) => p.id === sub.plan.id);
     const rows = collectionRows(sub, now);
@@ -336,10 +349,11 @@ export function SubscriptionDetail({
                             {failWhy(sub, now)}
                         </div>
                         <div className="mt-[3px] text-[12.5px] leading-[1.5] text-foreground/75">
-                            Saroh doesn&apos;t charge a card or try again on its
-                            own — {first} pays through the invoice&apos;s link.
-                            Send a new link, record a payment you took, pause or
-                            cancel.
+                            {charging
+                                ? `${charging}. The pay link is held until their bank answers, so ${first} isn't charged twice.`
+                                : sub.retryVia === "MANDATE"
+                                  ? `Their autopay didn't collect it, and Saroh doesn't try again on its own. Charge autopay again, send a new link, record a payment you took, pause or cancel.`
+                                  : `Saroh doesn't charge a card or try again on its own — ${first} pays through the invoice's link. Send a new link, record a payment you took, pause or cancel.`}
                         </div>
                         {payLink ? (
                             <PayLinkRow url={payLink} name={first} />
@@ -414,12 +428,19 @@ export function SubscriptionDetail({
                                     ? `Keeps ${money(sub.price, sub.currency)} — the plan is ${money(older.listPrice, sub.currency)} for new sign-ups`
                                     : null
                             }
-                            paysBy={
-                                how
-                                    ? `Pays by ${how}`
-                                    : "Each renewal is invoiced with a pay link"
-                            }
-                        />
+                            // What the customer set up (D12) comes first;
+                            // staff manage it from here (D14).
+                            paysBy={autopay.line}
+                        >
+                            <AutopayActions
+                                subscriptionId={sub.id}
+                                panel={autopay}
+                                card={sub.autopayCard ?? null}
+                                firstName={first}
+                                timeZone={tz}
+                                now={now}
+                            />
+                        </PlanCard>
                         <ChangesCard
                             // A fresh page after an action starts the card over.
                             key={
@@ -463,6 +484,7 @@ export function SubscriptionDetail({
                     contacts={contacts}
                     plans={plans}
                     initialContactId={sub.contact.id}
+                    autopayOffered={sub.autopayCard?.offered ?? false}
                     initialPlanId={
                         plan?.status === "ACTIVE" ? sub.plan.id : undefined
                     }

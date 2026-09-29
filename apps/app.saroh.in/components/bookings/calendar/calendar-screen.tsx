@@ -124,7 +124,13 @@ export function CalendarScreen({
     rules: BookingRules | null;
     /** What New booking may do about the customer and a pay link (E4). */
     people: BookingPeople;
-    can: { book: boolean; hours: boolean; order?: boolean };
+    can: {
+        book: boolean;
+        hours: boolean;
+        order?: boolean;
+        /** Take payment at the desk, and send a pay link instead (P2). */
+        desk?: { canTake: boolean; canLink: boolean };
+    };
     /** The full New booking dialog, for any service at any open time. */
     newBooking: ReactNode;
     /** What the business can tell its customers with (A14). */
@@ -657,6 +663,7 @@ export function CalendarScreen({
                     rules,
                     canBook: can.book,
                     canReadOrder: can.order ?? false,
+                    desk: can.desk,
                     notices,
                 }}
                 act={act}

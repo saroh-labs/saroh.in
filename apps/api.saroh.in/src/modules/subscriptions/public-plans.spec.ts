@@ -99,6 +99,8 @@ describe("the public plans route (G9)", () => {
             "utf8",
         );
         const code = service.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
-        expect(code).not.toMatch(/upi|autopay|card|razorpay|cashfree/i);
+        // It may pass on the autopay methods the provider itself reports
+        // (D12; DEC-059 allows that), but never names one of its own.
+        expect(code).not.toMatch(/upi|card|razorpay|cashfree|emandate/i);
     });
 });

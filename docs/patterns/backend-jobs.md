@@ -109,6 +109,18 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `resolveContact` (a merge lands on the survivor; a removed contact hears
   nothing).
 
+## Autopay charges — **Current** (D13)
+
+- **`subscription.charge`** runs a renewal's autopay charge in steps, each
+  its own run (`subscriptions/charge-job.ts`): `PREPARE` (the order and its
+  pre-debit notice), `DEBIT` (at `debitAfter`, asked again hourly while the
+  notice is out), `LOOK` (the debit looked up when its webhook is late).
+  The renewal writes the first step with the charge's intent on its own
+  transaction; each step writes the next with `enqueueChargeStepInTx`,
+  which skips a step already waiting for that charge, so a redelivered run
+  never forks the chain. The debit is claimed on the intent before it is
+  asked, so a run delivered twice debits once.
+
 ## Team alerts — **Current** (F14)
 
 - **`team.alert`** tells the business's own team, as each person chose in

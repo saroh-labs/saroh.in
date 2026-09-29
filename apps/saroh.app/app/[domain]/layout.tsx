@@ -5,6 +5,7 @@ import type { SignInOptions } from "@saroh/site-blocks";
 import { AccountEntry, ShopBag, SiteTheme } from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
+import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { customerReader } from "@/lib/customer-reader";
@@ -164,6 +165,7 @@ export default async function SiteLayout({
                     start: startCheckout,
                     standing: checkoutStanding,
                 }}
+                apiUrl={publicApiUrl()}
                 account={{
                     customer,
                     options: signInOptions ?? {
@@ -206,6 +208,8 @@ export default async function SiteLayout({
                 // A module page leaves the menu while its module is off (G15).
                 modules={resolved.modules}
                 action={action}
+                // A Shop entry in the menu while /shop serves (P4).
+                shopServes={shopServes}
                 account={account}
                 bag={bag}
             />

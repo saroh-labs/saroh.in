@@ -288,6 +288,25 @@
   business's `returnCredit` override refunds it only with `payment:manage`.
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
+- **Money taken at the desk is the booking's paper, paid by hand** (round-2
+  P2, DEC-023): `POST services/bookings/:id/desk-payment` (`booking:write`
+  and `invoice:write`, the pay link's pair) takes cash, UPI or card. With
+  no invoice it issues the booking's own (source BOOKING) and writes it
+  PAID with the method; a pay link already out is that ISSUED invoice paid
+  instead, its token cleared; after a deposit only the rest is taken, on a
+  SUPPLEMENTARY invoice against the deposit's (source BOOKING, `bookingId`
+  set). Nothing is charged, so nothing is refundable online: the booking's
+  `paidAtDeskCents` and `deskMethod` read PAID booking paper whose method
+  is one of `PAYMENT_METHODS` — so "Mark it paid" on the invoice counts
+  too — and `dueCents` subtracts it. What "Take ₹X" may take, and why not
+  (cancelled, a hold, a treatment's visit, a course's session, a pack or
+  membership, a payment PROCESSING, a voided invoice, no price, paid), is
+  one pure rule, `bookings/desk-take.ts`, shared by the booking read, the
+  diary and the write. The write takes the cancel's lock order, refuses an
+  `amountCents` that differs from what it works out, and answers a repeat
+  of the last take (same method and amount, within ten minutes) as it did.
+  A `PAID_AT_DESK` BookingEvent names who took it. No Undo: the invoice
+  is issued paper.
 - **Cancel and move have one write each, whoever acts** (A6):
   `bookings/booking-cancel.ts` and `booking-move.ts`. The team calls them
   from `BookingsService`, the customer from their account
@@ -349,11 +368,14 @@
   member's allowance only through `subscriptions/classes-allowance.ts`
   (`classesAllowance`, `HAS_ALLOWANCE_WHERE`): booking with the membership
   and Customer Detail's "Classes left" do, and the detail names the next
-  period's number when it differs. A null stamp is a row the previous image
-  wrote and reads the plan's number (the one-release fallback; follow-up Z1
-  removes it once no live row is unset); the backfill is
-  `backfill/classes-per-period.cli.ts` (`ROUND_2_PHASE_2_ROLLOUT.md`, D10).
-  A seed writing subscriptions sets both columns.
+  period's number when it differs. Since Z1 a set stamp is the only
+  designed state: the subscription's own value, null included, is
+  authoritative. A null stamp can only come from an API below D10 (a
+  rollback with no backfill after it); it is logged at ERROR as
+  `subscription_allowance_unset` and served the plan's number, never
+  unlimited, and the fix is the backfill
+  `backfill/classes-per-period.cli.ts` (`ROUND_2_PHASE_2_ROLLOUT.md`, D10
+  and Z1). A seed writing subscriptions sets both columns.
 - **Only an ACTIVE plan is on sale** (round-2 D21). A plan's `status` is a
   String, and a DRAFT (D5) isn't published yet. Every path that sells a plan
   — subscribe, a plan change, and a sign-up from the site — calls
@@ -462,9 +484,72 @@
 "PRIVACY_REMOVAL")` before its transaction and refuses while
   `unconfirmed` isn't zero. `cancelConfirmedAt` null on a CANCELLED row is
   "being confirmed" (DEC-026); a confirmed row is never asked again.
-- **Payment failed** is derived — the latest invoice unpaid past due — never
-  stored. "Retry now" mints a new pay link for that invoice, replacing the
-  old one; nothing is charged.
+- **Payment failed** is derived — the latest invoice unpaid and past due,
+  or whose autopay charge failed since it was issued (RENEWAL_FAILED,
+  MANDATE_LIMIT_LOW) — never stored. Retry (`subscriptions.service.ts`
+  `retryPayment`) asks the provider about an open charge first (a capture
+  it finds pays the invoice; one still in flight is a 409), then either
+  charges the mandate again under a new key (`via: MANDATE`) or mints a new
+  pay link, replacing the old one (`PAY_LINK`, the default). The read's
+  `retryVia` says which is on offer.
+- **Renewals charge the mandate** (round-2 D13). `renewOne` issues the
+  period's invoice, then `MandateChargesService.queueInTx` on the same
+  transaction: with an ACTIVE mandate whose provider's charging is on
+  (`payments/mandate-charge-gate.ts`, the rollout flag) and the invoice
+  within `maxAmountCents`, it writes a CREATED intent under
+  `inv_<invoiceId>_<attempt>` and the `subscription.charge` job; above the
+  limit it writes MANDATE_LIMIT_LOW and charges nothing; otherwise
+  nothing. The job (`subscription-charge.handler.ts`, steps in
+  `charge-job.ts`) prepares (order + pre-debit notice), debits at
+  `debitAfter` once the notice is DELIVERED or NOT_NEEDED, and looks the
+  debit up if its webhook is late. Each step re-checks the subscription
+  isn't CANCELLED and the mandate is still chargeable, or lets the charge
+  go (CANCELLED). Outcomes are written by `payments/mandate-charge-outcome.ts`
+  (CHARGED; RENEWAL_FAILED with `data.reason`; the team's "Payment failed"
+  alert on a decline). When the debit happens is the merchant's choice
+  (next point).
+- **The merchant chooses when autopay debits** (round-2 D13B, DEC-065;
+  `subscriptions/autopay-timing.ts`). `BusinessProfile.autopayChargeTiming`,
+  overridden by `SubscriptionPlan.autopayChargeTiming` when set (the booked
+  plan's for a renewal that switches plan): `DAY_AFTER_RENEWAL` (default,
+  D13 as it shipped: invoice on the renewal date, debit 26 hours later, at
+  once for a card or eMandate), `ON_RENEWAL_DATE` (the invoice and notice
+  `AUTOPAY_LEAD_DAYS` = 2 days early, the debit on the renewal date; every
+  method gets the early invoice) or `ON_DUE_DATE` (the debit at the start
+  of the due date, the notice 2 days before; no room for a Retry). Rules
+  every reader must keep:
+    - The planned debit is written on the charge's CREATED intent
+      (`debitAfter`) by `queueInTx`'s `schedule`, PREPARE is enqueued for 2
+      days before it, and `prepareCharge`'s `notBefore` keeps a no-notice
+      method from being debited sooner. **A setting changed later never moves
+      a queued charge.** DAY_AFTER_RENEWAL and Retry plan nothing (null).
+    - The early invoice comes from the renewal job's second pass
+      (`SubscriptionRenewHandler.renewEarly` → `renewEarlyOne`): ACTIVE, not
+      set to end, Payments on, a chargeable mandate, and **no invoice at all
+      yet for the next period**. On the renewal date `renewOne` finds it live
+      and advances without another.
+    - **Anything that stops the next period being billed as invoiced drops
+      the early invoice** (`subscriptions/early-renewal.ts`,
+      `dropEarlyRenewalInTx`): cancel (now or at period end), pause, and a
+      plan change booked or undone call it under the row lock; the charge
+      job's `stillCharging` calls it too before any step. It cancels the open
+      charge (never one PROCESSING), voids the invoice — or credits it in full
+      for a GST-registered business (DEC-023) — and writes
+      EARLY_INVOICE_CANCELLED. A new write that ends, pauses or re-terms a
+      subscription must call it.
+    - A VOID or CREDITED invoice is not a period's live invoice (`renewOne`,
+      and the `Invoice_one_live_per_period` index), so a subscription kept
+      after its early invoice was dropped is invoiced on the renewal date.
+    - The customer's "Next autopay charge" (`subscriptions/next-autopay-charge.ts`)
+      is a queued charge's planned debit, else the next renewal's projected
+      from the renewal date, the timing and the mandate's method.
+- **One charge at a time per invoice** (D13). While a mandate charge is
+  under way (`payments/charge-under-way.ts`: open and either PROCESSING or
+  on an ACTIVE mandate; sales only, never D12B's ₹1 check), a pay link,
+  its checkout, Send and Send reminder, the account's "Pay now" and Retry
+  are refused with 409 "Autopay charge in progress", and the reads say
+  "Autopay charge in progress · ‹date›" (`autopayCharge`,
+  `online.autopayCharge`, `autopayCharging`).
 
 ## Courses and class packs — **Current**
 

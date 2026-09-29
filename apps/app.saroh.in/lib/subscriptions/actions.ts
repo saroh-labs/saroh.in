@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { voidInvoice as voidInvoiceApi } from "@/lib/invoices/service";
 
+import type { AutopayChargeTiming } from "./autopay-timing";
 import type { PlanValues } from "./plan-drafts";
 import * as drafts from "./plan-drafts";
-import type { PauseChoice, PlanInput, SubscribeInput } from "./service";
+import type { PauseChoice, SubscribeInput } from "./service";
 import * as api from "./service";
 
 /** Thin: the API decides who may, and what a subscription may become. */
@@ -35,9 +36,41 @@ export async function pauseSubscription(id: string, choice: PauseChoice) {
 export async function setMembersCanPause(on: boolean) {
     return then(api.setMembersCanPause(on));
 }
-/** A new pay link for a failed renewal (F4's Retry by pay link). */
-export async function retrySubscription(id: string) {
-    return then(api.retrySubscription(id));
+/** "When autopay charges", for the business (D13B). */
+export async function setAutopayChargeTiming(timing: AutopayChargeTiming) {
+    return then(api.setAutopayChargeTiming(timing));
+}
+/** A plan's own "When autopay charges" (D13B); null: the business's. */
+export async function setPlanChargeTiming(
+    planId: string,
+    timing: AutopayChargeTiming | null,
+) {
+    return then(api.setPlanChargeTiming(planId, timing));
+}
+/**
+ * Retry a failed renewal: a new pay link (F4's Retry by pay link), or a new
+ * charge on their autopay (D13).
+ */
+export async function retrySubscription(
+    id: string,
+    via: api.RetryVia = "PAY_LINK",
+) {
+    return then(api.retrySubscription(id, via));
+}
+/**
+ * "Send a set-up link" (D14): the provider's page to approve autopay on,
+ * answered once; emailed as well when asked and the business can.
+ */
+export async function sendAutopayLink(
+    id: string,
+    method: api.AutopayMethod,
+    email: boolean,
+) {
+    return then(api.sendAutopayLink(id, method, email));
+}
+/** "Cancel autopay" (D14): the subscription carries on, invoiced by link. */
+export async function cancelAutopay(id: string) {
+    return then(api.cancelAutopay(id));
 }
 export async function resumeSubscription(id: string) {
     return then(api.resumeSubscription(id));
@@ -94,12 +127,6 @@ export async function loadSubscriptionEvents(id: string, cursor: string) {
     return api.listSubscriptionEvents(id, cursor);
 }
 
-export async function createPlan(input: PlanInput) {
-    return then(api.createPlan(input));
-}
-export async function updatePlan(id: string, input: PlanInput) {
-    return then(api.updatePlan(id, input));
-}
 /**
  * Archive, or sell again. The Plans tab's Undo calls it with the opposite,
  * so one action serves both ways (D3).

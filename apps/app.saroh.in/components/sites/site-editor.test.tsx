@@ -348,7 +348,9 @@ describe("SiteEditor shell", () => {
         const back = $(`a[href='/sites/${siteId}/pages']`);
         expect(back?.textContent).toBe("Website");
         expect(back?.getAttribute("aria-label")).toBe("Back to Website");
-        expect(button(/^Page: Home\. Switch or manage pages$/)).toBeTruthy();
+        expect(
+            button(/^Page: Home\. Choose another page to edit$/),
+        ).toBeTruthy();
         expect($("[role=status]")?.textContent).toBe("Published");
         expect($("[role=group][aria-label='Preview width']")).not.toBeNull();
         for (const d of ["desktop", "tablet", "phone"]) {
@@ -900,6 +902,23 @@ describe("SiteEditor shell", () => {
         expect(button("Publish").disabled).toBe(false);
         // G2: the pill carries what the save counted.
         expect($("[role=status]")?.textContent).toBe("Not published · 1 block");
+    });
+
+    it("keeps a hidden section in the block list, marked Hidden (G16)", () => {
+        render();
+        click(button(/Visible$/));
+        const row = button("Welcome in");
+        // Still listed, struck through and said: never dropped from the list.
+        expect(row.querySelector(".line-through")?.textContent).toBe(
+            "Welcome in",
+        );
+        const tag = document.getElementById(
+            row.getAttribute("aria-describedby") ?? "",
+        );
+        expect(tag?.textContent).toBe("Hidden");
+        expect(tag?.title).toBe("Not shown on the site");
+        // The other section carries no mark.
+        expect(button("Our story").getAttribute("aria-describedby")).toBeNull();
     });
 
     it("stops saving and offers a reload when someone else saved", async () => {

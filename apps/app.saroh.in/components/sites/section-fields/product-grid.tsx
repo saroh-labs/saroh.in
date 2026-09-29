@@ -4,7 +4,6 @@ import Link from "next/link";
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import {
     Select,
     SelectContent,
@@ -13,7 +12,6 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 import { Skeleton } from "@saroh/ui/skeleton";
-import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
@@ -21,6 +19,12 @@ import type { GridCatalogueLoad } from "@/components/sites/use-grid-catalogue";
 import { useGridCatalogue } from "@/components/sites/use-grid-catalogue";
 import type { ProductGridContent } from "@/lib/sites/service";
 
+import {
+    DisplayOptions,
+    hiddenFlag,
+    unlessDefault,
+    wordsOrAbsent,
+} from "./display-options";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
@@ -55,7 +59,6 @@ export function ProductGridFieldsView({
     const c = section.content;
     const patch = (next: Partial<ProductGridContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
-    const id = section.key ?? "product-grid";
     const source: Source = c.source ?? "newest";
 
     return (
@@ -160,23 +163,32 @@ export function ProductGridFieldsView({
                 </ToggleGroup>
             </Field>
 
-            <div className="flex items-center justify-between gap-3">
-                <Label htmlFor={`${id}-prices`}>Show prices</Label>
-                <Switch
-                    id={`${id}-prices`}
-                    checked={c.showPrices !== false}
-                    onCheckedChange={(on) =>
-                        patch({ showPrices: on ? undefined : false })
-                    }
-                />
-            </div>
-
-            <Field label="Photos">
-                <p className="text-xs text-muted-foreground">
-                    Each card uses that product&apos;s own photo, from its page
-                    in Sell › Products.
-                </p>
-            </Field>
+            <DisplayOptions
+                // Cards is how the grid has always shown, so it is absent.
+                layout={c.layout ?? "cards"}
+                onLayout={(v) => patch({ layout: unlessDefault(v, "cards") })}
+                photos={{
+                    value: c.showPhotos !== false,
+                    onChange: (on) => patch({ showPhotos: hiddenFlag(on) }),
+                    note: "Each card uses that product's own photo, from its page in Sell › Products.",
+                }}
+                descriptions={{
+                    value: c.showDescriptions !== false,
+                    onChange: (on) =>
+                        patch({ showDescriptions: hiddenFlag(on) }),
+                    note: "The first line about each product.",
+                }}
+                prices={{
+                    value: c.showPrices !== false,
+                    onChange: (on) => patch({ showPrices: hiddenFlag(on) }),
+                }}
+                button={{
+                    value: c.buttonLabel ?? "",
+                    onChange: (v) => patch({ buttonLabel: wordsOrAbsent(v) }),
+                    placeholder: "View",
+                    note: "Words at the foot of each card, like “View”. Leave empty for none: the whole card opens the product.",
+                }}
+            />
         </div>
     );
 }

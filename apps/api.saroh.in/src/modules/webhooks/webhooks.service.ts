@@ -30,12 +30,24 @@ import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
 import {
+    AUTHORISATION_PURPOSE,
+    captureCheckInTx,
+    failCheckInTx,
+} from "../payments/authorisation-check";
+import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
+import { recordChargeEventInTx } from "../payments/mandate-charge-outcome";
+import {
+    applyMandateChangeInTx,
+    applyPreDebitInTx,
+} from "../payments/mandate-events";
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
+import { completePlanJoinInTx } from "../subscriptions/plan-join";
+import { linkMandateInTx } from "./mandate-link";
 import { applyOnlineOrderSuccess } from "./online-order-payment";
 import type {
     NormalizedWebhookEvent,
@@ -62,8 +74,9 @@ export interface WebhookResult {
 
 /**
  * A row loaded from `paymentIntent` for reconciliation. Exactly one of
- * `orderId` / `invoiceId` is set (a CHECK constraint says so); `invoiceId`
- * may be absent on rows read by code that predates invoice intents.
+ * `orderId` / `invoiceId` is set (a CHECK constraint says so) — or neither,
+ * on an autopay check (`purpose` AUTHORISATION, DEC-064); `invoiceId` may
+ * be absent on rows read by code that predates invoice intents.
  */
 interface IntentRow {
     id: string;
@@ -71,10 +84,13 @@ interface IntentRow {
     provider: string;
     orderId: string | null;
     invoiceId?: string | null;
+    purpose?: string | null;
     providerIntentId?: string | null;
     status: string;
     amountCents: number;
     currency: string;
+    /** A renewal's autopay charge (D13): its outcome is logged on the plan. */
+    viaMandateId?: string | null;
 }
 
 /** What the provider is called on an invoice paid through it. */
@@ -300,6 +316,29 @@ export class WebhooksService {
     }
 
     /**
+     * Settle a payment the provider itself confirmed when Saroh asked it
+     * (P1): the checkout's signed return, the pending sweep, or `payments
+     * reconcile`. It runs the webhook's own reconciliation, so whichever of
+     * the look-up and the webhook comes first settles the intent and the
+     * other finds it settled and changes nothing — every effect checks the
+     * state it moves from under the intent's row lock, as a replay does.
+     *
+     * Nothing is written to the webhook inbox: this is not a delivery, and
+     * the caller has already checked the provider's answer (its order, its
+     * status and its amount against the intent). The caller's event is
+     * built from that answer, never from anything the browser sent.
+     */
+    async settleLookedUp(
+        provider: string,
+        organizationId: string,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        return prisma.$transaction((tx) =>
+            this.reconcile(tx, provider, organizationId, event),
+        );
+    }
+
+    /**
      * Map a verified event to a PaymentIntent and apply its money effect. Pure
      * of HTTP/secret concerns. Returns `{ applied }` — whether any state moved.
      */
@@ -309,7 +348,59 @@ export class WebhooksService {
         organizationId: string,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        const { applied } = await this.reconcileOutcome(
+            tx,
+            provider,
+            organizationId,
+            event,
+        );
+        // Autopay (D19): an authorisation's payment names the mandate it
+        // made. After the payment's own effect, so a plan joined with
+        // autopay (D12) has had its mandate row made by this same payment
+        // before the token is linked to it.
+        const linked = event.mandateLink
+            ? await linkMandateInTx(
+                  tx,
+                  this.factory.get(provider),
+                  organizationId,
+                  event.mandateLink,
+              )
+            : false;
+        return { applied: applied || linked };
+    }
+
+    /** {@link reconcile}'s money or mandate effect, by the event's outcome. */
+    private async reconcileOutcome(
+        tx: Tx,
+        provider: string,
+        organizationId: string,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
         if (event.outcome === "IGNORED") return { applied: false };
+
+        // Autopay (D11): a mandate's state, or a charge's pre-debit notice.
+        // A mandate charge's own payment settles below, as any intent's.
+        if (event.outcome === "MANDATE") {
+            return event.mandate
+                ? applyMandateChangeInTx(
+                      tx,
+                      organizationId,
+                      provider,
+                      event.mandate,
+                  )
+                : { applied: false };
+        }
+        if (event.outcome === "PRE_DEBIT") {
+            return event.preDebitStatus && event.providerIntentId
+                ? applyPreDebitInTx(
+                      tx,
+                      organizationId,
+                      provider,
+                      event.providerIntentId,
+                      event.preDebitStatus,
+                  )
+                : { applied: false };
+        }
 
         const intent = await this.findIntent(
             tx,
@@ -330,6 +421,30 @@ export class WebhooksService {
         intent: IntentRow,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        // The ₹1 autopay check (D12B, DEC-064): no order, no invoice, never
+        // a sale. Its capture reserves its refund and the job that sends
+        // it; the refund's own events settle that row, and nothing else.
+        if (intent.purpose === AUTHORISATION_PURPOSE) {
+            switch (event.outcome) {
+                case "SUCCEEDED":
+                    return captureCheckInTx(
+                        tx,
+                        intent,
+                        event.providerPaymentRef,
+                    );
+                case "FAILED":
+                    return failCheckInTx(tx, intent);
+                case "REFUNDED": {
+                    const settled = await this.settleRefund(tx, intent, event);
+                    return { applied: settled.applied };
+                }
+                case "REFUND_FAILED":
+                    return this.failProviderRefund(tx, intent, event);
+                default:
+                    return { applied: false };
+            }
+        }
+
         // An invoice's pay link (U13): the same outcomes, applied to the
         // invoice instead of an order.
         if (intent.invoiceId) {
@@ -612,6 +727,17 @@ export class WebhooksService {
     ): Promise<{ applied: boolean }> {
         const result = await this.applyIntentFailure(tx, intent);
         if (result.applied) {
+            // A renewal's autopay charge declined (D13): RENEWAL_FAILED,
+            // which Home reads as "Payment failed"; the pay link opens again.
+            if (intent.viaMandateId) {
+                await recordChargeEventInTx(
+                    tx,
+                    intent.organizationId,
+                    invoiceId,
+                    "RENEWAL_FAILED",
+                    { reason: "DECLINED" },
+                );
+            }
             await enqueueTeamAlert(tx, intent.organizationId, {
                 event: "failed",
                 invoiceId,
@@ -983,11 +1109,14 @@ export class WebhooksService {
             });
             id = byProvider?.id ?? null;
         }
+        // An autopay check (DEC-064) is on no order or invoice: its own.
         const parent = intent.orderId
             ? { orderId: intent.orderId }
             : intent.invoiceId
               ? { invoiceId: intent.invoiceId }
-              : null;
+              : intent.purpose === AUTHORISATION_PURPOSE
+                ? { id: intent.id }
+                : null;
         if (!id && event.refundReference && parent) {
             const byReference = await tx.paymentRefund.findFirst({
                 where: {
@@ -1101,6 +1230,21 @@ export class WebhooksService {
                       payment,
                   })
                 : null;
+        // A plan joined online (G20): the subscription is started from the
+        // draft's snapshot and the invoice numbered and paid — unless the
+        // draft was discarded, or its member removed or put on the plan by
+        // the desk meanwhile, and then the money is owed back, below.
+        const joined =
+            invoice?.status === "DRAFT" && invoice.source === "SUBSCRIPTION"
+                ? await completePlanJoinInTx(tx, {
+                      invoiceId,
+                      organizationId: intent.organizationId,
+                      now: new Date(),
+                      payment,
+                      // Autopay chosen at join starts with it (D12).
+                      providerIntentId: intent.providerIntentId,
+                  })
+                : null;
         // A booking's pay link (E4) paid after the booking was cancelled:
         // cancelling retires the link, but a checkout already open can still
         // take the money. The place is gone, so it is owed back, not a
@@ -1116,13 +1260,23 @@ export class WebhooksService {
         if (
             (invoice?.status === "ISSUED" && !cancelledBooking) ||
             held === "confirmed" ||
-            bought === "bought"
+            bought === "bought" ||
+            joined === "joined"
         ) {
             if (invoice?.status === "ISSUED") {
                 await tx.invoice.update({
                     where: { id: invoiceId },
                     data: { status: "PAID", paidAt: new Date(), ...payment },
                 });
+                // Paid by autopay (D13): CHARGED on the subscription's log.
+                if (intent.viaMandateId) {
+                    await recordChargeEventInTx(
+                        tx,
+                        intent.organizationId,
+                        invoiceId,
+                        "CHARGED",
+                    );
+                }
                 // A booking's pay link (E4): the booking reads as paid
                 // online. The invoice's lock is held, then the booking's.
                 if (invoice.source === "BOOKING" && invoice.bookingId) {
@@ -1148,9 +1302,11 @@ export class WebhooksService {
                 ? "RELEASED_HOLD"
                 : bought === "gone"
                   ? "PACK_NOT_BOUGHT"
-                  : cancelledBooking
-                    ? "CANCELLED_BOOKING"
-                    : (invoice?.status ?? "MISSING");
+                  : joined === "gone"
+                    ? "PLAN_NOT_JOINED"
+                    : cancelledBooking
+                      ? "CANCELLED_BOOKING"
+                      : (invoice?.status ?? "MISSING");
         await tx.paymentAttempt.create({
             data: {
                 organizationId: intent.organizationId,

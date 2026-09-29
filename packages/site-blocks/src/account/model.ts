@@ -1,3 +1,9 @@
+import type {
+    AutopayChecks,
+    AutopayMethod,
+    AutopayState,
+} from "../autopay/api";
+
 /**
  * The customer account area's data, as the site's server hands it to the
  * pages (ADR-011; round-2 plan A, A5). The same shapes the API's allow-list
@@ -127,6 +133,26 @@ export interface AccountSubscription extends AccountPlan {
     canPause: boolean;
     canResume: boolean;
     canCancel: boolean;
+    /** How its autopay stands (D12); null or absent: none. */
+    autopay?: AutopayState | null;
+    /**
+     * What turning autopay on pays now (D12): the plan's oldest unpaid
+     * invoice, paid in the same window by UPI or card. Null: nothing owed.
+     */
+    autopayPays?: { total: string; currency: string } | null;
+    /**
+     * An autopay charge is under way (D13): "Autopay charge in progress ·
+     * ‹date›", `at` being when their bank is asked. "Pay now" is hidden
+     * meanwhile. Null or absent: none.
+     */
+    autopayCharging?: { at: string } | null;
+    /**
+     * When autopay next takes money (D13B, DEC-065): "Next autopay charge:
+     * ‹date›" — a charge queued for a later day (said instead of "in
+     * progress"), or the next renewal's by the business's timing. Null or
+     * absent: none to say.
+     */
+    autopayNextCharge?: { at: string } | null;
 }
 
 export interface AccountPack {
@@ -143,6 +169,16 @@ export interface AccountPlanTab {
     packs: Block<AccountPack[]>;
     /** The weeks a pause may last; empty when the business has pausing off. */
     pauseWeeks: number[];
+    /**
+     * Every way the business's provider can take autopay (D12); empty or
+     * absent: autopay isn't offered.
+     */
+    autopayMethods?: AutopayMethod[];
+    /**
+     * The check each method takes to switch autopay on when nothing is
+     * owed (DEC-064: UPI and card ₹1, refunded); told before they pick.
+     */
+    autopayChecks?: AutopayChecks;
 }
 
 export interface AccountClasses {

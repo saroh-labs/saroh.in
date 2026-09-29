@@ -493,10 +493,8 @@ createServer((req, res) => {
                   }
                 : {}),
             actions: [],
-            primaryAction: null,
             hasAnyModule: true,
             upcoming: [],
-            numbers: [],
             unavailable: [],
             needs: [],
             needsTotal: 0,

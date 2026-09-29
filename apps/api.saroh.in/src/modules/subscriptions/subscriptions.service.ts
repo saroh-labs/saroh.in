@@ -3,6 +3,7 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
@@ -17,7 +18,17 @@ import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { AutopayLine } from "../payments/autopay.service";
+import { AutopayService } from "../payments/autopay.service";
+import {
+    autopayChargeInProgress,
+    chargeUnderWayOn,
+    subscriptionChargesUnderWay,
+} from "../payments/charge-under-way";
 import { cancelMandatesInTx } from "../payments/mandate-cancel-job";
+import { MandateChargesService } from "../payments/mandate-charges.service";
+import type { AutopayChargeTiming } from "./autopay-timing";
+import { earlyIssueAt, effectiveChargeTiming } from "./autopay-timing";
 import { allowanceData } from "./classes-allowance";
 import type { UpcomingCollection } from "./collections";
 import {
@@ -46,6 +57,8 @@ import type {
     SubscribeDto,
     SubscriptionSettingsDto,
 } from "./dto";
+import type { EarlyDropReason } from "./early-renewal";
+import { dropEarlyRenewalInTx } from "./early-renewal";
 import { overdueInvoiceOf, takesPaymentOnline } from "./member-invoices";
 import type { PauseEnded } from "./pause-until";
 import {
@@ -55,7 +68,7 @@ import {
     resumeWhenDue,
 } from "./pause-until";
 import type { Interval, Period } from "./periods";
-import { periodContaining } from "./periods";
+import { periodContaining, periodLabel } from "./periods";
 import type { PlanEditorView } from "./plan-draft-view";
 import { readPlanEditor } from "./plan-draft-view";
 import {
@@ -72,6 +85,14 @@ import { createPlanRow, setPlanStatusRow, updatePlanRow } from "./plan-writes";
 import type { PlanView } from "./plans";
 import { planViews, readPlan } from "./plans";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
+import type {
+    AutopayBadge,
+    AutopayCardView,
+} from "./subscription-autopay.service";
+import {
+    autopayBadges,
+    SubscriptionAutopayService,
+} from "./subscription-autopay.service";
 import type {
     EventPlanRef,
     SubscriptionEventLog,
@@ -218,6 +239,54 @@ export interface SubscriptionView {
      */
     startedAt: string;
     createdAt: string;
+    /**
+     * How its autopay stands (D12): on, paused, being set up or failed,
+     * with the method, its displayable hint and the limit. Null: none.
+     * Only Subscription Detail's read carries it.
+     */
+    autopay?: AutopayLine | null;
+    /**
+     * An autopay charge is under way on one of its unpaid invoices (D13):
+     * "Autopay charge in progress · ‹date›", `at` being when the debit is
+     * asked for. No Retry and no pay link meanwhile. Only Subscription
+     * Detail's read carries it; null: none.
+     */
+    autopayCharge?: { at: string } | null;
+    /**
+     * How Retry would go now (D13, default 35): `MANDATE` charges their
+     * autopay again ("Charge autopay again"), `PAY_LINK` makes a new pay
+     * link. Null: nothing to retry, or a charge is under way. Only
+     * Subscription Detail's read carries it.
+     */
+    retryVia?: RetryVia | null;
+    /**
+     * Subscription Detail's autopay card for staff (D14): whether the
+     * business offers autopay now, how the mandate was set up, a cancel
+     * still being confirmed, "limit too low", and where a set-up link
+     * would be emailed. Only Subscription Detail's read carries it.
+     */
+    autopayCard?: AutopayCardView | null;
+    /**
+     * Its autopay on the list (D14): the ACTIVE or PAUSED mandate's method
+     * and hint. Only the list carries it; null: none.
+     */
+    autopayOn?: AutopayBadge | null;
+}
+
+/** How a failed renewal is retried (D13). */
+export type RetryVia = "MANDATE" | "PAY_LINK";
+
+/** What Retry did (D13). */
+export interface RetryResult {
+    invoiceId: string;
+    via: RetryVia;
+    /** The new pay link's token (PAY_LINK), shown once; null for MANDATE. */
+    token: string | null;
+    /**
+     * The charge was already captured at the provider, found when Retry
+     * asked first (DEC-026): the invoice is paid now, nothing was charged.
+     */
+    paid?: boolean;
 }
 
 /**
@@ -302,6 +371,7 @@ interface InvoiceRowLite {
     total: { toString(): string };
     dueAt: Date | null;
     paidAt: Date | null;
+    issuedAt: Date | null;
 }
 
 /** A subscription's invoices, as its row needs them. */
@@ -309,6 +379,11 @@ interface SubscriptionInvoices {
     /** Issued and unpaid, oldest first. */
     unpaid: InvoiceRowLite[];
     latest: InvoiceRowLite | null;
+    /**
+     * When its autopay last failed or found the limit too low (D13's
+     * RENEWAL_FAILED or MANDATE_LIMIT_LOW), or null.
+     */
+    chargeFailedAt: Date | null;
 }
 
 /** What a period is billed at: the subscription's terms, or its new plan's. */
@@ -335,7 +410,18 @@ interface Terms {
  */
 @Injectable()
 export class SubscriptionsService {
-    constructor(private readonly invoices: InvoicesService) {}
+    constructor(
+        private readonly invoices: InvoicesService,
+        // The autopay line on Subscription Detail (D12); absent where a test
+        // builds the service by hand.
+        @Optional() private readonly autopay?: AutopayService,
+        // A renewal charges the customer's autopay (D13); absent where a
+        // test builds the service by hand, and then renewals only invoice.
+        @Optional() private readonly charges?: MandateChargesService,
+        // Subscription Detail's autopay card (D14); absent where a test
+        // builds the service by hand.
+        @Optional() private readonly autopayStaff?: SubscriptionAutopayService,
+    ) {}
 
     // — Plans ——————————————————————————————————————————————————————
 
@@ -491,22 +577,49 @@ export class SubscriptionsService {
             select: SUBSCRIPTION_SELECT,
         });
         const ids = rows.map((r) => r.id);
-        const [invoices, skips] = await Promise.all([
+        const [invoices, skips, badges] = await Promise.all([
             this.invoicesFor(ctx.organizationId, ids),
             this.skipsFor(ctx.organizationId, ids),
+            // "UPI Autopay · …" on the row (D14).
+            autopayBadges(ctx.organizationId, ids),
         ]);
         const now = new Date();
         return rows.map((r) =>
-            forViewer(
-                ctx,
-                this.view(r, invoices.get(r.id), skips.get(r.id), now),
-            ),
+            forViewer(ctx, {
+                ...this.view(r, invoices.get(r.id), skips.get(r.id), now),
+                autopayOn: badges.get(r.id) ?? null,
+            }),
         );
     }
 
     async get(ctx: OrganizationContext, id: string): Promise<SubscriptionView> {
         authorize(ctx, "subscription:read");
-        return this.read(ctx, id);
+        const view = await this.read(ctx, id);
+        // How autopay stands (D12), and the card staff manage it from (D14).
+        const autopay = this.autopay
+            ? await this.autopay.line(ctx.organizationId, id)
+            : null;
+        const autopayCard = this.autopayStaff
+            ? await this.autopayStaff.card(
+                  ctx.organizationId,
+                  id,
+                  view.currency,
+              )
+            : null;
+        // A charge under way, and how Retry would go (D13).
+        const charging = (
+            await subscriptionChargesUnderWay(prisma, ctx.organizationId, [id])
+        ).get(id);
+        const retryVia = charging
+            ? null
+            : await this.retryVia(ctx.organizationId, id, new Date());
+        return {
+            ...view,
+            autopay,
+            autopayCharge: charging ? { at: charging.at.toISOString() } : null,
+            retryVia,
+            autopayCard,
+        };
     }
 
     /** What was done to it and by whom, newest first (D9). */
@@ -722,6 +835,7 @@ export class SubscriptionsService {
             data: { status: "PAUSED", pausedAt: now, pausedUntil },
         });
         await log("PAUSED", { data: pausedEventData(pausedUntil) });
+        await this.dropEarly(tx, sub, "PAUSED", log, now);
         return pausedUntil;
     }
 
@@ -950,7 +1064,9 @@ export class SubscriptionsService {
                         pendingPlanId: null,
                     },
                 });
-                await this.log(tx, ctx, id)("CANCELLED");
+                const log = this.log(tx, ctx, id);
+                await log("CANCELLED");
+                await this.dropEarly(tx, sub, "CANCELLED", log);
                 await endMandates(tx, ctx.organizationId, id);
                 return;
             }
@@ -959,13 +1075,11 @@ export class SubscriptionsService {
                 where: { id },
                 data: { cancelAtPeriodEnd: true },
             });
-            await this.log(
-                tx,
-                ctx,
-                id,
-            )("CANCEL_SCHEDULED", {
+            const log = this.log(tx, ctx, id);
+            await log("CANCEL_SCHEDULED", {
                 data: { endsAt: sub.currentPeriodEnd.toISOString() },
             });
+            await this.dropEarly(tx, sub, "CANCELLED", log);
         });
         return this.read(ctx, id);
     }
@@ -1015,6 +1129,7 @@ export class SubscriptionsService {
                     },
                 });
                 await log("CANCELLED");
+                await this.dropEarly(tx, sub, "CANCELLED", log, now);
                 await endMandates(tx, member.organizationId, id);
                 return { outcome: "now", endsAt: now, timezone: sub.timezone };
             }
@@ -1025,6 +1140,7 @@ export class SubscriptionsService {
             await log("CANCEL_SCHEDULED", {
                 data: { endsAt: sub.currentPeriodEnd.toISOString() },
             });
+            await this.dropEarly(tx, sub, "CANCELLED", log);
             return { outcome: "scheduled", ...said };
         });
     }
@@ -1293,17 +1409,16 @@ export class SubscriptionsService {
                 where: { id },
                 data: { pendingPlanId: plan.id },
             });
-            await this.log(
-                tx,
-                ctx,
-                id,
-            )("PLAN_CHANGE_BOOKED", {
+            const log = this.log(tx, ctx, id);
+            await log("PLAN_CHANGE_BOOKED", {
                 data: {
                     to: planRef(plan),
                     from: sub.currentPeriodEnd.toISOString(),
                     replaced: sub.pendingPlan ? planRef(sub.pendingPlan) : null,
                 },
             });
+            // An early invoice (D13B) was for the old terms.
+            await this.dropEarly(tx, sub, "PLAN_CHANGED", log);
         });
         return this.read(ctx, id);
     }
@@ -1325,53 +1440,152 @@ export class SubscriptionsService {
                 where: { id },
                 data: { pendingPlanId: null },
             });
-            await this.log(
-                tx,
-                ctx,
-                id,
-            )("PLAN_CHANGE_CANCELLED", {
+            const log = this.log(tx, ctx, id);
+            await log("PLAN_CHANGE_CANCELLED", {
                 data: {
                     plan: sub.pendingPlan ? planRef(sub.pendingPlan) : null,
                 },
             });
+            // An early invoice (D13B) was for the booked plan's terms.
+            await this.dropEarly(tx, sub, "PLAN_CHANGED", log);
         });
         return this.read(ctx, id);
     }
 
     /**
-     * "Retry now" on a failed charge: a new pay link for the unpaid, overdue
-     * latest invoice, replacing the old one. Nothing is charged — there is
-     * no card on file — the link is what the customer pays through.
-     * Needs `invoice:write` as well, as any pay link does.
+     * Retry a failed renewal (D13; default 35). A charge still open on it
+     * is asked about first (DEC-026): one the provider captured settles the
+     * invoice and nothing more is done; one still in flight is a 409
+     * "Autopay charge in progress". Then, as asked:
+     *
+     * - `MANDATE`: a new autopay charge (a new attempt key, so a new order
+     *   and pre-debit notice), when the subscription's mandate is ACTIVE,
+     *   its provider's charging is on and the invoice is within its limit;
+     *   otherwise 409.
+     * - `PAY_LINK` (the default, as before D13): a new pay link, replacing
+     *   the old one; needs `invoice:write`, as any pay link does.
+     *
+     * The failed renewal is its latest invoice, unpaid and past due, or
+     * whose autopay charge failed (RENEWAL_FAILED, MANDATE_LIMIT_LOW).
      */
     async retryPayment(
         ctx: OrganizationContext,
         id: string,
-    ): Promise<{ invoiceId: string; token: string }> {
+        via: RetryVia = "PAY_LINK",
+    ): Promise<RetryResult> {
         authorize(ctx, "subscription:write");
-        // One transaction under the subscription's lock: the link and its
-        // RETRIED commit together, and a refused link records nothing.
+        const { organizationId } = ctx;
+        const now = new Date();
+        // Ask the provider about an open charge first, outside the lock.
+        const target = await this.retryTarget(organizationId, id, now);
+        if (target && this.charges) {
+            const open = await chargeUnderWayOn(prisma, organizationId, target);
+            if (open) {
+                const found = await this.charges.lookUp({
+                    organizationId,
+                    intentId: open.intentId,
+                });
+                if (found === "PAID") {
+                    return {
+                        invoiceId: target,
+                        via: "MANDATE",
+                        token: null,
+                        paid: true,
+                    };
+                }
+            }
+        }
+        // One transaction under the subscription's lock: the charge or the
+        // link and its RETRIED commit together; a refusal records nothing.
         return prisma.$transaction(async (tx) => {
-            const row = await this.lock(tx, ctx.organizationId, id);
-            const invoices = await this.invoicesFor(
-                ctx.organizationId,
-                [id],
-                tx,
-            );
-            const failed = failedCharge(row, invoices.get(id), new Date());
+            await this.lock(tx, organizationId, id);
+            const failed = await this.retryTarget(organizationId, id, now, tx);
             if (!failed) {
                 throw new ConflictException(
                     "The latest charge is not overdue, so there is nothing to retry.",
                 );
             }
+            if (await chargeUnderWayOn(tx, organizationId, failed)) {
+                throw autopayChargeInProgress();
+            }
+            if (via === "MANDATE") {
+                const queued = this.charges
+                    ? await this.charges.queueInTx(tx, {
+                          organizationId,
+                          subscriptionId: id,
+                          invoiceId: failed,
+                          now,
+                      })
+                    : ({ status: "NONE" } as const);
+                if (queued.status !== "QUEUED") {
+                    throw new ConflictException({
+                        message:
+                            queued.status === "LIMIT_LOW"
+                                ? "This renewal is more than their autopay covers. Make a pay link instead."
+                                : "Autopay can't take this charge now. Make a pay link instead.",
+                        details: { reason: "autopay-unavailable" },
+                    });
+                }
+                await this.log(
+                    tx,
+                    ctx,
+                    id,
+                )("RETRIED", {
+                    invoiceId: failed,
+                    data: { via: "MANDATE" },
+                });
+                return { invoiceId: failed, via: "MANDATE", token: null };
+            }
             const { token } = await this.invoices.createPayLinkInTx(
                 tx,
                 ctx,
-                failed.id,
+                failed,
             );
-            await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed.id });
-            return { invoiceId: failed.id, token };
+            await this.log(tx, ctx, id)("RETRIED", { invoiceId: failed });
+            return { invoiceId: failed, via: "PAY_LINK", token };
         });
+    }
+
+    /**
+     * The invoice Retry acts on: the failed renewal (`failedCharge`), or
+     * null. A cancelled subscription has none.
+     */
+    private async retryTarget(
+        organizationId: string,
+        id: string,
+        now: Date,
+        db: Tx = prisma,
+    ): Promise<string | null> {
+        const row = await db.customerSubscription.findFirst({
+            where: { id, organizationId },
+            select: { status: true },
+        });
+        if (!row) notFound("Subscription");
+        const invoices = await this.invoicesFor(organizationId, [id], db);
+        return failedCharge(row, invoices.get(id), now)?.id ?? null;
+    }
+
+    /**
+     * How Retry would go now (D13): by the customer's autopay when it can
+     * take this invoice, else a pay link. Null: nothing to retry.
+     */
+    private async retryVia(
+        organizationId: string,
+        id: string,
+        now: Date,
+    ): Promise<RetryVia | null> {
+        const row = await prisma.customerSubscription.findFirst({
+            where: { id, organizationId },
+            select: { status: true },
+        });
+        if (!row) return null;
+        const invoices = await this.invoicesFor(organizationId, [id]);
+        const failed = failedCharge(row, invoices.get(id), now);
+        if (!failed) return null;
+        const byMandate = this.charges
+            ? await this.charges.mandateRetryable(organizationId, [id])
+            : new Set<string>();
+        return byMandate.has(id) ? "MANDATE" : "PAY_LINK";
     }
 
     /** The business's subscription settings (A8). */
@@ -1379,18 +1593,65 @@ export class SubscriptionsService {
         ctx: OrganizationContext,
     ): Promise<SubscriptionSettingsView> {
         authorize(ctx, "subscription:read");
-        return readSubscriptionSettings(ctx.organizationId);
+        return readSubscriptionSettings(
+            ctx.organizationId,
+            await this.autopayAvailable(ctx.organizationId),
+        );
     }
 
-    /** Turn "Members can pause from their account" on or off (A8). */
+    /**
+     * Turn "Members can pause from their account" on or off (A8), and set
+     * "When autopay charges" (D13B). A new timing reaches charges queued
+     * from now on; one already queued keeps its date (DEC-065).
+     */
     async updateSettings(
         ctx: OrganizationContext,
         dto: SubscriptionSettingsDto,
     ): Promise<SubscriptionSettingsView> {
         authorize(ctx, "subscription:write");
-        return writeSubscriptionSettings(ctx.organizationId, {
-            membersCanPause: dto.membersCanPause,
+        if (
+            dto.membersCanPause === undefined &&
+            dto.autopayChargeTiming === undefined
+        ) {
+            fieldError("Nothing to change", "membersCanPause");
+        }
+        return writeSubscriptionSettings(
+            ctx.organizationId,
+            {
+                membersCanPause: dto.membersCanPause,
+                autopayChargeTiming: dto.autopayChargeTiming,
+            },
+            await this.autopayAvailable(ctx.organizationId),
+        );
+    }
+
+    /**
+     * A plan's own "When autopay charges" (D13B), or null for the
+     * business's setting. Set straight on the plan, not through its draft:
+     * buyers never see it. Charges already queued keep their date.
+     */
+    async setPlanChargeTiming(
+        ctx: OrganizationContext,
+        planId: string,
+        timing: AutopayChargeTiming | null,
+    ): Promise<PlanView> {
+        authorize(ctx, "subscription:write");
+        const { count } = await prisma.subscriptionPlan.updateMany({
+            where: { id: planId, organizationId: ctx.organizationId },
+            data: { autopayChargeTiming: timing },
         });
+        if (count === 0) notFound("Plan");
+        return readPlan(ctx.organizationId, planId);
+    }
+
+    /** Whether autopay can charge for this business (D13B's setting shows). */
+    private async autopayAvailable(organizationId: string): Promise<boolean> {
+        if (!this.charges) return false;
+        try {
+            return await this.charges.chargingAvailable(organizationId);
+        } catch {
+            return false;
+        }
     }
 
     /**
@@ -1586,11 +1847,13 @@ export class SubscriptionsService {
                         ...(uncharged ? { uncharged: true } : {}),
                     },
                 });
+            // An early renewal invoice (D13B) is this period's; one voided
+            // or credited before the period began is not (DEC-065).
             const live = await tx.invoice.findFirst({
                 where: {
                     subscriptionId: id,
                     periodStart: period.start,
-                    status: { not: "VOID" },
+                    status: { notIn: ["VOID", "CREDITED"] },
                 },
                 select: { id: true },
             });
@@ -1615,7 +1878,143 @@ export class SubscriptionsService {
                 createdByUserId: null,
             });
             await renewed(invoiceId);
+            // With autopay on, the charge is queued in this transaction
+            // (D13): its intent and first step, or MANDATE_LIMIT_LOW. With
+            // none, or its provider's charging off, the pay link as before.
+            // Its debit follows the merchant's timing (D13B).
+            await this.charges?.queueInTx(tx, {
+                organizationId: sub.organizationId,
+                subscriptionId: id,
+                invoiceId,
+                now,
+                schedule: {
+                    timing: await effectiveChargeTiming(
+                        tx,
+                        sub.organizationId,
+                        terms.planId,
+                    ),
+                    periodStart: period.start,
+                    timezone: sub.timezone,
+                },
+            });
             return "renewed";
+        });
+    }
+
+    /**
+     * Invoice the next period early, when its renewal charges autopay "on
+     * the renewal date" (D13B, DEC-065): {@link AUTOPAY_LEAD_DAYS} days
+     * before the period ends, so the bank's notice goes out with it and the
+     * debit lands on the renewal date. Called by the renewal job for an
+     * ACTIVE subscription, not set to end, with a chargeable mandate and
+     * Payments on. Once per period: a period with any invoice at all — one
+     * dropped by a cancel or pause included — is left to the renewal.
+     */
+    async renewEarlyOne(id: string, now: Date): Promise<"issued" | "skipped"> {
+        return prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${id} FOR UPDATE`;
+            const sub = await tx.customerSubscription.findUnique({
+                where: { id },
+                select: SUBSCRIPTION_SELECT,
+            });
+            if (
+                sub?.status !== "ACTIVE" ||
+                sub.cancelAtPeriodEnd ||
+                sub.currentPeriodEnd <= now ||
+                now < earlyIssueAt(sub.currentPeriodEnd, sub.timezone) ||
+                !this.charges
+            ) {
+                return "skipped";
+            }
+            const terms = await this.nextTerms(tx, sub);
+            const timing = await effectiveChargeTiming(
+                tx,
+                sub.organizationId,
+                terms.planId,
+            );
+            if (
+                timing !== "ON_RENEWAL_DATE" ||
+                !(await paymentsOn(tx, sub.organizationId)) ||
+                !(await this.charges.chargeableMandate(
+                    sub.organizationId,
+                    id,
+                    tx,
+                ))
+            ) {
+                return "skipped";
+            }
+            const anchor =
+                terms.interval !== sub.interval
+                    ? sub.currentPeriodEnd
+                    : sub.anchorAt;
+            const period = periodContaining(
+                anchor,
+                terms.interval,
+                sub.timezone,
+                sub.currentPeriodEnd,
+            );
+            const any = await tx.invoice.findFirst({
+                where: { subscriptionId: id, periodStart: period.start },
+                select: { id: true },
+            });
+            if (any || (await this.allSkipped(tx, sub, period))) {
+                return "skipped";
+            }
+            const invoiceId = await this.invoicePeriod(tx, {
+                organizationId: sub.organizationId,
+                subscriptionId: id,
+                contactId: sub.contactId,
+                planName: terms.planName,
+                price: terms.price,
+                currency: terms.currency,
+                timezone: sub.timezone,
+                period,
+                createdByUserId: null,
+                issuedAt: now,
+            });
+            await subscriptionEventLog(
+                tx,
+                sub.organizationId,
+                id,
+                JOB,
+            )("INVOICED", {
+                invoiceId,
+                data: {
+                    periodStart: period.start.toISOString(),
+                    periodEnd: period.end.toISOString(),
+                    early: true,
+                },
+            });
+            await this.charges.queueInTx(tx, {
+                organizationId: sub.organizationId,
+                subscriptionId: id,
+                invoiceId,
+                now,
+                schedule: {
+                    timing,
+                    periodStart: period.start,
+                    timezone: sub.timezone,
+                },
+            });
+            return "issued";
+        });
+    }
+
+    /** Drop the next period's early renewal invoice, if any (D13B). */
+    private dropEarly(
+        tx: Tx,
+        sub: SubscriptionRow,
+        reason: EarlyDropReason,
+        log: SubscriptionEventLog,
+        now: Date = new Date(),
+    ) {
+        return dropEarlyRenewalInTx(tx, {
+            organizationId: sub.organizationId,
+            subscriptionId: sub.id,
+            periodStart: sub.currentPeriodEnd,
+            reason,
+            now,
+            log,
         });
     }
 
@@ -1848,9 +2247,12 @@ export class SubscriptionsService {
             timezone: string;
             period: Period;
             createdByUserId: string | null;
+            /** When it is issued; now unless the job says (D13B). */
+            issuedAt?: Date;
         },
     ): Promise<string> {
         const issued = await this.invoices.issueInTx(tx, input.organizationId, {
+            ...(input.issuedAt ? { issuedAt: input.issuedAt } : {}),
             contactId: input.contactId,
             currency: input.currency,
             lines: [
@@ -1996,13 +2398,29 @@ export class SubscriptionsService {
                 total: true,
                 dueAt: true,
                 paidAt: true,
+                issuedAt: true,
             },
         });
+        // Autopay's failures (D13): a failed charge before its due date.
+        const failures = await db.subscriptionEvent.findMany({
+            where: {
+                organizationId,
+                subscriptionId: { in: subscriptionIds },
+                kind: { in: ["RENEWAL_FAILED", "MANDATE_LIMIT_LOW"] },
+            },
+            orderBy: { createdAt: "desc" },
+            distinct: ["subscriptionId"],
+            select: { subscriptionId: true, createdAt: true },
+        });
+        const failedAt = new Map(
+            failures.map((f) => [f.subscriptionId, f.createdAt]),
+        );
         for (const r of rows) {
             if (!r.subscriptionId) continue;
             const entry = byId.get(r.subscriptionId) ?? {
                 unpaid: [],
                 latest: null,
+                chargeFailedAt: failedAt.get(r.subscriptionId) ?? null,
             };
             if (r.status === "ISSUED") entry.unpaid.push(r);
             entry.latest = r;
@@ -2143,9 +2561,10 @@ export class SubscriptionsService {
 }
 
 /**
- * Payment failed: the latest charge is still unpaid and past its due date.
- * Derived, like "overdue", through the one rule (`isPastDue`); a cancelled
- * subscription has no failed charge to act on.
+ * Payment failed: the latest charge is still unpaid, and past its due date
+ * or its autopay charge failed since it was issued (D13's RENEWAL_FAILED
+ * or MANDATE_LIMIT_LOW). Derived, like "overdue", through the one rule
+ * (`isPastDue`); a cancelled subscription has no failed charge to act on.
  */
 function failedCharge(
     row: { status: string },
@@ -2154,7 +2573,14 @@ function failedCharge(
 ): InvoiceRowLite | null {
     const latest = invoices?.latest ?? null;
     if (row.status === "CANCELLED" || !latest) return null;
-    return isPastDue(latest, now) ? latest : null;
+    if (isPastDue(latest, now)) return latest;
+    const failedAt = invoices?.chargeFailedAt ?? null;
+    const autopayFailed =
+        latest.status === "ISSUED" &&
+        failedAt !== null &&
+        latest.issuedAt !== null &&
+        failedAt >= latest.issuedAt;
+    return autopayFailed ? latest : null;
 }
 
 /** A plan as an event names it, money as the wire says it. */
@@ -2172,16 +2598,6 @@ function planRef(p: {
         currency: p.currency,
         interval: p.interval,
     };
-}
-
-/** "1 Sep – 30 Sep 2026": the last day shown is the day before the end. */
-export function periodLabel(period: Period, timezone: string): string {
-    const start = DateTime.fromJSDate(period.start, { zone: timezone });
-    const last = DateTime.fromJSDate(period.end, { zone: timezone }).minus({
-        days: 1,
-    });
-    const sameYear = start.year === last.year;
-    return `${start.toFormat(sameYear ? "d LLL" : "d LLL yyyy")} – ${last.toFormat("d LLL yyyy")}`;
 }
 
 /**

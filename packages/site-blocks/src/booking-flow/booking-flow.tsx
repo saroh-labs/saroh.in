@@ -227,6 +227,8 @@ export default function BookingFlow({
     // land before the disabled buttons are drawn.
     const deskKey = useRef<string | null>(null);
     const leavingRef = useRef(false);
+    /** Read the hold now, rather than at the next tick (P1). */
+    const checkHoldNow = useRef<(() => void) | null>(null);
     const [leaving, setLeaving] = useState(false);
     const headingRef = useRef<HTMLHeadingElement>(null);
     // The start that went while they signed in: the next free one after it
@@ -487,7 +489,7 @@ export default function BookingFlow({
         const tick = () => setNow(Date.now());
         tick();
         const clock = setInterval(tick, 15_000);
-        const poll = setInterval(() => {
+        const pollOnce = () => {
             void fetchHold(apiUrl, payingToken).then((result) => {
                 // Letting the hold go answers for itself.
                 if (leavingRef.current) return;
@@ -541,10 +543,16 @@ export default function BookingFlow({
                     return p;
                 });
             });
-        }, POLL_MS);
+        };
+        const poll = setInterval(pollOnce, POLL_MS);
+        // Read at once when the window closes on a payment: its return has
+        // been checked and settled by then (P1), so the page moves on
+        // without waiting for the next tick.
+        checkHoldNow.current = pollOnce;
         return () => {
             clearInterval(clock);
             clearInterval(poll);
+            checkHoldNow.current = null;
         };
     }, [apiUrl, payingToken, bookerFirst]);
 
@@ -1030,13 +1038,15 @@ export default function BookingFlow({
                                     : () => void leaveHold("desk")
                             }
                             onBack={() => void leaveHold("choose")}
-                            onPaid={() =>
+                            onPaid={() => {
                                 setPhase((p) =>
                                     p.kind === "paying"
                                         ? { ...p, checkoutPaid: true }
                                         : p,
-                                )
-                            }
+                                );
+                                checkHoldNow.current?.();
+                            }}
+                            apiUrl={apiUrl}
                         />
                     ) : phase.kind === "expired" ? (
                         <ExpiredCard

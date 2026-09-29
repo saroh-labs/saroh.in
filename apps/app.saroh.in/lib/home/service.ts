@@ -42,8 +42,11 @@ export interface HomeInline {
     person: string | null;
     /** MARK_SENT: the step it moves the order to. */
     stage?: string;
-    /** RETRY: how; only "PAY_LINK" until D13's autopay. */
-    via?: "PAY_LINK";
+    /**
+     * RETRY: how — a new pay link, or a new charge on their autopay (D13).
+     * The API offers no Retry while an autopay charge is under way.
+     */
+    via?: "PAY_LINK" | "MANDATE";
 }
 
 /**
@@ -108,15 +111,6 @@ export interface HomeBooking {
     who: string | null;
     status: string;
     href: string;
-}
-
-/** A count whose `href` lands on exactly the rows it counts. */
-export interface HomeNumber {
-    key: string;
-    label: string;
-    value: number;
-    href: string;
-    moduleKey?: string;
 }
 
 /**
@@ -290,14 +284,14 @@ export interface HomeModel {
     staff: HomeStaff | null;
     /** A Reviewer's sites (F9); only on `view: "reviewer"`. */
     reviews?: HomeReviewSite[];
+    /** The ranked actions; the rail's badges read the OVERDUE ones. */
     actions: HomeAction[];
-    primaryAction: HomeAction | null;
     hasAnyModule: boolean;
+    /** The next confirmed bookings; Needs you's "Next" line reads them. */
     upcoming: HomeBooking[];
-    numbers: HomeNumber[];
     /** Empty on a healthy read; non-empty means what is shown is incomplete. */
     unavailable: HomeUnavailable[];
-    /** Needs you, flat and ranked (F3). `actions` stays for one release. */
+    /** Needs you, flat and ranked (F3). */
     needs: HomeNeed[];
     /** How many things need doing; a "3 more" row counts as three. */
     needsTotal: number;
@@ -313,10 +307,8 @@ const EMPTY: HomeModel = {
     view: "business",
     staff: null,
     actions: [],
-    primaryAction: null,
     hasAnyModule: false,
     upcoming: [],
-    numbers: [],
     unavailable: [],
     needs: [],
     needsTotal: 0,

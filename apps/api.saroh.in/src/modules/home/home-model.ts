@@ -101,21 +101,6 @@ export interface HomeBooking {
 }
 
 /**
- * A count that is a destination.
- *
- * Every number on Home links to the exact rows it counts — `href` carries the
- * filter, not just the screen. A tile that states "12 open leads" and lands on
- * an unfiltered list has made the merchant do the filtering twice.
- */
-export interface HomeNumber {
-    key: string;
-    label: string;
-    value: number;
-    href: string;
-    moduleKey?: string;
-}
-
-/**
  * A part of Home that could not be read.
  *
  * The difference between "you have no open orders" and "we could not find out
@@ -133,11 +118,11 @@ export interface HomeUnavailable {
 export type HomeInlineKind = "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
 
 /**
- * How a Retry is made (F4). Only a fresh pay link today; D13 adds
- * `MANDATE`, a charge on the customer's autopay, and hides Retry while such
- * a charge is PENDING ("Autopay charge in progress").
+ * How a Retry is made (F4, D13): `PAY_LINK`, a fresh pay link; `MANDATE`,
+ * a new charge on the customer's autopay. No Retry is offered while such a
+ * charge is under way ("Autopay charge in progress").
  */
-export type HomeRetryVia = "PAY_LINK";
+export type HomeRetryVia = "PAY_LINK" | "MANDATE";
 
 /**
  * What an inline action on a Needs-you row will do (F4), decided by the API
@@ -418,12 +403,19 @@ export interface HomeModel {
      * then names.
      */
     reviews?: HomeReviewSite[];
+    /**
+     * The ranked actions `needs` is flattened from. The workspace's rail
+     * reads its badges from them (OVERDUE ones with a count), so they stay.
+     * `primaryAction` and `numbers`, the old Home's other fields, were
+     * removed in Z5 once no live app read them.
+     */
     actions: HomeAction[];
-    primaryAction: HomeAction | null;
     hasAnyModule: boolean;
-    /** Confirmed bookings from now forward; the client groups them by day. */
+    /**
+     * Confirmed bookings from now forward (up to eight): Needs you's "Next"
+     * line reads the first.
+     */
     upcoming: HomeBooking[];
-    numbers: HomeNumber[];
     /**
      * Sources that failed. Empty on a healthy read. Non-empty means what is
      * shown is INCOMPLETE, and Home must say so rather than presenting the
@@ -433,7 +425,7 @@ export interface HomeModel {
     /**
      * Needs you, flat and ranked (F3): every row the sources carry, in the
      * order Home shows them; the client shows the first twelve, then "See
-     * all". `actions` stays beside it for one release (default 130).
+     * all".
      */
     needs: HomeNeed[];
     /**

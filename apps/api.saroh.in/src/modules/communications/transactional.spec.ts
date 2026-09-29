@@ -3,6 +3,7 @@
 // a slot in the stored body. Pure.
 import {
     fillSecretLink,
+    renderAutopaySetupLink,
     renderTransactional,
     SECRET_LINK_SLOT,
 } from "./transactional";
@@ -71,5 +72,47 @@ describe("fillSecretLink", () => {
         const filled = fillSecretLink(body, "https://saroh.app/pay/abc");
         expect(filled).not.toContain(SECRET_LINK_SLOT);
         expect(filled.match(/https:\/\/saroh\.app\/pay\/abc/g)).toHaveLength(2);
+    });
+});
+
+describe("renderAutopaySetupLink (D14)", () => {
+    const link = {
+        business: "Pulse & Co.",
+        firstName: "Meera",
+        plan: "Monthly unlimited",
+        method: "UPI app",
+        limit: "₹1,800.00",
+        check: "₹1.00",
+        expiresOn: "6 Oct 2026",
+    };
+
+    it("names the plan, the method, the limit, the ₹1 check and when the link stops", () => {
+        const { subject, body } = renderAutopaySetupLink(link);
+        expect(subject).toBe(
+            "Turn on autopay for Monthly unlimited with Pulse & Co.",
+        );
+        expect(body).toContain("<p>Hi Meera,</p>");
+        expect(body).toContain(
+            "paid from your UPI app, up to ₹1,800.00 a time",
+        );
+        expect(body).toContain("your bank needs a ₹1.00 check");
+        expect(body).toContain("The link works until 6 Oct 2026.");
+        expect(body).toContain("Pulse &amp; Co.");
+        // The link is only ever a slot in the stored body.
+        expect(body).toContain(`href="${SECRET_LINK_SLOT}"`);
+    });
+
+    it("says no check for a method that takes none, and escapes what was typed", () => {
+        const { body } = renderAutopaySetupLink({
+            ...link,
+            check: null,
+            method: "bank account",
+            plan: "<b>Gold</b>",
+            firstName: null,
+        });
+        expect(body).not.toContain("check");
+        expect(body).toContain("<p>Hello,</p>");
+        expect(body).toContain("&lt;b&gt;Gold&lt;/b&gt;");
+        expect(body).not.toContain("<b>Gold</b>");
     });
 });

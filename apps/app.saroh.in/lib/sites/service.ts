@@ -164,7 +164,14 @@ export interface ServicesListContent {
     serviceIds: string[];
     showPrices?: boolean;
     cta?: CtaValue;
+    /** Display options (G16). Absent: a list, descriptions shown, "Book". */
+    layout?: ListLayout;
+    showDescriptions?: boolean;
+    buttonLabel?: string;
 }
+
+/** "Show as" (G16): side by side, or one per row. */
+export type ListLayout = "cards" | "list";
 
 /**
  * `visitUs` — which shop's address and hours to show (G8). The place itself is
@@ -188,6 +195,9 @@ export interface JournalContent {
     count?: 3 | 6;
     showExcerpts?: boolean;
     showImages?: boolean;
+    /** Display options (G16). Absent: cards, and no button of their own. */
+    layout?: ListLayout;
+    buttonLabel?: string;
 }
 
 /**
@@ -200,6 +210,9 @@ export interface PlansContent {
     highlight?: "first" | "none";
     buttonLabel?: string;
     showDescriptions?: boolean;
+    /** Display options (G16). Absent: cards, with prices. */
+    layout?: ListLayout;
+    showPrices?: boolean;
 }
 
 /**
@@ -215,6 +228,25 @@ export interface ProductGridContent {
     productIds?: string[];
     count?: number;
     showPrices?: boolean;
+    /**
+     * Display options (G16). Absent: cards with photos and lines, and no
+     * button (the card opens the product).
+     */
+    layout?: ListLayout;
+    showPhotos?: boolean;
+    showDescriptions?: boolean;
+    buttonLabel?: string;
+}
+
+/**
+ * `packs` — how the business's class packs on sale show (G20). The packs
+ * themselves are read live by the site, never stored here.
+ * `showDescriptions` absent means shown.
+ */
+export interface PacksContent {
+    title?: string;
+    buttonLabel?: string;
+    showDescriptions?: boolean;
 }
 
 /** The field types an enquiry form supports (mirror of the section contract). */
@@ -278,6 +310,7 @@ export interface SectionContentByType {
     visitUs: VisitUsContent;
     journal: JournalContent;
     plans: PlansContent;
+    packs: PacksContent;
     productGrid: ProductGridContent;
 }
 
@@ -408,6 +441,13 @@ export interface SiteFooter {
     value: string;
 }
 
+/**
+ * A module page's kind (G14): one page per kind per site, beside the
+ * free-form pages. Mirrors the API's `MODULE_PAGE_KINDS`, in menu order.
+ */
+export type ModulePageKind = "SHOP" | "BOOK" | "PRICES" | "JOURNAL" | "CONTACT";
+export type PageKind = "FREE" | ModulePageKind;
+
 export interface SitePage {
     id: string;
     path: string;
@@ -415,6 +455,13 @@ export interface SitePage {
     isHome: boolean;
     /** Hidden pages stay in the draft and are left out of the snapshot (#197). */
     hidden: boolean;
+    /**
+     * FREE, or the module page this is (G14). Absent from an API older than
+     * G14, which only ever had free-form pages.
+     */
+    kind?: PageKind;
+    /** "Show in menu" (G14). Absent means on, as it was before G14. */
+    inMenu?: boolean;
 }
 
 /**
@@ -480,6 +527,24 @@ export interface SiteDetail extends SiteSummary {
      * API older than G11: either way the settings show no row.
      */
     sellsFrom?: SellsFrom | null;
+    /**
+     * The shop could serve (SITE_SHOP, Commerce on) and a storefront with
+     * products could be chosen, but Sells from is unanswered, so `/shop`
+     * isn't live yet (P4). Absent from an older API: not said.
+     */
+    shopAwaitsSellsFrom?: boolean;
+    /**
+     * The module pages this caller could add now (G14): kinds whose module is
+     * on and that the site doesn't have yet, in menu order. Empty without
+     * `site:update`; a module that isn't rolled out is never listed
+     * (DEC-057). Absent from an API older than G14.
+     */
+    addablePageKinds?: ModulePageKind[];
+    /**
+     * Whether Add block offers the Class packs block: Class packs rolled out
+     * and on (DEC-057). Absent from an older API, which reads as not.
+     */
+    packsBlockOffered?: boolean;
 }
 
 /** The storefront a site sells from, and the open ones with products. */
@@ -550,6 +615,12 @@ export type SitesResult<T> =
            * else's work — so the screen offers to reload rather than to retry.
            */
           conflict?: boolean;
+          /**
+           * An address to offer instead of one the API refused (G14's
+           * `details.suggestion`): taken, or one of the site's own routes.
+           * Offered, never applied.
+           */
+          suggestion?: string;
       };
 
 // ---------------------------------------------------------------------------
@@ -580,7 +651,7 @@ async function sitesBase(): Promise<string | null> {
 function readError(
     data: unknown,
     fallback: string,
-): { error: string; index?: number } {
+): { error: string; index?: number; suggestion?: string } {
     const body = (typeof data === "object" && data !== null ? data : {}) as {
         message?: unknown;
         error?: unknown;
@@ -599,11 +670,16 @@ function readError(
         typeof inner?.details === "object" && inner.details !== null
             ? inner.details
             : {}
-    ) as { index?: unknown };
+    ) as { index?: unknown; suggestion?: unknown };
 
     return {
         error: message ?? fallback,
         index: typeof details.index === "number" ? details.index : undefined,
+        // An address the API offers instead of a refused one (G14).
+        ...(typeof details.suggestion === "string" &&
+        details.suggestion.startsWith("/")
+            ? { suggestion: details.suggestion }
+            : {}),
     };
 }
 
@@ -1212,13 +1288,36 @@ export async function getSiteFlags(siteId: string): Promise<SiteFlags> {
 }
 
 /**
+ * A page to add (G14): a free-form page names its title and address; a
+ * module page names its `kind` and may leave both to the kind's defaults
+ * (a Book or Shop page's address is always its route's).
+ */
+export type CreatePageInput =
+    | { kind?: "FREE"; title: string; path: string; inMenu?: boolean }
+    | {
+          kind: ModulePageKind;
+          title?: string;
+          path?: string;
+          inMenu?: boolean;
+      };
+
+/** What a page change may carry; an omitted field is left alone. */
+export interface UpdatePageInput {
+    title?: string;
+    path?: string;
+    hidden?: boolean;
+    /** "Show in menu" (G14). */
+    inMenu?: boolean;
+}
+
+/**
  * Add a page to a site. The API decides what a legal path is and whether it is
  * free — the form does not pre-check, because a client-side answer that
  * disagreed with the server's would be worse than one round trip.
  */
 export async function createPage(
     siteId: string,
-    input: { title: string; path: string },
+    input: CreatePageInput,
 ): Promise<SitesResult<SitePage>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
@@ -1232,11 +1331,14 @@ export async function createPage(
     return { ok: false, ...readError(data, "Could not add the page.") };
 }
 
-/** Rename a page, move it, or both. An omitted field is left alone. */
+/**
+ * Rename a page, move it, hide it or take it out of the menu. An omitted
+ * field is left alone.
+ */
 export async function updatePage(
     siteId: string,
     pageId: string,
-    input: { title?: string; path?: string; hidden?: boolean },
+    input: UpdatePageInput,
 ): Promise<SitesResult<SitePage>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };

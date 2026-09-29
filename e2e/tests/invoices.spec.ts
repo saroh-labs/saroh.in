@@ -112,6 +112,15 @@ test.describe("invoices", () => {
             page.getByRole("button", { name: "Copy pay link" }),
         ).toHaveCount(0);
 
+        // 4b. Its paper as a PDF (D16), named for its number.
+        const [download] = await Promise.all([
+            page.waitForEvent("download"),
+            page.getByRole("button", { name: "Download PDF" }).click(),
+        ]);
+        expect(download.suggestedFilename()).toBe(
+            `${number.replace(/[^A-Za-z0-9._-]+/g, "-")}.pdf`,
+        );
+
         // 5. The list has it under Paid, and its quick look says so.
         await page.goto("/billing/invoices?view=paid");
         await expect(page.getByRole("tab", { name: /^Paid/ })).toHaveAttribute(

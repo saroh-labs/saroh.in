@@ -1,8 +1,18 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CalendarService } from "./calendar.service";
+
+/** A whole month as the `from`/`to` range the app asks for (E20; Z3). */
+function monthRange(month: string): { from: string; to: string } {
+    const first = DateTime.fromISO(`${month}-01`, { zone: "UTC" });
+    return {
+        from: first.toFormat("yyyy-MM-dd"),
+        to: first.endOf("month").toFormat("yyyy-MM-dd"),
+    };
+}
 
 /**
  * The Business Calendar's month (U4): each layer read on its own, a failed
@@ -283,7 +293,7 @@ function build(
     return { service, db, availability };
 }
 
-describe("CalendarService.month", () => {
+describe("CalendarService.read, a month at a time", () => {
     it("a month with orders, a renewal and an overdue invoice: per-day counts and one to act on", async () => {
         const { service } = build(undefined, {
             orders: [
@@ -298,7 +308,7 @@ describe("CalendarService.month", () => {
             invoices: [OVERDUE],
         });
 
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
 
         expect(res.timezone).toBe(IST);
         expect(res.timezoneSource).toBe("business");
@@ -347,8 +357,11 @@ describe("CalendarService.month", () => {
     });
 
     it("every day of the month is there, the empty ones with every layer at zero", async () => {
-        const { service } = build(["COMMERCE"]);
-        const res = await service.month(OWNER, "2026-02", NOW);
+        // Joined before February, so the whole short month is in reach.
+        const { service } = build(["COMMERCE"], {
+            createdAt: new Date("2026-01-10T06:00:00Z"),
+        });
+        const res = await service.read(OWNER, monthRange("2026-02"), NOW);
         expect(res.days).toHaveLength(28);
         for (const d of res.days) {
             expect(d.layers).toEqual({
@@ -363,7 +376,7 @@ describe("CalendarService.month", () => {
             // 00:30 on the 1st in India; still the 31st in UTC.
             orders: [order("o1", "2026-08-31T19:00:00Z")],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
 
         expect(db.order.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -389,7 +402,7 @@ describe("CalendarService.month", () => {
 
     it("names the zone it fell back to", async () => {
         const { service } = build(["COMMERCE"], { profileZone: null });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res).toMatchObject({
             timezone: "Asia/Kolkata",
             timezoneSource: "fallback",
@@ -413,7 +426,7 @@ describe("CalendarService.month", () => {
                 },
             ],
         });
-        const res = await service.month(MEMBER, "2026-09", NOW);
+        const res = await service.read(MEMBER, monthRange("2026-09"), NOW);
 
         expect(res.layers).toEqual(["bookings", "classes"]);
         expect(res).not.toHaveProperty("takings");
@@ -439,7 +452,7 @@ describe("CalendarService.month", () => {
             subscriptionInvoices: [RENEWAL_CHARGE],
             failInvoices: true,
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
 
         expect(res.unavailable).toEqual([
             { source: "invoices", label: "Invoices" },
@@ -468,7 +481,7 @@ describe("CalendarService.month", () => {
         const { service } = build(["PAYMENTS"], {
             collectionSubs: [collector],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
 
         const dates = res.days
             .filter((d) => (d.layers.collections?.count ?? 0) > 0)
@@ -500,7 +513,7 @@ describe("CalendarService.month", () => {
                 },
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
 
         expect(res.toActOn).toEqual([
             expect.objectContaining({
@@ -551,7 +564,7 @@ describe("CalendarService.month", () => {
             invoices: [ordersOwn, renewalPaid, handWritten],
             orderPaper: [paper("INVOICE", "250", paidAt)],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
 
         const fifth = res.days.find((d) => d.date === "2026-09-05")!;
         // The renewal's charge is the Subscriptions layer's to show.
@@ -579,7 +592,7 @@ describe("CalendarService.month", () => {
                 paper("SUPPLEMENTARY", "150", new Date("2026-10-07T05:00:00Z")),
             ],
         });
-        const res = await service.month(OWNER, "2026-10", NOW);
+        const res = await service.read(OWNER, monthRange("2026-10"), NOW);
         const day = (d: string) => res.days.find((x) => x.date === d)!;
 
         expect(day("2026-10-02").takings).toEqual([
@@ -636,7 +649,7 @@ describe("CalendarService.month", () => {
             ],
             orderPaper: [],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.days[29].layers.orders?.count).toBe(1);
         expect(res.days[29].takings).toEqual([]);
         expect(res.takings?.total).toEqual([]);
@@ -646,13 +659,13 @@ describe("CalendarService.month", () => {
         const { service, db } = build(["COMMERCE"], {
             orders: [order("o1", "2026-09-05T04:00:00Z")],
         });
-        await service.month(
+        await service.read(
             {
                 ...OWNER,
                 role: "ADMIN",
                 actions: new Set(["org:read", "order:read"] as const),
             },
-            "2026-09",
+            monthRange("2026-09"),
             NOW,
         );
         expect(db.invoice.findMany).not.toHaveBeenCalled();
@@ -675,7 +688,7 @@ describe("CalendarService.month", () => {
                 },
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
 
         expect(res.days[21].layers.bookings?.items[0]).toMatchObject({
             kind: "held",
@@ -705,7 +718,7 @@ describe("CalendarService.month", () => {
         const { service } = build(["APPOINTMENTS"], {
             classes: [spin, { ...spin, status: "PENDING" }],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.days[7].layers.classes?.items).toEqual([
             expect.objectContaining({
                 kind: "full",
@@ -723,13 +736,13 @@ describe("CalendarService.month", () => {
             subscriptionId: "sub_1",
         };
         const { service } = build(["PAYMENTS"], { invoices: [renewalDue] });
-        const res = await service.month(
+        const res = await service.read(
             {
                 ...OWNER,
                 role: "ADMIN",
                 actions: new Set(["org:read", "invoice:read"] as const),
             },
-            "2026-09",
+            monthRange("2026-09"),
             NOW,
         );
         expect(res.layers).toEqual(["invoices"]);
@@ -750,7 +763,7 @@ describe("CalendarService.month", () => {
         const { service } = build(["APPOINTMENTS"], {
             classes: [spin, spin],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.days[7].layers.classes?.items).toEqual([
             expect.objectContaining({
                 kind: "full",
@@ -763,7 +776,7 @@ describe("CalendarService.month", () => {
 
     it("a module that is off contributes no layer", async () => {
         const { service } = build(["APPOINTMENTS"]);
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         // No orders and no Invoices layer: its payments are a layer (E20).
         expect(res.layers).toEqual(["bookings", "classes", "payments"]);
         // Money, but nothing to take it through: no orders, no invoices.
@@ -773,10 +786,14 @@ describe("CalendarService.month", () => {
     it("refuses a malformed month and a reviewer", async () => {
         const { service } = build();
         await expect(
-            service.month(OWNER, "2026-9", NOW),
+            service.read(OWNER, { from: "2026-9-01", to: "2026-09-30" }, NOW),
         ).rejects.toBeInstanceOf(BadRequestException);
         await expect(
-            service.month({ ...OWNER, role: "REVIEWER" }, "2026-09", NOW),
+            service.read(
+                { ...OWNER, role: "REVIEWER" },
+                monthRange("2026-09"),
+                NOW,
+            ),
         ).rejects.toBeInstanceOf(ForbiddenException);
     });
     it("names the day the business joined, in its own zone", async () => {
@@ -784,7 +801,7 @@ describe("CalendarService.month", () => {
         const { service } = build(undefined, {
             createdAt: new Date("2026-05-31T20:00:00Z"),
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.joinedAt).toBe("2026-06-01");
     });
 
@@ -793,7 +810,7 @@ describe("CalendarService.month", () => {
             createdAt: "fail",
             orders: [order("o1", "2026-09-05T04:00:00Z")],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.joinedAt).toBeNull();
         expect(res.totals.orders).toBe(1);
         expect(res.unavailable).toEqual([]);
@@ -884,7 +901,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                 }),
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         const fifth = dayOfMonth(res, "2026-09-05");
 
         expect(fifth.money).toEqual([
@@ -918,7 +935,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
             orders: [order("o1", "2026-09-05T04:00:00Z", { invoices: [{}] })],
             moneyPaper: [PAID_ON_5TH, REFUND_ON_5TH],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         const fifth = dayOfMonth(res, "2026-09-05");
         expect(fifth.money?.[0]).toMatchObject({ in: 50000, out: 10000 });
         expect(fifth.layers.orders?.items[0].outWhy).toEqual(["refund"]);
@@ -937,7 +954,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
             invoices: [own],
             moneyPaper: [PAID_ON_5TH],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.money?.total).toEqual([
             expect.objectContaining({ in: 50000 }),
         ]);
@@ -951,7 +968,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                 { ...PAID_ON_5TH, paidAt: new Date("2026-09-07T04:00:00Z") },
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(dayOfMonth(res, "2026-09-05").money).toEqual([]);
         expect(
             dayOfMonth(res, "2026-09-05").layers.orders?.items[0],
@@ -990,7 +1007,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                 }),
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(
             dayOfMonth(res, "2026-09-09").layers.invoices?.items[0],
         ).toMatchObject({ in: 400000, out: 9440, outWhy: ["fee"] });
@@ -1037,14 +1054,18 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                     },
                     invoices: [
                         {
+                            kind: "INVOICE",
                             status: "PAID",
+                            paymentMethod: "ONLINE",
+                            total: "500.00",
+                            paidAt: new Date("2026-09-01T04:30:00Z"),
                             paymentIntents: [{ amountCents: 50000 }],
                         },
                     ],
                 },
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
 
         // The charge failed on its due day; its renewal is not also due.
         expect(dayOfMonth(res, "2026-09-13").money).toEqual([
@@ -1078,7 +1099,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                 },
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(dayOfMonth(res, "2026-09-26").money).toEqual([
             expect.objectContaining({ due: 120000 }),
         ]);
@@ -1107,7 +1128,16 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                     ...base,
                     id: "linked",
                     startAt: new Date("2026-09-24T04:30:00Z"),
-                    invoices: [{ status: "ISSUED", paymentIntents: [] }],
+                    invoices: [
+                        {
+                            kind: "INVOICE",
+                            status: "ISSUED",
+                            paymentMethod: null,
+                            total: "1500.00",
+                            paidAt: null,
+                            paymentIntents: [],
+                        },
+                    ],
                 },
                 {
                     ...base,
@@ -1117,7 +1147,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                 },
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.money?.total).toEqual([]);
     });
 
@@ -1141,7 +1171,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                 },
             ],
         });
-        const res = await service.month(MEMBER, "2026-09", NOW);
+        const res = await service.read(MEMBER, monthRange("2026-09"), NOW);
         const item = dayOfMonth(res, "2026-09-24").layers.bookings?.items[0];
         expect(item).toMatchObject({ amount: "1500.00", currency: "INR" });
         for (const key of ["in", "out", "due", "failed", "outWhy"]) {
@@ -1162,13 +1192,13 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
                 }),
             ],
         });
-        const res = await service.month(
+        const res = await service.read(
             {
                 ...OWNER,
                 role: "CUSTOM",
                 actions: new Set(["org:read", "payment:read"]),
             },
-            "2026-09",
+            monthRange("2026-09"),
             NOW,
         );
         expect(res.layers).toEqual([]);
@@ -1188,7 +1218,7 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
             orders: [order("o1", "2026-09-05T04:00:00Z")],
             failFees: true,
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.money).toEqual({ total: null, entries: [] });
         expect(res.unavailable).toEqual([{ source: "money", label: "Money" }]);
         expect(res.days[4]).not.toHaveProperty("money");
@@ -1347,7 +1377,7 @@ describe("CalendarService.read — from/to, staff and days off (E20)", () => {
                 },
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.days[7].layers.classes?.items[0]).toMatchObject({
             staffId: "st_meera",
             durationMinutes: 60,
@@ -1400,11 +1430,12 @@ describe("CalendarService.read — from/to, staff and days off (E20)", () => {
         ).resolves.toMatchObject({ month: "2026-12" });
     });
 
-    it("the month alias is not held to the range: the previous app pulls back on its own", async () => {
-        const { service } = build();
-        const res = await service.month(OWNER, "2026-01", NOW);
-        expect(res.month).toBe("2026-01");
-        expect(res.joinedAt).toBe("2026-06-02");
+    it("the month alias is gone (Z3): a month alone is a 400, and no read runs", async () => {
+        const { service, db } = build();
+        await expect(
+            service.read(OWNER, { month: "2026-09" } as never, NOW),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(db.order.findMany).not.toHaveBeenCalled();
     });
 
     it("the joined day unread: no back edge", async () => {
@@ -1417,12 +1448,11 @@ describe("CalendarService.read — from/to, staff and days off (E20)", () => {
         expect(res.joinedAt).toBeNull();
     });
 
-    it("refuses a malformed, mixed, backwards or overlong range", async () => {
+    it("refuses a malformed, backwards or overlong range", async () => {
         const { service } = build();
         for (const query of [
             { from: "2026-09-01" },
             { from: "2026-02-30", to: "2026-03-02" },
-            { month: "2026-09", from: "2026-09-01", to: "2026-09-30" },
             { from: "2026-09-10", to: "2026-09-01" },
             { from: "2026-07-01", to: "2026-09-30" },
             {},
@@ -1577,9 +1607,9 @@ describe("CalendarService.read — from/to, staff and days off (E20)", () => {
     });
 
     it("working hours: none without Appointments, null when days off failed", async () => {
-        const shop = await build(["COMMERCE"]).service.month(
+        const shop = await build(["COMMERCE"]).service.read(
             OWNER,
-            "2026-09",
+            monthRange("2026-09"),
             NOW,
         );
         expect(shop.hours).toEqual([]);
@@ -1633,7 +1663,7 @@ describe("CalendarService.read — from/to, staff and days off (E20)", () => {
 
     it("without Appointments there are no days off, and none are read", async () => {
         const { service, db } = build(["COMMERCE"]);
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         expect(res.daysOff).toEqual([]);
         expect(res.hasStaff).toBe(false);
         expect(db.businessClosure.findMany).not.toHaveBeenCalled();
@@ -1683,7 +1713,7 @@ describe("CalendarService.read — from/to, staff and days off (E20)", () => {
                 },
             ],
         });
-        const res = await service.month(OWNER, "2026-09", NOW);
+        const res = await service.read(OWNER, monthRange("2026-09"), NOW);
         const orders = dayOfMonth(res, "2026-09-19").layers.orders?.items;
         const flagsOf = (id: string) => orders?.find((i) => i.id === id)?.flags;
         expect(flagsOf("o_late")).toEqual(["late"]);

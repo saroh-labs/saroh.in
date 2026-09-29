@@ -257,6 +257,34 @@ describe("readyChecklist", () => {
         });
     });
 
+    it("is not ready while payments can't be confirmed — no webhook secret (DEC-063)", () => {
+        const r = readyChecklist({
+            settings: settled,
+            modules: [
+                mod("PAYMENTS", {
+                    readiness: "ATTENTION_REQUIRED",
+                    blockers: [
+                        {
+                            code: "PAYMENTS_WEBHOOK_SECRET_MISSING",
+                            actionHref: "/settings/providers",
+                        },
+                    ],
+                }),
+            ],
+        });
+        const step = r.steps.find((s) => s.key === "payments");
+        expect(step?.done).toBe(false);
+        expect(r.left[0]).toMatchObject({
+            key: "payments",
+            label: "Finish connecting payments",
+            cta: "Add webhook secret",
+            href: "/settings/providers",
+            broken: true,
+        });
+        // Not "switched off": nobody turned it off.
+        expect(r.left[0].why).not.toMatch(/switched off/);
+    });
+
     it("asks for what the business lists: a service, or either", () => {
         const noService = mod("APPOINTMENTS", {
             readiness: "SETUP_REQUIRED",
@@ -355,6 +383,47 @@ describe("readyChecklist", () => {
         expect(none.left).toEqual([
             expect.objectContaining({ key: "site", href: "/sites/new" }),
         ]);
+    });
+
+    it("asks for the shop's storefront while its shop waits on it (P4)", () => {
+        const facts = { products: 1, services: 0, sites: 1, sitesNotLive: 0 };
+        const waiting = mod("WEBSITE", {
+            readiness: "SETUP_REQUIRED",
+            blockers: [
+                {
+                    code: "WEBSITE_SHOP_NOT_CHOSEN",
+                    actionHref: "/sites/site_1/settings#sells-from",
+                },
+            ],
+        });
+        const r = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [waiting],
+        });
+        // The site is live, so Publish is ticked; the storefront is left.
+        expect(r.steps.find((s) => s.key === "site")?.done).toBe(true);
+        expect(r.left).toEqual([
+            expect.objectContaining({
+                key: "shop",
+                label: "Choose which storefront your site sells from",
+                why: "Until then your shop page isn't live.",
+                href: "/sites/site_1/settings#sells-from",
+            }),
+        ]);
+
+        // Answered, or no shop at all: never asked, never ticked.
+        const answered = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [mod("WEBSITE")],
+        });
+        expect(answered.steps.map((s) => s.key)).not.toContain("shop");
+
+        // The website off: nothing about it is asked (DEC-057).
+        const off = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [{ ...waiting, lifecycle: "DISABLED" as const }],
+        });
+        expect(off.steps.map((s) => s.key)).not.toContain("shop");
     });
 
     it("leaves out what it could not read, rather than call it done", () => {

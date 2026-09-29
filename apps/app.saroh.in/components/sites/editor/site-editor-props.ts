@@ -1,5 +1,6 @@
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import type {
+    ModulePageKind,
     ReviewState,
     Section,
     SiteCommentView,
@@ -63,4 +64,14 @@ export interface SiteEditorProps {
      * only then are blocks that sell, the Product grid (G12), offered.
      */
     shopOpen?: boolean;
+    /**
+     * Whether Class packs is rolled out and on for the business: only then
+     * is the Class packs block offered (DEC-057).
+     */
+    packsOpen?: boolean;
+    /**
+     * The module pages the site can have now (G14): the page menu's "Add a
+     * page" offers these, then a blank page. Empty without `site:update`.
+     */
+    addablePageKinds?: ModulePageKind[];
 }

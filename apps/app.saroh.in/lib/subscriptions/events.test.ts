@@ -161,6 +161,32 @@ describe("changeWhat", () => {
         expect(cancelled()).toBe("Autopay cancelled");
     });
 
+    it("says an early renewal invoice, and why it was dropped (D13B)", () => {
+        expect(
+            what({
+                kind: "INVOICED",
+                data: {
+                    periodStart: "2026-10-29T18:30:00.000Z",
+                    periodEnd: "2026-11-29T18:30:00.000Z",
+                    early: true,
+                },
+            }),
+        ).toBe(
+            "Invoiced 30 Oct – 29 Nov early, for autopay on the renewal date",
+        );
+        const dropped = (data: Record<string, unknown>) =>
+            what({ kind: "EARLY_INVOICE_CANCELLED", data });
+        expect(dropped({ reason: "CANCELLED", by: "VOIDED" })).toBe(
+            "Voided the early renewal invoice — cancelled before the renewal, autopay not charged",
+        );
+        expect(dropped({ reason: "PAUSED", by: "CREDITED" })).toBe(
+            "Credited the early renewal invoice — paused before the renewal, autopay not charged",
+        );
+        expect(dropped({ reason: "PLAN_CHANGED", by: "VOIDED" })).toContain(
+            "plan changed before the renewal",
+        );
+    });
+
     it("never breaks on data it didn't expect", () => {
         expect(what({ kind: "PLAN_CHANGE_BOOKED", data: { to: 3 } })).toBe(
             "Booked a plan change",
@@ -220,5 +246,57 @@ describe("changeRows", () => {
         expect(changeRows([event()], SUB, "u_other", NOW)).toEqual([
             { id: "e1", what: "Paused", when: "1 Oct · Priya" },
         ]);
+    });
+});
+
+describe("autopay set up by the customer (D12)", () => {
+    const setUp = (source: string | null, method: string | null = "UPI") =>
+        event({
+            kind: "MANDATE_SET_UP",
+            actor: { kind: "CUSTOMER", userId: null, name: null },
+            data: { method, source },
+        });
+
+    it("says the method they picked", () => {
+        expect(changeWhat(setUp("ACCOUNT"), SUB, NOW)).toBe(
+            "Autopay set up with UPI",
+        );
+        expect(changeWhat(setUp("ACCOUNT", "EMANDATE"), SUB, NOW)).toBe(
+            "Autopay set up with bank account",
+        );
+        expect(changeWhat(setUp("ACCOUNT", null), SUB, NOW)).toBe(
+            "Autopay set up",
+        );
+    });
+
+    it("says who, and where they set it up", () => {
+        expect(changeWho(setUp("PRICES"), SUB, null)).toBe(
+            "Meera, from the Prices page",
+        );
+        expect(changeWho(setUp("PAY_LINK"), SUB, null)).toBe(
+            "Meera, from the pay link",
+        );
+        expect(changeWho(setUp("ACCOUNT"), SUB, null)).toBe(
+            "Meera, from their account",
+        );
+        // D14: approved on the provider's page from a link staff sent.
+        expect(changeWho(setUp("SETUP_LINK"), SUB, null)).toBe(
+            "Meera, from a set-up link",
+        );
+    });
+
+    it("says a set-up link was made, and emailed (D14), and a replaced autopay", () => {
+        expect(
+            what({ kind: "MANDATE_LINK_SENT", data: { method: "UPI" } }),
+        ).toBe("Autopay set-up link made for UPI");
+        expect(
+            what({
+                kind: "MANDATE_LINK_SENT",
+                data: { method: "CARD", emailed: true },
+            }),
+        ).toBe("Autopay set-up link made for card and emailed");
+        expect(
+            what({ kind: "MANDATE_CANCELLED", data: { reason: "REPLACED" } }),
+        ).toBe("Autopay replaced — they approved a new one");
     });
 });

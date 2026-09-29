@@ -61,6 +61,7 @@ export function SubscriptionsScreen({
     openSubscribe,
     nowIso,
     settings = null,
+    autopayOffered = false,
 }: {
     subscriptions: Subscription[];
     /** The newest read hit its cap: older cancelled ones are not here. */
@@ -81,6 +82,8 @@ export function SubscriptionsScreen({
     nowIso: string;
     /** "Members can pause from their account" (A8); null when unread. */
     settings?: SubscriptionSettings | null;
+    /** The business offers autopay (D14): the copy may say so. */
+    autopayOffered?: boolean;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -249,6 +252,7 @@ export function SubscriptionsScreen({
                         canWrite={canWrite}
                         showClasses={showClasses}
                         settings={settings}
+                        nowIso={nowIso}
                     />
                 ) : (
                     <>
@@ -335,6 +339,7 @@ export function SubscriptionsScreen({
                     onOpenChange={onSubscribeOpenChange}
                     contacts={contacts}
                     plans={plans}
+                    autopayOffered={autopayOffered}
                 />
             ) : null}
         </>

@@ -73,6 +73,37 @@ audit that blocks on critical advisories; plus integration tests,
 - **Adopted** — Remove what nothing imports. Gap: `@radix-ui/react-toast` is
   declared in `apps/app.saroh.in/package.json` and imported nowhere.
 
+## Branches, batches and pull requests — **Adopted** (2026-09-29)
+
+Every pushed branch starts five Vercel builds. Pushing one branch per unit
+used up Vercel's deploy quota ("Resource is limited — try again in 24
+hours") and blocked real deploys. So work reaches GitHub in batches:
+
+1. **Open a batch.** Branch `batch-<YYYY-MM-DD>-<n>` from the latest
+   `development`, in its own worktree under `.claude/worktrees/`. `n` counts
+   from 1, and a day can have several batches.
+2. **One worktree per unit.** Each feature or unit gets its own worktree and
+   branch, cut from the batch, and several can run at once. Build and test
+   it there.
+3. **Land units locally.** Merge each finished unit into the batch branch
+   with `--no-ff` and a message naming the unit, then remove its worktree and
+   branch. **Never push a unit branch, and never open a PR per unit.**
+4. **Run the full checks on the batch** before it leaves the machine: lint,
+   typecheck, unit tests, the integration tests (run them in module groups,
+   since a full `test:int` run can crash a worker) and the `check:*` scripts
+   from AGENTS.md → Before you finish.
+5. **Push once and open one PR into `development`.** Do it when a feature is
+   complete, not on a timer. Merge when CI is green, then check the change on
+   the development stack. Anything unfinished carries over into the next
+   batch.
+6. **Release when ready.** Don't hold finished work back for a later day.
+   Open the `development` → `main` release PR as soon as development is
+   verified. **A person merges `main`; an agent never does.** After that
+   merge, the API is deployed as described under Shipping the API, with any
+   backfills the release names.
+
+On each unit's GitHub issue, comment when the unit lands on development.
+
 ## Shipping the API
 
 - **Current** — `.github/workflows/deploy-api.yml` builds

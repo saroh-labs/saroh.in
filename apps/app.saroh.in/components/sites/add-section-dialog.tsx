@@ -39,6 +39,7 @@ export function AddSectionDialog({
     onAdd,
     startType = null,
     shopOpen = false,
+    packsOpen = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -54,6 +55,8 @@ export function AddSectionDialog({
     startType?: SectionType | null;
     /** The shop is open for the business: the Product grid is offered (G12). */
     shopOpen?: boolean;
+    /** Class packs is rolled out and on: its block is offered (DEC-057). */
+    packsOpen?: boolean;
 }) {
     const [picked, setType] = useState<SectionType | null>(null);
     const type = picked ?? startType;
@@ -123,7 +126,7 @@ export function AddSectionDialog({
                             </DialogDescription>
                         </DialogHeader>
                         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {addableSections(shopOpen).map((t) => {
+                            {addableSections(shopOpen, packsOpen).map((t) => {
                                 const m = BLOCK_META[t];
                                 const looks = m.variants.length;
                                 return (

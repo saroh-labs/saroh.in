@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * Payments → Subscriptions (plan 2026-09-23-003, U12/U13) on Rye & Co., the
@@ -320,5 +320,119 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
             }),
         ).toBeVisible();
         await expect(page.getByRole("main")).not.toContainText("₹");
+    });
+});
+
+/**
+ * The Plan Editor (plan 2026-09-26-004, D7) on Northwind, the demo business
+ * whose data the suite may change: a new plan autosaves as a Draft and
+ * Publish opens it; a price changed on the live plan waits as unpublished
+ * changes until Publish changes; a change can be discarded; and a draft
+ * nobody bought can be deleted. The plan it opens is archived at the end,
+ * since a published plan is never deleted.
+ */
+test.describe("the Plan Editor (D7)", () => {
+    async function onNorthwind(page: Page) {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND_ORG}`);
+    }
+
+    test("create → publish; change the live plan → publish changes; discard", async ({
+        page,
+    }) => {
+        const name = `E2E plan ${Date.now()}`;
+        await onNorthwind(page);
+        await page.goto("/billing/subscriptions?tab=plans");
+        await page.getByRole("link", { name: "New plan" }).click();
+        await expect(page).toHaveURL(/\/billing\/plans\/new$/);
+        await expect(
+            page.getByText("Not saved yet — start with a name"),
+        ).toBeVisible();
+
+        await page.getByLabel("Name").fill(name);
+        await expect(
+            page.getByText(/^Saved as a draft — nobody can join it yet/),
+        ).toBeVisible();
+        await expect(page).toHaveURL(/\/billing\/plans\/[^/]+\/edit$/);
+        await expect(
+            page
+                .getByRole("button", { name: "Publish" })
+                .filter({ visible: true })
+                .first(),
+        ).toBeDisabled();
+
+        await page.getByRole("textbox", { name: /^Price/ }).fill("999");
+        await expect(
+            page.getByText("Draft · saved — nobody can join it yet"),
+        ).toBeVisible();
+        const editAddress = page.url();
+        try {
+            await page
+                .getByRole("button", { name: "Publish" })
+                .filter({ visible: true })
+                .first()
+                .click();
+            await expect(
+                page.getByText(`${name} is open for sign-ups.`),
+            ).toBeVisible();
+            await expect(
+                page.getByText("Open to new sign-ups · no changes"),
+            ).toBeVisible();
+
+            await page.getByRole("textbox", { name: /^Price/ }).fill("1099");
+            await expect(page.getByText("Changes not live")).toBeVisible();
+            await expect(
+                page.getByText(/When you publish: price ₹999 → ₹1,099/),
+            ).toBeVisible();
+            await page
+                .getByRole("button", { name: "Publish changes" })
+                .filter({ visible: true })
+                .first()
+                .click();
+            await expect(page.getByText("Changes published.")).toBeVisible();
+
+            await page.getByRole("textbox", { name: /^Price/ }).fill("1299");
+            await expect(page.getByText("Changes not live")).toBeVisible();
+            await page
+                .getByRole("button", { name: "Discard changes" })
+                .filter({ visible: true })
+                .first()
+                .click();
+            await page
+                .getByRole("alertdialog")
+                .getByRole("button", { name: "Discard changes" })
+                .click();
+            await expect(
+                page.getByText("Open to new sign-ups · no changes"),
+            ).toBeVisible();
+            await expect(
+                page.getByRole("textbox", { name: /^Price/ }),
+            ).toHaveValue("1099");
+        } finally {
+            // Nobody new can join it; the demo list is left as it was.
+            await page.goto(editAddress.replace(/\/edit$/, ""));
+            await page.getByRole("button", { name: "Archive" }).click();
+            await expect(
+                page.getByText(/^Archived — nobody new can join/),
+            ).toBeVisible();
+        }
+    });
+
+    test("a draft nobody bought can be deleted", async ({ page }) => {
+        await onNorthwind(page);
+        await page.goto("/billing/plans/new");
+        await page.getByLabel("Name").fill(`E2E draft ${Date.now()}`);
+        await expect(
+            page.getByText(/^Saved as a draft — nobody can join it yet/),
+        ).toBeVisible();
+        await page
+            .getByRole("button", { name: "Delete draft" })
+            .first()
+            .click();
+        await page
+            .getByRole("alertdialog")
+            .getByRole("button", { name: "Delete draft" })
+            .click();
+        await expect(page).toHaveURL(/\/billing\/subscriptions\?tab=plans$/);
     });
 });

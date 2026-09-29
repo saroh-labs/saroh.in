@@ -57,9 +57,16 @@ function byText(selector: string, text: string): HTMLElement {
     return found;
 }
 
-function one<T extends HTMLElement>(selector: string): T {
-    const found = host.querySelector<T>(selector);
-    if (!found) throw new Error(`No ${selector}`);
+/** One answer of a labelled choice ("Descriptions" › "Hide"). */
+function choice(label: string, answer: string): HTMLElement {
+    const group = Array.from(
+        host.querySelectorAll<HTMLElement>('[role="group"]'),
+    ).find((g) => g.firstElementChild?.textContent.trim() === label);
+    if (!group) throw new Error(`No "${label}" choice`);
+    const found = Array.from(group.querySelectorAll("button")).find(
+        (b) => b.textContent.trim() === answer,
+    );
+    if (!found) throw new Error(`No "${answer}" in "${label}"`);
     return found;
 }
 
@@ -94,12 +101,18 @@ afterEach(() => {
 describe("the Plans block's fields (G9)", () => {
     it("highlights the first plan and shows descriptions until told otherwise", () => {
         render({ title: "Plans" });
-        expect(byText("button", "First plan").getAttribute("data-state")).toBe(
-            "on",
-        );
         expect(
-            one("#sec_plans-descriptions").getAttribute("aria-checked"),
+            choice("Highlight", "First plan").getAttribute("aria-pressed"),
         ).toBe("true");
+        expect(
+            choice("Descriptions", "Show").getAttribute("aria-pressed"),
+        ).toBe("true");
+        expect(choice("Prices", "Show").getAttribute("aria-pressed")).toBe(
+            "true",
+        );
+        expect(choice("Show as", "Cards").getAttribute("aria-pressed")).toBe(
+            "true",
+        );
     });
 
     it("keeps no highlight when chosen, and stores the first as the default", () => {
@@ -119,7 +132,7 @@ describe("the Plans block's fields (G9)", () => {
         const onChange = render({ buttonLabel: "Ask" });
         const inputs = host.querySelectorAll<HTMLInputElement>("input");
         const button = inputs[1];
-        expect(button.placeholder).toBe("Ask about joining");
+        expect(button.placeholder).toBe("Join");
         type(button, "Join us");
         expect(lastContent(onChange)).toEqual({ buttonLabel: "Join us" });
         type(button, "");
@@ -128,20 +141,37 @@ describe("the Plans block's fields (G9)", () => {
 
     it("turns descriptions off, and back on as the default", () => {
         const onChange = render({});
-        click(one("#sec_plans-descriptions"));
+        click(choice("Descriptions", "Hide"));
         expect(lastContent(onChange)).toEqual({ showDescriptions: false });
 
         const back = render({ showDescriptions: false });
-        click(one("#sec_plans-descriptions"));
+        click(choice("Descriptions", "Show"));
         expect(lastContent(back)).toEqual({ showDescriptions: undefined });
+    });
+
+    it("lists plans one per row without prices (G16), and back as the default", () => {
+        const onChange = render({});
+        click(choice("Show as", "List"));
+        expect(lastContent(onChange)).toEqual({ layout: "list" });
+        click(choice("Prices", "Hide"));
+        expect(lastContent(onChange)).toEqual({ showPrices: false });
+
+        const back = render({ layout: "list", showPrices: false });
+        click(choice("Show as", "Cards"));
+        expect(lastContent(back)).toEqual({
+            layout: undefined,
+            showPrices: false,
+        });
     });
 
     it("never offers a plan, a price or a way to pay as a field", () => {
         render({});
-        expect(host.querySelector('[aria-label="Highlight"]')).toBeTruthy();
+        expect(choice("Highlight", "None")).toBeTruthy();
         expect(host.textContent).toContain("Descriptions");
-        expect(host.textContent).not.toMatch(/price|choose (a|which) plan/i);
-        expect(host.textContent).not.toMatch(/upi|card|autopay/i);
+        // Prices can be hidden, never typed: no field holds one.
+        expect(host.querySelectorAll("input")).toHaveLength(2);
+        expect(host.textContent).not.toMatch(/choose (a|which) plan/i);
+        expect(host.textContent).not.toMatch(/upi|autopay/i);
     });
 });
 

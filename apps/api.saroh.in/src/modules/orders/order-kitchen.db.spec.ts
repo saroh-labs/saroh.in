@@ -1047,7 +1047,11 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
             const today = DateTime.fromJSDate(now, {
                 zone: "Asia/Kolkata",
             }).toISODate();
-            const month = await calendar.month(owner, today!.slice(0, 7), now);
+            const month = await calendar.read(
+                owner,
+                { from: today!, to: today! },
+                now,
+            );
             const day = month.days.find((d) => d.date === today);
             return Number(day?.takings?.[0]?.amount ?? 0);
         };
@@ -1149,7 +1153,11 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
             const today = DateTime.fromJSDate(now, {
                 zone: "Asia/Kolkata",
             }).toISODate();
-            const month = await calendar.month(owner, today!.slice(0, 7), now);
+            const month = await calendar.read(
+                owner,
+                { from: today!, to: today! },
+                now,
+            );
             const day = month.days.find((d) => d.date === today);
             return Math.round(Number(day?.takings?.[0]?.amount ?? 0) * 100);
         };

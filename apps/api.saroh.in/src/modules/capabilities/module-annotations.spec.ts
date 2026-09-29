@@ -186,6 +186,19 @@ const NEVER: Record<string, string> = {
     // unless Class packs is rolled out and switched on (DEC-057, E12).
     "class-packs/account-packs.controller.ts":
         "a signed-in customer buying a pack — Class packs checked by the service, dark with the account area",
+    // G20: the Prices page's Class packs section. Class packs being off is
+    // checked by the service (`packsOffered`), which answers 404, as a
+    // site with no packs.
+    "class-packs/public-packs.controller.ts":
+        "a published site's Class packs section — Class packs checked by the service",
+    // G20: joining a plan from the site. Payments being off is checked by
+    // the service (`paymentsOffered`), which answers 404.
+    "subscriptions/account-plan-join.controller.ts":
+        "a signed-in customer joining a plan — Payments checked by the service, dark with the account area",
+    // D12: autopay on the customer's own plan. Payments being off, or a
+    // provider without autopay, is checked by the service (409).
+    "subscriptions/account-autopay.controller.ts":
+        "a signed-in customer's own autopay — Payments and the provider checked by the service, dark with the account area",
     // A13: the customer's message thread. Every business can be written
     // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
     // a module, on both sides.
@@ -202,6 +215,10 @@ const NEVER: Record<string, string> = {
     // payment already made still lands through the webhook.
     "orders/public-checkout.controller.ts":
         "a published site's bag and checkout — Commerce checked by the service",
+    // P4: a site order's confirmation page. Never module-gated: an order
+    // already paid is shown to whoever placed it, Commerce on or off.
+    "orders/checkout-confirmation.controller.ts":
+        "a placed site order's confirmation — shown to its customer only",
     // G9: a site's Plans block. Payments being off is checked by the
     // service (`paymentsOffered`), which answers 404, as a site with no plans.
     "subscriptions/public-plans.controller.ts":
@@ -210,6 +227,11 @@ const NEVER: Record<string, string> = {
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
+    // P1: the buyer's browser reports a payment the moment the provider's
+    // window closes. Never module-gated: a payment already taken is settled
+    // whatever the business has switched off since.
+    "webhooks/checkout-return.controller.ts":
+        "a buyer's checkout return — settles a payment already taken",
     "billing/billing-webhook.controller.ts": "billing webhook inbox",
     "waitlist/waitlist.controller.ts": "public waitlist",
 };

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { isPayInvoice, payDate, payMoney, payTitle } from "./invoice-pay-shape";
+import {
+    isPayInvoice,
+    payChargingOf,
+    payDate,
+    payMoney,
+    payTitle,
+} from "./invoice-pay-shape";
 
 const INVOICE = {
     businessName: "Lotus Yoga",
@@ -68,5 +74,16 @@ describe("payMoney and payDate", () => {
     it("writes the day in words, and nothing for a missing date", () => {
         expect(payDate("2026-09-08T10:00:00.000Z")).toBe("8 September 2026");
         expect(payDate(null)).toBeNull();
+    });
+});
+
+describe("an autopay charge under way (D13)", () => {
+    it("reads the day it is asked for, and anything strange as none", () => {
+        expect(payChargingOf({ at: "2026-10-02T10:00:00.000Z" })).toEqual({
+            at: "2026-10-02T10:00:00.000Z",
+        });
+        expect(payChargingOf({ at: "soon" })).toBeNull();
+        expect(payChargingOf(null)).toBeNull();
+        expect(payChargingOf(undefined)).toBeNull();
     });
 });

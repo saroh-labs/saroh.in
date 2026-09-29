@@ -4,9 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { RenderedPlans } from "@saroh/block-contract";
 
-import { accountMoney } from "../account/model";
 import { DEFAULT_API_URL } from "../api-url";
+import type { AutopayMethod } from "../autopay/api";
+import { autopayMethodsOf } from "../autopay/api";
 import { cn } from "../lib/utils";
+import type { PricesActions } from "../prices/api";
+import { PricesDone, useSignInFirst } from "../prices/flow";
+import type { JoinablePlan } from "../prices/join-sheet";
+import { JoinSheet } from "../prices/join-sheet";
+import { planEvery, planPrice } from "../prices/plan-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 
 /**
@@ -27,10 +33,13 @@ import { askAboutHref } from "../shop/ask-about-ordering";
  * With neither (`siteId` undefined) it says where the plans come from.
  * `siteId` null is a live render that could not tell, and draws nothing.
  *
- * **The button never promises what the site can't do.** Until a join sheet
- * ships (G20), it opens the site's enquiry form with the plan named: "Ask
- * about joining". A site with no enquiry form shows no button. No copy here
- * names a way to pay (DEC-059) or promises automatic renewals.
+ * **The button never promises what the site can't do.** Where the live
+ * site hands in its Join actions and the business can take the payment
+ * online (`payOnline`), it is "Join": the join sheet (G20), signing in
+ * first. Otherwise it opens the site's enquiry form with the plan named:
+ * "Ask about joining". A site with neither shows no button. No copy here
+ * names a way to pay (DEC-059) or promises automatic renewals: autopay is
+ * offered only in the join sheet, from the provider's own list (D12).
  *
  * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
  */
@@ -57,6 +66,16 @@ export interface PlansFeed {
      * null when the site has none (no button is drawn).
      */
     joinHref: string | null;
+    /**
+     * Whether a signed-in customer can join online now (G20): the business
+     * can take the payment. Absent or false: "Ask about joining".
+     */
+    payOnline?: boolean;
+    /**
+     * Every way the business's provider can take autopay (D12), for the
+     * join sheet's "Pay with". Absent or empty: autopay isn't offered.
+     */
+    autopayMethods?: AutopayMethod[];
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -64,6 +83,9 @@ export const PLANS_TITLE = "Plans";
 
 /** The button's words when the merchant left them empty. */
 export const PLANS_BUTTON = "Ask about joining";
+
+/** The button's words where the customer can join online (G20). */
+export const PLANS_JOIN = "Join";
 
 /** The badge on a highlighted plan that more members chose than any other. */
 export const MOST_CHOSEN = "Most chosen";
@@ -89,26 +111,20 @@ export function plansOf(body: unknown): PublicPlan[] | null {
     return rows.filter(isPublicPlan);
 }
 
-const INTERVALS: Partial<Record<string, { every: string; per: string }>> = {
-    WEEK: { every: "Every week", per: "week" },
-    MONTH: { every: "Every month", per: "month" },
-    QUARTER: { every: "Every 3 months", per: "3 months" },
-    YEAR: { every: "Every year", per: "year" },
-};
-
-/** "Every month", or null for an interval this build doesn't know. */
-export function planEvery(plan: Pick<PublicPlan, "interval">): string | null {
-    return INTERVALS[plan.interval]?.every ?? null;
+/** Whether a read says Join works (G20); an older API that doesn't say: no. */
+export function plansPayOnline(body: unknown): boolean {
+    return (body as { payOnline?: unknown } | null)?.payOnline === true;
 }
 
-/** "₹1,200 / month"; the bare price for an unknown interval. */
-export function planPrice(
-    plan: Pick<PublicPlan, "price" | "currency" | "interval">,
-): string {
-    const money = accountMoney(plan.price, plan.currency);
-    const per = INTERVALS[plan.interval]?.per;
-    return per ? `${money} / ${per}` : money;
+/** The autopay methods the plans read names (D12); none when it names none. */
+export function plansAutopayMethods(body: unknown): AutopayMethod[] {
+    return autopayMethodsOf(
+        (body as { autopayMethods?: unknown } | null)?.autopayMethods,
+    );
 }
+
+// Said the same way on the cards and in the join sheet (G20).
+export { planEvery, planPrice };
 
 /** Where a plan's button goes: the enquiry form, with the plan named. */
 export function joinHref(enquiryHref: string, planName: string): string {
@@ -123,7 +139,7 @@ function said(value: string | null | undefined): string | null {
 
 type LoadState =
     | { kind: "loading" }
-    | { kind: "ready"; plans: PublicPlan[] }
+    | { kind: "ready"; plans: PublicPlan[]; payOnline: boolean }
     /** 404: Payments is off, or the site isn't one the API serves. */
     | { kind: "off" }
     | { kind: "error" };
@@ -131,12 +147,18 @@ type LoadState =
 export default function PlansSection({
     content,
     feed,
+    prices = null,
     siteId,
     apiUrl = DEFAULT_API_URL,
 }: {
     content: RenderedPlans;
     /** The plans, read by the page that serves the site (live or preview). */
     feed?: PlansFeed;
+    /**
+     * Join's actions, handed in by the live site when the account area is
+     * on (G20). Null: the button asks about joining instead.
+     */
+    prices?: PricesActions | null;
     /**
      * The site, when the block reads its plans itself (the editor's canvas).
      * Null: a live render that could not tell, so nothing is drawn.
@@ -158,8 +180,11 @@ export default function PlansSection({
             );
             if (res.status === 404) return { kind: "off" };
             if (!res.ok) return { kind: "error" };
-            const plans = plansOf(await res.json().catch(() => null));
-            return plans ? { kind: "ready", plans } : { kind: "error" };
+            const body: unknown = await res.json().catch(() => null);
+            const plans = plansOf(body);
+            return plans
+                ? { kind: "ready", plans, payOnline: plansPayOnline(body) }
+                : { kind: "error" };
         } catch {
             return { kind: "error" };
         }
@@ -179,7 +204,15 @@ export default function PlansSection({
     const title = said(content.title) ?? PLANS_TITLE;
 
     if (feed) {
-        return <PlanCards content={content} title={title} feed={feed} />;
+        return (
+            <PlanCards
+                content={content}
+                title={title}
+                feed={feed}
+                prices={prices}
+                apiUrl={apiUrl}
+            />
+        );
     }
     if (siteId === null) return null;
     if (siteId === undefined) {
@@ -240,7 +273,11 @@ export default function PlansSection({
             title={title}
             // The canvas has no enquiry page to hand: the button is drawn,
             // not followed.
-            feed={{ plans: state.plans, joinHref: null }}
+            feed={{
+                plans: state.plans,
+                joinHref: null,
+                payOnline: state.payOnline,
+            }}
             canvas
         />
     );
@@ -305,22 +342,51 @@ function PlanCards({
     content,
     title,
     feed,
+    prices = null,
     canvas = false,
+    apiUrl,
 }: {
     content: RenderedPlans;
     title: string;
     feed: PlansFeed;
+    prices?: PricesActions | null;
+    /** Where a checkout's return is posted (P1). */
+    apiUrl?: string;
     /** Drawn in the editor: the button shows its words but goes nowhere. */
     canvas?: boolean;
 }) {
+    const joins = prices !== null && feed.payOnline === true;
+    const flow = useSignInFirst(joins ? prices : null);
+    const [joining, setJoining] = useState<JoinablePlan | null>(null);
+    const [done, setDone] = useState<string | null>(null);
     if (feed.plans.length === 0) return null;
     const highlightFirst = content.highlight !== "none";
     const showDescriptions = content.showDescriptions !== false;
-    const label = said(content.buttonLabel) ?? PLANS_BUTTON;
+    const showPrices = content.showPrices !== false;
+    // The canvas says what the live site's button will say.
+    const joinWords = joins || (canvas && feed.payOnline === true);
+    const label =
+        said(content.buttonLabel) ?? (joinWords ? PLANS_JOIN : PLANS_BUTTON);
+
+    function join(plan: PublicPlan) {
+        setDone(null);
+        flow.signedIn(() => setJoining(plan));
+    }
 
     return (
         <PlansFrame title={title}>
-            <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]">
+            {done && prices ? (
+                <PricesDone message={done} accountHref={prices.accountHref} />
+            ) : null}
+            <ul
+                className={cn(
+                    "grid",
+                    // "Show as" (G16): one plan per row, or side by side.
+                    content.layout === "list"
+                        ? "grid-cols-1 gap-2.5"
+                        : "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]",
+                )}
+            >
                 {feed.plans.map((plan, index) => {
                     const highlighted = highlightFirst && index === 0;
                     const every = planEvery(plan);
@@ -357,10 +423,23 @@ function PlanCards({
                             ) : null}
                             <span className="mt-1.5 flex items-center gap-2.5">
                                 <span className="flex-1 text-base font-bold">
-                                    {planPrice(plan)}
+                                    {showPrices ? planPrice(plan) : null}
                                 </span>
                                 {canvas ? (
                                     <span className={joinButton}>{label}</span>
+                                ) : joins ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => join(plan)}
+                                        aria-label={`${label}: ${plan.name}`}
+                                        className={cn(
+                                            joinButton,
+                                            "cursor-pointer transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]",
+                                            focusRing,
+                                        )}
+                                    >
+                                        {label}
+                                    </button>
                                 ) : feed.joinHref ? (
                                     <a
                                         href={joinHref(
@@ -382,6 +461,31 @@ function PlanCards({
                     );
                 })}
             </ul>
+            {joins ? (
+                <>
+                    {flow.sheet}
+                    {flow.customer ? (
+                        <JoinSheet
+                            plan={joining}
+                            onClose={() => setJoining(null)}
+                            businessName={prices.businessName}
+                            customer={flow.customer}
+                            api={prices.join}
+                            apiUrl={apiUrl}
+                            autopayMethods={feed.autopayMethods ?? []}
+                            onJoined={(message) => {
+                                setJoining(null);
+                                setDone(message);
+                            }}
+                            onSignedOut={() => {
+                                const plan = joining;
+                                setJoining(null);
+                                flow.signInAgain(() => setJoining(plan));
+                            }}
+                        />
+                    ) : null}
+                </>
+            ) : null}
         </PlansFrame>
     );
 }

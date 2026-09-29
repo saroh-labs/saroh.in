@@ -43,7 +43,11 @@ import type {
 } from "./dto";
 import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
 import type { PublicModulePageStates } from "./module-pages";
-import { addableModulePageKinds, publicModulePageStates } from "./module-pages";
+import {
+    addableModulePageKinds,
+    packsBlockOffered,
+    publicModulePageStates,
+} from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import type { SiteChangeKind } from "./pending-changes";
@@ -71,6 +75,7 @@ import {
     sellsFromView,
     shopRolloutOn,
 } from "./sells-from";
+import { awaitsSellsFrom, shopCouldServe } from "./sells-from-awaiting";
 import {
     assertPageInSite,
     assertPathIsFree,
@@ -401,6 +406,12 @@ export interface SiteDetailView {
      */
     addablePageKinds: ModulePageKind[];
     /**
+     * Whether Add block offers the Class packs block: Class packs rolled out
+     * for the business and on. Off, the block is offered nowhere (DEC-057);
+     * one already on a page stays.
+     */
+    packsBlockOffered: boolean;
+    /**
      * How many sections publishing would change (#190). Null before the first
      * publish. See {@link SitesService.pendingSectionChanges} — every surface
      * that shows this number reads this one computation.
@@ -440,6 +451,13 @@ export interface SiteDetailView {
      * flag, off until checkout ships): the settings show no row then.
      */
     sellsFrom: SellsFromView | null;
+    /**
+     * The shop could serve (`SITE_SHOP`, Commerce rolled out and on) and a
+     * storefront with products could be chosen, but Sells from is
+     * unanswered, so `/shop` isn't live (P4). The Shop settings say so.
+     * False whenever the shop isn't open for the business (DEC-057).
+     */
+    shopAwaitsSellsFrom: boolean;
 }
 
 /**
@@ -1020,12 +1038,18 @@ export class SitesService {
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
             sellsFrom,
+            // Asked only when it could be true: Commerce's gate is a read.
+            shopAwaitsSellsFrom:
+                sellsFrom !== null &&
+                awaitsSellsFrom(sellsFrom) &&
+                (await shopCouldServe(ctx.organizationId)),
             addablePageKinds: allows(ctx, "site:update")
                 ? await addableModulePageKinds(
                       ctx.organizationId,
                       site.pages.map((p) => p.kind),
                   )
                 : [],
+            packsBlockOffered: await packsBlockOffered(ctx.organizationId),
         };
     }
 

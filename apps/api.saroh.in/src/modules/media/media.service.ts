@@ -342,6 +342,37 @@ export class MediaService {
     }
 
     /**
+     * The first `length` bytes of a READY library object, read from storage
+     * (one ranged GET) — never over HTTP from its public address. For a
+     * module that draws the image itself: the invoice PDF prints the logo.
+     * Tenant-scoped: another organization's id, one still uploading, or one
+     * whose bytes are gone is null. Storage errors propagate.
+     */
+    async readReadyObjectStart(
+        organizationId: string,
+        mediaId: string,
+        length: number,
+    ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+        const media = await prisma.media.findUnique({
+            where: { id: mediaId },
+            select: {
+                organizationId: true,
+                key: true,
+                status: true,
+                contentType: true,
+            },
+        });
+        if (
+            media?.organizationId !== organizationId ||
+            media.status !== "READY"
+        ) {
+            return null;
+        }
+        const bytes = await this.storage.readObjectStart(media.key, length);
+        return bytes ? { bytes, contentType: media.contentType } : null;
+    }
+
+    /**
      * Load a media row and assert it belongs to `ctx.organizationId`. Throws
      * `NotFoundException` for a missing OR cross-tenant id — a 404 (not 403) so a
      * caller can't probe which media ids exist in another org.

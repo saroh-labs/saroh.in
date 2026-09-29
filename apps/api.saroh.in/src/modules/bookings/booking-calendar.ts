@@ -1,3 +1,6 @@
+import { bookingPrice } from "./booking-money";
+import type { DeskTake } from "./desk-take";
+import { chargingOnly, deskTake, paidAtDesk, paidOnlineOf } from "./desk-take";
 import type { PaidWith } from "./dto";
 import { PAID_WITH } from "./dto";
 import type { TreatmentRow, TreatmentView } from "./treatment-view";
@@ -59,6 +62,21 @@ export interface DiaryRow {
     /** A visit of a treatment (E10): its number, and its order. */
     visitNumber?: number | null;
     order?: TreatmentRow["order"];
+    /**
+     * For taking payment at the desk (P2): the terms it was booked at, what
+     * it pays for, and its own paper with the payments on it.
+     */
+    snapshot?: unknown;
+    orderId?: string | null;
+    courseEnrollmentId?: string | null;
+    invoices?: {
+        kind: string;
+        status: string;
+        paymentMethod: string | null;
+        total: { toString(): string };
+        paidAt: Date | null;
+        paymentIntents: { status: string; amountCents: number }[];
+    }[];
 }
 
 export interface DiaryPerson {
@@ -103,6 +121,16 @@ export interface DiaryBooking {
     subscriptionId: string | null;
     /** A visit of a treatment (E10): "Visit 2 of 3", with its order. */
     treatment: TreatmentView | null;
+    /**
+     * Paid at the desk (P2), and how the last of it was taken: CASH, UPI,
+     * CARD… Not a money figure, so everyone who reads bookings sees it.
+     */
+    paidAtDesk: { method: string | null } | null;
+    /**
+     * What "Take ₹X" takes now (P2); null when there is nothing to take.
+     * Money only — absent for a viewer who reads no money.
+     */
+    take?: DeskTake | null;
 }
 
 /** One start of a class: the places, who holds them, and how each paid. */
@@ -160,8 +188,28 @@ function serviceView(row: DiaryRow, money: boolean): DiaryService {
     };
 }
 
+/** What the desk has taken for a booking, and what it could take now (P2). */
+function deskOf(row: DiaryRow): {
+    paid: DiaryBooking["paidAtDesk"];
+    take: DeskTake | null;
+} {
+    const paper = row.invoices ?? [];
+    const desk = paidAtDesk(paper);
+    const take = deskTake(row, {
+        priceCents: bookingPrice(row.snapshot).priceCents,
+        paidOnlineCents: paidOnlineOf(paper),
+        paidAtDeskCents: desk.cents,
+        paper: chargingOnly(paper),
+    });
+    return {
+        paid: desk.cents > 0 ? { method: desk.method } : null,
+        take: "refusal" in take ? null : take,
+    };
+}
+
 export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
     const pack = row.packRedemption;
+    const desk = deskOf(row);
     return {
         id: row.id,
         serviceId: row.serviceId,
@@ -186,6 +234,8 @@ export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
                 : null,
         subscriptionId: row.subscriptionId,
         treatment: treatmentOf(row),
+        paidAtDesk: desk.paid,
+        ...(money ? { take: desk.take } : {}),
     };
 }
 

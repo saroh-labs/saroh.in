@@ -3,6 +3,8 @@ import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { discardStalePackDrafts } from "../class-packs/pack-checkout";
+import { discardStalePlanJoins } from "../subscriptions/plan-join";
+import { PaymentLookupService } from "../webhooks/payment-lookup.service";
 import { RELEASE_HOLDS_TYPE, releaseHoldInTx } from "./booking-hold";
 import { deleteOldEntries, expireLapsedOffers } from "./waitlist-offer";
 
@@ -15,10 +17,20 @@ export const RELEASE_EVERY_MS = 5 * 60 * 1000;
 export const RELEASE_BATCH = 200;
 
 /**
+ * How long a hold whose provider could not say whether it was paid is kept
+ * past its time, asked about again each run, before it is released anyway
+ * (P1). A hold past its time already holds nothing, so keeping it costs
+ * nothing; a payment that settles it later still confirms it when the
+ * place is free (`confirmHoldInTx`).
+ */
+export const UNANSWERED_HOLD_GRACE_MS = 60 * 60 * 1000;
+
+/**
  * Releases pay-now holds nobody paid for (U19): each PENDING booking whose
  * hold ran out is cancelled and its draft invoice voided (`releaseHoldInTx`).
  * Each run also voids the online pack drafts nobody paid within 24 hours
- * (A11, `class-packs/pack-checkout.ts`), ends waitlist offers nobody
+ * (A11, `class-packs/pack-checkout.ts`) and the online plan joins nobody
+ * paid (G20, `subscriptions/plan-join.ts`), ends waitlist offers nobody
  * answered in time — offering each place to the next in line — and deletes
  * places in line closed 30 days ago (A12, `waitlist-offer.ts`).
  *
@@ -33,6 +45,14 @@ export const RELEASE_BATCH = 200;
 export class ReleaseHoldsHandler {
     private readonly logger = new Logger(ReleaseHoldsHandler.name);
 
+    /**
+     * @param payments asks the provider about a hold's payment before the
+     *   hold is released (P1). Nest always gives it; only a test that builds
+     *   the handler by hand leaves it out, and then a hold is released on
+     *   its time alone, as before.
+     */
+    constructor(private readonly payments?: PaymentLookupService) {}
+
     readonly handle = async (_job: Job): Promise<void> => {
         let full = false;
         try {
@@ -43,6 +63,7 @@ export class ReleaseHoldsHandler {
             );
         }
         await this.discardPackDrafts(new Date());
+        await this.discardPlanJoins(new Date());
         await this.tidyWaitlist(new Date());
         const next = new Date(Date.now() + (full ? 0 : RELEASE_EVERY_MS));
         if (!(await this.schedule(next))) {
@@ -73,6 +94,27 @@ export class ReleaseHoldsHandler {
     }
 
     /**
+     * The same for plans joined online (G20): joins nobody paid within 24
+     * hours are voided (`discardStalePlanJoins`), so nobody is put on a
+     * plan. Never throws; a failed run is logged and the next one tries
+     * again.
+     */
+    async discardPlanJoins(now: Date): Promise<number> {
+        try {
+            const discarded = await discardStalePlanJoins(now);
+            if (discarded > 0) {
+                this.logger.log(`Discarded ${discarded} unpaid plan joins`);
+            }
+            return discarded;
+        } catch (error) {
+            this.logger.error(
+                `Could not discard unpaid plan joins: ${String(error)}`,
+            );
+            return 0;
+        }
+    }
+
+    /**
      * The class waitlist's part (A12): offers whose time ran out are ended
      * and their places offered on (`expireLapsedOffers`; an offer's own
      * delayed job normally gets there first), and places in line closed 30
@@ -96,17 +138,36 @@ export class ReleaseHoldsHandler {
     /**
      * Release one batch of holds that ran out by `now`. True when the batch
      * was full, so there may be more.
+     *
+     * Each hold's payment is asked about first (P1): money the provider has
+     * but whose webhook never came settles the hold through the webhook's
+     * own path — confirmed when its place is still free, owed back when not
+     * — so a paid hold is never released as unpaid. A provider that can't
+     * say keeps the hold for the next run, up to
+     * {@link UNANSWERED_HOLD_GRACE_MS} past its time.
      */
     async releaseExpired(now: Date): Promise<boolean> {
         const due = await prisma.booking.findMany({
             where: { status: "PENDING", holdExpiresAt: { lte: now } },
             orderBy: { holdExpiresAt: "asc" },
             take: RELEASE_BATCH,
-            select: { id: true },
+            select: { id: true, holdExpiresAt: true },
         });
         let released = 0;
-        for (const { id } of due) {
+        for (const { id, holdExpiresAt } of due) {
             try {
+                const paid = await this.payments?.confirmHoldPayment(id);
+                // Settled: the payment confirmed it, or released it and
+                // recorded the money as owed back. Either way, done.
+                if (paid === "PAID") continue;
+                if (
+                    paid === "UNKNOWN" &&
+                    holdExpiresAt &&
+                    now.getTime() - holdExpiresAt.getTime() <
+                        UNANSWERED_HOLD_GRACE_MS
+                ) {
+                    continue;
+                }
                 // Re-read under the booking's lock inside: a payment that
                 // confirmed it a moment ago wins, and nothing is released.
                 if (

@@ -45,12 +45,25 @@ export {
 } from "./blocks/on-today";
 export type { PublicToday, PublicTodayItem } from "./blocks/on-today";
 export {
+    PACKS_ASK,
+    PACKS_BUY,
+    PACKS_TITLE,
+    default as PacksSection,
+    packEyebrow,
+    packPerClass,
+    packsOf,
+} from "./blocks/packs";
+export type { PacksFeed, PublicPack } from "./blocks/packs";
+export {
     PLANS_BUTTON,
+    PLANS_JOIN,
     default as PlansSection,
     joinHref,
     planEvery,
     planPrice,
+    plansAutopayMethods,
     plansOf,
+    plansPayOnline,
 } from "./blocks/plans";
 export type { PlansFeed, PublicPlan } from "./blocks/plans";
 export {
@@ -129,8 +142,18 @@ export type {
 } from "./shop/api";
 export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
 export { ShopBag } from "./shop/bag";
+// The order confirmation page after a shop payment (P4).
 export type { ShopBagProps } from "./shop/bag";
 export type { BagItem } from "./shop/bag-store";
+export {
+    OrderConfirmation,
+    orderConfirmationHref,
+} from "./shop/order-confirmation";
+export type {
+    OrderConfirmationData,
+    OrderConfirmationLine,
+    OrderConfirmationLookup,
+} from "./shop/order-confirmation";
 
 // Not a page block either: the booking page on a merchant's site (U19),
 // `/<domain>/book` — every service, two weeks of times, pay now or at the desk.
@@ -268,13 +291,71 @@ export type {
     PacksApi,
     PlanPacksShop,
 } from "./account/packs-api";
+// G20: joining a plan and buying a pack from the site's Prices page.
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
 export type { TrackLookup } from "./account/track-sheet";
+export { PRICES_OFFLINE, joinedMessage } from "./prices/api";
+export type {
+    JoinApi,
+    JoinProblem,
+    JoinResult,
+    PlanJoinAttempt,
+    PlanJoinStarted,
+    PricesActions,
+} from "./prices/api";
+export { JoinSheet } from "./prices/join-sheet";
+export type { JoinSheetProps, JoinablePlan } from "./prices/join-sheet";
+// D12: the customer sets up autopay (the join, My plan, the pay link).
+export type { AutopayStartResult } from "./account/plan-api";
+export {
+    AUTOPAY_METHODS,
+    autopayCheckStateOf,
+    autopayChecksOf,
+    autopayMethodsOf,
+    autopayOutcomeOf,
+    autopayStartOf,
+    autopayStateOf,
+    isAutopayMethod,
+} from "./autopay/api";
+export type {
+    AutopayCheck,
+    AutopayCheckState,
+    AutopayChecks,
+    AutopayMethod,
+    AutopayOutcome,
+    AutopayStart,
+    AutopayState,
+} from "./autopay/api";
+export {
+    AutopayMethodChoice,
+    landOnBusinessSite,
+    openAutopayWindow,
+} from "./autopay/choice";
+export type { AutopayWindowOutcome } from "./autopay/choice";
+export { AutopayDone } from "./autopay/done";
+export type { AutopayDoneProps, AutopayDoneState } from "./autopay/done";
+export {
+    autopayCheckAfter,
+    autopayCheckBefore,
+    autopayCheckLine,
+    autopayMethodLabel,
+    autopayMethodSub,
+    autopayStateLine,
+    autopayWith,
+} from "./autopay/words";
+export { openProviderCheckout } from "./booking-flow/checkout";
+export { PayOption } from "./booking-flow/steps/pay-option";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
-export { SiteFooter, SiteHeader, footerLine, siteMenu } from "./site-chrome";
+export {
+    SiteFooter,
+    SiteHeader,
+    footerLine,
+    siteMenu,
+    withShopLink,
+} from "./site-chrome";
 export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";

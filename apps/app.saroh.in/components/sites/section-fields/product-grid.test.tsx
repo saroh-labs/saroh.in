@@ -92,6 +92,19 @@ function click(el: HTMLElement) {
     });
 }
 
+/** One answer of a labelled choice ("Prices" › "Hide"). */
+function choice(label: string, answer: string): HTMLElement {
+    const group = Array.from(
+        host.querySelectorAll<HTMLElement>('[role="group"]'),
+    ).find((g) => g.firstElementChild?.textContent.trim() === label);
+    if (!group) throw new Error(`No "${label}" choice`);
+    const found = Array.from(group.querySelectorAll("button")).find(
+        (b) => b.textContent.trim() === answer,
+    );
+    if (!found) throw new Error(`No "${answer}" in "${label}"`);
+    return found;
+}
+
 beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
@@ -112,11 +125,15 @@ describe("the Product grid's fields (G12)", () => {
         expect(byText("button", "Up to 4").getAttribute("data-state")).toBe(
             "on",
         );
-        expect(
-            host
-                .querySelector("#sec_grid-prices")
-                ?.getAttribute("aria-checked"),
-        ).toBe("true");
+        expect(choice("Prices", "Show").getAttribute("aria-pressed")).toBe(
+            "true",
+        );
+        expect(choice("Photos", "Show").getAttribute("aria-pressed")).toBe(
+            "true",
+        );
+        expect(choice("Show as", "Cards").getAttribute("aria-pressed")).toBe(
+            "true",
+        );
     });
 
     it("switching to a collection keeps no picked products", () => {
@@ -154,17 +171,29 @@ describe("the Product grid's fields (G12)", () => {
     });
 
     it("turns prices off, and back on as the default", () => {
-        const prices = () => {
-            const found = host.querySelector<HTMLElement>("#sec_grid-prices");
-            if (!found) throw new Error("No prices switch");
-            return found;
-        };
         const onChange = render({});
-        click(prices());
+        click(choice("Prices", "Hide"));
         expect(lastContent(onChange)).toEqual({ showPrices: false });
         const back = render({ showPrices: false });
-        click(prices());
+        click(choice("Prices", "Show"));
         expect(lastContent(back)).toEqual({ showPrices: undefined });
+    });
+
+    it("sets how products show (G16): a list, no photos or lines", () => {
+        const onChange = render({});
+        click(choice("Show as", "List"));
+        expect(lastContent(onChange)).toEqual({ layout: "list" });
+        click(choice("Photos", "Hide"));
+        expect(lastContent(onChange)).toEqual({ showPhotos: false });
+        click(choice("Descriptions", "Hide"));
+        expect(lastContent(onChange)).toEqual({ showDescriptions: false });
+
+        const back = render({ layout: "list", showPhotos: false });
+        click(choice("Show as", "Cards"));
+        expect(lastContent(back)).toEqual({
+            layout: undefined,
+            showPhotos: false,
+        });
     });
 
     it("lists picked products in order, saying which won't show", () => {
@@ -235,7 +264,8 @@ describe("the Product grid's fields (G12)", () => {
 
     it("never offers a product's name, price or photo as a field", () => {
         render({});
-        expect(host.querySelectorAll("input")).toHaveLength(1);
+        // The title, and the button's words (G16): never a product's own.
+        expect(host.querySelectorAll("input")).toHaveLength(2);
         expect(host.textContent).toContain(
             "Each card uses that product's own photo",
         );
@@ -258,8 +288,8 @@ describe("the Product grid in the editor (G12)", () => {
     it("is offered only while the shop is open for the business", () => {
         expect(addableSections(false)).not.toContain("productGrid");
         expect(addableSections(true)).toContain("productGrid");
-        expect(addableSections(true)).toEqual(SECTION_ORDER);
-        expect(addableSections(false)).toEqual(
+        expect(addableSections(true, true)).toEqual(SECTION_ORDER);
+        expect(addableSections(false, true)).toEqual(
             SECTION_ORDER.filter((t) => t !== "productGrid"),
         );
     });

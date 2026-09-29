@@ -66,6 +66,11 @@ export interface ShopBagProps {
     };
     /** The provider window; replaced in tests. */
     openCheckout?: OpenCheckout;
+    /**
+     * The public API the checkout's return is posted to (P1), so a paid
+     * order is placed without waiting for the webhook.
+     */
+    apiUrl?: string;
 }
 
 export function ShopBag({
@@ -74,6 +79,7 @@ export function ShopBag({
     api,
     account,
     openCheckout,
+    apiUrl,
 }: ShopBagProps) {
     const items = useBag(site);
     const count = bagCount(items);
@@ -262,6 +268,7 @@ export function ShopBag({
                     onBack={() => setStep({ kind: "bag" })}
                     onClose={close}
                     openCheckout={openCheckout}
+                    apiUrl={apiUrl}
                 />
             ) : null}
         </>

@@ -1,3 +1,4 @@
+import type { AutopayMethod, AutopayStart } from "../autopay/api";
 import type { AccountPlanTab } from "./model";
 
 /**
@@ -19,7 +20,19 @@ export interface PlanApi {
     cancel: (ref: string) => Promise<PlanChangeResult>;
     /** A fresh pay link for the plan's overdue invoice, made now. */
     payNow: (ref: string) => Promise<PayNowResult>;
+    /**
+     * Turn autopay on, or change how it pays (D12), with the method picked.
+     * Absent: the site can't, and My plan offers none.
+     */
+    startAutopay?: (
+        ref: string,
+        method: AutopayMethod,
+        idempotencyKey: string,
+    ) => Promise<AutopayStartResult>;
 }
+
+export type AutopayStartResult =
+    { ok: true; data: AutopayStart } | { ok: false; message: string };
 
 /** Said when the site's server couldn't be reached. */
 export const PLAN_OFFLINE =

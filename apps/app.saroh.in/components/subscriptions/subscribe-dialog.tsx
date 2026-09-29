@@ -20,6 +20,7 @@ import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
 import { invoiceMoney } from "@/lib/invoices/money";
 import { subscribe } from "@/lib/subscriptions/actions";
+import { renewalWords } from "@/lib/subscriptions/autopay";
 import { explainStart, intervalWords } from "@/lib/subscriptions/renewal";
 import type { Plan } from "@/lib/subscriptions/service";
 
@@ -46,6 +47,7 @@ export function SubscribeDialog({
     plans,
     initialPlanId,
     initialContactId,
+    autopayOffered = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -54,6 +56,8 @@ export function SubscribeDialog({
     initialPlanId?: string;
     /** Who, already chosen — the contact page subscribes its own person. */
     initialContactId?: string;
+    /** The business offers autopay (D14); unknown reads as not. */
+    autopayOffered?: boolean;
 }) {
     const router = useRouter();
     const ids = { who: useId(), plan: useId(), start: useId() };
@@ -104,8 +108,7 @@ export function SubscribeDialog({
                         Subscribe someone
                     </DialogTitle>
                     <DialogDescription>
-                        Invoiced each period. Nothing is charged and nobody is
-                        contacted.
+                        {renewalWords(autopayOffered).subscribe}
                     </DialogDescription>
                 </DialogHeader>
                 {active.length === 0 ? (

@@ -20,6 +20,11 @@ import type {
     AccountTrackStep,
     AccountView,
 } from "@saroh/site-blocks";
+import {
+    autopayChecksOf,
+    autopayMethodsOf,
+    autopayStateOf,
+} from "@saroh/site-blocks";
 
 /**
  * The account area's answers, checked before a page sees them (round-2 plan
@@ -161,6 +166,11 @@ function block<T>(
         return { ok: true, value: v.value };
     }
     return { ok: false };
+}
+
+/** A block's value mapped, a failed block kept failed. */
+function mapBlock<T, U>(b: AccountBlock<T>, f: (v: T) => U): AccountBlock<U> {
+    return b.ok ? { ok: true, value: f(b.value) } : { ok: false };
 }
 
 const orNull =
@@ -330,16 +340,52 @@ export function planTabResult(v: unknown): AccountPlanTab | null {
     if (!isRecord(v) || !Array.isArray(v.pauseWeeks)) return null;
     if (!v.pauseWeeks.every(isNumber)) return null;
     return {
-        subscriptions: block(
-            v.subscriptions,
-            (x): x is AccountSubscription[] =>
-                Array.isArray(x) && x.every(isSubscription),
+        subscriptions: mapBlock(
+            block(
+                v.subscriptions,
+                (x): x is AccountSubscription[] =>
+                    Array.isArray(x) && x.every(isSubscription),
+            ),
+            (rows) => rows.map(withAutopay),
         ),
         packs: block(
             v.packs,
             (x): x is AccountPack[] => Array.isArray(x) && x.every(isPack),
         ),
         pauseWeeks: v.pauseWeeks,
+        // Autopay (D12): the provider's own list; none from an older API.
+        autopayMethods: autopayMethodsOf(v.autopayMethods),
+        // The ₹1 check each takes with nothing owed (D12B); none from an
+        // older API.
+        autopayChecks: autopayChecksOf(v.autopayChecks),
+    };
+}
+
+/** A plan's autopay fields, checked: anything strange reads as none (D12). */
+function withAutopay(s: AccountSubscription): AccountSubscription {
+    const r = s as unknown as Rec;
+    const pays = r.autopayPays;
+    const charging = r.autopayCharging;
+    const nextCharge = r.autopayNextCharge;
+    return {
+        ...s,
+        // A charge under way (D13); anything strange reads as none.
+        autopayCharging:
+            isRecord(charging) && isString(charging.at)
+                ? { at: charging.at }
+                : null,
+        // When autopay next charges (D13B), checked the same way.
+        autopayNextCharge:
+            isRecord(nextCharge) &&
+            isString(nextCharge.at) &&
+            !Number.isNaN(Date.parse(nextCharge.at))
+                ? { at: nextCharge.at }
+                : null,
+        autopay: autopayStateOf(r.autopay),
+        autopayPays:
+            isRecord(pays) && isString(pays.total) && isString(pays.currency)
+                ? { total: pays.total, currency: pays.currency }
+                : null,
     };
 }
 

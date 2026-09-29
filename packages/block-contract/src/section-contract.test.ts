@@ -393,6 +393,7 @@ describe("per-section padding override (#189)", () => {
         journal: {},
         plans: {},
         productGrid: {},
+        packs: {},
     };
 
     it("is accepted on every section type", () => {
@@ -608,5 +609,82 @@ describe("productGrid v1", () => {
             products: [{ name: "Copied loaf", price: "99.00" }],
         });
         expect(parsed.success && parsed.data).toEqual({ title: "Shop" });
+    });
+});
+
+describe("list sections' display options (G16)", () => {
+    const base = {
+        servicesList: { serviceIds: ["svc_1"] },
+        productGrid: {},
+        plans: {},
+        journal: {},
+    } as const;
+
+    it("keeps an old section exactly as it was: every option is optional", () => {
+        for (const [type, content] of Object.entries(base)) {
+            const parsed = parseSectionContent(type, 1, content);
+            expect(parsed.success && parsed.data).toEqual(content);
+        }
+    });
+
+    it("takes Cards or List on every list section, and nothing else", () => {
+        for (const [type, content] of Object.entries(base)) {
+            for (const layout of ["cards", "list"]) {
+                const parsed = parseSectionContent(type, 1, {
+                    ...content,
+                    layout,
+                });
+                expect(parsed.success && parsed.data).toEqual({
+                    ...content,
+                    layout,
+                });
+            }
+            expect(
+                parseSectionContent(type, 1, { ...content, layout: "grid" })
+                    .success,
+            ).toBe(false);
+        }
+    });
+
+    it("stores the Photos, Descriptions and Prices switches each block has", () => {
+        const services = parseSectionContent("servicesList", 1, {
+            ...base.servicesList,
+            showDescriptions: false,
+            showPrices: false,
+        });
+        expect(services.success && services.data).toMatchObject({
+            showDescriptions: false,
+            showPrices: false,
+        });
+        const grid = parseSectionContent("productGrid", 1, {
+            showPhotos: false,
+            showDescriptions: false,
+            showPrices: false,
+        });
+        expect(grid.success && grid.data).toEqual({
+            showPhotos: false,
+            showDescriptions: false,
+            showPrices: false,
+        });
+        const plans = parseSectionContent("plans", 1, { showPrices: false });
+        expect(plans.success && plans.data).toEqual({ showPrices: false });
+    });
+
+    it("takes a button of up to 40 characters, trimmed", () => {
+        for (const [type, content] of Object.entries(base)) {
+            const parsed = parseSectionContent(type, 1, {
+                ...content,
+                buttonLabel: "  Choose a time ",
+            });
+            expect(parsed.success && parsed.data).toMatchObject({
+                buttonLabel: "Choose a time",
+            });
+            expect(
+                parseSectionContent(type, 1, {
+                    ...content,
+                    buttonLabel: "x".repeat(41),
+                }).success,
+            ).toBe(false);
+        }
     });
 });

@@ -62,6 +62,17 @@ export class FakeWebhookProvider implements WebhookProvider {
             providerRefundId: body.providerRefundId,
             refundAmountCents: body.refundAmountCents,
             refundReference: body.refundReference,
+            mandate: body.mandate
+                ? {
+                      ...body.mandate,
+                      // JSON carries a date as text.
+                      expiresAt: body.mandate.expiresAt
+                          ? new Date(body.mandate.expiresAt)
+                          : undefined,
+                  }
+                : undefined,
+            preDebitStatus: body.preDebitStatus,
+            mandateLink: body.mandateLink,
         };
     }
 }

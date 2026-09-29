@@ -7,7 +7,12 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { toMoneyString } from "../../common/money";
 import { payLinkUrl } from "../invoices/pay-link-url";
+import { AutopayService } from "../payments/autopay.service";
+import { subscriptionChargesUnderWay } from "../payments/charge-under-way";
+import { MandateChargesService } from "../payments/mandate-charges.service";
+import type { MandateMethod } from "../payments/providers/provider.port";
 import { ALLOWANCE_SELECT } from "../subscriptions/classes-allowance";
 import type { PauseWeeks } from "../subscriptions/dto";
 import { PAUSE_WEEKS } from "../subscriptions/dto";
@@ -15,6 +20,8 @@ import {
     overdueInvoiceOf,
     takesPaymentOnline,
 } from "../subscriptions/member-invoices";
+import { nextAutopayCharge } from "../subscriptions/next-autopay-charge";
+import { paymentsOffered } from "../subscriptions/public-plans.service";
 import { membersCanPause } from "../subscriptions/subscription-settings";
 import type { CustomerScope } from "../subscriptions/subscriptions.service";
 import { SubscriptionsService } from "../subscriptions/subscriptions.service";
@@ -48,8 +55,9 @@ import {
 
 /**
  * Whether an autopay charge is under way on an invoice (D13), when "Pay now"
- * is hidden and a pay-link request is a 409. D13 isn't built yet, so the
- * default says never; D13 provides the real check under this token.
+ * is hidden and a pay-link request is a 409. `SubscriptionsModule` provides
+ * the real check (`payments/charge-under-way.ts`); a spec that builds this
+ * by hand gets "never".
  */
 export const AUTOPAY_CHARGE_PENDING = Symbol("AUTOPAY_CHARGE_PENDING");
 export type AutopayChargePending = (
@@ -75,6 +83,10 @@ export class AccountPlanService {
         @Optional()
         @Inject(AUTOPAY_CHARGE_PENDING)
         private readonly chargePending: AutopayChargePending = NO_AUTOPAY_YET,
+        // Autopay on My plan (D12); absent where a test builds this by hand.
+        @Optional() private readonly autopay?: AutopayService,
+        // "Next autopay charge" (D13B); absent, none is said.
+        @Optional() private readonly charges?: MandateChargesService,
     ) {}
 
     // ---- Reading ---------------------------------------------------------
@@ -88,11 +100,53 @@ export class AccountPlanService {
             block("plan-subscriptions", () => this.plans(member, pausing, now)),
             block("plan-packs", () => this.packs(member, now)),
         ]);
+        const autopayMethods = await this.autopayMethods(member, subscriptions);
         return {
             subscriptions,
             packs,
             pauseWeeks: pausing ? [...PAUSE_WEEKS] : [],
+            autopayMethods,
+            autopayChecks: await this.autopayChecks(
+                member,
+                subscriptions,
+                autopayMethods,
+            ),
         };
+    }
+
+    /**
+     * The ₹1 check each offered method takes with nothing owed (DEC-064),
+     * so the sheet says so before they pick. None when autopay isn't
+     * offered; a provider that can't say is none, never a guess.
+     */
+    private async autopayChecks(
+        member: CustomerScope,
+        subscriptions: AccountPlanTab["subscriptions"],
+        methods: MandateMethod[],
+    ): Promise<AccountPlanTab["autopayChecks"]> {
+        if (!this.autopay || methods.length === 0) return {};
+        const currency =
+            (subscriptions.ok ? subscriptions.value[0]?.currency : null) ??
+            "INR";
+        return this.autopay
+            .checks(member.organizationId, currency)
+            .catch(() => ({}));
+    }
+
+    /**
+     * What the business's provider can take autopay with (D12), asked only
+     * when the member has a plan to put it on. A provider that can't say
+     * offers none.
+     */
+    private async autopayMethods(
+        member: CustomerScope,
+        subscriptions: AccountPlanTab["subscriptions"],
+    ): Promise<MandateMethod[]> {
+        if (!this.autopay) return [];
+        if (!subscriptions.ok || subscriptions.value.length === 0) return [];
+        // Autopay is a way to pay: only while Payments is on (DEC-057).
+        if (!(await paymentsOffered(member.organizationId))) return [];
+        return this.autopay.offer(member.organizationId).catch(() => []);
     }
 
     /** The member's live plans (on or paused), newest first. */
@@ -113,6 +167,9 @@ export class AccountPlanService {
                 take: PLAN_ROWS,
                 select: {
                     id: true,
+                    organizationId: true,
+                    planId: true,
+                    pendingPlanId: true,
                     status: true,
                     price: true,
                     currency: true,
@@ -127,6 +184,11 @@ export class AccountPlanService {
             }),
             takesPaymentOnline(prisma, organizationId),
         ]);
+        const charging = await subscriptionChargesUnderWay(
+            prisma,
+            organizationId,
+            rows.map((r) => r.id),
+        );
         return Promise.all(
             rows.map(async (row) => {
                 const [month, overdue] = await Promise.all([
@@ -135,17 +197,64 @@ export class AccountPlanService {
                         ? overdueInvoiceOf(prisma, member, row.id, now)
                         : Promise.resolve(null),
                 ]);
+                const underWay = charging.get(row.id) ?? null;
                 const payNow =
                     overdue &&
+                    !underWay &&
                     !(await this.chargePending(organizationId, overdue.id))
                         ? overdue
                         : null;
-                return subscriptionView({
-                    row,
-                    classes: month,
-                    payNow,
-                    membersCanPause: pausing,
-                });
+                const [line, owed] = this.autopay
+                    ? await Promise.all([
+                          this.autopay.line(organizationId, row.id),
+                          prisma.invoice.findFirst({
+                              where: {
+                                  organizationId,
+                                  subscriptionId: row.id,
+                                  status: "ISSUED",
+                              },
+                              orderBy: [{ dueAt: "asc" }, { issuedAt: "asc" }],
+                              select: { total: true, currency: true },
+                          }),
+                      ])
+                    : [null, null];
+                const nextCharge =
+                    line?.state === "ON" || underWay
+                        ? await nextAutopayCharge(
+                              this.charges,
+                              row,
+                              underWay,
+                              now,
+                          )
+                        : null;
+                return {
+                    ...subscriptionView({
+                        row,
+                        classes: month,
+                        payNow,
+                        membersCanPause: pausing,
+                    }),
+                    autopay: line
+                        ? {
+                              state: line.state,
+                              method: line.method,
+                              hint: line.hint,
+                              check: line.check,
+                          }
+                        : null,
+                    autopayCharging: underWay
+                        ? { at: underWay.at.toISOString() }
+                        : null,
+                    autopayNextCharge: nextCharge
+                        ? { at: nextCharge.toISOString() }
+                        : null,
+                    autopayPays: owed
+                        ? {
+                              total: toMoneyString(owed.total),
+                              currency: owed.currency,
+                          }
+                        : null,
+                };
             }),
         );
     }

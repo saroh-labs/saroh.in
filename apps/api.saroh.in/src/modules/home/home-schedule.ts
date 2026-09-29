@@ -7,7 +7,8 @@ import { diaryWhere } from "./home-staff";
 
 /**
  * Home's schedule band: the next confirmed bookings, which Needs you's
- * "Next: 10:30 Cleaning" reads, and how many are still to come. Moved out
+ * "Next: 10:30 Cleaning" reads. (Its count of all still to come fed the
+ * numbers band, removed with Home's other legacy fields: Z5.) Moved out
  * of `home.service.ts` by F11, which narrows it to a staff member's own
  * diary (`narrow.staff`) as it does Today.
  */
@@ -19,11 +20,9 @@ export const UPCOMING_LIMIT = 8;
 
 export interface HomeSchedule {
     upcoming: HomeBooking[];
-    /** Every confirmed booking from now on. */
-    total: number;
 }
 
-export const NO_SCHEDULE: HomeSchedule = { upcoming: [], total: 0 };
+export const NO_SCHEDULE: HomeSchedule = { upcoming: [] };
 
 /** The next confirmed bookings from now, each in the zone it was made in. */
 export async function readSchedule(
@@ -38,15 +37,12 @@ export async function readSchedule(
         startAt: { gte: now },
         ...diaryWhere(narrow?.staff),
     };
-    const [rows, total] = await Promise.all([
-        db.booking.findMany({
-            where,
-            orderBy: { startAt: "asc" },
-            take: UPCOMING_LIMIT,
-            include: { service: true, contact: true },
-        }),
-        db.booking.count({ where }),
-    ]);
+    const rows = await db.booking.findMany({
+        where,
+        orderBy: { startAt: "asc" },
+        take: UPCOMING_LIMIT,
+        include: { service: true, contact: true },
+    });
 
     const upcoming = rows.map((row) => ({
         id: row.id,
@@ -62,5 +58,5 @@ export async function readSchedule(
         status: row.status,
         href: "/bookings",
     }));
-    return { upcoming, total };
+    return { upcoming };
 }

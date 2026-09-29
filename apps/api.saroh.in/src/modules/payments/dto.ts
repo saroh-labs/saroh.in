@@ -15,6 +15,7 @@ import {
 } from "class-validator";
 
 import { SUPPORTED_PROVIDERS } from "./providers/provider.port";
+import { needsWebhookSecret, WEBHOOK_SECRET_REQUIRED } from "./webhook-secret";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -56,14 +57,21 @@ export class ConnectProviderDto {
     keySecret!: string;
 
     /**
-     * OPTIONAL provider webhook signing secret (S5-003). Like `keySecret` it is
+     * The provider's webhook signing secret (S5-003). Like `keySecret` it is
      * INBOUND-ONLY: sealed into the same encrypted credentials blob and NEVER
      * echoed back. Used server-side to HMAC-verify inbound webhooks for this org.
+     *
+     * Required where the provider signs with a secret of its own — Razorpay
+     * (DEC-063): without it every webhook is refused and a payment is never
+     * confirmed. Cashfree signs with the key secret, so it stays optional.
      */
-    @IsOptional()
+    @ValidateIf(
+        (o: ConnectProviderDto, v: unknown) =>
+            needsWebhookSecret(String(o.provider)) || (v != null && v !== ""),
+    )
     @Transform(trim)
-    @IsString()
-    @MinLength(1)
+    @IsString({ message: WEBHOOK_SECRET_REQUIRED })
+    @MinLength(1, { message: WEBHOOK_SECRET_REQUIRED })
     @MaxLength(1024)
     webhookSecret?: string;
 }

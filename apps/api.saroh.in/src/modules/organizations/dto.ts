@@ -51,7 +51,7 @@ export class BusinessProfileDto {
 
     /**
      * The legal form (`business-type.ts`): one of the six, or the old
-     * `company` for one more release. "" clears it to Not set.
+     * `company` (stored as `pvt`) until Z4. "" clears it to Not set.
      */
     @ValidateIf((_o, v: unknown) => v != null && v !== "")
     @Transform(trimLower)

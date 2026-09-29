@@ -414,6 +414,7 @@ describe("cancelFor: a privacy removal's cancel (C11)", () => {
             cancelled: 1,
             awaitingProvider: 1,
             unconfirmed: 0,
+            refused: 0,
         });
         const row = await mandateOf(m.mandateId);
         expect(row).toMatchObject({
@@ -464,6 +465,7 @@ describe("cancelFor: a privacy removal's cancel (C11)", () => {
             cancelled: 0,
             awaitingProvider: 0,
             unconfirmed: 0,
+            refused: 0,
         });
         // Only the unconfirmed one was asked again.
         expect(fake.mandateCancelCalls).toHaveLength(1);

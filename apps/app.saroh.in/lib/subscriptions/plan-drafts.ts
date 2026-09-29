@@ -1,4 +1,4 @@
-import { apiFetch, orgBase } from "@/lib/api/http";
+import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 import { editorFailure } from "@/lib/editor-shell/result";
 import type {
     EditorProblem,
@@ -61,6 +61,18 @@ async function call<T>(
     const data: unknown = await res.json().catch(() => null);
     if (res.ok) return { ok: true, data: data as T };
     return editorFailure(res.status, data, fallback);
+}
+
+/**
+ * The editor page's first read: null for a plan that isn't there (the
+ * not-found state); any other failure throws to the page's error boundary.
+ */
+export async function readPlanEditor(
+    id: string,
+): Promise<PlanEditorRecord | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<PlanEditorRecord>(`${base}${plan(id)}/draft`);
 }
 
 /** Read one plan for the editor, and again for Reload after a conflict. */

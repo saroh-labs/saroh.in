@@ -12,7 +12,7 @@
  *
  * It sets only a live (ACTIVE or PAUSED) subscription whose
  * `classesPerPeriodSetAt` is null, to its plan's classes a month as they
- * stand — what the API's fallback reads for that row today, so no member's
+ * stand — what the API serves for that row (logged since Z1), so no member's
  * allowance moves. A null (no allowance) is copied as null and counts as
  * set. A row already set is never touched, so it is idempotent: a second
  * run fills nothing. Safe while either image serves: one statement, and a
@@ -23,7 +23,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
-/** Live subscriptions whose allowance was never set (follow-up Z1 waits for 0). */
+/** Live subscriptions whose allowance was never set (Z1's pre-deploy gate: 0). */
 export const CLASSES_PER_PERIOD_UNSET_WHERE = {
     status: { not: "CANCELLED" },
     classesPerPeriodSetAt: null,

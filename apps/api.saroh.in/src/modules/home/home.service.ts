@@ -6,10 +6,7 @@ import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
-import {
-    overdueFollowUps,
-    crmNumbers as readCrmNumbers,
-} from "./home-crm-sources";
+import { overdueFollowUps } from "./home-crm-sources";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
@@ -17,7 +14,6 @@ import type {
     HomeEvidence,
     HomeInput,
     HomeModel,
-    HomeNumber,
     HomeSeverity,
     HomeUnavailable,
 } from "./home-model";
@@ -59,7 +55,6 @@ export type {
     HomeLastDay,
     HomeModel,
     HomeNeed,
-    HomeNumber,
     HomeRetryVia,
     HomeReviewPage,
     HomeReviewSite,
@@ -216,7 +211,7 @@ export class HomeService {
         );
 
         /*
-         * Read-only bands (the schedule, the numbers) use AVAILABILITY, not
+         * Read-only bands (the schedule) use AVAILABILITY, not
          * ACTIVE — the same rule the sidebar filters on.
          *
          * ACTIVE means "ready to do new work"; a module can be SETUP_REQUIRED
@@ -239,7 +234,6 @@ export class HomeService {
         const canReadLeads = holds(input, "lead:read");
         // The business's days: "Due today" on an order, "was due 14 Sep".
         const zone = await this.businessZone(input.organizationId);
-        const numbers: HomeNumber[] = [];
 
         /*
          * Every source below is independent of the others, so they are read
@@ -274,7 +268,6 @@ export class HomeService {
         const week = weekScope(input, available);
 
         const [
-            crmNumbers,
             overdue,
             open,
             schedule,
@@ -291,18 +284,6 @@ export class HomeService {
             notes,
             messages,
         ] = await Promise.all([
-            available.has("CRM")
-                ? guard(
-                      { moduleKey: "CRM", label: "Customer numbers" },
-                      () =>
-                          readCrmNumbers(
-                              this.db,
-                              input.organizationId,
-                              canReadLeads,
-                          ),
-                      [] as HomeNumber[],
-                  )
-                : skip([] as HomeNumber[]),
             active.has("CRM") && canReadLeads
                 ? guard(
                       { moduleKey: "CRM", label: "Overdue follow-ups" },
@@ -402,6 +383,9 @@ export class HomeService {
                               input.organizationId,
                               now,
                               canReadInvoices,
+                              undefined,
+                              undefined,
+                              zone,
                           ),
                       null,
                   )
@@ -509,8 +493,6 @@ export class HomeService {
         ]);
         const unavailable = slots.flat();
 
-        numbers.push(...crmNumbers);
-
         if (overdue.count > 0) {
             actions.push({
                 code: "CRM_OVERDUE_FOLLOWUPS",
@@ -524,22 +506,7 @@ export class HomeService {
         }
 
         if (available.has("COMMERCE")) {
-            if (open.count > 0) {
-                numbers.push({
-                    key: "OPEN_ORDERS",
-                    label: "Open orders",
-                    value: open.count,
-                    // The SCREEN that shows them, not the section above it.
-                    // The rail badges whatever href an OVERDUE action
-                    // carries, so pointing this at "/commerce" put the count
-                    // on Sell and sent the merchant to a list of storefronts
-                    // to hunt for orders one storefront at a time.
-                    href: "/commerce/orders",
-                    moduleKey: "COMMERCE",
-                });
-            }
-
-            // The ACTION, unlike the number, still requires ACTIVE: telling
+            // The action requires ACTIVE: telling
             // a merchant to fulfil orders through a module that is not ready
             // is sending them at a door that does not open.
             if (active.has("COMMERCE")) {
@@ -568,16 +535,6 @@ export class HomeService {
         }
 
         const upcoming = schedule.upcoming;
-        if (schedule.total > 0) {
-            numbers.push({
-                key: "UPCOMING_BOOKINGS",
-                label: "Upcoming bookings",
-                value: schedule.total,
-                href: "/bookings",
-                moduleKey: "APPOINTMENTS",
-            });
-        }
-
         if (owed.count > 0) {
             actions.push({
                 code: "PAYMENTS_REFUNDS_OWED",
@@ -629,10 +586,8 @@ export class HomeService {
                 ? { view: "staff" as const, staff: staffView.staff }
                 : { view: "business" as const }),
             actions,
-            primaryAction: actions[0] ?? null,
             hasAnyModule: views.some((v) => v.readiness !== "DISABLED"),
             upcoming,
-            numbers,
             unavailable,
             ...flattenNeeds(actions, zone),
             today,
@@ -665,11 +620,9 @@ export class HomeService {
             view: "reviewer",
             reviews,
             actions: [],
-            primaryAction: null,
             // Not the first-run question: a Reviewer has their sites.
             hasAnyModule: true,
             upcoming: [],
-            numbers: [],
             unavailable,
             needs: [],
             needsTotal: 0,

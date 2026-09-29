@@ -6,6 +6,7 @@ import type { RenderedJournal } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import { cardLink, listCard, listPhoto } from "./list-layout";
 
 /**
  * `journal` v1 — the site's latest published posts, read live (G10).
@@ -410,6 +411,9 @@ function JournalCards({
     const showImages = content.showImages !== false;
     const showExcerpts = content.showExcerpts !== false;
     const base = trimTrailingSlashes(feed.basePath);
+    // "Show as" and "Button" (G16). Absent: cards, and no words of their own.
+    const list = content.layout === "list";
+    const label = said(content.buttonLabel);
 
     return (
         <JournalFrame
@@ -420,11 +424,61 @@ function JournalCards({
                 </a>
             }
         >
-            <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]">
+            <ul
+                className={cn(
+                    "grid",
+                    list
+                        ? "grid-cols-1 gap-2.5"
+                        : "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]",
+                )}
+            >
                 {posts.map((post) => {
                     const image = showImages ? post.image?.trim() : null;
                     const excerpt = showExcerpts ? postExcerpt(post) : null;
                     const eyebrow = postEyebrow(post);
+                    if (list) {
+                        return (
+                            <li key={post.slug} className="min-w-0">
+                                <a
+                                    href={`${base}/${encodeURIComponent(post.slug)}`}
+                                    className={cn(
+                                        listCard(Boolean(image)),
+                                        "hover:border-site-fg/40 group cursor-pointer transition-[border-color,transform] active:scale-[0.99]",
+                                        focusRing,
+                                    )}
+                                >
+                                    {image ? (
+                                        <img
+                                            src={image}
+                                            alt=""
+                                            loading="lazy"
+                                            className={listPhoto}
+                                        />
+                                    ) : null}
+                                    <span className="grid min-w-0 content-start gap-1.5 py-4">
+                                        {eyebrow ? (
+                                            <span className="text-site-muted px-4 text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                                                {eyebrow}
+                                            </span>
+                                        ) : null}
+                                        <span className="font-site-heading px-4 text-[calc(1.1875rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em] underline-offset-4 group-hover:underline">
+                                            {post.title}
+                                        </span>
+                                        {excerpt ? (
+                                            <span className="text-site-body px-4 text-[13.5px] leading-normal [text-wrap:pretty]">
+                                                {excerpt}
+                                            </span>
+                                        ) : null}
+                                        {label ? (
+                                            <span className={cardLink}>
+                                                {label}
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                </a>
+                            </li>
+                        );
+                    }
                     return (
                         <li key={post.slug} className="min-w-0">
                             <a
@@ -458,6 +512,9 @@ function JournalCards({
                                     <span className="text-site-body px-4 text-[13.5px] leading-normal [text-wrap:pretty]">
                                         {excerpt}
                                     </span>
+                                ) : null}
+                                {label ? (
+                                    <span className={cardLink}>{label}</span>
                                 ) : null}
                             </a>
                         </li>

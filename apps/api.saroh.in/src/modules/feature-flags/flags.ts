@@ -50,6 +50,16 @@ export const FlagKey = {
      * never the thread. Read in `communications/account-thread.ts`.
      */
     ACCOUNT_THREAD: "ACCOUNT_THREAD",
+
+    /**
+     * Autopay through a business's Razorpay account (round-2 D19). The
+     * adapter can set up, charge and cancel mandates, but a business is
+     * offered autopay through Razorpay only while this is on. It stays off
+     * in production until a Razorpay test-mode run has authorised a
+     * mandate and settled a charge (waves plan, boundary 6). Reading,
+     * charging and cancelling a mandate already made never wait on it.
+     */
+    RAZORPAY_AUTOPAY: "RAZORPAY_AUTOPAY",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -123,5 +133,13 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-01-31",
         removeWhen:
             "The account thread is live on every instance and has needed no kill switch for a release.",
+    },
+    RAZORPAY_AUTOPAY: {
+        purpose:
+            "Offers autopay (UPI Autopay, card or bank eMandate) to the customers of a business that takes payments through Razorpay. Turn it on only after a Razorpay test-mode run has authorised a mandate and settled one charge; off, no autopay is set up or charged through Razorpay (renewals are invoiced with a pay link, as before autopay), while mandates already made can still be cancelled.",
+        owner: "Release manager",
+        reviewBy: "2027-01-31",
+        removeWhen:
+            "Razorpay autopay has run in production on every instance for a release and has needed no kill switch.",
     },
 };

@@ -20,6 +20,8 @@ jest.mock("@saroh/database", () => {
         },
         customerThreadMessage: { findFirst: jest.fn(), count: jest.fn() },
         merchantPaymentProvider: { count: jest.fn() },
+        // D13: an autopay charge under way holds the send.
+        paymentIntent: { findMany: jest.fn() },
         customerAccount: { count: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         organization: { findUnique: jest.fn() },
@@ -102,6 +104,7 @@ beforeEach(() => {
     db.customerThreadMessage!.findFirst!.mockResolvedValue(null);
     db.customerThreadMessage!.count!.mockResolvedValue(0);
     db.merchantPaymentProvider!.count!.mockResolvedValue(1);
+    db.paymentIntent!.findMany!.mockResolvedValue([]);
     db.customerAccount!.count!.mockResolvedValue(0);
     db.businessProfile!.findUnique!.mockResolvedValue(null);
     comms.emailConnected.mockResolvedValue(true);
@@ -121,6 +124,23 @@ describe("the send flag", () => {
             reason: "NO_PAYMENT_PROVIDER",
             nextReminderAt: null,
         });
+    });
+
+    it("an autopay charge under way holds it: AUTOPAY_PENDING, and a send is a 409 (D13)", async () => {
+        db.paymentIntent!.findMany!.mockResolvedValue([
+            {
+                id: "pi_m",
+                invoiceId: "inv_1",
+                debitAfter: new Date("2026-10-02T10:00:00Z"),
+                createdAt: new Date("2026-10-01T10:00:00Z"),
+            },
+        ]);
+        const { send } = await service().readFor("org_1", "inv_1");
+        expect(send).toMatchObject({ channels: [], reason: "AUTOPAY_PENDING" });
+        await expect(service().remind(owner, "inv_1")).rejects.toThrow(
+            "Autopay charge in progress",
+        );
+        expect(comms.queueTransactional).not.toHaveBeenCalled();
     });
 
     it("no email address and no thread: NO_EMAIL_ADDRESS", async () => {

@@ -76,6 +76,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         // G13: pure; public-checkout.db.spec.ts runs here.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
+        // P4: the order confirmation's view, pure.
+        "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
@@ -113,6 +115,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         // D18: pure; list-filter.db.spec.ts runs here.
         "<rootDir>/src/modules/invoices/list-filter.spec.ts",
+        // D16: pure; invoice-pdf.db.spec.ts runs here.
+        "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
         "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
         // D20: mocked Prisma; the real rows are in mandates.db.spec.ts.
         "<rootDir>/src/modules/payments/mandates.service.spec.ts",
@@ -135,11 +140,15 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
         // G9: pure; the real rows are in public-plans.db.spec.ts.
         "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
+        // G20: pure; the real rows are in public-plan-join.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/plan-join.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         // E14: pure; the real rows are in class-packs.drafts.db.spec.ts.
         "<rootDir>/src/modules/class-packs/pack-on-sale.spec.ts",
         // A11: pure; the real rows are in public-pack-purchase.service.db.spec.ts.
         "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
+        // G20: pure; the real rows are in public-packs.db.spec.ts.
+        "<rootDir>/src/modules/class-packs/public-packs.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         // U3 staff: mocked-DB and pure specs; staff.db.spec.ts runs here.
         "<rootDir>/src/modules/staff/staff.service.spec.ts",

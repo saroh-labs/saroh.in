@@ -1,4 +1,5 @@
 import type { prisma, Prisma } from "@saroh/database";
+import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
 import {
@@ -6,6 +7,11 @@ import {
     isPastDue,
     OWED_WHERE,
 } from "../invoices/invoice-state";
+import type { ChargeUnderWay } from "../payments/charge-under-way";
+import {
+    AUTOPAY_CHARGE_IN_PROGRESS,
+    chargesUnderWay,
+} from "../payments/charge-under-way";
 import type { HomeAction, HomeEvidence } from "./home-model";
 import { EVIDENCE_LIMIT, overdueTag, personName } from "./home-model";
 
@@ -80,6 +86,25 @@ const EVENT_TAGS: Record<RenewalEventKind, string> = {
     MANDATE_LIMIT_LOW: "Autopay limit too low",
 };
 
+/** The tags that say autopay failed: such a renewal is retried before its due date (D13). */
+export const AUTOPAY_FAILED_TAGS: readonly string[] = Object.values(EVENT_TAGS);
+
+/**
+ * The autopay charges under way on these invoices (D13), by invoice. A
+ * parameter, so the unit specs can hand in their own.
+ */
+export type RenewalChargeReader = (
+    db: Db,
+    organizationId: string,
+    invoiceIds: readonly string[],
+) => Promise<Map<string, ChargeUnderWay>>;
+
+/** "Autopay charge in progress · 14 Oct", in the business's zone. */
+export function chargingTag(at: Date, zone: string): string {
+    const day = DateTime.fromJSDate(at, { zone }).toFormat("d LLL");
+    return `${AUTOPAY_CHARGE_IN_PROGRESS} · ${day}`;
+}
+
 /** Not cancelled: ACTIVE or PAUSED, and still owed what it billed. */
 const LIVE_SUBSCRIPTION = {
     status: { not: "CANCELLED" },
@@ -123,7 +148,9 @@ async function latestPeriodInvoices(
  * failed charge uses: the last ISSUED or PAID invoice by issue date.
  *
  * One row per subscription, oldest due first. The amount is shown only to
- * someone who reads invoices (`showAmount`).
+ * someone who reads invoices (`showAmount`). While an autopay charge is
+ * under way on it (D13) the row says "Autopay charge in progress · ‹date›"
+ * and offers no Retry (`home-inline.ts`).
  */
 export async function failedRenewals(
     db: Db,
@@ -131,6 +158,8 @@ export async function failedRenewals(
     now: Date,
     showAmount: boolean,
     readSignals: RenewalSignalReader = readRenewalSignals,
+    readCharges: RenewalChargeReader = chargesUnderWay,
+    zone = "Asia/Kolkata",
 ): Promise<HomeAction | null> {
     const unpaid = await db.invoice.findMany({
         where: {
@@ -184,17 +213,26 @@ export async function failedRenewals(
     const current = owed.filter((i) => latestOf.get(i.subscriptionId) === i.id);
     if (current.length === 0) return null;
 
-    const signals = await readSignals(
-        db,
-        organizationId,
-        current.map((i) => i.subscriptionId),
-    );
+    const [signals, charging] = await Promise.all([
+        readSignals(
+            db,
+            organizationId,
+            current.map((i) => i.subscriptionId),
+        ),
+        readCharges(
+            db,
+            organizationId,
+            current.map((i) => i.id),
+        ),
+    ]);
 
     const evidence: HomeEvidence[] = [];
     for (const inv of current) {
         const { subscriptionId } = inv;
-        const tag = renewalTag(inv, subscriptionId, signals, now);
-        if (!tag) continue;
+        const failed = renewalTag(inv, subscriptionId, signals, now);
+        if (!failed) continue;
+        const charge = charging.get(inv.id);
+        const tag = charge ? chargingTag(charge.at, zone) : failed;
         evidence.push({
             id: subscriptionId,
             title: inv.subscription.plan.name,

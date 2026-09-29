@@ -5,6 +5,7 @@ import {
     customersSee,
     customFieldText,
     discountAmount,
+    madeByLine,
     onTheShop,
     plural,
     priceLabel,
@@ -93,6 +94,22 @@ describe("product page display rules", () => {
     it("treats a detail with no switch as shown", () => {
         expect(onTheShop({}, "maker")).toBe(true);
         expect(onTheShop({ maker: false }, "maker")).toBe(false);
+    });
+
+    it("prints Made by from the product's maker, or not at all (P5)", () => {
+        const made = { maker: null, madeIn: null, shopFields: {} };
+        // Made here: no row, never the storefront's name.
+        expect(madeByLine(made)).toBeNull();
+        expect(
+            madeByLine({ ...made, maker: "Tanvi Studio", madeIn: "Jaipur" }),
+        ).toBe("Tanvi Studio, Jaipur");
+        expect(
+            madeByLine({
+                maker: "Tanvi Studio",
+                madeIn: "Jaipur",
+                shopFields: { maker: false },
+            }),
+        ).toBe("Jaipur");
     });
 
     it("reads a custom field's value the way people say it", () => {

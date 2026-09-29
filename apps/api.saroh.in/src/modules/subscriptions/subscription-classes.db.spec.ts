@@ -2,7 +2,8 @@
  * Classes from the next renewal (round 2, D10) against a real Postgres: a
  * subscription keeps the classes a month it took at subscribe or at its last
  * renewal, and a booking paid with it counts against that; a row the
- * previous image wrote (never set) reads its plan's number, and the backfill
+ * previous image wrote (never set) is logged and reads its plan's number
+ * (Z1: no fallback, only a loud guard), and the backfill
  * (packages/database/src/backfill/classes-per-period.ts) sets it without
  * moving anyone's allowance — twice is the same as once. Runs in the
  * integration project (TEST_DATABASE_URL).
@@ -14,6 +15,7 @@ import {
     unsetClassesPerPeriod,
 } from "@saroh/database";
 
+import { structuredLogger } from "../../common/logging/structured-logger";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { useMembershipInTx } from "../bookings/use-membership";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -182,13 +184,21 @@ describe("classes from the next renewal (D10, real database)", () => {
         });
     });
 
-    it("reads the plan's 8 for a row the previous image wrote, not unlimited", async () => {
+    it("logs a row the previous image wrote and reads its plan's 8, not unlimited (Z1)", async () => {
+        const logged = jest
+            .spyOn(structuredLogger, "error")
+            .mockImplementation(() => undefined);
         const planId = await plan("Monthly 8 (old image)", 8);
         const contactId = await person();
         const s = await service.subscribe(org, { contactId, planId });
         await asOldImage(s.id);
         for (let i = 0; i < 8; i += 1) await classBooked(s.id, contactId);
         expect(await mayBookAnother(s.id, contactId)).toBe(false);
+        expect(logged).toHaveBeenCalledWith(
+            "subscription_allowance_unset",
+            expect.objectContaining({ subscriptionId: s.id }),
+        );
+        logged.mockRestore();
         // Out of the next test's count.
         await prisma.customerSubscription.update({
             where: { id: s.id },

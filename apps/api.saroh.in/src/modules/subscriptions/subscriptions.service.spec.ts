@@ -33,7 +33,14 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
         },
         subscriptionPlanEvent: { create: jest.fn() },
-        subscriptionEvent: { create: jest.fn(), findFirst: jest.fn() },
+        subscriptionEvent: {
+            create: jest.fn(),
+            findFirst: jest.fn(),
+            // D13: autopay's failures, read with a subscription's invoices.
+            findMany: jest.fn(),
+        },
+        // D13: an autopay charge under way on an invoice.
+        paymentIntent: { findMany: jest.fn() },
         subscriptionSkip: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
@@ -67,6 +74,9 @@ jest.mock("@saroh/database", () => {
             invoice: { findMany: jest.fn(), count: jest.fn() },
             subscriptionSkip: { findMany: jest.fn() },
             job: { findFirst: jest.fn() },
+            // D13: autopay's failures and a charge under way.
+            subscriptionEvent: { findMany: jest.fn() },
+            paymentIntent: { findMany: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },
@@ -179,6 +189,10 @@ beforeEach(() => {
     tx.subscriptionSkip!.findMany!.mockResolvedValue([]);
     tx.customerSubscription!.count!.mockResolvedValue(0);
     tx.paymentMandate!.findMany!.mockResolvedValue([]);
+    tx.subscriptionEvent!.findMany!.mockResolvedValue([]);
+    tx.paymentIntent!.findMany!.mockResolvedValue([]);
+    db.subscriptionEvent!.findMany!.mockResolvedValue([]);
+    db.paymentIntent!.findMany!.mockResolvedValue([]);
     tx.customerSubscription!.create!.mockResolvedValue({ id: "sub_1" });
     tx.customerSubscription!.findFirst!.mockResolvedValue(sub());
     tx.customerSubscription!.findUnique!.mockResolvedValue(sub());
@@ -1955,6 +1969,7 @@ describe("a failed charge", () => {
         createPayLinkInTx.mockResolvedValue({ token: "tok" });
         await expect(service.retryPayment(owner, "sub_1")).resolves.toEqual({
             invoiceId: "inv_1",
+            via: "PAY_LINK",
             token: "tok",
         });
         expect(createPayLinkInTx).toHaveBeenCalledWith(tx, owner, "inv_1");

@@ -315,7 +315,7 @@ model BusinessProfile {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   legalName    String?
-  type         String? // individual, partnership, llp, pvt, public, trust; `company` = pvt until F10b (business-type.ts)
+  type         String? // individual, partnership, llp, pvt, public, trust; an old `company` = pvt until the F10b backfill rewrites it; accepted until Z4 (business-type.ts)
   country      String?
   taxId        String?
   contactEmail String?
@@ -388,6 +388,14 @@ model BusinessProfile {
   // account shows no Pause and the API refuses a customer's pause (403).
   // Staff pause either way. No profile yet reads as on.
   membersCanPause Boolean @default(true)
+
+  // When autopay debits a renewal (round-2 D13B, DEC-065): ON_RENEWAL_DATE
+  // (the invoice and bank notice go out early so the debit lands on the
+  // renewal date), DAY_AFTER_RENEWAL (D13: invoice on the renewal date,
+  // debit about a day later) or ON_DUE_DATE (debit on the invoice's due
+  // date). A plan's `autopayChargeTiming` wins when set. A CHECK constraint
+  // holds the values. No profile yet reads as DAY_AFTER_RENEWAL.
+  autopayChargeTiming String @default("DAY_AFTER_RENEWAL")
 }
 
 // Membership: links a User to an Organization with a role (renamed from
@@ -3675,6 +3683,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_subscription_renew", where: raw("type = 'subscription.renew' AND status = 'PENDING'"))
   // One waiting run of the booking-hold sweep (U19), like the renewal chain.
   @@unique([type], map: "Job_one_pending_booking_release_holds", where: raw("type = 'booking.release-holds' AND status = 'PENDING'"))
+  // One waiting run of the pending payment sweep (P1), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_payments_confirm_pending", where: raw("type = 'payments.confirm-pending' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -4232,7 +4242,8 @@ model MerchantPaymentProvider {
 
 // PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order
 // or, through its pay link, an Invoice (ADR-007, U13). Exactly one of
-// `orderId` / `invoiceId` is set: the migration adds a CHECK constraint
+// `orderId` / `invoiceId` is set — or neither, on an autopay check
+// (`purpose` AUTHORISATION, DEC-064): the migrations add a CHECK constraint
 // ("PaymentIntent_one_target") that Prisma cannot express here.
 model PaymentIntent {
   id             String       @id @default(cuid())
@@ -4270,12 +4281,40 @@ model PaymentIntent {
   // provider reported none — never an estimate.
   feeCents Int?
 
+  // A charge through an autopay mandate (D11, D13). Such a charge is two
+  // steps: the provider's order is made with a pre-debit notice, and the
+  // debit is asked for only once the notice is delivered and `debitAfter`
+  // has passed. `preDebitStatus`: PENDING | DELIVERED | FAILED | NOT_NEEDED;
+  // null on every other intent. `preDebitRef` is the provider's notice id.
+  viaMandateId   String?
+  viaMandate     PaymentMandate? @relation("MandateCharges", fields: [viaMandateId], references: [id], onDelete: SetNull)
+  debitAfter     DateTime?
+  preDebitStatus String?
+  preDebitRef    String?
+
+  // Why the money was taken. Null: a sale (an order's or an invoice's
+  // payment). AUTHORISATION: the ₹1 check a provider takes to authorise
+  // autopay when nothing is owed (DEC-064, D12B) — not revenue, on no order
+  // or invoice, refunded automatically; `checkForMandateId` is the set-up
+  // it authorised (one check per set-up).
+  purpose           String?
+  checkForMandateId String?         @unique
+  checkForMandate   PaymentMandate? @relation("MandateAuthorisationCheck", fields: [checkForMandateId], references: [id], onDelete: SetNull)
+
+  // When Saroh last asked the provider about this intent's order (P1): the
+  // sweep that settles a capture whose webhook never came asks an open
+  // intent again only after a pause that grows with its age
+  // (webhooks/payment-lookup.service.ts). Null: never asked.
+  lastLookupAt DateTime?
+
   @@unique([orderId, idempotencyKey])
   @@unique([invoiceId, idempotencyKey])
   @@index([organizationId])
   @@index([orderId])
   @@index([invoiceId])
   @@index([provider, providerIntentId])
+  @@index([viaMandateId])
+  @@index([status, createdAt])
 }
 
 // PaymentAttempt — one interaction with the provider for an intent.
@@ -5051,6 +5090,12 @@ model SubscriptionPlan {
   // Bumped by every draft save, publish, discard and plan write, so an
   // editor holding an older revision is refused instead of overwriting (#285).
   draftRevision      Int       @default(0)
+
+  // When autopay debits this plan's renewals (round-2 D13B, DEC-065): one
+  // of BusinessProfile.autopayChargeTiming's values, or null to use the
+  // business's setting. Set straight from Plan Detail, not through a draft:
+  // it is billing, never shown to buyers. A CHECK constraint holds the values.
+  autopayChargeTiming String?
 }
 
 // One change to a plan: who made it, when, and each changed field's value
@@ -5328,8 +5373,10 @@ model Invoice {
 
   @@unique([organizationId, number])
   // One live invoice per subscription period: the renewal job's idempotency
-  // key. Voided invoices are left out, so a voided period can be reissued.
-  @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID'"))
+  // key. Voided and fully credited invoices are left out, so such a period
+  // can be reissued: a GST business credits an early renewal invoice a
+  // cancel or pause drops (D13B, DEC-065) where others void it.
+  @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID' AND status <> 'CREDITED'"))
   // One invoice per order and per booking (ADR-008): the idempotency key of
   // the payment reconciliation. Corrections are other kinds.
   @@unique([orderId], map: "Invoice_one_per_order", where: raw("kind = 'INVOICE'"))
@@ -5356,6 +5403,17 @@ model Invoice {
 
   // The sweep that discards online pack drafts nobody paid (A11).
   @@index([createdAt], map: "Invoice_open_pack_drafts_idx", where: raw("status = 'DRAFT' AND source = 'PACK'"))
+
+  // A plan joined online from the site's Prices page (round-2 G20): the plan
+  // and its terms — name, price, how often, classes a month — as they were
+  // when the customer started paying, on a source SUBSCRIPTION draft with no
+  // number. The payment's webhook numbers the invoice and starts the
+  // subscription from this, as `packTerms` does for a pack. Null on every
+  // other invoice.
+  planTerms Json?
+
+  // The sweep that discards online plan joins nobody paid (G20).
+  @@index([createdAt], map: "Invoice_open_plan_joins_idx", where: raw("status = 'DRAFT' AND source = 'SUBSCRIPTION'"))
 }
 
 model InvoiceLine {
@@ -5908,7 +5966,7 @@ model PaymentMandate {
   status            String    @default("PENDING")
   activatedAt       DateTime?
   cancelledAt       DateTime?
-  // CUSTOMER | STAFF | SUBSCRIPTION_ENDED | PRIVACY_REMOVAL | MERGED | PROVIDER
+  // CUSTOMER | STAFF | SUBSCRIPTION_ENDED | PRIVACY_REMOVAL | MERGED | PROVIDER | REPLACED
   cancelReason      String?
   // When the provider confirmed the cancel. Null on a CANCELLED row: Saroh
   // stopped charging it, and is still confirming with the provider.
@@ -5917,11 +5975,42 @@ model PaymentMandate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Set-up, status and limit (D11). What the customer authorised: the
+  // method they picked (UPI | CARD | EMANDATE; never a card or bank
+  // detail), the most one charge may take, in minor units, and how often.
+  method         String?
+  maxAmountCents Int?
+  currency       String    @default("INR")
+  // AS_PRESENTED: Saroh says when to charge (renewal dates move).
+  frequency      String?
+  // The provider's set-up object (Razorpay: the registration link or the
+  // authorisation order), so a webhook finds the row before the token is
+  // named; and when an unanswered set-up stops being worth waiting for.
+  setupReference String?
+  setupExpiresAt DateTime?
+  // When the provider says the authority ends.
+  expiresAt      DateTime?
+  pausedAt       DateTime?
+  failedAt       DateTime?
+  // The provider's reason code for a FAILED set-up, sanitised; never shown raw.
+  failureReason  String?
+  // Charges taken through it (D13).
+  intents        PaymentIntent[] @relation("MandateCharges")
+  // Where the customer set it up (D12): PAY_LINK | PRICES | ACCOUNT, and
+  // the site account that did, so the log can say "Autopay set up by
+  // ‹name›, from the Prices page". Null on a mandate set up by staff.
+  setupSource    String?
+  setupAccountId String?
+  // The ₹1 check taken to authorise it when nothing was owed (DEC-064).
+  authorisationChecks PaymentIntent[] @relation("MandateAuthorisationCheck")
+
   // A subscription has at most one ACTIVE mandate.
   @@unique([subscriptionId], map: "PaymentMandate_one_active_per_subscription", where: raw("status = 'ACTIVE'"))
+  @@unique([organizationId, provider, providerMandateId])
   @@index([organizationId])
   @@index([organizationId, subscriptionId, status])
   @@index([organizationId, contactId, status])
+  @@index([organizationId, provider, setupReference])
 }
 
 /// One notice about a customer's own booking or order, handled once

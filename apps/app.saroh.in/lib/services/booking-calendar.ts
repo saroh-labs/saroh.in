@@ -1,4 +1,5 @@
 import type { BookingOutcome, BookingStatus } from "./booking-state";
+import type { DeskTake } from "./desk-pay";
 
 /**
  * The bookings calendar read (U4), as the API sends it, and the pure shaping
@@ -65,6 +66,16 @@ export interface DiaryBooking {
     subscriptionId: string | null;
     /** A visit of a treatment (E10); absent from an older API. */
     treatment?: TreatmentView | null;
+    /**
+     * Paid at the desk (P2), and how the last of it was taken: CASH, UPI,
+     * CARD… Not a money figure. Absent from an API before P2.
+     */
+    paidAtDesk?: { method: string | null } | null;
+    /**
+     * What "Take ₹X" takes now (P2); null when there's nothing to take.
+     * Only for a viewer who may read money.
+     */
+    take?: DeskTake | null;
 }
 
 /** One start of a class: places, who holds them and how each paid. */

@@ -1,4 +1,5 @@
 import { cn } from "@saroh/ui/lib/utils";
+import type { ReactNode } from "react";
 
 const CARD = "rounded-[12px] border border-border bg-card px-[18px] py-4";
 const TITLE =
@@ -15,11 +16,14 @@ export function PlanOverview({
     classes,
     pays,
     glance,
+    autopay = null,
 }: {
     what: string;
     classes: string | null;
     pays: { label: string; amount: string }[];
     glance: { label: string; value: string }[];
+    /** "When autopay charges" for this plan (D13B), when autopay can charge. */
+    autopay?: ReactNode;
 }) {
     return (
         <div className="flex flex-wrap items-start gap-4">
@@ -79,6 +83,7 @@ export function PlanOverview({
                         ))}
                     </dl>
                 </section>
+                {autopay}
                 <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
                     Changing the price only affects people who join after the
                     change. Archiving stops new sign-ups; everyone already on it

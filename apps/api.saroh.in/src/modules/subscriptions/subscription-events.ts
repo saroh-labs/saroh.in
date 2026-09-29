@@ -66,8 +66,20 @@ export const SUBSCRIPTION_EVENT_KINDS = [
     "MANDATE_LIMIT_LOW",
     "MANDATE_SET_UP",
     "MANDATE_CANCELLED",
+    /**
+     * Staff made an autopay set-up link for the customer (D14):
+     * `data.method`, `data.limit`, `data.currency`, `data.mandateId`, and
+     * `data.emailed` when Saroh emailed it. Never the link itself.
+     */
+    "MANDATE_LINK_SENT",
     /** Paid by autopay (D13). */
     "CHARGED",
+    /**
+     * An early renewal invoice (D13B, "Charge on the renewal date") dropped
+     * before its period began, its autopay charge cancelled: `data.reason`
+     * CANCELLED, PAUSED or PLAN_CHANGED, `data.by` VOIDED or CREDITED.
+     */
+    "EARLY_INVOICE_CANCELLED",
 ] as const;
 export type SubscriptionEventKind = (typeof SUBSCRIPTION_EVENT_KINDS)[number];
 

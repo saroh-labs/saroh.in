@@ -6,6 +6,7 @@ import type {
     Plan,
     Renewals,
     Subscription,
+    SubscriptionAutopay,
     SubscriptionCharge,
 } from "./service";
 
@@ -159,18 +160,56 @@ function daysLate(dueAt: string, now: Date): number {
     return Math.floor((now.getTime() - Date.parse(dueAt)) / DAY);
 }
 
-/** Why a failed renewal is failed, in words: it is not paid, and how late. */
+/**
+ * Why a failed renewal is failed, in words: it is not paid, and how late —
+ * or, before its due date, that autopay didn't collect it (D13).
+ */
 export function failWhy(
     sub: Pick<Subscription, "failedCharge" | "currency" | "price">,
     now: Date,
 ): string {
     const charge = sub.failedCharge;
     if (!charge) return "The latest renewal isn't paid and is past due";
-    const late = charge.dueAt ? daysLate(charge.dueAt, now) : 0;
     const amount = money(charge.total, sub.currency);
+    if (charge.dueAt && Date.parse(charge.dueAt) > now.getTime()) {
+        return `Renewal of ${amount} wasn't collected by autopay`;
+    }
+    const late = charge.dueAt ? daysLate(charge.dueAt, now) : 0;
     return late > 0
         ? `Renewal of ${amount} isn't paid — ${late} ${late === 1 ? "day" : "days"} past due`
         : `Renewal of ${amount} isn't paid — past due`;
+}
+
+/**
+ * "Autopay charge in progress · 14 Oct" while a charge is under way (D13),
+ * the day being when the debit is asked for; null when none is.
+ */
+export function chargingText(
+    sub: Pick<Subscription, "autopayCharge" | "timezone">,
+    now: Date,
+): string | null {
+    const at = sub.autopayCharge?.at;
+    return at
+        ? `Autopay charge in progress · ${dayText(at, sub.timezone, now)}`
+        : null;
+}
+
+/**
+ * The Retry a failed renewal offers (D13, default 35): "Charge autopay
+ * again" when their mandate can take it, else "Retry with a new pay link"
+ * for someone who may make one. None while a charge is under way.
+ */
+export function retryOffer(
+    sub: Pick<Subscription, "autopayCharge" | "retryVia" | "failedCharge">,
+    canPayLink: boolean,
+): { label: string; via: "MANDATE" | "PAY_LINK" } | null {
+    if (sub.autopayCharge) return null;
+    if (sub.retryVia === "MANDATE") {
+        return { label: "Charge autopay again", via: "MANDATE" };
+    }
+    // Absent: an API older than D13, where Retry is a pay link.
+    if (sub.retryVia === null || !sub.failedCharge || !canPayLink) return null;
+    return { label: "Retry with a new pay link", via: "PAY_LINK" };
 }
 
 /**
@@ -267,12 +306,35 @@ export function rowWhen(
             danger: true,
         };
     }
+    const badge = autopayBadgeText(sub.autopayOn);
     return {
         text: sub.nextRenewalAt
-            ? `Next ${dayText(sub.nextRenewalAt, tz, now)}`
+            ? [`Next ${dayText(sub.nextRenewalAt, tz, now)}`, badge]
+                  .filter(Boolean)
+                  .join(" · ")
             : "—",
         danger: false,
     };
+}
+
+const BADGE_METHOD: Record<string, string> = {
+    UPI: "UPI Autopay",
+    CARD: "Card autopay",
+    EMANDATE: "Bank autopay",
+};
+
+/**
+ * The list's autopay mark (D14, after "Saroh Subscriptions": "Next 2 Oct ·
+ * UPI Autopay · priya.raman@okhdfc"): "UPI Autopay · mo•••@okicici",
+ * "Autopay paused". Null: no autopay on.
+ */
+export function autopayBadgeText(
+    badge: Subscription["autopayOn"],
+): string | null {
+    if (!badge) return null;
+    if (badge.paused) return "Autopay paused";
+    const head = (badge.method && BADGE_METHOD[badge.method]) ?? "Autopay";
+    return badge.hint ? `${head} · ${badge.hint}` : head;
 }
 
 /** A person's initials, for the round avatar: "Nisha Kulkarni" → "NK". */
@@ -360,13 +422,16 @@ export function headline(
         ? { tone: "accent" as const, label: `Ends ${d(ending)}` }
         : { tone: TAB_TONE[tab], label: TAB_LABEL[tab] };
     const next = sub.pendingPlan ?? sub;
+    const charging = chargingText(sub, now);
     if (tab === "failed") {
         const due = sub.failedCharge?.dueAt;
         return {
             pill,
             big: money(sub.failedCharge?.total ?? sub.price, sub.currency),
             when: due ? `failed ${d(due)}` : "failed",
-            line: `${failWhy(sub, now)}. Nothing is collected until it's paid.`,
+            line: charging
+                ? `${charging}. Nothing else can be charged until the bank answers.`
+                : `${failWhy(sub, now)}. Nothing is collected until it's paid.`,
         };
     }
     if (tab === "paused") {
@@ -409,7 +474,9 @@ export function headline(
         pill,
         big: money(next.price, next.currency),
         when: on,
-        line: `${money(next.price, next.currency)} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
+        line: charging
+            ? `${charging} for this period. Next: ${money(next.price, next.currency)} on ${on}`
+            : `${money(next.price, next.currency)} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
     };
 }
 
@@ -529,6 +596,76 @@ export function chargeRow(
         amount: money(c.total, c.currency),
         number: c.number,
     };
+}
+
+const AUTOPAY_METHOD: Record<string, string> = {
+    UPI: "UPI",
+    CARD: "card",
+    EMANDATE: "bank account",
+};
+
+const AUTOPAY_FAILED: Record<string, string> = {
+    NOT_APPROVED: "they didn't approve it",
+    EXPIRED: "they didn't approve it in time",
+    PROVIDER_REFUSED: "the payment provider didn't accept it",
+    NO_ANSWER: "the payment provider didn't answer",
+};
+
+/**
+ * The autopay line on Subscription Detail (D12), so the merchant can check
+ * what the customer set up: "Autopay on · UPI · mo•••@okicici · limit
+ * ₹1,500", "Autopay pending · UPI — waiting for them to approve it",
+ * "Autopay failed · card — they didn't approve it". Null: no autopay.
+ *
+ * A set-up that took the ₹1 check (D12B, DEC-064) says where its refund
+ * is — "· ₹1 check refunded", "· ₹1 check being refunded" — so the merchant
+ * never reads it as money in.
+ */
+export function autopayLine(
+    autopay: SubscriptionAutopay | null | undefined,
+): string | null {
+    if (!autopay) return null;
+    const line = autopayStateText(autopay);
+    const check = autopay.check ? autopayCheckText(autopay.check) : null;
+    return check ? `${line} · ${check}` : line;
+}
+
+const CHECK_STATE: Record<
+    NonNullable<SubscriptionAutopay["check"]>["state"],
+    string
+> = {
+    REFUNDED: "refunded",
+    REFUNDING: "being refunded",
+    NOT_REFUNDED: "not refunded — refund it from your payment provider",
+};
+
+function autopayCheckText(
+    check: NonNullable<SubscriptionAutopay["check"]>,
+): string {
+    return `${money(check.amount, check.currency)} check ${CHECK_STATE[check.state]}`;
+}
+
+function autopayStateText(autopay: SubscriptionAutopay): string {
+    const method = autopay.method ? AUTOPAY_METHOD[autopay.method] : null;
+    const how = [method, autopay.hint].filter(Boolean).join(" · ");
+    const withHow = (head: string) => (how ? `${head} · ${how}` : head);
+    switch (autopay.state) {
+        case "ON": {
+            const limit = autopay.limit
+                ? ` · limit ${money(autopay.limit, autopay.currency)}`
+                : "";
+            return `${withHow("Autopay on")}${limit}`;
+        }
+        case "PAUSED":
+            return `${withHow("Autopay paused")} — paused in their UPI app`;
+        case "PENDING":
+            return `${withHow("Autopay pending")} — waiting for them to approve it`;
+        case "FAILED":
+            return `${withHow("Autopay failed")} — ${
+                AUTOPAY_FAILED[autopay.failure ?? ""] ??
+                AUTOPAY_FAILED.NOT_APPROVED
+            }`;
+    }
 }
 
 /** "UPI", "the pay link" — how the latest paid charge was paid, if any was. */

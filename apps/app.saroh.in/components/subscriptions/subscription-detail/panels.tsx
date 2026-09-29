@@ -218,12 +218,15 @@ export function PlanCard({
     price,
     older,
     paysBy,
+    children,
 }: {
     name: string;
     what: string | null;
     price: string;
     older: string | null;
     paysBy: string;
+    /** Autopay's detail and actions, under "Pays by" (D14). */
+    children?: React.ReactNode;
 }) {
     return (
         <section aria-label="Plan" className={cn(CARD, "px-4 py-[13px]")}>
@@ -243,6 +246,7 @@ export function PlanCard({
             <div className="mt-2 text-[12px] text-muted-foreground">
                 {paysBy}
             </div>
+            {children}
         </section>
     );
 }

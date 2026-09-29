@@ -5,6 +5,12 @@ import { toFailure } from "@/lib/api/failure";
 import type { CappedList } from "@/lib/lists/capped";
 import { withLive } from "@/lib/lists/capped";
 
+import type {
+    AutopayChargeTiming,
+    AutopayTimingSettings,
+} from "./autopay-timing";
+import { autopayTimingSettingsOf } from "./autopay-timing";
+
 /**
  * Plans and the people on them (ADR-007), through the org-nested
  * `/subscription-plans` and `/subscriptions` routes. Server-only.
@@ -38,6 +44,11 @@ export interface Plan {
     /** What its running (not paused) members pay in a month, in its currency. */
     monthlyFromMembers: string;
     createdAt: string;
+    /**
+     * When autopay charges its renewals (D13B); null or absent: the
+     * business's setting.
+     */
+    autopayChargeTiming?: AutopayChargeTiming | null;
 }
 
 /** One price people on a plan pay, and how many pay it. */
@@ -51,11 +62,41 @@ export interface PlanPriceRow {
     current: boolean;
 }
 
+/**
+ * How a subscription's autopay stands (D12): on, paused in the customer's
+ * UPI app, being set up, or failed. Only Subscription Detail's read has it.
+ */
+export interface SubscriptionAutopay {
+    state: "ON" | "PAUSED" | "PENDING" | "FAILED";
+    method: "UPI" | "CARD" | "EMANDATE" | null;
+    /** Only what the provider gave as displayable: a masked handle, last four. */
+    hint: string | null;
+    /** The most one charge may take; null when unknown. */
+    limit: string | null;
+    currency: string;
+    since: string;
+    failure:
+        "NOT_APPROVED" | "EXPIRED" | "PROVIDER_REFUSED" | "NO_ANSWER" | null;
+    /**
+     * The ₹1 check the customer's set-up took with nothing owed, and where
+     * its automatic refund is (D12B, DEC-064). Never income. Null or
+     * absent: none was taken.
+     */
+    check?: {
+        amount: string;
+        currency: string;
+        state: "REFUNDING" | "REFUNDED" | "NOT_REFUNDED";
+        refundedAt: string | null;
+    } | null;
+}
+
 export interface Subscription {
     id: string;
     status: SubscriptionStatus;
     plan: { id: string; name: string };
     contact: { id: string; name: string; email: string };
+    /** Autopay (D12); absent from the list and from an API older than D12. */
+    autopay?: SubscriptionAutopay | null;
     price: string;
     currency: string;
     interval: Interval;
@@ -116,6 +157,96 @@ export interface Subscription {
     } | null;
     startedAt: string;
     createdAt: string;
+    /**
+     * An autopay charge is under way on one of its unpaid invoices (D13):
+     * "Autopay charge in progress · ‹date›", `at` being when the debit is
+     * asked for. No Retry and no pay link meanwhile. Only Subscription
+     * Detail's read has it; absent from an API older than D13.
+     */
+    autopayCharge?: { at: string } | null;
+    /**
+     * How Retry goes now (D13): `MANDATE` charges their autopay again,
+     * `PAY_LINK` makes a new pay link. Null: nothing to retry, or a charge
+     * is under way. Absent from an API older than D13 (a pay link).
+     */
+    retryVia?: RetryVia | null;
+    /**
+     * The autopay card staff manage it from (D14). Only Subscription
+     * Detail's read has it; absent from an API older than D14.
+     */
+    autopayCard?: AutopayCard | null;
+    /** Its autopay on the list (D14); only the list has it. */
+    autopayOn?: AutopayBadge | null;
+}
+
+/** How a failed renewal is retried (D13). */
+export type RetryVia = "MANDATE" | "PAY_LINK";
+
+/** A way to pay autopay by, as the business's provider offers it. */
+export type AutopayMethod = "UPI" | "CARD" | "EMANDATE";
+
+/** Whether the business offers autopay now, and by what (D14). */
+export interface AutopayOffer {
+    /**
+     * Its provider takes autopay and the rollout flag is on: only then may
+     * the workspace offer it or promise it.
+     */
+    offered: boolean;
+    /** Every method its account offers — never narrowed (DEC-059). */
+    methods: AutopayMethod[];
+    /** The ₹1 check a method takes when nothing is owed (DEC-064). */
+    checks: Partial<
+        Record<AutopayMethod, { amount: string; currency: string }>
+    >;
+    /** "Razorpay", when autopay is offered. */
+    provider: string | null;
+}
+
+/** Subscription Detail's autopay card (D14), beside D12's `autopay` line. */
+export interface AutopayCard extends AutopayOffer {
+    /** How the current mandate came to be; null without one. */
+    setUp: {
+        source: "PAY_LINK" | "PRICES" | "ACCOUNT" | "SETUP_LINK" | null;
+        at: string;
+        /** Who on the team sent the set-up link it came from. */
+        sentBy: string | null;
+    } | null;
+    /** The last mandate was cancelled and nothing replaced it. */
+    ended: { at: string; reason: string | null; confirmed: boolean } | null;
+    /** D13's "Autopay limit too low", while it holds. */
+    limitLow: {
+        limit: string | null;
+        amount: string;
+        currency: string;
+        at: string;
+    } | null;
+    /** Where Saroh would email a set-up link; null: copy it instead. */
+    emailTo: string | null;
+}
+
+/** A subscription's autopay on the list (D14). */
+export interface AutopayBadge {
+    method: AutopayMethod | null;
+    hint: string | null;
+    paused: boolean;
+}
+
+/** What "Send a set-up link" made; the link is shown once. */
+export interface AutopayLink {
+    url: string;
+    method: AutopayMethod;
+    limit: string;
+    currency: string;
+    check: { amount: string; currency: string } | null;
+    expiresAt: string;
+    emailed: { status: "QUEUED" | "SUPPRESSED"; to: string } | null;
+    emailProblem: string | null;
+}
+
+/** What "Cancel autopay" did (D14). */
+export interface AutopayCancelled {
+    outcome: "CANCELLED" | "CONFIRMING" | "REFUSED" | "ALREADY_OFF";
+    provider: string | null;
 }
 
 export interface UpcomingCollection {
@@ -203,16 +334,6 @@ export interface Renewals {
     lastCheckedAt: string | null;
     nextCheckAt: string | null;
     issuedToday: number;
-}
-
-export interface PlanInput {
-    name?: string;
-    description?: string | null;
-    price?: string;
-    currency?: string;
-    interval?: Interval;
-    /** 1–60; null is as many as they like. */
-    classesPerMonth?: number | null;
 }
 
 export interface SubscribeInput {
@@ -332,19 +453,26 @@ async function optionalRead<T>(
     }
 }
 
-export async function listPlans(): Promise<Plan[]> {
+/**
+ * The plans on sale and archived. `drafts` adds the drafts too: the Plan
+ * Editor checks a name against every plan that isn't archived.
+ */
+export async function listPlans({ drafts = false } = {}): Promise<Plan[]> {
     const base = await orgBase();
     if (!base) return [];
-    return (await getJson<Plan[]>(`${base}/subscription-plans`)) ?? [];
+    const query = drafts ? "?include=drafts" : "";
+    return (await getJson<Plan[]>(`${base}/subscription-plans${query}`)) ?? [];
 }
 
 /**
  * The plans, as the Plans tab reads them: a failed read is named in the tab
- * and costs nothing else, so the subscriptions still show (D3).
+ * and costs nothing else, so the subscriptions still show (D3). Drafts
+ * included (D7): the API leaves them out unless asked, for apps older than
+ * the Plan Editor, which would draw a draft as a live card (D5).
  */
 export async function listPlansOptional(): Promise<Optional<Plan[]>> {
     return optionalRead<Plan[]>((base) =>
-        apiFetch(`${base}/subscription-plans`),
+        apiFetch(`${base}/subscription-plans?include=drafts`),
     );
 }
 
@@ -443,12 +571,17 @@ export async function getRenewals(): Promise<Renewals | null> {
     return getJson<Renewals>(`${base}/subscriptions/renewals`);
 }
 
-/** The business's subscription settings (round-2 A8). */
+/** The business's subscription settings (round-2 A8; D13B). */
 export interface SubscriptionSettings {
     /** "Members can pause from their account": on by default. */
     membersCanPause: boolean;
     /** Whether customers have an account on the business's site yet. */
     accountArea: boolean;
+    /**
+     * "When autopay charges" (D13B). Null from an older API, or when the
+     * block is strange: the setting isn't shown.
+     */
+    autopay: AutopayTimingSettings | null;
 }
 
 /**
@@ -461,12 +594,13 @@ export async function getSubscriptionSettings(): Promise<SubscriptionSettings | 
     try {
         const res = await apiFetch(`${base}/subscriptions/settings`);
         if (!res.ok) return null;
-        const body = (await res.json()) as Partial<SubscriptionSettings>;
+        const body = (await res.json()) as Record<string, unknown>;
         return typeof body.membersCanPause === "boolean" &&
             typeof body.accountArea === "boolean"
             ? {
                   membersCanPause: body.membersCanPause,
                   accountArea: body.accountArea,
+                  autopay: autopayTimingSettingsOf(body.autopay),
               }
             : null;
     } catch {
@@ -482,6 +616,31 @@ export function setMembersCanPause(
         "PATCH",
         { membersCanPause: on },
         "Couldn't save that. Try again.",
+    );
+}
+
+/** "When autopay charges" for the business (D13B). */
+export function setAutopayChargeTiming(
+    timing: AutopayChargeTiming,
+): Promise<ApiResult<SubscriptionSettings>> {
+    return send<SubscriptionSettings>(
+        "/subscriptions/settings",
+        "PATCH",
+        { autopayChargeTiming: timing },
+        "Couldn't save when autopay charges. Try again.",
+    );
+}
+
+/** A plan's own "When autopay charges" (D13B); null: the business's. */
+export function setPlanChargeTiming(
+    planId: string,
+    timing: AutopayChargeTiming | null,
+): Promise<ApiResult<Plan>> {
+    return send<Plan>(
+        `${plan(planId)}/autopay-timing`,
+        "PATCH",
+        { autopayChargeTiming: timing },
+        "Couldn't save when autopay charges for this plan. Try again.",
     );
 }
 
@@ -544,16 +703,77 @@ export function cancelSubscription(id: string, when: "now" | "periodEnd") {
     );
 }
 /**
- * Retry a failed renewal with a new pay link (`POST :id/retry`): the old
- * link stops, nothing is charged or sent, and the link comes back once for
- * the merchant to copy (Home's "Retry by pay link", F4).
+ * Retry a failed renewal (`POST :id/retry`). By pay link (the default): the
+ * old link stops, nothing is charged or sent, and the link comes back once
+ * for the merchant to copy (Home's "Retry by pay link", F4). By autopay
+ * (D13): a new charge on their mandate, with no link (`url` null); `paid`
+ * when the provider had already collected it.
  */
-export function retrySubscription(id: string) {
-    return send<{ invoiceId: string; url: string }>(
+export function retrySubscription(id: string, via: RetryVia = "PAY_LINK") {
+    return send<{
+        invoiceId: string;
+        url: string | null;
+        via?: RetryVia;
+        paid?: boolean;
+    }>(
         `${sub(id)}/retry`,
         "POST",
+        via === "PAY_LINK" ? {} : { via },
+        via === "PAY_LINK"
+            ? "Couldn't make a new pay link. Nothing changed."
+            : "Autopay wasn't charged. Nothing changed.",
+    );
+}
+
+/**
+ * Whether the business offers autopay now (D14), for the copy that may
+ * promise it. Unknown (an older API, a failed read) reads as not offered,
+ * so nothing promises what may not be there.
+ */
+export async function getAutopayOffer(): Promise<AutopayOffer | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/subscriptions/autopay`);
+        if (!res.ok) return null;
+        const body = (await res.json()) as Partial<AutopayOffer>;
+        return typeof body.offered === "boolean" && Array.isArray(body.methods)
+            ? {
+                  offered: body.offered,
+                  methods: body.methods,
+                  checks: body.checks ?? {},
+                  provider: body.provider ?? null,
+              }
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * "Send a set-up link" (D14): the provider's page to approve autopay on,
+ * for `method`; emailed as well when `email` and the business can.
+ */
+export function sendAutopayLink(
+    id: string,
+    method: AutopayMethod,
+    email: boolean,
+) {
+    return send<AutopayLink>(
+        `${sub(id)}/autopay/link`,
+        "POST",
+        { method, email },
+        "Couldn't make a set-up link. Nothing was sent.",
+    );
+}
+
+/** "Cancel autopay" (D14): the provider is asked first. */
+export function cancelAutopay(id: string) {
+    return send<AutopayCancelled>(
+        `${sub(id)}/autopay/cancel`,
+        "POST",
         {},
-        "Couldn't make a new pay link. Nothing changed.",
+        "Couldn't cancel autopay. Nothing changed — try again.",
     );
 }
 
@@ -598,17 +818,6 @@ export function cancelPlanChange(id: string) {
         undefined,
         "Could not keep the current plan.",
     );
-}
-export function createPlan(input: PlanInput) {
-    return send<Plan>(
-        "/subscription-plans",
-        "POST",
-        input,
-        "Could not save that plan.",
-    );
-}
-export function updatePlan(id: string, input: PlanInput) {
-    return send<Plan>(plan(id), "PATCH", input, "Could not save that plan.");
 }
 export function setPlanArchived(id: string, archived: boolean) {
     return send<Plan>(

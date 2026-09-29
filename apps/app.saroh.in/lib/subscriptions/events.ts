@@ -32,6 +32,21 @@ const WEEKDAYS = [
 
 type Data = Record<string, unknown>;
 
+/** How the log names an autopay method (D12). */
+const AUTOPAY_METHOD: Record<string, string> = {
+    UPI: "UPI",
+    CARD: "card",
+    EMANDATE: "bank account",
+};
+
+/** Where the customer set autopay up (D12). */
+const SET_UP_FROM: Record<string, string> = {
+    ACCOUNT: "from their account",
+    PRICES: "from the Prices page",
+    PAY_LINK: "from the pay link",
+    SETUP_LINK: "from a set-up link",
+};
+
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
 
@@ -119,7 +134,10 @@ export function changeWhat(
         case "COLLECTION_UNSKIPPED":
             return `Un-skipped ${day(data.date, true)}`;
         case "INVOICED":
-            return `Invoiced ${periodText(data, sub.timezone, now)}${invoice}`;
+            // D13B: two days early, so autopay charges on the renewal date.
+            return data.early === true
+                ? `Invoiced ${periodText(data, sub.timezone, now)} early, for autopay on the renewal date${invoice}`
+                : `Invoiced ${periodText(data, sub.timezone, now)}${invoice}`;
         case "RENEWED":
             return data.uncharged === true
                 ? "Renewed — nothing charged, every collection skipped"
@@ -132,8 +150,12 @@ export function changeWhat(
             return `Renewal payment failed${invoice}`;
         case "MANDATE_LIMIT_LOW":
             return "Not charged — above the autopay limit";
-        case "MANDATE_SET_UP":
-            return "Autopay set up";
+        case "MANDATE_SET_UP": {
+            // D12: the method the customer picked.
+            const method = str(data.method);
+            const how = method ? AUTOPAY_METHOD[method] : undefined;
+            return how ? `Autopay set up with ${how}` : "Autopay set up";
+        }
         case "MANDATE_CANCELLED":
             // D20: autopay ends with what it was authorised for.
             switch (data.reason) {
@@ -143,11 +165,33 @@ export function changeWhat(
                     return "Autopay cancelled — customers merged";
                 case "PRIVACY_REMOVAL":
                     return "Autopay cancelled — their details were removed";
+                case "REPLACED":
+                    return "Autopay replaced — they approved a new one";
                 default:
                     return "Autopay cancelled";
             }
+        case "MANDATE_LINK_SENT": {
+            // D14: staff made a set-up link; "emailed" when Saroh sent it.
+            const method = str(data.method);
+            const how = method ? AUTOPAY_METHOD[method] : undefined;
+            const what = how
+                ? `Autopay set-up link made for ${how}`
+                : "Autopay set-up link made";
+            return data.emailed === true ? `${what} and emailed` : what;
+        }
         case "CHARGED":
             return `Paid by autopay${invoice}`;
+        case "EARLY_INVOICE_CANCELLED": {
+            // D13B: the early renewal invoice, dropped before its period.
+            const how = data.by === "CREDITED" ? "Credited" : "Voided";
+            const why =
+                data.reason === "PAUSED"
+                    ? "paused"
+                    : data.reason === "PLAN_CHANGED"
+                      ? "plan changed"
+                      : "cancelled";
+            return `${how} the early renewal invoice — ${why} before the renewal, autopay not charged${invoice}`;
+        }
         default:
             return "Changed";
     }
@@ -178,7 +222,12 @@ export function changeWho(
             return actor.name ?? "A team member";
         case "CUSTOMER": {
             const first = sub.contact.name.split(" ")[0] || sub.contact.name;
-            return `${first}, from their account`;
+            // Autopay says where it was set up (D12).
+            const from =
+                event.kind === "MANDATE_SET_UP"
+                    ? SET_UP_FROM[str((event.data as Data).source) ?? ""]
+                    : undefined;
+            return `${first}, ${from ?? "from their account"}`;
         }
         default:
             return actor.name ?? "Saroh";

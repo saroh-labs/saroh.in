@@ -149,6 +149,39 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
         ]);
     });
 
+    it("says whether Join works: only with a provider that opens a checkout (G20)", async () => {
+        const { organizationId, siteId } = await business();
+        await plan(organizationId, "Monthly", "1200");
+        expect((await service.list(siteId, "visitor")).payOnline).toBe(false);
+
+        // A Razorpay connection still missing its public key can't open one.
+        const provider = await prisma.merchantPaymentProvider.create({
+            data: {
+                organizationId,
+                provider: "RAZORPAY",
+                status: "CONNECTED",
+                encryptedCredentials: "x",
+                credentialsIv: "x",
+                credentialsAuthTag: "x",
+            },
+        });
+        expect((await service.list(siteId, "visitor")).payOnline).toBe(false);
+
+        await prisma.merchantPaymentProvider.update({
+            where: { id: provider.id },
+            data: { publicKey: "rzp_test_G20" },
+        });
+        const read = await service.list(siteId, "visitor");
+        expect(read.payOnline).toBe(true);
+        // Never how: no provider or payment method is named (DEC-059),
+        // beyond the autopay methods the provider itself reports (D12).
+        expect(Object.keys(read).sort()).toEqual([
+            "autopayMethods",
+            "payOnline",
+            "plans",
+        ]);
+    });
+
     it("a cancelled member doesn't count towards Most chosen", async () => {
         const { organizationId, siteId } = await business();
         const a = await plan(organizationId, "A", "100");
@@ -193,7 +226,11 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
         await plan(organizationId, "Old monthly", "900", {
             status: "ARCHIVED",
         });
-        expect(await service.list(siteId, "visitor")).toEqual({ plans: [] });
+        expect(await service.list(siteId, "visitor")).toEqual({
+            plans: [],
+            payOnline: false,
+            autopayMethods: [],
+        });
     });
 
     it("with Payments switched off → 404, whatever plans exist", async () => {
@@ -250,6 +287,8 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
         // Another visitor is still served.
         await expect(tight.list(siteId, "calm")).resolves.toEqual({
             plans: [],
+            payOnline: false,
+            autopayMethods: [],
         });
     });
 });

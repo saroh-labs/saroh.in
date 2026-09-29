@@ -71,7 +71,7 @@ describe("HomeService refunds owed on invoices", () => {
         const { service, db } = build([OWED]);
         const home = await service.build(OWNER);
 
-        expect(home.primaryAction).toEqual({
+        expect(home.actions[0]).toEqual({
             code: "PAYMENTS_REFUNDS_OWED",
             title: "Refund a payment taken on a settled invoice",
             href: "/billing/invoices/inv_1",
@@ -107,10 +107,10 @@ describe("HomeService refunds owed on invoices", () => {
     it("reads the reason the webhook recorded, not the invoice's status now (K-1)", async () => {
         const { service, db } = build([owedFor("CANCELLED_BOOKING")]);
         const home = await service.build(OWNER);
-        expect(home.primaryAction?.title).toBe(
+        expect(home.actions[0]?.title).toBe(
             "Refund a payment taken after its booking was cancelled",
         );
-        expect(home.primaryAction?.evidence?.[0]?.subtitle).toBe(
+        expect(home.actions[0]?.evidence?.[0]?.subtitle).toBe(
             "Asha Rao · Paid online after its booking was cancelled",
         );
         // The newest CAPTURED_NEEDS_REFUND attempt is where it was recorded.
@@ -154,8 +154,8 @@ describe("HomeService refunds owed on invoices", () => {
         async (recorded, title, why) => {
             const { service } = build([owedFor(recorded)]);
             const home = await service.build(OWNER);
-            expect(home.primaryAction?.title).toBe(title);
-            expect(home.primaryAction?.evidence?.[0]?.subtitle).toBe(
+            expect(home.actions[0]?.title).toBe(title);
+            expect(home.actions[0]?.evidence?.[0]?.subtitle).toBe(
                 `Asha Rao · ${why}`,
             );
         },
@@ -164,10 +164,10 @@ describe("HomeService refunds owed on invoices", () => {
     it("points at the invoice list when there are several", async () => {
         const { service } = build([OWED], 3);
         const home = await service.build(OWNER);
-        expect(home.primaryAction?.title).toBe(
+        expect(home.actions[0]?.title).toBe(
             "Refund 3 payments customers are owed",
         );
-        expect(home.primaryAction?.href).toBe("/billing/invoices");
+        expect(home.actions[0]?.href).toBe("/billing/invoices");
     });
 
     it("says nothing when nothing is owed", async () => {

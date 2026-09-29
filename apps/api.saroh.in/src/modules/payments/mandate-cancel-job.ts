@@ -1,5 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
+import type { SubscriptionActor } from "../subscriptions/subscription-events";
 import {
     JOB,
     recordSubscriptionEvent,
@@ -38,7 +39,9 @@ export type MandateCancelReason =
     | "SUBSCRIPTION_ENDED"
     | "PRIVACY_REMOVAL"
     | "MERGED"
-    | "PROVIDER";
+    | "PROVIDER"
+    /** A new authorisation for the same subscription took its place (D11). */
+    | "REPLACED";
 
 /** A mandate that can still be charged, or become chargeable. */
 export const LIVE_MANDATE_STATUSES = ["PENDING", "ACTIVE", "PAUSED"] as const;
@@ -96,8 +99,9 @@ export interface MarkedCancelled {
 
 /**
  * Mark every live mandate in scope CANCELLED, write "Autopay cancelled" on
- * each one's subscription (actor JOB, `data.reason`), and — unless `queue`
- * is false — write the `mandate.cancel` job when any is at the provider.
+ * each one's subscription (actor JOB, or `actor` — staff's "Cancel
+ * autopay", D14; `data.reason`), and — unless `queue` is false — write the
+ * `mandate.cancel` job when any is at the provider.
  *
  * A mandate that never reached the provider (no provider id) is confirmed
  * on the spot: there is nothing to ask. Each row moves under its own
@@ -109,7 +113,7 @@ export async function cancelMandatesInTx(
     tx: Prisma.TransactionClient,
     scope: MandateScope,
     reason: MandateCancelReason,
-    opts: { queue?: boolean; now?: Date } = {},
+    opts: { queue?: boolean; now?: Date; actor?: SubscriptionActor } = {},
 ): Promise<MarkedCancelled> {
     const live = await tx.paymentMandate.findMany({
         where: {
@@ -147,7 +151,7 @@ export async function cancelMandatesInTx(
             scope.organizationId,
             subscriptionId,
             "MANDATE_CANCELLED",
-            JOB,
+            opts.actor ?? JOB,
             { data: { reason } },
         );
     }

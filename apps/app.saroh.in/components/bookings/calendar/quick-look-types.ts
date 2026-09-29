@@ -30,6 +30,11 @@ export interface QuickLookContext {
     /** `order:read`: a treatment's order is a link, else words (E10). */
     canReadOrder?: boolean;
     /**
+     * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
+     * and whether a pay link can be sent instead (a provider connected).
+     */
+    desk?: { canTake: boolean; canLink: boolean };
+    /**
      * What the business can tell its customers with (A14); null when it
      * couldn't be read.
      */

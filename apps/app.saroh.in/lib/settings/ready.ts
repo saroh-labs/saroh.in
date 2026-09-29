@@ -8,6 +8,10 @@ import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import { BUSINESS_TAB_PARAM } from "./search";
 
+/** The API's readiness code for payments that can't be confirmed (DEC-063). */
+export const PAYMENTS_WEBHOOK_SECRET_MISSING =
+    "PAYMENTS_WEBHOOK_SECRET_MISSING";
+
 /**
  * Getting a business ready to take money, and what email needs.
  *
@@ -67,7 +71,10 @@ export function providersTabNote(attention: EmailAttention | null) {
 }
 
 export type ReadyStepKey =
-    "payments" | "address" | "tax" | "catalogue" | "site";
+    "payments" | "address" | "tax" | "catalogue" | "site" | "shop";
+
+/** The API's Website step: the shop waits on "Sells from" (P4). */
+export const WEBSITE_SHOP_NOT_CHOSEN = "WEBSITE_SHOP_NOT_CHOSEN";
 
 /** What Settings also asks for, beside the steps (`nudges.ts`, DEC-056). */
 export type SettingsNudgeKey = "email" | "businessType" | "logo" | "pipeline";
@@ -132,6 +139,23 @@ function payments(modules: readonly ModuleView[]): Check | null {
         };
     }
     const href = view.blockers[0]?.actionHref ?? "/settings/providers";
+    // Connected, but no payment through it can be confirmed: saved without
+    // its webhook signing secret (DEC-063). Not ready to take money, and
+    // not "switched off" either.
+    if (
+        view.readiness === "ATTENTION_REQUIRED" &&
+        view.blockers[0]?.code === PAYMENTS_WEBHOOK_SECRET_MISSING
+    ) {
+        return {
+            key: "payments",
+            label: "Finish connecting payments",
+            why: "Add your webhook signing secret, so payments customers make are confirmed.",
+            cta: "Add webhook secret",
+            href,
+            broken: true,
+            left: true,
+        };
+    }
     if (view.readiness === "ATTENTION_REQUIRED") {
         return {
             key: "payments",
@@ -283,8 +307,35 @@ function site(
 }
 
 /**
+ * The shop's storefront (P4): the site is live and its shop could serve,
+ * but "Sells from" is unanswered, so `/shop` isn't live. The API says so
+ * as the Website's step (`WEBSITE_SHOP_NOT_CHOSEN`) only while the shop is
+ * open for the business (DEC-057), so a business with no shop is never
+ * asked. Asked only while it is left: once answered there is no fact that
+ * says the step ever applied, and a tick for it would claim a shop that
+ * may not exist.
+ */
+function shop(modules: readonly ModuleView[]): Check | null {
+    if (!on(modules, "WEBSITE")) return null;
+    const blocker = modules
+        .find((m) => m.key === "WEBSITE")
+        ?.blockers.find((b) => b.code === WEBSITE_SHOP_NOT_CHOSEN);
+    if (!blocker) return null;
+    return {
+        key: "shop",
+        label: "Choose which storefront your site sells from",
+        why: "Until then your shop page isn't live.",
+        cta: "Choose storefront",
+        href: blocker.actionHref ?? "/sites",
+        broken: false,
+        left: true,
+    };
+}
+
+/**
  * The steps to take money, in order: connect payments, the registered
- * address, GST, a first product or service, and publishing the site.
+ * address, GST, a first product or service, publishing the site and,
+ * while its shop waits on it, choosing the storefront it sells from.
  *
  * Each check is left, done, or not a step at all. Unknown — the list behind
  * it could not be read — is left out, so the count never claims a step is
@@ -311,6 +362,7 @@ export function readyChecklist({
         tax(settings),
         modules ? catalogue(modules, settings.setup) : null,
         modules ? site(modules, settings.setup) : null,
+        modules ? shop(modules) : null,
     ].filter((c): c is Check => c !== null);
 
     const steps: ReadyStep[] = checks.map(({ left, ...item }) => ({
