@@ -12,6 +12,7 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { lacksWebhookSecret } from "../../payments/webhook-setup";
 import type { ModuleKey } from "../module-registry";
 import { deactivationImpactOf } from "./module-deactivation-impact";
 import type {
@@ -65,6 +66,10 @@ function attention(
 
 /** Providers the merchant connected and has not switched off. */
 const CONNECTED = "CONNECTED";
+
+/** Payments connected, but no payment through them can be confirmed (DEC-063). */
+export const PAYMENTS_WEBHOOK_SECRET_MISSING =
+    "PAYMENTS_WEBHOOK_SECRET_MISSING";
 
 /**
  * The readiness registry. Holds one adapter per module and resolves readiness /
@@ -323,7 +328,32 @@ export class ModuleReadinessRegistry {
                     }),
                 ]);
 
-                if (connected > 0) return active();
+                if (connected > 0) {
+                    // Connected is not confirmed (DEC-063): a Razorpay
+                    // connection saved without its webhook signing secret
+                    // takes the money, and every payment update it sends
+                    // is refused — the order waits "Awaiting payment"
+                    // forever. When no connected one can confirm a
+                    // payment, the business isn't ready to take one.
+                    const rows = await this.db.merchantPaymentProvider.findMany(
+                        {
+                            where: { organizationId, status: CONNECTED },
+                            select: {
+                                provider: true,
+                                encryptedCredentials: true,
+                                credentialsIv: true,
+                                credentialsAuthTag: true,
+                            },
+                        },
+                    );
+                    if (rows.length > 0 && rows.every(lacksWebhookSecret))
+                        return attention(
+                            PAYMENTS_WEBHOOK_SECRET_MISSING,
+                            "Payments can't be confirmed — add the webhook signing secret to your payment provider's connection.",
+                            "/settings/providers",
+                        );
+                    return active();
+                }
                 if (total > 0)
                     return attention(
                         "PAYMENTS_PROVIDER_DISABLED",
