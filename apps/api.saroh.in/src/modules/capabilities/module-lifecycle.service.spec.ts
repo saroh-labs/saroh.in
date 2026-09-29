@@ -127,6 +127,30 @@ describe("ModuleLifecycleService", () => {
         );
     });
 
+    it("enable refuses a module Saroh hasn't rolled out, in words (DEC-057)", async () => {
+        const db = makeDb();
+        const flags = {
+            isEnabled: jest.fn((flag: string) =>
+                Promise.resolve(flag !== "MODULE_WEBSITE"),
+            ),
+        };
+        const svc = new ModuleLifecycleService(
+            makeReadiness(),
+            db as never,
+            undefined,
+            flags as never,
+        );
+        const refused = svc.enable(OWNER, "WEBSITE");
+        await expect(refused).rejects.toBeInstanceOf(BadRequestException);
+        await expect(refused).rejects.toThrow(
+            "Website isn't available for your business yet.",
+        );
+        expect(db.organizationModule.upsert).not.toHaveBeenCalled();
+        // Rolled out: it turns on as before.
+        await svc.enable(OWNER, "COMMERCE");
+        expect(db.organizationModule.upsert).toHaveBeenCalledTimes(1);
+    });
+
     it("a rolled-out dependent still holds the disable up, named", async () => {
         const db = makeDb();
         db.organizationModule.findUnique.mockResolvedValue({

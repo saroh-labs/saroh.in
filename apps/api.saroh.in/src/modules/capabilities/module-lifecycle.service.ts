@@ -150,6 +150,16 @@ export class ModuleLifecycleService {
         // audit event).
         if ((await this.currentStatus(ctx, moduleKey)) === "ENABLED") return;
 
+        // Saroh hasn't rolled it out to this business (DEC-057): it is never
+        // shown, so it is never turned on — by the business or an operator,
+        // who meets the rules the owner does. The module's name, never the
+        // flag or a code.
+        if (!(await this.rolledOut(ctx, moduleKey))) {
+            throw new BadRequestException(
+                `${descriptor.label} isn't available for your business yet.`,
+            );
+        }
+
         // Hard dependencies must already be ENABLED.
         if (descriptor.dependencies.length > 0) {
             const deps = await this.db.organizationModule.findMany({

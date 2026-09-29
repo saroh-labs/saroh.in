@@ -108,6 +108,67 @@ describe("modules Saroh hasn't rolled out (DEC-057)", () => {
         }
     });
 
+    it("is never turned on: enabling it is refused in words, and nothing is written", async () => {
+        await prisma.organizationModule.update({
+            where: {
+                organizationId_moduleKey: {
+                    organizationId: org,
+                    moduleKey: "CLASS_PACKS",
+                },
+            },
+            data: { status: "DISABLED" },
+        });
+        const refused = await lifecycle
+            .enable(ctx, "CLASS_PACKS")
+            .then(() => null)
+            .catch((e: Error) => e.message);
+        expect(refused).toBe(
+            "Class packs isn't available for your business yet.",
+        );
+        expect(refused).not.toMatch(/ROLLOUT|MODULE_|CLASS_PACKS/);
+        const row = await prisma.organizationModule.findUnique({
+            where: {
+                organizationId_moduleKey: {
+                    organizationId: org,
+                    moduleKey: "CLASS_PACKS",
+                },
+            },
+            select: { status: true },
+        });
+        expect(row?.status).toBe("DISABLED");
+        // A rolled-out module still turns on.
+        await prisma.organizationModule.update({
+            where: {
+                organizationId_moduleKey: {
+                    organizationId: org,
+                    moduleKey: "COMMERCE",
+                },
+            },
+            data: { status: "DISABLED" },
+        });
+        await lifecycle.enable(ctx, "COMMERCE");
+        const commerce = await prisma.organizationModule.findUnique({
+            where: {
+                organizationId_moduleKey: {
+                    organizationId: org,
+                    moduleKey: "COMMERCE",
+                },
+            },
+            select: { status: true },
+        });
+        expect(commerce?.status).toBe("ENABLED");
+        // Put Class packs back as the other tests read it.
+        await prisma.organizationModule.update({
+            where: {
+                organizationId_moduleKey: {
+                    organizationId: org,
+                    moduleKey: "CLASS_PACKS",
+                },
+            },
+            data: { status: "ENABLED" },
+        });
+    });
+
     it("a refusal names the module, never its key", async () => {
         const refused = await lifecycle
             .archive(ctx, "CLASS_PACKS")
