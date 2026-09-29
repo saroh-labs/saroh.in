@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 
 import type { MandateCancelReason } from "./mandate-cancel-job";
 import { LIVE_MANDATE_STATUSES } from "./mandate-cancel-job";
+import { providerName } from "./mandate-rules";
 import type { MandatesService } from "./mandates.service";
 
 /**
@@ -60,16 +61,9 @@ export async function cancelAutopayFirst(
     return { ok: true, cancelled: result.cancelled };
 }
 
-const PROVIDER_NAMES: Readonly<Record<string, string>> = {
-    razorpay: "Razorpay",
-    cashfree: "Cashfree",
-};
-
-/** The provider as a merchant knows it. */
-export function providerName(provider: string | null | undefined): string {
-    const key = (provider ?? "").trim().toLowerCase();
-    return PROVIDER_NAMES[key] ?? "your payment provider";
-}
+// Moved to `mandate-rules.ts` (D11) so the mandates service can use it
+// without importing this file, which imports the service's type.
+export { providerName };
 
 /**
  * The provider hasn't confirmed their autopay is cancelled (an unsure

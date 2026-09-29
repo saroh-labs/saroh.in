@@ -38,7 +38,9 @@ export type MandateCancelReason =
     | "SUBSCRIPTION_ENDED"
     | "PRIVACY_REMOVAL"
     | "MERGED"
-    | "PROVIDER";
+    | "PROVIDER"
+    /** A new authorisation for the same subscription took its place (D11). */
+    | "REPLACED";
 
 /** A mandate that can still be charged, or become chargeable. */
 export const LIVE_MANDATE_STATUSES = ["PENDING", "ACTIVE", "PAUSED"] as const;
