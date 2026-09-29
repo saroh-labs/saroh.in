@@ -8,6 +8,8 @@ import {
     eventText,
     flowOf,
     goesToAddress,
+    headerStep,
+    howWords,
     isOpen,
     kitchenStanding,
     PAYMENT_TRANSITIONS,
@@ -85,6 +87,71 @@ const line = (over: Partial<OrderReadLine> = {}): OrderReadLine => ({
     quantity: 2,
     refundedQuantity: 0,
     ...over,
+});
+
+describe("the header's step pill and how it leaves (the design)", () => {
+    const pickup = {
+        status: "PENDING" as const,
+        paymentStatus: "PAID" as const,
+        refundStanding: "NONE" as const,
+        stage: "NEW" as const,
+        steps: [
+            { stage: "NEW" as const, label: "New" },
+            { stage: "PREPARING" as const, label: "Preparing" },
+            { stage: "READY" as const, label: "Ready" },
+            { stage: "COLLECTED" as const, label: "Collected" },
+        ],
+        fulfilmentLabel: "Pick-up",
+    };
+
+    it("says the step it is at, never Unfulfilled, toned as the list tones it", () => {
+        expect(headerStep(pickup)).toEqual({ label: "New", tone: "new" });
+        expect(
+            headerStep({ ...pickup, status: "PROCESSING", stage: "PREPARING" }),
+        ).toEqual({ label: "Preparing", tone: "prog" });
+        expect(
+            headerStep({ ...pickup, status: "PROCESSING", stage: "READY" }),
+        ).toEqual({ label: "Ready", tone: "ready" });
+        expect(
+            headerStep({ ...pickup, status: "DELIVERED", stage: "COLLECTED" }),
+        ).toEqual({ label: "Collected", tone: "done" });
+    });
+
+    it("says Refunded or Cancelled in red", () => {
+        expect(headerStep({ ...pickup, refundStanding: "REFUNDED" })).toEqual({
+            label: "Refunded",
+            tone: "bad",
+        });
+        expect(headerStep({ ...pickup, status: "CANCELLED" })).toEqual({
+            label: "Cancelled",
+            tone: "bad",
+        });
+    });
+
+    it("reads Pick-up at the storefront, never the old Collection", () => {
+        const at = {
+            fulfilmentType: "PICKUP" as const,
+            fulfilmentLabel: "Pick-up",
+            store: { id: "s1", name: "Hill Road" },
+            deliveryAddress: null,
+        };
+        expect(howWords(at)).toBe("Pick-up at Hill Road");
+        expect(
+            howWords({
+                ...at,
+                fulfilmentType: "LOCAL_DELIVERY",
+                fulfilmentLabel: "Local delivery",
+                deliveryAddress: { city: "Pune" } as never,
+            }),
+        ).toBe("Local delivery to Pune");
+        expect(
+            howWords({
+                ...at,
+                fulfilmentType: "SHIPPING",
+                fulfilmentLabel: "Shipping",
+            }),
+        ).toBe("Shipping");
+    });
 });
 
 describe("the kitchen flow", () => {
