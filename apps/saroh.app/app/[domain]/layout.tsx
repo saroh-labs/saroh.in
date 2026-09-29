@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import type { SignInOptions } from "@saroh/site-blocks";
-import { AccountEntry, ShopBag, SiteTheme } from "@saroh/site-blocks";
+import {
+    AccountEntry,
+    ShopBag,
+    SiteChromeFrame,
+    SiteTheme,
+} from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
@@ -202,24 +207,33 @@ export default async function SiteLayout({
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
             <SiteTheme variables={snapshot.site.styleVariables} />
-            <SiteHeader
-                name={snapshot.site.name}
-                navigation={snapshot.site.navigation ?? []}
-                // A module page leaves the menu while its module is off (G15).
-                modules={resolved.modules}
-                action={action}
-                // A Shop entry in the menu while /shop serves (P4).
-                shopServes={shopServes}
-                account={account}
-                bag={bag}
-            />
-
-            <div>{children}</div>
-
-            <SiteFooter
-                footer={snapshot.site.footer}
-                name={snapshot.site.name}
-            />
+            {/* The account area draws its own compact header and no
+                footer (DEC-073 #10): the frame leaves these out there. */}
+            <SiteChromeFrame
+                account={accountAreaOn()}
+                header={
+                    <SiteHeader
+                        name={snapshot.site.name}
+                        navigation={snapshot.site.navigation ?? []}
+                        // A module page leaves the menu while its module is
+                        // off (G15).
+                        modules={resolved.modules}
+                        action={action}
+                        // A Shop entry in the menu while /shop serves (P4).
+                        shopServes={shopServes}
+                        account={account}
+                        bag={bag}
+                    />
+                }
+                footer={
+                    <SiteFooter
+                        footer={snapshot.site.footer}
+                        name={snapshot.site.name}
+                    />
+                }
+            >
+                {children}
+            </SiteChromeFrame>
         </div>
     );
 }

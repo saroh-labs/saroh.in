@@ -199,7 +199,6 @@ function draw(
     render(
         <AccountBookingsTab
             bookings={{ ok: true, value: bookings }}
-            title="Appointments"
             businessName="Kavi Dental"
             phone="+91 98765 43210"
             api={calls}
@@ -212,9 +211,8 @@ function draw(
 describe("the Bookings tab (A6)", () => {
     it("lists Coming up with Move and Cancel, Past without, and no Cancelled card when there are none", () => {
         draw();
-        expect(
-            screen.getByRole("heading", { name: "Appointments", level: 1 }),
-        ).toBeInTheDocument();
+        // The tab's title is the account header's (DEC-073 #10), not the tab's.
+        expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
         const up = screen.getByRole("region", { name: "Coming up" });
         expect(within(up).getByText("3")).toBeInTheDocument();
         expect(
@@ -245,7 +243,6 @@ describe("the Bookings tab (A6)", () => {
         render(
             <AccountBookingsTab
                 bookings={{ ok: false }}
-                title="Bookings"
                 businessName="Pulse"
                 phone={null}
                 api={api()}
