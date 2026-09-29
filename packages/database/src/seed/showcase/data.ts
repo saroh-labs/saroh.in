@@ -1026,6 +1026,16 @@ export interface ShowcaseBusiness {
     weekdayWeights?: readonly number[];
     /** A Razorpay connection, so Payments reads as working. */
     paymentProvider?: "RAZORPAY" | "CASHFREE";
+    /**
+     * The registered address its invoices print (DEC-068: issuing one, or
+     * connecting a provider, asks for it first). Its state is a GST code.
+     */
+    registeredAddress: {
+        addressLine1: string;
+        city: string;
+        postalCode: string;
+        gstState: string;
+    };
     /** Plans, packs, courses and invoices; needs PAYMENTS for the invoices. */
     billing?: ShowcaseBilling;
     site: SeedSite;
@@ -1098,6 +1108,12 @@ export const PULSE: ShowcaseBusiness = {
     key: "pulse",
     slug: "pulse-fitness",
     name: "Pulse Fitness",
+    registeredAddress: {
+        addressLine1: "80 Feet Road, Koramangala",
+        city: "Bengaluru",
+        postalCode: "560034",
+        gstState: "29",
+    },
     modules: [
         "APPOINTMENTS",
         "CRM",
@@ -1607,6 +1623,12 @@ export const PRANA: ShowcaseBusiness = {
     key: "prana",
     slug: "prana-yoga",
     name: "Prana Yoga",
+    registeredAddress: {
+        addressLine1: "7 Temple Street, Jayanagar",
+        city: "Bengaluru",
+        postalCode: "560011",
+        gstState: "29",
+    },
     modules: [
         "APPOINTMENTS",
         "CRM",
@@ -2080,6 +2102,12 @@ export const CAREPOINT: ShowcaseBusiness = {
     key: "carepoint",
     slug: "carepoint-clinic",
     name: "CarePoint Clinic",
+    registeredAddress: {
+        addressLine1: "22 MG Road",
+        city: "Bengaluru",
+        postalCode: "560001",
+        gstState: "29",
+    },
     modules: ["APPOINTMENTS", "CRM", "WEBSITE"],
     // A Member, on purpose: the film shows what a Member may and may not see.
     demoRole: "MEMBER",
@@ -2325,6 +2353,12 @@ export const LUMEN: ShowcaseBusiness = {
     key: "lumen",
     slug: "lumen-studio",
     name: "Lumen Studio",
+    registeredAddress: {
+        addressLine1: "5 Church Street",
+        city: "Bengaluru",
+        postalCode: "560001",
+        gstState: "29",
+    },
     modules: ["CRM", "WEBSITE"],
     demoRole: "REVIEWER",
     owner: { first: "Aditi", last: "Rao", role: "OWNER" },

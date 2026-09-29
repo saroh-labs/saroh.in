@@ -24,6 +24,7 @@ import type { OrderFulfilment } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
 import { BookingsService } from "../bookings/bookings.service";
@@ -110,6 +111,7 @@ beforeAll(async () => {
             timezone: "UTC",
         },
     });
+    await giveBusinessDetails(orgId);
     storeId = (
         await prisma.store.create({
             data: {
@@ -1001,6 +1003,7 @@ describe("a treatment's order (B9, E9)", () => {
         await prisma.businessProfile.create({
             data: { organizationId: organization.id, timezone: "UTC" },
         });
+        await giveBusinessDetails(organization.id);
         dental = {
             organizationId: organization.id,
             userId: user.id,

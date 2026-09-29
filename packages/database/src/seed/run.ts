@@ -13,6 +13,7 @@ import {
     LEADS,
     LIVE_PAYMENT_PROVIDER,
     MODULE_STATES,
+    NORTHWIND_ADDRESS,
     ONLINE_STOCK,
     ORDERS,
     ORG_NAME,
@@ -107,14 +108,17 @@ export async function seed(): Promise<void> {
     });
 
     // The zone the business keeps time in (ADR-007): renewal dates and
-    // "today" are counted in it.
+    // "today" are counted in it. And its registered address, which every
+    // invoice prints: issuing one, or connecting a provider, asks for it
+    // first (DEC-068).
     await prisma.businessProfile.upsert({
         where: { organizationId: org.id },
-        update: { timezone: "Asia/Kolkata" },
+        update: { timezone: "Asia/Kolkata", ...NORTHWIND_ADDRESS },
         create: {
             id: id("profile"),
             organizationId: org.id,
             timezone: "Asia/Kolkata",
+            ...NORTHWIND_ADDRESS,
         },
     });
 

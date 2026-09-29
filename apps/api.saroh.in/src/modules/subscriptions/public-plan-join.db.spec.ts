@@ -32,6 +32,7 @@ import { Test } from "@nestjs/testing";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
 import { validationPipeOptions } from "../../common/validation";
@@ -160,6 +161,7 @@ async function studio(
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "Asia/Kolkata" },
     });
+    await giveBusinessDetails(org.id);
     await prisma.featureFlagOverride.create({
         data: {
             flagKey: "MODULE_PAYMENTS",

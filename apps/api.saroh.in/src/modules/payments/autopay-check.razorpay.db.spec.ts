@@ -33,6 +33,7 @@ import { createHmac } from "node:crypto";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import {
     authCustomer,
     authOrder,
@@ -134,6 +135,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "Asia/Kolkata" },
     });
+    await giveBusinessDetails(org.id);
     for (const key of ["MODULE_PAYMENTS", FlagKey.RAZORPAY_AUTOPAY]) {
         await prisma.featureFlag.upsert({
             where: { key },

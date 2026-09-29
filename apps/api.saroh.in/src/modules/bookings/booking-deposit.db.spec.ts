@@ -22,6 +22,7 @@ jest.mock("../../env", () => ({
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PaymentsService } from "../payments/payments.service";
 import {
@@ -92,6 +93,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "UTC" },
     });
+    await giveBusinessDetails(org.id);
     // Free to cancel until 24 hours before the start.
     await prisma.bookingRules.create({
         data: { organizationId: org.id, freeCancelHours: 24 },

@@ -22,6 +22,7 @@ import { createHmac } from "node:crypto";
 import { UnauthorizedException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "../invoices/invoices.service";
 import { MANDATE_CANCEL_TYPE } from "../payments/mandate-cancel-job";
@@ -68,6 +69,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Lotus Yoga", slug: `d11-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: user.id, role: "OWNER" };
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
@@ -299,6 +301,7 @@ describe("set-up", () => {
         const other = await prisma.organization.create({
             data: { name: "Elsewhere", slug: `d11-other-${tag}` },
         });
+        await giveBusinessDetails(other.id);
         const { subscriptionId } = await member();
         await expect(
             setups.createSetup({

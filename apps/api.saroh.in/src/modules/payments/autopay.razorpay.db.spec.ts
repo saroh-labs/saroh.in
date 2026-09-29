@@ -33,6 +33,7 @@ import { createHmac } from "node:crypto";
 import { ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import {
     authCustomer,
     authOrder,
@@ -148,6 +149,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "Asia/Kolkata" },
     });
+    await giveBusinessDetails(org.id);
     await prisma.featureFlag.upsert({
         where: { key: "MODULE_PAYMENTS" },
         create: { key: "MODULE_PAYMENTS", enabledByDefault: false },

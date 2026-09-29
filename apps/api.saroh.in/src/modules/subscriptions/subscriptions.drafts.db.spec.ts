@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -94,11 +95,13 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Drafts", slug: `d5-drafts-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     asha = await teammate(org.id, "Asha");
     priya = await teammate(org.id, "Priya");
     const other = await prisma.organization.create({
         data: { name: "Other", slug: `d5-other-${process.pid}` },
     });
+    await giveBusinessDetails(other.id);
     elsewhere = await teammate(other.id, "Olu");
 });
 

@@ -249,6 +249,9 @@ module.exports = {
         // (invoice-pdf.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
+        // DEC-068: which business details are missing — pure (the refusals
+        // and the flag after money are in business-details.db.spec.ts).
+        "<rootDir>/src/modules/invoices/business-details.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.

@@ -1,6 +1,16 @@
 // The workspace side of an invoice's pay link (ADR-007, U13): who may make
 // one, when, that only the token's hash is kept, that asking again replaces
 // it, and that voiding revokes it. The database is mocked.
+// The business-details refusal (DEC-068) has its own specs
+// (`business-details.spec.ts`, `business-details.db.spec.ts`); here
+// the business has its address.
+jest.mock("./business-details", () => ({
+    ...jest.requireActual<typeof import("./business-details")>(
+        "./business-details",
+    ),
+    assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {

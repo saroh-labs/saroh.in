@@ -8,6 +8,7 @@
 import { ConflictException } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingsService } from "../bookings/bookings.service";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
@@ -34,6 +35,7 @@ beforeAll(async () => {
     const created = await prisma.organization.create({
         data: { name: "Courses Org", slug: `courses-org-${process.pid}` },
     });
+    await giveBusinessDetails(created.id);
     // Booking history names the person who enrolled someone, so they exist.
     const user = await prisma.user.create({
         data: { email: `courses-${process.pid}@example.com` },

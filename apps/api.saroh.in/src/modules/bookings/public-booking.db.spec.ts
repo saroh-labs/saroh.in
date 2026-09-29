@@ -22,6 +22,7 @@ import { ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ContactAttentionService } from "../customer-workspace/contact-attention.service";
 import { PaymentsService } from "../payments/payments.service";
@@ -86,6 +87,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "UTC" },
     });
+    await giveBusinessDetails(org.id);
     siteId = (
         await prisma.site.create({
             data: {

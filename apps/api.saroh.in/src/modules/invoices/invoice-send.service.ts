@@ -25,6 +25,7 @@ import {
     autopayChargeInProgress,
     chargeUnderWayOn,
 } from "../payments/charge-under-way";
+import { assertBusinessDetails } from "./business-details";
 import { isPastDue } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrl } from "./pay-link-url";
@@ -222,6 +223,8 @@ export class InvoiceSendService {
         authorize(ctx, "invoice:write");
         const organizationId = ctx.organizationId;
         const now = new Date();
+        // It asks to be paid: the business details first (DEC-068).
+        await assertBusinessDetails(prisma, organizationId);
 
         return prisma.$transaction(async (tx) => {
             // The invoice's lock serializes sends, reminders and pay links.

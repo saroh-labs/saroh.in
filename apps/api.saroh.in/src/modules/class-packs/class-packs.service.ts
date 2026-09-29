@@ -16,6 +16,7 @@ import {
     requireBookingPower,
 } from "../bookings/booking-access";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
 import { contactName } from "../invoices/serialize";
@@ -64,6 +65,7 @@ import type { PackKind, PackPaidBy } from "./pack-kind";
 import {
     DEFAULT_PACK_KIND,
     MIN_VALIDITY_DAYS,
+    paidAlready,
     purchasesPayingFor,
     readPackKind,
     refuseKindChange,
@@ -562,6 +564,15 @@ export class ClassPacksService {
         if (!contact) notFound("Contact", "contactId");
         // A draft isn't published yet, an archived pack isn't sold (E14).
         assertPackOnSale(found);
+        // Its invoice still to be paid is refused without the business
+        // details; money the desk has already taken is recorded, and Home
+        // asks for them (DEC-068).
+        if (
+            !paidAlready(dto.paidBy) &&
+            (await paymentsOn(prisma, organizationId))
+        ) {
+            await assertBusinessDetails(prisma, organizationId);
+        }
 
         const id = await prisma.$transaction(async (tx) => {
             // The published terms, held FOR SHARE for the sale: a publish or

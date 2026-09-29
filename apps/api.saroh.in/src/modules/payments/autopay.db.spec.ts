@@ -26,6 +26,7 @@ import { createHmac } from "node:crypto";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -91,6 +92,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "Asia/Kolkata" },
     });
+    await giveBusinessDetails(org.id);
     await prisma.featureFlag.upsert({
         where: { key: "MODULE_PAYMENTS" },
         create: { key: "MODULE_PAYMENTS", enabledByDefault: false },

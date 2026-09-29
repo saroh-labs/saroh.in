@@ -21,6 +21,7 @@ jest.mock("../../env", () => ({
 
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { CommunicationsService } from "../communications/communications.service";
 import { InvoiceSendService } from "../invoices/invoice-send.service";
@@ -80,6 +81,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Rye & Co.", slug: `home-inline-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: "user_1", role: "OWNER" };
     input = { organizationId: org.id, organizationRole: "OWNER" };
     contactId = (

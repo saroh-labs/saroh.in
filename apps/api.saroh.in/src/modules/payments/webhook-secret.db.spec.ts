@@ -27,6 +27,7 @@ import { createHmac } from "node:crypto";
 import { BadRequestException, ValidationPipe } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { validationPipeOptions } from "../../common/validation";
 import { ModuleReadinessRegistry } from "../capabilities/readiness/module-readiness.registry";
@@ -49,6 +50,7 @@ async function business(name: string): Promise<OrganizationContext> {
     const org = await prisma.organization.create({
         data: { name, slug: `whsecret-${name.toLowerCase()}-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     return { organizationId: org.id, userId: "user_1", role: "OWNER" };
 }
 

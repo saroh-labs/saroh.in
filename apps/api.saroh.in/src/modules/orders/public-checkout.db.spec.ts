@@ -33,6 +33,7 @@ import { createHmac } from "node:crypto";
 
 import { isRlsTestMode } from "../../../test/rls-mode";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
 import { validationPipeOptions } from "../../common/validation";
@@ -163,6 +164,7 @@ async function shop(
     const org = await prisma.organization.create({
         data: { name: "Rye & Co.", slug: `g13-${next()}` },
     });
+    await giveBusinessDetails(org.id);
     await prisma.featureFlagOverride.create({
         data: { flagKey: "SITE_SHOP", organizationId: org.id, enabled: true },
     });

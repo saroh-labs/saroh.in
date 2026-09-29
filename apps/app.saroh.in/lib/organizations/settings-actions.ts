@@ -15,6 +15,7 @@ import type {
 } from "./settings-service";
 import {
     getOrganizationSettings,
+    readOrganizationSettings,
     updateBusinessLogo,
     updateOrganizationSettings,
 } from "./settings-service";
@@ -42,6 +43,14 @@ export async function saveOrganizationSettings(
         revalidatePath("/");
     }
     return result;
+}
+
+/**
+ * What "Add your business details" starts from (DEC-068): the settings as
+ * they are, or why they can't be read (a role without them is told so).
+ */
+export async function readBusinessDetails() {
+    return readOrganizationSettings();
 }
 
 /**

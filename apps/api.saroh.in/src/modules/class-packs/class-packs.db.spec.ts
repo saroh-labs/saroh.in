@@ -6,6 +6,7 @@
  */
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingsService } from "../bookings/bookings.service";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -31,6 +32,7 @@ beforeAll(async () => {
     const created = await prisma.organization.create({
         data: { name: "Packs Org", slug: `packs-org-${process.pid}` },
     });
+    await giveBusinessDetails(created.id);
     // Booking history names the person who booked by hand, so they exist.
     const user = await prisma.user.create({
         data: { email: `packs-${process.pid}@example.com` },
@@ -238,6 +240,7 @@ describe("class packs (real database)", () => {
         const off = await prisma.organization.create({
             data: { name: "No payments", slug: `no-payments-${process.pid}` },
         });
+        await giveBusinessDetails(off.id);
         const offCtx: OrganizationContext = {
             organizationId: off.id,
             userId: "u",

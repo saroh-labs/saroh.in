@@ -445,6 +445,26 @@ describe("readyChecklist", () => {
         expect(r.total).toBe(1);
         expect(r.left.map((i) => i.key)).toEqual(["address"]);
     });
+
+    it("keeps the address until its state is in, as the API does before an invoice (DEC-068)", () => {
+        const noState = {
+            ...settled,
+            tax: { ...settled.tax, registered: false },
+            registeredAddress: { ...settled.registeredAddress, state: null },
+        };
+        const left = (country: string | null) =>
+            readyChecklist({
+                settings: {
+                    ...noState,
+                    profile: { ...settled.profile, country },
+                },
+                modules: null,
+            }).left.map((i) => i.key);
+        expect(left("IN")).toEqual(["address"]);
+        expect(left(null)).toEqual(["address"]);
+        // An address abroad has no Indian state to add.
+        expect(left("GB")).toEqual([]);
+    });
 });
 
 describe("takeMoneyPlace", () => {

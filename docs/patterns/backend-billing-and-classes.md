@@ -26,6 +26,62 @@
   `invoice:read`; a subscription or pack view without it still says what is
   owed, not which invoices.
 
+## Business details before money — **Current** (DEC-068, M3)
+
+Every invoice prints the business's registered address, and a
+GST-registered business's GSTIN. **Refuse before money; record and flag
+after it.**
+
+- **The rule is one file**, `invoices/business-details.ts`: missing is the
+  address (first line, city, PIN, and an Indian address's state,
+  `gstState`) and, when `gstRegistered`, the GSTIN (`taxId`). No profile is
+  a missing address.
+- **Before money, a merchant's action is refused** with
+  `assertBusinessDetails`: a 409 `{ reason: "BUSINESS_DETAILS_MISSING",
+missing: ["address", "gstin"] }` in merchant words, before anything is
+  written or numbered. The app reads `missing` off the failure (`toFailure`,
+  `mutate`) and asks for the details in place (`useBusinessDetailsStep`),
+  then runs the action again.
+- **After money, nothing is refused.** Paper written because money moved is
+  written without the details, and Home's Needs you says so
+  (`PAYMENTS_BUSINESS_DETAILS`, `home/home-business-details.ts`: missing
+  details and any numbered paper, to whoever holds `org:update`).
+- **Every path that writes an invoice, and which side it is on:**
+
+    | Path                                                                 | Money                              | Behaviour                            |
+    | -------------------------------------------------------------------- | ---------------------------------- | ------------------------------------ |
+    | Issue a draft (`InvoicesService.issue`)                              | before                             | refused                              |
+    | Send / Remind (`InvoiceSendService`)                                 | before                             | refused                              |
+    | An invoice's pay link, and Retry by pay link (`payLink`)             | before                             | refused                              |
+    | A member's own "Pay now" (`payLinkForCustomer`)                      | before                             | allowed: the customer can't add them |
+    | An order's pay link; New order with a pay link                       | before                             | refused                              |
+    | A booking's pay link (`BookingsService.payLink`)                     | before                             | refused                              |
+    | Subscribe (`SubscriptionsService.subscribe`)                         | before                             | refused                              |
+    | Restart past the paid period by hand (`resume`)                      | before                             | refused                              |
+    | A pack sold at the desk still to be paid (`paidBy` none or NONE)     | before                             | refused                              |
+    | A course enrolment with Payments on                                  | before                             | refused                              |
+    | Connect a payment provider (`connectProvider`)                       | before                             | refused: online money starts here    |
+    | An order paid online (webhook → `ensureOrderInvoice`)                | after                              | recorded, flagged                    |
+    | A payment on a superseded charge (`invoiceSupersededPayment`)        | after                              | recorded, flagged                    |
+    | Renewal, early renewal, a pause ending (the job)                     | after                              | recorded, flagged                    |
+    | A member's own resume; Undo of a skip that invoices the period       | no new sale: the period was agreed | recorded, flagged                    |
+    | Retry by charging the mandate                                        | the invoice is already out         | not checked                          |
+    | A pack paid at the desk (CASH, UPI, CARD, BANK, ONLINE)              | after                              | recorded, flagged                    |
+    | Money taken at the desk for a booking (`booking-desk-pay.ts`)        | after                              | recorded, flagged                    |
+    | New order paid at the counter; an order marked paid by hand          | after                              | recorded, flagged                    |
+    | Booking hold, pack or plan bought online (numbered on the webhook)   | after                              | recorded, flagged                    |
+    | Credit notes and an edit's correction (`correctOrderInvoiceForEdit`) | corrections of paper already out   | never checked                        |
+
+- **A new path that writes an invoice or opens a way to be paid picks a
+  side.** Merchant-initiated and before money: call `assertBusinessDetails`
+  before the transaction (or first in it). Anything a payment, a job or a
+  customer triggers: never call it. The site's checkout and booking page
+  are not re-gated: a business connected before DEC-068 keeps taking
+  online payments, and Home asks for the details.
+- **Tests:** an integration spec's business needs an address before it
+  connects a provider or issues anything: `giveBusinessDetails` in
+  `test/business-details.ts`. The seed gives every business one.
+
 ## Invoices for orders, corrections and GST — **Current** (ADR-008, DEC-023)
 
 - **One invoice per order**, and per paid online booking — idempotent on the

@@ -1,5 +1,6 @@
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
+import { inIndia } from "@/lib/organizations/business-details";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -172,8 +173,14 @@ function payments(modules: readonly ModuleView[]): Check | null {
 
 const filled = (v: string | null | undefined) => !!v?.trim();
 
+/**
+ * The registered address, the API's rule for an invoice (DEC-068): its
+ * first line, city and PIN, and an Indian address its state. Until it is
+ * in, Issue, Send, a pay link and connecting payments ask for it first.
+ */
 function address(
     registered: NonNullable<OrganizationSettings["registeredAddress"]>,
+    country: string | null | undefined,
 ): Check {
     return {
         key: "address",
@@ -186,7 +193,7 @@ function address(
             filled(registered.line1) &&
             filled(registered.city) &&
             filled(registered.postalCode) &&
-            filled(registered.state)
+            (filled(registered.state) || !inIndia(country))
         ),
     };
 }
@@ -358,7 +365,9 @@ export function readyChecklist({
     const checks = [
         modules ? payments(modules) : null,
         // Absent from an API older than the registered address: unknown.
-        settings.registeredAddress ? address(settings.registeredAddress) : null,
+        settings.registeredAddress
+            ? address(settings.registeredAddress, settings.profile?.country)
+            : null,
         tax(settings),
         modules ? catalogue(modules, settings.setup) : null,
         modules ? site(modules, settings.setup) : null,

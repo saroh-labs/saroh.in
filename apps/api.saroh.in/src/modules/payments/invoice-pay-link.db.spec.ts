@@ -22,6 +22,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ContactsService } from "../contacts/contacts.service";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -57,6 +58,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Lotus Yoga", slug: `pay-link-org-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: "user_1", role: "OWNER" };
     contactId = (
         await prisma.contact.create({

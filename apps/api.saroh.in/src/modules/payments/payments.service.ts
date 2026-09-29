@@ -12,6 +12,7 @@ import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
 import type {
@@ -439,6 +440,10 @@ export class PaymentsService {
         // both it and the secret are checked before anything is stored
         // (DEC-054). Throws 400 before any write.
         const publicKey = publicKeyFor({ ...input, provider });
+
+        // Taking money online starts here, and every payment it takes is
+        // invoiced: the business details before the keys are kept (DEC-068).
+        await assertBusinessDetails(prisma, ctx.organizationId);
 
         // Seal { keyId, keySecret, webhookSecret? } as one blob. Plaintext
         // (incl. the webhook secret) is NEVER persisted or logged.

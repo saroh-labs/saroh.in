@@ -19,6 +19,7 @@ jest.mock("../../env", () => ({
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { MergeContactsDto } from "../customer-workspace/merge.dto";
 import { MergeService } from "../customer-workspace/merge.service";
@@ -54,6 +55,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Northwind", slug: `d20-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: user.id, role: "OWNER" };
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",

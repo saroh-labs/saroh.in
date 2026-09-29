@@ -1028,6 +1028,7 @@ in that gap.
 or redirect, never read the page once and assert — assert through a
 web-first expectation or a poll, so a slow runner waits instead of failing.
 **Category**: e2e · `e2e/tests/four-scenes.spec.ts` · `.agents/skills/saroh-browser-tests/SKILL.md`
+
 ## Modules — production showed `ROLLOUT_DISABLED` in Settings › Modules
 
 **Problem**: On a fresh production database every module's rollout flag was
@@ -1076,3 +1077,26 @@ Settings › Team with a 60-character email (no hyphen) and long names, at
 names the innermost boxes past the edge or spilling their text.
 **Category**: e2e · design system · `.agents/skills/saroh-browser-tests/SKILL.md`
 (Traps), `docs/patterns/frontend-design-system.md` (reflow)
+
+## Invoices — a new precondition on connecting a provider failed 46 integration specs (DEC-068)
+
+**Problem**: Refusing an invoice, a pay link or a provider connection until
+the business has its registered address (M3) turned 46 `*.db.spec.ts` files
+red, most of them about bookings, subscriptions and webhooks, not invoices.
+**Root cause**: Nearly every money spec connects a provider in its setup
+through `PaymentsService.connectProvider`, and its test business was made
+with no `BusinessProfile` address. The browser suite had the same shape:
+Northwind, Pulse, Prana, CarePoint, Lumen and Leela & Loom were seeded with
+no address, and every Northwind invoice spec would have been refused.
+**Fix**: `test/business-details.ts` (`giveBusinessDetails`) gives a test
+business an address without touching its GST standing; the specs call it
+after they make the business (and after any `businessProfile.create` of
+their own). Unit specs that mock Prisma stub `assertBusinessDetails`; the
+refusal and the flag after money have their own specs. Every seeded business
+has an address; the GST-registration browser spec clears Northwind's first
+and puts the seeded one back.
+**Rule**: a new check on a path every setup walks (connecting a provider,
+making a storefront) ships with its fixture, and the seed says what the
+check needs. `docs/patterns/backend-billing-and-classes.md` → Business
+details before money.
+**Category**: tests · seed · DEC-068

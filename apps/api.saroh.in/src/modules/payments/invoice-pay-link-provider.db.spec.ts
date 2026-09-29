@@ -18,6 +18,7 @@ jest.mock("../../env", () => ({
 import { ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "../invoices/invoices.service";
 import { encryptSecret } from "./crypto";
@@ -38,6 +39,7 @@ async function business(name: string): Promise<OrganizationContext> {
     const org = await prisma.organization.create({
         data: { name, slug: `inv-link-${name.toLowerCase()}-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     return { organizationId: org.id, userId: "user_1", role: "OWNER" };
 }
 
