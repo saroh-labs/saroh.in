@@ -829,6 +829,18 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - Shop, booking and checkout routes in test mode, with writes refused.
     - Things that don't go through a publish stay live and outside test releases: products, prices, stock, plans and packs (they have their own publish), hours, "Sells from", posts and modules. The test release says so.
 
+## DEC-072 GST shows only when it applies
+
+**Status: Accepted — 2026-09-29** · user · extends [DEC-023](#dec-023-an-invoice-for-every-order-issued-invoices-never-change-and-gst) and D15 · [backend-billing-and-classes.md](../patterns/backend-billing-and-classes.md) GST
+
+- Context: Rye's plan renewal lines are issued with `gstRate` null. D15 already reads null as "not set", not exempt, yet Invoice Detail's paper and the PDF labelled those lines "Nil-rated".
+- Decision:
+    - **A business that isn't GST-registered charges no GST, so no GST appears anywhere** on its invoice, receipt or PDF: no rate, no tax columns, no "Nil-rated".
+    - **A registered business's line with no rate set** (`gstRate` null) shows no GST rate: no "Nil-rated", no "0%".
+    - **Only a line whose rate really is 0%** (a nil-rated or exempt supply, recorded as 0) may be labelled "Nil-rated".
+- Consequences: presentation only. Stored data and totals are unchanged (a null rate is already taxed at nothing and never counts toward a bill of supply). The rule is `lineGstNote`, once in the API for the PDF and once in the app for the paper. The draft editor's hint no longer says a line with no rate is nil-rated.
+- Migration: none.
+
 ## DEC-073 Round-2 design deviations, settled
 
 **Status: Accepted — 2026-09-29** · user ("go with your recommendations for the deviations") · the round-2 check against the designs

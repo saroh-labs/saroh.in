@@ -115,6 +115,18 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   delivery state, else the business's state — same state CGST + SGST, else
   IGST. Registered → tax invoice; unregistered → receipt. A registered
   business's orders ignore the storefront's old add-on tax.
+- **GST shows only when it applies (DEC-072)** — presentation, on the
+  paper, the PDF, the pay page and anything else a customer reads:
+    - An unregistered business charges no GST, so its paper shows none: no
+      rate, no HSN/SAC column, no tax columns, no "Nil-rated".
+    - A registered business's line whose `gstRate` is null is "not set"
+      (D15): no rate, no "0%", no "Nil-rated". It is taxed at nothing and is
+      not a 0% supply, so it never makes a paper a bill of supply.
+    - Only a rate recorded as exactly 0 is labelled "Nil-rated".
+    - One rule, twice: `lineGstNote` in `invoices/invoice-paper-view.ts` (the
+      PDF) and in the app's `lib/invoices/paper-title.ts` (Invoice Detail's
+      paper). Change both together. Stored rates are never rewritten to
+      match.
 - **Numbering:** `InvoiceSequence` per business **and series**; never renumber
   an existing invoice. The financial year is April–March for everyone (GST
   sets it; not a setting), and a number's financial year and month are dated

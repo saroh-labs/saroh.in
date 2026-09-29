@@ -248,6 +248,8 @@ module.exports = {
         // D16: the invoice's paper and its PDF, read back as text — pure
         // (invoice-pdf.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        // DEC-072: a line's GST note on the paper and the PDF — pure.
+        "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
         // DEC-068: which business details are missing — pure (the refusals
         // and the flag after money are in business-details.db.spec.ts).
