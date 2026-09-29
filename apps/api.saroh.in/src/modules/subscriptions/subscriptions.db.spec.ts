@@ -1141,6 +1141,8 @@ describe("retrying a failed charge (review S-5, real database)", () => {
             data: {
                 organizationId: shop.organizationId,
                 provider: "RAZORPAY",
+                // A pay link needs one that opens checkout (B11, D22).
+                publicKey: "rzp_test_Retry1",
                 encryptedCredentials: "x",
                 credentialsIv: "x",
                 credentialsAuthTag: "x",

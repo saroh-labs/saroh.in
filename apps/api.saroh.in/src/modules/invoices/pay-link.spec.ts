@@ -12,7 +12,10 @@ jest.mock("@saroh/database", () => {
         ...actual,
         prisma: {
             invoice: { findFirst: jest.fn(), updateMany: jest.fn() },
-            merchantPaymentProvider: { count: jest.fn() },
+            merchantPaymentProvider: {
+                count: jest.fn(),
+                findFirst: jest.fn(),
+            },
             paymentIntent: { findMany: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
@@ -84,11 +87,20 @@ function row(over: Record<string, unknown> = {}) {
 
 const service = new InvoicesService();
 
+/** A connection that can open the checkout window. */
+const RAZORPAY_READY = {
+    id: "mpp_1",
+    provider: "RAZORPAY",
+    status: "CONNECTED",
+    publicKey: "rzp_test_Public1",
+};
+
 beforeEach(() => {
     jest.clearAllMocks();
     db.invoice.findFirst?.mockResolvedValue(row());
     db.invoice.updateMany?.mockResolvedValue({ count: 1 });
     db.merchantPaymentProvider.count?.mockResolvedValue(1);
+    db.merchantPaymentProvider.findFirst?.mockResolvedValue(RAZORPAY_READY);
     db.paymentIntent.findMany?.mockResolvedValue([]);
 });
 
@@ -139,13 +151,46 @@ describe("making a pay link", () => {
     });
 
     it("refuses when no payment provider is connected", async () => {
-        db.merchantPaymentProvider.count?.mockResolvedValue(0);
-        await expect(
-            service.createPayLink(owner, "inv_1"),
-        ).rejects.toBeInstanceOf(ConflictException);
-        expect(db.merchantPaymentProvider.count).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", status: "CONNECTED" },
+        db.merchantPaymentProvider.findFirst?.mockResolvedValue(null);
+        await expect(service.createPayLink(owner, "inv_1")).rejects.toThrow(
+            new ConflictException(
+                "Connect a payment provider to send a pay link.",
+            ),
+        );
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("looks only for a connection that can open the checkout window (B11, D22)", async () => {
+        await service.createPayLink(owner, "inv_1");
+        expect(db.merchantPaymentProvider.findFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                status: "CONNECTED",
+                OR: [
+                    { provider: { not: "RAZORPAY" } },
+                    {
+                        AND: [
+                            { publicKey: { not: null } },
+                            { publicKey: { not: "" } },
+                        ],
+                    },
+                ],
+            },
+            orderBy: { createdAt: "asc" },
         });
+    });
+
+    it("refuses a Razorpay connection missing its public key id, saying what it needs", async () => {
+        // None can open the window; the one connected is Razorpay, no key.
+        db.merchantPaymentProvider.findFirst
+            ?.mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({
+                ...RAZORPAY_READY,
+                publicKey: null,
+            });
+        await expect(service.createPayLink(owner, "inv_1")).rejects.toThrow(
+            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Providers.",
+        );
         expect(db.invoice.updateMany).not.toHaveBeenCalled();
     });
 
@@ -169,7 +214,7 @@ describe("making a pay link", () => {
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
             merchantPaymentProvider: {
-                count: jest.fn().mockResolvedValue(1),
+                findFirst: jest.fn().mockResolvedValue(RAZORPAY_READY),
             },
             // D13: no autopay charge under way.
             paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
