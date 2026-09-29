@@ -66,6 +66,17 @@ export interface SubscriptionAutopay {
     since: string;
     failure:
         "NOT_APPROVED" | "EXPIRED" | "PROVIDER_REFUSED" | "NO_ANSWER" | null;
+    /**
+     * The ₹1 check the customer's set-up took with nothing owed, and where
+     * its automatic refund is (D12B, DEC-064). Never income. Null or
+     * absent: none was taken.
+     */
+    check?: {
+        amount: string;
+        currency: string;
+        state: "REFUNDING" | "REFUNDED" | "NOT_REFUNDED";
+        refundedAt: string | null;
+    } | null;
 }
 
 export interface Subscription {

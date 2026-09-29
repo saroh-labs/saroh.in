@@ -19,7 +19,11 @@ import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
-import type { AutopayOutcome, AutopayStart } from "./autopay.service";
+import type {
+    AutopayCheck,
+    AutopayOutcome,
+    AutopayStart,
+} from "./autopay.service";
 import { AutopayService } from "./autopay.service";
 import type { CreateIntentResult } from "./payments.service";
 import { PaymentsService } from "./payments.service";
@@ -75,6 +79,12 @@ export interface PayAutopay {
     methods: MandateMethod[];
     /** Autopay is on already: the method and its displayable hint. */
     on: { method: MandateMethod | null; hint: string | null } | null;
+    /**
+     * The check each method takes to authorise when nothing is owed — the
+     * invoice already paid (DEC-064: UPI and card ₹1, refunded). Absent
+     * from an API older than D12B.
+     */
+    checks: Partial<Record<MandateMethod, AutopayCheck>>;
 }
 
 /**
@@ -233,6 +243,7 @@ export class PublicInvoicesService {
             where: { id: found.id, organizationId: found.organizationId },
             select: {
                 source: true,
+                currency: true,
                 subscription: {
                     select: {
                         id: true,
@@ -245,16 +256,19 @@ export class PublicInvoicesService {
         const sub = invoice?.subscription;
         if (invoice?.source !== "SUBSCRIPTION" || !sub) return null;
         if (sub.status === "CANCELLED") return null;
-        const [methods, line] = await Promise.all([
+        const [methods, line, checks] = await Promise.all([
             this.autopay.offer(found.organizationId).catch(() => []),
             this.autopay.line(found.organizationId, sub.id),
+            this.autopay
+                .checks(found.organizationId, invoice.currency)
+                .catch(() => ({})),
         ]);
         const on =
             line?.state === "ON"
                 ? { method: line.method, hint: line.hint }
                 : null;
         if (methods.length === 0 && !on) return null;
-        return { plan: sub.plan.name, methods, on };
+        return { plan: sub.plan.name, methods, on, checks };
     }
 
     /**

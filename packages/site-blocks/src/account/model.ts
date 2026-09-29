@@ -1,4 +1,8 @@
-import type { AutopayMethod, AutopayState } from "../autopay/api";
+import type {
+    AutopayChecks,
+    AutopayMethod,
+    AutopayState,
+} from "../autopay/api";
 
 /**
  * The customer account area's data, as the site's server hands it to the
@@ -157,6 +161,11 @@ export interface AccountPlanTab {
      * absent: autopay isn't offered.
      */
     autopayMethods?: AutopayMethod[];
+    /**
+     * The check each method takes to switch autopay on when nothing is
+     * owed (DEC-064: UPI and card ₹1, refunded); told before they pick.
+     */
+    autopayChecks?: AutopayChecks;
 }
 
 export interface AccountClasses {

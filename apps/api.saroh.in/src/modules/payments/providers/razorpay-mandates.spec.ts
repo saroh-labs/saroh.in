@@ -93,6 +93,14 @@ describe("Razorpay takes autopay, behind its rollout flag", () => {
         ).resolves.toEqual(["UPI", "CARD", "EMANDATE"]);
         expect(fetchMock).not.toHaveBeenCalled();
     });
+
+    it("says UPI and card authorise for at least ₹1, eMandate for 0 (the D12B check)", () => {
+        expect(mandates.authorisationMinimumCents).toEqual({
+            UPI: 100,
+            CARD: 100,
+        });
+        expect(mandates.authorisationMinimumCents?.EMANDATE).toBeUndefined();
+    });
 });
 
 describe("createSetup: in the site's window (CHECKOUT, the default)", () => {
@@ -243,6 +251,8 @@ describe("createSetup: a hosted link (HOSTED_LINK)", () => {
         expect(result).toEqual({
             providerCustomerId: RZP.customerId,
             setupReference: RZP.linkId,
+            // Its payment is made on the link's order (D12B's check).
+            paymentReference: RZP.authOrderId,
             authorisationUrl: "https://rzp.io/i/d11spike",
             clientParams: {
                 razorpayOrderId: RZP.authOrderId,
@@ -415,7 +425,36 @@ describe("get", () => {
             status: "ACTIVE",
             providerMandateId: RZP.tokenId,
             providerCustomerId: RZP.customerId,
+            // The authorisation's own payment: a lost ₹1 check capture is
+            // recovered from it (D12B).
+            setupPayment: {
+                providerPaymentRef: RZP.authPaymentId,
+                captured: true,
+            },
         });
+    });
+
+    it("a captured check whose token isn't made yet: PENDING, with the payment", async () => {
+        fetchMock.mockReturnValueOnce(
+            answer(200, {
+                count: 1,
+                items: [authPayment({ invoice_id: null, token_id: null })],
+            }),
+        );
+        const mandate = await mandates.get({
+            providerMandateId: null,
+            providerCustomerId: RZP.customerId,
+            setupReference: RZP.authOrderId,
+            credentials: CREDS,
+        });
+        expect(mandate).toMatchObject({
+            status: "PENDING",
+            setupPayment: {
+                providerPaymentRef: RZP.authPaymentId,
+                captured: true,
+            },
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it("an in-page set-up nobody has paid yet is PENDING", async () => {
@@ -430,6 +469,7 @@ describe("get", () => {
             status: "PENDING",
             providerMandateId: null,
             providerCustomerId: RZP.customerId,
+            setupPayment: null,
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });

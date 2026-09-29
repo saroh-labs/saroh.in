@@ -30,6 +30,11 @@ import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
 import {
+    AUTHORISATION_PURPOSE,
+    captureCheckInTx,
+    failCheckInTx,
+} from "../payments/authorisation-check";
+import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
@@ -68,8 +73,9 @@ export interface WebhookResult {
 
 /**
  * A row loaded from `paymentIntent` for reconciliation. Exactly one of
- * `orderId` / `invoiceId` is set (a CHECK constraint says so); `invoiceId`
- * may be absent on rows read by code that predates invoice intents.
+ * `orderId` / `invoiceId` is set (a CHECK constraint says so) — or neither,
+ * on an autopay check (`purpose` AUTHORISATION, DEC-064); `invoiceId` may
+ * be absent on rows read by code that predates invoice intents.
  */
 interface IntentRow {
     id: string;
@@ -77,6 +83,7 @@ interface IntentRow {
     provider: string;
     orderId: string | null;
     invoiceId?: string | null;
+    purpose?: string | null;
     providerIntentId?: string | null;
     status: string;
     amountCents: number;
@@ -388,6 +395,30 @@ export class WebhooksService {
         intent: IntentRow,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        // The ₹1 autopay check (D12B, DEC-064): no order, no invoice, never
+        // a sale. Its capture reserves its refund and the job that sends
+        // it; the refund's own events settle that row, and nothing else.
+        if (intent.purpose === AUTHORISATION_PURPOSE) {
+            switch (event.outcome) {
+                case "SUCCEEDED":
+                    return captureCheckInTx(
+                        tx,
+                        intent,
+                        event.providerPaymentRef,
+                    );
+                case "FAILED":
+                    return failCheckInTx(tx, intent);
+                case "REFUNDED": {
+                    const settled = await this.settleRefund(tx, intent, event);
+                    return { applied: settled.applied };
+                }
+                case "REFUND_FAILED":
+                    return this.failProviderRefund(tx, intent, event);
+                default:
+                    return { applied: false };
+            }
+        }
+
         // An invoice's pay link (U13): the same outcomes, applied to the
         // invoice instead of an order.
         if (intent.invoiceId) {
@@ -1041,11 +1072,14 @@ export class WebhooksService {
             });
             id = byProvider?.id ?? null;
         }
+        // An autopay check (DEC-064) is on no order or invoice: its own.
         const parent = intent.orderId
             ? { orderId: intent.orderId }
             : intent.invoiceId
               ? { invoiceId: intent.invoiceId }
-              : null;
+              : intent.purpose === AUTHORISATION_PURPOSE
+                ? { id: intent.id }
+                : null;
         if (!id && event.refundReference && parent) {
             const byReference = await tx.paymentRefund.findFirst({
                 where: {

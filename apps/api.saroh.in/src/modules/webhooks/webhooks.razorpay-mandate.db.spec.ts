@@ -258,7 +258,12 @@ describe("the gate (waves plan boundary 6)", () => {
 
     it("on: UPI, card and eMandate are offered", async () => {
         expect(await setups.mandateMethods(owner.organizationId)).toEqual([
-            { provider: "RAZORPAY", methods: ["UPI", "CARD", "EMANDATE"] },
+            {
+                provider: "RAZORPAY",
+                methods: ["UPI", "CARD", "EMANDATE"],
+                // With nothing owed, UPI and card take the ₹1 check (D12B).
+                checkCents: { UPI: 100, CARD: 100 },
+            },
         ]);
     });
 });

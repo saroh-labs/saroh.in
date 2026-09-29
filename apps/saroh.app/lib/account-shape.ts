@@ -20,7 +20,11 @@ import type {
     AccountTrackStep,
     AccountView,
 } from "@saroh/site-blocks";
-import { autopayMethodsOf, autopayStateOf } from "@saroh/site-blocks";
+import {
+    autopayChecksOf,
+    autopayMethodsOf,
+    autopayStateOf,
+} from "@saroh/site-blocks";
 
 /**
  * The account area's answers, checked before a page sees them (round-2 plan
@@ -351,6 +355,9 @@ export function planTabResult(v: unknown): AccountPlanTab | null {
         pauseWeeks: v.pauseWeeks,
         // Autopay (D12): the provider's own list; none from an older API.
         autopayMethods: autopayMethodsOf(v.autopayMethods),
+        // The ₹1 check each takes with nothing owed (D12B); none from an
+        // older API.
+        autopayChecks: autopayChecksOf(v.autopayChecks),
     };
 }
 

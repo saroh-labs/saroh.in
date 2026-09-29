@@ -4232,7 +4232,8 @@ model MerchantPaymentProvider {
 
 // PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order
 // or, through its pay link, an Invoice (ADR-007, U13). Exactly one of
-// `orderId` / `invoiceId` is set: the migration adds a CHECK constraint
+// `orderId` / `invoiceId` is set — or neither, on an autopay check
+// (`purpose` AUTHORISATION, DEC-064): the migrations add a CHECK constraint
 // ("PaymentIntent_one_target") that Prisma cannot express here.
 model PaymentIntent {
   id             String       @id @default(cuid())
@@ -4276,10 +4277,19 @@ model PaymentIntent {
   // has passed. `preDebitStatus`: PENDING | DELIVERED | FAILED | NOT_NEEDED;
   // null on every other intent. `preDebitRef` is the provider's notice id.
   viaMandateId   String?
-  viaMandate     PaymentMandate? @relation(fields: [viaMandateId], references: [id], onDelete: SetNull)
+  viaMandate     PaymentMandate? @relation("MandateCharges", fields: [viaMandateId], references: [id], onDelete: SetNull)
   debitAfter     DateTime?
   preDebitStatus String?
   preDebitRef    String?
+
+  // Why the money was taken. Null: a sale (an order's or an invoice's
+  // payment). AUTHORISATION: the ₹1 check a provider takes to authorise
+  // autopay when nothing is owed (DEC-064, D12B) — not revenue, on no order
+  // or invoice, refunded automatically; `checkForMandateId` is the set-up
+  // it authorised (one check per set-up).
+  purpose           String?
+  checkForMandateId String?         @unique
+  checkForMandate   PaymentMandate? @relation("MandateAuthorisationCheck", fields: [checkForMandateId], references: [id], onDelete: SetNull)
 
   @@unique([orderId, idempotencyKey])
   @@unique([invoiceId, idempotencyKey])
@@ -5960,12 +5970,14 @@ model PaymentMandate {
   // The provider's reason code for a FAILED set-up, sanitised; never shown raw.
   failureReason  String?
   // Charges taken through it (D13).
-  intents        PaymentIntent[]
+  intents        PaymentIntent[] @relation("MandateCharges")
   // Where the customer set it up (D12): PAY_LINK | PRICES | ACCOUNT, and
   // the site account that did, so the log can say "Autopay set up by
   // ‹name›, from the Prices page". Null on a mandate set up by staff.
   setupSource    String?
   setupAccountId String?
+  // The ₹1 check taken to authorise it when nothing was owed (DEC-064).
+  authorisationChecks PaymentIntent[] @relation("MandateAuthorisationCheck")
 
   // A subscription has at most one ACTIVE mandate.
   @@unique([subscriptionId], map: "PaymentMandate_one_active_per_subscription", where: raw("status = 'ACTIVE'"))

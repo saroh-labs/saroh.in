@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
-import { autopayStateLine } from "../autopay/words";
+import { autopayCheckLine, autopayStateLine } from "../autopay/words";
 import { AutopaySheet } from "./autopay-sheet";
 import { BuyPackSheet } from "./buy-pack-sheet";
 import { CancelSheet } from "./cancel-sheet";
@@ -278,6 +278,7 @@ export function PlanTab({
                 <AutopaySheet
                     plan={open?.kind === "autopay" ? open.plan : null}
                     methods={autopayMethods}
+                    checks={tab.autopayChecks}
                     onClose={() => setOpen(null)}
                     start={api.startAutopay}
                     businessName={account.businessName}
@@ -341,6 +342,10 @@ function PlanCard({
         : planLine(plan);
     const classes = planClassesLine(plan);
     const autopay = autopayStateLine(plan.autopay);
+    // The ₹1 check its set-up took, and where its refund is (DEC-064).
+    const check = plan.autopay?.check
+        ? autopayCheckLine(plan.autopay.check)
+        : null;
     const autopayOn =
         plan.autopay?.state === "ON" || plan.autopay?.state === "PAUSED";
     // A set-up still being confirmed isn't started again from here.
@@ -415,6 +420,9 @@ function PlanCard({
                         ) : null}
                         {autopay ? (
                             <span className="mt-0.5 block">{autopay}</span>
+                        ) : null}
+                        {check ? (
+                            <span className="mt-0.5 block">{check}</span>
                         ) : null}
                     </>
                 }

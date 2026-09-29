@@ -12,7 +12,13 @@ import type { OpenCheckout } from "../booking-flow/checkout";
 import type { JoinApi, PlanJoinStarted } from "../prices/api";
 import { JoinSheet } from "../prices/join-sheet";
 import type { AutopayMethod, AutopayOutcome, AutopayStart } from "./api";
-import { autopayMethodsOf, autopayOutcomeOf, autopayStartOf } from "./api";
+import {
+    autopayCheckStateOf,
+    autopayChecksOf,
+    autopayMethodsOf,
+    autopayOutcomeOf,
+    autopayStartOf,
+} from "./api";
 import type { AutopayDoneState } from "./done";
 import { AutopayDone, DONE_POLL_MS } from "./done";
 import { autopayMethodLabel } from "./words";
@@ -93,6 +99,7 @@ const START: AutopayStart = {
     ref: "m_1",
     method: "UPI",
     mode: "PAY_AND_AUTHORISE",
+    check: null,
     limit: "3800.00",
     currency: "INR",
     handoff: HANDOFF,
@@ -366,14 +373,20 @@ const SUB: AccountSubscription = {
 function tabOf(
     sub: AccountSubscription,
     methods: AutopayMethod[] = METHODS,
+    checks: AccountPlanTab["autopayChecks"] = {},
 ): AccountPlanTab {
     return {
         subscriptions: { ok: true, value: [sub] },
         packs: { ok: true, value: [] },
         pauseWeeks: [],
         autopayMethods: methods,
+        autopayChecks: checks,
     };
 }
+
+const RUPEE = { amount: "1.00", currency: "INR" };
+const CHECK_BEFORE =
+    "To switch on autopay, your bank needs a ₹1 check. We refund the ₹1 straight away — it's back in your account in 5–7 working days.";
 
 function planApi(start?: PlanApi["startAutopay"]): PlanApi {
     return {
@@ -477,11 +490,184 @@ describe("My plan's autopay (D12)", () => {
     });
 });
 
+describe("the ₹1 check (D12B, DEC-064)", () => {
+    it("nothing owed: says the ₹1 check before they pay by UPI or card, never for eMandate", async () => {
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf(SUB, METHODS, { UPI: RUPEE, CARD: RUPEE })}
+                api={planApi(vi.fn())}
+            />,
+        );
+        await press(screen.getByRole("button", { name: "Set up autopay" }));
+        const sheet = screen.getByRole("dialog", { name: "Set up autopay" });
+        expect(within(sheet).getByText(CHECK_BEFORE)).toBeInTheDocument();
+
+        await press(
+            within(sheet).getByRole("radio", {
+                name: (n: string) => n.startsWith(autopayMethodLabel("CARD")),
+            }),
+        );
+        expect(within(sheet).getByText(CHECK_BEFORE)).toBeInTheDocument();
+
+        await press(
+            within(sheet).getByRole("radio", {
+                name: (n: string) =>
+                    n.startsWith(autopayMethodLabel("EMANDATE")),
+            }),
+        );
+        expect(within(sheet).queryByText(CHECK_BEFORE)).toBeNull();
+    });
+
+    it("something owed: that payment authorises, so no check is spoken of", async () => {
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf(
+                    {
+                        ...SUB,
+                        autopayPays: { total: "2500.00", currency: "INR" },
+                    },
+                    METHODS,
+                    { UPI: RUPEE, CARD: RUPEE },
+                )}
+                api={planApi(vi.fn())}
+            />,
+        );
+        await press(screen.getByRole("button", { name: "Set up autopay" }));
+        expect(screen.queryByText(CHECK_BEFORE)).toBeNull();
+    });
+
+    it.each([
+        ["REFUNDING", "Autopay check · ₹1 · Refund on its way"],
+        ["REFUNDED", "Autopay check · ₹1 · Refunded"],
+        ["NOT_REFUNDED", "Autopay check · ₹1 · Not refunded yet"],
+    ] as const)("My plan shows a %s check as “%s”", (state, line) => {
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf({
+                    ...SUB,
+                    autopay: {
+                        state: "ON",
+                        method: "UPI",
+                        hint: "mo•••@okicici",
+                        check: {
+                            ...RUPEE,
+                            state,
+                            refundedAt:
+                                state === "REFUNDED"
+                                    ? "2026-10-02T06:00:00.000Z"
+                                    : null,
+                        },
+                    },
+                })}
+                api={planApi(vi.fn())}
+            />,
+        );
+        expect(screen.getByText(line)).toBeInTheDocument();
+    });
+
+    it("the page after: autopay on, the check being refunded, then refunded on its day", () => {
+        renderDone({
+            kind: "outcome",
+            outcome: {
+                ...OUTCOME,
+                autopay: {
+                    ...OUTCOME.autopay,
+                    state: "ON",
+                    method: "UPI",
+                    hint: "mo•••@okicici",
+                    check: { ...RUPEE, state: "REFUNDING", refundedAt: null },
+                },
+            },
+        });
+        expect(
+            screen.getByText(
+                "Autopay is on with UPI (mo•••@okicici). The ₹1 check is being refunded — it reaches you in 5–7 working days. Next payment ₹2,500 on 2 Nov 2026.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("the page after, once refund.processed: the day it was refunded", () => {
+        renderDone({
+            kind: "outcome",
+            outcome: {
+                ...OUTCOME,
+                autopay: {
+                    state: "ON",
+                    method: "UPI",
+                    hint: "mo•••@okicici",
+                    check: {
+                        ...RUPEE,
+                        state: "REFUNDED",
+                        refundedAt: "2026-10-02T06:00:00.000Z",
+                    },
+                },
+            },
+        });
+        expect(
+            screen.getByText(
+                "Autopay is on with UPI (mo•••@okicici). The ₹1 check was refunded on 2 Oct 2026. Next payment ₹2,500 on 2 Nov 2026.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("the page after a set-up that failed still says the check comes back", () => {
+        renderDone({
+            kind: "outcome",
+            outcome: {
+                ...OUTCOME,
+                autopay: {
+                    state: "FAILED",
+                    method: "UPI",
+                    hint: null,
+                    check: { ...RUPEE, state: "REFUNDING", refundedAt: null },
+                },
+            },
+        });
+        expect(
+            screen.getByText(/The ₹1 check is being refunded/),
+        ).toBeInTheDocument();
+    });
+
+    it("reads checks and a check's state, leaving anything strange out", () => {
+        expect(
+            autopayChecksOf({
+                UPI: RUPEE,
+                CARD: { amount: 1 },
+                NACH: RUPEE,
+            }),
+        ).toEqual({ UPI: RUPEE });
+        expect(autopayChecksOf(null)).toEqual({});
+        expect(
+            autopayCheckStateOf({
+                ...RUPEE,
+                state: "REFUNDED",
+                refundedAt: "2026-10-02T06:00:00.000Z",
+            }),
+        ).toEqual({
+            ...RUPEE,
+            state: "REFUNDED",
+            refundedAt: "2026-10-02T06:00:00.000Z",
+        });
+        expect(autopayCheckStateOf({ ...RUPEE, state: "LOST" })).toBeNull();
+        expect(autopayStartOf({ ...START, check: RUPEE })?.check).toEqual(
+            RUPEE,
+        );
+    });
+});
+
 // ---- The page after ---------------------------------------------------------
 
 const OUTCOME: AutopayOutcome = {
     plan: "Monthly unlimited",
-    autopay: { state: "ON", method: "UPI", hint: "mo•••@okicici" },
+    autopay: {
+        state: "ON",
+        method: "UPI",
+        hint: "mo•••@okicici",
+        check: null,
+    },
     paid: true,
     nextPaymentAt: "2026-11-01T18:30:00.000Z",
     nextAmount: "2500.00",

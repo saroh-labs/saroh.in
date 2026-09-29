@@ -174,6 +174,21 @@ export interface AccountAutopay {
     state: "ON" | "PAUSED" | "PENDING" | "FAILED";
     method: "UPI" | "CARD" | "EMANDATE" | null;
     hint: string | null;
+    /**
+     * The ₹1 check its set-up took, and whether it is back with them
+     * ("Autopay check · ₹1 · Refunded", DEC-064). Null: none was taken.
+     * Absent from an API older than D12B.
+     */
+    check?: AccountAutopayCheck | null;
+}
+
+/** The ₹1 autopay check as the member sees it (DEC-064). */
+export interface AccountAutopayCheck {
+    /** "1.00" */
+    amount: string;
+    currency: string;
+    state: "REFUNDING" | "REFUNDED" | "NOT_REFUNDED";
+    refundedAt: string | null;
 }
 
 export interface AccountPack {
@@ -196,6 +211,17 @@ export interface AccountPlanTab {
      * it offers; empty when it takes none, and then autopay isn't offered.
      */
     autopayMethods?: ("UPI" | "CARD" | "EMANDATE")[];
+    /**
+     * The check each method takes to switch autopay on when nothing is
+     * owed (DEC-064: UPI and card ₹1, refunded straight away), told before
+     * they pick. Absent from an API older than D12B.
+     */
+    autopayChecks?: Partial<
+        Record<
+            "UPI" | "CARD" | "EMANDATE",
+            { amount: string; currency: string }
+        >
+    >;
 }
 
 /** What a pause, resume or cancel answers: what happened, and the tab now. */

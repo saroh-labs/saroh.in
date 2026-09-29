@@ -2,6 +2,7 @@
 
 import type { AutopayMethod, AutopayStart } from "@saroh/site-blocks";
 import {
+    autopayCheckBefore,
     AutopayMethodChoice,
     autopayWith,
     ctaClasses,
@@ -26,7 +27,8 @@ import type { PayAutopay } from "@/lib/invoice-pay-shape";
  * the invoice is paid first, then autopay is authorised (nothing taken). Once
  * approved, the customer lands on the page on the business's own site that
  * says how autopay stands, never on Saroh's or the provider's. An invoice
- * already paid offers "Turn on autopay" alone.
+ * already paid offers "Turn on autopay" alone; by UPI or card that takes a
+ * ₹1 check, refunded straight away, and says so first (D12B, DEC-064).
  *
  * Styled in the business's `--site-*` tokens, never Saroh's brand.
  */
@@ -144,6 +146,8 @@ export function InvoiceAutopay({
     }
 
     const off = busy || method === null;
+    // Nothing owed: UPI and card take the ₹1 check, refunded (DEC-064).
+    const check = !payable && method ? (autopay.checks[method] ?? null) : null;
     const cta = busy
         ? "Opening…"
         : !payable
@@ -185,6 +189,11 @@ export function InvoiceAutopay({
                     chosen={method}
                     onPick={setMethod}
                 />
+            ) : null}
+            {check ? (
+                <p className="text-sm text-site-body">
+                    {autopayCheckBefore(check)}
+                </p>
             ) : null}
             {said ? (
                 <p role="status" className="text-sm text-site-body">
