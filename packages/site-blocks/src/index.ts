@@ -52,8 +52,8 @@ export {
     default as PacksSection,
     packEyebrow,
     packPerClass,
-    packsOf,
 } from "./blocks/packs";
+// Called by saroh.app's server: from a module with no "use client".
 export type { PacksFeed, PublicPack } from "./blocks/packs";
 export {
     PLANS_BUTTON,
@@ -62,23 +62,23 @@ export {
     joinHref,
     planEvery,
     planPrice,
-    plansAutopayMethods,
-    plansOf,
-    plansPayOnline,
 } from "./blocks/plans";
+export { packsOf } from "./prices/pack-words";
+// Called by saroh.app's server: from a module with no "use client".
 export type { PlansFeed, PublicPlan } from "./blocks/plans";
 export {
     PRODUCT_GRID_TITLE,
     default as ProductGridSection,
-    productCardsOf,
-    productGridQuery,
 } from "./blocks/product-grid";
+export { plansAutopayMethods, plansOf, plansPayOnline } from "./lib/plans-read";
+// Called by saroh.app's server: from a module with no "use client".
 export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
 export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
+export { productCardsOf, productGridQuery } from "./lib/product-grid-read";
 // Server-safe (not in the "use client" block): saroh.app reads it for the
 // booking page's header on the server (E6).
 export { isPublicVisit } from "./lib/public-visit";
