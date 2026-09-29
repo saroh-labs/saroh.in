@@ -59,6 +59,7 @@ import {
 } from "./order-pricing";
 import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
+import { assertNotPayingOnlineInTx } from "./payment-in-flight";
 import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
 
 const CUSTOMER_SELECT = {
@@ -543,6 +544,11 @@ export class OrdersService {
                     order.paymentStatus as PaymentStatus,
                     nextPayment,
                 );
+                // Not while the customer is paying it online (#622): the
+                // payment landing next would bill the order a second time.
+                if (nextPayment === "PAID") {
+                    await assertNotPayingOnlineInTx(tx, orderId);
+                }
             }
 
             // The kitchen stage follows a status set here, so the next
