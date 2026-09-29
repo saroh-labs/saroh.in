@@ -3,7 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import type { SkuPreview, SkuSettings } from "@/lib/products/settings";
 import {
@@ -13,6 +13,7 @@ import {
 import { patternProblem } from "@/lib/products/sku-pattern";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { primaryBtn, smallBtn, TabIntro, useUnsaved } from "./product-settings";
 
 const TOKENS = [
@@ -51,6 +52,8 @@ export function SkuTab({
     const [pending, start] = useTransition();
 
     const dirty = pattern !== saved.pattern || suggest !== saved.suggest;
+    const saveBar = useRef<HTMLDivElement>(null);
+    useBottomBarInset(saveBar, dirty && canWrite);
     const own = patternProblem(pattern);
     // The server's check includes clashes; its answer is for the pattern
     // it was asked about, so a stale one is not shown.
@@ -239,7 +242,10 @@ export function SkuTab({
             </p>
 
             {dirty && canWrite ? (
-                <div className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5">
+                <div
+                    ref={saveBar}
+                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5"
+                >
                     <span
                         role="status"
                         className={cn(
