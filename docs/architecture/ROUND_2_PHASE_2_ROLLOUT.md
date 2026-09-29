@@ -1057,6 +1057,70 @@ invoice timeline shows one capture).
 Deploy the previous API and app. Nothing to undo: the column and indexes
 stay, unread. A payment the new API settled stays settled.
 
+## Z2a: notes are text only (batch 2026-09-29; before Z2)
+
+Nothing reads or writes `ContactNoteAllergen` any more; the table stays
+until Z2, two deploys after this one. Allergies live on Needs attention
+(C1). No migration.
+
+- **API.** A note saves its text only and needs some ("Write a note.").
+  `allergenIds` is still accepted from an app from before Z2a: the note
+  never keeps them, and each one on the business's list goes on the
+  person's Needs attention (as C1 did), so an allergy picked there is not
+  lost. The note view still sends `allergens` / `matchAllergens`, always
+  empty, and leaves out old notes with no text (they held only allergens).
+  Customer Detail's `allergens` now lists Needs attention's Allergy
+  entries. Removing an allergen is refused only while a Needs attention
+  entry names it; old note rows naming it are cleared in the same
+  transaction (the table's foreign key is NoAction). The #529 catalogue
+  backfill clears, rather than moves, old note rows naming an allergen it
+  merges away.
+- **App.** The Notes tab has no allergen picker or chips. Order Detail's
+  fallback for an order read from before B15 reads the contact's Needs
+  attention, not the notes; the unchecked banner now says "Couldn't check
+  ‹first›'s allergies".
+- **Database package.** The C1 backfill (`contact-attention.ts` and its
+  CLI) is removed; the seed and the showcase write no note allergens, and
+  the showcase check counts today's allergy orders from Needs attention.
+
+### Before deploying
+
+The C1 backfill ran with the phase-1 release (`ROUND_2_PHASE_1_ROLLOUT.md`).
+Confirm no note allergen is missing from Needs attention (any state):
+
+```sql
+SELECT count(*) FROM "ContactNoteAllergen" na
+JOIN "ContactNote" n ON n.id = na."noteId"
+JOIN "StoreAllergen" a ON a.id = na."allergenId"
+WHERE NOT EXISTS (
+  SELECT 1 FROM "ContactAttention" e
+  LEFT JOIN "StoreAllergen" ea ON ea.id = e."allergenId"
+  WHERE e."contactId" = n."contactId" AND e.kind = 'ALLERGY'
+    AND lower(trim(coalesce(ea.name, e.label))) = lower(trim(a.name))
+);  -- 0
+```
+
+If it is not 0, run the C1 backfill from a checkout of a commit before Z2a
+(`src/backfill/contact-attention.cli.ts`), then check again.
+
+### Deploy
+
+API first, then the workspace. The previous app keeps working on this API:
+its picker's allergens go on Needs attention, and its chips are empty.
+
+### Rollback
+
+Rolling the API back is safe: the old API reads note allergens, and notes
+written since have none (their allergens are on Needs attention, which it
+also reads). Rolling the app back is safe while this API serves.
+
+### Z2 (two deploys later)
+
+Drop the table and model, the `ContactNoteDto.allergenIds` field, the
+empty `allergens` / `matchAllergens` on the note view, and the two
+`contactNoteAllergen.deleteMany` calls (`allergens.service.ts`,
+`backfill/catalogue-settings.ts`).
+
 ## Before switching a flag on (advisory)
 
 These browser suites are skipped in CI while their features are off. Run
