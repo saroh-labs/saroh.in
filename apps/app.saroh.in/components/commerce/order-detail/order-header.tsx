@@ -101,7 +101,7 @@ export function OrderHeading({
                     </span>
                 </div>
             </div>
-            <div className="flex flex-none flex-wrap items-center gap-2 print:hidden">
+            <div className="flex max-w-full flex-none flex-wrap items-center gap-2 print:hidden">
                 {children}
             </div>
         </div>

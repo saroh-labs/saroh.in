@@ -98,20 +98,23 @@ export function IdentityLinkDialog({
                                 style={
                                     { "--wk-i": index } as React.CSSProperties
                                 }
-                                className="wk-item flex items-center justify-between gap-4 p-3"
+                                className="wk-item flex items-center justify-between gap-3 p-3"
                             >
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium">
+                                {/* The name and address wrap, whole, so a
+                                    long email never pushes Link off a
+                                    phone's screen. */}
+                                <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                                    <p className="text-sm font-medium">
                                         {s.name}
                                     </p>
-                                    <p className="truncate text-xs text-muted-foreground">
+                                    <p className="text-xs text-muted-foreground">
                                         {s.email} · matched on{" "}
                                         {s.matchedOn.join(" + ")}
                                     </p>
                                 </div>
                                 <Button
                                     size="sm"
-                                    className="wk-press"
+                                    className="wk-press shrink-0"
                                     disabled={pending}
                                     onClick={() => confirm(s.customerId)}
                                 >
@@ -133,15 +136,15 @@ export function IdentityLinkDialog({
                             {duplicates.map((dup) => (
                                 <li
                                     key={dup.contactId}
-                                    className="flex items-center justify-between gap-4 p-3"
+                                    className="flex items-center justify-between gap-3 p-3"
                                 >
-                                    <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium">
+                                    <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                                        <p className="text-sm font-medium">
                                             {dup.name ??
                                                 dup.email ??
                                                 "Another record"}
                                         </p>
-                                        <p className="truncate text-xs text-muted-foreground">
+                                        <p className="text-xs text-muted-foreground">
                                             {dup.email ? `${dup.email} · ` : ""}
                                             matched on{" "}
                                             {dup.matchedOn.join(" + ")}
@@ -151,6 +154,7 @@ export function IdentityLinkDialog({
                                         <Button
                                             size="sm"
                                             variant="outline"
+                                            className="shrink-0"
                                             disabled={pending}
                                             onClick={() => {
                                                 setOpen(false);

@@ -137,6 +137,14 @@
 - **Adopted** — **Reflow at 320px and 390px** with no hidden operation and no
   page-level horizontal scroll; wide content scrolls inside its own container
   (14, 18, 04 §4). Put `min-w-0` on grid and flex columns holding text.
+- **Current** — **A long value wraps whole; its buttons never move**
+  (2026-09-29, P2). An email or a name a merchant typed wraps with
+  `[overflow-wrap:anywhere]` rather than `truncate` where it is the thing
+  being confirmed, and the button beside it is `shrink-0`. `DialogContent`
+  and `AlertDialogContent` hold one `minmax(0,1fr)` column, break long words
+  and scroll inside past the screen's height, so no value can push a
+  dialog's actions off a phone. `e2e/tests/phone-reflow.spec.ts` checks the
+  dialogs and sheets at 320 and 390 with a 60-character email.
 - **Adopted** — **No hover-only affordance, ever** (PRODUCT_STRATEGY §19): the
   phone and the shop floor have no hover.
 - **Current** — **The focus ring is Ink 900 with a Paper offset** (Saffron 400
