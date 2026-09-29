@@ -642,6 +642,19 @@ test.describe("orders quick view and row menu (B5)", () => {
         await expect(
             panel.getByRole("link", { name: /Open full page/ }),
         ).toBeVisible();
+        // As the design draws it (DEC-073): Close is a plain X, and a
+        // customer with a record is a Saffron link to it.
+        const close = panel.getByRole("button", { name: "Close quick view" });
+        await expect(close).toBeVisible();
+        await expect(close).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+        const customer = panel
+            .getByRole("definition")
+            .getByRole("link")
+            .first();
+        if (await customer.count()) {
+            await expect(customer).toHaveAttribute("href", /\/customers\//);
+            await expect(customer).toHaveClass(/text-brand/);
+        }
 
         await page.keyboard.press("Escape");
         await expect(panel).toHaveCount(0);
