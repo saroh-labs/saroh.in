@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { OrderRow } from "@/lib/orders/business-service";
 import {
     ageWords,
+    nextVisitWords,
     rowAge,
     rowCustomer,
     rowInitials,
@@ -159,10 +160,78 @@ describe("rowAge", () => {
         expect(rowAge(row({ standing: "CANCELLED" }))).toBeNull();
     });
 
-    it("leaves an appointment to its visits", () => {
+    it("leaves an appointment to its visits: nothing from an API that doesn't say", () => {
         expect(
             rowAge(row({ fulfilmentType: "APPOINTMENT_IN_PERSON" })),
         ).toBeNull();
+    });
+
+    describe("a treatment's next visit (B14, DEC-067)", () => {
+        // 18 Sep, 16:10 in Bengaluru.
+        const now = new Date("2026-09-18T10:40:00Z");
+        const treatment = (nextVisit: OrderRow["nextVisit"]) =>
+            row({
+                fulfilmentType: "APPOINTMENT_IN_PERSON",
+                steps: [
+                    { stage: "NEW", label: "Booked" },
+                    { stage: "DELIVERED", label: "Attended" },
+                ],
+                nextVisit,
+            });
+
+        it("says the day and time of the next booked visit, in the clinic's zone", () => {
+            expect(
+                rowAge(
+                    treatment({
+                        startAt: "2026-09-19T04:30:00Z",
+                        timezone: "Asia/Kolkata",
+                    }),
+                    now,
+                ),
+            ).toEqual({ text: "Next 19 Sep, 10:00", late: false });
+        });
+
+        it("writes today in a sentence's case", () => {
+            expect(
+                rowAge(
+                    treatment({
+                        startAt: "2026-09-18T12:30:00Z",
+                        timezone: "Asia/Kolkata",
+                    }),
+                    now,
+                )?.text,
+            ).toBe("Next today, 18:00");
+        });
+
+        it("says when no visit is booked", () => {
+            expect(rowAge(treatment(null), now)?.text).toBe(
+                "Next visit not booked",
+            );
+        });
+
+        it("is never late, and says nothing once it's attended, refunded or cancelled", () => {
+            const t = {
+                ...treatment(null),
+                late: true,
+                ageMinutes: 9_000,
+            };
+            expect(rowAge(t, now)?.late).toBe(false);
+            expect(rowAge({ ...t, standing: "FULFILLED" }, now)).toBeNull();
+            expect(rowAge({ ...t, standing: "REFUNDED" }, now)).toBeNull();
+            expect(rowAge({ ...t, standing: "CANCELLED" }, now)).toBeNull();
+        });
+
+        it("nextVisitWords says yesterday too, for a visit not marked yet", () => {
+            expect(
+                nextVisitWords(
+                    {
+                        startAt: "2026-09-17T04:30:00Z",
+                        timezone: "Asia/Kolkata",
+                    },
+                    now,
+                ),
+            ).toBe("Next yesterday, 10:00");
+        });
     });
 
     it("never says late from an API before B2b", () => {

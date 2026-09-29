@@ -1,5 +1,5 @@
-import type { RawOrderVisits } from "./order-visits";
-import { orderVisitsOf, visitActorIds } from "./order-visits";
+import type { NextVisitBooking, RawOrderVisits } from "./order-visits";
+import { nextVisitOf, orderVisitsOf, visitActorIds } from "./order-visits";
 
 /*
  * B14's Visits card read, pure: each visit's state, who marked it, and what
@@ -196,5 +196,49 @@ describe("orderVisitsOf (B14)", () => {
                 ]),
             ),
         ).toEqual(["u_1", "u_2"]);
+    });
+});
+
+describe("nextVisitOf — the Orders row's Next (B14, DEC-067)", () => {
+    const b = (
+        n: number,
+        iso: string,
+        outcome: string | null = null,
+    ): NextVisitBooking => ({
+        orderId: "o1",
+        visitNumber: n,
+        startAt: at(iso),
+        outcome,
+        service: { timezone: "Asia/Kolkata" },
+    });
+
+    it("is the first visit by number still waiting", () => {
+        expect(
+            nextVisitOf([
+                b(1, "2026-09-10T10:00:00Z", "ATTENDED"),
+                b(2, "2026-09-19T10:00:00Z"),
+                b(3, "2026-09-26T10:00:00Z"),
+            ]),
+        ).toEqual({
+            startAt: at("2026-09-19T10:00:00Z"),
+            timezone: "Asia/Kolkata",
+        });
+    });
+
+    it("skips a missed visit, and counts a visit's first booking only", () => {
+        expect(
+            nextVisitOf([
+                b(1, "2026-09-10T10:00:00Z", "NO_SHOW"),
+                b(1, "2026-09-12T10:00:00Z"),
+                b(2, "2026-09-20T10:00:00Z"),
+            ])?.startAt,
+        ).toEqual(at("2026-09-20T10:00:00Z"));
+    });
+
+    it("is null with nothing booked, or every visit attended", () => {
+        expect(nextVisitOf([])).toBeNull();
+        expect(
+            nextVisitOf([b(1, "2026-09-10T10:00:00Z", "ATTENDED")]),
+        ).toBeNull();
     });
 });

@@ -258,3 +258,83 @@ export async function visitsForRead(
         return { visits: null };
     }
 }
+
+/** A treatment's next visit, as the Orders list's row says it (B14). */
+export interface NextVisitDto {
+    startAt: Date;
+    /** The clinic's zone, which the row's "Next 19 Sep, 10:00" is read in. */
+    timezone: string;
+}
+
+/** What {@link nextVisitOf} reads of one booking. */
+export interface NextVisitBooking {
+    orderId: string | null;
+    visitNumber: number | null;
+    startAt: Date;
+    outcome: string | null;
+    service: { timezone: string };
+}
+
+/**
+ * The order's next visit by the Visits card's own rule (`orderVisitsOf`):
+ * the first visit, by number, whose booking is still waiting — neither
+ * attended nor missed; a cancelled booking is not passed in. Null when
+ * none is booked. `bookings` come in visit-number order, earliest made
+ * first, as the card reads them.
+ */
+export function nextVisitOf(
+    bookings: readonly NextVisitBooking[],
+): NextVisitDto | null {
+    const byNumber = new Map<number, NextVisitBooking>();
+    for (const b of bookings) {
+        if (b.visitNumber !== null && !byNumber.has(b.visitNumber)) {
+            byNumber.set(b.visitNumber, b);
+        }
+    }
+    const waiting = [...byNumber.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([, b]) => b)
+        .find((b) => b.outcome !== "ATTENDED" && b.outcome !== "NO_SHOW");
+    return waiting
+        ? { startAt: waiting.startAt, timezone: waiting.service.timezone }
+        : null;
+}
+
+/**
+ * Each treatment's next visit on a page of the Orders list (B14, DEC-067:
+ * "Next ‹date›" on the row), in one read for the page. An order with none
+ * booked is null; only the orders asked about are in the map.
+ */
+export async function nextVisitsFor(
+    db: Pick<Prisma.TransactionClient, "booking">,
+    organizationId: string,
+    orderIds: readonly string[],
+): Promise<Map<string, NextVisitDto | null>> {
+    const out = new Map<string, NextVisitDto | null>(
+        orderIds.map((id) => [id, null]),
+    );
+    if (orderIds.length === 0) return out;
+    const bookings = await db.booking.findMany({
+        where: {
+            organizationId,
+            orderId: { in: [...orderIds] },
+            status: { not: "CANCELLED" },
+            visitNumber: { not: null },
+        },
+        orderBy: [{ visitNumber: "asc" }, { createdAt: "asc" }],
+        select: {
+            orderId: true,
+            visitNumber: true,
+            startAt: true,
+            outcome: true,
+            service: { select: { timezone: true } },
+        },
+    });
+    const byOrder = new Map<string, NextVisitBooking[]>();
+    for (const b of bookings) {
+        if (!b.orderId) continue;
+        byOrder.set(b.orderId, [...(byOrder.get(b.orderId) ?? []), b]);
+    }
+    byOrder.forEach((list, id) => out.set(id, nextVisitOf(list)));
+    return out;
+}

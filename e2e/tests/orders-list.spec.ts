@@ -390,6 +390,45 @@ async function filterOptions(page: Page, org: string): Promise<FilterOptions> {
     return (await res.json()) as FilterOptions;
 }
 
+/**
+ * A treatment's row says its next visit (B14, DEC-067): "Next 19 Sep,
+ * 10:00", or "Next visit not booked". Kavi Dental is a film set: read only.
+ */
+test.describe("a treatment's next visit on the row (B14)", () => {
+    const KAVI = "seed_sc_kavi_org";
+
+    test("each open treatment's row says when its next visit is", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${KAVI}`);
+        const { rows } = await list(page, KAVI, "&tab=open");
+        const treatments = (
+            rows as (Row & {
+                nextVisit?: { startAt: string; timezone: string } | null;
+            })[]
+        ).filter(
+            (r) =>
+                r.fulfilmentType.startsWith("APPOINTMENT_") &&
+                r.nextVisit !== undefined,
+        );
+        test.skip(treatments.length === 0, "No open treatments on Kavi.");
+
+        await page.goto("/commerce/orders?tab=open");
+        for (const t of treatments.slice(0, 3)) {
+            const row = orders(page)
+                .getByRole("listitem")
+                .filter({ hasText: `#${t.orderId}` });
+            await expect(row).toContainText(
+                t.nextVisit
+                    ? /Next (today|yesterday|\d{1,2} \w{3})/
+                    : "Next visit not booked",
+            );
+            await expect(row).not.toContainText("Late");
+        }
+    });
+});
+
 test.describe("orders list filters (B4)", () => {
     test("step, fulfilment and date filters survive a reload", async ({
         page,

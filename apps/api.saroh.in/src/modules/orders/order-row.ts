@@ -15,6 +15,7 @@ import type { OrderReadDto } from "./order-read";
 import { amountDueCents } from "./order-read";
 import type { OrderStage } from "./order-stage";
 import { orderStanding } from "./order-standing";
+import type { NextVisitDto } from "./order-visits";
 import { walkInOf } from "./walk-in";
 
 /**
@@ -31,7 +32,8 @@ import { walkInOf } from "./walk-in";
  * the Late filter runs in SQL) and the courier. B15 adds `attention`: the
  * customer's Needs attention this viewer may see (`order-attention.ts`). B5 adds when the order's pay link was made, for the row
  * menu's "New pay link" (never the link: only its hash is kept), and the
- * quick view's projection of the order read (`quickViewOf`).
+ * quick view's projection of the order read (`quickViewOf`). B14 (DEC-067)
+ * adds a treatment's next visit, for the row's "Next 19 Sep, 10:00".
  */
 
 interface DecimalLike {
@@ -93,6 +95,12 @@ export interface OrderRowDto extends FulfilmentView, LateView {
      * is here only for a viewer who may read sensitive entries.
      */
     attention?: OrderAttentionTag[] | null;
+    /**
+     * A treatment's next booked visit (B14, DEC-067), by the Visits card's
+     * rule; null when none is booked. Only on an appointment order, and
+     * left out when it couldn't be read (the row then says nothing of it).
+     */
+    nextVisit?: NextVisitDto | null;
 }
 
 /** What `order-list.ts` loads for each row. */
@@ -149,6 +157,11 @@ export interface RowView {
      * when it couldn't be read. Absent, the row carries no `attention`.
      */
     attention?: OrderAttention | null;
+    /**
+     * The order's next visit (B14), for a treatment: null when none is
+     * booked. Absent, the row carries no `nextVisit`.
+     */
+    nextVisit?: NextVisitDto | null;
 }
 
 export function serializeOrderRow(
@@ -255,6 +268,7 @@ export function serializeOrderRow(
                       ? attentionTags(view.attention)
                       : null,
               }),
+        ...(view.nextVisit === undefined ? {} : { nextVisit: view.nextVisit }),
     };
 }
 
