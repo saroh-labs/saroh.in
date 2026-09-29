@@ -883,6 +883,10 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
         - Checklist rows are two lines (title and reason), shared with Home.
         - The phone tab bar stays Home, Sell, Calendar, Insights; the two designs disagree with each other.
         - Mark sent is offered only on orders ready to hand over (the API's stage rule).
+    - **Site and accounts:**
+        - A past appointment with no attendance recorded still reads "Booked"; it never claims "Attended".
+        - The editor's Tablet and zoom controls stay as they are (G2/G3).
+        - A shop card adds the first option that can be sold now.
 - **Fixed to match the design, or to correct a small error:**
     1. Order Detail's customer card reads "Needs attention: Sesame", since the card covers every kind of entry, not just allergies.
     2. A treatment order shows Needs attention in the customer card as well as the Visits card.
@@ -892,6 +896,10 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     6. C12's booking-note card uses the customer's full name, and names the roles that can see a sensitive note.
     7. Settings › Business's "Address" tab is "Registered address" (DEC-069 names the four addresses apart).
     8. Permission lists hide the permissions of modules hidden from the business ("Manage automations" while DEC-068 hides Automations).
+    9. Module pages (Book, Prices, Shop) draw the design's page title and lead line, and a rich-text intro lines up with the cards.
+    10. The account area has the design's compact header (logo, tab title, language) and no site footer.
+    11. Whole-rupee prices show without decimals ("₹500"), wherever the site shows a price.
+    12. A product card sums up its options ("2 sizes") instead of listing them.
 
 ## DEC-074 A location's team sees and moves that location's orders
 
