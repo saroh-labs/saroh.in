@@ -174,6 +174,8 @@ export async function listOrderRows(
                           firstName: true,
                           lastName: true,
                           phone: true,
+                          // A returning customer's ring on the row.
+                          _count: { select: { orders: true } },
                       },
                   },
                   items: {
