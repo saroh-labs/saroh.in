@@ -1054,7 +1054,9 @@ export const SITES: readonly SeedSite[] = [
                 ],
             },
             {
-                path: "/book",
+                // Not /book: that address is the booking page's (G14), which
+                // always answered there, so a page at it was never seen.
+                path: "/walkthrough",
                 title: "Book a walkthrough",
                 sections: [
                     {

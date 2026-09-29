@@ -13,8 +13,10 @@ import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ModuleKey } from "../module-registry";
+import { deactivationImpactOf } from "./module-deactivation-impact";
 import type {
     DeactivationBlocker,
+    DeactivationImpactItem,
     ModuleReadinessAdapter,
     ReadinessInput,
     ReadinessResult,
@@ -104,6 +106,18 @@ export class ModuleReadinessRegistry {
     ): Promise<DeactivationBlocker[]> {
         const adapter = this.adapters.get(key);
         return adapter ? adapter.deactivationBlockers(input) : [];
+    }
+
+    /**
+     * What turning the module off touches, with real counts (F13). Beside
+     * the blockers, never instead of them: an impact line informs, a
+     * blocker refuses. A module with nothing to count says nothing here.
+     */
+    deactivationImpact(
+        key: ModuleKey,
+        input: ReadinessInput,
+    ): Promise<DeactivationImpactItem[]> {
+        return deactivationImpactOf(this.db, key, input);
     }
 
     // --- adapters ---------------------------------------------------------
@@ -212,18 +226,30 @@ export class ModuleReadinessRegistry {
         return {
             key: "CLASS_PACKS",
             evaluate: async ({ organizationId }) => {
-                const [all, onSale] = await Promise.all([
-                    this.db.classPack.count({ where: { organizationId } }),
+                // A draft (E14) isn't published yet: it isn't a pack to sell.
+                const [all, onSale, drafts] = await Promise.all([
+                    this.db.classPack.count({
+                        where: { organizationId, status: { not: "DRAFT" } },
+                    }),
                     this.db.classPack.count({
                         where: { organizationId, status: "ACTIVE" },
                     }),
+                    this.db.classPack.count({
+                        where: { organizationId, status: "DRAFT" },
+                    }),
                 ]);
                 if (all === 0)
-                    return setup(
-                        "CLASS_PACKS_NO_PACK",
-                        "Make a pack to start selling them.",
-                        "/class-packs/new",
-                    );
+                    return drafts > 0
+                        ? setup(
+                              "CLASS_PACKS_NO_PACK",
+                              "Publish a pack to start selling it.",
+                              "/class-packs",
+                          )
+                        : setup(
+                              "CLASS_PACKS_NO_PACK",
+                              "Make a pack to start selling them.",
+                              "/class-packs/new",
+                          );
                 if (onSale === 0)
                     return setup(
                         "CLASS_PACKS_NONE_ON_SALE",
@@ -255,22 +281,25 @@ export class ModuleReadinessRegistry {
                     );
                 return active();
             },
-            deactivationBlockers: async ({ organizationId }) => {
+            deactivationBlockers: async ({ organizationId, may }) => {
                 const open = await this.db.order.count({
                     where: {
                         organizationId,
                         status: { in: [...OPEN_ORDER_STATES] },
                     },
                 });
-                if (open > 0)
-                    return [
-                        {
-                            code: "COMMERCE_OPEN_ORDERS",
-                            message: `Resolve ${open} open order(s) before disabling Commerce. Existing orders remain manageable.`,
-                            actionHref: "/commerce",
-                        },
-                    ];
-                return [];
+                if (open === 0) return [];
+                // The number only for someone who may read orders (F13).
+                const counts = !may || may("order:read") || may("order:stage");
+                return [
+                    {
+                        code: "COMMERCE_OPEN_ORDERS",
+                        message: counts
+                            ? `${open} open ${open === 1 ? "order needs" : "orders need"} sending or cancelling first. Orders already placed stay in Orders.`
+                            : "Some open orders need sending or cancelling first. Orders already placed stay in Orders.",
+                        actionHref: "/commerce/orders",
+                    },
+                ];
             },
         };
     }

@@ -1,5 +1,6 @@
 import type { PaymentHandoff } from "./api";
 import type { BookingDays, BookResult } from "./model";
+import type { WaitlistReach } from "./waitlist";
 
 // ── State ────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,19 @@ export type Phase =
           price: string | null;
           /** Paid a deposit: what is left for the visit (E8). */
           rest?: string | null;
+          /** Paid with a class credit (A10): "Used 1 credit from…". */
+          creditText?: string | null;
           when: string;
           first: string;
+      }
+    | {
+          /** On a full class's waitlist (A12). */
+          kind: "waitlisted";
+          serviceName: string;
+          when: string;
+          first: string;
+          /** 1 is next. */
+          placeInLine: number | null;
+          reach: WaitlistReach;
+          email: string;
       };

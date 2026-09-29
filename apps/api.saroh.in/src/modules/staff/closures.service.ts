@@ -6,8 +6,8 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { requireBookingPower } from "../bookings/booking-access";
 import { businessTimezone } from "../bookings/staff-availability";
-import { authorize } from "../organizations/organization-policy";
 import type { AddClosureDto, OffRangeDto, PreviewOffDto } from "./dto";
 import type { BookingBrief } from "./off-bookings";
 import { bookingsInSpans } from "./off-bookings";
@@ -65,7 +65,7 @@ export class ClosuresService {
         ctx: OrganizationContext,
         now = new Date(),
     ): Promise<ClosureView[]> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         return closureViews(
             ctx.organizationId,
             new Date(now.getTime() - HISTORY_DAYS * DAY),
@@ -77,7 +77,7 @@ export class ClosuresService {
         dto: AddClosureDto,
         now = new Date(),
     ): Promise<{ closures: ClosureView[]; affected: BookingBrief[] }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const spans = await this.spansOf(ctx, dto);
         const reason = dto.reason?.trim() ? dto.reason.trim() : null;
         await prisma.businessClosure.createMany({
@@ -105,7 +105,7 @@ export class ClosuresService {
         ids: string[],
         now = new Date(),
     ): Promise<ClosureView[]> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         const unique = [...new Set(ids)];
         await prisma.$transaction(async (tx) => {
             const { count } = await tx.businessClosure.deleteMany({
@@ -131,7 +131,7 @@ export class ClosuresService {
         dto: PreviewOffDto,
         now = new Date(),
     ): Promise<{ affected: BookingBrief[] }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         if (dto.staffId) {
             const person = await prisma.staffMember.findFirst({
                 where: { id: dto.staffId, organizationId: ctx.organizationId },

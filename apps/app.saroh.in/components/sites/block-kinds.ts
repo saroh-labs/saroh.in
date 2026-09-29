@@ -14,7 +14,8 @@ export interface BoundSource {
     reads: string;
     /** Where that is changed, and what follows from changing it there. */
     notice: string;
-    href: string;
+    /** Where; a site's own screen takes the site being edited. */
+    href: string | ((siteId: string) => string);
     linkLabel: string;
 }
 
@@ -41,6 +42,24 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         href: "/commerce/storefronts",
         linkLabel: "Open Storefronts",
     },
+    journal: {
+        reads: "Reads your latest published posts live, so a new post shows here without publishing the site again.",
+        notice: "Posts come from Website › Posts. Publish a post and it shows here; take one down and it goes.",
+        href: (siteId) => `/sites/${siteId}/posts`,
+        linkLabel: "Open Posts",
+    },
+    plans: {
+        reads: "Reads your plans on sale live, so a price or a newly published plan shows here without publishing the site again.",
+        notice: "Plans live in Payments › Subscriptions › Plans. Only published plans show; a draft or an unpublished change never does, and nothing shows while Payments is off.",
+        href: "/billing/subscriptions?tab=plans",
+        linkLabel: "Open Plans",
+    },
+    productGrid: {
+        reads: "Reads the catalogue. Stays current on its own.",
+        notice: "Products live in Sell › Products. Which products appear follows the catalogue — add or hide them there, and this block follows. Only published products sold where the site sells from show.",
+        href: "/commerce/products",
+        linkLabel: "Open Products",
+    },
     booking: {
         reads: "Reads your services and their availability live, so a visitor can only book what you actually offer.",
         notice: "Which services can be booked, and when, follow Services and your opening hours — change them there, and this block follows.",
@@ -48,6 +67,15 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         linkLabel: "Open Services",
     },
 };
+
+/** A bound block's link, for the site being edited; null when it needs one. */
+export function boundHref(
+    bound: BoundSource,
+    siteId: string | undefined,
+): string | null {
+    if (typeof bound.href === "string") return bound.href;
+    return siteId ? bound.href(siteId) : null;
+}
 
 /**
  * The Add block tab's groups (#337), in the order the design lists them.

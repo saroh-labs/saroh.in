@@ -29,6 +29,7 @@ import type {
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
 
+import { DeliveryFeeRow } from "./delivery-fee-row";
 import { Note, Section } from "./storefront-section";
 
 /** Where Orders' notice sends someone to change a threshold. */
@@ -122,6 +123,22 @@ export function FulfilmentSection({
                         : "The ways an order from here can reach the customer. Digital products and appointments follow the product, so they need no chip."}
                 </Note>
             </div>
+
+            {store.siteShop
+                ? (["LOCAL_DELIVERY", "SHIPPING"] as const)
+                      .filter((type) => types.includes(type))
+                      .map((type) => (
+                          <DeliveryFeeRow
+                              key={`${type}-${String(fee(store, type))}`}
+                              type={type}
+                              fee={fee(store, type)}
+                              currency={store.currency}
+                              canEdit={canEdit}
+                              pending={pending}
+                              save={save}
+                          />
+                      ))
+                : null}
 
             <div className="grid gap-3">
                 <div>
@@ -249,3 +266,15 @@ function helpFor(type: StorefrontFulfilmentType): string {
 }
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** The website checkout's fee for a way (G13); null is free. */
+function fee(
+    store: StorefrontSettings,
+    type: "LOCAL_DELIVERY" | "SHIPPING",
+): string | null {
+    return (
+        (type === "LOCAL_DELIVERY"
+            ? store.localDeliveryFee
+            : store.shippingFee) ?? null
+    );
+}

@@ -1,5 +1,5 @@
-import type { OrgAction } from "./organization-policy";
-import { ORG_ACTIONS } from "./organization-policy";
+import type { OrgAction } from "./organization-actions";
+import { ORG_ACTIONS } from "./organization-actions";
 
 /**
  * Every permission, in the words a business owner would use to grant it.
@@ -141,13 +141,47 @@ export const CAPABILITIES: readonly Capability[] = [
         label: "Count and move stock",
         note: "Counts shelves, records deliveries and waste, and moves stock between storefronts. Prices and names still need Change storefronts.",
     },
-    { action: "order:read", group: "sell", label: "See orders" },
-    { action: "order:write", group: "sell", label: "Change orders" },
+    {
+        action: "order:read",
+        group: "sell",
+        label: "See orders",
+        note: "The whole order: items, the customer, totals, payments and refunds.",
+    },
     {
         action: "order:stage",
         group: "sell",
-        label: "Move orders through the kitchen",
+        label: "Move orders through their steps and print",
         note: "Sees what to make and who it is for, never what anyone paid.",
+    },
+    {
+        action: "order:create",
+        group: "sell",
+        label: "Take new orders",
+        note: "Includes walk-ins and a new order's payment link. Whoever can take, change, refund or export orders also sees them in full.",
+    },
+    {
+        action: "order:edit",
+        group: "sell",
+        label: "Change orders after they're placed",
+        note: "Items, address and how it's fulfilled, until it's handed over. Includes making a new payment link, which stops the old one.",
+    },
+    {
+        action: "order:refund",
+        group: "sell",
+        label: "Refund and cancel orders",
+        note: "Money goes back to the customer. Also settles the difference when a paid order changes.",
+    },
+    {
+        action: "order:export",
+        group: "sell",
+        label: "Export orders",
+        note: "A spreadsheet file of every order and who it was for leaves Saroh.",
+    },
+    {
+        action: "order:write",
+        group: "sell",
+        label: "Take, change and export orders",
+        note: "Kept for roles made before these were separate. It includes Take new orders, Change orders after they're placed and Export orders.",
     },
     { action: "discount:read", group: "sell", label: "See discount codes" },
     {
@@ -192,17 +226,35 @@ export const CAPABILITIES: readonly Capability[] = [
     { action: "form:write", group: "website", label: "Change website forms" },
 
     // — Contacts ——————————————————————————————————————————————
-    { action: "contact:read", group: "contacts", label: "See contacts" },
+    {
+        action: "contact:read",
+        group: "contacts",
+        label: "See customers and contacts",
+        note: "Name, phone, email, address, notes and what the team must know. Search by any of them. Medical and other sensitive notes need their own permission.",
+    },
     {
         action: "contact:write",
         group: "contacts",
-        label: "Add and edit contacts",
+        label: "Edit customers and contacts",
+        note: "Details, notes and what the team must know. Includes deleting a record with no orders or invoices. Whoever can edit can also see.",
+    },
+    {
+        action: "customer:sensitive",
+        group: "contacts",
+        label: "See sensitive notes",
+        note: "Medical and other notes marked sensitive, and notes left when booking online. Without it, the team is told a note is there but not what it says.",
     },
     {
         action: "customer:merge",
         group: "contacts",
         label: "Merge duplicate customers",
         note: "A merge can't be undone. The customer kept takes every order, booking, invoice and note of the other, and can see them if they sign in on your website.",
+    },
+    {
+        action: "customer:remove",
+        group: "contacts",
+        label: "Remove a customer's details",
+        note: "For a privacy request. It can't be undone: their name, email, phone and address go from every order, booking and message. Invoices keep what was printed on them.",
     },
     { action: "lead:read", group: "contacts", label: "See leads" },
     { action: "lead:write", group: "contacts", label: "Add and edit leads" },
@@ -224,10 +276,20 @@ export const CAPABILITIES: readonly Capability[] = [
     },
 
     // — Schedule ——————————————————————————————————————————————
-    { action: "service:read", group: "schedule", label: "See services" },
-    { action: "service:write", group: "schedule", label: "Change services" },
     { action: "booking:read", group: "schedule", label: "See bookings" },
-    { action: "booking:write", group: "schedule", label: "Change bookings" },
+    {
+        action: "booking:write",
+        group: "schedule",
+        label: "Change bookings",
+        note: "Book, check in, mark a no-show, move and cancel. Whoever can change bookings also sees them.",
+    },
+    { action: "service:read", group: "schedule", label: "See services" },
+    {
+        action: "service:write",
+        group: "schedule",
+        label: "Change services, hours, time off and booking rules",
+        note: "Setting up how the business takes bookings, not the day's bookings. Whoever can change services also sees them.",
+    },
     { action: "course:read", group: "schedule", label: "See courses" },
     {
         action: "course:write",
@@ -239,11 +301,19 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "pack:read",
         group: "schedule",
         label: "See class packs and who bought them",
+        note: "The whole pack: who holds one, classes left, prices and every sale.",
+    },
+    {
+        action: "pack:sell",
+        group: "schedule",
+        label: "Sell class packs and book with them",
+        note: "Sells a pack at the desk and pays for a booking with one. Setting a pack's price or how long it lasts needs Make and change class packs.",
     },
     {
         action: "pack:write",
         group: "schedule",
-        label: "Sell class packs and book with them",
+        label: "Make and change class packs",
+        note: "Prices, classes, how long they last, publishing, extending and archiving. Whoever can change packs can also sell them.",
     },
 
     // — Money —————————————————————————————————————————————————

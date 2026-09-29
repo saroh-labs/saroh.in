@@ -8,6 +8,8 @@ jest.mock("@saroh/database", () => ({
             updateMany: jest.fn(),
             count: jest.fn(),
         },
+        // F14: the person's own bell choices; none unless a test sets some.
+        notificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
     },
 }));
 
@@ -22,6 +24,7 @@ const findUnique = prisma.notification.findUnique as jest.Mock;
 const update = prisma.notification.update as jest.Mock;
 const updateMany = prisma.notification.updateMany as jest.Mock;
 const count = prisma.notification.count as jest.Mock;
+const prefFindMany = prisma.notificationPreference.findMany as jest.Mock;
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
@@ -165,5 +168,93 @@ describe("NotificationsService.unreadCount", () => {
             new NotificationsService().unreadCount(ctx({ role: "MEMBER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(count).not.toHaveBeenCalled();
+    });
+});
+
+describe("what each person sees of the inbox (F14)", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        prefFindMany.mockResolvedValue([]);
+    });
+
+    it("turning the bell off for New order stops that notice reaching them", async () => {
+        prefFindMany.mockResolvedValue([
+            { event: "order", channel: "bell", enabled: false },
+        ]);
+        findMany.mockResolvedValue([]);
+        count.mockResolvedValue(0);
+
+        await new NotificationsService().list(ctx());
+        await new NotificationsService().unreadCount(ctx());
+
+        const hidden = { type: { notIn: ["order.new"] } };
+        expect(findMany.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            ...hidden,
+        });
+        expect(count.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            readAt: null,
+            ...hidden,
+        });
+    });
+
+    it("reads only the signed-in person's own choices, in this business", async () => {
+        findMany.mockResolvedValue([]);
+        await new NotificationsService().list(ctx({ userId: "user_9" }));
+        expect(prefFindMany.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            userId: "user_9",
+            channel: "bell",
+        });
+    });
+
+    it("leaves out notices about what their role can't read", async () => {
+        findMany.mockResolvedValue([]);
+        // An invented role with the inbox and the team, but no orders,
+        // bookings or money.
+        await new NotificationsService().list(
+            ctx({
+                role: "MEMBER",
+                actions: new Set(["notification:read", "member:read"]),
+            }),
+        );
+        expect(findMany.mock.calls[0][0].where.type).toEqual({
+            notIn: [
+                "order.new",
+                "booking.new",
+                "booking.moved",
+                "booking.cancelled",
+                "payment.failed",
+            ],
+        });
+    });
+
+    it("Mark all read leaves what they don't see alone", async () => {
+        prefFindMany.mockResolvedValue([
+            { event: "team", channel: "bell", enabled: false },
+        ]);
+        updateMany.mockResolvedValue({ count: 1 });
+        await new NotificationsService().markAllRead(ctx());
+        expect(updateMany.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            readAt: null,
+            type: { notIn: ["team.joined"] },
+        });
+    });
+
+    it("never hides an enquiry or a review: they have no switch", async () => {
+        prefFindMany.mockResolvedValue(
+            ["order", "booking", "failed", "team"].map((event) => ({
+                event,
+                channel: "bell",
+                enabled: false,
+            })),
+        );
+        findMany.mockResolvedValue([]);
+        await new NotificationsService().list(ctx());
+        const hidden = findMany.mock.calls[0][0].where.type.notIn as string[];
+        expect(hidden).not.toContain("enquiry.new");
+        expect(hidden).not.toContain("review.needs-reply");
     });
 });

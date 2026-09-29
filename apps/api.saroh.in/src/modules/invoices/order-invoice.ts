@@ -1,4 +1,6 @@
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
+import { orderPartyName } from "../orders/walk-in";
 import type { GstLine, GstLineInput, TaxType } from "./gst";
 import {
     allocate,
@@ -8,7 +10,6 @@ import {
     taxTypeFor,
 } from "./gst";
 import { stateCode } from "./gst-states";
-import { contactName } from "./serialize";
 import { toCents } from "./totals";
 
 /**
@@ -55,20 +56,29 @@ export interface OrderForInvoice {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
+    /** Null for a walk-in (B13), billed by `walkInName`. */
     customer: {
         firstName: string | null;
         lastName: string | null;
         email: string;
-    };
+    } | null;
+    walkInName?: string | null;
     items: {
         id: string;
         quantity: number;
         price: Money;
+        /** Null on a treatment's service line (E9, DEC-050). */
         product: {
             name: string;
             gstRate: Money | null;
             hsnCode: string | null;
-        };
+        } | null;
+        /** What a service line bills: its GST comes from the service. */
+        service?: {
+            name: string;
+            gstRate: Money | null;
+            sacCode: string | null;
+        } | null;
         variant: { title: string } | null;
     }[];
 }
@@ -119,9 +129,22 @@ export function orderBillTo(order: OrderForInvoice): BillTo {
               .filter((x) => x && x.trim() !== "")
               .join(", ")
         : null;
+    // A walk-in (B13) is billed by the name they gave, marked so, with no
+    // email: nobody to send it to, so it is never emailed.
+    if (!order.customer) {
+        return {
+            name: orderPartyName(order, { label: true }),
+            email: null,
+            address,
+            state: null,
+        };
+    }
+    // A walk-in kept by their phone (B13b) has a placeholder email: no
+    // email to print or send to.
+    const email = contactEmailForDisplay(order.customer.email);
     return {
-        name: contactName(order.customer),
-        email: order.customer.email,
+        name: orderPartyName(order),
+        email,
         address,
         state: null,
     };
@@ -143,16 +166,30 @@ export function buildOrderInvoice(
     order: OrderForInvoice,
     profile: TaxProfile,
 ): BuiltDocument {
-    const inputs: GstLineInput[] = order.items.map((item) => ({
-        description: item.variant
-            ? `${item.product.name} — ${item.variant.title}`
-            : item.product.name,
-        quantity: item.quantity,
-        unitCents: toCents(item.price.toString()),
-        rateBps: rateToBps(item.product.gstRate),
-        code: item.product.hsnCode,
-        orderItemId: item.id,
-    }));
+    const inputs: GstLineInput[] = order.items.map((item) => {
+        // A service line (E9) is billed at its service's rate and SAC.
+        const billed = item.product
+            ? {
+                  name: item.product.name,
+                  gstRate: item.product.gstRate,
+                  code: item.product.hsnCode,
+              }
+            : {
+                  name: item.service?.name ?? "",
+                  gstRate: item.service?.gstRate ?? null,
+                  code: item.service?.sacCode ?? null,
+              };
+        return {
+            description: item.variant
+                ? `${billed.name} — ${item.variant.title}`
+                : billed.name,
+            quantity: item.quantity,
+            unitCents: toCents(item.price.toString()),
+            rateBps: rateToBps(billed.gstRate),
+            code: billed.code,
+            orderItemId: item.id,
+        };
+    });
     const shippingCents = toCents(order.shipping.toString());
     if (shippingCents > 0) {
         inputs.push({
@@ -482,6 +519,8 @@ export function buildManualInvoice(
         unitCents: number;
         rateBps: number | null;
         code: string | null;
+        /** The order line it bills, when it bills one (a treatment's, E9). */
+        orderItemId?: string | null;
     }[],
     profile: Pick<TaxProfile, "registered" | "gstin" | "state" | "address">,
     billToState: string | null,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ADDED_BY_HAND, addedByHand } from "./added";
 import type {
     CustomerDetail,
     DetailBooking,
@@ -181,12 +182,13 @@ describe("the tabs, by business kind", () => {
         ]);
     });
 
-    it("gives a bookings business Bookings and Membership", () => {
+    it("gives a bookings business Bookings, Packs and Membership", () => {
         const d = gym();
         expect(kindOf(d)).toBe("bookings");
         expect(tabsFor(d).map((t) => t.label)).toEqual([
             "Overview",
             "Bookings",
+            "Packs",
             "Membership",
             "Invoices",
             "Notes",
@@ -197,12 +199,128 @@ describe("the tabs, by business kind", () => {
         const d = gym();
         delete d.subscriptions;
         delete d.invoices;
+        delete d.packs;
         expect(tabsFor(d).map((t) => t.key)).toEqual(["over", "bk", "notes"]);
+    });
+
+    it("counts every pack on the Packs tab, and none when the read failed (C7)", () => {
+        const pack = {
+            id: "pp1",
+            pack: { id: "p", name: "10 classes" },
+            credits: 10,
+            used: 3,
+            left: 7,
+            expiresAt: "2026-10-12T00:00:00Z",
+            boughtAt: "2026-09-01T00:00:00Z",
+            standing: "ACTIVE" as const,
+        };
+        const withTwo = gym({
+            packs: {
+                from: "contact",
+                rows: [pack, { ...pack, id: "pp2", standing: "EXPIRED" }],
+            },
+        });
+        expect(tabsFor(withTwo).find((t) => t.key === "pk")?.count).toBe(2);
+        expect(
+            tabsFor(gym({ packs: null })).find((t) => t.key === "pk")?.count,
+        ).toBeNull();
+        // Class packs off, Appointments off, or no `pack:read`: no tab, and
+        // an old link to ?tab=pk opens Overview.
+        const none = gym();
+        delete none.packs;
+        const tabs = tabsFor(none);
+        expect(tabs.map((t) => t.key)).not.toContain("pk");
+        expect(tabFromQuery("pk", tabs)).toBe("over");
+        expect(tabFromQuery("pk", tabsFor(withTwo))).toBe("pk");
     });
 
     it("keeps a failed source's tab, without a count", () => {
         const d = shop({ invoices: null });
         expect(tabsFor(d).find((t) => t.key === "inv")?.count).toBeNull();
+    });
+
+    it("adds Messages before Notes, counting what's unread (A13)", () => {
+        const thread = {
+            messages: [],
+            earlier: false,
+            unread: 2,
+            signsIn: true,
+            canReply: true,
+        };
+        const tabs = tabsFor(gym(), thread);
+        expect(tabs.map((t) => t.key)).toEqual([
+            "over",
+            "bk",
+            "pk",
+            "sub",
+            "inv",
+            "msg",
+            "notes",
+        ]);
+        expect(tabs.find((t) => t.key === "msg")?.count).toBe(2);
+        expect(
+            tabsFor(gym(), { ...thread, unread: 0 }).find(
+                (t) => t.key === "msg",
+            )?.count,
+        ).toBeNull();
+        expect(
+            tabsFor(gym(), "failed").find((t) => t.key === "msg")?.count,
+        ).toBeNull();
+        expect(tabsFor(gym(), null).map((t) => t.key)).not.toContain("msg");
+        expect(tabFromQuery("msg", tabs)).toBe("msg");
+    });
+
+    it("adds Reviews after Invoices, counting every review, hidden too (C6)", () => {
+        const review = (id: string, status: "PUBLISHED" | "HIDDEN") => ({
+            id,
+            rating: 5,
+            body: "Lovely",
+            displayName: "Asha R.",
+            productId: "p1",
+            productName: "Sourdough",
+            storeId: "s1",
+            invitedTo: "asha@example.in",
+            status,
+            reply: null,
+            repliedAt: null,
+            createdAt: "2026-09-20T10:00:00Z",
+        });
+        const thread = {
+            messages: [],
+            earlier: false,
+            unread: 0,
+            signsIn: true,
+            canReply: true,
+        };
+        const tabs = tabsFor(shop(), thread, [
+            review("r1", "PUBLISHED"),
+            review("r2", "HIDDEN"),
+        ]);
+        expect(tabs.map((t) => t.label)).toEqual([
+            "Overview",
+            "Orders",
+            "Subscriptions",
+            "Invoices",
+            "Reviews",
+            "Messages",
+            "Notes",
+        ]);
+        expect(tabs.find((t) => t.key === "rev")?.count).toBe(2);
+        expect(tabFromQuery("rev", tabs)).toBe("rev");
+        // None yet: the tab stays, with its 0 and the empty state.
+        expect(
+            tabsFor(shop(), null, []).find((t) => t.key === "rev")?.count,
+        ).toBe(0);
+    });
+
+    it("keeps a failed Reviews read's tab without a count, and has none for a role that can't read reviews", () => {
+        expect(
+            tabsFor(shop(), null, "failed").find((t) => t.key === "rev")?.count,
+        ).toBeNull();
+        const noReviews = tabsFor(shop(), null, null);
+        expect(noReviews.map((t) => t.key)).not.toContain("rev");
+        // An old link to ?tab=rev opens Overview instead.
+        expect(tabFromQuery("rev", noReviews)).toBe("over");
     });
 
     it("opens the tab the address names, else Overview", () => {
@@ -270,8 +388,35 @@ describe("the header", () => {
 
     it("says since when a shop customer buys, and where", () => {
         expect(sinceLine(shop(), "Rye & Co.", NOW)).toBe(
-            "Customer since August 2026 · buys at Rye & Co. · Returning means 2 or more orders",
+            "Customer since August 2026 · buys at Rye & Co.",
         );
+    });
+
+    it("says someone added on the Customers list was added by hand (DEC-056, C14)", () => {
+        const today = shop({
+            orders: { from: "linked-customers", rows: [] },
+        });
+        today.contact = {
+            ...today.contact,
+            source: ADDED_BY_HAND,
+            createdAt: "2026-09-23T06:00:00Z",
+        };
+        expect(sinceLine(today, "Rye & Co.", NOW)).toBe(
+            "Added by hand today · no orders yet",
+        );
+        expect(addedByHand(today)).toBe(true);
+        const earlier = shop({
+            orders: { from: "linked-customers", rows: [] },
+        });
+        earlier.contact = { ...earlier.contact, source: ADDED_BY_HAND };
+        expect(sinceLine(earlier, "Rye & Co.", NOW)).toBe(
+            "Added by hand on 1 Jul · no orders yet",
+        );
+        expect(addedByHand(shop())).toBe(false);
+    });
+
+    it("says what Returning means on the word itself", () => {
+        expect(tagFor(shop())?.title).toBe("Returning: 2 or more orders");
     });
 });
 
@@ -280,15 +425,29 @@ describe("a shop customer's overview", () => {
         const tiles = orderTiles(shop(), NOW);
         expect(tiles.map((t) => [t.label, t.value, t.note])).toEqual([
             ["Orders", "2", "1 open, new"],
-            ["Spent", "₹1,500", "Since August 2026"],
+            ["Spent", "₹1,500", "Including delivery"],
             ["Average order", "₹750", "Across 2 orders"],
             ["Last order", "Today", "12:44 at Rye & Co."],
         ]);
     });
 
-    it("leaves money tiles out for a viewer who reads no money", () => {
+    it("leaves Spent out without order:read and invoice:read, keeping the average the orders show (C13)", () => {
         const d = shop({ money: false });
         delete d.stats.spent;
+        expect(orderTiles(d, NOW).map((t) => t.label)).toEqual([
+            "Orders",
+            "Average order",
+            "Last order",
+        ]);
+    });
+
+    it("states no average from orders sent without totals (an API before C13)", () => {
+        const d = shop({ money: false });
+        delete d.stats.spent;
+        for (const o of d.orders?.rows ?? []) {
+            delete o.total;
+            delete o.currency;
+        }
         expect(orderTiles(d, NOW).map((t) => t.label)).toEqual([
             "Orders",
             "Last order",
@@ -332,6 +491,24 @@ describe("a shop customer's overview", () => {
         ]);
     });
 
+    it("leaves a treatment's line out of what they usually buy (E9)", () => {
+        const rows = [
+            order({
+                id: "o4",
+                items: [
+                    {
+                        productId: null,
+                        kind: "service",
+                        name: "Root canal treatment",
+                        variant: null,
+                        quantity: 1,
+                    },
+                ],
+            }),
+        ];
+        expect(favourites(rows)).toEqual([]);
+    });
+
     it("says how they get their orders and where the last delivery went", () => {
         const rows = shop().orders?.rows ?? [];
         expect(howTheyGet(rows)).toBe(
@@ -349,6 +526,13 @@ describe("a shop customer's overview", () => {
         );
         expect(deliveryAddress([order()])).toBe(
             "No address — they have only collected.",
+        );
+        // The address kept on their record comes first (C8).
+        expect(deliveryAddress(rows, "3 Lake View, Pune 411001")).toBe(
+            "3 Lake View, Pune 411001",
+        );
+        expect(deliveryAddress([order()], "3 Lake View, Pune 411001")).toBe(
+            "3 Lake View, Pune 411001",
         );
     });
 
@@ -459,6 +643,8 @@ describe("a gym customer's bookings and classes", () => {
         expect(lines[0]).toEqual(
             expect.objectContaining({
                 name: "5 classes pack",
+                // Each opens its Pack Detail (C7).
+                href: "/class-packs/p",
                 left: "Ended",
                 sub: "Ran out 1 Sep with 2 unused",
             }),

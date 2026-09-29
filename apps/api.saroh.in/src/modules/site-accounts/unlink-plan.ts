@@ -1,5 +1,8 @@
 import type { Prisma } from "@saroh/database";
 
+import { realOrderWhere } from "../orders/open-orders";
+import { ensureThread } from "./thread-store";
+
 /**
  * What moves when staff say "This isn't them" about a site account (A4,
  * DEC-049; round-2 plan A).
@@ -14,7 +17,9 @@ import type { Prisma } from "@saroh/database";
  * unit that first writes it with the account on it:
  * - bookings with `customerAccountId` (A9), and the invoices billing them,
  *   so the money follows the booking (review C-1);
- * - orders and identity links made while signed in (G13);
+ * - orders placed signed in, with the identity links they made (A7:
+ *   `Order.customerAccountId`, written by G13's checkout and E9's
+ *   treatments);
  * - thread messages the customer wrote (A13);
  * - waitlist entries (A12);
  * - mandates (D11).
@@ -127,6 +132,153 @@ function bookingInvoices(scope: UnlinkScope, bookingOn: string[]) {
     };
 }
 
+/** Messages the account wrote in the thread of the contact it is leaving. */
+function writtenByAccount(scope: UnlinkScope) {
+    return {
+        organizationId: scope.organizationId,
+        author: "CUSTOMER" as const,
+        customerAccountId: scope.accountId,
+        thread: { contactId: scope.fromContactId },
+        createdAt: { gte: scope.since },
+    };
+}
+
+/**
+ * Thread messages the customer wrote from the account since it linked
+ * (A13): they move into the new contact's thread, keeping their times. What
+ * the team or Saroh wrote to the contact stays in the contact's thread.
+ */
+export const THREAD_MESSAGES_MOVER: UnlinkMover = {
+    key: "messages",
+    model: "CustomerThreadMessage",
+    noun: ["message", "messages"],
+    count: (tx, scope) =>
+        tx.customerThreadMessage.count({ where: writtenByAccount(scope) }),
+    move: async (tx, scope) => {
+        const rows = await tx.customerThreadMessage.findMany({
+            where: writtenByAccount(scope),
+            select: { id: true, createdAt: true },
+            orderBy: { createdAt: "asc" },
+        });
+        if (rows.length === 0) return 0;
+        const newest = rows[rows.length - 1].createdAt;
+        const thread = await ensureThread(
+            tx,
+            scope.organizationId,
+            scope.toContactId,
+            newest,
+        );
+        const moved = await tx.customerThreadMessage.updateMany({
+            where: { id: { in: rows.map((r) => r.id) } },
+            data: { threadId: thread.id },
+        });
+        // The customer wrote them, so they have read up to them.
+        await tx.customerThread.update({
+            where: { id: thread.id },
+            data: { lastMessageAt: newest, customerReadAt: newest },
+            select: { id: true },
+        });
+        return moved.count;
+    },
+};
+
+/**
+ * The identity links the account's own orders made (A7): a store customer
+ * linked to the contact being left, since the account linked, by the
+ * account's signed-in checkout (`SITE_ACCOUNT`, G13) or its treatment
+ * booking (`BOOKING`, E9), whose orders include one the account placed.
+ * A link staff made, a payment made or the backfill made stays.
+ */
+function accountMadeLinks(scope: UnlinkScope) {
+    return {
+        organizationId: scope.organizationId,
+        contactId: scope.fromContactId,
+        reason: { in: ["SITE_ACCOUNT" as const, "BOOKING" as const] },
+        createdAt: { gte: scope.since },
+        customer: {
+            orders: {
+                some: {
+                    organizationId: scope.organizationId,
+                    customerAccountId: scope.accountId,
+                    createdAt: { gte: scope.since },
+                },
+            },
+        },
+    };
+}
+
+/** The account's real orders on those links (never an abandoned checkout). */
+async function ordersOnMovingLinks(
+    tx: Prisma.TransactionClient,
+    scope: UnlinkScope,
+): Promise<{ count: number; linkIds: string[] }> {
+    const links = await tx.customerIdentityLink.findMany({
+        where: accountMadeLinks(scope),
+        select: { id: true, customerId: true },
+    });
+    if (links.length === 0) return { count: 0, linkIds: [] };
+    const count = await tx.order.count({
+        where: {
+            organizationId: scope.organizationId,
+            customerAccountId: scope.accountId,
+            createdAt: { gte: scope.since },
+            customerId: { in: links.map((l) => l.customerId) },
+            AND: [realOrderWhere()],
+        },
+    });
+    return { count, linkIds: links.map((l) => l.id) };
+}
+
+/**
+ * Orders the customer placed signed in (A7). An order names no contact: it
+ * is the contact's through its store customer's identity link, so the link
+ * the account's own order made moves to the new contact, and the order with
+ * it. The account keeps reading the order by its `customerAccountId`
+ * wherever the link sits.
+ */
+export const ORDERS_MOVER: UnlinkMover = {
+    key: "orders",
+    model: "Order",
+    noun: ["order", "orders"],
+    count: async (tx, scope) => (await ordersOnMovingLinks(tx, scope)).count,
+    move: async (tx, scope) => {
+        const { count, linkIds } = await ordersOnMovingLinks(tx, scope);
+        if (linkIds.length > 0) {
+            await tx.customerIdentityLink.updateMany({
+                where: { id: { in: linkIds } },
+                data: { contactId: scope.toContactId },
+            });
+        }
+        return count;
+    },
+};
+
+/**
+ * Places in line the customer joined from the account since it linked
+ * (A12), in any state: the new contact is who is waiting. A place staff put
+ * someone in stays with the contact. The new contact is fresh, so no line
+ * holds it twice.
+ */
+export const WAITLIST_MOVER: UnlinkMover = {
+    key: "waitlist",
+    model: "ClassWaitlistEntry",
+    noun: ["place on a waitlist", "places on waitlists"],
+    count: (tx, scope) =>
+        tx.classWaitlistEntry.count({
+            where: {
+                ...madeByAccount(scope),
+                status: { in: ["WAITING", "OFFERED"] },
+            },
+        }),
+    move: async (tx, scope) =>
+        (
+            await tx.classWaitlistEntry.updateMany({
+                where: madeByAccount(scope),
+                data: { contactId: scope.toContactId },
+            })
+        ).count,
+};
+
 /**
  * The records that move with the account. A9 adds the first, bookings made
  * signed in; each unit above adds its own, with a db test.
@@ -134,6 +286,9 @@ function bookingInvoices(scope: UnlinkScope, bookingOn: string[]) {
 export const UNLINK_MOVERS: readonly UnlinkMover[] = [
     BOOKINGS_MOVER,
     BOOKING_INVOICES_MOVER,
+    ORDERS_MOVER,
+    THREAD_MESSAGES_MOVER,
+    WAITLIST_MOVER,
 ];
 
 /**

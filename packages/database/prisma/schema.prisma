@@ -62,6 +62,9 @@ model User {
   // Bookings they moved or cancelled on a customer's behalf (#121).
   bookingEvents BookingEvent[] @relation("BookingEventActor")
 
+  // What this person chose to hear about, per business (round-2 F14).
+  notificationPreferences NotificationPreference[]
+
   @@index([email])
 }
 
@@ -277,6 +280,29 @@ model Organization {
 
   // Everything done to a subscription, append-only (plan 2026-09-26-004, D9).
   subscriptionEvents SubscriptionEvent[]
+
+  // When an owner or admin dismissed Team's one-time notice naming the
+  // storefront people the F16 backfill put on the team (DEC-048). Null: not
+  // dismissed. Only people added after it are listed again.
+  storefrontTeamNoticeDismissedAt DateTime?
+
+  // A customer's message thread with the business (round-2 A13).
+  customerThreads        CustomerThread[]
+  customerThreadMessages CustomerThreadMessage[]
+
+  // Autopay mandates at the business's own provider (round-2 D11, D20).
+  paymentMandates PaymentMandate[]
+  // A class pack's history and its holders' extensions (round-2 E13).
+  packEvents     PackEvent[]
+  packExtensions PackExtension[]
+  // The notices told about a customer's bookings and orders (round-2 A14).
+  customerNotices CustomerNotice[]
+  // Places in line for full classes (round-2 A12).
+  classWaitlistEntries ClassWaitlistEntry[]
+  // Bulk kitchen moves held on the server, then committed (round-2 B6).
+  orderStageBatches OrderStageBatch[]
+  // Each person's alert choices here (round-2 F14).
+  notificationPreferences NotificationPreference[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -289,7 +315,7 @@ model BusinessProfile {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   legalName    String?
-  type         String? // individual, company, ...
+  type         String? // individual, partnership, llp, pvt, public, trust; `company` = pvt until F10b (business-type.ts)
   country      String?
   taxId        String?
   contactEmail String?
@@ -355,6 +381,13 @@ model BusinessProfile {
   // ("+919845012345"), checked by the API and by a CHECK constraint. Null:
   // no number, and the site shows no Call button rather than an empty one.
   phone String?
+
+  // "Members can pause from their account" (round-2 A8), beside the
+  // subscriptions' time zone above: on, a member pauses their own plan for
+  // 2, 4 or 8 weeks from the account area on the business's site; off, the
+  // account shows no Pause and the API refuses a customer's pause (403).
+  // Staff pause either way. No profile yet reads as on.
+  membersCanPause Boolean @default(true)
 }
 
 // Membership: links a User to an Organization with a role (renamed from
@@ -377,6 +410,12 @@ model Membership {
 
   // The staff member this team member is on the diary as, if any (U3).
   staffMember StaffMember?
+
+  // Extra permissions for this one person, on top of their role (F17,
+  // DEC-039). Action keys, like OrganizationRole.actions: unknown strings are
+  // dropped on read, and an extra only ever adds. Set by someone holding
+  // `member:role:update`, within their own reach, never on themselves.
+  extraActions String[] @default([])
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -1442,8 +1481,12 @@ model Order {
   organization   Organization? @relation(fields: [organizationId], references: [id])
 
   orderId    String // Store-specific order number (ORD-001, etc)
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
+  // Null only for a walk-in (plan B, B13): someone served at the counter who
+  // left no email, so no storefront customer and no contact is made. Their
+  // name (and phone, if given) stays on the order as `walkInName` and
+  // `walkInPhone`. Every other order names its storefront customer.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   // Pricing
   subtotal Decimal @db.Decimal(12, 2)
@@ -1523,10 +1566,40 @@ model Order {
   payTokenHash     String?   @unique
   payLinkCreatedAt DateTime?
 
+  // A treatment's visits (E9, DEC-050): one booking per visit.
+  bookings Booking[]
+  // The key the site's checkout sheet sent when it started this order (G13):
+  // a double tap or a retry with the same key finds this order and its
+  // intent instead of making a second. Null on every order not started at a
+  // site's checkout.
+  checkoutKey String?
+
+  // The customer's site account when they placed it signed in: at the
+  // site's checkout (G13), or a treatment booked signed in (E9, A9). The
+  // account's Orders read it beside the contact's identity links, so an
+  // order it placed shows even when its store customer stands for someone
+  // else; "This isn't them" (A4) moves what it made (round 2, A7). A
+  // single-column key, as Booking's: RLS keeps it in the business.
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
+  // A walk-in's name, and their phone if they gave one, for "call when it's
+  // ready" (plan B, B13). Set only when `customerId` is null; kept like any
+  // order's contact details (DEC-042). No contact is made from them, because
+  // a contact needs an email.
+  walkInName  String?
+  walkInPhone String?
+
   @@unique([storeId, orderId])
+  @@unique([storeId, checkoutKey])
   @@index([storeId])
   @@index([customerId])
   @@index([organizationId])
+  // The calendar's Orders layer and Home's week read a business's orders
+  // by when they were placed (round 2, E20).
+  @@index([organizationId, createdAt])
+  // What an account ordered, newest first (A7).
+  @@index([customerAccountId, createdAt])
 }
 
 model OrderItem {
@@ -1534,8 +1607,12 @@ model OrderItem {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
+  // What the line bills: a product, or a service (a treatment, E9,
+  // DEC-050). Exactly one is set, CHECKed (`OrderItem_bills_one_thing`). A
+  // service line holds no stock (`stockRow` NONE), has no variant and a
+  // quantity of 1, and takes its GST from the service.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   // The variant bought. Null on lines from before per-variant stock, and on
   // products without variants; those move the product's own stock.
@@ -1570,9 +1647,15 @@ model OrderItem {
   // The invoice lines that bill it (U5): a line refund credits these.
   invoiceLines InvoiceLine[]
 
+  // The service a treatment's line bills (E9, DEC-050). Restrict: services
+  // are soft-deleted, so the row stays and the order keeps its line.
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
   @@index([orderId])
   @@index([variantId])
   @@index([stockLevelId])
+  @@index([serviceId])
   // Lines holding stock, for the held-stock check (#511): few of all lines.
   @@index([stockLevelId], map: "OrderItem_holding_idx", where: raw("\"heldQuantity\" <> 0"))
 }
@@ -1927,6 +2010,21 @@ model StoreSettings {
   // When the one-time "Pick-up orders now count as late after 2 hours"
   // notice on Orders was dismissed for this storefront (B17).
   lateRuleNoticeDismissedAt     DateTime?
+
+  // The shop's delivery fee (G13): a flat amount added to an order's
+  // `shipping` when the site's checkout picks Local delivery or Shipping.
+  // Null is free. B9 prefills a change of fulfilment from it.
+  localDeliveryFee Decimal? @db.Decimal(10, 2)
+  shippingFee      Decimal? @db.Decimal(10, 2)
+
+  // Customers who share an email (DEC-055, C15). Set: from this moment on,
+  // a customer of this storefront who pays with an email that a contact
+  // made from another store customer already holds is linked to that
+  // contact on their own (`customer-workspace/same-email-link.ts`). Null
+  // leaves the pair for staff: the default, and every existing
+  // storefront's. Store customers from before it was set stay as they
+  // are, so turning it on never re-links a pair that already existed.
+  linkSameEmailSince DateTime?
 }
 
 model StoreFeatures {
@@ -2484,6 +2582,8 @@ enum CustomerLinkReason {
   PAYMENT
   // They placed the order signed in on the business's site (A4, G13).
   SITE_ACCOUNT
+  // They booked a treatment, which is sold as an order (E9, DEC-050).
+  BOOKING
 }
 
 // ContactNote: what the team has written down about a person (U8, ADR-008).
@@ -2874,9 +2974,33 @@ model Page {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // What the page is (round-2 G14, DEC-046): FREE is a page the merchant
+  // lays out by hand, as every page was before; the others are module pages,
+  // which sit beside them. At most one of each module kind per site (the
+  // partial unique index below). A Book page is always at /book and a Shop
+  // page at /shop; the others default to /prices, /journal and /contact.
+  kind PageKind @default(FREE)
+
+  // "Show in menu" (G14). A module page joins the site's menu on its own
+  // while this is on; any page with it off is reachable by link but never
+  // listed. On by default, so every page that existed before keeps the menu
+  // it had.
+  inMenu Boolean @default(true)
+
   @@unique([siteId, path])
+  @@unique([siteId, kind], map: "Page_siteId_module_kind_key", where: raw("kind <> 'FREE'"))
   @@index([siteId])
   @@index([organizationId])
+}
+
+/// A page's kind (G14): FREE, or the module it presents.
+enum PageKind {
+  FREE
+  SHOP
+  BOOK
+  PRICES
+  JOURNAL
+  CONTACT
 }
 
 // PageVersion — a DRAFT / working version of a Page. Editing happens here; a
@@ -3222,6 +3346,9 @@ model Domain {
 // `Customer` (store-scoped, tied to orders/carts): a Contact is a
 // marketing/sales person captured from enquiries, deduped per org by email.
 model Contact {
+  // Their places in line for full classes (round-2 A12).
+  classWaitlistEntries ClassWaitlistEntry[]
+
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3286,6 +3413,33 @@ model Contact {
   mergedInto   Contact?  @relation("ContactMerge", fields: [mergedIntoId, organizationId], references: [id, organizationId], onDelete: Cascade)
   mergedFrom   Contact[] @relation("ContactMerge")
   mergedAt     DateTime?
+
+  // Their postal address, as staff keep it on the edit sheet (C8, R10).
+  // Never copied into orders already placed; New order may prefill from it.
+  // `country` is ISO 3166-1 alpha-2. In India `state` is the GST state's
+  // name and `postalCode` a six-digit PIN (checked by the API). A merge
+  // fills it from the other contact, whole, when the survivor has none.
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String?
+
+  // Their message thread with the business, written from their account on
+  // the business's site and answered by the team (round-2 A13). At most one.
+  customerThread CustomerThread?
+
+  // The autopay mandates they authorised (round-2 D11). Never moved by a
+  // merge: the merged-away person's are cancelled (D20).
+  paymentMandates PaymentMandate[]
+
+  // When staff removed their details for a privacy request (DEC-042, C11).
+  // The row stays so orders, invoices and bookings keep their keys; its
+  // email is the `removed+<id>@removed.invalid` placeholder, and name,
+  // phone, company and address are cleared. Lists, search and Customer
+  // Detail leave it out, and `resolveContact` writers refuse it.
+  removedAt DateTime?
 
   // Email is unique WITHIN an org (email is required, so no NULL rows): a repeat
   // enquiry from the same address updates the existing Contact rather than
@@ -3567,6 +3721,38 @@ model Notification {
   @@index([organizationId])
 }
 
+// NotificationPreference: one person's choice for one alert on one channel,
+// in one business (round-2 F14, R13). "What you hear about" in Settings ›
+// Your profile.
+//
+// The defaults are code (`notifications/alert-preferences.ts`): the bell on
+// for everything, email on for Payment failed only, WhatsApp off. A row is
+// written only when the person changes a switch, so a business that never
+// opens the grid has no rows and hears exactly the defaults.
+//
+// `event` is an alert key (order | booking | failed | team) and `channel`
+// one of bell | email | whatsapp. Strings, not enums, so a new alert is a
+// code change and never a migration.
+model NotificationPreference {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  event   String
+  channel String
+  enabled Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, userId, event, channel])
+  @@index([organizationId])
+  @@index([userId])
+}
+
 // ============================================================================
 // SCHEDULING / BOOKINGS (Stage 4 — S4-001)
 // ============================================================================
@@ -3583,6 +3769,9 @@ model Notification {
 // Service — an org-owned bookable offering (one provider/resource for now,
 // modeled as `capacity`).
 model Service {
+  // Who is waiting for a place in its full sessions (round-2 A12).
+  waitlistEntries ClassWaitlistEntry[]
+
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3642,6 +3831,9 @@ model Service {
   // Whether the business's booking page and services lists offer it. A
   // hidden service is still booked by staff.
   showOnBookingPage Boolean @default(true)
+
+  // The order lines that bill it: a treatment sold as an order (E9).
+  orderItems OrderItem[]
 
   @@index([organizationId])
   @@index([siteId])
@@ -3776,6 +3968,15 @@ model Booking {
   // is judged by its start and today's rules, as before.
   freeCancelUntil DateTime?
 
+  // A visit of a treatment (E9, DEC-050): the order that sold the whole
+  // treatment, and which visit this is (1, 2, …). An order always has its
+  // visit number, CHECKed (`Booking_visit_of_order`). SetNull keeps the
+  // booking, and the number it had, if the order goes. A visit never refunds on its own: money comes back through
+  // the order's refund.
+  orderId     String?
+  order       Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  visitNumber Int?
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   @@index([organizationId])
@@ -3797,6 +3998,10 @@ model Booking {
   @@index([organizationId, startAt])
   // What an account booked (the double-booking check, and unlinking).
   @@index([customerAccountId, startAt])
+  // One live booking per visit of a treatment (E9): two people booking
+  // visit 2 at once can't both win. A cancelled visit leaves it, so the
+  // visit can be booked again; bookings with no order coexist.
+  @@unique([orderId, visitNumber], map: "Booking_one_live_visit", where: raw("status <> 'CANCELLED'"))
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a
@@ -3884,6 +4089,9 @@ model StaffTimeOff {
 
   @@index([organizationId])
   @@index([staffId, startAt])
+  // The calendar's days off read a business's time off overlapping a month
+  // (round 2, E20).
+  @@index([organizationId, startAt])
 }
 
 /// One-off hours on one date, on top of the weekly ones (a closed day opened).
@@ -4810,7 +5018,7 @@ model SubscriptionPlan {
   price       Decimal @db.Decimal(12, 2)
   currency    String
   interval    String // WEEK | MONTH | QUARTER | YEAR
-  status      String  @default("ACTIVE") // ACTIVE | ARCHIVED — archived plans take no new subscribers
+  status      String  @default("ACTIVE") // DRAFT | ACTIVE | ARCHIVED — only ACTIVE takes new subscribers (D21)
 
   // A membership's classes a month (U3). Null: as many as they like.
   classesPerMonth Int?
@@ -4829,6 +5037,20 @@ model SubscriptionPlan {
   // business's plan.
   @@unique([id, organizationId])
   @@index([organizationId])
+
+  // Drafts (round-2 D5, `common/drafts/`). A live plan's unpublished changes:
+  // only the fields that differ from the published columns, which buyers
+  // keep reading. Null when there are none. A DRAFT plan writes its columns
+  // directly and never holds a pending set.
+  pendingChanges     Json?
+  // When, and by whom, the pending set (or a draft's columns) was last
+  // saved. Null once published or discarded. No foreign key: a teammate who
+  // leaves keeps their saves; a Saroh operator's is never stored (DEC-035).
+  pendingChangedAt   DateTime?
+  pendingChangedById String?
+  // Bumped by every draft save, publish, discard and plan write, so an
+  // editor holding an older revision is refused instead of overwriting (#285).
+  draftRevision      Int       @default(0)
 }
 
 // One change to a plan: who made it, when, and each changed field's value
@@ -4924,6 +5146,10 @@ model CustomerSubscription {
   // (`subscriptions/classes-allowance.ts`), until follow-up Z1.
   classesPerPeriod      Int?
   classesPerPeriodSetAt DateTime?
+
+  // Its autopay mandates (round-2 D11): at most one ACTIVE, and every one
+  // ends when the subscription does (D20).
+  paymentMandates PaymentMandate[]
 
   // One live subscription per person per plan: a second is a double-click,
   // and it would bill them twice every period.
@@ -5097,6 +5323,9 @@ model Invoice {
   // Emails that sent it or reminded about it (D17).
   messages Message[]
 
+  // Account-thread posts that sent it or reminded about it (D17, A13).
+  threadMessages CustomerThreadMessage[]
+
   @@unique([organizationId, number])
   // One live invoice per subscription period: the renewal job's idempotency
   // key. Voided invoices are left out, so a voided period can be reissued.
@@ -5111,6 +5340,22 @@ model Invoice {
   @@index([orderId])
   @@index([bookingId])
   @@index([relatedInvoiceId])
+  // The calendar's money, Payments and Invoices layers and Home's week read
+  // invoices by when they were paid, and credit notes by when they were
+  // issued (round 2, E19, E20).
+  @@index([organizationId, status, paidAt])
+  @@index([organizationId, paidAt])
+  @@index([organizationId, issuedAt])
+
+  // A pack bought online (round-2 A11): the pack and its terms — name,
+  // credits, validity, price — as they were when the customer started
+  // paying, on the source PACK draft. The payment's webhook numbers the
+  // invoice and makes the purchase from this, so a pack changed or archived
+  // meanwhile still sells on what was shown. Null on every other invoice.
+  packTerms Json?
+
+  // The sweep that discards online pack drafts nobody paid (A11).
+  @@index([createdAt], map: "Invoice_open_pack_drafts_idx", where: raw("status = 'DRAFT' AND source = 'PACK'"))
 }
 
 model InvoiceLine {
@@ -5245,7 +5490,7 @@ model ClassPack {
   validityDays Int
   price        Decimal @db.Decimal(12, 2)
   currency     String
-  status       String  @default("ACTIVE") // ACTIVE | ARCHIVED
+  status       String  @default("ACTIVE") // DRAFT | ACTIVE | ARCHIVED (E14)
 
   services  ClassPackService[]
   purchases PackPurchase[]
@@ -5254,6 +5499,34 @@ model ClassPack {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
+
+  // Drafts (round-2 E14, `common/drafts/`, as a plan's in D5). A live pack's
+  // unpublished changes: only the fields that differ from the published
+  // columns (and services), which sales keep reading. Null when there are
+  // none. A DRAFT pack writes its columns directly and never holds a set.
+  pendingChanges   Json?
+  // When the pending set (or a draft's columns) was last saved. Null once
+  // published or discarded.
+  pendingChangedAt DateTime?
+  // Bumped by every draft save, publish, discard and pack write, so an
+  // editor holding an older revision is refused instead of overwriting (#285).
+  draftRevision    Int       @default(0)
+  // Who moved the revision last, and when: named in a stale editor's 409.
+  // No foreign key: a teammate who leaves keeps their saves; a Saroh
+  // operator's is never stored (DEC-035), so a time with no person is theirs.
+  revisedAt        DateTime?
+  revisedById      String?
+
+  // Round-2 E13 (defaults 45, 46). CLASSES pays for classes (capacity > 1),
+  // ONE_TO_ONE for one-to-one sessions (capacity 1); locked once sold.
+  kind          String      @default("CLASSES") // CLASSES | ONE_TO_ONE
+  // Sold only to someone who has never bought a pack of this kind.
+  firstPackOnly Boolean     @default(false)
+  events        PackEvent[]
+
+  // The composite key a pack event points at, so an event can't name
+  // another business's pack.
+  @@unique([id, organizationId])
 }
 
 model ClassPackService {
@@ -5297,6 +5570,70 @@ model PackPurchase {
   @@index([organizationId])
   @@index([contactId])
   @@index([packId])
+
+  // How the sale was paid (round-2 E13): CASH | UPI | CARD | BANK | ONLINE |
+  // NONE. A record of what the desk took, never a restriction on how anyone
+  // pays (DEC-059). Null: sold before it was recorded.
+  paidBy     String?
+  extensions PackExtension[]
+  events     PackEvent[]
+
+  // The composite key an extension points at (one business's purchase).
+  @@unique([id, organizationId])
+}
+
+// A holder's pack given more days (round-2 E13, default 46): at most 30 at a
+// time, moving `PackPurchase.expiresAt`. Append-only.
+model PackExtension {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  purchaseId     String
+  purchase       PackPurchase @relation(fields: [purchaseId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  days          Int // 1–30, checked in the migration too
+  reason        String
+  // The use-by date before and after.
+  expiresBefore DateTime
+  expiresAfter  DateTime
+  // Who gave it. Not a foreign key: a teammate who leaves keeps their
+  // extensions. Null for a Saroh operator, never stored (DEC-035).
+  byUserId      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, purchaseId])
+}
+
+// A class pack's history (round-2 E13): created, published, changed, sold,
+// extended, archived, restored. Append-only, written in the change's own
+// transaction (PACK_EVENT_KINDS in class-packs/pack-events.ts).
+model PackEvent {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  packId         String
+  pack           ClassPack     @relation(fields: [packId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  // The sale an event is about (SOLD, EXTENDED). Kept when the purchase
+  // goes with its contact, as history without a name.
+  purchaseId     String?
+  purchase       PackPurchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+
+  kind        String
+  // TEAM | CUSTOMER | OPERATOR (`subscriptions/event-actors.ts`). An
+  // operator's reads as Saroh support (DEC-035).
+  actorKind   String
+  // Not a foreign key: someone who leaves keeps their history.
+  actorUserId String?
+  // What happened, by kind: `{ field: [before, after] }` for a change; the
+  // price and how it was paid for a sale; the days, reason and use-by dates
+  // for an extension.
+  details     Json    @default("{}")
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, packId, createdAt])
+  @@index([purchaseId])
 }
 
 // One credit spent on one booking. Cancelling the booking reverses it.
@@ -5342,6 +5679,9 @@ enum CustomerAccountStatus {
 /// code. Belongs to one business, is exactly one Contact, and is never a
 /// Better Auth `User` (ADR-011).
 model CustomerAccount {
+  // Places in line the customer joined from this account (A12).
+  waitlistEntries ClassWaitlistEntry[]
+
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5376,6 +5716,11 @@ model CustomerAccount {
 
   // Bookings made signed in (A9).
   bookings Booking[]
+  // Orders placed signed in (A7).
+  orders   Order[]
+
+  // Messages the customer wrote to the business from this account (A13).
+  threadMessages CustomerThreadMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5446,4 +5791,317 @@ model CustomerSession {
   @@index([accountId])
   @@index([siteId])
   @@index([expiresAt])
+}
+
+/// Who wrote a thread message (A13): the customer from their account, a
+/// staff member from the workspace, or Saroh itself for the business (an
+/// invoice sent, and later A14's order and booking notices).
+enum CustomerThreadAuthor {
+  CUSTOMER
+  STAFF
+  SYSTEM
+}
+
+/// A customer's one message thread with the business (round-2 A13, R14,
+/// default 77): the customer writes from their account on the business's
+/// site, and the team answers in the workspace. Rooted on the Contact, so a
+/// merge absorbs the other's thread (C9) and a removal deletes it (C11).
+model CustomerThread {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // The newest message, for the order threads are listed in.
+  lastMessageAt  DateTime  @default(now())
+  // When each side last opened it: a message from the other side after this
+  // is unread, and opening clears the dot.
+  customerReadAt DateTime?
+  staffReadAt    DateTime?
+
+  messages CustomerThreadMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One thread per customer.
+  @@unique([contactId, organizationId])
+  // The target of (threadId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  @@index([organizationId, lastMessageAt])
+}
+
+/// One message in a customer's thread (A13). Plain text, never rendered as
+/// HTML.
+model CustomerThreadMessage {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  threadId String
+  thread   CustomerThread @relation(fields: [threadId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  author CustomerThreadAuthor
+  body   String
+
+  // The account that wrote it (CUSTOMER). "This isn't them" moves the
+  // messages the account wrote since it linked (unlink-plan.ts).
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+  // The staff member who wrote it (STAFF), or sent the invoice (SYSTEM).
+  authorUserId      String?
+
+  // What a SYSTEM message says happened, and the invoice it is about: D17's
+  // INVOICE_SENT | INVOICE_REMINDER. The invoice's once-sent and
+  // one-reminder-a-day rules count these beside its emails.
+  event     String?
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([threadId, createdAt])
+  @@index([customerAccountId, createdAt])
+  @@index([invoiceId, createdAt])
+}
+
+/// An autopay mandate at the business's own payment provider (round-2 D11,
+/// DEC-038): the customer's authorisation for the provider to charge one
+/// subscription's renewals. Saroh keeps only the provider's ids and what it
+/// returns as displayable; card and bank details never reach Saroh.
+///
+/// It belongs to exactly one subscription and ends with it (D20): every
+/// move of that subscription to CANCELLED, a privacy removal of the contact
+/// and a merge that retires the contact cancel it at the provider through
+/// `payments/mandates.service.ts` (`cancelFor`, or `cancelMandatesInTx`
+/// with the `mandate.cancel` job). It is marked CANCELLED before the
+/// provider answers, so it is never charged again; `cancelConfirmedAt` is
+/// set once the provider has said so (null: "being confirmed", DEC-026).
+///
+/// D20 built the smallest piece of D11's model it needs; D11 adds the
+/// set-up, the limit and the charge columns.
+model PaymentMandate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  subscriptionId String
+  subscription   CustomerSubscription @relation(fields: [subscriptionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // The MerchantPaymentProvider it was set up with: "RAZORPAY" | "CASHFREE".
+  provider           String
+  // The provider's customer and mandate (or token) ids. Null while a set-up
+  // hasn't reached the provider; such a mandate is cancelled without a call.
+  providerCustomerId String?
+  providerMandateId  String?
+  // Only what the provider returns as displayable (a masked handle, the
+  // last four digits). Cleared by a privacy removal (C11).
+  displayHint        String?
+
+  // PENDING | ACTIVE | PAUSED | CANCELLED | FAILED
+  status            String    @default("PENDING")
+  activatedAt       DateTime?
+  cancelledAt       DateTime?
+  // CUSTOMER | STAFF | SUBSCRIPTION_ENDED | PRIVACY_REMOVAL | MERGED | PROVIDER
+  cancelReason      String?
+  // When the provider confirmed the cancel. Null on a CANCELLED row: Saroh
+  // stopped charging it, and is still confirming with the provider.
+  cancelConfirmedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // A subscription has at most one ACTIVE mandate.
+  @@unique([subscriptionId], map: "PaymentMandate_one_active_per_subscription", where: raw("status = 'ACTIVE'"))
+  @@index([organizationId])
+  @@index([organizationId, subscriptionId, status])
+  @@index([organizationId, contactId, status])
+}
+
+/// One notice about a customer's own booking or order, handled once
+/// (round-2 A14, R15): the ledger that makes `booking.notify` and
+/// `customer.notify` idempotent per event. It is written first, on the
+/// handler's transaction, with what the notice became: a SYSTEM message in
+/// the customer's thread, a transactional email (`Message`), and, for what
+/// the customer did themselves, a notice to the team (`Notification`).
+/// The send job reads it back to stamp a confirmation's email verified
+/// (DEC-049), and an order step's Undo reads it to know whether the
+/// customer was already told.
+model CustomerNotice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The event it is about, unique per business ("booking:<eventId>",
+  // "order:<orderEventId>", "team:booking:<eventId>").
+  eventKey String
+  // BOOKING_CONFIRMED | BOOKING_MOVED | BOOKING_CANCELLED | ORDER_READY |
+  // ORDER_HANDED_OVER | WAITLIST_OFFER | TEAM_TOLD
+  kind     String
+
+  // What it was about and what it became. Informational, no FK, like
+  // Notification.leadId: the record outlives nothing it could dangle from.
+  contactId       String?
+  bookingId       String?
+  orderId         String?
+  threadMessageId String?
+  messageId       String?
+  notificationId  String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, eventKey])
+  @@index([organizationId])
+  @@index([messageId])
+}
+
+// ============================================================================
+// BULK KITCHEN MOVES (round-2 B6)
+// ============================================================================
+
+enum OrderStageBatchStatus {
+  HELD
+  COMMITTED
+  CANCELLED
+}
+
+/// Many orders moved a step at once from the Orders list (round-2 B6, R11).
+/// The batch is written HELD with its lines and its commit job ten seconds
+/// on, in one transaction, so a closed tab loses nothing; "Send now" or the
+/// job commits it, each line in its own order-locked transaction through
+/// the single-order stage write. `id` is the client's `batchId`: a retry of
+/// the same id returns what is stored and never moves anything twice.
+model OrderStageBatch {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  status   OrderStageBatchStatus @default(HELD)
+  // When the job commits it, unless "Send now" or "Undo all" came first.
+  commitAt DateTime
+  // Who asked. Not a foreign key, like OrderEvent.actorUserId: the steps
+  // are written in their name.
+  actorUserId String
+
+  committedAt DateTime?
+  cancelledAt DateTime?
+  // "Undo all" after the commit.
+  undoneAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  lines OrderStageBatchLine[]
+
+  @@index([organizationId])
+}
+
+/// One order in a batch: the step it was asked to take from where the list
+/// showed it, and what became of it. `result` is null until the commit
+/// reaches it: MOVED | MOVED_BY_SOMEONE_ELSE | NOT_FOUND | REFUSED |
+/// CANCELLED (Undo all reached it first). `undoResult`: UNDONE | REFUSED.
+model OrderStageBatchLine {
+  id             String @id @default(cuid())
+  organizationId String
+
+  batchId String
+  batch   OrderStageBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  // As the client sent it. Not a foreign key: an id from another business
+  // is recorded as NOT_FOUND, and moves nothing.
+  orderId   String
+  position  Int
+  fromStage OrderStage
+  toStage   OrderStage
+
+  result       String?
+  reason       String?
+  stageEventId String?
+
+  undoResult  String?
+  undoReason  String?
+  undoEventId String?
+  // The customer had already been told when it was undone (A14).
+  told        Boolean?
+
+  @@unique([batchId, orderId])
+  @@index([organizationId])
+}
+
+/// Where a place in line for a full class stands (round-2 A12).
+enum ClassWaitlistStatus {
+  // In line.
+  WAITING
+  // A freed place is held for them until `offeredUntil`.
+  OFFERED
+  // They took the place: `bookingId` is the booking.
+  ACCEPTED
+  // The held place ran out unanswered, and went to the next in line.
+  EXPIRED
+  // They left the line themselves.
+  LEFT
+  // The class was cancelled, or its service taken off sale.
+  CLOSED
+}
+
+/// A place in line for one session of a full class (round-2 A12, R13,
+/// default 9). A session is a service and its start: classes have no row of
+/// their own. When a place frees (a cancel, a move away, a hold let go or
+/// run out), `waitlist.offer` holds it for the first WAITING entry until
+/// the earlier of 2 hours from then and 1 hour before the class, and tells
+/// them (`customer.notify`, WAITLIST_OFFER). A held place counts as taken
+/// in every capacity count (`bookings/held-seats.ts`) except that person's
+/// own booking of it, which accepts the offer. Expiry offers the next.
+///
+/// Rooted on the Contact: a merge keeps the better place of two in one
+/// class (C9), and a removal deletes them (C11).
+model ClassWaitlistEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  // The session: the class's start and end.
+  startAt   DateTime
+  endAt     DateTime
+
+  contactId String
+  contact   Contact @relation(fields: [contactId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // The account that joined, from the business's site. "This isn't them"
+  // moves the entries the account made since it linked (unlink-plan.ts).
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
+
+  // Their place in the session's line: first come, first offered.
+  position Int
+  status   ClassWaitlistStatus @default(WAITING)
+
+  // While OFFERED: when the place was held for them, and until when.
+  offeredAt    DateTime?
+  offeredUntil DateTime?
+  // When it stopped being live (accepted, expired, left or closed); the
+  // cleanup deletes it 30 days on (default 74).
+  closedAt     DateTime?
+  // The booking that took the place (ACCEPTED). Informational, no FK.
+  bookingId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One live place per person per session; one who left or let an offer
+  // run out may join again, at the back.
+  @@unique([serviceId, startAt, contactId], map: "ClassWaitlistEntry_one_live_per_session", where: raw("status = ANY (ARRAY['WAITING'::\"ClassWaitlistStatus\", 'OFFERED'::\"ClassWaitlistStatus\"])"))
+  @@index([organizationId])
+  @@index([serviceId, startAt, status, position])
+  @@index([status, offeredUntil])
+  @@index([contactId, status])
+  @@index([customerAccountId, createdAt])
+  @@index([closedAt])
 }

@@ -85,6 +85,19 @@
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row
   mixing two businesses.
+- **Current** — **An order line bills a product or a service, never both**
+  (DEC-050, round-2 E9). `OrderItem.productId` is nullable beside
+  `serviceId`, and `OrderItem_bills_one_thing` CHECKs exactly one. A
+  service line is a treatment sold as one order (Appointment type): quantity
+  1, `stockRow` NONE, no variant, GST from the Service. Read a line's name
+  and kind through `orders/order-line.ts` (`lineName`, `lineKind`,
+  `PRODUCT_LINES` for stock, reviews and discounts), never `item.product`
+  alone. Its visits are bookings (`Booking.orderId`, `visitNumber`, one live
+  booking per visit by the partial unique `Booking_one_live_visit`), and a
+  visit never refunds on its own: visit 1's pay-now invoice names the order
+  (`treatment-ledger.ts` counts its payments as the order's), so
+  `bookingPaymentInTx` never finds it. `bookings/visits.ts` sells and books
+  them.
 - **Current** — **A new shelf never changes how a product counts** (#513,
   PR #533 review). `stock.service` makes a missing row only under the
   product's lock, re-reads Track stock there, and refuses (409) a variant's
@@ -173,6 +186,24 @@
   (`mergedIntoId: null`). Every relation to `Contact` needs a rule in
   `merge-plan.ts` `MERGE_RULES`; `merge.relations.spec.ts` fails a new one
   without.
+- **Current** — **A privacy removal anonymises in place; a new personal
+  field needs a rule** (DEC-042, round-2 C11). "Remove their details"
+  (`customer-workspace/privacy-removal.service.ts`) keeps the contact row
+  (`removedAt`, the `removed+<id>@removed.invalid` placeholder, no name,
+  phone, company or address) so every key to it holds, and scrubs the
+  person wherever else they live: store customers only they hold, their
+  orders' recipient and note (never `deliveryState`, the place of supply),
+  messages, review invitations and reviews, bookings' booker details and
+  snapshot. Issued invoices keep their bill-to; leads and form entries are
+  the CRM's and stay. Autopay is cancelled at the provider first through
+  D20's `cancelFor` (`payments/mandate-gate.ts`), and nothing changes while
+  the provider hasn't confirmed; a contact's hard delete asks the same gate.
+  Lists and search leave a removed contact out (`removedAt: null`,
+  `notRetired`). Every relation to `Contact` needs a rule in
+  `privacy-removal-plan.ts` `REMOVAL_RULES` too (`merge.relations.spec.ts`),
+  and every personal-looking field on a model reachable from `Contact` or
+  `Customer` needs an entry in `personal-data.ts` — a rule, or "kept" and
+  why (`personal-data.spec.ts`).
 
 ## Money — **Current**
 

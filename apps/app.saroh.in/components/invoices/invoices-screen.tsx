@@ -9,22 +9,28 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
+import { InvoiceRow } from "@/components/invoices/invoice-row";
+import { ScopeNotice, SourceChips } from "@/components/invoices/source-filter";
 import { SinceNotice } from "@/components/shared/since-notice";
-import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { invoicesHref } from "@/lib/invoices/links";
+import { exemptNote } from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
+import type { InvoiceScope, SourceChip } from "@/lib/invoices/sources";
+import {
+    chipEmptyLine,
+    chipsFor,
+    inChip,
+    scopeEmptyLine,
+    scopeLine,
+} from "@/lib/invoices/sources";
 import type { InvoiceTab } from "@/lib/invoices/status";
 import {
-    billedTo,
     inTab,
     INVOICE_TABS,
-    invoicePill,
     owedSummary,
     paidSinceRows,
-    sourceLine,
-    whenLine,
     withCorrectionsUnder,
 } from "@/lib/invoices/status";
 import { LIST_LIMIT } from "@/lib/lists/capped";
@@ -49,7 +55,9 @@ function sums(list: { currency: string; cents: number }[]): string {
  * Payments → Invoices, after the "Saroh Invoices" design: every invoice the
  * business has — made by orders, by subscription renewals, or written by
  * hand — in tabs with counts, what is owed, a banner while any are overdue,
- * and a quick look on each row.
+ * and a quick look on each row. Chips narrow it by what each was for
+ * (`?source=`, D18); from Pack or Course Detail it holds one pack's or
+ * course's only (`?pack=`, `?course=`), and says so.
  *
  * Overdue is worked out from the due date by the API, never stored. A credit
  * note sits under the invoice it corrects and never counts as owed; an
@@ -62,6 +70,8 @@ export function InvoicesScreen({
     businessName,
     tax,
     initialTab,
+    initialChip = "all",
+    scope = null,
     paidSince = null,
     paidSinceInvoices = null,
 }: {
@@ -73,6 +83,13 @@ export function InvoicesScreen({
     /** Null when the business's tax settings could not be read. */
     tax: InvoiceBusinessTax | null;
     initialTab: InvoiceTab;
+    /** The source chip `?source=` chose (D18). */
+    initialChip?: SourceChip;
+    /**
+     * One pack's or course's invoices (D18): `invoices` holds only theirs,
+     * read so by the API, and the chips give way to the pill.
+     */
+    scope?: InvoiceScope | null;
     /**
      * From Home's "Last 24 hours" (`?since=`, F6): only the invoices paid
      * from then on — the money Home added up, a credit note never.
@@ -89,31 +106,54 @@ export function InvoicesScreen({
     const pathname = usePathname();
     const params = useSearchParams();
     const [tab, setTab] = useState<InvoiceTab>(initialTab);
+    const [chip, setChip] = useState<SourceChip>(initialChip);
     const [peek, setPeek] = useState<Invoice | null>(null);
 
-    function pick(next: InvoiceTab) {
-        setTab(next);
-        // The tab is part of the address, so a reload or a shared link keeps it.
+    // The tab and the chip are part of the address, so a reload or a shared
+    // link keeps them.
+    function remember(key: "view" | "source", value: string | null) {
         const q = new URLSearchParams(params.toString());
-        if (next === "all") q.delete("view");
-        else q.set("view", next);
+        if (value === null) q.delete(key);
+        else q.set(key, value);
         const s = q.toString();
         router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
     }
 
-    const { owed, overdue, overdueCount } = owedSummary(invoices);
+    function pick(next: InvoiceTab) {
+        setTab(next);
+        remember("view", next === "all" ? null : next);
+    }
+
+    function pickChip(next: SourceChip) {
+        setChip(next);
+        setPeek(null);
+        remember("source", next === "all" ? null : next);
+    }
+
+    // Everything below — the tabs, their counts, what is owed — reads the
+    // chip's rows.
+    const chips = scope ? [] : chipsFor(invoices, chip);
+    const mine = scope ? invoices : inChip(invoices, chip);
+    const { owed, overdue, overdueCount } = owedSummary(mine);
     const rows = withCorrectionsUnder(
-        paidSinceRows(invoices, paidSinceInvoices, paidSince),
+        paidSinceRows(
+            mine,
+            paidSinceInvoices && inChip(paidSinceInvoices, chip),
+            paidSince,
+        ),
     );
     const shown = rows.filter((i) => {
         if (inTab(i, tab)) return true;
         // A correction follows its invoice into whichever tab shows it.
         const parent = i.related
-            ? invoices.find((p) => p.id === i.related?.id)
+            ? mine.find((p) => p.id === i.related?.id)
             : undefined;
         return tab !== "all" && parent !== undefined && inTab(parent, tab);
     });
     const tabLabel = INVOICE_TABS.find((t) => t.id === tab)?.label ?? "";
+    // Every issued paper a bill of supply (D15): the line says so, rather
+    // than "GST tax invoices".
+    const exempt = exemptNote(invoices);
 
     return (
         // One block: the page container spaces its children apart, and the
@@ -143,11 +183,13 @@ export function InvoicesScreen({
             />
             <p className="mb-3 text-[12px] text-muted-foreground">
                 Orders and subscription renewals make their invoice themselves.
-                {tax
-                    ? tax.registered
-                        ? ` GST tax invoices${tax.gstin ? `, GSTIN ${tax.gstin}` : ""}.`
-                        : " Not GST-registered — no tax is charged."
-                    : null}
+                {exempt
+                    ? ` ${exempt}`
+                    : tax
+                      ? tax.registered
+                          ? ` GST tax invoices${tax.gstin ? `, GSTIN ${tax.gstin}` : ""}.`
+                          : " Not GST-registered — no tax is charged."
+                      : null}
             </p>
 
             <div
@@ -157,7 +199,7 @@ export function InvoicesScreen({
             >
                 {INVOICE_TABS.map((t) => {
                     const on = t.id === tab;
-                    const n = invoices.filter((i) => inTab(i, t.id)).length;
+                    const n = mine.filter((i) => inTab(i, t.id)).length;
                     const alarm = t.id === "overdue" && n > 0;
                     return (
                         <button
@@ -190,6 +232,18 @@ export function InvoicesScreen({
             </div>
 
             <div className="flex flex-col pb-[26px] pt-4">
+                {scope ? (
+                    <ScopeNotice
+                        line={scopeLine(scope, mine.length)}
+                        clearHref={invoicesHref()}
+                    />
+                ) : (
+                    <SourceChips
+                        chips={chips}
+                        chosen={chip}
+                        onPick={pickChip}
+                    />
+                )}
                 {paidSince ? (
                     <div className="mb-3.5">
                         <SinceNotice
@@ -223,7 +277,7 @@ export function InvoicesScreen({
                     </div>
                 ) : null}
 
-                {invoices.length === 0 ? (
+                {invoices.length === 0 && !scope ? (
                     <EmptyState
                         icon={<ReceiptText />}
                         title="No invoices yet"
@@ -240,7 +294,9 @@ export function InvoicesScreen({
                     />
                 ) : shown.length === 0 ? (
                     <div className="rounded-[12px] border border-dashed border-border-strong px-5 py-10 text-center text-[13px] text-muted-foreground">
-                        No {tabLabel.toLowerCase()} invoices.
+                        {scope && mine.length === 0
+                            ? scopeEmptyLine(scope)
+                            : chipEmptyLine(tabLabel, scope ? "all" : chip)}
                     </div>
                 ) : (
                     <ul className="flex flex-col gap-2">
@@ -274,76 +330,5 @@ export function InvoicesScreen({
                 }}
             />
         </div>
-    );
-}
-
-function InvoiceRow({
-    invoice: i,
-    selected,
-    onOpen,
-}: {
-    invoice: Invoice;
-    selected: boolean;
-    onOpen: () => void;
-}) {
-    const pill = invoicePill(i);
-    const when = whenLine(i);
-    const credit = i.kind === "CREDIT_NOTE";
-    const nested = credit || i.kind === "SUPPLEMENTARY";
-    return (
-        <button
-            type="button"
-            aria-haspopup="dialog"
-            onClick={onOpen}
-            className={cn(
-                "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-2 rounded-[11px] border border-border px-3.5 py-3 text-left transition-colors duration-fast hover:border-border-strong md:grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,1.6fr)_96px]",
-                selected
-                    ? "bg-brand-subtle shadow-[inset_3px_0_0_hsl(var(--highlight))]"
-                    : "bg-card",
-                nested && "md:ml-6 md:w-[calc(100%-1.5rem)]",
-            )}
-        >
-            <span className="min-w-0">
-                <span className="block font-mono text-[12.5px] font-medium text-foreground">
-                    {i.number ?? "Draft"}
-                </span>
-                <span className="mt-0.5 block text-[12px] text-muted-foreground">
-                    {i.issuedAt ? (
-                        <ViewerDate iso={i.issuedAt} variant="dayMonth" />
-                    ) : (
-                        "Not issued yet"
-                    )}
-                </span>
-            </span>
-            <span className="min-w-0 text-right md:text-left">
-                <span className="block truncate text-[14px] font-semibold text-foreground">
-                    {billedTo(i).name}
-                </span>
-                <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
-                    {sourceLine(i)}
-                </span>
-            </span>
-            <span className="min-w-0">
-                <InvoicePill label={pill.label} variant={pill.variant} />
-                <span
-                    className={cn(
-                        "mt-[3px] block text-[12px]",
-                        when.late
-                            ? "text-destructive-subtle-foreground"
-                            : "text-muted-foreground",
-                    )}
-                >
-                    {when.before}
-                    {when.date ? (
-                        <ViewerDate iso={when.date} variant="dayMonth" />
-                    ) : null}
-                    {when.after}
-                </span>
-            </span>
-            <span className="text-right font-display text-[14px] font-semibold tabular-nums text-foreground">
-                {credit ? "−" : ""}
-                {money(i.total, i.currency)}
-            </span>
-        </button>
     );
 }

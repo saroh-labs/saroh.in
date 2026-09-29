@@ -13,7 +13,7 @@ import {
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
-import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
+import { showError, showInfo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FieldErrors } from "react-hook-form";
@@ -40,6 +40,11 @@ import {
     LeaveDialog,
     useLeaveGuard,
 } from "@/components/organizations/use-leave-guard";
+import {
+    cardUndo,
+    logoCardUndo,
+    useSettingsUndo,
+} from "@/components/organizations/use-settings-undo";
 import { countryName, CountrySelect } from "@/components/shared/country-select";
 import { OptionSelect } from "@/components/shared/option-select";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
@@ -65,6 +70,14 @@ import {
     phoneLabel,
     phoneProblem,
 } from "@/lib/organizations/business-phone";
+import type { BusinessTypeValue } from "@/lib/organizations/business-types";
+import {
+    BUSINESS_TYPE_OPTIONS,
+    BUSINESS_TYPE_VALUES,
+    businessTypeForApi,
+    businessTypeLabel,
+    businessTypeOf,
+} from "@/lib/organizations/business-types";
 import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
@@ -80,7 +93,7 @@ const formSchema = z
     .object({
         name: z.string().trim().min(1, { message: "Name is required" }),
         legalName: z.string().optional(),
-        type: z.enum(["", "individual", "company"]).optional(),
+        type: z.enum(BUSINESS_TYPE_VALUES).optional(),
         country: z.string().optional(),
         taxId: z.string().optional(),
         contactEmail: optionalText(z.string().email("Enter a valid email")),
@@ -169,13 +182,6 @@ const FIELD_OF: Record<string, keyof FormValues> = {
 /** Delivery always carries a rate: no "Not set" row. */
 const DELIVERY_RATES = GST_RATE_OPTIONS.filter((o) => o.value !== "");
 
-/** The same vocabulary the API validates (`BUSINESS_TYPES`). */
-const TYPES = [
-    { value: "", label: "Not set" },
-    { value: "individual", label: "Individual" },
-    { value: "company", label: "Company" },
-] as const;
-
 /** The format a business numbers by: its own, else its standing's default. */
 function numberFormatOf(settings: OrganizationSettings) {
     const saved = settings.tax?.invoiceNumber;
@@ -190,11 +196,10 @@ function numberFormatOf(settings: OrganizationSettings) {
 }
 
 function valuesOf(settings: OrganizationSettings): FormValues {
-    const type = settings.profile?.type;
     return {
         name: settings.name,
         legalName: settings.profile?.legalName ?? "",
-        type: type === "individual" || type === "company" ? type : "",
+        type: businessTypeOf(settings.profile?.type),
         country: settings.profile?.country ?? "",
         taxId: settings.profile?.taxId ?? "",
         contactEmail: settings.profile?.contactEmail ?? "",
@@ -341,8 +346,8 @@ function addressText(v: FormValues): string {
  * needs a registered address) is said in words when the field it names is
  * not on screen.
  *
- * Type and country are pickers, not text: the API accepts only "individual"
- * or "company" and a two-letter country code. Empty strings are SENT rather
+ * Type and country are pickers, not text: the API accepts only the six
+ * business types (`business-types.ts`) and a two-letter country code. Empty strings are SENT rather
  * than dropped: a cleared field means "remove this value".
  */
 export function OrganizationSettingsForm({
@@ -392,6 +397,13 @@ export function OrganizationSettingsForm({
     const editDirty = editing === "hours" ? hoursDirty : isDirty;
     // An open edit with changes holds the way off this page.
     const { leaveTo, stay } = useLeaveGuard(editing !== null && editDirty);
+    // Undo on a save (F12); what it saved back shows at once.
+    const undo = useSettingsUndo();
+    const applySaved = (next: OrganizationSettings) => {
+        setSettings(next);
+        form.reset(valuesOf(next));
+        router.refresh();
+    };
     // The number-format rules span four fields (and the prefix and GST
     // switch), but the form re-checks only the field that changed, so the
     // rule is worked out here from what is on screen: a part ticked in shows
@@ -419,6 +431,8 @@ export function OrganizationSettingsForm({
             setTab(editing);
             return;
         }
+        // A new edit closes the last save's Undo, which would reset it.
+        undo.settle();
         form.reset(valuesOf(settings));
         // No zone saved: the browser's is offered, as a change to save.
         const fromBrowser = key === "identity" && !savedZone && browserZone();
@@ -462,6 +476,12 @@ export function OrganizationSettingsForm({
                 values[key]?.trim() ?? "",
             ]),
         );
+        // Private limited goes as the spelling every API takes (F10).
+        if ("type" in profile) {
+            profile.type = businessTypeForApi(
+                profile.type as BusinessTypeValue,
+            );
+        }
         const tax = {
             ...(dirtyFields.gstRegistered
                 ? { registered: values.gstRegistered }
@@ -506,14 +526,15 @@ export function OrganizationSettingsForm({
             tax.state = "";
         }
 
-        const result = await saveOrganizationSettings({
+        const sent = {
             ...(dirtyFields.name ? { name: values.name.trim() } : {}),
             ...(Object.keys(profile).length > 0 ? { profile } : {}),
             ...(Object.keys(tax).length > 0 ? { tax } : {}),
             ...(Object.keys(registeredAddress).length > 0
                 ? { registeredAddress }
                 : {}),
-        });
+        };
+        const result = await saveOrganizationSettings(sent);
 
         if (!result.ok) {
             const field = result.field ? FIELD_OF[result.field] : undefined;
@@ -524,10 +545,11 @@ export function OrganizationSettingsForm({
         }
 
         const title = SECTIONS[editing].title;
-        showSuccess(
+        undo.offer(
             editing === "contact"
                 ? `${title} saved`
                 : `${title} saved — invoices from now on use it`,
+            cardUndo(settings, result.data, sent, applySaved),
         );
         setSettings(result.data);
         form.reset(valuesOf(result.data));
@@ -584,9 +606,7 @@ export function OrganizationSettingsForm({
             },
             {
                 label: "Type",
-                value:
-                    TYPES.find((t) => t.value && t.value === saved.type)
-                        ?.label ?? "",
+                value: businessTypeLabel(saved.type) ?? "",
             },
             {
                 label: "Time zone",
@@ -891,7 +911,7 @@ export function OrganizationSettingsForm({
                                 <OptionSelect
                                     value={field.value ?? ""}
                                     onValueChange={field.onChange}
-                                    options={TYPES}
+                                    options={BUSINESS_TYPE_OPTIONS}
                                     className="w-full"
                                 />
                             </FormControl>
@@ -1229,7 +1249,17 @@ export function OrganizationSettingsForm({
                                         logoUrl={settings.logo?.url ?? null}
                                         name={settings.name}
                                         canEdit={canEdit}
-                                        onSaved={setSettings}
+                                        onSaved={(next, said) => {
+                                            undo.offer(
+                                                said,
+                                                logoCardUndo(
+                                                    settings,
+                                                    next,
+                                                    setSettings,
+                                                ),
+                                            );
+                                            setSettings(next);
+                                        }}
                                     />
                                 ) : undefined
                             }
@@ -1248,6 +1278,7 @@ export function OrganizationSettingsForm({
                     onEdit={() => startEditing("hours")}
                     onDone={() => setEditing(null)}
                     onDirty={setHoursDirty}
+                    offerUndo={undo.offer}
                 />
 
                 <BusinessPrintPreview

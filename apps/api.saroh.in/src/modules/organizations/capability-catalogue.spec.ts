@@ -4,7 +4,7 @@ import {
     CAPABILITY_GROUPS,
     grantableCapabilities,
 } from "./capability-catalogue";
-import { ORG_ACTIONS } from "./organization-policy";
+import { isNeverExtra, ORG_ACTIONS } from "./organization-policy";
 
 /**
  * The catalogue is what an owner picks permissions from, and `ORG_ACTIONS` is
@@ -93,6 +93,129 @@ describe("capability catalogue", () => {
             CAPABILITY_BY_ACTION.get("member:role:update")?.note,
         ).toBeDefined();
         expect(CAPABILITY_BY_ACTION.get("module:manage")?.note).toBeDefined();
+    });
+});
+
+describe("the split order powers (B16)", () => {
+    it("labels each part in the owner's words, in Sell, grantable", () => {
+        const grantable = grantableCapabilities().map((c) => c.action);
+        for (const [action, label] of [
+            ["order:create", "Take new orders"],
+            ["order:edit", "Change orders after they're placed"],
+            ["order:refund", "Refund and cancel orders"],
+            ["order:export", "Export orders"],
+        ] as const) {
+            expect(CAPABILITY_BY_ACTION.get(action)?.label).toBe(label);
+            expect(CAPABILITY_BY_ACTION.get(action)?.group).toBe("sell");
+            expect(grantable).toContain(action);
+        }
+    });
+
+    it("relabels the kitchen's power, keeping its key", () => {
+        expect(CAPABILITY_BY_ACTION.get("order:stage")?.label).toBe(
+            "Move orders through their steps and print",
+        );
+    });
+
+    it("says what the old umbrella includes, for roles saved before the split", () => {
+        const write = CAPABILITY_BY_ACTION.get("order:write");
+        expect(write?.note).toContain("Take new orders");
+        expect(write?.note).toContain("Change orders after they're placed");
+        expect(write?.note).toContain("Export orders");
+    });
+});
+
+describe("the customer powers (C13)", () => {
+    it("labels each in the owner's words, in one group, grantable", () => {
+        const grantable = grantableCapabilities().map((c) => c.action);
+        for (const [action, label] of [
+            ["contact:read", "See customers and contacts"],
+            ["contact:write", "Edit customers and contacts"],
+            ["customer:sensitive", "See sensitive notes"],
+            ["customer:merge", "Merge duplicate customers"],
+            ["customer:remove", "Remove a customer's details"],
+        ] as const) {
+            expect(CAPABILITY_BY_ACTION.get(action)?.label).toBe(label);
+            expect(CAPABILITY_BY_ACTION.get(action)?.group).toBe("contacts");
+            expect(grantable).toContain(action);
+        }
+    });
+
+    it("lists them together, reads before writes, the irreversible last", () => {
+        const order = CAPABILITIES.filter((c) => c.group === "contacts")
+            .map((c) => c.action)
+            .slice(0, 5);
+        expect(order).toEqual([
+            "contact:read",
+            "contact:write",
+            "customer:sensitive",
+            "customer:merge",
+            "customer:remove",
+        ]);
+    });
+
+    it("says that seeing a customer doesn't include their sensitive notes", () => {
+        expect(CAPABILITY_BY_ACTION.get("contact:read")?.note).toMatch(
+            /sensitive notes need their own permission/,
+        );
+        expect(CAPABILITY_BY_ACTION.get("customer:sensitive")?.note).toMatch(
+            /Medical/,
+        );
+    });
+});
+
+describe("the booking and class-pack powers (E26)", () => {
+    it("relabels service:write for the set-up it covers, keeping its key", () => {
+        // One power, one key: no separate "booking settings" permission.
+        expect(CAPABILITY_BY_ACTION.get("service:write")?.label).toBe(
+            "Change services, hours, time off and booking rules",
+        );
+        expect(
+            CAPABILITIES.some(
+                (c) => (c.action as string) === "booking:settings",
+            ),
+        ).toBe(false);
+    });
+
+    it("labels selling a pack apart from changing one, in Schedule, grantable", () => {
+        const grantable = grantableCapabilities().map((c) => c.action);
+        for (const [action, label] of [
+            ["pack:read", "See class packs and who bought them"],
+            ["pack:sell", "Sell class packs and book with them"],
+            ["pack:write", "Make and change class packs"],
+        ] as const) {
+            expect(CAPABILITY_BY_ACTION.get(action)?.label).toBe(label);
+            expect(CAPABILITY_BY_ACTION.get(action)?.group).toBe("schedule");
+            expect(grantable).toContain(action);
+        }
+    });
+
+    it("lists the pack powers together, the read first", () => {
+        const packs = CAPABILITIES.filter((c) =>
+            c.action.startsWith("pack:"),
+        ).map((c) => c.action);
+        expect(packs).toEqual(["pack:read", "pack:sell", "pack:write"]);
+    });
+
+    it("says what each pack power includes", () => {
+        // The whole pack, money included: there is no money-free read.
+        expect(CAPABILITY_BY_ACTION.get("pack:read")?.note).toMatch(/prices/);
+        expect(CAPABILITY_BY_ACTION.get("pack:sell")?.note).toContain(
+            "Make and change class packs",
+        );
+        expect(CAPABILITY_BY_ACTION.get("pack:write")?.note).toMatch(
+            /can also sell them/,
+        );
+    });
+});
+
+describe("extra permissions for one person (F17)", () => {
+    it("never offers as an extra what only the Owner may hold", () => {
+        // The policy's own list and the catalogue's `ownerOnly` agree, so
+        // what the screen can't offer the gate can't resolve either.
+        for (const c of CAPABILITIES) {
+            expect(isNeverExtra(c.action)).toBe(c.ownerOnly === true);
+        }
     });
 });
 

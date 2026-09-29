@@ -382,7 +382,7 @@ describe("within reach (F19)", () => {
         await expect(
             service().update(MANAGER, "senior", { label: "Senior staff" }),
         ).rejects.toThrow(
-            "You can't change a role that can do more than you can: Manage payments.",
+            "You can't change a role that can do more than you can: Manage payments, Refund and cancel orders.",
         );
         await expect(
             service().update(MANAGER, "senior", {
@@ -399,7 +399,7 @@ describe("within reach (F19)", () => {
     it("refuses the Manager removing a role that holds more than them", async () => {
         role.findUnique!.mockResolvedValue(SENIOR_ROLE);
         await expect(service().remove(MANAGER, "senior")).rejects.toThrow(
-            "You can't remove a role that can do more than you can: Manage payments.",
+            "You can't remove a role that can do more than you can: Manage payments, Refund and cancel orders.",
         );
         expect(role.deleteMany).not.toHaveBeenCalled();
     });

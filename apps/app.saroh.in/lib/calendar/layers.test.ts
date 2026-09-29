@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    actOnCount,
     dayChips,
     dayTitle,
     describeItem,
@@ -104,6 +103,19 @@ describe("layersFor", () => {
         ]);
     });
 
+    it("a clinic reads its bookings, then its payments in green (E20)", () => {
+        const layers = layersFor(
+            month({
+                layers: ["bookings", "classes", "payments"],
+                totals: { bookings: 12, classes: 0, payments: 5 },
+            }),
+        );
+        expect(layers.map((l) => [l.key, l.label, l.one, l.tone])).toEqual([
+            ["bookings", "Bookings", "booking", 1],
+            ["payments", "Payments", "payment", 2],
+        ]);
+    });
+
     it("keeps the lead and a layer that could not be read, even at nothing", () => {
         const keys = layersFor(
             month({
@@ -162,22 +174,30 @@ describe("a day's chips", () => {
         invoices: [item({ kind: "overdue" })],
     });
 
-    it("says what needs acting on first, then a count per layer", () => {
-        expect(dayChips(d, layers, {}).map((c) => c.text)).toEqual([
-            "2 to act on",
+    const today = "2026-09-18";
+
+    it("names what needs you first, then a count per layer (E22)", () => {
+        expect(dayChips(d, layers, {}, today).map((c) => c.text)).toEqual([
+            "2 need you",
             "1 order",
             "2 renewals",
             "1 invoice",
         ]);
     });
 
-    it("switching a layer off takes its chip and its things to act on", () => {
+    it("switching a layer off takes its chip and its problems", () => {
         const off = { invoices: true };
-        expect(actOnCount(d, off)).toBe(1);
-        expect(dayChips(d, layers, off).map((c) => c.text)).toEqual([
-            "1 to act on",
+        expect(dayChips(d, layers, off, today).map((c) => c.text)).toEqual([
+            "1 renewal failed",
             "1 order",
             "2 renewals",
+        ]);
+    });
+
+    it("a day with nothing wrong has no problem chip", () => {
+        const calm = day("2026-09-15", { orders: [item()] });
+        expect(dayChips(calm, layers, {}, today).map((c) => c.key)).toEqual([
+            "orders",
         ]);
     });
 
@@ -195,9 +215,9 @@ describe("a day's chips", () => {
                 }),
             ],
         });
-        expect(dayChips(pickups, layers, {}).map((c) => c.text)).toEqual([
-            "2 pick-ups",
-        ]);
+        expect(
+            dayChips(pickups, layers, {}, "2026-09-18").map((c) => c.text),
+        ).toEqual(["2 pick-ups"]);
     });
 
     it("invoices wear a tone no other layer uses, for a shop and a diary alike", () => {
@@ -302,6 +322,27 @@ describe("how things read", () => {
             sub: "Placed 10:00",
             flag: null,
             href: "/commerce/orders/o1",
+        });
+    });
+
+    it("an order past its late time is flagged Late (E22)", () => {
+        expect(
+            describeItem("orders", item({ flags: ["late"] }), at).flag,
+        ).toEqual({ label: "Late", tone: "bad" });
+    });
+
+    it("a clinic's payment, with its time and what it paid for (E20)", () => {
+        const paid = item({
+            kind: "paid",
+            title: "Check-up · Asha Rao",
+            subtitle: "INV-0042",
+            link: { type: "invoice", id: "inv_1" },
+        });
+        expect(describeItem("payments", paid, at)).toEqual({
+            title: "10:00 Paid · Check-up · Asha Rao",
+            sub: "INV-0042",
+            flag: null,
+            href: "/billing/invoices/inv_1",
         });
     });
 

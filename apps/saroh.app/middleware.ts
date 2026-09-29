@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { env } from "@/env";
+import { accountAreaOn, isAccountPath } from "@/lib/account-area-switch";
 
 export const config = {
     matcher: [
@@ -68,6 +69,19 @@ export default function middleware(req: NextRequest) {
     // request 404'd instead of reaching app/page.tsx.
     if (isApexHost(hostname)) {
         return NextResponse.next();
+    }
+
+    // The account area switched off (`lib/account-area.ts`) is not there: a
+    // real 404, decided here because the page's own `notFound()` runs after
+    // `[domain]/loading.tsx` has already sent a 200 and started streaming.
+    if (isAccountPath(path) && !accountAreaOn()) {
+        return new NextResponse("Not found", {
+            status: 404,
+            headers: {
+                "content-type": "text/plain; charset=utf-8",
+                "x-robots-tag": "noindex",
+            },
+        });
     }
 
     // Everything else is a tenant hostname: rewrite to the /[domain] route.

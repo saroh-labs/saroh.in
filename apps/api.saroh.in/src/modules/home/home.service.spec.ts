@@ -214,10 +214,12 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
     it("still returns the parts that answered when open orders fail", async () => {
         const home = await buildWithFailure("order").build(INPUT);
 
-        // Today reads orders for its pick-ups, so it is named too (F5).
+        // Today reads orders for its pick-ups, so it is named too (F5),
+        // and so does This week for its order count (F7).
         expect(home.unavailable).toEqual([
             { moduleKey: "COMMERCE", label: "Open orders" },
             { moduleKey: "APPOINTMENTS", label: "Today" },
+            { moduleKey: "HOME", label: "This week" },
         ]);
         // The schedule survived, which is the whole point.
         expect(home.upcoming).toHaveLength(1);
@@ -226,9 +228,11 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
     it("names the schedule when it is the part that failed", async () => {
         const home = await buildWithFailure("booking").build(INPUT);
 
+        // This week counts the week's bookings too (F7).
         expect(home.unavailable).toEqual([
             { moduleKey: "APPOINTMENTS", label: "Schedule" },
             { moduleKey: "APPOINTMENTS", label: "Today" },
+            { moduleKey: "HOME", label: "This week" },
         ]);
         expect(home.upcoming).toEqual([]);
         // Today failed with it: never shown as an empty day.

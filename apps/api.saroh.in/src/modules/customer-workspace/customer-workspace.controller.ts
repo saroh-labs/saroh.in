@@ -20,6 +20,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AccountUnlinkService } from "../site-accounts/account-unlink.service";
 import { ContactAttentionService } from "./contact-attention.service";
 import { ContactNotesService } from "./contact-notes.service";
+import { AddCustomerDto, CustomerAddService } from "./customer-add.service";
 import { CustomerDetailService } from "./customer-detail.service";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 import {
@@ -27,9 +28,15 @@ import {
     ListUnlinkedQueryDto,
 } from "./customers-list.dto";
 import { CustomersListService } from "./customers-list.service";
-import { ContactNoteDto, CreateAttentionDto, UpdateAttentionDto } from "./dto";
+import {
+    ConfirmAttentionDto,
+    ContactNoteDto,
+    CreateAttentionDto,
+    UpdateAttentionDto,
+} from "./dto";
 import { MergeContactsDto, MergePreviewQueryDto } from "./merge.dto";
 import { MergeService } from "./merge.service";
+import { PrivacyRemovalService } from "./privacy-removal.service";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -58,12 +65,14 @@ export class CustomerWorkspaceController {
         private readonly customers: CustomersListService,
         private readonly accounts: AccountUnlinkService,
         private readonly merges: MergeService,
+        private readonly removals: PrivacyRemovalService,
+        private readonly adds: CustomerAddService,
     ) {}
 
     /**
-     * The business's customers (DEC-041, C3): everyone who has paid or signs
-     * in on its site, with search, chips and counts, sort, "Bought at" and
-     * pages of 50.
+     * The business's customers (DEC-041, C3): everyone who has paid, signs
+     * in on its site or was added with Add customer (DEC-056, C14), with
+     * search, chips and counts, sort, "Bought at" and pages of 50.
      */
     @Get()
     list(
@@ -71,6 +80,16 @@ export class CustomerWorkspaceController {
         @Query() query: ListCustomersQueryDto,
     ) {
         return this.customers.list(ctx, query);
+    }
+
+    /**
+     * Add customer (DEC-056, C14): a contact only, never a storefront's
+     * customer. A 409 names the contact that already holds the email.
+     */
+    @Post()
+    @HttpCode(201)
+    add(@OrgContext() ctx: OrganizationContext, @Body() dto: AddCustomerDto) {
+        return this.adds.add(ctx, dto);
     }
 
     /** Paying store customers no contact holds yet, for the review sheet. */
@@ -107,6 +126,28 @@ export class CustomerWorkspaceController {
         @Body() dto: MergeContactsDto,
     ) {
         return this.merges.merge(ctx, contactId, otherId, dto);
+    }
+
+    /**
+     * What removing their details for a privacy request would do (DEC-042,
+     * C11): what goes, what stays, and anything that refuses it.
+     */
+    @Get(":contactId/removal/preview")
+    removalPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.removals.preview(ctx, contactId);
+    }
+
+    /** Remove their details for a privacy request (DEC-042, C11). Final. */
+    @Post(":contactId/removal")
+    @HttpCode(200)
+    removeDetails(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("contactId") contactId: string,
+    ) {
+        return this.removals.remove(ctx, contactId);
     }
 
     /**
@@ -213,15 +254,20 @@ export class CustomerWorkspaceController {
         return { ok: true };
     }
 
-    /** "Add to Needs attention" on a suggestion. */
+    /**
+     * "Add to Needs attention" on a suggestion, with the kind, label and
+     * sensitive tick the confirm card settled on (C12). No body adds it as
+     * it stands.
+     */
     @Post(":contactId/attention/:entryId/confirm")
     @HttpCode(200)
     confirmAttention(
         @OrgContext() ctx: OrganizationContext,
         @Param("contactId") contactId: string,
         @Param("entryId") entryId: string,
+        @Body() dto: ConfirmAttentionDto,
     ) {
-        return this.attention.confirm(ctx, contactId, entryId);
+        return this.attention.confirm(ctx, contactId, entryId, dto);
     }
 
     /** Which contact a store customer is linked to (U18), or null. */

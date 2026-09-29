@@ -3,6 +3,7 @@ import type { PayingLinkOutcome, Prisma } from "@saroh/database";
 import { linkPayingCustomer } from "@saroh/database";
 
 import { normaliseEmail } from "./duplicates";
+import { linkSameEmailCustomer } from "./same-email-link";
 
 const logger = new Logger("EnsureContact");
 
@@ -53,6 +54,12 @@ function errorKind(error: unknown): string {
  * linked silently (#120). Emails are read through `duplicates.ts`, so a
  * reserved placeholder is no email.
  *
+ * Unless the customer's storefront links customers who share an email
+ * (DEC-055, C15): then a customer left for staff is linked to the contact
+ * holding the email when `same-email-link.ts` allows it ("linked"), under
+ * the same savepoint. The backfill never does this, so re-running it after
+ * a storefront turns the setting on re-links nobody.
+ *
  * Skipped, with nothing written:
  * - an order that isn't paid;
  * - a walk-in: no store customer (B13 makes `Order.customerId` nullable) or
@@ -66,7 +73,7 @@ export async function ensureContactForPaidOrder(
         customerId: string | null;
         paymentStatus: string;
     },
-): Promise<PayingLinkOutcome | null> {
+): Promise<PayingLinkOutcome | "linked" | null> {
     if (order.paymentStatus !== "PAID") return null;
     if (!order.organizationId || !order.customerId) return null;
     const { organizationId, customerId } = order;
@@ -84,9 +91,15 @@ export async function ensureContactForPaidOrder(
             { organizationId, customerId, reason: "PAYMENT" },
             normaliseEmail,
         );
+        const linked =
+            outcome === "suggested" &&
+            (await linkSameEmailCustomer(tx, {
+                organizationId,
+                customerId,
+            })) === "linked";
         await tx.$queryRaw`SELECT set_config('lock_timeout', ${before}, true)`;
         await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${SAVEPOINT}`);
-        return outcome;
+        return linked ? "linked" : outcome;
     } catch (error) {
         // Undoes whatever the contact rule wrote, and the lock_timeout.
         await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${SAVEPOINT}`);

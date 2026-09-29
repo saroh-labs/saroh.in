@@ -129,6 +129,25 @@ export class UpdateStorefrontDto {
     })
     freeShippingThreshold?: string | null;
 
+    /**
+     * The site checkout's flat fee for Local delivery (G13); `null` or
+     * "0" is free.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @Matches(MONEY_RE, {
+        message: "Local delivery fee: a number with up to 2 decimals",
+    })
+    localDeliveryFee?: string | null;
+
+    /** The site checkout's flat fee for Shipping (G13); `null` is free. */
+    @IsOptional()
+    @Transform(trim)
+    @Matches(MONEY_RE, {
+        message: "Shipping fee: a number with up to 2 decimals",
+    })
+    shippingFee?: string | null;
+
     @IsOptional()
     @IsIn(STOREFRONT_KINDS, { message: "A storefront is a shop or online" })
     kind?: (typeof STOREFRONT_KINDS)[number];
@@ -164,6 +183,16 @@ export class UpdateStorefrontDto {
     @IsOptional()
     @IsBoolean()
     paused?: boolean;
+
+    /**
+     * Customers who share an email (DEC-055, C15): true links a customer
+     * of this storefront who pays with an email a store-made contact
+     * already holds to that contact on their own; false leaves the pair for
+     * staff. Needs `contact:write` as well as `store:write`.
+     */
+    @IsOptional()
+    @IsBoolean()
+    linkSameEmailCustomers?: boolean;
 
     /** A connected provider's name, or `null` to use the business's only one. */
     @IsOptional()

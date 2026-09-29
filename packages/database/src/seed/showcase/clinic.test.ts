@@ -8,6 +8,7 @@ import {
     KAVI_SAC,
     KAVI_SERVICES,
     PT,
+    SVC,
 } from "./clinic-data";
 import type { KaviWorld } from "./clinic-plan";
 import {
@@ -245,9 +246,15 @@ function checkDay(now: Date): KaviWorld {
     for (const inv of w.invoices) {
         const tag = `${inv.id} at ${when}`;
         expect(inv.issuedAt.getTime(), tag).toBeLessThanOrEqual(t);
-        expect(inv.dueAt.getTime(), tag).toBeGreaterThanOrEqual(
-            inv.issuedAt.getTime(),
-        );
+        // An order's invoice is never due: the order is where it is paid.
+        if (inv.source === "ORDER") {
+            expect(inv.dueAt, tag).toBeNull();
+            expect(inv.status, tag).toBe("PAID");
+        } else {
+            expect(inv.dueAt?.getTime(), tag).toBeGreaterThanOrEqual(
+                inv.issuedAt.getTime(),
+            );
+        }
         if (inv.status === "PAID") {
             expect(inv.paidAt?.getTime(), tag).toBeGreaterThanOrEqual(
                 inv.issuedAt.getTime(),
@@ -272,7 +279,7 @@ function checkDay(now: Date): KaviWorld {
         if (inv.bookingId) {
             const b = byId.get(inv.bookingId);
             expect(b?.contactId, tag).toBe(inv.contactId);
-            expect(inv.dueAt.getTime(), tag).toBe(inv.issuedAt.getTime());
+            expect(inv.dueAt?.getTime(), tag).toBe(inv.issuedAt.getTime());
         }
     }
     const series = new Map<string, string[]>();
@@ -328,7 +335,7 @@ function checkDay(now: Date): KaviWorld {
     const state = (i: KaviWorld["invoices"][number]) =>
         i.status === "PAID"
             ? i.source
-            : i.dueAt.getTime() < t
+            : (i.dueAt?.getTime() ?? Infinity) < t
               ? "overdue"
               : "due";
     for (const s of ["BOOKING", "MANUAL", "due", "overdue"]) {
@@ -402,7 +409,10 @@ describe("Kavi Dental seeded on any day", () => {
     it("prices every line at a service's price, 0%, SAC 9993", () => {
         const w = plan(ist("2026-09-27", "10:30"));
         expect(KAVI_SAC).toBe("9993");
-        const lines = w.invoices.flatMap((i) => i.lines);
+        // An order's invoice names the service alone, as its order does.
+        const lines = w.invoices
+            .filter((i) => i.source !== "ORDER")
+            .flatMap((i) => i.lines);
         expect(lines.length).toBeGreaterThan(0);
         for (const l of lines) {
             expect(l.description).toMatch(
@@ -429,6 +439,51 @@ describe("Kavi Dental seeded on any day", () => {
             w.invoices.flatMap((i) => (i.bookingId ? [i.bookingId] : [])),
         );
         for (const b of treatments) expect(billed.has(b.id ?? "")).toBe(false);
+    });
+
+    it("sells each treatment as one order, with a booking per visit (E9)", () => {
+        const w = plan(ist("2026-09-27", "10:30"));
+        const k = (key: string) => `seed_sc_kavi_booking_${key}`;
+        expect(
+            w.orders.map((o) => [
+                o.key,
+                o.visits.map((v) => [v.bookingId, v.visitNumber]),
+            ]),
+        ).toEqual([
+            [
+                "rahul_rct",
+                [
+                    [k("rahul_rct_1"), 1],
+                    [k("rahul_rct_2"), 2],
+                ],
+            ],
+            ["farah_whitening", [[k("farah_whitening"), 1]]],
+        ]);
+        for (const o of w.orders) {
+            for (const v of o.visits) {
+                const b = w.bookings.find((x) => x.id === v.bookingId);
+                expect(b?.orderId).toBe(o.id);
+                expect(b?.visitNumber).toBe(v.visitNumber);
+                // Paid for on the order, never on the visit.
+                expect(b?.paidWith).toBeNull();
+                expect(b?.contactId).toBe(o.contactId);
+            }
+        }
+        // Rahul's was paid at the desk: its one invoice, for the whole
+        // treatment. Farah's is still due on the order, with no invoice.
+        const [rahul, farah] = w.orders;
+        const paper = w.invoices.filter((i) => i.orderId !== null);
+        expect(paper.map((i) => i.orderId)).toEqual([rahul.id]);
+        expect(paper[0].lines).toEqual([
+            {
+                description: "Root canal treatment",
+                quantity: 1,
+                unitPaise: KAVI_SERVICES[SVC.rootCanal].pricePaise,
+                orderItemId: rahul.itemId,
+            },
+        ]);
+        expect(rahul.paidAt).not.toBeNull();
+        expect(farah.paidAt).toBeNull();
     });
 
     it("writes the line as the booking page's hold does", () => {

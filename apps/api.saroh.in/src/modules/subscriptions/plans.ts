@@ -25,6 +25,12 @@ export interface PlanView extends PlanFigures {
     status: string;
     /** A membership's classes a month. Null: as many as they like. */
     classesPerMonth: number | null;
+    /**
+     * When its draft was last saved (D5): a DRAFT's, or a live plan's
+     * unpublished changes'. Null when a live plan has none. The Plans tab
+     * and Plan Detail read it as "Unpublished changes".
+     */
+    pendingChangedAt: string | null;
     createdAt: string;
 }
 
@@ -37,6 +43,7 @@ const PLAN_SELECT = {
     interval: true,
     status: true,
     classesPerMonth: true,
+    pendingChangedAt: true,
     createdAt: true,
 } as const;
 
@@ -105,6 +112,7 @@ function planView(row: PlanRow, groups: readonly PriceGroup[]): PlanView {
         interval: row.interval as Interval,
         status: row.status,
         classesPerMonth: row.classesPerMonth,
+        pendingChangedAt: row.pendingChangedAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString(),
         ...planFigures(row, groups),
     };
@@ -150,7 +158,27 @@ export async function assertPlanNameFree(
     name: string,
     exceptId?: string,
 ): Promise<void> {
-    const clash = await db.subscriptionPlan.findFirst({
+    const clash = await planNameClash(db, organizationId, name, exceptId);
+    if (clash) {
+        throw new ConflictException({
+            message: nameTakenMessage(clash.name),
+            details: { field: "name", planId: clash.id },
+        });
+    }
+}
+
+/**
+ * The other plan, live or draft, already called `name` (the rule above);
+ * null when the name is free. A draft's editor lists a clash as a reason it
+ * can't be published yet, rather than refusing the save (D5).
+ */
+export async function planNameClash(
+    db: Db,
+    organizationId: string,
+    name: string,
+    exceptId?: string,
+): Promise<{ id: string; name: string } | null> {
+    return db.subscriptionPlan.findFirst({
         where: {
             organizationId,
             status: { not: "ARCHIVED" },
@@ -159,10 +187,8 @@ export async function assertPlanNameFree(
         },
         select: { id: true, name: true },
     });
-    if (clash) {
-        throw new ConflictException({
-            message: `There is already a plan called ${clash.name}. Give this one another name.`,
-            details: { field: "name", planId: clash.id },
-        });
-    }
+}
+
+export function nameTakenMessage(other: string): string {
+    return `There is already a plan called ${other}. Give this one another name.`;
 }

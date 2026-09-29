@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { amountDueCents } from "./order-read";
+import { withBookingPayments } from "./treatment-ledger";
 
 /**
  * An order's pay link (plan B, B11), as ADR-007's invoice pay link: a token
@@ -19,6 +20,9 @@ export const PAY_LINK_ORDER_SELECT = {
     storeId: true,
     status: true,
     paymentStatus: true,
+    // A site checkout's order (G13) holds its stock on its first payment,
+    // so a second one would hold again: its difference isn't taken by link.
+    placedOnline: true,
     total: true,
     currency: true,
     store: { select: { settings: { select: { pausedAt: true } } } },
@@ -31,6 +35,23 @@ export const PAY_LINK_ORDER_SELECT = {
             refunds: {
                 where: { status: { not: "FAILED" } },
                 select: { amountCents: true, forEdit: true },
+            },
+        },
+    },
+    // A treatment's deposit, paid at booking on its invoice (E9): a pay
+    // link asks only for the rest.
+    invoices: {
+        where: { source: "BOOKING", kind: "INVOICE" },
+        select: {
+            paymentIntents: {
+                where: { status: "SUCCEEDED" },
+                select: {
+                    amountCents: true,
+                    refunds: {
+                        where: { status: { not: "FAILED" } },
+                        select: { amountCents: true, forEdit: true },
+                    },
+                },
             },
         },
     },
@@ -50,12 +71,22 @@ export const RETIRED_PAY_LINK = {
 export type PayLinkStanding = "DUE" | "PAID" | "CLOSED";
 
 /**
- * Due: unpaid, or its payment failed, with money still owed. Paid: paid, by
- * hand or online. Closed: cancelled or refunded — there is nothing to pay.
+ * Due: unpaid, or its payment failed, with money still owed — or paid
+ * online and changed since to cost more (B9: a dearer way to fulfil it, or
+ * an edit), so the difference is owed. Paid: paid, by hand or online, with
+ * nothing more owed; paid by hand, the counter settles any difference.
+ * Closed: cancelled or refunded — there is nothing to pay.
  */
 export function payLinkStanding(order: PayLinkOrder): PayLinkStanding {
     if (order.status === "CANCELLED" || order.paymentStatus === "REFUNDED") {
         return "CLOSED";
+    }
+    if (order.paymentStatus === "PAID") {
+        return !order.placedOnline &&
+            order.paymentIntents.length > 0 &&
+            dueCentsOf(order) > 0
+            ? "DUE"
+            : "PAID";
     }
     if (order.paymentStatus !== "UNPAID" && order.paymentStatus !== "FAILED") {
         return "PAID";
@@ -65,7 +96,7 @@ export function payLinkStanding(order: PayLinkOrder): PayLinkStanding {
 
 /** The order's total less what was taken — what a pay link charges. */
 export function dueCentsOf(order: PayLinkOrder): number {
-    return amountDueCents(order);
+    return amountDueCents(withBookingPayments(order, order.invoices));
 }
 
 /**

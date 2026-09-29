@@ -26,6 +26,12 @@ export interface BookingService {
      * older than the page: no deposit.
      */
     depositCents?: number | null;
+    /**
+     * How many visits one booking of it is (E10). More than one is a
+     * treatment: sold whole, with visit 1 booked here and the rest booked
+     * with the business. Absent from an API older than the page: one.
+     */
+    visits?: number;
     /** Online only. */
     online: boolean;
     /**
@@ -135,6 +141,7 @@ function isService(v: unknown): v is BookingService {
         numOrNull(v.priceCents) &&
         strOrNull(v.currency) &&
         (v.depositCents === undefined || numOrNull(v.depositCents)) &&
+        (v.visits === undefined || isNum(v.visits)) &&
         typeof v.online === "boolean" &&
         (v.where === undefined ||
             v.where === "IN_PERSON" ||
@@ -257,8 +264,11 @@ export function whereText(
 
 // ── Paying at booking (U19, E8) ──────────────────────────────────────────
 
-/** How the booker pays: it all now, the deposit now, or at the desk. */
-export type BookPay = "NOW" | "DEPOSIT" | "DESK";
+/**
+ * How the booker pays: it all now, the deposit now, at the desk, or with a
+ * class credit of their own (A10).
+ */
+export type BookPay = "NOW" | "DEPOSIT" | "DESK" | "CREDIT";
 
 /** One way to pay, as the pay step offers it. */
 export interface PayChoice {
@@ -267,6 +277,103 @@ export interface PayChoice {
     sub: string;
     /** What it takes at booking, in words: "₹400". */
     amount: string;
+    /** A short word beside it: "Included" for a membership's class. */
+    tag?: string;
+}
+
+// ── A class credit (A10) ─────────────────────────────────────────────────
+
+/**
+ * The one credit the API offers a signed-in customer for this class at this
+ * time (`GET public/site-accounts/bookings/credit`): a class from their pack,
+ * or from their membership's month. The page books with what it was given
+ * and never picks one itself.
+ */
+export type OfferedCredit =
+    | {
+          kind: "PACK";
+          id: string;
+          /** The pack's name: "10 classes". */
+          name: string;
+          left: number;
+          /** The last day it can be used, `YYYY-MM-DD`. */
+          useBy: string;
+      }
+    | {
+          kind: "MEMBERSHIP";
+          id: string;
+          /** The plan's name. */
+          name: string;
+          left: number;
+          allowance: number;
+          /** When that month's classes start again, `YYYY-MM-DD`. */
+          resetsOn: string;
+      };
+
+/** The credit read's answer: a credit, or none. */
+export interface CreditAnswer {
+    credit: OfferedCredit | null;
+}
+
+const isDate = (v: unknown) => isStr(v) && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+function isCredit(v: unknown): v is OfferedCredit {
+    if (!isObj(v) || !isStr(v.id) || !isStr(v.name) || !isNum(v.left)) {
+        return false;
+    }
+    if (v.kind === "PACK") return isDate(v.useBy);
+    return v.kind === "MEMBERSHIP" && isNum(v.allowance) && isDate(v.resetsOn);
+}
+
+export function isCreditAnswer(v: unknown): v is CreditAnswer {
+    return isObj(v) && (v.credit === null || isCredit(v.credit));
+}
+
+/** "10 classes pack", or "Membership": what the credit comes from. */
+function creditSource(credit: OfferedCredit): string {
+    if (credit.kind === "MEMBERSHIP") return "Membership";
+    return /\bpack$/i.test(credit.name) ? credit.name : `${credit.name} pack`;
+}
+
+/**
+ * The pay step's "Use 1 credit" (the Pulse Fitness design): listed first
+ * and chosen by default, nothing to pay. "10 classes pack · use by 12 Nov",
+ * or "Membership · resets 1 Oct" with "Included" beside it.
+ */
+export function creditChoice(
+    credit: OfferedCredit,
+    currency: string | null,
+): PayChoice {
+    const when =
+        credit.kind === "PACK"
+            ? `use by ${dateText(credit.useBy)}`
+            : `resets ${dateText(credit.resetsOn)}`;
+    return {
+        pay: "CREDIT",
+        label: `Use 1 credit (${credit.left} left)`,
+        sub: `${creditSource(credit)} · ${when}`,
+        amount: formatMoney(0, currency ?? "INR") ?? "₹0",
+        ...(credit.kind === "MEMBERSHIP" ? { tag: "Included" } : {}),
+    };
+}
+
+/**
+ * The confirmation's line once a credit paid for the class: "Used 1 credit
+ * from your 10 classes pack — 9 left, use by 12 Nov." or "… from your
+ * membership — 3 left in October." (the class's month, which may not be
+ * this one).
+ */
+export function creditUsedText(credit: OfferedCredit): string {
+    const left = Math.max(0, credit.left - 1);
+    const from = creditSource(credit).toLowerCase();
+    if (credit.kind === "PACK") {
+        return `Used 1 credit from your ${from} — ${left} left, use by ${dateText(credit.useBy)}.`;
+    }
+    const month = new Intl.DateTimeFormat("en-GB", {
+        month: "long",
+        timeZone: "UTC",
+    }).format(new Date(civil(credit.resetsOn).getTime() - 86_400_000));
+    return `Used 1 credit from your ${from} — ${left} left in ${month}.`;
 }
 
 /**
@@ -287,9 +394,14 @@ export function payChoices(
     if (!price || !service.priceCents || service.priceCents <= 0) return [];
     const isClass = service.kind === "class";
     const place = isClass ? "place" : "appointment";
+    // A treatment is paid for whole (E10): "for all 3 visits".
+    const visits = visitsOf(service);
+    const forAll = visits > 1 ? ` for all ${visits} visits` : "";
     const payNow: PayChoice = {
         pay: "NOW",
-        label: isClass ? `Pay ${price} for this class` : `Pay ${price} now`,
+        label: isClass
+            ? `Pay ${price} for this class`
+            : `Pay ${price}${forAll} now`,
         sub: `Online — your ${place} is confirmed straight away`,
         amount: price,
     };
@@ -308,7 +420,7 @@ export function payChoices(
             },
             {
                 ...payNow,
-                label: `Pay the full ${price} now`,
+                label: `Pay the full ${price}${forAll} now`,
                 sub: "Online, in one payment",
             },
         ];
@@ -377,13 +489,49 @@ export function orList(names: string[]): string {
     return `${names.slice(0, -1).join(", ")} or ${names.at(-1) ?? ""}`;
 }
 
-/** "60 min · one-to-one · with Karan or Vikram". */
+// ── Visits (E10) ─────────────────────────────────────────────────────────
+
+/** How many visits one booking of the service is: 1 unless a treatment. */
+export function visitsOf(service: BookingService | null): number {
+    const n = service?.visits ?? 1;
+    return Number.isInteger(n) && n > 1 ? n : 1;
+}
+
+/**
+ * The summary's "Then" for a treatment (the Kavi Dental design): "We'll
+ * book visits 2 and 3 with you at the first appointment". Null for one
+ * visit.
+ */
+export function laterVisitsText(visits: number): string | null {
+    if (visits <= 1) return null;
+    const which =
+        visits === 2
+            ? "visit 2"
+            : visits === 3
+              ? "visits 2 and 3"
+              : `visits 2 to ${visits}`;
+    return `We'll book ${which} with you at the first appointment`;
+}
+
+/** The confirmation's word on a treatment: "Visit 1 of 3. We'll book the rest with you then". */
+export function firstVisitText(visits: number): string | null {
+    return visits > 1
+        ? `Visit 1 of ${visits}. We'll book the rest with you then`
+        : null;
+}
+
+/** "60 min · one-to-one · with Karan or Vikram"; "3 visits of 60 min · …". */
 export function serviceLine(service: BookingService): string {
     const kind =
         service.kind === "class"
             ? `class of ${service.capacity}`
             : "one-to-one";
-    const parts = [`${service.durationMinutes} min`, kind];
+    const visits = visitsOf(service);
+    const length =
+        visits > 1
+            ? `${visits} visits of ${service.durationMinutes} min`
+            : `${service.durationMinutes} min`;
+    const parts = [length, kind];
     if (service.staff.length > 0) parts.push(`with ${orList(service.staff)}`);
     return parts.join(" · ");
 }

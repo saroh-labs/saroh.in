@@ -283,6 +283,47 @@ const renderedVisitUs = z.object({
 });
 
 /**
+ * `journal`, as published (G10): nothing resolves at publish. The posts are
+ * read when the page is served, from the site the page belongs to.
+ */
+const renderedJournal = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    count: z.union([z.literal(3), z.literal(6)]).optional(),
+    showExcerpts: z.boolean().optional(),
+    showImages: z.boolean().optional(),
+});
+
+/**
+ * `plans`, as published (G9): nothing resolves at publish. The plans are read
+ * when the page is served, from the business the site belongs to.
+ */
+const renderedPlans = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    highlight: z.enum(["first", "none"]).optional(),
+    buttonLabel: z.string().optional(),
+    showDescriptions: z.boolean().optional(),
+});
+
+/**
+ * `productGrid`, as published (G12): nothing resolves at publish. The
+ * products are read when the page is served, at the site's storefront.
+ */
+const renderedProductGrid = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    source: z.enum(["newest", "collection", "picked"]).optional(),
+    collectionId: z.string().optional(),
+    productIds: z.array(z.string()).optional(),
+    count: z.number().int().optional(),
+    showPrices: z.boolean().optional(),
+});
+
+/**
  * The rendered schema for every block type.
  *
  * `Record<SectionType, …>` on purpose: a block type added to `SECTION_TYPES`
@@ -309,6 +350,9 @@ export const RENDERED_SCHEMAS = {
     contact: renderedContact,
     servicesList: renderedServicesList,
     visitUs: renderedVisitUs,
+    journal: renderedJournal,
+    plans: renderedPlans,
+    productGrid: renderedProductGrid,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -327,6 +371,9 @@ export type RenderedTestimonials = RenderedContent<"testimonials">;
 export type RenderedContact = RenderedContent<"contact">;
 export type RenderedServicesList = RenderedContent<"servicesList">;
 export type RenderedVisitUs = RenderedContent<"visitUs">;
+export type RenderedJournal = RenderedContent<"journal">;
+export type RenderedPlans = RenderedContent<"plans">;
+export type RenderedProductGrid = RenderedContent<"productGrid">;
 
 /**
  * Validate rendered content for a block type.

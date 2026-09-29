@@ -443,6 +443,48 @@ export async function getRenewals(): Promise<Renewals | null> {
     return getJson<Renewals>(`${base}/subscriptions/renewals`);
 }
 
+/** The business's subscription settings (round-2 A8). */
+export interface SubscriptionSettings {
+    /** "Members can pause from their account": on by default. */
+    membersCanPause: boolean;
+    /** Whether customers have an account on the business's site yet. */
+    accountArea: boolean;
+}
+
+/**
+ * The settings, or null when they couldn't be read (or this role can't):
+ * optional, so the Plans tab just goes without the row.
+ */
+export async function getSubscriptionSettings(): Promise<SubscriptionSettings | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/subscriptions/settings`);
+        if (!res.ok) return null;
+        const body = (await res.json()) as Partial<SubscriptionSettings>;
+        return typeof body.membersCanPause === "boolean" &&
+            typeof body.accountArea === "boolean"
+            ? {
+                  membersCanPause: body.membersCanPause,
+                  accountArea: body.accountArea,
+              }
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+export function setMembersCanPause(
+    on: boolean,
+): Promise<ApiResult<SubscriptionSettings>> {
+    return send<SubscriptionSettings>(
+        "/subscriptions/settings",
+        "PATCH",
+        { membersCanPause: on },
+        "Couldn't save that. Try again.",
+    );
+}
+
 async function send<T>(
     path: string,
     method: "POST" | "PATCH" | "DELETE",
@@ -501,6 +543,20 @@ export function cancelSubscription(id: string, when: "now" | "periodEnd") {
         "Could not cancel that.",
     );
 }
+/**
+ * Retry a failed renewal with a new pay link (`POST :id/retry`): the old
+ * link stops, nothing is charged or sent, and the link comes back once for
+ * the merchant to copy (Home's "Retry by pay link", F4).
+ */
+export function retrySubscription(id: string) {
+    return send<{ invoiceId: string; url: string }>(
+        `${sub(id)}/retry`,
+        "POST",
+        {},
+        "Couldn't make a new pay link. Nothing changed.",
+    );
+}
+
 export function keepSubscription(id: string) {
     return send<Subscription>(
         `${sub(id)}/keep`,

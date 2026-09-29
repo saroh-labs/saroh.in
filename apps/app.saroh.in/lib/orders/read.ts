@@ -1,3 +1,9 @@
+import type {
+    AttentionKind,
+    AttentionSource,
+} from "@/lib/customer-workspace/attention";
+import type { NoticeReach } from "@/lib/messages/notice-reach";
+
 /**
  * The one read of an order that Order Detail renders (ADR-008, U6, U14):
  * `GET /organizations/:org/orders/:id`. Types only, so the client screen and
@@ -74,7 +80,12 @@ export interface AllergenRef {
 
 export interface OrderReadLine {
     id: string;
-    productId: string;
+    /** Null on a treatment's line (E9, DEC-050): it bills a service. */
+    productId: string | null;
+    /** The service a treatment's line bills; absent from an API before E9. */
+    serviceId?: string | null;
+    /** What the line bills; absent from an API before E9 (a product). */
+    kind?: "product" | "service";
     name: string | null;
     variantTitle: string | null;
     sku: string | null;
@@ -153,6 +164,54 @@ export interface OrderReadInvoice {
     /** INVOICE | CREDIT_NOTE | SUPPLEMENTARY */
     kind: string;
     status: string;
+    /**
+     * What the paper is called (D15): "Tax invoice", "Bill of supply",
+     * "Receipt"… Absent from an API before it; the money card then works
+     * it out as it used to.
+     */
+    title?: string;
+}
+
+/** How one visit of a treatment stands (B14): Attended, Booked, Missed, Not booked. */
+export type VisitState = "ATTENDED" | "BOOKED" | "MISSED" | "TO_BOOK";
+
+export interface OrderVisit {
+    number: number;
+    /** Its booking; null while it is still to book. */
+    bookingId: string | null;
+    startAt: string | null;
+    endAt: string | null;
+    staffName: string | null;
+    where: "IN_PERSON" | "ONLINE";
+    state: VisitState;
+    attendedAt: string | null;
+    attendedBy: { id: string; name: string | null } | null;
+}
+
+/** A treatment's visits (B14, E9), as the API reads them for the Visits card. */
+export interface OrderVisits {
+    total: number;
+    attended: number;
+    booked: number;
+    service: {
+        id: string;
+        name: string;
+        durationMinutes: number;
+        timezone: string;
+        priceCents: number | null;
+    };
+    visits: OrderVisit[];
+    next: {
+        /** Can be marked attended now: booked and started. */
+        attend: number | null;
+        /** Booked, not started yet. */
+        upcoming: { number: number; startAt: string } | null;
+        /** To book next, when no booked visit waits. */
+        book: number | null;
+    };
+    done: boolean;
+    /** Cancelled or refunded: nothing more is booked or marked. */
+    closed: boolean;
 }
 
 export interface OrderRead extends FulfilmentFields {
@@ -160,6 +219,11 @@ export interface OrderRead extends FulfilmentFields {
     /** The storefront's own number, e.g. "1063". */
     orderId: string;
     placedAt: string;
+    /**
+     * Placed by the customer at the site's checkout (G13). Optional: an API
+     * from before it sends none.
+     */
+    placedOnline?: boolean;
     updatedAt: string;
     store: { id: string; name: string };
     status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
@@ -169,14 +233,20 @@ export interface OrderRead extends FulfilmentFields {
     customer: {
         id: string;
         name: string | null;
+        /** Their own phone: null without `contact:read` (review #19). */
         phone: string | null;
-        /** Only with `order:read`. */
+        /** Only with `contact:read` (review #19); a Member holding it sees it. */
         email?: string;
         /** The contact this customer is confirmed as, if linked. */
         contactId: string | null;
         orderCount: number;
         firstOrderAt: string | null;
     } | null;
+    /**
+     * A walk-in (B13): no customer record, only the name they gave and their
+     * phone (with `contact:read`). Optional: an API before B13 sends none.
+     */
+    walkIn?: { name: string; phone: string | null } | null;
     deliveryAddress: DeliveryAddress | null;
     notes: string | null;
     trackingUrl: string | null;
@@ -192,10 +262,58 @@ export interface OrderRead extends FulfilmentFields {
         stages: KitchenStage[];
         undo: { eventId: string; until: string } | null;
         editable: boolean;
+        /**
+         * "Change how it's fulfilled…" (B9): the ways it can take now, its
+         * own among them, and why it can't change when it can't. Absent
+         * from an API before B9.
+         */
+        fulfilment?: {
+            options: { type: FulfilmentType; label: string }[];
+            refusal: string | null;
+        };
+        /** "Cancel order…" (B9): why not, and whether one waits on its refund. */
+        cancel?: { refusal: string | null; pending: boolean };
+        /** A note in the customer's messages would reach them (A13). */
+        tell?: boolean;
     };
     money: OrderReadMoney | null;
     /** Null for a role without `invoice:read`. */
     invoices: OrderReadInvoice[] | null;
+    /**
+     * The customer's Needs attention this viewer may see (B15). Null when
+     * the API couldn't read it; absent from an API before B15.
+     */
+    attention?: OrderAttention | null;
+    /**
+     * How its Ready and handover reach the customer (A14): emailed, in
+     * their account, or nothing. Null when the API couldn't read it;
+     * absent from an API before A14.
+     */
+    customerNotice?: NoticeReach | null;
+    /**
+     * A treatment's visits (B14). Absent on an order that isn't one (and
+     * from an API before B14); null when the API couldn't read them.
+     */
+    visits?: OrderVisits | null;
+}
+
+/** One Needs attention entry, as the order read carries it (B15). */
+export interface OrderAttentionEntry {
+    id: string;
+    kind: AttentionKind;
+    label: string;
+    detail: string | null;
+    sensitive: boolean;
+    allergen: AllergenRef | null;
+    /** Every allergen of the entry's name in the business, to match lines. */
+    matchAllergens: AllergenRef[];
+    source: AttentionSource;
+}
+
+export interface OrderAttention {
+    entries: OrderAttentionEntry[];
+    /** Entries on the person this viewer may not see. */
+    hiddenSensitiveCount: number;
 }
 
 /** A customer note that names allergens, from the contact's detail read. */

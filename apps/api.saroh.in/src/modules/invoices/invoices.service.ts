@@ -18,6 +18,7 @@ import type {
     RecordPaymentDto,
     VoidInvoiceDto,
 } from "./dto";
+import { exemptInvoiceIds } from "./exempt-invoices";
 import { isGstRate, rateToBps } from "./gst";
 import { gstinProblem, stateCode } from "./gst-states";
 import type { InvoiceSource } from "./invoice-state";
@@ -30,6 +31,7 @@ import {
     paidSinceFilter,
     viewWhere,
 } from "./invoice-state";
+import { listFilterWhere } from "./list-filter";
 import type { BuiltDocument, TaxProfile } from "./order-invoice";
 import { buildManualInvoice } from "./order-invoice";
 import {
@@ -138,12 +140,19 @@ export class InvoicesService {
                 ...(query.paidSince
                     ? paidSinceFilter(new Date(query.paidSince))
                     : {}),
+                // What it was for (D18); ANDed on, so hidden drafts stay hidden.
+                ...listFilterWhere(query),
             },
             orderBy: { createdAt: "desc" },
             take: LIST_LIMIT,
             select: INVOICE_LIST_SELECT,
         });
-        return rows.map((r) => serializeInvoice(r as InvoiceRow, now));
+        const exempt = await exemptInvoiceIds(prisma, ctx.organizationId, rows);
+        return rows.map((r) =>
+            serializeInvoice(r as InvoiceRow, now, {
+                exempt: exempt.has(r.id),
+            }),
+        );
     }
 
     /**
@@ -195,6 +204,30 @@ export class InvoicesService {
         id: string,
     ): Promise<{ token: string }> {
         authorize(ctx, "invoice:write");
+        return this.mintPayLink(db, ctx.organizationId, id);
+    }
+
+    /**
+     * A fresh pay link for a member's own overdue invoice, from their
+     * account on the business's site (round-2 A8): the same link a team
+     * member makes, replacing the old one, so the customer never meets a
+     * stale link. There is no team member to authorize: the caller has
+     * already found the invoice by the member's own contact.
+     */
+    async payLinkForCustomer(
+        db: Tx,
+        organizationId: string,
+        id: string,
+    ): Promise<{ token: string }> {
+        return this.mintPayLink(db, organizationId, id);
+    }
+
+    private async mintPayLink(
+        db: Tx,
+        organizationId: string,
+        id: string,
+    ): Promise<{ token: string }> {
+        const ctx = { organizationId };
         const current = await this.read(ctx.organizationId, id, db);
         this.assertOwnPaper(current, "given a pay link");
         if (current.status !== "ISSUED") {
@@ -688,7 +721,7 @@ export class InvoicesService {
      * back, so does the invoice and the number it took. A registered
      * business's is a tax invoice, its lines taxed at the rates they carry.
      *
-     * Authorization is the caller's: selling a pack under `pack:write` issues
+     * Authorization is the caller's: selling a pack under `pack:sell` issues
      * its invoice without also needing `invoice:write`.
      */
     async issueInTx(

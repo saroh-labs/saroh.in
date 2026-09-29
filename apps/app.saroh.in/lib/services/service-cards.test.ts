@@ -58,6 +58,15 @@ describe("lengthLine", () => {
             ),
         ).toBe("60 min · no gap after · In person or online · 12 places");
     });
+
+    it("says a treatment's visits (E10)", () => {
+        expect(lengthLine(card({ visits: 3 }))).toBe(
+            "3 visits of 60 min · 15 min gap after",
+        );
+        expect(lengthLine(card({ visits: 1 }))).toBe(
+            "60 min · 15 min gap after",
+        );
+    });
 });
 
 describe("usageLine", () => {

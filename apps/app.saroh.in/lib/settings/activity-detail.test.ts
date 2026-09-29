@@ -133,6 +133,27 @@ describe("activityDetail — what changed", () => {
         expect(detail.withoutValues).toBe(false);
     });
 
+    it("shows a business type by its name, before and after (F10)", () => {
+        const detail = activityDetail(
+            event({
+                metadata: {
+                    fields: ["type"],
+                    changes: [
+                        { field: "type", before: "company", after: "llp" },
+                    ],
+                },
+            }),
+            KOLKATA,
+        );
+        expect(detail.changes).toEqual([
+            {
+                label: "Type of business",
+                before: "Private limited company",
+                after: "LLP",
+            },
+        ]);
+    });
+
     it("says an earlier save kept no values, listing every field once", () => {
         const detail = activityDetail(
             event({
@@ -215,6 +236,54 @@ describe("activityDetail — what changed", () => {
                 before: "2 hours",
                 after: "20 minutes",
             },
+        ]);
+    });
+
+    it("tells linking customers who share an email as it was and became (C15)", () => {
+        expect(
+            activityDetail(
+                event({
+                    action: "storefront.same-email.update",
+                    metadata: {
+                        fields: ["linkSameEmailCustomers"],
+                        storefront: "Rye Online",
+                        changes: [
+                            {
+                                field: "linkSameEmailCustomers",
+                                before: false,
+                                after: true,
+                            },
+                        ],
+                    },
+                }),
+                KOLKATA,
+            ).changes,
+        ).toEqual([
+            {
+                label: "Link customers who share an email, Rye Online",
+                before: "Off",
+                after: "On",
+            },
+        ]);
+    });
+
+    it("tells one of someone's own alerts as it was and became (F14)", () => {
+        expect(
+            activityDetail(
+                event({
+                    action: "member.alerts.update",
+                    metadata: {
+                        alert: "failed",
+                        channel: "email",
+                        changes: [
+                            { field: "alertOn", before: true, after: false },
+                        ],
+                    },
+                }),
+                KOLKATA,
+            ).changes,
+        ).toEqual([
+            { label: "Payment failed by Email", before: "On", after: "Off" },
         ]);
     });
 
@@ -395,6 +464,20 @@ describe("activityDetail — what changed", () => {
         ).toEqual([{ label: "Role", before: null, after: "Admin" }]);
         // No role kept: nothing to list, not an empty row.
         expect(rows({ action: "membership.accept", metadata: {} })).toEqual([]);
+        // Joined from a storefront (F16): the role and where from.
+        expect(
+            rows({
+                action: "membership.storefront-join",
+                metadata: {
+                    role: "MEMBER",
+                    storefront: "Hill Road",
+                    source: "backfill",
+                },
+            }),
+        ).toEqual([
+            { label: "Role", before: null, after: "Member" },
+            { label: "From storefront", before: null, after: "Hill Road" },
+        ]);
         expect(
             rows({
                 action: "membership.remove",

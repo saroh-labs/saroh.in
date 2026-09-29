@@ -1,5 +1,6 @@
+import type { OrderReadDto } from "./order-read";
 import type { RawOrderRow } from "./order-row";
-import { serializeOrderRow } from "./order-row";
+import { quickViewOf, serializeOrderRow } from "./order-row";
 
 /**
  * One Orders row (plan B, B1): what it says, and what it leaves out for a
@@ -135,6 +136,27 @@ describe("serializeOrderRow", () => {
         expect(row.customer).toEqual({ id: "c1", name: "Asha Rao" });
     });
 
+    it("reads “Removed customer”, with no email, once their details were removed (C11)", () => {
+        const row = serializeOrderRow(
+            raw({
+                customer: {
+                    email: "removed+c1@removed.invalid",
+                    firstName: null,
+                    lastName: null,
+                    phone: null,
+                },
+            }),
+            { money: true, contact: true, now },
+        );
+        expect(row.customer).toEqual({
+            id: "c1",
+            name: "Removed customer",
+            phone: null,
+        });
+        // The order itself is unchanged.
+        expect(row).toMatchObject({ orderId: "1042", total: "610.00" });
+    });
+
     it("counts an unpaid order's whole total as unpaid", () => {
         const row = serializeOrderRow(
             raw({ paymentStatus: "UNPAID", paymentIntents: [] }),
@@ -182,5 +204,187 @@ describe("serializeOrderRow", () => {
             now,
         });
         expect(row.customer).toBeNull();
+    });
+
+    it("says when the pay link was made, with money, and never the link (B5)", () => {
+        const made = new Date("2026-09-27T09:30:00.000Z");
+        const row = serializeOrderRow(raw({ payLinkCreatedAt: made }), {
+            money: true,
+            contact: false,
+            now,
+        });
+        expect(row.payLinkCreatedAt).toEqual(made);
+        expect(JSON.stringify(row)).not.toMatch(/order-pay|token/i);
+
+        const none = serializeOrderRow(raw(), {
+            money: true,
+            contact: false,
+            now,
+        });
+        expect(none.payLinkCreatedAt).toBeNull();
+
+        const kitchen = serializeOrderRow(raw({ payLinkCreatedAt: made }), {
+            money: false,
+            contact: true,
+            now,
+        });
+        expect(kitchen).not.toHaveProperty("payLinkCreatedAt");
+    });
+});
+
+describe("the row's Needs attention (B15)", () => {
+    const entry = (over: Record<string, unknown> = {}) => ({
+        id: "a1",
+        kind: "ALLERGY" as const,
+        label: "Sesame",
+        detail: "Allergic to sesame",
+        sensitive: false,
+        allergen: { id: "al1", name: "Sesame" },
+        matchAllergens: [{ id: "al1", name: "Sesame" }],
+        source: "BOOKING_PAGE" as const,
+        ...over,
+    });
+
+    it("carries each entry's kind and words, never its allergen ids or who wrote it", () => {
+        const row = serializeOrderRow(raw(), {
+            money: false,
+            contact: false,
+            now,
+            attention: { entries: [entry()], hiddenSensitiveCount: 2 },
+        });
+        expect(row.attention).toEqual([
+            {
+                id: "a1",
+                kind: "ALLERGY",
+                label: "Sesame",
+                detail: "Allergic to sesame",
+                source: "BOOKING_PAGE",
+            },
+        ]);
+        // How many sensitive entries there are is not the row's to say.
+        expect(JSON.stringify(row)).not.toContain("hiddenSensitiveCount");
+    });
+
+    it("is null when it couldn't be read, so the app says Not available", () => {
+        const row = serializeOrderRow(raw(), {
+            money: true,
+            contact: true,
+            now,
+            attention: null,
+        });
+        expect(row.attention).toBeNull();
+    });
+
+    it("is empty when there is nothing, and absent when not asked for", () => {
+        const empty = serializeOrderRow(raw(), {
+            money: true,
+            contact: true,
+            now,
+            attention: { entries: [], hiddenSensitiveCount: 0 },
+        });
+        expect(empty.attention).toEqual([]);
+        const old = serializeOrderRow(raw(), {
+            money: true,
+            contact: true,
+            now,
+        });
+        expect(old).not.toHaveProperty("attention");
+    });
+});
+
+describe("quickViewOf (B5)", () => {
+    const read = {
+        id: "o1",
+        orderId: "1042",
+        customer: {
+            id: "c1",
+            name: "Asha Rao",
+            phone: "+91 98765 43210",
+            email: "asha@example.in",
+            contactId: "k1",
+            orderCount: 3,
+            firstOrderAt: null,
+        },
+        notes: "No sesame",
+    } as unknown as OrderReadDto;
+
+    it("keeps the customer's phone and email for a caller who reads contacts", () => {
+        expect(quickViewOf(read, { contact: true })).toBe(read);
+    });
+
+    it("leaves them out for one who doesn't, and keeps the rest", () => {
+        const quick = quickViewOf(read, { contact: false });
+        expect(quick.customer).toEqual({
+            id: "c1",
+            name: "Asha Rao",
+            phone: null,
+            contactId: "k1",
+            orderCount: 3,
+            firstOrderAt: null,
+        });
+        expect(quick.customer).not.toHaveProperty("email");
+        expect(quick.notes).toBe("No sesame");
+        // The read it came from is left as it was.
+        expect(read.customer?.phone).toBe("+91 98765 43210");
+    });
+
+    it("keeps an order whose customer record is gone", () => {
+        const gone = { ...read, customer: null } as OrderReadDto;
+        expect(quickViewOf(gone, { contact: false }).customer).toBeNull();
+    });
+
+    // B13: a walk-in's phone is left out as a customer's would be.
+    it("leaves a walk-in's phone out for a caller who doesn't read contacts", () => {
+        const walkIn = {
+            ...read,
+            customer: null,
+            walkIn: { name: "Ravi", phone: "+91 90000 11111" },
+        } as OrderReadDto;
+        expect(quickViewOf(walkIn, { contact: false }).walkIn).toEqual({
+            name: "Ravi",
+            phone: null,
+        });
+        expect(quickViewOf(walkIn, { contact: true }).walkIn?.phone).toBe(
+            "+91 90000 11111",
+        );
+    });
+});
+
+describe("a walk-in's row (B13)", () => {
+    it("has no customer, and carries the walk-in's name", () => {
+        const row = serializeOrderRow(
+            raw({
+                customerId: null,
+                customer: null,
+                walkInName: "Ravi",
+                walkInPhone: "+91 90000 11111",
+            }),
+            { money: true, contact: true, now },
+        );
+        expect(row.customer).toBeNull();
+        expect(row.walkIn).toEqual({
+            name: "Ravi",
+            phone: "+91 90000 11111",
+        });
+    });
+
+    it("keeps the walk-in's phone from a caller without contact:read", () => {
+        const row = serializeOrderRow(
+            raw({
+                customerId: null,
+                customer: null,
+                walkInName: "Ravi",
+                walkInPhone: "+91 90000 11111",
+            }),
+            { money: false, contact: false, now },
+        );
+        expect(row.walkIn).toEqual({ name: "Ravi", phone: null });
+    });
+
+    it("is null on a customer's row", () => {
+        expect(
+            serializeOrderRow(raw(), { money: true, contact: true, now })
+                .walkIn,
+        ).toBeNull();
     });
 });

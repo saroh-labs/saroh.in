@@ -4,7 +4,13 @@ import { PageSections } from "@saroh/site-blocks";
 
 import { PreviewGone } from "@/components/preview-gone";
 import { publicApiUrl } from "@/lib/api-url";
-import { findHomePage, getPreviewByToken } from "@/lib/publication";
+import {
+    findHomePage,
+    getPreviewByToken,
+    getPreviewJournalFeed,
+} from "@/lib/publication";
+import { getPreviewPlansFeed } from "@/lib/site-plans";
+import { getPreviewProductGridFeeds } from "@/lib/site-product-grids";
 
 /** The draft's home page, behind a preview token (#198). */
 export default async function PreviewHomePage({
@@ -28,11 +34,28 @@ export default async function PreviewHomePage({
     const home = findHomePage(preview.snapshot);
     if (!home) notFound();
 
+    // The draft's posts (G10), as the preview's own index shows them, and
+    // the plans on sale now (G9) and each Product grid's products (G12): a
+    // draft plan or product never shows, even here.
+    const [journal, plans, productGrids] = await Promise.all([
+        getPreviewJournalFeed(home.sections, preview.snapshot, token),
+        getPreviewPlansFeed(
+            home.sections,
+            preview.snapshot,
+            preview.siteId,
+            token,
+        ),
+        getPreviewProductGridFeeds(home.sections, preview.siteId),
+    ]);
+
     return (
         <PageSections
             sections={home.sections}
             apiUrl={publicApiUrl()}
             siteId={preview.siteId}
+            journal={journal}
+            plans={plans}
+            productGrids={productGrids}
         />
     );
 }

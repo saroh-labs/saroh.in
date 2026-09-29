@@ -1,4 +1,5 @@
 import { fromMajor, toMajor } from "./money";
+import { dayProblems, problemChip } from "./problems";
 import type {
     CalendarDay,
     CalendarItem,
@@ -38,6 +39,7 @@ const ORDER: LayerKey[] = [
     "collections",
     "subscriptions",
     "invoices",
+    "payments",
 ];
 
 /**
@@ -62,6 +64,9 @@ function toneOf(key: LayerKey, shop: boolean): LayerTone {
             return shop ? 5 : 1;
         case "classes":
             return shop ? 6 : 3;
+        // The design's clinic: its payments green, beside its bookings.
+        case "payments":
+            return 2;
     }
 }
 
@@ -87,7 +92,8 @@ export function layersFor(month: Pick<CalendarMonth, "layers" | "totals">) {
         }));
 }
 
-const LABELS: Record<
+/** A layer's words; money's kinds are named by them too (E23). */
+export const LABELS: Record<
     LayerKey,
     (shop: boolean) => Pick<LayerStyle, "label" | "one" | "many">
 > = {
@@ -107,21 +113,15 @@ const LABELS: Record<
     invoices: () => ({ label: "Invoices", one: "invoice", many: "invoices" }),
     bookings: () => ({ label: "Bookings", one: "booking", many: "bookings" }),
     classes: () => ({ label: "Classes", one: "class", many: "classes" }),
+    payments: () => ({
+        label: "Payments",
+        one: "payment",
+        many: "payments",
+    }),
 };
 
 /** The layers switched off, by key. */
 export type Off = Partial<Record<LayerKey, boolean>>;
-
-/** How many things on a day need acting on, among the layers switched on. */
-export function actOnCount(day: CalendarDay, off: Off): number {
-    const failed = off.subscriptions
-        ? 0
-        : (day.layers.subscriptions?.kinds.failed ?? 0);
-    const overdue = off.invoices
-        ? 0
-        : (day.layers.invoices?.kinds.overdue ?? 0);
-    return failed + overdue;
-}
 
 export interface DayChip {
     key: LayerKey | "act";
@@ -130,18 +130,19 @@ export interface DayChip {
 }
 
 /**
- * A day's chips: what needs acting on first, then a count per layer that has
- * anything. The desk shows the first three; the phone draws each as a dot.
+ * A day's chips: its named problem first ("1 late order", "2 need you",
+ * E22), then a count per layer that has anything. The desk shows the first
+ * three; the phone draws each as a dot, the problem's red.
  */
 export function dayChips(
     day: CalendarDay,
     layers: LayerStyle[],
     off: Off,
+    today: string,
 ): DayChip[] {
     const chips: DayChip[] = [];
-    const act = actOnCount(day, off);
-    if (act > 0)
-        chips.push({ key: "act", text: `${act} to act on`, tone: "act" });
+    const problem = problemChip(dayProblems(day, off, today));
+    if (problem) chips.push({ key: "act", text: problem, tone: "act" });
     for (const layer of layers) {
         if (off[layer.key]) continue;
         const n = day.layers[layer.key]?.count ?? 0;
@@ -181,13 +182,6 @@ export function mainCurrency(month: CalendarMonth): string | null {
         }
     }
     return null;
-}
-
-/** A day's takings in the main currency, in major units (0 when none). */
-export function dayTakings(day: CalendarDay, currency: string | null): number {
-    if (!currency || !day.takings) return 0;
-    const hit = day.takings.find((t) => t.currency === currency);
-    return hit ? toMajor(hit.amount) : 0;
 }
 
 /** Where a dated thing opens. */
@@ -262,7 +256,10 @@ export function describeItem(
                 at ? `Placed ${at}` : null,
                 item.kind === "cancelled"
                     ? { label: "Cancelled", tone: "bad" }
-                    : null,
+                    : // Past its storefront's late time (E20's flag, E22).
+                      item.flags?.includes("late")
+                      ? { label: "Late", tone: "bad" }
+                      : null,
             );
         case "collections":
             return line(`Collects · ${item.title}`, item.subtitle);
@@ -311,6 +308,12 @@ export function describeItem(
                 at ? `${at} ${item.title}` : item.title,
                 item.subtitle,
                 item.kind === "full" ? { label: "Full", tone: "accent" } : null,
+            );
+        // "10:30 Paid · Check-up · Asha Rao", then its invoice (E20).
+        case "payments":
+            return line(
+                joined(at ? `${at} Paid` : "Paid", item.title),
+                item.subtitle,
             );
     }
 }

@@ -41,13 +41,16 @@ export function greeting(
 
 /**
  * "Friday 18 September · Rye & Co.", the business's date; for a new
- * business, what the first job is.
+ * business, what the first job is. A staff member's Home narrowed to their
+ * storefronts adds them (F11): "… · Rye & Co. · Hill Road only".
  */
 export function dateLine(
     lastDay: HomeLastDay | null,
     businessName: string,
+    only: string | null = null,
 ): string {
-    if (!lastDay) return businessName;
+    const where = only ? `${businessName} · ${only}` : businessName;
+    if (!lastDay) return where;
     if (lastDay.fresh) return `Let's get ${businessName} ready to take money.`;
     // The date is already the business's; read it as a calendar day.
     const day = new Intl.DateTimeFormat("en-GB", {
@@ -60,7 +63,7 @@ export function dateLine(
         // en-GB writes "Friday 18 September" or, in some ICU builds,
         // "Friday, 18 September"; the design has no comma.
         .replace(",", "");
-    return `${day} · ${businessName}`;
+    return `${day} · ${where}`;
 }
 
 const plural = (n: number, one: string, many: string) =>

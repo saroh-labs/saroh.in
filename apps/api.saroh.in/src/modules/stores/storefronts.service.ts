@@ -25,6 +25,7 @@ import { lateThresholdsOf } from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
 import { storefrontLimit } from "../organizations/business-limits";
 import { lockStockLevels } from "../products/stock-levels";
+import { shopRolloutOn } from "../sites/sells-from";
 import { openingHoursText } from "./opening-hours-text";
 import type { LateRuleNotice } from "./storefront-fulfilment";
 import {
@@ -103,6 +104,23 @@ export interface StorefrontSettings extends StorefrontSummary {
     guestCheckout: boolean;
     /** ISO, when paused; `null` while taking payments. */
     pausedAt: string | null;
+    /** The site checkout's flat delivery fees (G13); `null` is free. */
+    localDeliveryFee: string | null;
+    shippingFee: string | null;
+    /**
+     * Whether the business's site shop is open (the `SITE_SHOP` rollout
+     * flag, G11/G13): the fees above are asked for only then.
+     */
+    siteShop: boolean;
+    /**
+     * Customers who share an email (DEC-055, C15): whether a customer of
+     * this storefront who pays with an email a store-made contact already
+     * holds is linked to it on their own (true), or left for staff (false,
+     * the default). `linkSameEmailSince` is when it was turned on: only
+     * customers made since are linked.
+     */
+    linkSameEmailCustomers: boolean;
+    linkSameEmailSince: string | null;
     /** The provider this storefront's checkout names, if it names one. */
     checkoutProvider: string | null;
     /**
@@ -184,6 +202,7 @@ export class StorefrontsService {
             providers,
             onHand,
             promised,
+            siteShop,
         ] = await Promise.all([
             prisma.storeSettings.findUnique({ where: { storeId } }),
             prisma.order.count({
@@ -212,6 +231,9 @@ export class StorefrontsService {
                 where: { storeId, promised: { gt: 0 } },
                 _sum: { promised: true },
             }),
+            // Only whether to ask for the website's delivery fees: a flag
+            // that can't be read hides them rather than the screen.
+            shopRolloutOn(organizationId).catch(() => false),
         ]);
         const connected = providers.filter((p) => p.status === "CONNECTED");
         const named = settings?.checkoutProvider ?? null;
@@ -250,6 +272,16 @@ export class StorefrontsService {
             guestCheckout: settings?.guestCheckout ?? true,
             pausedAt: settings?.pausedAt?.toISOString() ?? null,
             paused: Boolean(settings?.pausedAt),
+            localDeliveryFee: settings?.localDeliveryFee
+                ? toMoneyString(settings.localDeliveryFee)
+                : null,
+            shippingFee: settings?.shippingFee
+                ? toMoneyString(settings.shippingFee)
+                : null,
+            siteShop,
+            linkSameEmailCustomers: Boolean(settings?.linkSameEmailSince),
+            linkSameEmailSince:
+                settings?.linkSameEmailSince?.toISOString() ?? null,
             checkoutProvider: named,
             effectiveProvider: named
                 ? connected.some((p) => p.provider === named)
@@ -357,6 +389,17 @@ export class StorefrontsService {
                           : null,
                   }
                 : {}),
+            // Turning it on twice keeps the first time, as pausing does:
+            // the time is where "customers made since" starts (C15).
+            ...(dto.linkSameEmailCustomers !== undefined
+                ? {
+                      linkSameEmailSince: dto.linkSameEmailCustomers
+                          ? current.linkSameEmailSince
+                              ? new Date(current.linkSameEmailSince)
+                              : new Date()
+                          : null,
+                  }
+                : {}),
             ...(dto.checkoutProvider !== undefined
                 ? {
                       checkoutProvider:
@@ -374,6 +417,12 @@ export class StorefrontsService {
                 : {}),
             ...(dto.freeShippingThreshold !== undefined
                 ? { freeShippingThreshold: dto.freeShippingThreshold }
+                : {}),
+            ...(dto.localDeliveryFee !== undefined
+                ? { localDeliveryFee: feeOrNull(dto.localDeliveryFee) }
+                : {}),
+            ...(dto.shippingFee !== undefined
+                ? { shippingFee: feeOrNull(dto.shippingFee) }
                 : {}),
             // Which ways it offers follows the toggle an app from before
             // B17's chips saves (B2a) — only the one it sent (O-4). The
@@ -436,7 +485,49 @@ export class StorefrontsService {
                 saved,
             );
         }
+        if (dto.linkSameEmailCustomers !== undefined && actorUserId) {
+            await this.recordSameEmail(
+                organizationId,
+                actorUserId,
+                current,
+                saved,
+            );
+        }
         return saved;
+    }
+
+    /**
+     * Customers who share an email turned on or off (C15), in Settings ›
+     * Activity: which storefront, and the setting as it was and became. A
+     * save that left it as it was records nothing.
+     */
+    private async recordSameEmail(
+        organizationId: string,
+        actorUserId: string,
+        before: StorefrontSettings,
+        after: StorefrontSettings,
+    ): Promise<void> {
+        const changes = recordableChanges([
+            {
+                field: "linkSameEmailCustomers",
+                before: before.linkSameEmailCustomers,
+                after: after.linkSameEmailCustomers,
+            },
+        ]);
+        if (changes.length === 0) return;
+        await this.audit?.record({
+            action: AuditAction.StorefrontSameEmailUpdate,
+            actorUserId,
+            organizationId,
+            targetType: "storefront",
+            targetId: after.id,
+            outcome: AuditOutcome.Success,
+            metadata: {
+                fields: ["linkSameEmailCustomers"],
+                storefront: after.name,
+                changes: changes as unknown as Prisma.InputJsonArray,
+            },
+        });
     }
 
     /**
@@ -606,4 +697,10 @@ export class StorefrontsService {
         if (!store) throw new NotFoundException("Storefront not found");
         return store;
     }
+}
+
+/** A fee as stored: nothing, or zero, is free (null). */
+function feeOrNull(value: string | null): string | null {
+    if (value === null || value === "") return null;
+    return Number(value) > 0 ? value : null;
 }

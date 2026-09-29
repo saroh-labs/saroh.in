@@ -41,6 +41,37 @@ describe("checkRenderability (#283)", () => {
         });
     });
 
+    it("draws a Product grid (G12), and names one it can't", () => {
+        expect(
+            checkRenderability({
+                pages: [
+                    {
+                        path: "/",
+                        sections: [
+                            hero,
+                            {
+                                type: "productGrid",
+                                content: {
+                                    title: "From the counter",
+                                    source: "picked",
+                                    productIds: ["p_1", "p_2"],
+                                    count: 4,
+                                },
+                            },
+                            {
+                                type: "productGrid",
+                                content: { source: "everything" },
+                            },
+                        ],
+                    },
+                ],
+            }),
+        ).toEqual({
+            renderable: false,
+            unrenderable: [{ path: "/", index: 2, type: "productGrid" }],
+        });
+    });
+
     it("treats a page with no sections as renderable", () => {
         expect(
             checkRenderability({ pages: [{ path: "/", sections: [] }] }),
@@ -56,4 +87,36 @@ describe("checkRenderability (#283)", () => {
             });
         },
     );
+});
+
+describe("module pages in a snapshot (G14)", () => {
+    it("draws a module page's sections, and names its kind when one can't be", () => {
+        expect(
+            checkRenderability({
+                pages: [
+                    { path: "/", sections: [hero] },
+                    {
+                        path: "/journal",
+                        kind: "JOURNAL",
+                        sections: [
+                            {
+                                type: "journal",
+                                content: { title: "Journal", count: 6 },
+                            },
+                        ],
+                    },
+                    {
+                        path: "/book",
+                        kind: "BOOK",
+                        sections: [{ type: "servicesList", content: {} }],
+                    },
+                ],
+            }),
+        ).toEqual({
+            renderable: false,
+            unrenderable: [
+                { path: "/book", index: 0, type: "servicesList", kind: "BOOK" },
+            ],
+        });
+    });
 });

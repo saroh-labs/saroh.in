@@ -5,13 +5,13 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { paperTitle } from "@/components/invoices/invoice-paper";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { createPayLink, readInvoice } from "@/lib/invoices/actions";
 import { customerHref, invoiceHref, sourceHref } from "@/lib/invoices/links";
+import { isExemptPaper, paperTitle } from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
 import {
     billedTo,
@@ -315,19 +315,21 @@ function TaxRows({
     businessName: string;
     money: (a: string) => string;
 }) {
-    const rows: [string, string][] = i.gst
-        ? [
-              ["Taxable value", money(i.subtotal)],
-              ...(i.gst.taxType === "INTER"
-                  ? ([["IGST", money(i.gst.igst)]] as [string, string][])
-                  : ([
-                        ["CGST", money(i.gst.cgst)],
-                        ["SGST", money(i.gst.sgst)],
-                    ] as [string, string][])),
-          ]
-        : Number(i.tax) > 0
-          ? [["Tax", money(i.tax)]]
-          : [[`No GST — ${businessName} isn't registered`, ""]];
+    const rows: [string, string][] = isExemptPaper(i)
+        ? [["Exempt from GST — no tax is charged", ""]]
+        : i.gst
+          ? [
+                ["Taxable value", money(i.subtotal)],
+                ...(i.gst.taxType === "INTER"
+                    ? ([["IGST", money(i.gst.igst)]] as [string, string][])
+                    : ([
+                          ["CGST", money(i.gst.cgst)],
+                          ["SGST", money(i.gst.sgst)],
+                      ] as [string, string][])),
+            ]
+          : Number(i.tax) > 0
+            ? [["Tax", money(i.tax)]]
+            : [[`No GST — ${businessName} isn't registered`, ""]];
     return (
         <div className="py-1">
             {rows.map(([k, v]) => (

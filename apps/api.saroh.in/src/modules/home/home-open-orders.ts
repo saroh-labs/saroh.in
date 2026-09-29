@@ -7,9 +7,11 @@ import {
 } from "../orders/late-thresholds";
 import { openOrderSql } from "../orders/open-orders";
 import { lateSettingsJoin, lateSql } from "../orders/order-list-filters";
+import { orderPartyName } from "../orders/walk-in";
 import type { HomeEvidence, HomeTone } from "./home-model";
 import { EVIDENCE_LIMIT, personName } from "./home-model";
 import { openOrderWords } from "./home-order-rows";
+import { storeSql } from "./home-staff";
 
 type Db = typeof prisma;
 
@@ -31,12 +33,18 @@ export interface OpenOrders {
  *
  * One read picks the rows and counts them — every open order, and how many
  * are late — so "N more" can say whether any it stands for is late. Its money
- * only to someone who reads orders.
+ * only to someone who reads orders. A staff member's Home reads only their
+ * storefronts' (F11, `storeIds`); absent or null, every storefront's.
  */
 export async function readOpenOrders(
     db: Db,
     organizationId: string,
-    view: { now: Date; zone: string; money: boolean },
+    view: {
+        now: Date;
+        zone: string;
+        money: boolean;
+        storeIds?: readonly string[] | null;
+    },
 ): Promise<OpenOrders> {
     const picked = await db.$queryRaw<
         { id: string; late: boolean; total: number; lates: number }[]
@@ -44,7 +52,7 @@ export async function readOpenOrders(
         SELECT o.id, o."createdAt", ${lateSql(view.now)} AS late
         FROM "Order" o
         ${lateSettingsJoin()}
-        WHERE ${openOrderSql(organizationId)}
+        WHERE ${openOrderSql(organizationId)}${storeSql(view.storeIds, "o")}
     )
     SELECT id, late,
         (COUNT(*) OVER ())::int AS total,
@@ -72,7 +80,10 @@ export async function readOpenOrders(
     for (const { id } of picked) {
         const row = byId.get(id);
         if (!row) continue;
-        const who = personName(row.customer);
+        // A walk-in (B13) has no customer, only the name they gave.
+        const who = row.customer
+            ? personName(row.customer)
+            : orderPartyName(row);
         evidence.push({
             id: row.id,
             title: row.orderId,

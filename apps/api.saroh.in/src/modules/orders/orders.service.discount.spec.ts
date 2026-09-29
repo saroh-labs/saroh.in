@@ -21,6 +21,11 @@ jest.mock("../invoices/order-invoicing", () => ({
         .mockResolvedValue({ supplementary: null, creditNote: null }),
 }));
 
+// The team's "New order" alert (F14) is its own job; here, only that it is queued.
+jest.mock("../notifications/team-alerts", () => ({
+    enqueueTeamAlert: jest.fn(),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
@@ -79,7 +84,7 @@ function makeService(
     discounts: DiscountsService | null = new DiscountsService(),
 ) {
     const stores = {
-        writableOrganization: jest.fn().mockResolvedValue({ organizationId }),
+        orderWriteOrganization: jest.fn().mockResolvedValue({ organizationId }),
     } as unknown as StoresService;
     const activation = {
         firstOrderCreated: jest.fn().mockResolvedValue(undefined),
@@ -107,7 +112,13 @@ beforeEach(() => {
     db.inventory!.findUnique!.mockResolvedValue(null);
     db.order!.count!.mockResolvedValue(0);
     db.order!.create!.mockResolvedValue({ id: "o_1", items: [] });
-    db.storeSettings!.findUnique!.mockResolvedValue({ currency: "INR" });
+    // A storefront offering all three ways (B13 checks a named way).
+    db.storeSettings!.findUnique!.mockResolvedValue({
+        currency: "INR",
+        fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+        collectionEnabled: true,
+        shippingEnabled: true,
+    });
     db.discount!.findUnique!.mockResolvedValue(MARKETDAY);
     db.discountRedemption!.count!.mockResolvedValue(3);
 });

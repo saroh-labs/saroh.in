@@ -7,11 +7,20 @@ import {
     BookingUnavailable,
     initialDateOf,
     initialTimeOf,
+    ModulePageUnavailable,
+    MoveClass,
 } from "@saroh/site-blocks";
 
+import { PublishedPage } from "@/components/published-page";
+import { accountAreaOn, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
 import { getSignedInCustomer } from "@/lib/customer-session";
+import {
+    isBookingDeepLink,
+    moduleLabel,
+    moduleRoute,
+} from "@/lib/module-pages";
 import { getSiteForHost } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
 
@@ -20,7 +29,14 @@ import {
     signOut,
     verifySignInCode,
 } from "../account/actions";
-import { bookSignedIn } from "./actions";
+import { moveBooking } from "../account/bookings/actions";
+import {
+    bookSignedIn,
+    creditFor,
+    joinWaitlist,
+    leaveWaitlist,
+    waitlistFor,
+} from "./actions";
 
 /**
  * The customer's booking page on a merchant's site (U19): `/<domain>/book`,
@@ -42,8 +58,23 @@ import { bookSignedIn } from "./actions";
  * place, hours and phone (E6) are the site's public visit read, the one
  * Visit us shows; without it the header names the business only.
  *
+ * A full class offers its waitlist (round-2 A12): joined, read and left
+ * through `./actions.ts` with the session, like booking.
+ *
+ * `?move=<ref>` (round-2 A6, behind the account area's switch) moves one
+ * of the signed-in customer's classes instead: "Moving: ‹class›", its other
+ * sessions, and "Move here", through `account/bookings/actions.ts`.
+ *
  * A static segment, so it wins over `[slug]`: a merchant page at `/book`
  * would be shadowed by this one (none of the templates has one).
+ *
+ * **The Book page dresses it** (round-2 G15). When the site has published a
+ * Book page, a plain `/book` draws that page's sections (its title, intro
+ * and the services list with its display options) inside the site's chrome;
+ * a service there opens `/book?service=<id>`, which goes straight into the
+ * flow as before. While Appointments is off (or not rolled out) the Book
+ * page's address says "This isn't available right now" with a link home.
+ * A site with no Book page gets today's flow, unchanged.
  */
 
 export async function generateMetadata({
@@ -55,9 +86,15 @@ export async function generateMetadata({
     const resolved = await getSiteForHost(domain);
     if (!resolved) return null;
     const name = resolved.snapshot.site.name;
+    // The Book page's own title (G15), which is also its menu name.
+    const label = moduleLabel(resolved.snapshot.pages, "BOOK", "Book");
     return {
-        title: `Book · ${name}`,
-        openGraph: { title: `Book · ${name}`, siteName: name, url: "/book" },
+        title: `${label} · ${name}`,
+        openGraph: {
+            title: `${label} · ${name}`,
+            siteName: name,
+            url: "/book",
+        },
         metadataBase: new URL(`https://${domain}`),
     };
 }
@@ -71,12 +108,50 @@ export default async function BookPage({
         service?: string | string[];
         date?: string | string[];
         start?: string | string[];
+        move?: string | string[];
     }>;
 }) {
     const { domain } = await params;
-    const { service, date, start } = await searchParams;
+    const { service, date, start, move } = await searchParams;
     const resolved = await getSiteForHost(domain);
     if (!resolved?.siteId) notFound();
+
+    // Moving a class from the account (A6): its sessions, "Moving: ‹class›".
+    const moving =
+        typeof move === "string" && move.trim() && accountAreaOn()
+            ? move.trim().slice(0, 64)
+            : null;
+    if (moving) {
+        return (
+            <MoveClass
+                row={await getMyBooking(moving)}
+                apiUrl={publicApiUrl()}
+                businessName={resolved.snapshot.site.name}
+                move={moveBooking}
+            />
+        );
+    }
+
+    // The Book page (G15): its sections on a plain /book, or its address
+    // taken off while Appointments is off. Deep links go on to the flow.
+    const route = moduleRoute(
+        resolved.snapshot.pages,
+        resolved.modules,
+        "BOOK",
+        isBookingDeepLink({ service, date, start }),
+    );
+    if (route.draw === "unavailable") {
+        return <ModulePageUnavailable business={resolved.snapshot.site.name} />;
+    }
+    if (route.draw === "page") {
+        return (
+            <PublishedPage
+                page={route.page}
+                snapshot={resolved.snapshot}
+                siteId={resolved.siteId}
+            />
+        );
+    }
 
     const [lookup, visit, customer, options] = await Promise.all([
         getBookingPage(resolved.siteId),
@@ -105,7 +180,14 @@ export default async function BookPage({
                     verifyCode: verifySignInCode,
                 },
                 book: bookSignedIn,
+                credit: creditFor,
                 signOut,
+                // A full class's waitlist (A12).
+                waitlist: {
+                    mine: waitlistFor,
+                    join: joinWaitlist,
+                    leave: leaveWaitlist,
+                },
             }}
             apiUrl={publicApiUrl()}
             initialServiceId={typeof service === "string" ? service : null}

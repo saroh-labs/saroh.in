@@ -4,6 +4,7 @@ import type { StockCheck } from "../stock/stock-checks.service";
 import { businessTracksStock } from "../stock/tracking";
 import type { HomeAction, HomeEvidence } from "./home-model";
 import { EVIDENCE_LIMIT } from "./home-model";
+import { inStores } from "./home-staff";
 
 /**
  * Home's stock and website sources (round 2, F1): shelves short for open
@@ -25,15 +26,17 @@ const STOCK_NEEDS_HREF = "/commerce/stock?show=needs";
  * The Stock screen's open SHORT checks: a shelf that holds fewer than open
  * orders were promised. ATTENTION — an order is already waiting on stock
  * that isn't there. A business that doesn't track stock has no shelves to
- * be short, so it gives nothing: not a row, and not a notice.
+ * be short, so it gives nothing: not a row, and not a notice. A staff
+ * member's Home keeps only their storefronts' shelves (F11, `storeIds`).
  */
 export async function stockShort(
     db: Db,
     checks: ShortChecks,
     organizationId: string,
+    storeIds?: readonly string[] | null,
 ): Promise<HomeAction | null> {
     if (!(await businessTracksStock(db, organizationId))) return null;
-    const short = await checks.openShort(organizationId);
+    const short = inStores(await checks.openShort(organizationId), storeIds);
     const count = short.length;
     if (count === 0) return null;
 

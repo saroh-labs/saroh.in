@@ -23,6 +23,9 @@ export const SECTION_LABELS: Record<SectionType, string> = {
     contact: "Contact",
     servicesList: "Services",
     visitUs: "Visit us",
+    journal: "Journal",
+    plans: "Plans",
+    productGrid: "Product grid",
 };
 
 /**
@@ -47,6 +50,9 @@ export const SECTION_HINTS: Record<SectionType, string> = {
     servicesList: "Your services with duration and price, always up to date.",
     visitUs:
         "Your shop's address, hours and Open now, with directions, always up to date.",
+    journal: "Your latest posts, newest first. A new post shows up on its own.",
+    plans: "Your plans on sale, with price and how often. A new plan shows up on its own.",
+    productGrid: "Reads the catalogue. Stays current on its own.",
 };
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
@@ -112,6 +118,24 @@ export const SECTION_ORDER: SectionType[] = [
     "contact",
     "servicesList",
     "visitUs",
+    "journal",
+    "plans",
+    "productGrid",
 ];
+
+/**
+ * Blocks that sell, offered only while the shop is open for the business
+ * (G11–G13, the `SITE_SHOP` flag): until then a Product grid would show
+ * nothing on the site, so it isn't offered at all (DEC-057). One already on
+ * a page stays, and its canvas says why it is empty.
+ */
+const SHOP_BLOCKS: readonly SectionType[] = ["productGrid"];
+
+/** The blocks the Add tab and the picker offer, in order. */
+export function addableSections(shopOpen: boolean): SectionType[] {
+    return shopOpen
+        ? SECTION_ORDER
+        : SECTION_ORDER.filter((t) => !SHOP_BLOCKS.includes(t));
+}
 
 /** A sensible empty section for the chosen type (contract v1). */

@@ -31,7 +31,11 @@ import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { PackPurchase } from "@/lib/class-packs/service";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
-import { bookByHand, listAvailability } from "@/lib/services/actions";
+import {
+    bookByHand,
+    bookVisit,
+    listAvailability,
+} from "@/lib/services/actions";
 import type { BookingPeople, PayChoice } from "@/lib/services/booking-pay";
 import {
     bookerFor,
@@ -41,6 +45,7 @@ import {
     payNote,
 } from "@/lib/services/booking-pay";
 import type { Slot } from "@/lib/services/service";
+import type { VisitToBook } from "@/lib/services/treatment";
 
 const WINDOW_DAYS = 14;
 
@@ -66,6 +71,10 @@ const WINDOW_DAYS = 14;
  * recent first, or added new, with their Needs attention once picked. A
  * priced booking can be sent a pay link: the booking is made, its invoice
  * issued, and the link shown to copy.
+ *
+ * With `visit` (E10) it books the next visit of a treatment: the service,
+ * the customer and the order are set, and only the time is chosen. The
+ * visit is paid for on its order, so no pack or payment is asked.
  */
 export function NewBookingDialog({
     services,
@@ -73,6 +82,8 @@ export function NewBookingDialog({
     canUsePacks = false,
     triggerClassName,
     plainTrigger = false,
+    visit,
+    primaryTrigger = false,
 }: {
     services: {
         id: string;
@@ -83,11 +94,18 @@ export function NewBookingDialog({
     }[];
     /** Customer search and pay links, as far as the viewer may (E4). */
     people: BookingPeople;
-    /** May read and spend class packs (`pack:read` and `pack:write`). */
+    /** May read and spend class packs (`pack:read`, `pack:sell` and `booking:write`). */
     canUsePacks?: boolean;
     triggerClassName?: string;
     /** The calendar's button: words only, as the Bookings design draws it. */
     plainTrigger?: boolean;
+    /** Book this treatment's next visit (E10), on its order. */
+    visit?: VisitToBook;
+    /**
+     * "Book visit N" as the page's primary action (B14, Order Detail's
+     * header) rather than the booking page's outline button.
+     */
+    primaryTrigger?: boolean;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -168,9 +186,37 @@ export function NewBookingDialog({
     const booker = bookerFor(who);
     const offerLink = people.payLink && (service?.priceCents ?? 0) > 0;
     const payNow: PayChoice = pay === "LINK" && !offerLink ? "DESK" : pay;
-    const ready = Boolean(service && picked && booker) && !saving;
+    const ready =
+        Boolean(service && picked && (visit !== undefined || booker)) &&
+        !saving;
+
+    /** The treatment's next visit (E10): on its order, nothing to pay. */
+    async function saveVisit(v: VisitToBook) {
+        if (!service || !picked) return;
+        setSaving(true);
+        const res = await bookVisit(v.orderId, {
+            visitNumber: v.visitNumber,
+            startAt: picked,
+        });
+        setSaving(false);
+        if (!res.ok) {
+            showError(res.error);
+            // Most likely the time went while this was open: read again.
+            setPicked(null);
+            setLoaded(null);
+            setReload((n) => n + 1);
+            return;
+        }
+        showSuccess(
+            `Visit ${v.visitNumber} of ${v.visits} booked for ${v.who}, ${dayTime(picked, service.timezone)}`,
+        );
+        setOpen(false);
+        setPicked(null);
+        router.refresh();
+    }
 
     async function save() {
+        if (visit) return saveVisit(visit);
         if (!service || !picked || !booker || !who) return;
         setSaving(true);
         setPackRefusal(null);
@@ -247,22 +293,38 @@ export function NewBookingDialog({
             }}
         >
             <DialogTrigger asChild>
-                <Button
-                    disabled={services.length === 0}
-                    className={triggerClassName}
-                >
-                    {plainTrigger ? null : <Plus className="mr-1.5 size-4" />}
-                    New booking
-                </Button>
+                {visit ? (
+                    <Button
+                        variant={primaryTrigger ? "default" : "outline"}
+                        size={primaryTrigger ? "default" : "sm"}
+                        disabled={services.length === 0}
+                        className={triggerClassName}
+                    >
+                        Book visit {visit.visitNumber}
+                    </Button>
+                ) : (
+                    <Button
+                        disabled={services.length === 0}
+                        className={triggerClassName}
+                    >
+                        {plainTrigger ? null : (
+                            <Plus className="mr-1.5 size-4" />
+                        )}
+                        New booking
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="max-h-[86vh] overflow-y-auto sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
-                        New booking
+                        {visit
+                            ? `Book visit ${visit.visitNumber} of ${visit.visits}`
+                            : "New booking"}
                     </DialogTitle>
                     <DialogDescription>
-                        Choosing the service sets how long it takes, so there
-                        are really two things to decide: who, and when.
+                        {visit
+                            ? `${service?.name ?? "The treatment"} for ${visit.who}. It's paid for on order #${visit.orderNumber}, so there's only the time to choose.`
+                            : "Choosing the service sets how long it takes, so there are really two things to decide: who, and when."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -276,38 +338,42 @@ export function NewBookingDialog({
                 ) : (
                     <>
                         <div className="grid gap-4">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={ids.service}>
-                                    What are they booked for?
-                                </Label>
-                                <OptionSelect
-                                    id={ids.service}
-                                    value={serviceId}
-                                    onValueChange={(v) => {
-                                        setServiceId(v);
-                                        setPicked(null);
-                                    }}
-                                    options={services.map((s) => ({
-                                        value: s.id,
-                                        label: `${s.name} · ${s.minutes} min`,
-                                    }))}
-                                />
-                            </div>
+                            {visit ? null : (
+                                <>
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor={ids.service}>
+                                            What are they booked for?
+                                        </Label>
+                                        <OptionSelect
+                                            id={ids.service}
+                                            value={serviceId}
+                                            onValueChange={(v) => {
+                                                setServiceId(v);
+                                                setPicked(null);
+                                            }}
+                                            options={services.map((s) => ({
+                                                value: s.id,
+                                                label: `${s.name} · ${s.minutes} min`,
+                                            }))}
+                                        />
+                                    </div>
 
-                            <div className="grid gap-1.5">
-                                <div
-                                    id={ids.contact}
-                                    className="text-[12.5px] font-medium"
-                                >
-                                    Who is it for?
-                                </div>
-                                <CustomerPicker
-                                    value={who}
-                                    onPick={setWho}
-                                    canSearch={people.canSearch}
-                                    labelledBy={ids.contact}
-                                />
-                            </div>
+                                    <div className="grid gap-1.5">
+                                        <div
+                                            id={ids.contact}
+                                            className="text-[12.5px] font-medium"
+                                        >
+                                            Who is it for?
+                                        </div>
+                                        <CustomerPicker
+                                            value={who}
+                                            onPick={setWho}
+                                            canSearch={people.canSearch}
+                                            labelledBy={ids.contact}
+                                        />
+                                    </div>
+                                </>
+                            )}
 
                             <div className="grid gap-2">
                                 <div className="text-[12.5px] font-medium">
@@ -379,7 +445,7 @@ export function NewBookingDialog({
                                 ) : null}
                             </div>
 
-                            {pack && service ? (
+                            {pack && service && !visit ? (
                                 <div
                                     className={cn(
                                         "grid gap-2.5 rounded-[10px] border px-3.5 py-3 transition-colors duration-fast",
@@ -424,7 +490,13 @@ export function NewBookingDialog({
                                     ) : null}
                                 </div>
                             ) : null}
-                            {paying ? null : (
+                            {visit ? (
+                                <p className="text-[12px] leading-[1.5] text-muted-foreground">
+                                    A visit is never billed on its own: the
+                                    treatment was sold once, on order #
+                                    {visit.orderNumber}.
+                                </p>
+                            ) : paying ? null : (
                                 <div className="grid gap-1.5">
                                     <div
                                         id={ids.pay}

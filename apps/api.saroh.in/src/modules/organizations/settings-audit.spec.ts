@@ -68,6 +68,12 @@ describe("settingsSnapshot", () => {
         });
     });
 
+    it("says a company row's type as pvt, and a new type as stored (F10)", () => {
+        expect(settingsSnapshot(row(), AT).type).toBe("pvt");
+        expect(settingsSnapshot(row({ type: "llp" }), AT).type).toBe("llp");
+        expect(settingsSnapshot(row({ type: null }), AT).type).toBeNull();
+    });
+
     it("never reads the contact email or the website", () => {
         const snap = settingsSnapshot(row(), AT);
         expect(snap).not.toHaveProperty("contactEmail");

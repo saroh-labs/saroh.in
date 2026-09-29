@@ -1,11 +1,21 @@
 import { fromMinor, toMoneyString } from "../../common/money";
+import { contactEmailForDisplay } from "../contacts/contact-email";
+import {
+    isRemovedStoreCustomer,
+    REMOVED_CUSTOMER_NAME,
+} from "../customers/anonymise-customer";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import type { OrderAttention, OrderAttentionTag } from "./order-attention";
+import { attentionTags } from "./order-attention";
+import { lineName } from "./order-line";
 import type { PaymentStanding } from "./order-list-filters";
 import { paymentStandingOf } from "./order-list-filters";
+import type { OrderReadDto } from "./order-read";
 import { amountDueCents } from "./order-read";
 import type { OrderStage } from "./order-stage";
 import { orderStanding } from "./order-standing";
+import { walkInOf } from "./walk-in";
 
 /**
  * One row of the Orders list (plan B, B1) — built here and only here, so the
@@ -18,8 +28,10 @@ import { orderStanding } from "./order-standing";
  * B2a adds how it leaves: the type, its `steps` and `stepIndex`
  * (`fulfilment.ts`). B2b adds whether it is late (`late`,
  * `lateBy`, `lateAfterMinutes`, by the rule in `fulfilment.ts`, the same one
- * the Late filter runs in SQL) and the courier. B15 adds `attention`, with no
- * stand-in here.
+ * the Late filter runs in SQL) and the courier. B15 adds `attention`: the
+ * customer's Needs attention this viewer may see (`order-attention.ts`). B5 adds when the order's pay link was made, for the row
+ * menu's "New pay link" (never the link: only its hash is kept), and the
+ * quick view's projection of the order read (`quickViewOf`).
  */
 
 interface DecimalLike {
@@ -43,6 +55,11 @@ export interface OrderRowDto extends FulfilmentView, LateView {
         /** Only with `contact:read`. */
         phone?: string | null;
     } | null;
+    /**
+     * A walk-in (B13): no customer record, only the name they gave, and
+     * their phone (only with `contact:read`). Null when `customer` is set.
+     */
+    walkIn: { name: string; phone: string | null } | null;
     status: string;
     paymentStatus: string;
     stage: string;
@@ -64,13 +81,27 @@ export interface OrderRowDto extends FulfilmentView, LateView {
     /** Who took it, typed at the handover to a courier; else null. */
     courierName: string | null;
     trackingNumber: string | null;
+    /**
+     * When the order's pay link was made (B11); null when it has none. Only
+     * with `order:read`. Never the link: only its hash is kept.
+     */
+    payLinkCreatedAt?: Date | null;
+    /**
+     * The customer's Needs attention this viewer may see (B15), in order:
+     * Allergy first. Empty when there is none; null when it couldn't be read
+     * (the app then says "Not available", never nothing). A sensitive entry
+     * is here only for a viewer who may read sensitive entries.
+     */
+    attention?: OrderAttentionTag[] | null;
 }
 
 /** What `order-list.ts` loads for each row. */
 export interface RawOrderRow {
     id: string;
     orderId: string;
-    customerId: string;
+    customerId: string | null;
+    walkInName?: string | null;
+    walkInPhone?: string | null;
     status: string;
     paymentStatus: string;
     stage: string;
@@ -80,6 +111,8 @@ export interface RawOrderRow {
     createdAt: Date;
     courierName: string | null;
     trackingNumber: string | null;
+    /** When its pay link was made (B11); absent where it isn't loaded. */
+    payLinkCreatedAt?: Date | null;
     store: { id: string; name: string };
     customer: {
         email: string;
@@ -87,7 +120,12 @@ export interface RawOrderRow {
         lastName: string | null;
         phone: string | null;
     } | null;
-    items: { product: { name: string } | null }[];
+    items: {
+        product: { name: string } | null;
+        service?: { name: string } | null;
+    }[];
+    /** A treatment's balance recorded by hand (E9): nothing is due. */
+    balanceByHand?: boolean;
     /** SUCCEEDED payments only, with their non-failed refunds. */
     paymentIntents: {
         amountCents: number;
@@ -106,6 +144,11 @@ export interface RowView {
      * absent. The list reads them once per storefront in the page.
      */
     lateThresholds?: LateThresholds;
+    /**
+     * The customer's Needs attention as this viewer may see it (B15); null
+     * when it couldn't be read. Absent, the row carries no `attention`.
+     */
+    attention?: OrderAttention | null;
 }
 
 export function serializeOrderRow(
@@ -128,13 +171,17 @@ export function serializeOrderRow(
         order.paymentIntents.length === 0;
     const names: string[] = [];
     for (const item of order.items) {
-        const name = item.product?.name;
+        const name = lineName(item);
         if (name && !names.includes(name)) names.push(name);
     }
     const customerName = [order.customer?.firstName, order.customer?.lastName]
         .filter(Boolean)
         .join(" ")
         .trim();
+    // Their details were removed for a privacy request (C11): the order
+    // stays, under "Removed customer", with no email to show.
+    const removed = isRemovedStoreCustomer(order.customer);
+    const shownEmail = contactEmailForDisplay(order.customer?.email);
 
     return {
         id: order.id,
@@ -147,18 +194,25 @@ export function serializeOrderRow(
             ),
         ),
         store: order.store,
-        customer: order.customer
-            ? {
-                  id: order.customerId,
-                  name: customerName || null,
-                  ...(view.contact
-                      ? {
-                            email: order.customer.email,
-                            phone: order.customer.phone,
-                        }
-                      : {}),
-              }
-            : null,
+        customer:
+            order.customer && order.customerId
+                ? {
+                      id: order.customerId,
+                      name: removed
+                          ? REMOVED_CUSTOMER_NAME
+                          : customerName || null,
+                      ...(view.contact
+                          ? {
+                                // Never a placeholder (B13b).
+                                ...(removed || !shownEmail
+                                    ? {}
+                                    : { email: shownEmail }),
+                                phone: order.customer.phone,
+                            }
+                          : {}),
+                  }
+                : null,
+        walkIn: walkInOf(order, view.contact),
         status: order.status,
         paymentStatus: order.paymentStatus,
         stage: order.stage,
@@ -186,6 +240,7 @@ export function serializeOrderRow(
                   unpaidAmount: fromMinor(
                       byHand ? 0 : amountDueCents(order, captured),
                   ),
+                  payLinkCreatedAt: order.payLinkCreatedAt ?? null,
               }
             : {}),
         itemCount: order.items.length,
@@ -193,5 +248,31 @@ export function serializeOrderRow(
         moreProducts: Math.max(0, names.length - 2),
         courierName: order.courierName,
         trackingNumber: order.trackingNumber,
+        ...(view.attention === undefined
+            ? {}
+            : {
+                  attention: view.attention
+                      ? attentionTags(view.attention)
+                      : null,
+              }),
     };
+}
+
+/**
+ * The order read as the Orders list's quick view asks for it (B5,
+ * `GET :orderId?view=quick`). Order Detail's read already leaves out what
+ * the caller may not see — the customer's phone and email without
+ * `contact:read` (review #19), money without a money read — so opening a row
+ * never shows more of the customer than the row did. Kept as the quick
+ * view's one seam, and to hold that line should the read ever widen.
+ */
+export function quickViewOf(
+    read: OrderReadDto,
+    view: Pick<RowView, "contact">,
+): OrderReadDto {
+    if (view.contact) return read;
+    const walkIn = read.walkIn ? { ...read.walkIn, phone: null } : null;
+    if (!read.customer) return { ...read, walkIn };
+    const { phone: _phone, email: _email, ...customer } = read.customer;
+    return { ...read, customer: { ...customer, phone: null }, walkIn };
 }

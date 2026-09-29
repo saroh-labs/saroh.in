@@ -51,6 +51,44 @@ describe("OrganizationContextService.resolve", () => {
         expect(ctx.actions?.has("member:read")).toBe(false);
     });
 
+    it("adds a person's extra permissions to their role, with implied holds (F17)", async () => {
+        membershipFindUnique.mockResolvedValue({
+            role: "MEMBER",
+            extraActions: ["order:refund", "not:real", "org:delete"],
+        });
+
+        const ctx = await service.resolve("user_1", "org_1");
+
+        expect(ctx.actions?.has("order:refund")).toBe(true);
+        // A refund shows the order it refunds.
+        expect(ctx.actions?.has("order:read")).toBe(true);
+        expect(ctx.actions?.has("order:edit")).toBe(false);
+        // Unknown and owner-only strings never resolve.
+        expect(ctx.actions?.has("org:delete")).toBe(false);
+        // The role is still whole.
+        expect(ctx.actions?.has("order:stage")).toBe(true);
+    });
+
+    it("lists a person's businesses with their extras counted (F17)", async () => {
+        membershipFindMany.mockResolvedValue([
+            {
+                role: "MEMBER",
+                extraActions: ["payment:read"],
+                organization: {
+                    id: "org_1",
+                    name: "Rye",
+                    slug: "rye",
+                    lifecycleStatus: "ACTIVE",
+                },
+            },
+        ]);
+
+        const [org] = await service.listForUser("user_1");
+
+        expect(org?.actions).toContain("payment:read");
+        expect(org?.actions).not.toContain("payment:manage");
+    });
+
     it("returns a context when the user is a member", async () => {
         membershipFindUnique.mockResolvedValue({ role: "ADMIN" });
 
@@ -73,7 +111,7 @@ describe("OrganizationContextService.resolve", () => {
                     userId: "user_1",
                 },
             },
-            select: { role: true },
+            select: { role: true, extraActions: true },
         });
         // Success path is a single query — no org existence lookup.
         expect(organizationFindUnique).not.toHaveBeenCalled();

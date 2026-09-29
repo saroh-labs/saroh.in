@@ -5,6 +5,9 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { classPacksOn } from "./class-packs-on";
+import { packKindFor, purchasesPayingFor, readPackKind } from "./pack-kind";
+
 type Tx = Prisma.TransactionClient;
 
 /** What a booking asks of a pack. */
@@ -17,12 +20,52 @@ export interface RedeemInput {
     startAt: Date;
     /** A particular purchase, or absent to spend the one expiring soonest. */
     purchaseId?: string;
+    /**
+     * Who is spending it: the team at the desk (the default), or the
+     * customer themselves on the business's site (A10). A customer always
+     * names the purchase they were offered; someone else's is as good as
+     * missing (404), and a refusal says `credit-gone` in their own words so
+     * the page offers another way to pay.
+     */
+    actor?: "team" | "customer";
 }
 
-function refuse(message: string): never {
+/** The reason a customer's page reads when their credit can't be spent. */
+export const CREDIT_GONE = "credit-gone";
+
+type Words = Record<"elsewhere" | "uncovered" | "expires" | "empty", string>;
+
+const TEAM_WORDS: Words = {
+    elsewhere: "That class pack belongs to someone else.",
+    uncovered: "That class pack does not cover this service.",
+    expires: "That class pack runs out before this session.",
+    empty: "That class pack has no classes left.",
+};
+
+const CUSTOMER_WORDS: Words = {
+    elsewhere: "That class pack was not found",
+    uncovered: "Your class pack doesn't cover this class.",
+    expires: "Your class pack runs out before this class.",
+    empty: "Your class pack has no classes left.",
+};
+
+function refuse(message: string, actor: RedeemInput["actor"]): never {
     throw new BadRequestException({
         message,
-        details: { field: "packPurchaseId" },
+        details: {
+            field: "packPurchaseId",
+            ...(actor === "customer" ? { reason: CREDIT_GONE } : {}),
+        },
+    });
+}
+
+function missing(actor: RedeemInput["actor"]): never {
+    throw new NotFoundException({
+        message: "That class pack was not found",
+        details: {
+            field: "packPurchaseId",
+            ...(actor === "customer" ? { reason: CREDIT_GONE } : {}),
+        },
     });
 }
 
@@ -57,14 +100,36 @@ export async function redeemPackInTx(
     tx: Tx,
     input: RedeemInput,
 ): Promise<{ purchaseId: string; packName: string }> {
+    // What kind of pack pays for it (E13, default 45): a Classes pack for a
+    // class, a One-to-one pack for a one-to-one session. A service that
+    // isn't this business's is covered by none of its packs anyway.
+    const service = (await tx.service.findFirst({
+        where: { id: input.serviceId, organizationId: input.organizationId },
+        select: { id: true, capacity: true },
+    })) ?? { id: input.serviceId, capacity: 1 };
+    const kind = packKindFor(service);
     const where = {
         organizationId: input.organizationId,
         contactId: input.contactId,
         expiresAt: { gt: input.startAt },
-        pack: { services: { some: { serviceId: input.serviceId } } },
+        ...purchasesPayingFor(service),
     } satisfies Prisma.PackPurchaseWhereInput;
 
     let chosen: { id: string; credits: number; packName: string } | null = null;
+    const words = input.actor === "customer" ? CUSTOMER_WORDS : TEAM_WORDS;
+
+    // A customer spends only the pack they were offered, never "whichever",
+    // and only while the business has Class packs on (E12): switched off,
+    // the site stops offering them, and a page drawn before is refused.
+    if (input.actor === "customer") {
+        if (!input.purchaseId) missing(input.actor);
+        if (!(await classPacksOn(tx, input.organizationId))) {
+            refuse(
+                "Class packs can't be used online right now. Choose another way to pay.",
+                input.actor,
+            );
+        }
+    }
 
     if (input.purchaseId) {
         const named = await tx.packPurchase.findFirst({
@@ -80,6 +145,7 @@ export async function redeemPackInTx(
                 pack: {
                     select: {
                         name: true,
+                        kind: true,
                         services: {
                             where: { serviceId: input.serviceId },
                             select: { serviceId: true },
@@ -88,24 +154,24 @@ export async function redeemPackInTx(
                 },
             },
         });
-        if (!named) {
-            throw new NotFoundException({
-                message: "That class pack was not found",
-                details: { field: "packPurchaseId" },
-            });
-        }
+        if (!named) missing(input.actor);
         if (named.contactId !== input.contactId) {
-            refuse("That class pack belongs to someone else.");
+            // A customer is never told whose it is, or that it exists.
+            if (input.actor === "customer") missing(input.actor);
+            refuse(words.elsewhere, input.actor);
         }
-        if (named.pack.services.length === 0) {
-            refuse("That class pack does not cover this service.");
+        if (
+            named.pack.services.length === 0 ||
+            readPackKind(named.pack.kind) !== kind
+        ) {
+            refuse(words.uncovered, input.actor);
         }
         if (named.expiresAt <= input.startAt) {
-            refuse("That class pack runs out before this session.");
+            refuse(words.expires, input.actor);
         }
         await lock(tx, named.id);
         if ((await creditsLeft(tx, named)) <= 0) {
-            refuse("That class pack has no classes left.");
+            refuse(words.empty, input.actor);
         }
         chosen = {
             id: named.id,
@@ -138,6 +204,7 @@ export async function redeemPackInTx(
         if (!chosen) {
             refuse(
                 "They have no class pack with classes left for this service on that date.",
+                input.actor,
             );
         }
     }

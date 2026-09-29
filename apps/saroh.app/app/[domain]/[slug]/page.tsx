@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
-import { PageSections } from "@saroh/site-blocks";
+import { PublishedPage } from "@/components/published-page";
+import { ModulePageUnavailable } from "@saroh/site-blocks";
 
-import { publicApiUrl } from "@/lib/api-url";
+import { moduleOff } from "@/lib/module-pages";
 import {
     findPageByPath,
     getPublishedPosts,
@@ -114,12 +115,12 @@ export default async function SitePostPage({
         notFound();
     }
 
-    return (
-        <PageSections
-            sections={page.sections}
-            apiUrl={publicApiUrl()}
-            bookHref="/book"
-            siteId={siteId}
-        />
-    );
+    // A Prices, Journal or Contact page whose module is off (G15): said in
+    // words with a way home, so a shared link still lands somewhere. (Book
+    // and Shop pages never reach here: `/book` and `/shop` are routes.)
+    if (moduleOff(page, resolved.modules)) {
+        return <ModulePageUnavailable business={snapshot.site.name} />;
+    }
+
+    return <PublishedPage page={page} snapshot={snapshot} siteId={siteId} />;
 }

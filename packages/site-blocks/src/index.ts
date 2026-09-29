@@ -17,6 +17,9 @@ export type { Section } from "./section-renderer";
 
 export {
     BlockFixturePreview,
+    SAMPLE_PLANS,
+    SAMPLE_POSTS,
+    SAMPLE_PRODUCTS,
     SAMPLE_SERVICES,
     SAMPLE_VISIT,
 } from "./block-fixture-preview";
@@ -30,11 +33,33 @@ export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
 export {
+    default as JournalSection,
+    postExcerpt,
+    postEyebrow,
+} from "./blocks/journal";
+export type { JournalFeed, JournalPost } from "./blocks/journal";
+export {
     default as OnTodayHero,
     isPublicToday,
     todayHref,
 } from "./blocks/on-today";
 export type { PublicToday, PublicTodayItem } from "./blocks/on-today";
+export {
+    PLANS_BUTTON,
+    default as PlansSection,
+    joinHref,
+    planEvery,
+    planPrice,
+    plansOf,
+} from "./blocks/plans";
+export type { PlansFeed, PublicPlan } from "./blocks/plans";
+export {
+    PRODUCT_GRID_TITLE,
+    default as ProductGridSection,
+    productCardsOf,
+    productGridQuery,
+} from "./blocks/product-grid";
+export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
@@ -84,6 +109,29 @@ export {
 } from "./product/shop-listing";
 export type { ShopListingCard } from "./product/shop-listing";
 
+// The bag and checkout on a merchant's site (G13): Add to bag or "Ask about
+// ordering" in the product page's action slot, and the header's bag with
+// its sheets. The site's server actions arrive as a `ShopCheckoutApi`.
+export { AddToBag } from "./shop/add-to-bag";
+export { SHOP_OFFLINE } from "./shop/api";
+export type {
+    CheckoutQuote,
+    CheckoutStanding,
+    CheckoutStarted,
+    DeliveryAddress,
+    QuoteLine,
+    QuoteWay,
+    ShopCheckoutApi,
+    ShopProblem,
+    ShopResult,
+    ShopWay,
+    StartCheckout,
+} from "./shop/api";
+export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
+export { ShopBag } from "./shop/bag";
+export type { ShopBagProps } from "./shop/bag";
+export type { BagItem } from "./shop/bag-store";
+
 // Not a page block either: the booking page on a merchant's site (U19),
 // `/<domain>/book` — every service, two weeks of times, pay now or at the desk.
 export {
@@ -95,11 +143,16 @@ export type {
     BookingFlowProps,
 } from "./booking-flow/booking-flow";
 export { initialDateOf, initialTimeOf } from "./booking-flow/initial-start";
-export { isBookResult, isBookingPage } from "./booking-flow/model";
+export {
+    isBookResult,
+    isBookingPage,
+    isCreditAnswer,
+} from "./booking-flow/model";
 export type {
     BookResult,
     BookingPageData,
     BookingService,
+    CreditAnswer,
 } from "./booking-flow/model";
 // Booking signed in (A9): the site's server action books, and answers the
 // page in the page's own terms.
@@ -107,8 +160,22 @@ export { OFFLINE_RESULT, resultOf } from "./booking-flow/api";
 export type {
     BookSignedIn,
     Result as BookingResult,
+    CreditFor,
     SignedInBookRequest,
 } from "./booking-flow/api";
+// A full class's waitlist (A12): the site's server actions join, leave and
+// read it with the session, and answer the page in the page's own terms.
+export {
+    isWaitlistJoined,
+    isWaitlistLeft,
+    isWaitlistPlaces,
+} from "./booking-flow/waitlist";
+export type {
+    WaitlistApi,
+    WaitlistJoined,
+    WaitlistPlaces,
+    WaitlistSession,
+} from "./booking-flow/waitlist";
 
 // Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
 // The site's server actions arrive as `api`; the sheet never calls the API.
@@ -123,10 +190,93 @@ export type {
 export { SignInSheet } from "./account/sign-in-sheet";
 export type { SignInSheetProps } from "./account/sign-in-sheet";
 
+// The customer account area (plan A, A5): the header's entry, the tab bar,
+// Home, Me and Messages (A13). Data arrives from the site's server; changes go through its
+// server actions.
+export { AccountEntry } from "./account/account-entry";
+export { AccountHome } from "./account/account-home";
+export { Me } from "./account/me";
+export type { DetailsResult, MeApi, MeProps, NoteResult } from "./account/me";
+export { AccountMessages } from "./account/messages";
+export type {
+    AccountMessagesProps,
+    MessagesApi,
+    SendResult,
+} from "./account/messages";
+// A7: the Orders tab and an order's Track; A8: the Plan tab.
+export type {
+    Block as AccountBlock,
+    AccountBooking,
+    AccountClasses,
+    AccountHome as AccountHomeData,
+    AccountMessage,
+    AccountNote,
+    AccountOrder,
+    AccountOrderDetail,
+    AccountOrderLine,
+    AccountOrderVisit,
+    AccountPack,
+    AccountPlan,
+    AccountPlanTab,
+    AccountReceipt,
+    AccountSubscription,
+    AccountTab,
+    AccountTabKey,
+    AccountThread,
+    AccountTrackStep,
+    AccountView,
+} from "./account/model";
+export { AccountOrders, ORDERS_HREF, trackHref } from "./account/orders-list";
+// A6: the Bookings tab, its Move and Cancel sheets, and a class moved on the
+// booking page.
+export type {
+    CancelResult as AccountCancelAnswer,
+    MoveResult as AccountMoveAnswer,
+    TimesResult as AccountTimesAnswer,
+    VisitResult as AccountVisitAnswer,
+    BookingsApi,
+} from "./account/bookings-api";
+export { AccountBookingsTab } from "./account/bookings-list";
+export { BOOKINGS_HREF, moveClassHref } from "./account/bookings-model";
+export type {
+    AccountBookingRow,
+    AccountBookingState,
+    AccountBookings,
+    AccountCancelResult,
+    AccountCancelTerms,
+    AccountTimes,
+    AccountTreatment,
+    AccountTreatmentVisit,
+} from "./account/bookings-model";
+export { MoveClass } from "./account/move-class";
+export { AccountCard } from "./account/parts";
+export { PlanTab } from "./account/plan-tab";
+export type {
+    PayNowResult,
+    PlanApi,
+    PlanChangeResult,
+    PlanTabProps,
+} from "./account/plan-tab";
+// A11: buying a class pack from the Plan tab.
+export { BuyPackSheet } from "./account/buy-pack-sheet";
+export type {
+    AccountPackAttempt,
+    AccountPackCheckout,
+    AccountPackOnSale,
+    AccountPacksOnSale,
+    PackResult,
+    PacksApi,
+    PlanPacksShop,
+} from "./account/packs-api";
+export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
+export type { TrackLookup } from "./account/track-sheet";
+
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
-export { SiteFooter, SiteHeader, footerLine } from "./site-chrome";
-export type { SiteFooterContent } from "./site-chrome";
+export { SiteFooter, SiteHeader, footerLine, siteMenu } from "./site-chrome";
+export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
+// A module page's address while its module is off (G15).
+export { ModulePageUnavailable } from "./module-page-unavailable";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";

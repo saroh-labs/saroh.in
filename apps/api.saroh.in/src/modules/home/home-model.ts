@@ -56,6 +56,8 @@ export interface HomeEvidence {
     headline?: string;
     /** A few more words for the line under it, e.g. an invoice's first line. */
     detail?: string;
+    /** The action the row offers in place (F4), set by `home-inline.ts`. */
+    inline?: HomeInline;
 }
 
 export interface HomeAction {
@@ -127,17 +129,52 @@ export interface HomeUnavailable {
     label: string;
 }
 
+/** The inline actions a Needs-you row can carry (F4). */
+export type HomeInlineKind = "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+
 /**
- * What an inline action on a Needs-you row will do (F4). F3 sends none: each
- * row is a link until F4 fills this in and the row grows its button.
+ * How a Retry is made (F4). Only a fresh pay link today; D13 adds
+ * `MANDATE`, a charge on the customer's autopay, and hides Retry while such
+ * a charge is PENDING ("Autopay charge in progress").
+ */
+export type HomeRetryVia = "PAY_LINK";
+
+/**
+ * What an inline action on a Needs-you row will do (F4), decided by the API
+ * (`home-inline.ts`): it is sent only to a viewer who may do it, only when
+ * the write it calls can take it, and its words say truthfully who is told
+ * and how. A row without one stays a link.
+ *
+ * Every action calls the target's own endpoint — the order's stage move,
+ * the subscription's retry, the invoice's reminder, the customer's thread —
+ * and Home adds no write of its own.
  */
 export interface HomeInline {
-    kind: "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+    kind: HomeInlineKind;
+    /** The row's button: "Mark sent". */
     label: string;
     /** What will happen, and who is told, said before it happens. */
     confirm: string;
+    /** The confirm's button: "Mark sent and tell Anika". */
+    yes: string;
+    /** What the row says once it's done: "Reminder sent to Farah". */
+    done: string;
+    /**
+     * A message leaves the business. The app holds it ten seconds (default
+     * 51) before it goes, and Undo in that time means nothing leaves; after
+     * it, no Undo.
+     */
+    sends: boolean;
     /** Whether Undo is offered after (never once a message has left). */
     undoable: boolean;
+    /** What it acts on: the order, subscription, invoice or contact id. */
+    target: string;
+    /** The customer's first name, for what the toast says after; else null. */
+    person: string | null;
+    /** MARK_SENT: the step it moves the order to. */
+    stage?: string;
+    /** RETRY: how it is retried. */
+    via?: HomeRetryVia;
 }
 
 /**
@@ -258,10 +295,80 @@ export interface HomeLastDay {
 }
 
 /**
- * Whose Home this is (F9): the business's, or a Reviewer's, which carries
- * only the sites they were asked to review. F11 adds the staff landing.
+ * This week's takings against last week's same days (F7): up, down or level
+ * by a whole percent, or `THIN` — too little last week to compare.
  */
-export type HomeView = "business" | "reviewer";
+export type HomeWeekChange =
+    { kind: "UP" | "DOWN" | "LEVEL"; percent: number } | { kind: "THIN" };
+
+/** Takings so far this week in one currency (F7), net of refunds. */
+export interface HomeWeekTakings {
+    currency: string;
+    amountMinor: number;
+    /** The same days last week, in the same currency. */
+    lastWeekMinor: number;
+    change: HomeWeekChange;
+    /** The invoices paid since Monday. */
+    href: string;
+}
+
+/** What is owed to the business (F7): issued, unpaid, not an order's own. */
+export interface HomeWeekOwed {
+    totals: { currency: string; amountMinor: number }[];
+    /** Unpaid bills, of every currency. */
+    bills: number;
+    /** Of those, past their due date. */
+    overdue: number;
+    href: string;
+}
+
+/**
+ * Home's "This week" (F7). Each figure is present only for a viewer who
+ * holds its read, and absent — never zero — otherwise: takings with
+ * `payment:read` and `invoice:read`, bookings with `booking:read`, orders
+ * with `order:read` or `order:stage`, owed with `invoice:read`.
+ */
+export interface HomeWeek {
+    /** The zone the week is kept in. */
+    zone: string;
+    /** This week's Monday in that zone, `2026-09-14`. */
+    startDate: string;
+    /** One per currency taken this week; empty when nothing came in. */
+    takings?: HomeWeekTakings[];
+    /** Confirmed bookings Monday to Sunday, and the whole of last week. */
+    bookings?: { count: number; lastWeek: number; href: string };
+    /** Orders placed since Monday. */
+    orders?: { count: number; href: string };
+    /** Absent too for a business that has never billed outside an order. */
+    owed?: HomeWeekOwed;
+}
+
+/**
+ * Whose Home this is: the business's; a Reviewer's, which carries only the
+ * sites they were asked to review (F9); or a staff member's, narrowed to
+ * the storefronts they work on and their own diary (F11).
+ */
+export type HomeView = "business" | "reviewer" | "staff";
+
+/** A storefront a staff member's Home is narrowed to (F11). */
+export interface HomeStaffStore {
+    id: string;
+    name: string;
+}
+
+/**
+ * What a staff member's Home covers (F11), for the header's "Hill Road
+ * only". Which rows they see is still their own capabilities'.
+ */
+export interface HomeStaff {
+    /**
+     * The storefronts they work on, by name; null for every storefront —
+     * none assigned, or all of them.
+     */
+    stores: HomeStaffStore[] | null;
+    /** Today shows their own bookings: they are on the diary. */
+    ownDiary: boolean;
+}
 
 /** A page of a site a Reviewer was asked to review (F9). */
 export interface HomeReviewPage {
@@ -303,6 +410,8 @@ export interface HomeReviewSite {
 export interface HomeModel {
     /** Whose Home this is; `reviewer` sends `reviews` and nothing else. */
     view: HomeView;
+    /** What a staff member's Home is narrowed to; only on `view: "staff"`. */
+    staff?: HomeStaff;
     /**
      * A Reviewer's sites (F9), present only on `view: "reviewer"`. Empty
      * when they have none — or when the read failed, which `unavailable`
@@ -343,6 +452,12 @@ export interface HomeModel {
      * and `unavailable` names "The last 24 hours".
      */
     lastDay: HomeLastDay;
+    /**
+     * This week (F7): null when the viewer reads none of its figures, or
+     * when the read failed (then `unavailable` names "This week"). Never
+     * sent to a Reviewer.
+     */
+    week?: HomeWeek | null;
 }
 
 export interface HomeInput {

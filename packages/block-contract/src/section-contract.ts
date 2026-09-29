@@ -529,6 +529,95 @@ const visitUsV1 = z.object({
     showHours: z.boolean().optional(),
 });
 
+/**
+ * journal v1 — the site's latest published posts, read live (G10).
+ *
+ * A bound block (ADR-004): it stores how many posts to show and how, never the
+ * posts. They are read when the page is served, from the posts this site owns
+ * (`GET public/sites/:siteId/posts`, newest first), so publishing a post puts
+ * it on the page without republishing the site, and taking one down removes it.
+ *
+ * `count` is 3 or 6 — a row, or two. ABSENT means 3. `showExcerpts` and
+ * `showImages` default to on, so ABSENT means shown. With no posts live the
+ * block renders nothing on the site; the editor's canvas says why.
+ */
+const journalV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    count: z.union([z.literal(3), z.literal(6)]).optional(),
+    showExcerpts: z.boolean().optional(),
+    showImages: z.boolean().optional(),
+});
+
+/**
+ * plans v1 — the business's subscription plans on sale, read live (G9).
+ *
+ * A bound block (ADR-004): it stores the section title and how the plans
+ * show, never a plan. They are read when the page is served
+ * (`GET public/sites/:siteId/plans`): only plans on sale (published and
+ * active), with their published values, never a draft or an unpublished
+ * change, and nothing at all while Payments is off for the business.
+ *
+ * `highlight` marks the first plan ("Most chosen"); ABSENT means `first`.
+ * `buttonLabel` is the card's button; ABSENT means the block's own default.
+ * `showDescriptions` defaults to on, so ABSENT means shown. With no plan on
+ * sale the block renders nothing on the site; the editor's canvas says why.
+ */
+const plansV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    highlight: z.enum(["first", "none"]).optional(),
+    buttonLabel: z.string().trim().max(40).optional(),
+    showDescriptions: z.boolean().optional(),
+});
+
+/** How many products a Product grid shows, at most, and when it isn't set. */
+export const PRODUCT_GRID_MAX = 12;
+export const PRODUCT_GRID_DEFAULT_COUNT = 4;
+
+/**
+ * productGrid v1 — products from the catalogue, read live (G12).
+ *
+ * A bound block (ADR-004): it stores the title and WHICH products by id,
+ * never a product's name, photo or price. They are read when the page is
+ * served (`GET public/sites/:siteId/shop/products?source=…`), at the site's
+ * sells-from storefront: only published products listed there, with only
+ * the variants sold there, and nothing at all while the shop is not open
+ * for the business. A picked product later archived or unlisted drops out
+ * at view time, and the editor flags it before publish.
+ *
+ * - `source` ABSENT means `newest`: the newest products sold there.
+ * - `collection`: the products of `collectionId` (DEC-031), hand-picked in
+ *   their order or automatic by name.
+ * - `picked`: `productIds`, in the merchant's order.
+ * - `count` ABSENT means {@link PRODUCT_GRID_DEFAULT_COUNT}.
+ * - `showPrices` defaults to on, so ABSENT means shown.
+ *
+ * A just-added block, or one whose collection or products are still to be
+ * chosen, saves: a draft is saved as it is typed. It renders nothing live
+ * until there is something to show, and the flag engine says why. Whether
+ * an id is the business's own is checked by the API at save, not here.
+ */
+const productGridV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    source: z.enum(["newest", "collection", "picked"]).optional(),
+    collectionId: z.string().trim().min(1).max(64).optional(),
+    productIds: z
+        .array(z.string().trim().min(1).max(64))
+        .max(PRODUCT_GRID_MAX)
+        .refine(
+            (ids) => new Set(ids).size === ids.length,
+            "A product is picked twice",
+        )
+        .optional(),
+    count: z.number().int().min(1).max(PRODUCT_GRID_MAX).optional(),
+    showPrices: z.boolean().optional(),
+});
+
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
 const enquiryFieldTypes = ["text", "email", "tel", "textarea"] as const;
 
@@ -627,6 +716,9 @@ export const SECTION_TYPES = [
     "contact",
     "servicesList",
     "visitUs",
+    "journal",
+    "plans",
+    "productGrid",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -751,6 +843,28 @@ const REGISTRY: Record<string, SectionContract> = {
         version: 1,
         // A title, an id and two switches; the place is read from the API live.
         schema: visitUsV1,
+        sanitizedFields: [],
+    },
+    [key("journal", 1)]: {
+        type: "journal",
+        version: 1,
+        // A title, a count and two switches; the posts are read live.
+        schema: journalV1,
+        sanitizedFields: [],
+    },
+    [key("plans", 1)]: {
+        type: "plans",
+        version: 1,
+        // A title and display options; the plans are read live.
+        schema: plansV1,
+        sanitizedFields: [],
+    },
+    [key("productGrid", 1)]: {
+        type: "productGrid",
+        version: 1,
+        // A title, which products by id, a count and a switch; the products
+        // themselves are read live.
+        schema: productGridV1,
         sanitizedFields: [],
     },
 };

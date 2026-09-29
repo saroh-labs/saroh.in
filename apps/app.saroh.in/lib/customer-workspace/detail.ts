@@ -1,9 +1,13 @@
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
+import type { PackKind } from "@/lib/class-packs/pack-cards";
+import type { PackUseState } from "@/lib/class-packs/pack-detail-data";
+import type { PaidBy } from "@/lib/class-packs/sell-words";
 import type { DetailAttention } from "@/lib/customer-workspace/attention";
 import type { InvoiceSource, InvoiceStanding } from "@/lib/invoices/service";
 import type { FulfilmentType } from "@/lib/orders/read";
 import type { Interval } from "@/lib/subscriptions/service";
 
+import type { MergedRedirect } from "./merge";
 import type { SiteAccount } from "./site-account";
 
 /**
@@ -12,8 +16,10 @@ import type { SiteAccount } from "./site-account";
  *
  * Rooted on the contact. A block the viewer may not read, or whose module is
  * off, is ABSENT; one the API could not read is `null` and named in
- * `unavailable`. Money figures are left out for a role that reads no money
- * (`money: false`), never sent for the screen to hide.
+ * `unavailable`. Each part follows its own read (DEC-039, C13): an order's
+ * total with `order:read`, a pack's price with `pack:read`. Spent sums orders
+ * and invoices, so it comes only with both reads (`money: true`), and is left
+ * out, never sent for the screen to hide.
  */
 
 export interface MoneyTotal {
@@ -47,7 +53,10 @@ export interface DetailOrder {
     paymentStatus: string;
     itemCount: number;
     items: {
-        productId: string;
+        /** Null on a treatment's line (E9): it bills a service. */
+        productId: string | null;
+        /** What the line bills; absent from an API before E9. */
+        kind?: "product" | "service";
         name: string;
         variant: string | null;
         quantity: number;
@@ -111,9 +120,18 @@ export interface DetailInvoice {
     paidAt: string | null;
 }
 
+/** One class spent from a pack, and what became of it (E13's words). */
+export interface DetailPackUse {
+    bookingId: string;
+    startAt: string;
+    service: { id: string; name: string };
+    state: PackUseState;
+}
+
 export interface DetailPack {
     id: string;
-    pack: { id: string; name: string };
+    /** `kind` from C7's API on; without it, a classes pack. */
+    pack: { id: string; name: string; kind?: PackKind };
     credits: number;
     used: number;
     left: number;
@@ -122,6 +140,11 @@ export interface DetailPack {
     standing: "ACTIVE" | "USED_UP" | "EXPIRED";
     price?: string;
     currency?: string;
+    // C7: how it was paid, the days given, and the classes spent from it
+    // (latest first). Optional: an API from before C7 doesn't send them.
+    paidBy?: PaidBy | null;
+    extensions?: { days: number; reason: string; createdAt: string }[];
+    uses?: DetailPackUse[];
 }
 
 export interface MembershipAllowance {
@@ -169,6 +192,18 @@ export interface CustomerDetail {
         email: string;
         phone: string | null;
         company: string | null;
+        /**
+         * Their postal address (C8), each line null when not kept. Absent
+         * from an API before C8.
+         */
+        addressLine1?: string | null;
+        addressLine2?: string | null;
+        city?: string | null;
+        /** In India, the GST state's name. */
+        state?: string | null;
+        postalCode?: string | null;
+        /** ISO 3166-1 alpha-2. */
+        country?: string | null;
         source: string | null;
         createdAt: string;
     };
@@ -220,15 +255,17 @@ export interface CustomerDetail {
 
 /**
  * The customer, or null when there is no such contact in this business. A
- * 403 renders the forbidden boundary and any other failure throws to the
- * route's error boundary — a failed read is never an empty customer.
+ * record merged into another (C9) answers `{ mergedInto }`, and the page
+ * goes there (C10). A 403 renders the forbidden boundary and any other
+ * failure throws to the route's error boundary — a failed read is never an
+ * empty customer.
  */
 export async function getCustomerDetail(
     contactId: string,
-): Promise<CustomerDetail | null> {
+): Promise<CustomerDetail | MergedRedirect | null> {
     const base = await orgBase();
     if (!base) return null;
-    return getJson<CustomerDetail>(
+    return getJson<CustomerDetail | MergedRedirect>(
         `${base}/customers/${encodeURIComponent(contactId)}/detail`,
     );
 }

@@ -123,12 +123,13 @@ describe("sinceScope", () => {
         expect(sinceScope(member, ALL)?.money).toBe(false);
     });
 
-    it("asks for invoice:read beside payment:read, as the rows are invoices", () => {
+    it("gives money to payment:read alone, linked to the Calendar without invoice:read (F11)", () => {
         const scope = sinceScope(holding(["payment:read"]), ALL);
-        expect(scope).toBeNull();
-        expect(
-            sinceScope(holding(["payment:read", "invoice:read"]), ALL)?.money,
-        ).toBe(true);
+        expect(scope?.money).toBe(true);
+        expect(scope?.moneyIn).toBe("calendar");
+        const both = sinceScope(holding(["payment:read", "invoice:read"]), ALL);
+        expect(both?.money).toBe(true);
+        expect(both?.moneyIn).toBeUndefined();
     });
 
     it("counts orders for the kitchen, who move them without reading them", () => {
@@ -205,7 +206,11 @@ describe("readSince", () => {
                 organizationId: "org_1",
                 createdAt: { gte: since },
                 // Real orders only, as the Orders list counts them (H-3).
-                NOT: { placedOnline: true, paymentStatus: "UNPAID" },
+                NOT: {
+                    placedOnline: true,
+                    paymentStatus: "UNPAID",
+                    paymentIntents: { none: { status: "SUCCEEDED" } },
+                },
             },
         });
         expect(client.booking.count).toHaveBeenCalledWith({
@@ -345,6 +350,9 @@ describe("HomeService: the header", () => {
                 findMany: empty.findMany,
             },
             invoice: { ...empty, ...client.invoice },
+            // F2's low-rated reviews read the same table as the strip.
+            productReview: { ...empty, ...client.productReview },
+            contactAttention: empty,
             paymentIntent: empty,
             site: empty,
             // Open orders' one raw read: none open.

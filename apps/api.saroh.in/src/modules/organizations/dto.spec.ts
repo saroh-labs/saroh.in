@@ -5,7 +5,11 @@ import "reflect-metadata";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 
-import { BusinessProfileDto, InvoiceNumberFormatDto } from "./dto";
+import {
+    BUSINESS_TYPES,
+    BusinessProfileDto,
+    InvoiceNumberFormatDto,
+} from "./dto";
 
 async function refused(body: unknown): Promise<string[]> {
     return (await validate(plainToInstance(BusinessProfileDto, body))).map(
@@ -37,6 +41,45 @@ describe("a business profile's contact details", () => {
                 await refused({ contactEmail: "nope", website: "not a url" })
             ).sort(),
         ).toEqual(["contactEmail", "website"]);
+    });
+});
+
+describe("a business profile's type (F10)", () => {
+    const messages = async (body: unknown) =>
+        (await validate(plainToInstance(BusinessProfileDto, body))).flatMap(
+            (e) => Object.values(e.constraints ?? {}),
+        );
+
+    it("takes each of the six types", async () => {
+        for (const type of BUSINESS_TYPES) {
+            expect(await refused({ type })).toEqual([]);
+        }
+        expect(BUSINESS_TYPES).toEqual([
+            "individual",
+            "partnership",
+            "llp",
+            "pvt",
+            "public",
+            "trust",
+        ]);
+    });
+
+    it("takes an old client's company for one more release (Z4 removes it)", async () => {
+        expect(await refused({ type: "company" })).toEqual([]);
+    });
+
+    it("takes a type in any case, and an empty one as Not set", async () => {
+        expect(await refused({ type: " LLP " })).toEqual([]);
+        expect(await refused({ type: "" })).toEqual([]);
+        expect(await refused({})).toEqual([]);
+    });
+
+    it('refuses an unknown type with "Unknown business type"', async () => {
+        expect(await refused({ type: "cooperative" })).toEqual(["type"]);
+        expect(await messages({ type: "cooperative" })).toEqual([
+            "Unknown business type",
+        ]);
+        expect(await refused({ type: 3 })).toEqual(["type"]);
     });
 });
 

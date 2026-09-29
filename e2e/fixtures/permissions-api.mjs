@@ -51,6 +51,9 @@ const PRODUCT_ROLES = {
     },
     NOREAD: {
         role: "MEMBER",
+        // The API always sends the stored role's key; a role the business
+        // made is not a built-in one, whatever it is based on.
+        roleKey: "front_desk",
         roleLabel: "Front desk",
         actions: ["order:read", "booking:read"],
     },
@@ -69,6 +72,35 @@ const MANAGER_ACTIONS = [
     "inventory:write",
     "order:read",
 ];
+// The staff landing (F11): a Member who works on Hill Road only.
+PRODUCT_ROLES.STAFF = {
+    role: "MEMBER",
+    roleLabel: null,
+    actions: ["org:read", "store:read", "booking:read", "order:stage"],
+};
+const STAFF_HOME = {
+    staff: {
+        stores: [{ id: "store_1", name: "Hill Road" }],
+        ownDiary: false,
+    },
+    needs: [
+        {
+            id: "COMMERCE_OPEN_ORDERS:ord_1",
+            code: "COMMERCE_OPEN_ORDERS",
+            severity: "OVERDUE",
+            title: "Send order #1042 to Anika Rao",
+            sub: "2 × Sourdough",
+            amountMinor: null,
+            currency: null,
+            amountIn: null,
+            tag: "Due today",
+            tone: "due",
+            href: "/commerce/orders/ord_1?storefront=store_1",
+            moduleKey: "COMMERCE",
+        },
+    ],
+    needsTotal: 1,
+};
 PRODUCT_ROLES.MANAGER = {
     role: "MEMBER",
     roleKey: "manager",
@@ -106,6 +138,28 @@ const ROLES = [
         ],
         1,
     ),
+];
+/**
+ * The Manager's team (F17): themselves, a Member given See orders as an
+ * extra permission, and someone in Senior, which holds payments.
+ */
+const person = (userId, name, roleKey, extraActions, isSelf = false) => ({
+    userId,
+    name,
+    email: `${userId}@example.in`,
+    // Every one maps to the built-in Member by name; the key decides.
+    role: "MEMBER",
+    roleKey,
+    siteIds: [],
+    isSelf,
+    lastActiveAt: null,
+    storefronts: [],
+    extraActions,
+});
+const MANAGER_TEAM = [
+    person("u_manager", "Kiran Shah", "manager", [], true),
+    person("u_meera", "Meera Nair", "MEMBER", ["order:read"]),
+    person("u_sanjay", "Sanjay Rao", "senior", []),
 ];
 const CATALOGUE = {
     groups: ["team", "sell", "money"],
@@ -320,6 +374,23 @@ createServer((req, res) => {
                     dependencies: [],
                     blockers: [{ code: "UNAUTHORIZED" }],
                 },
+                // Payments is out of a Member's and a Reviewer's reach
+                // (`payment:read`), as the real API says: its gate answers
+                // with Payments' locked card (D18).
+                ...(scenario === "MEMBER" || scenario === "REVIEWER"
+                    ? [
+                          {
+                              key: "PAYMENTS",
+                              label: "Payments",
+                              lifecycle: "ENABLED",
+                              readiness: "DISABLED",
+                              selectedForProject: true,
+                              canManage: false,
+                              dependencies: [],
+                              blockers: [{ code: "UNAUTHORIZED" }],
+                          },
+                      ]
+                    : []),
                 // Sell is out of a Reviewer's reach, as the real API says —
                 // so its gate, not the Orders page, answers them (DEC-056).
                 ...(scenario === "REVIEWER"
@@ -386,9 +457,15 @@ createServer((req, res) => {
             error: "Read-only roles must not load the editor draft",
         });
     // Home (F9): a Reviewer's is the sites sent to them, and nothing else.
+    // A staff member's (F11) is their storefront's work, said in the header.
     if (path.endsWith("/home"))
         return reply(200, {
-            view: scenario === "REVIEWER" ? "reviewer" : "business",
+            view:
+                scenario === "REVIEWER"
+                    ? "reviewer"
+                    : scenario === "STAFF"
+                      ? "staff"
+                      : "business",
             ...(scenario === "REVIEWER"
                 ? {
                       reviews: [
@@ -432,11 +509,16 @@ createServer((req, res) => {
                 fresh: false,
                 items: [],
             },
+            ...(scenario === "STAFF" ? STAFF_HOME : {}),
         });
     // Team → Roles (F19).
     if (path.endsWith("/roles/catalogue")) return reply(200, CATALOGUE);
     if (path.endsWith("/roles")) return reply(200, ROLES);
-    if (path.endsWith("/members")) return reply(200, []);
+    // A person's extra permissions (F17): the Manager's team.
+    if (path.endsWith("/members"))
+        return reply(200, scenario === "MANAGER" ? MANAGER_TEAM : []);
+    if (path.endsWith("/extra-actions") && req.method === "PUT")
+        return reply(200, { userId: "u_meera", extraActions: [] });
     if (path.endsWith("/notifications/unread-count"))
         return reply(200, { count: 0 });
     return reply(404, { error: "Fixture route not found" });

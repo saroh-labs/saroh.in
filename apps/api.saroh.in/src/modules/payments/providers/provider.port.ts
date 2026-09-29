@@ -112,8 +112,47 @@ export async function readRefundAnswer<T>(
     }
 }
 
+/** Cancel one mandate at the provider (round-2 D20). */
+export interface CancelMandateInput {
+    /** The provider's mandate (or recurring token) id. */
+    providerMandateId: string;
+    /** The provider's customer id, where its API needs it to find the mandate. */
+    providerCustomerId: string | null;
+    credentials: ProviderCredentials;
+}
+
+/**
+ * A mandate call that did not come back with an answer. `REFUSED`: the
+ * provider definitely didn't do it and would refuse again. `UNKNOWN`: it
+ * may have — a timeout, a network error, a 5xx — so Saroh asks again
+ * rather than assuming either way (DEC-026). A cancel of a mandate the
+ * provider already has cancelled is a success, never an error.
+ */
+export class MandateCallError extends Error {
+    constructor(
+        message: string,
+        readonly outcome: "REFUSED" | "UNKNOWN",
+    ) {
+        super(message);
+        this.name = "MandateCallError";
+    }
+}
+
+/**
+ * Autopay mandates at the business's own provider (DEC-038). D11 grows it
+ * with set-up, charge and status; D20 needs only `cancel`. A provider
+ * without it (Razorpay until D19, Cashfree this round) never offers
+ * autopay: {@link supportsMandates}.
+ */
+export interface MandateCapability {
+    /** Resolves once the provider says the mandate is cancelled. Throws {@link MandateCallError}. */
+    cancel(input: CancelMandateInput): Promise<void>;
+}
+
 export interface MerchantProvider {
     readonly name: string;
+    /** Autopay mandates, when this provider's adapter has them. */
+    readonly mandates?: MandateCapability;
     createOrderIntent(
         input: CreateOrderIntentInput,
     ): Promise<CreateOrderIntentResult>;
@@ -128,6 +167,11 @@ export interface MerchantProvider {
      * Throws {@link RefundCallError} (`UNKNOWN`) when it could not say.
      */
     findRefund(input: FindRefundInput): Promise<RefundResult | null>;
+}
+
+/** Whether this provider's adapter can take autopay at all (D11). */
+export function supportsMandates(provider: MerchantProvider): boolean {
+    return provider.mandates !== undefined;
 }
 
 /** Factory over the concrete providers — injectable so tests swap in a fake. */

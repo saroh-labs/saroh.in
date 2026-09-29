@@ -1,8 +1,12 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Logger, NotFoundException } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
+import type { OrganizationContext } from "../../common/types/organization-context";
 import { businessTimezone } from "../bookings/staff-availability";
+import { canSeeSensitive } from "../customer-workspace/attention-read";
 import { lateThresholdsByStore, thresholdsFor } from "./late-thresholds";
+import type { OrderAttention } from "./order-attention";
+import { attentionByCustomer } from "./order-attention";
 import type { OrderListFilter, OrderListView } from "./order-list-filters";
 import {
     computedConditions,
@@ -18,9 +22,15 @@ import {
 } from "./order-list-filters";
 import type { OrderRowDto } from "./order-row";
 import { serializeOrderRow } from "./order-row";
+import { withBookingPayments } from "./treatment-ledger";
+
+const logger = new Logger("OrderList");
 
 /** Rows per page (default 87). */
 export const ORDER_PAGE_SIZE = 50;
+
+/** A walk-in's Needs attention (B13): none, since there is nobody to note. */
+const NO_ATTENTION: OrderAttention = { entries: [], hiddenSensitiveCount: 0 };
 
 export interface OrderListPage {
     rows: OrderRowDto[];
@@ -33,6 +43,19 @@ export interface OrderListPage {
 export interface OrderListQuery extends OrderListFilter {
     /** The last row's id from the page before. */
     cursor?: string;
+}
+
+/** Who is looking, and so what each row may say. */
+export interface OrderListCaller extends OrderListView {
+    /** `order:read`: the order's money. */
+    money: boolean;
+    /**
+     * The caller (B15): with it, each row carries the customer's Needs
+     * attention as they may see it, and the Needs attention filter counts
+     * sensitive entries only if they may read them. Without it, rows carry
+     * no `attention` and the filter counts non-sensitive entries only.
+     */
+    viewer?: OrganizationContext;
 }
 
 /**
@@ -48,9 +71,13 @@ export interface OrderListQuery extends OrderListFilter {
 export async function listOrderRows(
     organizationId: string,
     query: OrderListQuery,
-    view: OrderListView & { money: boolean },
+    caller: OrderListCaller,
     now: Date = new Date(),
 ): Promise<OrderListPage> {
+    const view: OrderListView = {
+        contact: caller.contact,
+        sensitive: caller.viewer ? canSeeSensitive(caller.viewer) : false,
+    };
     if (query.date && (query.from || query.to)) {
         throw new BadRequestException({
             message: "Pick a date range or a preset, not both.",
@@ -123,6 +150,9 @@ export async function listOrderRows(
                   id: true,
                   orderId: true,
                   customerId: true,
+                  // A walk-in's name and phone (B13), when there is no customer.
+                  walkInName: true,
+                  walkInPhone: true,
                   status: true,
                   paymentStatus: true,
                   stage: true,
@@ -132,6 +162,8 @@ export async function listOrderRows(
                   createdAt: true,
                   courierName: true,
                   trackingNumber: true,
+                  // Whether a pay link is out (B11), for the row menu (B5).
+                  payLinkCreatedAt: true,
                   store: { select: { id: true, name: true } },
                   customer: {
                       select: {
@@ -143,7 +175,11 @@ export async function listOrderRows(
                   },
                   items: {
                       orderBy: { id: "asc" },
-                      select: { product: { select: { name: true } } },
+                      select: {
+                          product: { select: { name: true } },
+                          // A treatment's line names its service (E9).
+                          service: { select: { name: true } },
+                      },
                   },
                   paymentIntents: {
                       where: { status: "SUCCEEDED" },
@@ -155,16 +191,48 @@ export async function listOrderRows(
                           },
                       },
                   },
+                  // A treatment's payment at booking (E9).
+                  invoices: {
+                      where: { source: "BOOKING", kind: "INVOICE" },
+                      select: {
+                          paymentIntents: {
+                              where: { status: "SUCCEEDED" },
+                              select: {
+                                  amountCents: true,
+                                  refunds: {
+                                      where: { status: { not: "FAILED" } },
+                                      select: {
+                                          amountCents: true,
+                                          forEdit: true,
+                                      },
+                                  },
+                              },
+                          },
+                      },
+                  },
               },
           })
         : [];
-    const byId = new Map(loaded.map((o) => [o.id, o]));
+    const byId = new Map(
+        loaded.map(({ invoices, ...o }) => [
+            o.id,
+            withBookingPayments(o, invoices),
+        ]),
+    );
     // Each storefront's late thresholds, once per storefront in the page:
     // the numbers `lateSql` read for the Late filter and the counts.
-    const thresholds = await lateThresholdsByStore(
-        prisma,
-        loaded.map((o) => o.store.id),
-    );
+    const [thresholds, attention] = await Promise.all([
+        lateThresholdsByStore(
+            prisma,
+            loaded.map((o) => o.store.id),
+        ),
+        caller.viewer
+            ? rowAttention(
+                  caller.viewer,
+                  loaded.flatMap((o) => (o.customerId ? [o.customerId] : [])),
+              )
+            : Promise.resolve(undefined),
+    ]);
 
     return {
         rows: page.flatMap((id) => {
@@ -172,8 +240,17 @@ export async function listOrderRows(
             return o
                 ? [
                       serializeOrderRow(o, {
-                          money: view.money,
-                          contact: view.contact,
+                          money: caller.money,
+                          contact: caller.contact,
+                          attention:
+                              attention === undefined
+                                  ? undefined
+                                  : attention === null
+                                    ? null
+                                    : o.customerId
+                                      ? (attention.get(o.customerId) ?? null)
+                                      : // A walk-in has no Needs attention (B13).
+                                        NO_ATTENTION,
                           now,
                           lateThresholds: thresholdsFor(thresholds, o.store.id),
                       }),
@@ -184,4 +261,23 @@ export async function listOrderRows(
         counts,
         nextCursor: more ? (page[page.length - 1] ?? null) : null,
     };
+}
+
+/**
+ * The page's Needs attention, per customer (B15). A failed read is null for
+ * every row, never an empty list: the rows then say "Not available", since
+ * silence reads as "nothing to know". The list itself still answers.
+ */
+async function rowAttention(
+    viewer: OrganizationContext,
+    customerIds: string[],
+): Promise<Map<string, OrderAttention> | null> {
+    try {
+        return await attentionByCustomer(viewer, customerIds);
+    } catch (error) {
+        logger.warn(
+            `Needs attention couldn't be read for the Orders list: ${String(error)}`,
+        );
+        return null;
+    }
 }

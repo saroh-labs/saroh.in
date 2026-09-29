@@ -37,6 +37,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "contacts/contacts.controller.ts": "CRM",
     "pipelines/pipelines.controller.ts": "CRM",
     "bookings/bookings.controller.ts": "APPOINTMENTS",
+    // A12: a class's waitlist, for the team.
+    "bookings/waitlist.controller.ts": "APPOINTMENTS",
     // Staff, their hours and the booking rules (U3) — both controllers.
     "staff/staff.controller.ts": "APPOINTMENTS",
     // E3: business closures and the time-off preview.
@@ -109,6 +111,9 @@ const NEVER: Record<string, string> = {
     "contacts/contact-search.controller.ts":
         "the customer picker in New booking and New order (B13) works whichever of CRM, Appointments and Commerce is on",
     "notifications/notifications.controller.ts": "cross-cutting",
+    // F14: a person's own alert choices; the rows follow their role and
+    // the modules on, read by the service.
+    "notifications/notification-preferences.controller.ts": "cross-cutting",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
     "organizations/organization-roles.controller.ts":
@@ -158,10 +163,49 @@ const NEVER: Record<string, string> = {
     // (`appointmentsOpen`), as on the anonymous route.
     "site-accounts/account-bookings.controller.ts":
         "a signed-in customer booking on a published site — Appointments checked per service",
+    // A12: joining a full class's waitlist from the booking page, checked
+    // per service like booking (`loadBookableService`).
+    "site-accounts/account-waitlist.controller.ts":
+        "a signed-in customer joining a class's waitlist on a published site — Appointments checked per service",
+    // A5: the customer's account area. It lists only the modules the
+    // business has rolled out and on (`account-home.service.ts`), and must
+    // stay reachable whichever are off: Me, receipts and sign-out.
+    "site-accounts/account.controller.ts":
+        "a signed-in customer's own account on a published site — modules checked per tab",
+    // A6, A7, A8: the account's Bookings, Orders and Plan tabs. Each shows
+    // only the customer's own records, which stay theirs to read whichever
+    // modules are off; the tab bar hides a tab whose module is off
+    // (`account-home.service.ts`). Dark with the account area.
+    "site-accounts/account-bookings-tab.controller.ts":
+        "a signed-in customer's own bookings — the tab follows Appointments, dark with the account area",
+    "site-accounts/account-orders.controller.ts":
+        "a signed-in customer's own orders — the tab follows Commerce, dark with the account area",
+    "site-accounts/account-plan.controller.ts":
+        "a signed-in customer's own plans and packs — the tab follows what's on sale, dark with the account area",
+    // A11: buying a class pack from the account. The service answers 404
+    // unless Class packs is rolled out and switched on (DEC-057, E12).
+    "class-packs/account-packs.controller.ts":
+        "a signed-in customer buying a pack — Class packs checked by the service, dark with the account area",
+    // A13: the customer's message thread. Every business can be written
+    // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
+    // a module, on both sides.
+    "site-accounts/account-messages.controller.ts":
+        "a signed-in customer's own thread with the business — dark with the account area, not a module",
+    "customer-workspace/threads.controller.ts":
+        "the team's side of a customer's thread — message:read / message:write, dark with the account area",
     // G11: a site's shop. Commerce being off is checked by the service
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":
         "a published site's shop and product pages — Commerce checked by the service",
+    // G13: a site's bag and checkout. Never module-gated off mid-payment;
+    // the service asks `commerceOpen` before it starts a checkout, and a
+    // payment already made still lands through the webhook.
+    "orders/public-checkout.controller.ts":
+        "a published site's bag and checkout — Commerce checked by the service",
+    // G9: a site's Plans block. Payments being off is checked by the
+    // service (`paymentsOffered`), which answers 404, as a site with no plans.
+    "subscriptions/public-plans.controller.ts":
+        "a published site's Plans block — Payments checked by the service",
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",

@@ -17,6 +17,11 @@ export interface Catalogue {
 /** A product page: what `ProductPage` draws, plus its address and search text. */
 export type CatalogueProduct = ProductPageData & {
     slug: string;
+    /**
+     * The listing at the site's storefront, what the bag holds (G13).
+     * Absent from an API before G13; such a page offers no bag.
+     */
+    listingId?: string;
     seoTitle: string | null;
     seoDescription: string | null;
 };
@@ -99,7 +104,8 @@ export function isCatalogueProduct(v: unknown): v is CatalogueProduct {
         Array.isArray(v.reviews) &&
         Array.isArray(v.extras) &&
         isStringOrNull(v.seoTitle) &&
-        isStringOrNull(v.seoDescription)
+        isStringOrNull(v.seoDescription) &&
+        (v.listingId === undefined || isString(v.listingId))
     );
 }
 

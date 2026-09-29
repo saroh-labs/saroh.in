@@ -14,6 +14,7 @@ import {
 } from "./fulfilment";
 import { LATE_THRESHOLD_COLUMNS } from "./late-thresholds";
 import { openSql, realOrderSql } from "./open-orders";
+import { attentionSql } from "./order-attention";
 import { refundStanding } from "./order-refunds";
 
 /**
@@ -55,6 +56,11 @@ export interface OrderListFilter {
     storeId?: string;
     late?: boolean;
     /**
+     * Whether its customer has Needs attention this viewer may see (B15):
+     * true keeps only those orders, false only the others.
+     */
+    attention?: boolean;
+    /**
      * What the row's pill says, as a key ("ready", "handed-to-courier",
      * "refunded"): see {@link stepSql}. B4.
      */
@@ -76,6 +82,11 @@ export interface OrderListFilter {
 export interface OrderListView {
     /** `contact:read`: search, and see, a customer's phone and email. */
     contact: boolean;
+    /**
+     * Whether sensitive Needs attention counts for this viewer
+     * (`canSeeSensitive`, B15); without it only non-sensitive entries do.
+     */
+    sensitive?: boolean;
 }
 
 /** The instants a `from`/`to` day range covers: `[gte, lt)`. */
@@ -158,6 +169,8 @@ export function searchSql(q: string, view: OrderListView): Prisma.Sql {
     const parts: Prisma.Sql[] = [
         Prisma.sql`o."orderId" ILIKE ${pattern}`,
         Prisma.sql`CONCAT_WS(' ', c."firstName", c."lastName") ILIKE ${pattern}`,
+        // A walk-in is found by the name they gave (B13).
+        Prisma.sql`o."walkInName" ILIKE ${pattern}`,
     ];
     if (view.contact) {
         parts.push(Prisma.sql`c.email ILIKE ${pattern}`);
@@ -166,6 +179,9 @@ export function searchSql(q: string, view: OrderListView): Prisma.Sql {
         if (digits.length >= 3) {
             parts.push(
                 Prisma.sql`regexp_replace(COALESCE(c.phone, ''), '\\D', '', 'g') LIKE ${`%${digits}%`}`,
+            );
+            parts.push(
+                Prisma.sql`regexp_replace(COALESCE(o."walkInPhone", ''), '\\D', '', 'g') LIKE ${`%${digits}%`}`,
             );
         }
     }
@@ -333,6 +349,10 @@ export function orderConditions(
         and.push(Prisma.sql`o."createdAt" >= ${ts(filter.since)}`);
     }
     if (filter.q?.trim()) and.push(searchSql(filter.q, view));
+    if (filter.attention !== undefined) {
+        const has = attentionSql(view.sensitive ?? false);
+        and.push(filter.attention ? has : Prisma.sql`NOT ${has}`);
+    }
     return Prisma.join(and, " AND ");
 }
 

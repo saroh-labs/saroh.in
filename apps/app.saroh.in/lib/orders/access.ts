@@ -8,7 +8,8 @@ import type { Organization } from "@/lib/organizations/service";
  *   kitchen, `order:stage` alone (DEC-024). Someone holding neither (the
  *   Reviewer bundle, or a role the business made without them) is told so
  *   by the locked card — never a hidden screen, never a failure.
- * - `money`: totals, export and New order, through `order:read`.
+ * - `money`: totals and payments, through `order:read`. What someone may
+ *   DO to an order is `orderPowers` below (B16).
  *
  * Without resolved actions (an older response) the built-in roles decide:
  * an Owner and an Admin read orders, a Member stages them, and a Reviewer
@@ -32,6 +33,75 @@ export function ordersAccess(
     return {
         open: role !== "REVIEWER",
         money: role === "OWNER" || role === "ADMIN",
+    };
+}
+
+/**
+ * What this person may do to an order (B16, DEC-039), from what the API
+ * resolved for them — each one the power its endpoint asks, so a screen
+ * never offers what the API would refuse:
+ *
+ * - `stage`: move it through its steps and print (`order:stage`);
+ * - `create`: take a new order and make its pay link (`order:create`);
+ * - `edit`: change it after it's placed, and make a new pay link
+ *   (`order:edit`);
+ * - `payLink`: make or replace a pay link — `create` or `edit`;
+ * - `refund`: refund and cancel (`order:refund`);
+ * - `export`: the CSV (`order:export`).
+ *
+ * The API adds each part to a role saved with the old umbrella
+ * (`order:write` → create, edit, export; `payment:manage` → refund), so the
+ * umbrellas count here too: an API from before B16 sends only them.
+ *
+ * Without resolved actions (an older response) the built-in roles decide:
+ * an Owner and an Admin may do everything, a Member moves steps. With no
+ * organization at all the API decides, so nothing is withheld here.
+ */
+export interface OrderPowers {
+    stage: boolean;
+    create: boolean;
+    edit: boolean;
+    payLink: boolean;
+    refund: boolean;
+    export: boolean;
+}
+
+export function orderPowers(
+    organization: Pick<Organization, "role" | "actions"> | null,
+): OrderPowers {
+    if (!organization) {
+        return {
+            stage: true,
+            create: true,
+            edit: true,
+            payLink: true,
+            refund: true,
+            export: true,
+        };
+    }
+    const { actions, role } = organization;
+    if (!actions) {
+        const full = role === "OWNER" || role === "ADMIN";
+        return {
+            stage: role !== "REVIEWER",
+            create: full,
+            edit: full,
+            payLink: full,
+            refund: full,
+            export: full,
+        };
+    }
+    const holds = (action: string) => actions.includes(action);
+    const write = holds("order:write");
+    const create = holds("order:create") || write;
+    const edit = holds("order:edit") || write;
+    return {
+        stage: holds("order:stage"),
+        create,
+        edit,
+        payLink: create || edit,
+        refund: holds("order:refund") || holds("payment:manage"),
+        export: holds("order:export") || write,
     };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import type { RenderedEnquiry } from "@saroh/block-contract";
 import { cn } from "../lib/utils";
@@ -32,6 +32,29 @@ type SubmitState =
     | { kind: "submitting" }
     | { kind: "success" }
     | { kind: "error"; message: string };
+
+/**
+ * The message a link asked for: `?about=` names a product "Ask about
+ * ordering" sent (G13), `?join=` a plan "Ask about joining" sent (G9).
+ */
+export function askedFromSearch(search: string): string | null {
+    const read = (key: string) => {
+        const value = new URLSearchParams(search).get(key)?.trim() ?? "";
+        return value.length > 0 ? value.slice(0, 200) : null;
+    };
+    const plan = read("join");
+    if (plan) return `I'd like to join ${plan}. `;
+    const product = read("about");
+    return product ? `I'd like to order ${product}. ` : null;
+}
+
+function askedFromUrl(): string | null {
+    try {
+        return askedFromSearch(window.location.search);
+    } catch {
+        return null;
+    }
+}
 
 /** Map an enquiry field type to the native input type / control. */
 function inputTypeFor(type: RenderedEnquiry["fields"][number]["type"]): string {
@@ -65,6 +88,26 @@ export default function EnquirySection({
 
     const [values, setValues] = useState<Record<string, string>>({});
     const [state, setState] = useState<SubmitState>({ kind: "idle" });
+
+    // "Ask about ordering" on a product page (G13) links here with
+    // `?about=<product>`, and "Ask about joining" on a Plans block (G9) with
+    // `?join=<plan>`: the message starts with it, and the visitor finishes
+    // it. Read after mount, so the server's markup stays the same for
+    // everyone.
+    const messageField =
+        content.fields.find((f) => f.type === "textarea")?.name ?? null;
+    useEffect(() => {
+        if (!messageField) return;
+        const asked = askedFromUrl();
+        if (!asked) return;
+        // After this render, as an answer from the address bar.
+        const timer = setTimeout(() => {
+            setValues((prev) =>
+                prev[messageField] ? prev : { ...prev, [messageField]: asked },
+            );
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [messageField]);
 
     // No backing Form → nothing to submit against. Render nothing.
     if (!content.formId) return null;
@@ -131,7 +174,10 @@ export default function EnquirySection({
     }
 
     return (
-        <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+        <section
+            id="enquiry"
+            className="mx-auto w-full max-w-2xl scroll-mt-20 px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+        >
             {content.title ? (
                 <h2 className="text-site-fg text-3xl font-bold tracking-tight">
                     {content.title}

@@ -1,18 +1,17 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Sheet, SheetContent, SheetTitle } from "@saroh/ui/sheet";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
+import { CalendarMissing } from "@/components/calendar/calendar-missing";
 import { CalendarNothing } from "@/components/calendar/calendar-nothing";
+import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { DayPanel } from "@/components/calendar/day-panel";
+import { DaySheet } from "@/components/calendar/day-sheet";
 import { dayButton, MonthGrid } from "@/components/calendar/month-grid";
+import { MonthStrip } from "@/components/calendar/month-strip";
+import { cellOff, dayOffLine } from "@/lib/calendar/days-off";
 import { askedDay } from "@/lib/calendar/grid-keys";
 import type { Off } from "@/lib/calendar/layers";
 import {
@@ -22,17 +21,27 @@ import {
     monthTitle,
     shiftMonth,
 } from "@/lib/calendar/layers";
-import { wholeMoney } from "@/lib/calendar/money";
-import type { Edge } from "@/lib/calendar/range";
+import {
+    calendarCash,
+    moneyByDate,
+    monthEntries,
+    wholeMoney,
+} from "@/lib/calendar/money";
+import type { ProblemCan } from "@/lib/calendar/problems";
 import {
     calendarRange,
     dayShortcuts,
     monthEdges,
     openingDay,
 } from "@/lib/calendar/range";
+import {
+    calendarHref,
+    forPerson,
+    pickedPerson,
+    teamOptions,
+} from "@/lib/calendar/team";
 import type { CalendarMonth } from "@/lib/calendar/types";
-
-import { TONE_BORDER, TONE_FILL } from "./tones";
+import { weekHref } from "@/lib/calendar/week";
 
 /** Between the phone and the full rail the day opens as a sheet. */
 const SHEET_WIDTHS = "(min-width: 760px) and (max-width: 1099px)";
@@ -50,15 +59,12 @@ function useDaySheet(): boolean {
     );
 }
 
-const listed = (labels: string[]) =>
-    labels.length < 2
-        ? (labels[0] ?? "")
-        : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
-
 /**
  * Home › Calendar, after the "Saroh Business Calendar" design: the month, a
  * switch per layer with its count, the day's chips and takings, and the
- * picked day grouped by layer with a link to each record.
+ * picked day grouped by layer with a link to each record. Days off are
+ * said on their day, and a team of two or more can be narrowed to one
+ * person (E24).
  */
 export function BusinessCalendar({
     data,
@@ -66,20 +72,38 @@ export function BusinessCalendar({
     thisMonth,
     can,
     day: asked,
+    team,
 }: {
     data: CalendarMonth;
     /** "YYYY-MM-DD" and "YYYY-MM" now, in the business's zone. */
     today: string;
     thisMonth: string;
-    /** May take an order (`order:write`) or a booking (`booking:write`). */
-    can: { order: boolean; book: boolean };
+    /** May take an order, a booking, or send a reminder (E22): `*:write`. */
+    can: { order: boolean; book: boolean } & ProblemCan;
     /** `?day=`: the day to open on, when a key crossed into this month. */
     day?: string;
+    /** `?team=`: the person the team filter opens on (E24). */
+    team?: string;
 }) {
     const router = useRouter();
+    // Every layer the month has keeps its switch while one person is picked.
     const layers = layersFor(data);
     const range = calendarRange(data.joinedAt, thisMonth);
     const [off, setOff] = useState<Off>({});
+    const people = teamOptions(data);
+    const [person, setPerson] = useState(() => pickedPerson(team, people));
+    const shown = useMemo(() => forPerson(data, person), [data, person]);
+    const hrefFor = (m: string, day?: string) =>
+        calendarHref({ month: m, thisMonth, day, team: person });
+    // The URL says who is picked, so a link or a reload keeps them; no read.
+    const pickPerson = (id: string | null) => {
+        setPerson(id);
+        window.history.replaceState(
+            null,
+            "",
+            calendarHref({ month: data.month, thisMonth, team: id }),
+        );
+    };
     const [selected, setSelected] = useState(() => {
         const dates = data.days.map((d) => d.date);
         return askedDay(asked, dates, range) ?? openingDay(dates, today, range);
@@ -90,12 +114,21 @@ export function BusinessCalendar({
     if (layers.length === 0) return <CalendarNothing />;
 
     const currency = mainCurrency(data);
-    const lead = layers[0];
-    const day = data.days.find((d) => d.date === selected) ?? data.days.at(0);
+    const day = shown.days.find((d) => d.date === selected) ?? shown.days.at(0);
     const failed = new Set(data.unavailable.map((u) => u.source));
-    const missing = data.unavailable.map((u) => u.label);
-    const money = data.takings !== undefined;
-    const showTakings = money && data.takings?.total !== null && !off[lead.key];
+    // In, out and due (E23): only for `payment:read`, whom the API sent them.
+    // The person picked narrows what is drawn; the file stays the month's.
+    const narrowed = calendarCash(shown, off, currency);
+    const cash = narrowed && {
+        ...narrowed,
+        all: monthEntries(data) ?? narrowed.all,
+    };
+    const offs = new Map(
+        shown.days.flatMap((d) => {
+            const o = cellOff(data, d.date, person);
+            return o ? [[d.date, o] as const] : [];
+        }),
+    );
 
     const pick = (date: string) => {
         setSelected(date);
@@ -110,8 +143,7 @@ export function BusinessCalendar({
             setSelected(date);
             return;
         }
-        const month = m === thisMonth ? "" : `month=${m}&`;
-        router.push(`/calendar?${month}day=${date}`, { scroll: false });
+        router.push(hrefFor(m, date), { scroll: false });
     };
 
     const panel = (heading: (title: string) => React.ReactNode) =>
@@ -130,14 +162,13 @@ export function BusinessCalendar({
                     layers: data.layers,
                     can,
                 })}
+                can={can}
+                money={cash}
+                offLine={dayOffLine(data, day.date)}
             />
         ) : null;
 
-    const monthHref = (m: string) =>
-        m === thisMonth ? "/calendar" : `/calendar?month=${m}`;
     const edges = monthEdges(data.month, range);
-    const edgeNote = edges.before?.note ?? edges.after?.note;
-    const isThisMonth = data.month === thisMonth;
 
     return (
         <>
@@ -146,151 +177,83 @@ export function BusinessCalendar({
                 title={monthTitle(data.month)}
                 className="mb-0"
                 actions={
-                    <span className="w-full text-right text-[12.5px] text-muted-foreground sm:w-auto">
-                        {monthSummary({
-                            month: data,
-                            layers,
-                            off,
-                            today,
-                            money: wholeMoney,
-                        })}
-                    </span>
+                    // With the strip, the money is said there (the design).
+                    cash ? undefined : (
+                        <span className="w-full text-right text-[12.5px] text-muted-foreground sm:w-auto">
+                            {monthSummary({
+                                month: shown,
+                                layers,
+                                off,
+                                today,
+                                money: wholeMoney,
+                            })}
+                        </span>
+                    )
                 }
             />
 
-            <div className="!mt-0.5 flex flex-wrap items-center gap-1.5">
-                <div className="flex gap-1">
-                    <MonthStep
-                        href={monthHref(shiftMonth(data.month, -1))}
-                        label="Previous month"
-                        edge={edges.before}
-                    >
-                        <ChevronLeft className="size-4" />
-                    </MonthStep>
-                    {isThisMonth ? (
-                        // Already here: the design greys it and it does
-                        // nothing, rather than reloading the same month.
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled
-                            aria-current="date"
-                            className="px-[11px] text-[12.5px] disabled:text-muted-foreground disabled:opacity-100"
-                        >
-                            This month
-                        </Button>
-                    ) : (
-                        <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="px-[11px] text-[12.5px]"
-                        >
-                            <Link href="/calendar">This month</Link>
-                        </Button>
-                    )}
-                    <MonthStep
-                        href={monthHref(shiftMonth(data.month, 1))}
-                        label="Next month"
-                        edge={edges.after}
-                    >
-                        <ChevronRight className="size-4" />
-                    </MonthStep>
-                </div>
-                {edgeNote ? (
-                    // Said on the page as well as on the button: a reason
-                    // only on hover is one a phone never shows.
-                    <span
-                        id="calendar-edge"
-                        className="text-[12px] text-muted-foreground"
-                    >
-                        {edgeNote}
-                    </span>
-                ) : null}
-                <span className="flex-1" />
-                <div
-                    role="group"
-                    aria-label="Show on the calendar"
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {layers.map((layer) => {
-                        const on = !off[layer.key];
-                        const broken = failed.has(layer.key);
-                        return (
-                            <button
-                                key={layer.key}
-                                type="button"
-                                aria-pressed={on}
-                                disabled={broken}
-                                onClick={() =>
-                                    setOff((o) => ({
-                                        ...o,
-                                        [layer.key]: !o[layer.key],
-                                    }))
-                                }
-                                className={cn(
-                                    "inline-flex h-8 items-center gap-[5px] rounded-full border px-[11px] text-[12.5px] font-semibold transition-colors duration-fast coarse:h-11",
-                                    broken
-                                        ? "cursor-not-allowed border-dashed border-border text-muted-foreground"
-                                        : on
-                                          ? "border-foreground bg-card text-foreground"
-                                          : "border-border bg-transparent text-muted-foreground hover:border-border-strong",
-                                )}
-                            >
-                                <span
-                                    aria-hidden
-                                    className={cn(
-                                        "mr-1.5 inline-block size-[9px] rounded-[3px] border-[1.5px]",
-                                        TONE_BORDER[layer.tone],
-                                        on && !broken
-                                            ? TONE_FILL[layer.tone]
-                                            : "bg-transparent",
-                                    )}
-                                />
-                                {layer.label}
-                                <span className="font-medium text-muted-foreground">
-                                    {broken
-                                        ? "couldn't load"
-                                        : (data.totals[layer.key] ?? 0)}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+            <CalendarToolbar
+                prev={{
+                    href: hrefFor(shiftMonth(data.month, -1)),
+                    label: "Previous month",
+                    edge: edges.before,
+                }}
+                next={{
+                    href: hrefFor(shiftMonth(data.month, 1)),
+                    label: "Next month",
+                    edge: edges.after,
+                }}
+                current={{
+                    label: "This month",
+                    href: hrefFor(thisMonth),
+                    here: data.month === thisMonth,
+                }}
+                view={{
+                    value: "month",
+                    hrefs: {
+                        month: hrefFor(data.month),
+                        // The week holding the day picked (E25).
+                        week: weekHref({
+                            day: day?.date ?? today,
+                            today,
+                            team: person,
+                        }),
+                    },
+                }}
+                people={people}
+                person={person}
+                onPerson={pickPerson}
+                layers={layers}
+                off={off}
+                totals={shown.totals}
+                failed={failed}
+                onToggle={(key) => setOff((o) => ({ ...o, [key]: !o[key] }))}
+            />
 
-            {missing.length > 0 ? (
-                <PartialNotice
-                    action={
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.refresh()}
-                        >
-                            Try again
-                        </Button>
-                    }
-                >
-                    {listed(missing)} couldn&apos;t be loaded, so{" "}
-                    {missing.length === 1 ? "it is" : "they are"} missing from
-                    this month — everything else is here.
-                    {money && data.takings?.total === null
-                        ? " Takings are left out while part of them is missing."
-                        : ""}
-                </PartialNotice>
+            {cash ? (
+                <MonthStrip
+                    month={data.month}
+                    cash={cash}
+                    thisMonth={thisMonth}
+                    today={today}
+                    shop={data.layers.includes("orders")}
+                />
             ) : null}
+
+            <CalendarMissing data={data} span="month" />
 
             <div className="!mt-3.5 flex flex-wrap items-start gap-4">
                 <MonthGrid
                     month={data.month}
-                    days={data.days}
+                    days={shown.days}
                     range={range}
                     layers={layers}
                     off={off}
                     today={today}
                     selected={day?.date ?? ""}
-                    currency={currency}
-                    showTakings={showTakings}
+                    currency={cash?.currency ?? null}
+                    money={cash ? moneyByDate(cash.shown) : null}
+                    offs={offs}
                     onPick={pick}
                     onMove={move}
                 />
@@ -318,85 +281,24 @@ export function BusinessCalendar({
                 bookings — nothing is entered on the calendar itself.{" "}
                 <span className="min-[760px]:hidden">
                     Each dot is a layer with something that day; red means
-                    something to act on. Tap a day to see it.
+                    something that needs you. Tap a day to see it.
                 </span>
-                {showTakings ? (
+                {cash ? (
                     <span className="max-[759px]:hidden">
-                        The bar in each day is what was taken that day, scaled
-                        to the busiest day.
+                        Each day&apos;s money is what came in (+) and went out
+                        (−) that day.
                     </span>
                 ) : null}
             </p>
 
-            <Sheet open={sheetOpen && sheetWidths} onOpenChange={setSheetOpen}>
-                {/* A dialog: Tab stays inside, Esc closes it. It opens on
-                    the day's title, and closing it puts focus back on the day
-                    in the grid rather than at the top of the page (E28). */}
-                <SheetContent
-                    side="right"
-                    className="w-[380px] max-w-full overflow-y-auto px-[18px] py-4 sm:max-w-[380px]"
-                    onOpenAutoFocus={(e) => {
-                        e.preventDefault();
-                        document
-                            .getElementById("calendar-sheet-title")
-                            ?.focus();
-                    }}
-                    onCloseAutoFocus={(e) => {
-                        e.preventDefault();
-                        if (day) dayButton(day.date)?.focus();
-                    }}
-                >
-                    {panel((title) => (
-                        <SheetTitle
-                            id="calendar-sheet-title"
-                            tabIndex={-1}
-                            className="pr-10 font-display text-[16px] font-semibold tracking-[-0.02em] outline-none"
-                        >
-                            {title}
-                        </SheetTitle>
-                    ))}
-                </SheetContent>
-            </Sheet>
-        </>
-    );
-}
-
-/**
- * ‹ or ›: a link to the next month, or — at the edge of what the calendar
- * reaches — a greyed button that stays focusable and says why.
- */
-function MonthStep({
-    href,
-    label,
-    edge,
-    children,
-}: {
-    href: string;
-    label: string;
-    edge: Edge | null;
-    children: React.ReactNode;
-}) {
-    if (edge) {
-        return (
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-disabled
-                aria-label={label}
-                aria-describedby="calendar-edge"
-                title={edge.title}
-                className="w-8 cursor-default px-0 text-muted-foreground hover:bg-card hover:text-muted-foreground"
+            <DaySheet
+                open={sheetOpen && sheetWidths}
+                onOpenChange={setSheetOpen}
+                // Back on the day in the grid (E28).
+                returnTo={() => (day ? dayButton(day.date) : null)}
             >
-                {children}
-            </Button>
-        );
-    }
-    return (
-        <Button asChild variant="outline" size="sm" className="w-8 px-0">
-            <Link href={href} aria-label={label}>
-                {children}
-            </Link>
-        </Button>
+                {panel}
+            </DaySheet>
+        </>
     );
 }

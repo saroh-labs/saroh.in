@@ -117,6 +117,12 @@ export function PacksPanel({
                     packs={packs}
                     initialContactId={contact.id}
                     invoicesOnSale={invoicesOnSale}
+                    held={(purchases ?? []).map((p) => ({
+                        contactId: contact.id,
+                        packId: p.pack.id,
+                        left: p.left,
+                        standing: packStanding(p, at),
+                    }))}
                 />
             ) : null}
         </>

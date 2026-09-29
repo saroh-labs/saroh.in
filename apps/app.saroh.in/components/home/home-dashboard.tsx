@@ -6,12 +6,14 @@ import Link from "next/link";
 import { firstRunJobs } from "@/lib/home/first-run";
 import { formatList, nextLine } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
+import { showsWeek, weekRows } from "@/lib/home/week";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
 import { FirstRunJobs } from "./first-run-jobs";
 import { NeedsYou } from "./needs-you";
 import { TakeMoneyChecklist } from "./take-money-checklist";
+import { ThisWeek } from "./this-week";
 import { Today } from "./today";
 
 /** "Get ready to take money", for someone who may change the business. */
@@ -30,6 +32,10 @@ export interface HomeSetup {
  *    two clicks later.
  * 2. **Today** — the business's day in time order, with who has arrived
  *    (F5). Days after today are the calendar's.
+ *
+ * Beside them, **This week** (F7): takings against the same days last week,
+ * the week's bookings and orders, and what is owed — each figure only for
+ * whoever may read it, which the API decides.
  *
  * The counts that used to close the page as a band of tiles folded into the
  * header's "Last 24 hours" (F6, `home-header.tsx`): what changed since
@@ -61,6 +67,10 @@ export function HomeDashboard({
     }
 
     const now = new Date();
+    // A business with nothing sold, booked or paid yet gets no week (F7).
+    const week = showsWeek(home.week, home.lastDay?.fresh ?? false)
+        ? weekRows(home.week)
+        : [];
 
     return (
         <div className="space-y-6">
@@ -77,7 +87,7 @@ export function HomeDashboard({
             ) : null}
 
             {/* The design's row: the work column, and beside it This week
-                (F7) once it lands; it wraps under on a narrow screen. */}
+                (F7); it wraps under below 1100px. */}
             <div className="flex flex-wrap items-start gap-5">
                 {/* `min-w-0` is required, not tidiness: a flex item defaults
                     to `min-width: auto`, so this column refused to shrink below
@@ -109,6 +119,7 @@ export function HomeDashboard({
                         <TakeMoneyChecklist {...setup} slot="late" />
                     ) : null}
                 </div>
+                <ThisWeek rows={week} />
             </div>
         </div>
     );

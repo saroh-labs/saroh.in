@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
     Optional,
@@ -11,12 +12,15 @@ import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
+import { formatMoney } from "../invoices/invoice-send.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
     creditRestOfOrder,
     ensureOrderInvoice,
     loadTaxProfile,
 } from "../invoices/order-invoicing";
+import { assertPaymentsOn } from "../invoices/payments-on";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import type {
@@ -31,11 +35,22 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
+import {
+    assertOneParty,
+    assertStorefrontOffers,
+    cashReceivedCents,
+    isCounterPayment,
+    newOrderLines,
+    orderPartyInTx,
+    storefrontOffers,
+    takeCounterPaymentInTx,
+} from "./new-order";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
-import type { OrderListQuery } from "./order-list";
+import type { OrderListCaller, OrderListQuery } from "./order-list";
 import { listOrderRows } from "./order-list";
 import { orderFilterOptions, searchOrderProducts } from "./order-list-options";
 import { retireOrderPayLinkInTx } from "./order-pay-link";
+import { issueOrderPayLinkInTx } from "./order-pay-link.service";
 import {
     fromCents,
     priceOrderLines,
@@ -50,9 +65,16 @@ const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
 } as const;
 
+/** What a store-scoped order write says to a role without its power (B16). */
+const ORDER_WRITE_REFUSAL = {
+    "order:create": "Your role can't take new orders.",
+    "order:edit": "Your role can't change orders.",
+    "order:refund": "Your role can't refund or cancel orders.",
+} as const;
+
 /**
- * Order management. Authorization delegates to StoresService (read = access,
- * write = canWrite). Totals are computed server-side from snapshotted product
+ * Order management. Authorization delegates to StoresService (read = access;
+ * writes = the order power each asks, `requireOrderWrite`, B16). Totals are computed server-side from snapshotted product
  * prices; inventory is reserved on create and committed/released on status
  * change — all inside one transaction so stock and order stay consistent.
  */
@@ -88,13 +110,16 @@ export class OrdersService {
      * and NEVER by a store id the caller sent: `storeId` and every other
      * filter only NARROW inside the organization, so a tampered value can at
      * worst return nothing. See `order-list.ts`.
+     *
+     * With the caller (`viewer`), each row carries the customer's Needs
+     * attention as they may see it, and the filter reads the same (B15).
      */
     listRows(
         organizationId: string,
         query: OrderListQuery,
-        view: { money: boolean; contact: boolean },
+        caller: OrderListCaller,
     ) {
-        return listOrderRows(organizationId, query, view);
+        return listOrderRows(organizationId, query, caller);
     }
 
     /**
@@ -120,6 +145,8 @@ export class OrdersService {
                 items: {
                     include: {
                         product: { select: { name: true } },
+                        // A treatment's line names its service (E9).
+                        service: { select: { name: true } },
                         variant: { select: { title: true } },
                     },
                 },
@@ -141,18 +168,15 @@ export class OrdersService {
     }
 
     async create(storeId: string, userId: string, dto: CreateOrderDto) {
-        const organizationId = await this.requireWrite(storeId, userId);
-
-        const customer = await prisma.customer.findFirst({
-            where: { id: dto.customerId, storeId },
-            select: { id: true },
-        });
-        if (!customer) {
-            throw new BadRequestException({
-                message: "Unknown customer",
-                field: "customerId",
-            });
-        }
+        const organizationId = await this.requireOrderWrite(
+            storeId,
+            userId,
+            "order:create",
+        );
+        // Who it is for, and how it is paid (B13): checked before anything
+        // is priced, so a request that can't be served costs nothing.
+        assertOneParty(dto);
+        await this.assertNewOrderAllowed(storeId, userId, organizationId, dto);
         // Either vocabulary in; only what this release may write is stored
         // (fulfilment.ts: SHIPPING and the rest are refused until B2c).
         const type = typeOf(dto.fulfilment ?? "PICKUP");
@@ -175,8 +199,19 @@ export class OrdersService {
         // an order in any other is refused rather than silently mixed in.
         const settings = await prisma.storeSettings.findUnique({
             where: { storeId },
-            select: { currency: true },
+            select: {
+                currency: true,
+                fulfilmentTypes: true,
+                collectionEnabled: true,
+                shippingEnabled: true,
+            },
         });
+        // And a way the storefront offers (B13): New order v2 offers only
+        // those, so anything else is a forged request. A request from before
+        // v2 (no `payment`) is served as it was, whatever way it names.
+        if (dto.payment !== undefined) {
+            assertStorefrontOffers(type, storefrontOffers(settings));
+        }
         if (
             settings &&
             dto.currency !== undefined &&
@@ -253,10 +288,26 @@ export class OrdersService {
             });
         }
 
+        // Paid at the counter (B13): cash short of the total is refused.
+        const counter =
+            dto.payment && isCounterPayment(dto.payment.kind)
+                ? {
+                      kind: dto.payment.kind,
+                      receivedCents:
+                          dto.payment.kind === "CASH"
+                              ? cashReceivedCents(
+                                    dto.payment.received,
+                                    totalCents,
+                                    (cents) =>
+                                        formatMoney(fromCents(cents), currency),
+                                )
+                              : null,
+                  }
+                : null;
+
         const data = {
             storeId,
             organizationId,
-            customerId: dto.customerId,
             currency,
             subtotal: fromCents(subtotalCents),
             tax: fromCents(taxCents),
@@ -295,8 +346,16 @@ export class OrdersService {
             try {
                 const created = await prisma.$transaction(
                     async (tx) => {
+                        // Found or made in this transaction: an order that
+                        // fails leaves no customer behind (B13).
+                        const party = await orderPartyInTx(tx, {
+                            storeId,
+                            organizationId,
+                            userId,
+                            dto,
+                        });
                         const { items, ...order } = await tx.order.create({
-                            data: { ...data, orderId: orderNumber },
+                            data: { ...data, ...party, orderId: orderNumber },
                             select: {
                                 id: true,
                                 items: {
@@ -324,7 +383,36 @@ export class OrdersService {
                                 currency,
                             );
                         }
-                        return order;
+                        // Paid now at the counter, or its pay link (B11)
+                        // made with it: one or the other, or neither
+                        // (pay later).
+                        if (counter) {
+                            await takeCounterPaymentInTx(tx, {
+                                orderId: order.id,
+                                organizationId,
+                                userId,
+                                kind: counter.kind,
+                                receivedCents: counter.receivedCents,
+                                at: new Date(),
+                            });
+                        }
+                        const payLink =
+                            dto.payment?.kind === "LINK" && organizationId
+                                ? await issueOrderPayLinkInTx(
+                                      tx,
+                                      organizationId,
+                                      order.id,
+                                  )
+                                : null;
+                        // The team's "New order" (F14), with the order.
+                        if (organizationId) {
+                            await enqueueTeamAlert(tx, organizationId, {
+                                event: "order",
+                                orderId: order.id,
+                                actorUserId: userId,
+                            });
+                        }
+                        return { ...order, payLink };
                     },
                     // Serializable ONLY for an order carrying a code: the
                     // cap re-count inside must see a concurrent redemption.
@@ -351,7 +439,9 @@ export class OrdersService {
                         created.id,
                     );
                 }
-                return { id: created.id };
+                return created.payLink
+                    ? { id: created.id, payLink: created.payLink }
+                    : { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;
                 // A serialization failure only means something on the coded
@@ -368,13 +458,33 @@ export class OrdersService {
         throw new BadRequestException("Could not allocate an order number");
     }
 
+    /** New order's lines (B13): see `new-order.ts`. */
+    async newOrderLines(storeId: string, userId: string, productIds: string[]) {
+        await this.requireOrderWrite(storeId, userId, "order:create");
+        return newOrderLines(storeId, productIds);
+    }
+
     async updateStatus(
         storeId: string,
         orderId: string,
         userId: string,
         dto: UpdateOrderDto,
     ) {
-        await this.requireWrite(storeId, userId);
+        // Recording a status or a payment by hand is a change to the order
+        // (`order:edit`); cancelling it or recording money handed back is
+        // `order:refund`'s (B16, matrix §2). Both asked when both are sent.
+        const refunds =
+            dto.status === "CANCELLED" || dto.paymentStatus === "REFUNDED";
+        const edits =
+            (dto.status !== undefined && dto.status !== "CANCELLED") ||
+            (dto.paymentStatus !== undefined &&
+                dto.paymentStatus !== "REFUNDED");
+        if (refunds) {
+            await this.requireOrderWrite(storeId, userId, "order:refund");
+        }
+        if (edits || !refunds) {
+            await this.requireOrderWrite(storeId, userId, "order:edit");
+        }
         const nextStatus = dto.status;
         const nextPayment = dto.paymentStatus;
 
@@ -540,6 +650,40 @@ export class OrdersService {
     }
 
     /**
+     * What New order v2 asks beyond writing to the storefront (B13): a
+     * picked person is read by their email, which takes `contact:read` (as
+     * the search that found them does); a pay link takes `order:create`
+     * (B16) and a business that takes payments (B11).
+     */
+    private async assertNewOrderAllowed(
+        storeId: string,
+        userId: string,
+        organizationId: string | null,
+        dto: CreateOrderDto,
+    ): Promise<void> {
+        if (
+            dto.contactId &&
+            !(await this.stores.memberAllows(storeId, userId, "contact:read"))
+        ) {
+            throw new ForbiddenException(
+                "Your role can't look customers up. Take it as a walk-in, or add them by email.",
+            );
+        }
+        if (dto.payment?.kind !== "LINK") return;
+        if (!organizationId) {
+            throw new BadRequestException("A pay link needs a business.");
+        }
+        if (
+            !(await this.stores.memberAllows(storeId, userId, "order:create"))
+        ) {
+            throw new ForbiddenException(
+                "Your role can't make a pay link. Take the payment at the counter, or leave it to pay later.",
+            );
+        }
+        await assertPaymentsOn(prisma, organizationId, "make a pay link");
+    }
+
+    /**
      * Reading a storefront's orders — with their totals — takes `order:read`,
      * not only a way into the store (the rule is shared with the customer
      * list; see `requireOrderRead`). Without it this older read handed a
@@ -550,18 +694,26 @@ export class OrdersService {
         return requireOrderRead(this.stores, storeId, userId, "orders");
     }
 
-    private async requireWrite(
+    /**
+     * A store-scoped order write (B16): the owning Organization when the
+     * caller may take `action` on this storefront's orders (see
+     * `StoresService.orderWriteOrganization`). A storefront they can't reach
+     * stays a 404, so nothing says it exists; one they can reach, without
+     * the power, is a 403 in words.
+     */
+    private async requireOrderWrite(
         storeId: string,
         userId: string,
+        action: "order:create" | "order:edit" | "order:refund",
     ): Promise<string | null> {
-        const writable = await this.stores.writableOrganization(
+        const writable = await this.stores.orderWriteOrganization(
             storeId,
             userId,
+            action,
         );
-        if (writable === null) {
-            throw new NotFoundException("Store not found");
-        }
-        return writable.organizationId;
+        if (writable !== null) return writable.organizationId;
+        await this.stores.getForUser(storeId, userId);
+        throw new ForbiddenException(ORDER_WRITE_REFUSAL[action]);
     }
 
     private isUniqueOrderNumber(err: unknown): boolean {

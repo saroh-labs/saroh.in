@@ -39,6 +39,9 @@ export function OrderActions({
     paymentStatus,
     pending,
     onPendingChange,
+    withCancel = true,
+    canRecord = true,
+    canRefund = true,
 }: {
     storeId: string;
     orderId: string;
@@ -47,13 +50,29 @@ export function OrderActions({
     paymentStatus: PaymentStatus;
     pending: Pending | null;
     onPendingChange: (p: Pending | null) => void;
+    /**
+     * Offer "Cancel order" here: only against an API before B9. From B9 it
+     * is "Cancel order…" on the Change card, a refund in full.
+     */
+    withCancel?: boolean;
+    /** Record a payment by hand (`order:edit`, B16). */
+    canRecord?: boolean;
+    /**
+     * Cancel, or record money handed back (`order:refund`, B16). Without it
+     * neither is drawn: the API would refuse them.
+     */
+    canRefund?: boolean;
 }) {
     const router = useRouter();
     const setPending = onPendingChange;
     // Recording a payment by hand is for money that moved outside Saroh —
     // cash, a bank transfer. A card refund goes through Refund instead, which
-    // actually sends the money back.
-    const paymentMoves = PAYMENT_TRANSITIONS[paymentStatus];
+    // actually sends the money back. Each move is offered only to someone
+    // whose role the API would let make it.
+    const paymentMoves = PAYMENT_TRANSITIONS[paymentStatus].filter((to) =>
+        to === "REFUNDED" ? canRefund : canRecord,
+    );
+    const cancellable = withCancel && canRefund && canCancel(status);
 
     async function commit(p: Pending) {
         const res = await updateOrder(
@@ -79,7 +98,7 @@ export function OrderActions({
 
     return (
         <>
-            {canCancel(status) || paymentMoves.length > 0 ? (
+            {cancellable || paymentMoves.length > 0 ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
@@ -102,7 +121,7 @@ export function OrderActions({
                                 Record as {PAYMENT_LABEL[to].toLowerCase()}
                             </DropdownMenuItem>
                         ))}
-                        {canCancel(status) ? (
+                        {cancellable ? (
                             <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
                                 onSelect={() => setPending({ kind: "cancel" })}

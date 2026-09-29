@@ -3,9 +3,11 @@ import {
     Controller,
     Delete,
     Get,
+    HttpCode,
     Param,
     Patch,
     Post,
+    Put,
     UseGuards,
 } from "@nestjs/common";
 
@@ -15,8 +17,13 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
-import { InviteMemberDto, UpdateMemberRoleDto } from "./members.dto";
+import {
+    InviteMemberDto,
+    SetExtraActionsDto,
+    UpdateMemberRoleDto,
+} from "./members.dto";
 import { OrganizationMembersService } from "./organization-members.service";
+import { StorefrontTeamNoticeService } from "./storefront-team-notice.service";
 
 /**
  * The organization roster and its invitations (#276).
@@ -28,12 +35,32 @@ import { OrganizationMembersService } from "./organization-members.service";
  */
 @Controller()
 export class OrganizationMembersController {
-    constructor(private readonly members: OrganizationMembersService) {}
+    constructor(
+        private readonly members: OrganizationMembersService,
+        private readonly storefrontNotice: StorefrontTeamNoticeService,
+    ) {}
 
     @Get("organizations/:organizationId/members")
     @UseGuards(BetterAuthGuard, OrganizationGuard)
     list(@OrgContext() ctx: OrganizationContext) {
         return this.members.list(ctx);
+    }
+
+    /**
+     * The people the F16 backfill put on the team as Storefront team, for
+     * Team's one-time notice (DEC-048). `member:role:update`.
+     */
+    @Get("organizations/:organizationId/storefront-team-notice")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    storefrontTeamNotice(@OrgContext() ctx: OrganizationContext) {
+        return this.storefrontNotice.read(ctx);
+    }
+
+    @Post("organizations/:organizationId/storefront-team-notice/dismiss")
+    @HttpCode(200)
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    dismissStorefrontTeamNotice(@OrgContext() ctx: OrganizationContext) {
+        return this.storefrontNotice.dismiss(ctx);
     }
 
     @Get("organizations/:organizationId/invitations")
@@ -68,6 +95,20 @@ export class OrganizationMembersController {
         @Body() dto: UpdateMemberRoleDto,
     ) {
         return this.members.updateRole(ctx, userId, dto);
+    }
+
+    /**
+     * A person's extra permissions, the whole list (F17). Under
+     * `member:role:update` and the reach rule; audited.
+     */
+    @Put("organizations/:organizationId/members/:userId/extra-actions")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    setExtraActions(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("userId") userId: string,
+        @Body() dto: SetExtraActionsDto,
+    ) {
+        return this.members.setExtraActions(ctx, userId, dto);
     }
 
     @Delete("organizations/:organizationId/members/:userId")

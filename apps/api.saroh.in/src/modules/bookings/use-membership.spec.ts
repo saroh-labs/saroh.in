@@ -101,3 +101,52 @@ describe("a class paid with a membership (D10)", () => {
         expect(count).not.toHaveBeenCalled();
     });
 });
+
+describe("a customer booking a class with their membership online (A10)", () => {
+    const MINE = { ...USE, actor: "customer" as const };
+
+    it("uses one of the month's classes", async () => {
+        findFirst.mockResolvedValue(membership());
+        count.mockResolvedValue(7);
+        await expect(useMembershipInTx(tx, MINE)).resolves.toBeUndefined();
+    });
+
+    it("treats someone else's membership as missing: 404, credit-gone", async () => {
+        findFirst.mockResolvedValue(membership({ contactId: "c_other" }));
+        await expect(useMembershipInTx(tx, MINE)).rejects.toMatchObject({
+            status: 404,
+            response: { details: { reason: "credit-gone" } },
+        });
+    });
+
+    it("never pays a class from a membership with no classes a month", async () => {
+        findFirst.mockResolvedValue(membership({ classesPerPeriod: null }));
+        await expect(useMembershipInTx(tx, MINE)).rejects.toMatchObject({
+            response: {
+                message:
+                    "Your membership doesn't include classes to book online.",
+                details: { reason: "credit-gone" },
+            },
+        });
+    });
+
+    it("says the month's classes are used, in their words", async () => {
+        findFirst.mockResolvedValue(membership());
+        count.mockResolvedValue(8);
+        const attempt = useMembershipInTx(tx, MINE);
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toMatchObject({
+            response: {
+                message: "Your membership's classes for that month are used.",
+                details: { reason: "credit-gone" },
+            },
+        });
+    });
+
+    it("says a paused membership is theirs and paused", async () => {
+        findFirst.mockResolvedValue(membership({ status: "PAUSED" }));
+        await expect(useMembershipInTx(tx, MINE)).rejects.toThrow(
+            "Your membership is paused.",
+        );
+    });
+});

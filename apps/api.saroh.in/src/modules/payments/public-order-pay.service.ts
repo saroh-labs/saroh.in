@@ -10,6 +10,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { hashPayToken } from "../invoices/pay-token";
+import { lineName } from "../orders/order-line";
 import type { PayLinkStanding } from "../orders/order-pay-link";
 import {
     dueCentsOf,
@@ -117,12 +118,16 @@ export class PublicOrderPayService {
                     orderId: true,
                     organization: { select: { name: true } },
                     customer: { select: { firstName: true } },
+                    // A walk-in (B13) is greeted by the name they gave.
+                    walkInName: true,
                     items: {
                         orderBy: { id: "asc" },
                         select: {
                             quantity: true,
                             price: true,
                             product: { select: { name: true } },
+                            // A treatment's line names its service (E9).
+                            service: { select: { name: true } },
                             variant: { select: { title: true } },
                         },
                     },
@@ -139,14 +144,16 @@ export class PublicOrderPayService {
                 select: { style: true },
             });
             const status = payLinkStanding(order);
-            const first = order.customer.firstName?.trim() ?? "";
+            const first = order.customer
+                ? (order.customer.firstName?.trim() ?? "")
+                : (order.walkInName?.trim().split(/\s+/)[0] ?? "");
             return {
                 businessName: order.organization.name,
                 orderNumber: order.orderId,
                 firstName: first.length > 0 ? first : null,
                 lines: order.items.map((i) => {
                     const unit = Math.round(Number(i.price) * 100);
-                    const name = i.product.name;
+                    const name = lineName(i) ?? "";
                     return {
                         name: i.variant?.title
                             ? `${name} · ${i.variant.title}`

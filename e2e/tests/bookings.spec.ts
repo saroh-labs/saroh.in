@@ -491,12 +491,14 @@ test.describe("availability and services", () => {
         await expect(
             page.getByRole("heading", { level: 1, name: "New service" }),
         ).toBeVisible();
-        // Visits and the deposit arrive with E10 and E8.
-        await expect(page.getByLabel("Visits")).toHaveCount(0);
+        // A new service starts one-to-one, so it offers Visits (E10); a
+        // class has none. The deposit (E8) waits for a price.
+        await expect(page.getByLabel("Visits")).toHaveCount(1);
         await expect(
             page.getByRole("radiogroup", { name: "Deposit" }),
         ).toHaveCount(0);
         await page.getByRole("radio", { name: "Class" }).click();
+        await expect(page.getByLabel("Visits")).toHaveCount(0);
         await page.getByLabel("Name").fill("E2E class");
         await page.getByRole("textbox", { name: /^Price/ }).fill("0");
         const who = page.getByRole("group", { name: "Who takes it" });

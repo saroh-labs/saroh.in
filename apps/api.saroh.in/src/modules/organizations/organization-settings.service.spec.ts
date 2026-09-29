@@ -302,6 +302,86 @@ describe("OrganizationSettingsService", () => {
             expect(record).not.toHaveBeenCalled();
         });
 
+        describe("business types (F10)", () => {
+            const withType = (type: string | null) => ({
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                businessProfile: { legalName: null, type },
+            });
+
+            it("saves LLP and records type: individual → llp in Activity", async () => {
+                orgFindUnique
+                    .mockResolvedValueOnce(withType("individual"))
+                    .mockResolvedValue(withType("llp"));
+
+                await service.update(ctx(), { profile: { type: "llp" } });
+
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({ update: { type: "llp" } }),
+                );
+                expect(record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        action: AuditAction.ProfileUpdate,
+                        metadata: {
+                            fields: ["type"],
+                            changes: [
+                                {
+                                    field: "type",
+                                    before: "individual",
+                                    after: "llp",
+                                },
+                            ],
+                        },
+                    }),
+                );
+            });
+
+            it("keeps a private limited company as company this release, whichever spelling is sent", async () => {
+                for (const sent of ["pvt", "company"] as const) {
+                    profileUpsert.mockClear();
+                    await service.update(ctx(), { profile: { type: sent } });
+                    expect(profileUpsert).toHaveBeenCalledWith(
+                        expect.objectContaining({
+                            update: { type: "company" },
+                        }),
+                    );
+                }
+            });
+
+            it("records a company row as pvt, so moving to it from company is no change", async () => {
+                orgFindUnique
+                    .mockResolvedValueOnce(withType("individual"))
+                    .mockResolvedValue(withType("company"));
+
+                await service.update(ctx(), { profile: { type: "pvt" } });
+
+                expect(record.mock.calls[0][0].metadata.changes).toEqual([
+                    { field: "type", before: "individual", after: "pvt" },
+                ]);
+            });
+
+            it("clears the type to Not set with an empty string", async () => {
+                orgFindUnique
+                    .mockResolvedValueOnce(withType("trust"))
+                    .mockResolvedValue(withType(null));
+
+                await service.update(ctx(), { profile: { type: "" } });
+
+                expect(profileUpsert).toHaveBeenCalledWith(
+                    expect.objectContaining({ update: { type: null } }),
+                );
+                expect(record.mock.calls[0][0].metadata.changes).toEqual([
+                    { field: "type", before: "trust", after: null },
+                ]);
+            });
+
+            it("reads a stored company back as it is, for the app to name", async () => {
+                const settings = await service.get(ctx());
+                expect(settings.profile?.type).toBe("company");
+            });
+        });
+
         describe("the public phone (DEC-053, F20)", () => {
             it("stores a typed number as E.164 and audits it by name only", async () => {
                 await service.update(ctx(), {

@@ -60,6 +60,7 @@ export function SiteEditor({
     address,
     initialStyle,
     styleOptions,
+    shopOpen = false,
 }: SiteEditorProps) {
     const review = useEditorReview({
         siteId,
@@ -200,6 +201,7 @@ export function SiteEditor({
                         {...add}
                         flagsBySection={flagsBySection}
                         notedKeys={review.notedKeys}
+                        shopOpen={shopOpen}
                     />
                 }
                 canvas={
@@ -261,6 +263,7 @@ export function SiteEditor({
                 }}
                 variables={resolveStyleVariables(style, styleOptions)}
                 onAdd={(type, variant) => addSection(type, variant)}
+                shopOpen={shopOpen}
             />
 
             {publish.checking ? (

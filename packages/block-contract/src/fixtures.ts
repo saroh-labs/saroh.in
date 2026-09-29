@@ -476,6 +476,73 @@ export const BLOCK_META = {
             },
         },
     },
+    journal: {
+        label: "Journal",
+        description:
+            "The site's latest published posts, newest first, read live from the posts the site owns.",
+        variants: soleVariant(
+            "Cards with a photo, the author and date, the title and an excerpt, linking to each post.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component sample posts.
+            default: { variant: "default", title: "Journal", count: 3 },
+        },
+        cases: {
+            // Two rows, words only: the switches off and the larger count.
+            plain: {
+                variant: "default",
+                title: "From the kitchen",
+                count: 6,
+                showExcerpts: false,
+                showImages: false,
+            },
+        },
+    },
+    plans: {
+        label: "Plans",
+        description:
+            "The business's subscription plans on sale, with price and how often, read live from Payments.",
+        variants: soleVariant(
+            "Cards with how often, the plan's name, its description and price, and a button; the first can be highlighted.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component sample plans.
+            default: { variant: "default", title: "Memberships" },
+        },
+        cases: {
+            // No highlight, no descriptions, the merchant's own button.
+            plain: {
+                variant: "default",
+                title: "Bread every week",
+                highlight: "none",
+                buttonLabel: "Ask to join",
+                showDescriptions: false,
+            },
+        },
+    },
+    productGrid: {
+        label: "Product grid",
+        description:
+            "Products from the catalogue, the newest, a collection's or hand-picked, read live from the storefront the site sells from.",
+        variants: soleVariant(
+            "Cards with a photo, the options it comes in, the name, a line about it and the price, each opening its product page.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component sample products.
+            default: { variant: "default", title: "From the counter" },
+        },
+        cases: {
+            // Hand-picked, two of them, no prices.
+            picked: {
+                variant: "default",
+                title: "Our favourites",
+                source: "picked",
+                productIds: ["sample-sourdough", "sample-croissant"],
+                count: 2,
+                showPrices: false,
+            },
+        },
+    },
 } satisfies { [K in SectionType]: BlockMeta<K> };
 
 /** Every block's catalog entry, for a picker or the catalog index. */

@@ -11,13 +11,16 @@ import { currencySymbol } from "@/lib/format/money";
 import type { ServiceDraft } from "@/lib/services/service-editor";
 import {
     bookingPageNote,
+    draftVisits,
     staffNote,
     timeNote,
+    wholeNumber,
 } from "@/lib/services/service-editor";
 import type { StaffView } from "@/lib/staff/types";
 
 import { DepositField } from "./deposit-field";
 import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
+import { VisitsField, VisitsStorefrontNote } from "./visits-field";
 import { WhereField } from "./where-field";
 
 /*
@@ -97,7 +100,12 @@ export function TimeSection({
     draft,
     set,
     hasStaff,
-}: Edit & { hasStaff: boolean }) {
+    noStorefront,
+}: Edit & {
+    hasStaff: boolean;
+    /** A treatment can't be sold: no storefront to sell it from (E10). */
+    noStorefront: boolean;
+}) {
     return (
         <Section title="Time">
             <div className="flex flex-wrap gap-3">
@@ -113,7 +121,12 @@ export function TimeSection({
                     onChange={(gap) => set({ gap })}
                     width="w-[120px]"
                 />
-                {/* E10's visits field goes here, for one-to-one. */}
+                {draft.kind === "one" ? (
+                    <VisitsField
+                        value={draft.visits}
+                        onChange={(visits) => set({ visits })}
+                    />
+                ) : null}
                 {draft.kind === "class" ? (
                     <NumberField
                         label="Places"
@@ -123,7 +136,17 @@ export function TimeSection({
                     />
                 ) : null}
             </div>
-            <p className={HELP}>{timeNote(draft.kind, hasStaff)}</p>
+            <p className={HELP}>
+                {timeNote(
+                    draft.kind,
+                    hasStaff,
+                    draftVisits(draft),
+                    wholeNumber(draft.minutes),
+                )}
+            </p>
+            {noStorefront && draftVisits(draft) > 1 ? (
+                <VisitsStorefrontNote />
+            ) : null}
             <WhereField
                 where={draft.where}
                 meetingUrl={draft.meetingUrl}
@@ -155,6 +178,7 @@ export function PriceSection({
                 deposit={draft.deposit}
                 price={draft.price}
                 currency={currency}
+                visits={draftVisits(draft)}
                 onChange={(deposit) => set({ deposit })}
             />
         </Section>

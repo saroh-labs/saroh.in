@@ -1,3 +1,4 @@
+import { ALERT_CHANNELS, ALERTS } from "@/lib/notifications/preferences";
 import { productHref } from "@/lib/products/links";
 import { storefrontHref } from "@/lib/stores/links";
 
@@ -12,6 +13,13 @@ import {
     recordedChanges,
     text,
 } from "./activity-changes";
+import {
+    customerPlace,
+    detailsWhat,
+    mergedWhat,
+    removedWhat,
+} from "./activity-customers";
+import { extrasWhat } from "./activity-extras";
 import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
 
 /**
@@ -37,6 +45,10 @@ import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
  * Track stock turned on or off (#515), for a product or the business, says
  * what it did in the same voice: "turned Track stock off for Plum jam — 38
  * set to 0", "turned Track stock on for Plum jam with its first count".
+ *
+ * A customer record merged or its details changed by staff (C10) is told
+ * without the customer's name, which the stream never holds (DEC-035), and
+ * links to them: `activity-customers.ts`.
  */
 
 /**
@@ -49,12 +61,15 @@ export const ACTIVITY_ACTIONS = [
     "profile.update",
     "storefront.hours.update",
     "storefront.fulfilment.update",
+    "storefront.same-email.update",
     "organization.module.enabled",
     "organization.module.disabled",
     "organization.plan.changed",
     "membership.invite",
     "membership.accept",
+    "membership.storefront-join",
     "membership.role.update",
+    "membership.extras.update",
     "membership.remove",
     "product.sold-out.mark",
     "product.sold-out.clear",
@@ -62,6 +77,10 @@ export const ACTIVITY_ACTIONS = [
     "product.stock-tracking.off",
     "business.stock-tracking.on",
     "business.stock-tracking.off",
+    "customer.merged",
+    "customer.details.changed",
+    "customer.removed",
+    "member.alerts.update",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -148,6 +167,26 @@ function productPlace(
     };
 }
 
+/**
+ * One of a person's own alerts turned on or off (F14), as the rest of a
+ * sentence: "turned email on for New order, for themselves". An alert or
+ * channel this page doesn't know is said generally, never as a raw key.
+ */
+function alertWhat(meta: Record<string, unknown>): string {
+    const alert = ALERTS.find((a) => a.key === meta.alert)?.label;
+    const channel = ALERT_CHANNELS.find((c) => c === meta.channel);
+    const after = recordedChanges(meta)?.find(
+        (c) => c.field === "alertOn",
+    )?.after;
+    if (!alert || !channel || typeof after !== "boolean") {
+        return "changed their own alerts";
+    }
+    const how = { bell: "the bell", email: "email", whatsapp: "WhatsApp" }[
+        channel
+    ];
+    return `turned ${how} ${after ? "on" : "off"} for ${alert}, for themselves`;
+}
+
 export function personName(person: AuditPerson | null): string | null {
     if (!person) return null;
     // A blank name is no name: say the email instead.
@@ -205,6 +244,12 @@ export function activityLine(
         }
         case "storefront.hours.update":
             return line("changed the opening hours", business("hours"));
+        case "member.alerts.update":
+            // One of their own alerts (F14): "turned email on for New order".
+            return line(alertWhat(meta), {
+                label: "Alerts",
+                href: "/settings/profile",
+            });
         case "storefront.fulfilment.update": {
             // How orders leave, or when they count as late (B17).
             const where = text(meta.storefront);
@@ -218,6 +263,23 @@ export function activityLine(
                     href: STOREFRONTS_HREF(event.targetId),
                 },
             );
+        }
+        case "storefront.same-email.update": {
+            // Customers who share an email linked on their own, or not (C15).
+            const where = text(meta.storefront);
+            const after = recordedChanges(meta)?.find(
+                (c) => c.field === "linkSameEmailCustomers",
+            )?.after;
+            const what =
+                after === true
+                    ? "turned on linking customers who share an email"
+                    : after === false
+                      ? "turned off linking customers who share an email"
+                      : "changed how customers who share an email are linked";
+            return line(`${what}${where ? ` at ${where}` : ""}`, {
+                label: "Storefronts",
+                href: STOREFRONTS_HREF(event.targetId),
+            });
         }
         case "organization.module.enabled":
             return line(
@@ -248,6 +310,19 @@ export function activityLine(
             const as = role(meta.role);
             return line(`joined the team${as ? ` as ${as}` : ""}`, TEAM());
         }
+        case "membership.storefront-join": {
+            // Someone on a storefront put on the team (F16, DEC-048): by
+            // accepting a storefront invite, or by the one-off backfill.
+            const as = role(meta.role);
+            const from = text(meta.storefront);
+            const tail = `${as ? ` as ${as}` : ""}${from ? `, from ${from}` : ""}`;
+            return line(
+                meta.source === "backfill"
+                    ? `was added to the team${tail}`
+                    : `joined the team${tail}`,
+                TEAM(),
+            );
+        }
         case "membership.role.update": {
             const from = role(meta.from);
             const to = role(meta.to);
@@ -258,6 +333,9 @@ export function activityLine(
             if (to) return line(`made ${whom} ${to}`, TEAM());
             return line(`changed ${whom}'s role`, TEAM());
         }
+        case "membership.extras.update":
+            // A person's extra permissions (F17), in the owner's words.
+            return line(extrasWhat(target ?? "someone", meta), TEAM());
         case "membership.remove":
             return line(`removed ${target ?? "someone"} from the team`, TEAM());
         case "product.sold-out.mark":
@@ -293,6 +371,13 @@ export function activityLine(
                 PRODUCTS,
             );
         }
+        case "customer.merged":
+            return line(mergedWhat(meta), customerPlace(event.targetId));
+        case "customer.details.changed":
+            return line(detailsWhat(meta), customerPlace(event.targetId));
+        // Their page is gone (C11): the line leads to the list.
+        case "customer.removed":
+            return line(removedWhat(meta), customerPlace(null));
         default:
             return null;
     }

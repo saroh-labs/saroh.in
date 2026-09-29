@@ -85,9 +85,13 @@ export type InvoiceSource = (typeof INVOICE_SOURCES)[number];
  * booking page made, with no number yet, that is either paid within 15
  * minutes (and numbered) or voided when its hold runs out. It is not the
  * business's draft to edit, and an abandoned one is not paper at all.
+ *
+ * A pack a customer is buying online (A11) is the same: a source PACK draft
+ * with no number, paid (and numbered) or voided after 24 hours. A pack the
+ * desk sells is issued there and then, so it always has a number.
  */
 export const NOT_A_BOOKING_HOLD = {
-    NOT: { source: "BOOKING", number: null },
+    NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
 } satisfies Prisma.InvoiceWhereInput;
 
 /**

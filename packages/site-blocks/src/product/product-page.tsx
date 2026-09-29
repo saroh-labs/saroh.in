@@ -20,9 +20,10 @@ import { cn } from "../lib/utils";
  *
  * Public mode (`preview={false}`, round-2 G11) is the merchant's live
  * product page: no markers and no staff controls, and where the basket
- * button sits, an `action` slot. The slot is empty until the bag and
- * checkout (G13) fill it with Add to bag or "Ask about ordering"; whatever
- * fills it reads the chosen variant, and whether it is sold out, with
+ * button sits, an `action` slot, which the bag and checkout (G13) fill
+ * with Add to bag, or "Ask about ordering" where the site can't take an
+ * online order. Whatever fills it reads the chosen variant, and whether it
+ * is sold out, with
  * {@link useProductSelection}, so a server page can pass it as a plain node.
  *
  * `markers` draws numbered badges on each area so a panel beside the preview
@@ -144,6 +145,10 @@ export function stockLabel(
 export interface ProductSelection {
     /** The variant picked; null for a product without variants. */
     variantId: string | null;
+    /** Its title ("Large"), for words about it; null without variants. */
+    variantTitle: string | null;
+    /** The product's name. */
+    name: string;
     /** The price shown for it. */
     price: string;
     /** Nothing of it can be sold now: the action is off. */
@@ -542,6 +547,8 @@ export default function ProductPage({
                         <SelectionContext.Provider
                             value={{
                                 variantId: variant?.id ?? null,
+                                variantTitle: variant?.title ?? null,
+                                name: product.name,
                                 price,
                                 soldOut,
                             }}

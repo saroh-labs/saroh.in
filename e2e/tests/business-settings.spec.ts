@@ -147,4 +147,106 @@ test.describe("business settings", () => {
         expect(restored.registeredAddress?.city ?? null).toBeNull();
         expect(restored.registeredAddress?.postalCode ?? null).toBeNull();
     });
+
+    /*
+     * Undo on a save (F12): the toast offers Undo, which saves the previous
+     * prefix back through the same write — so Activity records two changes.
+     * An Undo whose field changed since (another tab) is refused, and the
+     * newer value stands.
+     */
+    test("Undo on a save puts the prefix back, as a change of its own", async ({
+        page,
+    }) => {
+        test.setTimeout(120_000);
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        const was = await readPrefix(page.request);
+        const since = new Date().toISOString();
+
+        try {
+            await savePrefixInUi(page, "UQ");
+            await page
+                .getByRole("button", { name: "Undo" })
+                .click({ timeout: 10_000 });
+            await expect
+                .poll(() => readPrefix(page.request), { timeout: 15_000 })
+                .toBe(was);
+
+            const updates = (await readAudit(page.request)).filter(
+                (e) =>
+                    e.action === "profile.update" &&
+                    e.createdAt >= since &&
+                    JSON.stringify(e.metadata).includes("invoicePrefix"),
+            );
+            expect(updates.length).toBe(2);
+        } finally {
+            await setPrefix(page.request, was);
+        }
+    });
+
+    test("Undo after another tab changed the prefix is refused", async ({
+        page,
+    }) => {
+        test.setTimeout(120_000);
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        const was = await readPrefix(page.request);
+
+        try {
+            await savePrefixInUi(page, "UQ");
+            // Another tab saves over it before Undo is pressed.
+            await setPrefix(page.request, "UZ");
+            await page
+                .getByRole("button", { name: "Undo" })
+                .click({ timeout: 10_000 });
+            await expect(page.getByText("Changed since — reload")).toBeVisible({
+                timeout: 15_000,
+            });
+            expect(await readPrefix(page.request)).toBe("UZ");
+        } finally {
+            await setPrefix(page.request, was);
+        }
+    });
 });
+
+async function readPrefix(request: APIRequestContext): Promise<string> {
+    const res = await request.get(settingsUrl, { headers });
+    expect(res.ok()).toBe(true);
+    const body = (await res.json()) as {
+        tax?: { invoicePrefix: string | null };
+    };
+    return body.tax?.invoicePrefix ?? "";
+}
+
+async function setPrefix(request: APIRequestContext, prefix: string) {
+    const res = await request.patch(`${urls.API_URL}/organizations/${ORG}`, {
+        headers,
+        data: { tax: { invoicePrefix: prefix } },
+    });
+    expect(res.ok()).toBe(true);
+}
+
+async function readAudit(request: APIRequestContext) {
+    const res = await request.get(
+        `${urls.API_URL}/organizations/${ORG}/audit?limit=20&actions=profile.update`,
+        { headers },
+    );
+    expect(res.ok()).toBe(true);
+    const body = (await res.json()) as {
+        events?: { action: string; createdAt: string; metadata: unknown }[];
+    };
+    return body.events ?? [];
+}
+
+/** Tax and invoices → Edit → a new prefix → Save, and wait for the toast. */
+async function savePrefixInUi(page: Page, prefix: string) {
+    await page.goto("/settings/organization");
+    await page.getByRole("tab", { name: "Tax and invoices" }).click();
+    await page.getByRole("button", { name: "Edit tax and invoices" }).click();
+    const card = page.getByRole("region", { name: "Tax and invoices" });
+    await card.getByLabel("Invoice prefix").fill(prefix);
+    await card.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText(/^Tax and invoices saved/)).toBeVisible({
+        timeout: 30_000,
+    });
+}

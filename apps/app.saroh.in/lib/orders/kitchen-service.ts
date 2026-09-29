@@ -4,7 +4,12 @@ import { apiFetch, getJson, mutate, orgBase } from "@/lib/api/http";
 import type { CourierFields } from "./courier";
 import type { DetailAllergyNote } from "./lifecycle";
 import { allergyNotesFrom } from "./lifecycle";
-import type { AllergyNote, KitchenStage, OrderRead } from "./read";
+import type {
+    AllergyNote,
+    FulfilmentType,
+    KitchenStage,
+    OrderRead,
+} from "./read";
 
 /**
  * One order's kitchen flow, scoped by the active organization (ADR-008, U6):
@@ -22,6 +27,30 @@ export async function getOrderRead(orderId: string): Promise<OrderRead | null> {
     const base = await orgBase();
     if (!base) return null;
     return getJson<OrderRead>(`${base}/orders/${encodeURIComponent(orderId)}`);
+}
+
+/**
+ * The order as the Orders list's quick view reads it (B5): Order Detail's
+ * read, with the customer's phone and email left out by the API for a role
+ * that doesn't read contacts (`?view=quick`). Not `getJson`: the quick view
+ * is one panel over the list, so a refusal or a failure is said in the panel
+ * and never takes over the page.
+ */
+export async function readOrderQuickView(
+    orderId: string,
+): Promise<
+    | { ok: true; order: OrderRead }
+    | { ok: false; reason: "gone" | "denied" | "failed" }
+> {
+    const base = await orgBase();
+    if (!base) return { ok: false, reason: "failed" };
+    const res = await apiFetch(
+        `${base}/orders/${encodeURIComponent(orderId)}?view=quick`,
+    );
+    if (res.status === 404) return { ok: false, reason: "gone" };
+    if (res.status === 403) return { ok: false, reason: "denied" };
+    if (!res.ok) return { ok: false, reason: "failed" };
+    return { ok: true, order: (await res.json()) as OrderRead };
 }
 
 /**
@@ -97,10 +126,36 @@ export function saveOrderCourier(
     );
 }
 
+/**
+ * "Mark visit N attended" on a treatment's order (B14, `order:stage`): only
+ * once the visit has started; the last one fulfils the order.
+ */
+export function markOrderVisitAttended(
+    orderId: string,
+    visitNumber: number,
+): Promise<
+    CrmResult<{
+        visitNumber: number;
+        attended: number;
+        visits: number;
+        done: boolean;
+    }>
+> {
+    return mutate(
+        path(
+            orderId,
+            `/visits/${encodeURIComponent(String(visitNumber))}/attended`,
+        ),
+        "POST",
+        {},
+        "The visit wasn't marked. Try again.",
+    );
+}
+
 export function undoOrderStage(
     orderId: string,
     eventId: string,
-): Promise<CrmResult<{ stage: string }>> {
+): Promise<CrmResult<{ stage: string; told?: boolean }>> {
     return mutate(
         path(orderId, "/stage/undo"),
         "POST",
@@ -220,5 +275,69 @@ export function retryOrderRefund(
         "POST",
         {},
         "We couldn't check on the refund. Nothing was sent twice — try again in a minute.",
+    );
+}
+
+export interface ChangeFulfilmentInput {
+    fulfilment: FulfilmentType;
+    /** The delivery charge now, as money ("40.00"). */
+    shipping: string;
+    address?: EditOrderInput["address"];
+    /** Say so in the customer's messages. */
+    tell?: boolean;
+    idempotencyKey?: string;
+}
+
+export interface ChangeFulfilmentOutcome {
+    differenceCents: number;
+    /** Still to take (+), now due, or handed back (-). */
+    settleCents: number;
+    byHand: boolean;
+    refund: { amountCents: number; status: string } | null;
+    moneyError: string | null;
+    told: boolean;
+}
+
+/**
+ * "Change how it's fulfilled…" (B9): the new way and the delivery charge
+ * staff typed; the API works the difference out and charges or refunds it.
+ */
+export function changeOrderFulfilment(
+    orderId: string,
+    input: ChangeFulfilmentInput,
+): Promise<CrmResult<ChangeFulfilmentOutcome>> {
+    return mutate(
+        path(orderId, "/fulfilment"),
+        "POST",
+        input,
+        "How it's fulfilled wasn't changed. Try again.",
+    );
+}
+
+export interface CancelOutcome {
+    cancelled: boolean;
+    refund: {
+        amountCents: number;
+        currency: string;
+        beingConfirmed: boolean;
+        partlyRefused: boolean;
+    } | null;
+    byHand: { amountCents: number; currency: string } | null;
+    told: boolean;
+}
+
+/**
+ * "Cancel order…" (B9): a refund in full, and the order kept as cancelled.
+ * `idempotencyKey` makes a retry find the refund the first one made.
+ */
+export function cancelOrderInFull(
+    orderId: string,
+    input: { reason: string | null; idempotencyKey: string; tell?: boolean },
+): Promise<CrmResult<CancelOutcome>> {
+    return mutate(
+        path(orderId, "/cancel"),
+        "POST",
+        input,
+        "The order wasn't cancelled. Nothing was sent back.",
     );
 }

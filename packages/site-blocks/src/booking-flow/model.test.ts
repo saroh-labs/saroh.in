@@ -5,16 +5,21 @@ import {
     asksWhere,
     buildIcs,
     changeText,
+    creditChoice,
+    creditUsedText,
     dateText,
     dayAria,
     dayCountLabel,
     depositUnpayable,
+    firstVisitText,
     formatMoney,
     groupStarts,
     isBookingDays,
     isBookingPage,
     isBookResult,
+    isCreditAnswer,
     isHoldView,
+    laterVisitsText,
     looksLikeEmail,
     orList,
     payChoices,
@@ -25,6 +30,7 @@ import {
     serviceLine,
     serviceWhere,
     timeIn,
+    visitsOf,
     whereLabel,
     whereText,
 } from "./model";
@@ -411,6 +417,126 @@ describe("paying at booking (E8)", () => {
             isBookingPage({
                 ...page,
                 services: [{ ...service(), depositCents: "300" }],
+            }),
+        ).toBe(false);
+    });
+});
+
+describe("a class credit (A10)", () => {
+    const PACK = {
+        kind: "PACK" as const,
+        id: "pp_1",
+        name: "10 classes",
+        left: 1,
+        useBy: "2026-11-12",
+    };
+    const MEMBER = {
+        kind: "MEMBERSHIP" as const,
+        id: "sub_1",
+        name: "Monthly 8",
+        left: 8,
+        allowance: 8,
+        resetsOn: "2027-01-01",
+    };
+
+    it("reads the credit answer, and refuses a wrong shape", () => {
+        expect(isCreditAnswer({ credit: null })).toBe(true);
+        expect(isCreditAnswer({ credit: PACK })).toBe(true);
+        expect(isCreditAnswer({ credit: MEMBER })).toBe(true);
+        expect(isCreditAnswer({})).toBe(false);
+        expect(isCreditAnswer({ credit: { ...PACK, left: "1" } })).toBe(false);
+        expect(isCreditAnswer({ credit: { ...PACK, useBy: "soon" } })).toBe(
+            false,
+        );
+        expect(isCreditAnswer({ credit: { ...MEMBER, kind: "PLAN" } })).toBe(
+            false,
+        );
+    });
+
+    it("words the pay option: a pack's last day, a membership's reset and Included", () => {
+        expect(creditChoice(PACK, "INR")).toEqual({
+            pay: "CREDIT",
+            label: "Use 1 credit (1 left)",
+            sub: "10 classes pack · use by 12 Nov",
+            amount: "₹0",
+        });
+        expect(creditChoice({ ...PACK, name: "Starter pack" }, "INR").sub).toBe(
+            "Starter pack · use by 12 Nov",
+        );
+        expect(creditChoice(MEMBER, "INR")).toMatchObject({
+            label: "Use 1 credit (8 left)",
+            sub: "Membership · resets 1 Jan",
+            tag: "Included",
+        });
+    });
+
+    it("says what is left once used: never below none, and the class's month", () => {
+        expect(creditUsedText(PACK)).toBe(
+            "Used 1 credit from your 10 classes pack — 0 left, use by 12 Nov.",
+        );
+        expect(creditUsedText(MEMBER)).toBe(
+            "Used 1 credit from your membership — 7 left in December.",
+        );
+    });
+});
+
+describe("visits (E10)", () => {
+    it("reads a service without visits, or with one, as one visit", () => {
+        expect(visitsOf(service())).toBe(1);
+        expect(visitsOf(service({ visits: 1 }))).toBe(1);
+        expect(visitsOf(null)).toBe(1);
+        expect(visitsOf(service({ visits: 3 }))).toBe(3);
+    });
+
+    it("names the visits in the service's line", () => {
+        expect(serviceLine(service({ visits: 3, staff: [] }))).toBe(
+            "3 visits of 60 min · one-to-one",
+        );
+    });
+
+    it("says when the later visits are booked", () => {
+        expect(laterVisitsText(1)).toBeNull();
+        expect(laterVisitsText(2)).toBe(
+            "We'll book visit 2 with you at the first appointment",
+        );
+        expect(laterVisitsText(3)).toBe(
+            "We'll book visits 2 and 3 with you at the first appointment",
+        );
+        expect(laterVisitsText(6)).toBe(
+            "We'll book visits 2 to 6 with you at the first appointment",
+        );
+        expect(firstVisitText(1)).toBeNull();
+        expect(firstVisitText(3)).toBe(
+            "Visit 1 of 3. We'll book the rest with you then",
+        );
+    });
+
+    it("pays for all the visits at once", () => {
+        const choices = payChoices(service({ visits: 3 }), true, "Kavi Dental");
+        expect(choices.map((c) => c.label)).toEqual([
+            "Pay ₹1,200 for all 3 visits now",
+            "Pay at the desk",
+        ]);
+    });
+
+    it("accepts visits in the page's read, and refuses a wrong one", () => {
+        const page = {
+            businessName: "Kavi Dental",
+            open: true,
+            timezone: ZONE,
+            payOnline: true,
+            rules: {
+                bookAheadDays: null,
+                latestBookingMinutes: null,
+                freeCancelHours: null,
+            },
+            services: [service({ visits: 3 })],
+        };
+        expect(isBookingPage(page)).toBe(true);
+        expect(
+            isBookingPage({
+                ...page,
+                services: [{ ...service(), visits: "3" }],
             }),
         ).toBe(false);
     });

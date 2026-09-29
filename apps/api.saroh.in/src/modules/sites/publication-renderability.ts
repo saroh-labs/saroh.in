@@ -8,6 +8,11 @@ export interface UnrenderableSection {
     index: number;
     /** Its block type, as stored; `""` when the snapshot did not name one. */
     type: string;
+    /**
+     * The module page it sits on (G14), when the page is one, so version
+     * history can say "your Book page" where a path alone reads as /book.
+     */
+    kind?: string;
 }
 
 export interface Renderability {
@@ -39,9 +44,10 @@ export function checkRenderability(snapshot: unknown): Renderability {
     const unrenderable: UnrenderableSection[] = [];
     for (const page of pages) {
         if (page === null || typeof page !== "object") continue;
-        const { path, sections } = page as {
+        const { path, sections, kind } = page as {
             path?: unknown;
             sections?: unknown;
+            kind?: unknown;
         };
         if (!Array.isArray(sections)) continue;
 
@@ -56,6 +62,9 @@ export function checkRenderability(snapshot: unknown): Renderability {
                     path: typeof path === "string" ? path : "",
                     index,
                     type,
+                    ...(typeof kind === "string" && kind !== "FREE"
+                        ? { kind }
+                        : {}),
                 });
             }
         });

@@ -37,10 +37,13 @@ export function MoneyCard({
     onRetryRefund,
     busy = false,
     payLink,
+    appointment = false,
 }: {
     money: OrderReadMoney;
     /** It goes to an address (a local delivery or a shipment). */
     delivery: boolean;
+    /** Fulfilled by its visits (B14): no delivery or collection row. */
+    appointment?: boolean;
     paymentStatus: OrderRead["paymentStatus"];
     refundStanding: OrderRead["refundStanding"];
     invoices: OrderRead["invoices"];
@@ -53,13 +56,14 @@ export function MoneyCard({
     payLink?: ReactNode;
 }) {
     const n = (v: string) => Number(v);
-    const rows: [string, string][] = [
-        ["Items", format(n(money.subtotal))],
-        [
+    const rows: [string, string][] = [["Items", format(n(money.subtotal))]];
+    // A treatment is neither delivered nor collected (B14).
+    if (!appointment) {
+        rows.push([
             delivery ? "Delivery" : "Collection",
             n(money.shipping) > 0 ? format(n(money.shipping)) : "Free",
-        ],
-    ];
+        ]);
+    }
     if (n(money.discount) > 0) {
         rows.push([
             money.discountCode
@@ -72,8 +76,11 @@ export function MoneyCard({
     const invoice = invoices?.find((i) => i.kind === "INVOICE") ?? null;
     const corrections = invoices?.filter((i) => i.kind !== "INVOICE") ?? [];
     const taxed = n(money.tax) > 0;
+    // The API names the paper (D15): a registered clinic's exempt
+    // treatment is a "Bill of supply". An older API sends no title.
     const invoiceLabel =
-        invoice?.number?.includes("/") || taxed ? "Tax invoice" : "Receipt";
+        invoice?.title ??
+        (invoice?.number?.includes("/") || taxed ? "Tax invoice" : "Receipt");
 
     const provider =
         payments?.intents.find((i) => i.status === "SUCCEEDED")?.provider ??

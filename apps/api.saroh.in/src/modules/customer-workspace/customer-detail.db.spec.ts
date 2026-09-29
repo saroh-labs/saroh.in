@@ -102,6 +102,19 @@ describe("Customer detail (DB)", () => {
                 paymentStatus: "PAID",
             },
         });
+        // A site checkout never paid: not an order, so not counted.
+        await prisma.order.create({
+            data: {
+                storeId,
+                organizationId: org.id,
+                orderId: `ORD-${tag}-abandoned`,
+                customerId: linkedId,
+                subtotal: "90",
+                total: "90",
+                currency: "INR",
+                placedOnline: true,
+            },
+        });
 
         // Same email, never linked: a possible match and nothing more.
         lookalikeStoreId = (

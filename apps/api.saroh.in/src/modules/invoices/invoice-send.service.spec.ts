@@ -18,6 +18,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             count: jest.fn(),
         },
+        customerThreadMessage: { findFirst: jest.fn(), count: jest.fn() },
         merchantPaymentProvider: { count: jest.fn() },
         customerAccount: { count: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
@@ -98,6 +99,8 @@ beforeEach(() => {
     db.message!.findFirst!.mockResolvedValue(null);
     db.message!.findMany!.mockResolvedValue([]);
     db.message!.count!.mockResolvedValue(0);
+    db.customerThreadMessage!.findFirst!.mockResolvedValue(null);
+    db.customerThreadMessage!.count!.mockResolvedValue(0);
     db.merchantPaymentProvider!.count!.mockResolvedValue(1);
     db.customerAccount!.count!.mockResolvedValue(0);
     db.businessProfile!.findUnique!.mockResolvedValue(null);

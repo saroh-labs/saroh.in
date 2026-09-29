@@ -18,6 +18,8 @@ import { openOrderWhere } from "../orders/open-orders";
 import type { HomeInput, HomeToday, HomeTodayItem } from "./home-model";
 import { holds, personName } from "./home-model";
 import { orderNumber } from "./home-order-rows";
+import type { HomeNarrow } from "./home-staff";
+import { diaryWhere, storeWhere, WHOLE_BUSINESS } from "./home-staff";
 
 /**
  * Home's Today column (round 2, F5): the business's day — its bookings, its
@@ -121,6 +123,8 @@ export interface TodayOrderRow {
         lastName: string | null;
         email: string | null;
     } | null;
+    /** A walk-in's name when there is no customer (B13). */
+    walkInName?: string | null;
     /** Its storefront's late thresholds; absent reads the defaults. */
     store?: { settings: LateThresholdColumns | null } | null;
 }
@@ -245,6 +249,12 @@ const STAGE_WORDS: Record<string, string> = {
  * Minutes after placing a pick-up is due: the Pick-up threshold its
  * storefront sets (B17; DEC-045), the one its Late tag goes by.
  */
+/** A walk-in's name (B13), or null when none was kept. */
+function walkInNameOf(row: TodayOrderRow): string | null {
+    const name = row.walkInName?.trim();
+    return name !== undefined && name.length > 0 ? name : null;
+}
+
 function readyAfter(row: TodayOrderRow): number {
     return lateThresholdsOf(row.store?.settings).PICKUP;
 }
@@ -269,7 +279,7 @@ export function pickUpItems(
             row.createdAt.getTime() + readyAfter(row) * 60_000,
         );
         if (due < day.start || due >= day.end) continue;
-        const who = row.customer ? personName(row.customer) : null;
+        const who = row.customer ? personName(row.customer) : walkInNameOf(row);
         const stage = STAGE_WORDS[row.stage];
         items.push({
             id: row.id,
@@ -333,6 +343,7 @@ async function pickUpRows(
     db: typeof prisma,
     organizationId: string,
     day: { start: Date; end: Date },
+    storeIds: readonly string[] | null,
 ): Promise<TodayOrderRow[]> {
     const longest = await db.storeSettings.aggregate({
         where: { store: { organizationId } },
@@ -347,6 +358,8 @@ async function pickUpRows(
             // Open as the Orders list's Open tab reads it: never refunded,
             // never an abandoned online checkout.
             ...openOrderWhere(organizationId),
+            // A staff member's storefronts only (F11).
+            ...storeWhere(storeIds),
             stage: { in: ["NEW", "PREPARING", "READY"] },
             fulfilment: { in: storedValuesOf(["PICKUP"]) },
             createdAt: {
@@ -367,17 +380,24 @@ async function pickUpRows(
             customer: {
                 select: { firstName: true, lastName: true, email: true },
             },
+            // A walk-in is named by the name they gave (B13).
+            walkInName: true,
             store: { select: { settings: { select: LATE_THRESHOLD_SELECT } } },
         },
     });
 }
 
-/** Read today for one business. Throws on a failed read; Home names it. */
+/**
+ * Read today for one business. Throws on a failed read; Home names it. A
+ * staff member's day (F11) is their own diary and their storefronts'
+ * pick-ups (`narrow`).
+ */
 export async function readToday(
     db: typeof prisma,
     input: HomeInput,
     scope: TodayScope,
     at: { now: Date; zone: string },
+    narrow: HomeNarrow = WHOLE_BUSINESS,
 ): Promise<HomeToday> {
     const day = businessDay(at.now, at.zone);
     const [bookingRows, orderRows] = await Promise.all([
@@ -385,6 +405,7 @@ export async function readToday(
             ? (db.booking.findMany({
                   where: {
                       organizationId: input.organizationId,
+                      ...diaryWhere(narrow.staff),
                       // Standing bookings only: a cancelled one isn't coming,
                       // and an unpaid hold isn't a booking yet.
                       status: "CONFIRMED",
@@ -427,7 +448,7 @@ export async function readToday(
               }) as Promise<TodayBookingRow[]>)
             : Promise.resolve([] as TodayBookingRow[]),
         scope.pickUps
-            ? pickUpRows(db, input.organizationId, day)
+            ? pickUpRows(db, input.organizationId, day, narrow.storeIds)
             : Promise.resolve([] as TodayOrderRow[]),
     ]);
 

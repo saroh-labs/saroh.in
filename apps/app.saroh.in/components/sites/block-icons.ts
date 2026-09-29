@@ -5,12 +5,15 @@ import {
     CircleHelp,
     Clock,
     Images,
+    LayoutGrid,
     LayoutList,
     MailQuestion,
     MapPin,
     MousePointerClick,
+    Newspaper,
     PanelTop,
     Quote,
+    Repeat,
     Sparkles,
 } from "lucide-react";
 
@@ -35,4 +38,7 @@ export const SECTION_ICONS: Record<SectionType, LucideIcon> = {
     contact: MapPin,
     servicesList: LayoutList,
     visitUs: Clock,
+    journal: Newspaper,
+    plans: Repeat,
+    productGrid: LayoutGrid,
 };

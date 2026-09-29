@@ -1,9 +1,23 @@
 import { toMoneyString } from "../../common/money";
+import { contactEmailForDisplay } from "../contacts/contact-email";
+import {
+    isRemovedStoreCustomer,
+    REMOVED_CUSTOMER_NAME,
+} from "../customers/anonymise-customer";
+import type { InvoiceTitle } from "../invoices/invoice-title";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import type { OrderAttention } from "./order-attention";
+import type { ChangeOptions } from "./order-change-types";
+import type { RawOrderInvoice } from "./order-invoice-title";
+import { orderInvoiceTitle } from "./order-invoice-title";
+import type { OrderLineKind } from "./order-line";
+import { isServiceLine, lineKind, lineName } from "./order-line";
 import { refundStanding } from "./order-refunds";
 import type { OrderFulfilment, OrderStage } from "./order-stage";
 import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
+import type { OrderVisitsDto } from "./order-visits";
+import { walkInOf } from "./walk-in";
 
 /**
  * The one read of an order that Order Detail renders (ADR-008, U6, U14): the
@@ -14,6 +28,12 @@ import { canEditItems, nextStages, UNDO_WINDOW_MS } from "./order-stage";
  * (ADR-008, "No money figures without a money read"). A Member at the
  * counter holds `order:stage` and no money read, so `money` is null, lines
  * carry no price, and timeline steps carry no amount.
+ *
+ * The customer's own phone and email go only to a caller holding
+ * `contact:read` (review #19), on this read, the list's rows and the quick
+ * view alike: a Member holding `contact:read` sees both. The delivery
+ * address's phone is the order's, not the customer's record: whoever works
+ * the order sees it, since a local delivery can't go out without it.
  */
 
 interface DecimalLike {
@@ -46,7 +66,13 @@ export interface AllergenRef {
 
 export interface OrderLineDto {
     id: string;
-    productId: string;
+    /** Null on a service line (E9): it bills `serviceId` instead. */
+    productId: string | null;
+    /** The service a treatment's line bills (E9, DEC-050); null otherwise. */
+    serviceId: string | null;
+    /** What the line bills, so the screen doesn't branch on ids. */
+    kind: OrderLineKind;
+    /** The product's name, or the service's. */
     name: string | null;
     variantTitle: string | null;
     /** The variant's SKU, where the line names a variant. */
@@ -122,6 +148,8 @@ export interface OrderReadDto extends FulfilmentView, LateView {
     id: string;
     orderId: string;
     placedAt: Date;
+    /** Placed by the customer at the site's checkout (G13). */
+    placedOnline: boolean;
     updatedAt: Date;
     store: { id: string; name: string };
     status: string;
@@ -132,8 +160,9 @@ export interface OrderReadDto extends FulfilmentView, LateView {
     customer: {
         id: string;
         name: string | null;
+        /** Their own phone: null without `contact:read` (review #19). */
         phone: string | null;
-        /** Only with `order:read` — the kitchen needs a name, not an inbox. */
+        /** Only with `contact:read` (review #19). */
         email?: string;
         /**
          * The contact this store customer is confirmed as (a
@@ -147,6 +176,12 @@ export interface OrderReadDto extends FulfilmentView, LateView {
         /** When their first order was placed. */
         firstOrderAt: Date | null;
     } | null;
+    /**
+     * A walk-in (B13): someone served at the counter with no customer
+     * record, so `customer` is null. Their phone, like a customer's own,
+     * only with `contact:read`. Null on every order with a customer.
+     */
+    walkIn: { name: string; phone: string | null } | null;
     /** Null when no address was ever given. */
     deliveryAddress: DeliveryAddressDto | null;
     notes: string | null;
@@ -172,7 +207,7 @@ export interface OrderReadDto extends FulfilmentView, LateView {
         undo: { eventId: string; until: Date } | null;
         /** Items, address and fulfilment can still change. */
         editable: boolean;
-    };
+    } & Partial<ChangeOptions>;
     /** Null for a role without a money read. */
     money: OrderMoneyDto | null;
     /**
@@ -181,6 +216,19 @@ export interface OrderReadDto extends FulfilmentView, LateView {
      * `invoice:read` — invoice ids and numbers go only to it.
      */
     invoices: OrderInvoiceDto[] | null;
+    /**
+     * The customer's Needs attention this caller may see (B15): sensitive
+     * entries only to a caller who may read them, the rest to whoever reads
+     * the order, the kitchen included. Null when it couldn't be read, so
+     * the screen says so rather than showing nothing.
+     */
+    attention?: OrderAttention | null;
+    /**
+     * A treatment's visits (B14, E9): the Visits card and what the header
+     * offers next. Absent on an order that isn't one; null when they
+     * couldn't be read, so the card says so.
+     */
+    visits?: OrderVisitsDto | null;
 }
 
 export interface OrderInvoiceDto {
@@ -189,12 +237,18 @@ export interface OrderInvoiceDto {
     /** INVOICE | CREDIT_NOTE | SUPPLEMENTARY */
     kind: string;
     status: string;
+    /**
+     * What the paper is called (D15, `invoice-title.ts`): a registered
+     * business's paper whose every line is exempt is a "Bill of supply".
+     */
+    title: InvoiceTitle;
 }
 
 export interface RawOrderRead {
     id: string;
     orderId: string;
     createdAt: Date;
+    placedOnline?: boolean;
     updatedAt: Date;
     status: string;
     paymentStatus: string;
@@ -211,6 +265,8 @@ export interface RawOrderRead {
     courierName: string | null;
     trackingNumber: string | null;
     payLinkCreatedAt?: Date | null;
+    walkInName?: string | null;
+    walkInPhone?: string | null;
     deliveryName: string | null;
     deliveryPhone: string | null;
     deliveryLine1: string | null;
@@ -219,7 +275,7 @@ export interface RawOrderRead {
     deliveryState: string | null;
     deliveryPostalCode: string | null;
     store: { id: string; name: string };
-    invoices?: OrderInvoiceDto[];
+    invoices?: RawOrderInvoice[];
     customer: {
         id: string;
         email: string;
@@ -232,7 +288,9 @@ export interface RawOrderRead {
     } | null;
     items: {
         id: string;
-        productId: string;
+        productId: string | null;
+        serviceId?: string | null;
+        service?: { name: string } | null;
         quantity: number;
         price: DecimalLike;
         product: {
@@ -272,6 +330,11 @@ export interface RawOrderRead {
         undoesEventId: string | null;
         createdAt: Date;
     }[];
+    /**
+     * Paid, with part of it recorded by hand: a treatment's balance taken at
+     * the clinic after its deposit online (E9, `treatment-ledger.ts`).
+     */
+    balanceByHand?: boolean;
     /** SUCCEEDED payments only, with their non-failed refunds. */
     paymentIntents: {
         amountCents: number;
@@ -293,10 +356,20 @@ export interface RawOrderRead {
 }
 
 export interface ReadOptions {
-    /** The caller holds a money read (`payment:read`). */
+    /** The caller holds a money read (`order:read` or `payment:read`). */
     money: boolean;
-    /** The caller holds `order:read` (customer email). */
+    /** The caller holds `order:read` (the pay link's date). */
     fullRead: boolean;
+    /**
+     * The caller holds `contact:read`: the customer's own phone and email
+     * (review #19). Never the delivery phone, which the order needs.
+     */
+    contact: boolean;
+    /**
+     * The customer's Needs attention as the caller may see it (B15); null
+     * when it couldn't be read. Absent, the read carries none.
+     */
+    attention?: OrderAttention | null;
     /** The caller holds `invoice:read` (the order's paper). */
     invoiceRead?: boolean;
     /** Names for the people on the timeline. */
@@ -379,17 +452,23 @@ export function serializeOrderRead(
         postalCode: order.deliveryPostalCode,
     };
     const hasAddress = Object.values(address).some((v) => v !== null);
-    const name = order.customer
-        ? [order.customer.firstName, order.customer.lastName]
-              .filter(Boolean)
-              .join(" ")
-              .trim()
-        : "";
+    // Their details were removed for a privacy request (C11).
+    const removed = isRemovedStoreCustomer(order.customer);
+    const shownEmail = contactEmailForDisplay(order.customer?.email);
+    const name = removed
+        ? REMOVED_CUSTOMER_NAME
+        : order.customer
+          ? [order.customer.firstName, order.customer.lastName]
+                .filter(Boolean)
+                .join(" ")
+                .trim()
+          : "";
 
     return {
         id: order.id,
         orderId: order.orderId,
         placedAt: order.createdAt,
+        placedOnline: order.placedOnline ?? false,
         updatedAt: order.updatedAt,
         // Only who it is: the settings row the late rule read stays here.
         store: { id: order.store.id, name: order.store.name },
@@ -421,14 +500,22 @@ export function serializeOrderRead(
             ? {
                   id: order.customer.id,
                   name: name || null,
-                  phone: order.customer.phone,
-                  ...(opts.fullRead ? { email: order.customer.email } : {}),
+                  phone: opts.contact ? order.customer.phone : null,
+                  // Never a placeholder: a walk-in kept by their phone
+                  // (B13b) has no email to show.
+                  ...(opts.contact && !removed && shownEmail
+                      ? { email: shownEmail }
+                      : {}),
                   contactId:
                       order.customer.identityLinks?.[0]?.contactId ?? null,
                   orderCount: order.customer._count?.orders ?? 1,
                   firstOrderAt: order.customer.orders?.[0]?.createdAt ?? null,
               }
             : null,
+        walkIn: walkInOf(
+            { ...order, customerId: order.customer?.id ?? null },
+            opts.contact,
+        ),
         deliveryAddress: hasAddress ? address : null,
         notes: order.notes,
         trackingUrl: order.trackingUrl,
@@ -440,7 +527,9 @@ export function serializeOrderRead(
         items: order.items.map((i) => ({
             id: i.id,
             productId: i.productId,
-            name: i.product?.name ?? null,
+            serviceId: i.serviceId ?? null,
+            kind: lineKind(i),
+            name: lineName(i),
             variantTitle: i.variant?.title ?? null,
             sku: i.variant?.sku ?? null,
             imageUrl:
@@ -492,13 +581,24 @@ export function serializeOrderRead(
                 fulfilment: order.fulfilment as OrderFulfilment,
             }),
             undo: undoableStep(order.events, opts.now),
-            editable: canEditItems({
-                stage,
-                status: order.status,
-                paymentStatus: order.paymentStatus,
-            }),
+            // A treatment's order changes through its visits (E9).
+            editable:
+                canEditItems({
+                    stage,
+                    status: order.status,
+                    paymentStatus: order.paymentStatus,
+                }) && !order.items.some(isServiceLine),
         },
-        invoices: opts.invoiceRead ? (order.invoices ?? []) : null,
+        // Only who each document is: a read may load more of them.
+        invoices: opts.invoiceRead
+            ? (order.invoices ?? []).map((i) => ({
+                  id: i.id,
+                  number: i.number,
+                  kind: i.kind,
+                  status: i.status,
+                  title: orderInvoiceTitle(i, opts.now),
+              }))
+            : null,
         money: opts.money
             ? {
                   currency: order.currency,
@@ -507,9 +607,10 @@ export function serializeOrderRead(
                   shipping: toMoneyString(order.shipping),
                   discount: toMoneyString(order.discount),
                   total: toMoneyString(order.total),
-                  paid: byHand
-                      ? toMoneyString(order.total)
-                      : money(capturedCents),
+                  paid:
+                      byHand || order.balanceByHand
+                          ? toMoneyString(order.total)
+                          : money(capturedCents),
                   refunded: money(refundedCents),
                   due: byHand
                       ? "0.00"
@@ -534,6 +635,7 @@ export function serializeOrderRead(
                       : null,
               }
             : null,
+        ...(opts.attention === undefined ? {} : { attention: opts.attention }),
     };
 }
 
@@ -552,10 +654,16 @@ export function amountDueCents(
             amountCents: number;
             refunds: { amountCents: number; forEdit?: boolean }[];
         }[];
+        /** A treatment's balance recorded by hand (E9): nothing is due. */
+        balanceByHand?: boolean;
     },
     capturedCents?: number,
 ): number {
-    if (order.status === "CANCELLED" || order.paymentStatus === "REFUNDED") {
+    if (
+        order.status === "CANCELLED" ||
+        order.paymentStatus === "REFUNDED" ||
+        order.balanceByHand
+    ) {
         return 0;
     }
     const captured =

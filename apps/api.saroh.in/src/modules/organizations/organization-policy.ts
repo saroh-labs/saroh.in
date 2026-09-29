@@ -97,14 +97,19 @@ const READ_ONLY_ACTIONS: readonly OrgAction[] = [
     // pipeline or anything to do with money.
     "booking:read",
     "service:read",
+    // Phone and email are part of the person (matrix §3): no separate key.
+    // Sensitive Needs attention is `customer:sensitive`, never on the floor.
     "contact:read",
 ];
 
 /**
  * What a MEMBER holds beyond the read-only floor (DEC-024, amends DEC-020):
  * the kitchen. Someone at the counter reads an order's kitchen view — items,
- * stage, notes, who it is for, never money — and moves its stage. Refunds and
- * edits stay `payment:manage` / `order:write`, which a Member does not hold.
+ * stage, notes, who it is for, never money — and moves its stage. Taking,
+ * changing, refunding and exporting orders are `order:create`, `order:edit`,
+ * `order:refund` and `order:export` (B16), which a Member does not hold; nor
+ * does a Member hold `booking:write`, `pack:read` or `pack:sell` (E26). The
+ * Member default bundle is F18's to change (matrix Q1).
  *
  * Kept apart from the floor because it is a write: the floor is what every
  * reading role shares, and this is one narrow thing a Member may DO.
@@ -196,8 +201,8 @@ export function allows(ctx: OrganizationContext, action: OrgAction): boolean {
  *
  * The reach rule (DEC-039, F19): nobody grants a power they don't hold, and
  * nobody changes a role or a person that can do more than they can. Members
- * (who can be put in which role), roles (what a role may be given) and, next,
- * a person's extra permissions all ask this one question, so the answer can
+ * (who can be put in which role), roles (what a role may be given) and a
+ * person's extra permissions (F17) all ask this one question, so the answer can
  * never differ between them.
  *
  * Implied holds count, because `allows` reads the actor's resolved set: an
@@ -236,27 +241,148 @@ export function withinReach(
  *    outlives the role it names (the key is deliberately not a foreign key),
  *    so a renamed or deleted role leaves someone seeing LESS than they
  *    expected rather than locked out of a business they belong to.
+ *
+ * `extras` are the person's own extra permissions (F17, DEC-039; matrix §5):
+ * the role's set and the extras, united, filtered to actions that exist and
+ * may be given as an extra (`extraActionsFor`), then `withImplied`. An extra
+ * only ever adds; taking a power away is a role change. With no extras the
+ * answer is exactly the role's, so nobody without one resolves differently.
  */
 export function resolveCapabilities(
     roleKey: string,
     stored?: readonly string[] | null,
+    extras?: readonly string[] | null,
+): ReadonlySet<OrgAction> {
+    const role = roleCapabilities(roleKey, stored);
+    const own = extraActionsFor(roleKey, extras);
+    if (own.length === 0) return role;
+    return withImplied(new Set<OrgAction>([...role, ...own]));
+}
+
+/** What the role alone grants: cases 1–3 above. */
+function roleCapabilities(
+    roleKey: string,
+    stored?: readonly string[] | null,
 ): ReadonlySet<OrgAction> {
     if (stored) {
-        const known = new Set<string>(ORG_ACTIONS);
-        return withImplied(
-            new Set(stored.filter((a): a is OrgAction => known.has(a))),
-        );
+        return withImplied(new Set(stored.filter(isKnownAction)));
     }
     return isBuiltInRole(roleKey) ? CAPABILITIES[roleKey] : CAPABILITIES.MEMBER;
 }
+
+const KNOWN_ACTIONS: ReadonlySet<string> = new Set(ORG_ACTIONS);
+
+function isKnownAction(action: string): action is OrgAction {
+    return KNOWN_ACTIONS.has(action);
+}
+
+/**
+ * Never an extra, for anyone: the powers only the built-in Owner holds
+ * (`ownerOnly` in the catalogue — closing the business). Written here as
+ * well as there because the policy must not trust a stored list to have
+ * been vetted by the write path; `capability-catalogue.spec.ts` keeps the
+ * two in step.
+ */
+const NEVER_EXTRA: ReadonlySet<OrgAction> = new Set<OrgAction>(["org:delete"]);
+
+/**
+ * What a Reviewer may hold as an extra: the website review powers and
+ * nothing more (DEC-006). A Reviewer is an outside pair of eyes on one site;
+ * an extra must not turn them into staff. These are the three the role
+ * already holds, so in practice a Reviewer has no extra to be given — the
+ * list exists so a stored row can never widen one.
+ */
+export const REVIEWER_EXTRA_ACTIONS: readonly OrgAction[] = [
+    "site:read",
+    "site:comment",
+    "site:approve",
+];
+
+/**
+ * The extras a person with this role may hold: the stored list filtered to
+ * actions that exist, never an owner-only one, and for a Reviewer only the
+ * website review powers. Unknown strings are dropped, as role lists are.
+ */
+export function extraActionsFor(
+    roleKey: string,
+    extras?: readonly string[] | null,
+): OrgAction[] {
+    if (!extras || extras.length === 0) return [];
+    const reviewer = roleKey === "REVIEWER";
+    return [
+        ...new Set(
+            extras
+                .filter(isKnownAction)
+                .filter((a) => !NEVER_EXTRA.has(a))
+                .filter((a) => !reviewer || REVIEWER_EXTRA_ACTIONS.includes(a)),
+        ),
+    ];
+}
+
+/** Whether an action can ever be given to one person as an extra. */
+export function isNeverExtra(action: OrgAction): boolean {
+    return NEVER_EXTRA.has(action);
+}
+
+/**
+ * What `order:write` was split into (DEC-039, B16): a role saved with the old
+ * umbrella keeps taking, changing and exporting orders.
+ */
+const ORDER_WRITE_PARTS: readonly OrgAction[] = [
+    "order:create",
+    "order:edit",
+    "order:export",
+];
+
+/** The order powers that each show the whole order they act on. */
+const ORDER_POWERS: readonly OrgAction[] = [
+    "order:create",
+    "order:edit",
+    "order:refund",
+    "order:export",
+];
 
 /**
  * Powers a role holds because it holds a wider one. `store:write` has always
  * covered setting stock, so a role saved before `inventory:write` existed
  * (#513) — or saved without it since — keeps counting.
+ *
+ * The order split (B16, matrix §2): `order:write` → `order:create`,
+ * `order:edit` and `order:export`; `payment:manage` → `order:refund`, since
+ * refunds were always its; and each of the four → `order:read`, because a
+ * power over an order shows the whole order (matrix §1 rule 2). Applied in
+ * that order, so `order:write` and `payment:manage` reach `order:read`
+ * through their parts. `order:stage` does not imply `order:read` until F18.
+ *
+ * Customers (C13, matrix §2): `contact:write` → `contact:read`, since editing
+ * a person means seeing them. Nothing implies `customer:sensitive`,
+ * `customer:merge` or `customer:remove`: each is granted on its own.
+ *
+ * Bookings and class packs (E26, matrix §2): `booking:write` →
+ * `booking:read` and `service:write` → `service:read`, since changing the
+ * diary or a service means seeing it. `pack:write` → `pack:sell`, since
+ * selling a pack was always its, and `pack:sell` → `pack:read`, since a
+ * sale shows the pack it sells; applied in that order, so `pack:write`
+ * reaches `pack:read` through `pack:sell`.
+ *
+ * A person's extras (F17) go through the same rules: `resolveCapabilities`
+ * unites the role's set with the extras and runs this over the union, so a
+ * Member given `order:refund` also reads the order it refunds, and one given
+ * `pack:write` sells and sees packs. No line here changed for F17; built-in
+ * roles with no extras still skip it and resolve to the shipped map.
  */
 function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("store:write")) set.add("inventory:write");
+    if (set.has("contact:write")) set.add("contact:read");
+    if (set.has("booking:write")) set.add("booking:read");
+    if (set.has("service:write")) set.add("service:read");
+    if (set.has("pack:write")) set.add("pack:sell");
+    if (set.has("pack:sell")) set.add("pack:read");
+    if (set.has("order:write")) {
+        for (const part of ORDER_WRITE_PARTS) set.add(part);
+    }
+    if (set.has("payment:manage")) set.add("order:refund");
+    if (ORDER_POWERS.some((power) => set.has(power))) set.add("order:read");
     return set;
 }
 

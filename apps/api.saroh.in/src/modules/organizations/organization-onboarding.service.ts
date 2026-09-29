@@ -14,6 +14,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { addressProblem, addressTaken } from "../sites/site-address";
+import { businessTypeWrite } from "./business-type";
 import type { OnboardOrganizationDto } from "./dto";
 import { slugify } from "./slug";
 
@@ -178,7 +179,7 @@ export class OrganizationOnboardingService {
 
         const data = {
             legalName: profile.legalName,
-            type: profile.type,
+            type: businessTypeWrite(profile.type) ?? undefined,
             country: profile.country,
             taxId: profile.taxId,
             contactEmail: profile.contactEmail,

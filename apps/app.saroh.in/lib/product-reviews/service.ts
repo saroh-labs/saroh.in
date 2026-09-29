@@ -68,6 +68,26 @@ export async function listReviews(
     return (await getJson<Review[]>(`${base}/product-reviews${qs}`)) ?? [];
 }
 
+/**
+ * One customer's reviews, newest first (C6, Customer Detail's Reviews tab):
+ * the reviews of the store customers linked to them. Null when there is
+ * nothing this viewer may be shown — the role can't read reviews, the
+ * business doesn't sell, or the customer is gone — so the tab stays away.
+ * Any other failure throws, for the page to say so.
+ */
+export async function contactReviews(
+    contactId: string,
+): Promise<Review[] | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const res = await apiFetch(
+        `${base}/product-reviews?contactId=${encodeURIComponent(contactId)}`,
+    );
+    if (res.status === 403 || res.status === 404) return null;
+    if (!res.ok) throw new Error(`GET contact reviews failed: ${res.status}`);
+    return (await res.json()) as Review[];
+}
+
 export async function reviewSummary(): Promise<ProductRating[]> {
     const base = await orgBase();
     if (!base) return [];

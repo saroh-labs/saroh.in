@@ -13,9 +13,15 @@ import {
     pickKind,
     picksAllergen,
     rowTags,
+    setAsideText,
+    SUGGESTION_KINDS,
+    suggestionDraft,
+    suggestionsTitle,
+    suggestionWhen,
     tagText,
     tagTitle,
     toInput,
+    toSuggestionInput,
 } from "./attention";
 
 const TZ = "Asia/Kolkata";
@@ -68,7 +74,7 @@ describe("tags", () => {
             "Blood thinners · from the booking page",
         );
         expect(tagTitle(entry({ source: "CUSTOMER" }))).toBe(
-            "Takes warfarin. Check before any extraction · from the customer",
+            "Takes warfarin. Check before any extraction · from their account",
         );
     });
 });
@@ -153,7 +159,7 @@ describe("who added it", () => {
             ),
         ).toMatch(/^From the booking page · /);
         expect(entryMeta(entry({ source: "CUSTOMER" }), null, TZ, NOW)).toMatch(
-            /^From the customer · /,
+            /^From their account · /,
         );
     });
 
@@ -174,6 +180,14 @@ describe("the editor", () => {
         const d = emptyDraft();
         expect(d.kind).toBe("MEDICAL");
         expect(d.sensitive).toBe(true);
+    });
+
+    it("never starts or turns sensitive for a role without customer:sensitive (C13)", () => {
+        const d = emptyDraft(false);
+        expect(d.kind).toBe("MEDICAL");
+        expect(d.sensitive).toBe(false);
+        const access = pickKind(d, "ACCESS", false);
+        expect(pickKind(access, "MEDICAL", false).sensitive).toBe(false);
     });
 
     it("turns sensitive off for Access and on again for Medical", () => {
@@ -339,5 +353,122 @@ describe("the editor", () => {
         expect(fieldOf("detail")).toBe("detail");
         expect(fieldOf("kind")).toBeNull();
         expect(fieldOf(undefined)).toBeNull();
+    });
+});
+
+describe("booking-page notes (C12)", () => {
+    const rahul = entry({
+        label: "I take amlodipine 5mg for blood pressure",
+        detail: "I take amlodipine 5mg for blood pressure. Please check before the numbing.",
+        source: "BOOKING_PAGE",
+        status: "SUGGESTED",
+        bookingId: "bk_1",
+        createdByUserId: null,
+        addedBy: null,
+        createdAt: "2026-09-18T05:12:00Z",
+    });
+
+    it("starts from the suggested label, Medical and sensitive", () => {
+        const draft = suggestionDraft(rahul, []);
+        expect(draft).toMatchObject({
+            kind: "MEDICAL",
+            label: "I take amlodipine 5mg for blood pressure",
+            sensitive: true,
+            sensitiveSet: false,
+        });
+        // The design's card holds 40 characters.
+        expect(
+            suggestionDraft(entry({ label: "x".repeat(60) }), []).label,
+        ).toHaveLength(40);
+    });
+
+    it("offers Medical, Allergy and Access; sensitive follows Medical until ticked", () => {
+        expect(SUGGESTION_KINDS).toEqual(["MEDICAL", "ALLERGY", "ACCESS"]);
+        const draft = suggestionDraft(rahul, []);
+        expect(pickKind(draft, "ACCESS").sensitive).toBe(false);
+        const ticked = { ...draft, sensitive: true, sensitiveSet: true };
+        expect(pickKind(ticked, "ACCESS").sensitive).toBe(true);
+        // A suggestion of a kind the card doesn't offer starts as Medical.
+        expect(suggestionDraft(entry({ kind: "OTHER" }), []).kind).toBe(
+            "MEDICAL",
+        );
+    });
+
+    it("sends the kind, label and tick, never the booker's words", () => {
+        const draft = {
+            ...suggestionDraft(rahul, []),
+            label: "  Takes amlodipine ",
+        };
+        expect(toSuggestionInput(draft, [])).toEqual({
+            kind: "MEDICAL",
+            label: "Takes amlodipine",
+            sensitive: true,
+            allergenId: null,
+        });
+    });
+
+    it("sends an allergen from the list for an Allergy, with no label", () => {
+        const draft = {
+            ...pickKind(suggestionDraft(rahul, CHOICES), "ALLERGY"),
+            allergenId: SESAME.id,
+        };
+        expect(draftProblem({ ...draft, allergenId: null }, CHOICES)).toEqual({
+            field: "allergenId",
+            message: "Pick what they're allergic to.",
+        });
+        expect(toSuggestionInput(draft, CHOICES)).toEqual({
+            kind: "ALLERGY",
+            label: "",
+            sensitive: false,
+            allergenId: SESAME.id,
+        });
+        expect(draftTag(draft, CHOICES)).toBe("Allergy: Sesame");
+    });
+
+    it("says how many notes wait, and who wrote each and when", () => {
+        expect(suggestionsTitle([rahul])).toBe("1 note from the booking page");
+        expect(suggestionsTitle([rahul, rahul])).toBe(
+            "2 notes from the booking page",
+        );
+        expect(suggestionWhen("Rahul", rahul, TZ, NOW)).toBe(
+            "Rahul wrote this when booking online, 18 Sep at 10:42",
+        );
+        expect(suggestionWhen(null, rahul, TZ, NOW)).toBe(
+            "They wrote this when booking online, 18 Sep at 10:42",
+        );
+        expect(setAsideText(rahul)).toBe(
+            "Set aside. The note stays in their booking history.",
+        );
+    });
+
+    it("words a note sent from their account (A5) by where it came from", () => {
+        const fromAccount = { ...rahul, source: "CUSTOMER" as const };
+        expect(suggestionsTitle([fromAccount])).toBe(
+            "1 note from their account",
+        );
+        expect(suggestionsTitle([fromAccount, rahul])).toBe(
+            "2 notes from the customer",
+        );
+        expect(suggestionWhen("Rahul", fromAccount, TZ, NOW)).toBe(
+            "Rahul sent this from their account, 18 Sep at 10:42",
+        );
+        // Set aside, it leaves their list: it isn't kept on a booking.
+        expect(setAsideText(fromAccount)).toBe(
+            "Set aside. It won't be added to their record.",
+        );
+        const added = { ...fromAccount, status: "ACTIVE" as const };
+        expect(entryMeta(added, "user_1", TZ, NOW)).toBe(
+            "From their account · 18 Sep",
+        );
+    });
+
+    it("reads as from the booking page once added", () => {
+        const added = { ...rahul, status: "ACTIVE" as const };
+        expect(entryMeta(added, "user_1", TZ, NOW)).toBe(
+            "From the booking page · 18 Sep",
+        );
+        expect(tagTitle({ ...added, label: "Takes amlodipine" })).toBe(
+            `${rahul.detail} · from the booking page`,
+        );
     });
 });

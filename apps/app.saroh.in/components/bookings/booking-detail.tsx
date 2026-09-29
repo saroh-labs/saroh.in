@@ -5,9 +5,11 @@ import Link from "next/link";
 
 import { BookingPackControl } from "@/components/bookings/booking-pack-control";
 import { CancelBookingControl } from "@/components/bookings/cancel-booking-control";
+import { ClassWaitlist } from "@/components/bookings/class-waitlist";
 import { JoinOnline } from "@/components/bookings/join-online";
 import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
+import { TreatmentVisits } from "@/components/bookings/treatment-visits";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { formatStatus } from "@/lib/format/status";
 import {
@@ -16,6 +18,7 @@ import {
     refundLine,
     refundPolicyLine,
 } from "@/lib/services/booking-money";
+import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import { joinLink } from "@/lib/services/meeting-link";
 import type { BookingDetail, BookingEvent } from "@/lib/services/service";
 
@@ -34,10 +37,14 @@ export function BookingDetailView({
     past,
     packs,
     canRefund = false,
+    canReadOrder = false,
+    waitlist,
 }: {
     booking: BookingDetail;
     /** `payment:manage`: may refund money a late cancel keeps (E8). */
     canRefund?: boolean;
+    /** `order:read`: a treatment's visit links to its order (E9). */
+    canReadOrder?: boolean;
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
     past: boolean;
     /**
@@ -49,6 +56,11 @@ export function BookingDetailView({
         usable: { id: string; label: string }[];
         canWrite: boolean;
     };
+    /**
+     * The class's waitlist for this session (A12), read by the page for a
+     * class still to come; null when the read failed. Absent: not a class.
+     */
+    waitlist?: ClassWaitlistRow[] | null;
 }) {
     const { service, contact, timezone } = booking;
     const cancelled = booking.status === "CANCELLED";
@@ -120,6 +132,7 @@ export function BookingDetailView({
                                     freeCancelUntil={booking.freeCancelUntil}
                                     timezone={timezone}
                                     canRefund={canRefund}
+                                    canReadOrder={canReadOrder}
                                 />
                             </>
                         )}
@@ -225,7 +238,8 @@ export function BookingDetailView({
                         />
                     </dl>
                     {/* A linked contact is a destination; a typed-in name is
-                        not — the same rule the list row follows. */}
+                        not — the same rule the list row follows. Their page
+                        is Customer Detail, as the peek's link is. */}
                     {contact ? (
                         <Button
                             asChild
@@ -233,13 +247,27 @@ export function BookingDetailView({
                             size="sm"
                             className="mt-4"
                         >
-                            <Link href={`/contacts/${contact.id}`}>
-                                Open contact
+                            <Link
+                                href={`/customers/${encodeURIComponent(contact.id)}`}
+                            >
+                                Open {firstName(bookerLabel(booking))}&apos;s
+                                page
                             </Link>
                         </Button>
                     ) : null}
                 </section>
             </div>
+
+            {/* A visit of a treatment (E10): which visit, its order, and
+                the next one to book. */}
+            {booking.treatment ? (
+                <TreatmentVisits
+                    treatment={booking.treatment}
+                    service={service}
+                    who={bookerLabel(booking)}
+                    canReadOrder={canReadOrder}
+                />
+            ) : null}
 
             {showPacks ? (
                 <section className="mt-6 rounded-lg border border-border p-5">
@@ -251,6 +279,10 @@ export function BookingDetailView({
                         canWrite={packs.canWrite}
                     />
                 </section>
+            ) : null}
+
+            {waitlist !== undefined ? (
+                <ClassWaitlist rows={waitlist} timezone={timezone} />
             ) : null}
 
             <section className="mt-6 rounded-lg border border-border p-5">
@@ -346,6 +378,11 @@ function shortTime(iso: string, timeZone: string): string {
         minute: "2-digit",
         hour12: true,
     }).format(new Date(iso));
+}
+
+/** "Asha" from "Asha Rao"; an email stays whole. */
+function firstName(label: string): string {
+    return label.includes("@") ? label : (label.split(" ")[0] ?? label);
 }
 
 /** The contact's name if the CRM knows them, else whatever was typed in. */

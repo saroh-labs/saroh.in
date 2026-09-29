@@ -573,3 +573,61 @@ export function siteCodeEmail(
   <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice if your sign-in email changes.</p>
 </div>`;
 }
+
+/**
+ * Tell the old address its sign-in email for a business's site changed
+ * (ADR-011, "the one other identity mail"; round-2 plan A, A5). From the
+ * code stream's own sender, in the business's name, as the code is.
+ *
+ * Nothing in it names the new address: whoever reads the old inbox learns
+ * that the change happened and whom to ask, not where the account went.
+ * `businessName` must already be cleaned (`site-accounts/sender-name.ts`).
+ * With no SMTP, development logs that it went (the code's fake transport);
+ * `SITE_CODES_EMAIL_FAKE=fail` fails it.
+ */
+export async function sendSiteEmailChangedEmail(
+    to: string,
+    details: { businessName: string },
+): Promise<EmailOutcome> {
+    const { businessName } = details;
+    if (!siteCodesTransporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            console.info(
+                `[Site sign-in email changed] (no SMTP) notice to ${to} for ${businessName}`,
+            );
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await siteCodesTransporter.sendMail({
+            from: {
+                name: codeSenderName(businessName),
+                address: SITE_CODES_FROM_ADDRESS,
+            },
+            to,
+            subject: emailChangedSubject(businessName),
+            html: siteEmailChangedEmail(businessName),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+/** "Your sign-in email for ‹Business› changed". */
+export function emailChangedSubject(businessName: string): string {
+    return `Your sign-in email for ${businessName} changed`;
+}
+
+/** The notice's body; every value in it is escaped. */
+export function siteEmailChangedEmail(businessName: string): string {
+    const name = esc(businessName);
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Your sign-in email changed</h2>
+  <p>The email you use to sign in on ${name}'s website was just changed to another address. This address won't sign you in there any more.</p>
+  <p>If you didn't make this change, contact ${name} straight away.</p>
+  <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice like this one if your sign-in email changes.</p>
+</div>`;
+}

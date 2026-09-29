@@ -1,7 +1,8 @@
 /**
  * The transactional messages Saroh sends for a business (round-2 D17), each
- * a fixed template in the business's voice. A14 adds its order, booking and
- * waitlist templates here.
+ * a fixed template in the business's voice: the invoice ones here, and A14's
+ * booking, order and waitlist notices, whose words live beside their
+ * handler (`site-accounts/notify-templates.ts`).
  *
  * Transactional, not marketing (default 10): the customer asked for what
  * they are being told about, so no marketing opt-in is needed. A revoked
@@ -14,11 +15,41 @@
  * with `message:read` can list, never carries the token.
  */
 
+export const INVOICE_TEMPLATES = ["INVOICE_SENT", "INVOICE_REMINDER"] as const;
+export type InvoiceTemplate = (typeof INVOICE_TEMPLATES)[number];
+
+/**
+ * A14's notices about a customer's own booking, order or waitlist place
+ * (R15). Each is also the `event` of the SYSTEM thread message it writes.
+ */
+export const NOTICE_TEMPLATES = [
+    "BOOKING_CONFIRMED",
+    "BOOKING_MOVED",
+    "BOOKING_CANCELLED",
+    "ORDER_READY",
+    "ORDER_HANDED_OVER",
+    "WAITLIST_OFFER",
+] as const;
+export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
+
+/**
+ * F14's alerts to the business's own team (a new order, a booking, a failed
+ * payment, someone joining), worded by `notifications/team-alert.handler.ts`
+ * and sent only to the people who chose email for them.
+ */
+export const TEAM_TEMPLATES = ["TEAM_ALERT"] as const;
+export type TeamTemplate = (typeof TEAM_TEMPLATES)[number];
+
 export const TRANSACTIONAL_TEMPLATES = [
-    "INVOICE_SENT",
-    "INVOICE_REMINDER",
+    ...INVOICE_TEMPLATES,
+    ...NOTICE_TEMPLATES,
+    ...TEAM_TEMPLATES,
 ] as const;
 export type TransactionalTemplate = (typeof TRANSACTIONAL_TEMPLATES)[number];
+
+export function isNoticeTemplate(value: unknown): value is NoticeTemplate {
+    return (NOTICE_TEMPLATES as readonly unknown[]).includes(value);
+}
 
 /** Where a secret link goes in a stored body; filled in at send time. */
 export const SECRET_LINK_SLOT = "{{secret_link}}";
@@ -54,7 +85,7 @@ export function escapeHtml(text: string): string {
 
 /** The subject and body for one template. */
 export function renderTransactional(
-    template: TransactionalTemplate,
+    template: InvoiceTemplate,
     vars: InvoiceMailVars,
 ): RenderedMessage {
     const business = escapeHtml(vars.business);

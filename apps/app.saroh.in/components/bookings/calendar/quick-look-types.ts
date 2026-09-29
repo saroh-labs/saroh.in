@@ -1,3 +1,4 @@
+import type { NoticeChannels } from "@/lib/messages/notice-reach";
 import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { Slot } from "@/lib/services/service";
 import type { BookingRules } from "@/lib/staff/types";
@@ -26,6 +27,13 @@ export interface QuickLookContext {
     money: boolean;
     rules: BookingRules | null;
     canBook: boolean;
+    /** `order:read`: a treatment's order is a link, else words (E10). */
+    canReadOrder?: boolean;
+    /**
+     * What the business can tell its customers with (A14); null when it
+     * couldn't be read.
+     */
+    notices?: NoticeChannels | null;
 }
 
 export const btn = {

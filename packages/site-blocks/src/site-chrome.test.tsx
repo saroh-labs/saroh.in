@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { SiteFooterContent } from "./site-chrome";
-import { footerLine, SiteFooter, SiteHeader } from "./site-chrome";
+import { footerLine, SiteFooter, SiteHeader, siteMenu } from "./site-chrome";
 
 /**
  * The customer site's v2 header and footer (G17): one row with the name,
@@ -328,5 +328,300 @@ describe("footerLine", () => {
         { format: "html", value: "Bare text" },
     ] as const)("reads %j as more than a line", (footer) => {
         expect(footerLine(footer)).toBeNull();
+    });
+});
+
+describe("module pages in the menu (G15)", () => {
+    // What G14 publishes for a site with no menu of its own: its module
+    // pages, in the kinds' order, each carrying its kind.
+    const MODULE_MENU = [
+        { label: "Book", href: "/book", kind: "BOOK" },
+        { label: "Prices", href: "/prices", kind: "PRICES" },
+        { label: "Journal", href: "/journal", kind: "JOURNAL" },
+        { label: "Contact", href: "/contact", kind: "CONTACT" },
+    ];
+
+    const hrefs = (el: HTMLElement) =>
+        Array.from(el.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+
+    it("reads Home · Book · Prices · Journal · Contact on Pulse", () => {
+        render(<SiteHeader name="Pulse Fitness" navigation={MODULE_MENU} />);
+        const row = screen.getByRole("navigation", { name: "Site" });
+        expect(linkTexts(row)).toEqual([
+            "Home",
+            "Book",
+            "Prices",
+            "Journal",
+            "Contact",
+        ]);
+        expect(hrefs(row)).toEqual([
+            "/",
+            "/book",
+            "/prices",
+            "/journal",
+            "/contact",
+        ]);
+    });
+
+    it("keeps Book after Home, in the editor's order", () => {
+        expect(
+            siteMenu([
+                { label: "Journal", href: "/journal", kind: "JOURNAL" },
+                { label: "Book", href: "/book", kind: "BOOK" },
+            ]).map((i) => i.label),
+        ).toEqual(["Home", "Journal", "Book"]);
+    });
+
+    it("takes Book out while Appointments is off", () => {
+        render(
+            <SiteHeader
+                name="Pulse Fitness"
+                navigation={MODULE_MENU}
+                modules={{
+                    BOOK: "off",
+                    PRICES: "on",
+                    JOURNAL: "on",
+                    CONTACT: "on",
+                }}
+            />,
+        );
+        const row = screen.getByRole("navigation", { name: "Site" });
+        expect(linkTexts(row)).toEqual([
+            "Home",
+            "Prices",
+            "Journal",
+            "Contact",
+        ]);
+    });
+
+    it("shows a module page whose state isn't known: it never guesses off", () => {
+        expect(
+            siteMenu(MODULE_MENU, { PRICES: "off" }).map((i) => i.label),
+        ).toEqual(["Home", "Book", "Journal", "Contact"]);
+        expect(siteMenu(MODULE_MENU, null)).toHaveLength(5);
+    });
+
+    it("draws no menu once every module page is off, not Home alone", () => {
+        expect(
+            siteMenu([{ label: "Book", href: "/book", kind: "BOOK" }], {
+                BOOK: "off",
+            }),
+        ).toEqual([]);
+    });
+
+    it("leaves the merchant's own menu as it is: no Home added", () => {
+        const own = [
+            { label: "Classes", href: "/classes" },
+            { label: "Book", href: "/book", kind: "BOOK" },
+        ];
+        expect(siteMenu(own)).toEqual(own);
+        expect(siteMenu(own, { BOOK: "off" })).toEqual([
+            { label: "Classes", href: "/classes" },
+        ]);
+    });
+
+    it("draws an existing site's menu exactly as published", () => {
+        expect(siteMenu(NAV)).toEqual(NAV);
+        expect(siteMenu([])).toEqual([]);
+    });
+
+    it("keeps Home inside a draft preview, and drops a module that is off there too (G19)", () => {
+        render(
+            <SiteHeader
+                name="Pulse Fitness"
+                navigation={MODULE_MENU}
+                basePath="/preview/tok"
+                modules={{ BOOK: "off" }}
+            />,
+        );
+        const row = screen.getByRole("navigation", { name: "Site" });
+        expect(hrefs(row)).toEqual([
+            "/preview/tok",
+            "/preview/tok/prices",
+            "/preview/tok/journal",
+            "/preview/tok/contact",
+        ]);
+    });
+
+    it("keeps Home inside a draft preview", () => {
+        render(
+            <SiteHeader
+                name="Pulse Fitness"
+                navigation={MODULE_MENU.slice(0, 1)}
+                basePath="/preview/tok"
+            />,
+        );
+        const row = screen.getByRole("navigation", { name: "Site" });
+        expect(hrefs(row)).toEqual(["/preview/tok", "/preview/tok/book"]);
+    });
+});
+
+describe("the menu follows the modules (G19)", () => {
+    // A shop and studio's menu as publish resolves it: the merchant's own
+    // entries, then its module pages, each carrying its kind.
+    const MENU = [
+        { label: "Home", href: "/" },
+        { label: "Our story", href: "/about" },
+        { label: "Shop", href: "/shop", kind: "SHOP" },
+        { label: "Book", href: "/book", kind: "BOOK" },
+        { label: "Contact", href: "/contact", kind: "CONTACT" },
+    ];
+    const ORDER = { label: "Order", href: "/shop" };
+
+    it("takes Shop and Order away once Commerce is off, without a republish", () => {
+        const { rerender } = render(
+            <SiteHeader
+                name="Rye"
+                navigation={MENU}
+                modules={{ SHOP: "on", BOOK: "off", CONTACT: "on" }}
+                action={ORDER}
+            />,
+        );
+        const row = () => screen.getByRole("navigation", { name: "Site" });
+        expect(linkTexts(row())).toEqual([
+            "Home",
+            "Our story",
+            "Shop",
+            "Contact",
+        ]);
+        expect(screen.getAllByRole("link", { name: "Order" })).toHaveLength(1);
+
+        // Commerce off: the same snapshot, the live read says SHOP is off,
+        // and the layout's main button (`headerAction`) is none.
+        rerender(
+            <SiteHeader
+                name="Rye"
+                navigation={MENU}
+                modules={{ SHOP: "off", BOOK: "off", CONTACT: "on" }}
+                action={null}
+            />,
+        );
+        expect(linkTexts(row())).toEqual(["Home", "Our story", "Contact"]);
+        expect(screen.queryByRole("link", { name: "Order" })).toBeNull();
+    });
+
+    it("keeps the menu's own order: a module page stays where it was put", () => {
+        const placed = [
+            { label: "Book", href: "/book", kind: "BOOK" },
+            { label: "Home", href: "/" },
+            { label: "Shop", href: "/shop", kind: "SHOP" },
+            { label: "About", href: "/about" },
+        ];
+        expect(
+            siteMenu(placed, { BOOK: "on", SHOP: "off" }).map((i) => i.label),
+        ).toEqual(["Book", "Home", "About"]);
+    });
+
+    it("keeps a hand-made entry to a free-form page, whatever is off", () => {
+        const own = [
+            { label: "Home", href: "/" },
+            { label: "Menu", href: "/menu" },
+            { label: "Shop", href: "/shop", kind: "SHOP" },
+        ];
+        expect(
+            siteMenu(own, {
+                SHOP: "off",
+                BOOK: "off",
+                PRICES: "off",
+                JOURNAL: "off",
+                CONTACT: "off",
+            }),
+        ).toEqual([
+            { label: "Home", href: "/" },
+            { label: "Menu", href: "/menu" },
+        ]);
+    });
+
+    it("draws no menu when Home is all a module going off leaves", () => {
+        const menu = [
+            { label: "Home", href: "/" },
+            { label: "Shop", href: "/shop", kind: "SHOP" },
+        ];
+        expect(siteMenu(menu, { SHOP: "off" })).toEqual([]);
+        render(
+            <SiteHeader
+                name="Rye"
+                navigation={menu}
+                modules={{ SHOP: "off" }}
+            />,
+        );
+        expect(screen.queryByRole("navigation", { name: "Site" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Menu" })).toBeNull();
+    });
+
+    it("brings a module page back when its module is on again", () => {
+        const menu = [
+            { label: "Home", href: "/" },
+            { label: "Shop", href: "/shop", kind: "SHOP" },
+        ];
+        expect(siteMenu(menu, { SHOP: "on" })).toEqual(menu);
+    });
+
+    it("draws a site that never added module pages exactly as published", () => {
+        // A merchant who published Home alone keeps it: nothing was taken.
+        const homeOnly = [{ label: "Home", href: "/" }];
+        expect(siteMenu(homeOnly, { SHOP: "off" })).toEqual(homeOnly);
+        expect(siteMenu(NAV, { SHOP: "off", BOOK: "off" })).toEqual(NAV);
+    });
+});
+
+describe("the header's controls look pressable (G19)", () => {
+    const MENU = [
+        { label: "Home", href: "/" },
+        { label: "Classes", href: "/classes" },
+    ];
+
+    it("gives every menu entry, the name and the main button a pointer, a hover and a pressed state", () => {
+        render(<SiteHeader name="Pulse" navigation={MENU} action={BOOK} />);
+        const row = screen.getByRole("navigation", { name: "Site" });
+        for (const a of Array.from(row.querySelectorAll("a"))) {
+            expect(a.className).toContain("cursor-pointer");
+            expect(a.className).toMatch(/\bactive:/);
+            expect(a.className).toContain("focus-visible:ring-2");
+        }
+        // Not the page you're on: it has a hover.
+        const classes = screen.getByRole("link", { name: "Classes" });
+        expect(classes.className).toContain("hover:bg-site-border/40");
+
+        const name = screen.getByRole("link", { name: "Pulse — home" });
+        expect(name.className).toContain("cursor-pointer");
+        expect(name.className).toMatch(/\bhover:/);
+        expect(name.className).toMatch(/\bactive:/);
+
+        const book = screen
+            .getAllByRole("link", { name: "Book" })
+            .find((a) => a.className.includes("min-[820px]:inline-flex"));
+        expect(book?.className).toContain("cursor-pointer");
+        expect(book?.className).toContain("active:opacity-80");
+    });
+
+    it("gives the phone menu's button and entries the same states", () => {
+        render(<SiteHeader name="Pulse" navigation={MENU} action={BOOK} />);
+        const button = screen.getByRole("button", { name: "Menu" });
+        expect(button.className).toContain("cursor-pointer");
+        expect(button.className).toMatch(/\bhover:/);
+        expect(button.className).toMatch(/\bactive:/);
+        // Open, it looks pressed as well as saying so.
+        expect(button.className).toContain("aria-expanded:bg-site-border/40");
+
+        act(() => button.click());
+        const list = menuList(button);
+        const links = Array.from(list?.querySelectorAll("a") ?? []);
+        expect(links.length).toBeGreaterThan(0);
+        for (const a of links) {
+            expect(a.className).toContain("cursor-pointer");
+            expect(a.className).toMatch(/\bactive:/);
+            expect(a.className).toContain("focus-visible:ring-2");
+        }
+    });
+
+    it("draws the states in the site's own tokens, never Saroh's", () => {
+        const { container } = render(
+            <SiteHeader name="Pulse" navigation={MENU} action={BOOK} />,
+        );
+        act(() => screen.getByRole("button", { name: "Menu" }).click());
+        expect(container.innerHTML).not.toMatch(
+            /\b(?:hover|active):(?:bg|text)-(?:primary|muted|accent|border|foreground|background)\b/,
+        );
     });
 });

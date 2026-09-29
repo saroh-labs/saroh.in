@@ -58,8 +58,9 @@ what the API allows.
 - **Adopted** — **Members move kitchen stages, nothing else on an order**
   (DEC-024, amends DEC-020). `order:stage` reads the order's kitchen view —
   items, stage, notes, allergens, customer name — with money figures left out
-  by the API, and moves its stage or undoes the last step. Refunds and edits
-  to items or address stay `order:write` / `payment:manage` (Owner/Admin).
+  by the API, and moves its stage or undoes the last step. Taking, changing,
+  refunding and exporting orders are the split order powers below
+  (Owner/Admin by default).
   **Current** since U14: a module may name several `requiredAction`s, any one
   of which reaches it, and Commerce takes `order:read` or `order:stage`, so a
   Member reaches Sell → Orders (the list comes back without totals or emails)
@@ -67,6 +68,55 @@ what the API allows.
   store-scoped order list and read send totals, so they refuse a role with
   `order:stage` but no `order:read`. A new read inside Commerce must ask for
   its own action; the module gate no longer implies `order:read`.
+- **Current** (B16, DEC-039) — **Each order endpoint asks its own power.**
+  `order:create` takes a new order (store-scoped `POST stores/:id/orders`
+  and its New order lines) and its pay link; `order:edit` changes a placed
+  order (`PATCH`, "Change how it's fulfilled", recording a payment by hand);
+  a pay link on an order takes either; `order:refund` refunds, retries a
+  refund and cancels (a cancel is a refund in full), and settles the money
+  when a paid order changes; `order:export` is asked of every Export page
+  (`GET orders?export=true`). Reads stay `order:read` or `order:stage`, and
+  moving steps and the courier's details `order:stage`. `resolveCapabilities`
+  adds implied holds: `order:write` → create, edit, export; `payment:manage`
+  → refund; each of the four → `order:read` (the whole order, money
+  included — Order Detail sends money to `order:read` or `payment:read`).
+  So a role saved before the split keeps what it could do; no backfill. On
+  the store-scoped writes `store:write` no longer takes orders; a storefront
+  role that writes to its storefront still does (DEC-048).
+  `order-permissions.db.spec.ts` pins the matrix one row per endpoint; a new
+  order endpoint adds its row there.
+- **Current** (C13, DEC-039) — **Each customer endpoint asks its own power.**
+  `contact:read` ("See customers and contacts") reads the list, Customer
+  Detail and search, phone and email included; `contact:write` ("Edit
+  customers and contacts") edits, and hard-deletes a record with no orders or
+  invoices, and implies `contact:read`. `customer:sensitive` shows Medical
+  and other sensitive Needs attention entries and booking-page intake notes;
+  `canSeeSensitive` in `customer-workspace/attention-read.ts` is the one seam
+  every surface asks, and nothing implies it (a front desk with
+  `contact:write` doesn't read medical notes). `customer:merge` and
+  `customer:remove` stand alone. Owner and Admin hold all five; a Member
+  holds `contact:read`. Inside Customer Detail each part follows its own
+  read: an order's total with `order:read`, a pack's price with `pack:read`,
+  subscriptions with `subscription:read`, invoices and Owed with
+  `invoice:read`; Spent, which sums orders and invoices, needs both.
+  Customer refusals read "Your role can't …" (`customer-access.ts`).
+  `customer-permissions.db.spec.ts` pins one row per customer endpoint.
+- **Current** (E26, DEC-039) — **Each booking, service and pack endpoint
+  asks its own power.** `service:write` is relabelled "Change services,
+  hours, time off and booking rules" and covers all of that set-up; there is
+  no `booking:settings` key (one power, one key). `pack:sell` ("Sell class
+  packs and book with them") sells a pack at the desk and spends or gives
+  back a holder's class on a booking (with `booking:write`); `pack:write`
+  ("Make and change class packs") creates, edits, publishes, extends and
+  archives. `pack:read` shows the whole pack, prices and sales included:
+  there is no money-free pack read. `resolveCapabilities` adds implied
+  holds: `booking:write` → `booking:read`, `service:write` → `service:read`,
+  `pack:write` → `pack:sell` → `pack:read`, so a role saved with
+  `pack:write` still sells; no backfill. Owner and Admin hold all three pack
+  powers; a Member holds none of them until F18 (matrix Q1). Refusals read
+  "Your role can't …" (`bookings/booking-access.ts`).
+  `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
+  service or pack endpoint adds its row there.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
@@ -90,6 +140,42 @@ what the API allows.
   resolved set (implied holds count); the refusal is a 403 naming the
   permissions in the owner's words. Any new write of a permission list
   (F17's extras) asks the same helper.
+- **Current** (F17, DEC-039) — **A person can hold extra permissions beyond
+  their role.** `Membership.extraActions` (action keys, default empty).
+  `resolveCapabilities(roleKey, stored, extras)` unites the role's set with
+  the extras, filtered by `extraActionsFor` (known actions only, never
+  `org:delete`, and for a Reviewer only `site:read`, `site:comment`,
+  `site:approve` — DEC-006), then runs `withImplied` over the union; with no
+  extras it returns exactly the role's set. Every place that resolves a
+  person passes their extras: `OrganizationContextService.resolve` and
+  `listForUser`, `StoresService`'s membership check, and the members
+  service's reach checks. `PUT organizations/:id/members/:userId/extra-actions`
+  replaces the list, under `member:role:update` and the reach rule for every
+  actor, Owner included: never your own list (403), never someone whose role
+  and current extras exceed yours (403), and nothing afterwards beyond what
+  you hold, implied holds counted (403 "Your role can't give a permission
+  you don't have: …"); an owner-only power or a non-review power for a
+  Reviewer is a 400. An extra the role already grants is not stored. Changing
+  or removing someone also counts their extras; moving someone to Reviewer
+  drops their non-review extras. Each change writes
+  `membership.extras.update` (given and taken, keys and labels), which
+  Settings › Activity reads as "gave Ravi Refund orders".
+- **Current** (F16, DEC-048) — **A storefront's people are on the team.**
+  Accepting a storefront invite (`members/members.service.ts`) also makes a
+  `Membership` in the store's business, in the same transaction, in the
+  narrow **"Storefront team"** role (key `storefront-team`: `org:read`,
+  `member:read`, `module:read`, `media:read`, `store:read`,
+  `product-review:read` — no customers, bookings, orders or money), unless
+  the person already holds a role, which is never lowered or replaced. The
+  rule is `joinTeamFromStorefront` in `@saroh/database`
+  (`backfill/store-members-to-memberships.ts`, shared with the one-off
+  backfill); it writes a `membership.storefront-join` Activity entry. A
+  storefront invite needs `member:invite` in the business as well as the
+  `StoreOwner` check, and the Storefront team role as the business has it
+  must be within the inviter's reach. Removing someone from the team deletes
+  their `StoreMembers` rows in that business's storefronts, in the removal's
+  serializable transaction. What anyone does inside a storefront still comes
+  from their storefront role.
 - **Current** — **The last OWNER cannot be demoted or removed.** The S1-006
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so

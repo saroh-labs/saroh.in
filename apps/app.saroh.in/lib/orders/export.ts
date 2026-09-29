@@ -47,7 +47,13 @@ export function ordersToCsv(orders: OrderRow[]): string {
     const columns: Column[] = [
         { head: "Order", value: (o) => o.orderId },
         { head: "Placed", value: (o) => o.placedAt },
-        { head: "Customer", value: (o) => o.customer?.name ?? "" },
+        {
+            head: "Customer",
+            // A walk-in (B13) by the name they gave, marked as one.
+            value: (o) =>
+                o.customer?.name ??
+                (o.walkIn ? `${o.walkIn.name} (walk-in)` : ""),
+        },
         ...(contact
             ? [
                   {
@@ -56,7 +62,8 @@ export function ordersToCsv(orders: OrderRow[]): string {
                   },
                   {
                       head: "Phone",
-                      value: (o: OrderRow) => o.customer?.phone ?? "",
+                      value: (o: OrderRow) =>
+                          o.customer?.phone ?? o.walkIn?.phone ?? "",
                   },
               ]
             : []),

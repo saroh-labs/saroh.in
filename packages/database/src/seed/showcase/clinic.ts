@@ -390,6 +390,11 @@ async function clearVolume(prisma: Db) {
     });
     await prisma.bookingEvent.deleteMany({ where });
     await prisma.booking.deleteMany({ where });
+    // The treatments' orders (E9), after their visits.
+    await prisma.orderItem.deleteMany({ where });
+    await prisma.order.deleteMany({ where });
+    await prisma.customerIdentityLink.deleteMany({ where });
+    await prisma.customer.deleteMany({ where });
     await prisma.contact.deleteMany({ where });
     await prisma.staffTimeOff.deleteMany({ where });
     await prisma.businessClosure.deleteMany({ where });
@@ -399,12 +404,93 @@ async function writeWorld(prisma: Db, w: KaviWorld) {
     await prisma.businessClosure.createMany({ data: w.closures });
     await prisma.staffTimeOff.createMany({ data: w.timeOff });
     await prisma.contact.createMany({ data: w.contacts });
+    await writeOrders(prisma, w.orders);
     await prisma.booking.createMany({ data: w.bookings });
     await prisma.bookingEvent.createMany({ data: w.events });
     await prisma.contactAttention.createMany({ data: w.attention });
     await writeInvoices(prisma, w.invoices, w.sequences);
     await prisma.paymentIntent.createMany({ data: w.intents });
     await prisma.paymentAttempt.createMany({ data: w.attempts });
+}
+
+/**
+ * The treatments' orders (E9, DEC-050), before the bookings that are their
+ * visits: each at the clinic's one storefront, its store customer found by
+ * the patient's email and linked to their contact, one line billing the
+ * service (no stock). Numbered after any order made here by hand.
+ */
+async function writeOrders(prisma: Db, orders: KaviWorld["orders"]) {
+    const orgId = KAVI.orgId;
+    const storeId = KAVI.storeId;
+    const taken = new Set(
+        (
+            await prisma.order.findMany({
+                where: { storeId },
+                select: { orderId: true },
+            })
+        ).map((o) => o.orderId),
+    );
+    let n = 0;
+    const nextNumber = () => {
+        for (;;) {
+            n += 1;
+            const number = `ORD-${String(n).padStart(3, "0")}`;
+            if (!taken.has(number)) return number;
+        }
+    };
+    for (const o of orders) {
+        const svc = KAVI_SERVICES[o.service];
+        const price = rupees(svc.pricePaise);
+        await prisma.customer.create({
+            data: {
+                id: o.customerId,
+                storeId,
+                organizationId: orgId,
+                email: o.email,
+                firstName: o.first,
+                lastName: o.last,
+                phone: o.phone,
+                createdAt: o.placedAt,
+            },
+        });
+        await prisma.customerIdentityLink.create({
+            data: {
+                id: o.linkId,
+                organizationId: orgId,
+                contactId: o.contactId,
+                customerId: o.customerId,
+                reason: "BOOKING",
+                createdAt: o.placedAt,
+            },
+        });
+        await prisma.order.create({
+            data: {
+                id: o.id,
+                storeId,
+                organizationId: orgId,
+                orderId: nextNumber(),
+                customerId: o.customerId,
+                currency: CURRENCY,
+                subtotal: price,
+                // Exempt: 0% inside the price.
+                tax: "0.00",
+                total: price,
+                fulfilment: o.fulfilment,
+                paymentStatus: o.paidAt ? "PAID" : "UNPAID",
+                paidAt: o.paidAt,
+                createdAt: o.placedAt,
+                items: {
+                    create: {
+                        id: o.itemId,
+                        serviceId: serviceIdOf(o.service),
+                        quantity: 1,
+                        price,
+                        stockRow: "NONE",
+                    },
+                },
+            },
+        });
+    }
 }
 
 /**
@@ -451,6 +537,7 @@ async function writeInvoices(
             status: d.status,
             kind: "INVOICE",
             bookingId: d.bookingId,
+            orderId: d.orderId,
             contactId: d.contactId,
             billToName: d.billToName,
             billToEmail: d.billToEmail,
@@ -497,6 +584,7 @@ async function writeInvoices(
                 cgst: "0.00",
                 sgst: "0.00",
                 igst: "0.00",
+                orderItemId: l.orderItemId ?? null,
             };
         }),
     );

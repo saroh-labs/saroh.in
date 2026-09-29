@@ -147,6 +147,32 @@ describe("an order's invoice", () => {
         expect(orderBillTo(order({ fulfilment: "PICKUP" })).address).toBeNull();
     });
 
+    // B13: a walk-in has no customer. The paper names them, says so, and
+    // carries no email, so it is never sent anywhere.
+    it("bills a walk-in by name, marked as one, with no email", () => {
+        const walkIn = order({
+            customer: null,
+            walkInName: "Asha",
+            fulfilment: "PICKUP",
+        });
+        expect(orderBillTo(walkIn)).toEqual({
+            name: "Asha (walk-in)",
+            email: null,
+            address: null,
+            state: null,
+        });
+        // The lines and sums don't depend on who it is for.
+        expect(buildOrderInvoice(walkIn, RYE)).toEqual(
+            buildOrderInvoice(order({ fulfilment: "PICKUP" }), RYE),
+        );
+    });
+
+    it("bills a walk-in who left no name as Walk-in", () => {
+        expect(
+            orderBillTo(order({ customer: null, walkInName: null })).name,
+        ).toBe("Walk-in");
+    });
+
     // B2a: the six types (DEC-045), read through `typeOf`. Whatever goes to
     // an address is taxed where it goes.
     it.each(["LOCAL_DELIVERY", "SHIPPING"])(
@@ -494,5 +520,74 @@ describe("the seller's registered address (CGST rule 46)", () => {
         expect(cn.sellerAddress).toBe(
             "Old Shop, 1 MG Road, Bengaluru 560001, Karnataka",
         );
+    });
+});
+
+describe("buildOrderInvoice: a treatment's service line (E9, DEC-050)", () => {
+    it("bills the service by name, at its rate and SAC, naming the line", () => {
+        const doc = buildOrderInvoice(
+            order({
+                subtotal: "11800.00",
+                shipping: "0.00",
+                discount: "0.00",
+                total: "11800.00",
+                fulfilment: "APPOINTMENT_IN_PERSON",
+                items: [
+                    {
+                        id: "item_rct",
+                        quantity: 1,
+                        price: "11800.00",
+                        product: null,
+                        service: {
+                            name: "Root canal treatment",
+                            gstRate: "18",
+                            sacCode: "999312",
+                        },
+                        variant: null,
+                    },
+                ],
+            }),
+            RYE,
+        );
+        expect(doc.lines).toHaveLength(1);
+        expect(doc.lines[0]).toMatchObject({
+            description: "Root canal treatment",
+            quantity: 1,
+            rateBps: 1800,
+            code: "999312",
+            orderItemId: "item_rct",
+            amountCents: 1_180_000,
+            taxableCents: 1_000_000,
+        });
+        expect(doc.totalCents).toBe(1_180_000);
+    });
+
+    it("an exempt service line carries no tax", () => {
+        const doc = buildOrderInvoice(
+            order({
+                subtotal: "12000.00",
+                shipping: "0.00",
+                discount: "0.00",
+                total: "12000.00",
+                fulfilment: "APPOINTMENT_IN_PERSON",
+                items: [
+                    {
+                        id: "item_rct",
+                        quantity: 1,
+                        price: "12000.00",
+                        product: null,
+                        service: {
+                            name: "Root canal treatment",
+                            gstRate: "0",
+                            sacCode: "9993",
+                        },
+                        variant: null,
+                    },
+                ],
+            }),
+            RYE,
+        );
+        expect(doc.taxCents).toBe(0);
+        expect(doc.lines[0]).toMatchObject({ code: "9993", rateBps: 0 });
     });
 });

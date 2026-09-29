@@ -26,8 +26,20 @@ export interface PayInvoice {
     currency: string;
     status: PayStatus;
     billedTo: string | null;
+    /**
+     * A GST-registered business's paper whose every line is exempt (D15).
+     * Absent from an API older than it: read as false.
+     */
+    billOfSupply?: boolean;
     /** `--site-*` variables for the business's theme, or null for defaults. */
     theme: Record<string, string> | null;
+}
+
+/** What the page calls the paper: "Bill of supply" when it is one (D15). */
+export function payTitle(
+    invoice: Pick<PayInvoice, "billOfSupply">,
+): "Bill of supply" | "Invoice" {
+    return invoice.billOfSupply ? "Bill of supply" : "Invoice";
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -65,6 +77,7 @@ export function isPayInvoice(v: unknown): v is PayInvoice {
         isString(v.currency) &&
         (PAY_STATUSES as readonly unknown[]).includes(v.status) &&
         isNullableString(v.billedTo) &&
+        (v.billOfSupply === undefined || typeof v.billOfSupply === "boolean") &&
         isTheme(v.theme)
     );
 }

@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 import { formatMoney } from "@/lib/format/money";
+import type { NoticeChannels } from "@/lib/messages/notice-reach";
 import {
     cancelBooking,
     recordBookingOutcome,
@@ -109,6 +110,7 @@ export function CalendarScreen({
     people,
     can,
     newBooking,
+    notices = null,
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -122,9 +124,11 @@ export function CalendarScreen({
     rules: BookingRules | null;
     /** What New booking may do about the customer and a pay link (E4). */
     people: BookingPeople;
-    can: { book: boolean; hours: boolean };
+    can: { book: boolean; hours: boolean; order?: boolean };
     /** The full New booking dialog, for any service at any open time. */
     newBooking: ReactNode;
+    /** What the business can tell its customers with (A14). */
+    notices?: NoticeChannels | null;
 }) {
     const router = useRouter();
     const { hold, undo, pending } = useHeld();
@@ -336,6 +340,7 @@ export function CalendarScreen({
                     for (const b of seats) {
                         const res = await cancelBooking(b.id, {
                             returnCredit: true,
+                            closesClass: true,
                         });
                         if (!res.ok) {
                             failed += 1;
@@ -645,7 +650,15 @@ export function CalendarScreen({
             <BookingQuickLook
                 block={peekBlock}
                 onClose={() => setPeek(null)}
-                ctx={{ timezone, now, money, rules, canBook: can.book }}
+                ctx={{
+                    timezone,
+                    now,
+                    money,
+                    rules,
+                    canBook: can.book,
+                    canReadOrder: can.order ?? false,
+                    notices,
+                }}
                 act={act}
                 heldFor={(id) => {
                     const key = pending.find(

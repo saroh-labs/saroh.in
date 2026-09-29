@@ -156,15 +156,20 @@ export function ProductOrdersTab({
                                         </Link>
                                     </td>
                                     <td className="truncate">
-                                        <Link
-                                            href={customerHref(
-                                                storeId,
-                                                o.customerId,
-                                            )}
-                                            className="text-brand hover:text-foreground"
-                                        >
-                                            {o.customer}
-                                        </Link>
+                                        {o.customerId ? (
+                                            <Link
+                                                href={customerHref(
+                                                    storeId,
+                                                    o.customerId,
+                                                )}
+                                                className="text-brand hover:text-foreground"
+                                            >
+                                                {o.customer}
+                                            </Link>
+                                        ) : (
+                                            // A walk-in (B13): no record to open.
+                                            o.customer
+                                        )}
                                     </td>
                                     <td className="text-foreground/75">
                                         {o.lines

@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { rateToBps } from "../invoices/gst";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
@@ -10,7 +11,10 @@ import {
     writeDocumentLines,
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
-import { courseSeatsHeld } from "./course-seats";
+import { BookingEventType } from "./booking-event-type";
+import { seatsHeld } from "./held-seats";
+import { cancelUnsoldTreatmentInTx } from "./treatment-unsold";
+import { offerFreedPlaceInTx } from "./waitlist-queue";
 
 /**
  * Pay now on the booking page (U19, ADR-008): a PENDING booking that holds
@@ -129,6 +133,11 @@ export async function createHoldInvoiceInTx(
             sacCode: string | null;
         };
         startAt: Date;
+        /**
+         * A treatment's order (E9, DEC-050): this invoice is the order's,
+         * and its line bills the order's service line.
+         */
+        order?: { orderId: string; orderItemId: string };
     },
 ): Promise<{ invoiceId: string; payToken: string }> {
     const profile = await loadTaxProfile(tx, input.organizationId);
@@ -144,6 +153,7 @@ export async function createHoldInvoiceInTx(
                 unitCents: input.service.priceCents,
                 rateBps: rateToBps(input.service.gstRate?.toString() ?? null),
                 code: input.service.sacCode,
+                orderItemId: input.order?.orderItemId ?? null,
             },
         ],
         profile,
@@ -158,6 +168,7 @@ export async function createHoldInvoiceInTx(
             kind: "INVOICE",
             source: "BOOKING",
             bookingId: input.bookingId,
+            orderId: input.order?.orderId ?? null,
             contactId: input.contactId,
             billToName: input.billToName,
             billToEmail: input.billToEmail,
@@ -219,12 +230,17 @@ export async function lockBookingInTx(
  *
  * `actorUserId` is the team member who cancelled it; none when the booker
  * let it go or its time ran out.
+ *
+ * The place it held is free again, so the class's waitlist is offered it
+ * (A12) — unless the same person is booking the same session again this
+ * moment (`freesPlace: false`, K-2), when nothing frees.
  */
 export async function releaseHoldInTx(
     tx: Tx,
     bookingId: string,
     now: Date,
     actorUserId: string | null = null,
+    options: { freesPlace?: boolean } = {},
 ): Promise<boolean> {
     await lockBookingInTx(tx, bookingId);
     const booking = await tx.booking.findUnique({
@@ -232,9 +248,11 @@ export async function releaseHoldInTx(
         select: {
             id: true,
             organizationId: true,
+            serviceId: true,
             status: true,
             startAt: true,
             holdExpiresAt: true,
+            orderId: true,
         },
     });
     if (booking?.status !== "PENDING") return false;
@@ -272,6 +290,17 @@ export async function releaseHoldInTx(
             payTokenHash: null,
         },
     });
+    // A treatment whose first visit was never paid was never sold (E9).
+    if (booking.orderId) {
+        await cancelUnsoldTreatmentInTx(tx, booking.orderId, actorUserId);
+    }
+    if (options.freesPlace !== false) {
+        await offerFreedPlaceInTx(tx, {
+            organizationId: booking.organizationId,
+            serviceId: booking.serviceId,
+            startAt: booking.startAt,
+        });
+    }
     return true;
 }
 
@@ -279,13 +308,14 @@ export async function releaseHoldInTx(
  * Whether a booking's place is still free, leaving the booking itself out —
  * for a payment that arrives after its hold ran out. A one-to-one somebody
  * takes is that person's diary; anything else is the service's seats, with
- * what open courses still hold.
+ * what open courses and waitlist offers still hold.
  */
 async function placeStillFree(
     tx: Tx,
     booking: {
         id: string;
         serviceId: string;
+        contactId: string | null;
         staffId: string | null;
         startAt: Date;
         endAt: Date;
@@ -320,12 +350,12 @@ async function placeStillFree(
     const taken = await tx.booking.count({
         where: { ...overlapping, serviceId: booking.serviceId },
     });
-    const held = await courseSeatsHeld(
-        tx,
-        booking.serviceId,
-        clearFrom,
-        clearTo,
-    );
+    // A place held for someone on the waitlist (A12) is theirs, unless it
+    // is this booker's own.
+    const held = await seatsHeld(tx, booking.serviceId, clearFrom, clearTo, {
+        exceptContactId: booking.contactId,
+        now,
+    });
     return taken + held < capacity;
 }
 
@@ -359,7 +389,7 @@ export async function confirmHoldInTx(
             status: "DRAFT",
             source: "BOOKING",
         },
-        select: { id: true, bookingId: true },
+        select: { id: true, bookingId: true, orderId: true, total: true },
     });
     if (!invoice?.bookingId) return "released";
     await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${invoice.bookingId} FOR UPDATE`;
@@ -367,6 +397,9 @@ export async function confirmHoldInTx(
         where: { id: invoice.bookingId },
         select: {
             id: true,
+            organizationId: true,
+            contactId: true,
+            intakeNote: true,
             serviceId: true,
             staffId: true,
             status: true,
@@ -395,6 +428,29 @@ export async function confirmHoldInTx(
         where: { id: booking.id },
         data: { status: "CONFIRMED", holdExpiresAt: null, paidWith: "PAID" },
     });
+    // Confirmed now, so its booking-page note waits for staff (C12).
+    await suggestFromBookingNoteInTx(tx, { ...booking, status: "CONFIRMED" });
+    // And told now (A14): a hold is not told when it is made, only when
+    // it is paid. Keyed to its Booked event, as any booking's notice.
+    const booked = await tx.bookingEvent.findFirst({
+        where: { bookingId: booking.id, type: BookingEventType.Booked },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+    });
+    await tx.job.create({
+        data: {
+            organizationId: input.organizationId,
+            type: "booking.notify",
+            payload: {
+                bookingId: booking.id,
+                serviceId: booking.serviceId,
+                contactId: booking.contactId,
+                reason: "confirmed",
+                ...(booked ? { eventId: booked.id } : {}),
+            },
+        },
+        select: { id: true },
+    });
     const profile = await loadTaxProfile(tx, input.organizationId);
     const number = await numberFor(
         tx,
@@ -414,5 +470,17 @@ export async function confirmHoldInTx(
             ...input.payment,
         },
     });
+    // A treatment paid in full at booking (E9): its order is paid. A
+    // deposit leaves the rest due on the order.
+    if (invoice.orderId) {
+        await tx.order.updateMany({
+            where: {
+                id: invoice.orderId,
+                paymentStatus: "UNPAID",
+                total: { lte: invoice.total },
+            },
+            data: { paymentStatus: "PAID", paidAt: now },
+        });
+    }
     return "confirmed";
 }

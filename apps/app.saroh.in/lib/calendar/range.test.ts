@@ -7,6 +7,8 @@ import {
     dayShortcuts,
     inRange,
     monthEdges,
+    monthSpan,
+    monthToOpen,
     openingDay,
 } from "./range";
 
@@ -169,5 +171,63 @@ describe("calendarLocked", () => {
 
     it("unknown actions are not a lock — the API decides", () => {
         expect(calendarLocked(undefined)).toBe(false);
+    });
+});
+
+describe("monthSpan", () => {
+    it("asks for the month's first to its last day", () => {
+        expect(monthSpan("2026-09")).toEqual({
+            from: "2026-09-01",
+            to: "2026-09-30",
+        });
+        expect(monthSpan("2028-02").to).toBe("2028-02-29");
+    });
+});
+
+describe("monthToOpen", () => {
+    /** The API's error envelope around a refusal's details. */
+    const refused = (details: unknown) => ({
+        error: {
+            code: "BAD_REQUEST",
+            statusCode: 400,
+            message: "The calendar starts in 2026-06.",
+            details,
+        },
+    });
+
+    it("a month before the business joined opens the joined month", () => {
+        expect(
+            monthToOpen(
+                refused({
+                    reason: "before_joined",
+                    month: "2026-06",
+                    earliestMonth: "2026-06",
+                }),
+            ),
+        ).toBe("2026-06");
+    });
+
+    it("a month past what can be planned opens the last one", () => {
+        expect(
+            monthToOpen(
+                refused({
+                    reason: "too_far_ahead",
+                    month: "2026-12",
+                    latestMonth: "2026-12",
+                }),
+            ),
+        ).toBe("2026-12");
+    });
+
+    it("any other 400 is a failure, not a month to open", () => {
+        expect(monthToOpen(null)).toBeNull();
+        expect(monthToOpen({ error: "bad" })).toBeNull();
+        expect(monthToOpen(refused([{ field: "from" }]))).toBeNull();
+        expect(
+            monthToOpen(refused({ reason: "before_joined", month: "June" })),
+        ).toBeNull();
+        expect(
+            monthToOpen(refused({ reason: "other", month: "2026-06" })),
+        ).toBeNull();
     });
 });

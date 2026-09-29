@@ -4,6 +4,9 @@ import { useSyncExternalStore } from "react";
 
 import type {
     RenderedBooking,
+    RenderedJournal,
+    RenderedPlans,
+    RenderedProductGrid,
     RenderedServicesList,
     RenderedVisitUs,
     SectionType,
@@ -12,10 +15,16 @@ import { blockFixture } from "@saroh/block-contract";
 
 import type { Slot } from "./blocks/booking";
 import BookingSection from "./blocks/booking";
+import type { JournalPost } from "./blocks/journal";
+import JournalSection from "./blocks/journal";
+import type { PublicPlan } from "./blocks/plans";
+import PlansSection from "./blocks/plans";
+import ProductGridSection from "./blocks/product-grid";
 import type { PublicService } from "./blocks/services-list";
 import ServicesListSection from "./blocks/services-list";
 import type { PublicVisit } from "./blocks/visit-us";
 import VisitUsSection from "./blocks/visit-us";
+import type { ShopListingCard } from "./product/shop-listing";
 import SectionRenderer from "./section-renderer";
 
 /**
@@ -73,6 +82,119 @@ export const SAMPLE_VISIT: PublicVisit = {
     ],
     timezone: "Europe/London",
 };
+
+/**
+ * Posts for previewing `journal` where there are no real ones: the catalog
+ * and the Add-section picker (G10). Dates are fixed, so the picture is the
+ * same on every machine; the last has no photo and no excerpt of its own, so
+ * those cases look right too.
+ */
+export const SAMPLE_POSTS: JournalPost[] = [
+    {
+        title: "Why our sourdough takes two days",
+        slug: "two-day-sourdough",
+        excerpt:
+            "A slow, cold rise is where the flavour comes from. Here is what happens overnight.",
+        image: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='800' height='400' fill='%23d9cbb5'/%3E%3Cellipse cx='400' cy='230' rx='230' ry='110' fill='%23a8794c'/%3E%3C/svg%3E",
+        author: "Asha",
+        publishedAt: "2026-09-18T08:00:00.000Z",
+    },
+    {
+        title: "The new rye starter",
+        slug: "new-rye-starter",
+        excerpt:
+            "Six weeks of feeding, and it is finally ready for the counter.",
+        image: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='800' height='400' fill='%232f2a26'/%3E%3Crect x='300' y='90' width='200' height='240' rx='24' fill='%23e0913a'/%3E%3C/svg%3E",
+        author: "Asha",
+        publishedAt: "2026-09-04T08:00:00.000Z",
+    },
+    {
+        title: "Opening hours over the festival",
+        slug: "festival-hours",
+        content:
+            "<p>We close early on the Friday and open late on the Saturday. Orders for the weekend close on Thursday at 6pm.</p>",
+        publishedAt: "2026-08-28T08:00:00.000Z",
+    },
+];
+
+/**
+ * Plans for previewing `plans` where there are no real ones: the catalog and
+ * the Add-section picker (G9). The first is the most chosen, so the
+ * highlight's badge shows; the last has no description.
+ */
+export const SAMPLE_PLANS: PublicPlan[] = [
+    {
+        id: "sample-weekly",
+        name: "Weekly loaf",
+        description: "One sourdough every Saturday, collected at the counter.",
+        price: "350.00",
+        currency: "INR",
+        interval: "WEEK",
+        mostChosen: true,
+    },
+    {
+        id: "sample-monthly",
+        name: "Monthly box",
+        description: "Four loaves and a jar of something seasonal.",
+        price: "1200.00",
+        currency: "INR",
+        interval: "MONTH",
+        mostChosen: false,
+    },
+    {
+        id: "sample-yearly",
+        name: "Bread for a year",
+        description: null,
+        price: "12000.00",
+        currency: "INR",
+        interval: "YEAR",
+        mostChosen: false,
+    },
+];
+
+/**
+ * Products for previewing `productGrid` where there are none: the catalog
+ * and the Add-section picker (G12). One comes in sizes and one has sold
+ * out, so both lines show; none has a photo, so nothing is fetched.
+ */
+export const SAMPLE_PRODUCTS: ShopListingCard[] = [
+    {
+        slug: "sourdough",
+        name: "Sourdough loaf",
+        currency: "INR",
+        price: "250.00",
+        mrp: null,
+        priceFrom: true,
+        image: null,
+        variantTitles: ["Small", "Large"],
+        blurb: "Slow rye, baked at dawn. Keeps a week.",
+        soldOut: false,
+    },
+    {
+        slug: "almond-croissant",
+        name: "Almond croissant",
+        currency: "INR",
+        price: "140.00",
+        mrp: null,
+        priceFrom: false,
+        image: null,
+        variantTitles: [],
+        blurb: "Twice-baked, with frangipane.",
+        soldOut: true,
+    },
+    {
+        slug: "house-blend-beans",
+        name: "House blend beans",
+        currency: "INR",
+        price: "950.00",
+        mrp: null,
+        priceFrom: false,
+        image: null,
+        variantTitles: ["250 g"],
+        blurb: null,
+        soldOut: false,
+    },
+];
 
 /**
  * Open times for previewing `booking`: tomorrow and the day after, mornings,
@@ -149,6 +271,24 @@ const LIVE_DATA_PREVIEWS: Partial<
         <ServicesListSection
             content={content as RenderedServicesList}
             services={SAMPLE_SERVICES}
+        />
+    ),
+    journal: (content) => (
+        <JournalSection
+            content={content as RenderedJournal}
+            feed={{ posts: SAMPLE_POSTS, basePath: "/blog" }}
+        />
+    ),
+    plans: (content) => (
+        <PlansSection
+            content={content as RenderedPlans}
+            feed={{ plans: SAMPLE_PLANS, joinHref: "/contact#enquiry" }}
+        />
+    ),
+    productGrid: (content) => (
+        <ProductGridSection
+            content={content as RenderedProductGrid}
+            feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
         />
     ),
     visitUs: (content) => (

@@ -11,7 +11,15 @@ import {
     describeItem,
     itemsTotal,
 } from "@/lib/calendar/layers";
-import { toMajor, wholeMoney } from "@/lib/calendar/money";
+import type { CalendarCash } from "@/lib/calendar/money";
+import {
+    dayMoney,
+    groupMoney,
+    toMajor,
+    wholeMoney,
+} from "@/lib/calendar/money";
+import type { ProblemCan } from "@/lib/calendar/problems";
+import { problemAction, problemOf } from "@/lib/calendar/problems";
 import type { Shortcut } from "@/lib/calendar/range";
 import type { CalendarDay, LayerKey } from "@/lib/calendar/types";
 
@@ -28,13 +36,18 @@ const LAYER_HOME: Record<LayerKey, string> = {
     invoices: "/billing/invoices",
     bookings: "/bookings",
     classes: "/bookings",
+    payments: "/billing/invoices",
 };
 
 /**
  * One day, grouped by layer, each thing a link to its record. The side panel
  * on the desk, the sheet between 760 and 1100px, and the list under the month
  * on a phone — one body, so the three cannot say different things. A day
- * from today offers what can be made on it (E21).
+ * from today offers what can be made on it (E21), and a named problem —
+ * a failed renewal, a late order, an overdue invoice, a no-show — shows
+ * its fix beside it (E22). For a role that reads money (E23) the day
+ * says what came in, went out and is due, and each layer what it took.
+ * Under the title, who is off or that the business is closed (E24).
  */
 export function DayPanel({
     day,
@@ -45,6 +58,9 @@ export function DayPanel({
     currency,
     heading,
     shortcuts = [],
+    can,
+    money = null,
+    offLine = null,
 }: {
     day: CalendarDay;
     layers: LayerStyle[];
@@ -56,8 +72,18 @@ export function DayPanel({
     heading: (title: string) => React.ReactNode;
     /** "New order", "Book": what this person may make on this day. */
     shortcuts?: Shortcut[];
+    /** The fixes this person may make to a named problem (E22). */
+    can: ProblemCan;
+    /** `payment:read` only (E23): the month's money. Null: none drawn. */
+    money?: CalendarCash | null;
+    /** Who is off, or the business closed, that day (E24). */
+    offLine?: string | null;
 }) {
+    const entries = money?.shown.filter((e) => e.date === day.date) ?? [];
+    const cash = money ? dayMoney(entries, money.currency) : null;
     const n = dayCount(day, layers, off);
+    // A shop's renewals are subscriptions; a diary's, memberships.
+    const shop = layers.some((l) => l.key === "orders");
     const ahead = day.date > today;
     const groups = layers.filter(
         (l) => !off[l.key] && (day.layers[l.key]?.count ?? 0) > 0,
@@ -73,11 +99,45 @@ export function DayPanel({
                 dayTitle(day.date, today) +
                     (day.date === today ? " · today" : ""),
             )}
+            {offLine ? (
+                <p className="mt-[3px] text-[12.5px] text-neutral-600 dark:text-muted-foreground">
+                    {offLine}
+                </p>
+            ) : null}
             <p className="mb-2.5 mt-0.5 min-h-[1lh] text-[12.5px] text-muted-foreground">
                 {n > 0
                     ? `${n} ${n === 1 ? "thing" : "things"}${ahead ? " coming up" : ""}`
                     : ""}
             </p>
+            {cash ? (
+                <div className="mb-1 flex flex-wrap gap-x-3.5 border-y border-foreground/10 pb-2.5 pt-2 text-[12.5px]">
+                    <span>
+                        <span className="text-muted-foreground">In </span>
+                        <strong className="font-semibold tabular-nums">
+                            {cash.in}
+                        </strong>
+                    </span>
+                    <span>
+                        <span className="text-muted-foreground">Out </span>
+                        <strong className="font-semibold tabular-nums text-destructive-subtle-foreground">
+                            {cash.out}
+                        </strong>
+                    </span>
+                    {cash.due ? (
+                        <span>
+                            <span className="text-muted-foreground">Due </span>
+                            <strong className="font-semibold tabular-nums">
+                                {cash.due}
+                            </strong>
+                        </span>
+                    ) : null}
+                    {cash.why ? (
+                        <span className="basis-full text-[11.5px] text-muted-foreground">
+                            {cash.why}
+                        </span>
+                    ) : null}
+                </div>
+            ) : null}
             {shortcuts.length > 0 ? (
                 <div className="mb-1 mt-2 flex flex-wrap gap-1.5">
                     {shortcuts.map((s) => (
@@ -112,7 +172,18 @@ export function DayPanel({
             {groups.map((layer) => {
                 const cell = day.layers[layer.key];
                 if (!cell) return null;
-                const total = itemsTotal(cell.items, cell.count, currency);
+                // With money: what the layer took, is due and failed (E23);
+                // without, the amounts the items carry (a booking's price).
+                const total = money
+                    ? groupMoney(
+                          entries.filter((e) => e.layer === layer.key),
+                          money.currency,
+                      )
+                    : null;
+                const sum =
+                    total === null
+                        ? itemsTotal(cell.items, cell.count, currency)
+                        : null;
                 const more =
                     cell.count - Math.min(cell.items.length, PER_GROUP);
                 return (
@@ -127,9 +198,13 @@ export function DayPanel({
                             />
                             {layer.label} · {cell.count}
                             <span className="flex-1" />
-                            {total !== null && currency ? (
+                            {total ? (
                                 <span className="font-medium normal-case tabular-nums tracking-normal">
-                                    {wholeMoney(total, currency)}
+                                    {total}
+                                </span>
+                            ) : sum !== null && currency ? (
+                                <span className="font-medium normal-case tabular-nums tracking-normal">
+                                    {wholeMoney(sum, currency)}
                                 </span>
                             ) : null}
                         </h3>
@@ -139,11 +214,20 @@ export function DayPanel({
                                     timeZone,
                                     ahead,
                                 });
+                                // A named problem carries its fix (E22). The
+                                // whole row opens where the fix is made.
+                                const problem = problemOf(layer.key, item, {
+                                    date: day.date,
+                                    today,
+                                });
+                                const action = problem
+                                    ? problemAction(problem, { can, shop })
+                                    : null;
                                 return (
                                     <li key={item.id}>
                                         <Link
                                             href={line.href}
-                                            className="-mx-2 flex items-baseline gap-2 rounded-lg px-2 py-[7px] text-foreground hover:bg-muted"
+                                            className="-mx-2 flex items-baseline gap-2 rounded-lg px-2 py-[7px] text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
                                         >
                                             <span className="min-w-0 flex-1">
                                                 <span className="block truncate text-[13px] font-semibold">
@@ -166,6 +250,11 @@ export function DayPanel({
                                                 >
                                                     {line.flag.label}
                                                 </Badge>
+                                            ) : null}
+                                            {action ? (
+                                                <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-brand underline underline-offset-2">
+                                                    {action}
+                                                </span>
                                             ) : null}
                                             {item.amount !== undefined &&
                                             item.currency ? (

@@ -1,6 +1,10 @@
 import { unstable_rethrow } from "next/navigation";
 
 import { getJson, orgBase } from "@/lib/api/http";
+import type {
+    AttentionKind,
+    AttentionSource,
+} from "@/lib/customer-workspace/attention";
 
 import type { FulfilmentFields, FulfilmentType } from "./read";
 
@@ -57,6 +61,8 @@ export interface OrderRow extends FulfilmentFields {
         email?: string;
         phone?: string | null;
     } | null;
+    /** A walk-in (B13), with no customer record. Absent before B13. */
+    walkIn?: { name: string; phone: string | null } | null;
     status: string;
     paymentStatus: string;
     stage: string;
@@ -74,6 +80,27 @@ export interface OrderRow extends FulfilmentFields {
     /** The first two products' names, and how many more there are. */
     productNames: string[];
     moreProducts: number;
+    /**
+     * When the order's pay link was made (B11); null when it has none. Only
+     * with `order:read`, and absent from an API before B5. Never the link.
+     */
+    payLinkCreatedAt?: string | null;
+    /**
+     * The customer's Needs attention this viewer may see (B15), Allergy
+     * first: a sensitive entry is here only for a role that may read it.
+     * Null when the API couldn't read it (the row says "Not available");
+     * absent from an API before B15.
+     */
+    attention?: OrderAttentionTag[] | null;
+}
+
+/** One Needs attention entry on a row (B15): its kind and words. */
+export interface OrderAttentionTag {
+    id: string;
+    kind: AttentionKind;
+    label: string;
+    detail: string | null;
+    source: AttentionSource;
 }
 
 /** The date presets the API reads in the business's zone (B4). */
@@ -113,6 +140,11 @@ export interface OrderListParams {
     storeId?: string;
     late?: boolean;
     /**
+     * Only orders whose customer has Needs attention this viewer may see
+     * (B15); a sensitive-only entry counts only for a role that may read it.
+     */
+    attention?: boolean;
+    /**
      * What the row's pill says, as the API keys it ("ready",
      * "handed-to-courier", "refunded"); from `getOrderFilterOptions`. B4.
      */
@@ -126,6 +158,11 @@ export interface OrderListParams {
     /** ISO instant: only orders placed from it on (Home's "Last 24 hours"). */
     since?: string;
     cursor?: string;
+    /**
+     * This page is read for Export (B16): the API asks `order:export` of
+     * it, as a file of every order leaving Saroh is its own power.
+     */
+    export?: true;
 }
 
 export interface OrderListPage {

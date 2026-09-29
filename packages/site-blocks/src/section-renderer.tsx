@@ -7,6 +7,9 @@ import type {
     RenderedFeatures,
     RenderedGallery,
     RenderedHero,
+    RenderedJournal,
+    RenderedPlans,
+    RenderedProductGrid,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -21,6 +24,12 @@ import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
+import type { JournalFeed } from "./blocks/journal";
+import JournalSection from "./blocks/journal";
+import type { PlansFeed } from "./blocks/plans";
+import PlansSection from "./blocks/plans";
+import type { ProductGridFeed } from "./blocks/product-grid";
+import ProductGridSection from "./blocks/product-grid";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -58,6 +67,9 @@ export default function SectionRenderer({
     apiUrl,
     bookHref,
     siteId,
+    journal,
+    plans,
+    productGrid,
 }: {
     section: Section;
     /**
@@ -74,6 +86,24 @@ export default function SectionRenderer({
      * editor's canvas — and those blocks then say what they will show.
      */
     siteId?: string | null;
+    /**
+     * The site's latest posts, read by the page that serves it (G10), for the
+     * Journal block. Undefined on the editor's canvas, where the block reads
+     * them itself and says so when there are none.
+     */
+    journal?: JournalFeed;
+    /**
+     * The business's plans on sale, read by the page that serves the site
+     * (G9), for the Plans block. Undefined on the editor's canvas, where the
+     * block reads them itself and says why when there are none.
+     */
+    plans?: PlansFeed;
+    /**
+     * This section's products, read by the page that serves the site (G12),
+     * for a Product grid. Undefined on the editor's canvas, where the block
+     * reads them itself and says why when there are none.
+     */
+    productGrid?: ProductGridFeed;
 }) {
     switch (section.type) {
         case "hero":
@@ -140,6 +170,33 @@ export default function SectionRenderer({
                     siteId={siteId}
                 />
             );
+        case "journal":
+            return (
+                <JournalSection
+                    content={section.content as RenderedJournal}
+                    feed={journal}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
+        case "plans":
+            return (
+                <PlansSection
+                    content={section.content as RenderedPlans}
+                    feed={plans}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
+        case "productGrid":
+            return (
+                <ProductGridSection
+                    content={section.content as RenderedProductGrid}
+                    feed={productGrid}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
         case "booking":
             return (
                 <BookingSection
@@ -187,6 +244,9 @@ export function PageSections({
     apiUrl,
     bookHref,
     siteId,
+    journal,
+    plans,
+    productGrids,
 }: {
     sections: Section[];
     /** Passed through to the blocks that talk to the public API. */
@@ -195,6 +255,15 @@ export function PageSections({
     bookHref?: string;
     /** The live site's id, for the blocks that read by site (G8). */
     siteId?: string | null;
+    /** The site's latest posts, for the Journal block (G10). */
+    journal?: JournalFeed;
+    /** The business's plans on sale, for the Plans block (G9). */
+    plans?: PlansFeed;
+    /**
+     * Each Product grid's products (G12), by the section's index in
+     * `sections`: every grid asks for its own.
+     */
+    productGrids?: readonly (ProductGridFeed | undefined)[];
 }) {
     return (
         <>
@@ -206,6 +275,9 @@ export function PageSections({
                         apiUrl={apiUrl}
                         bookHref={bookHref}
                         siteId={siteId}
+                        journal={journal}
+                        plans={plans}
+                        productGrid={productGrids?.[i]}
                     />
                 );
                 return style === undefined ? (

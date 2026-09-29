@@ -133,6 +133,60 @@ export function SiteFooter({
 }
 
 /**
+ * Whether each module page shows now (G15), by kind (`BOOK`, `SHOP`, …), as
+ * the public site read says: `off` while its module is switched off or not
+ * rolled out for the business.
+ */
+export type ModulePageStates = Partial<Record<string, "on" | "off">>;
+
+/**
+ * The menu the header draws (G15), from the published navigation.
+ *
+ * - An entry for a module page whose module is `off` leaves the menu. One
+ *   whose state isn't known stays: the site never guesses a module off, as
+ *   the workspace's module gate fails open.
+ * - **Home leads a menu made of module pages alone.** A site with no menu of
+ *   its own publishes one of its module pages only (G14), which reads as
+ *   "Book · Prices · Journal" with no way back but the name. The design's
+ *   menu always starts at Home, so it is put in front:
+ *   "Home · Book · Prices · Journal · Contact". (Home is never a module
+ *   page, so it can't already be there.) It is not added while nothing else
+ *   is listed: Home alone is no menu.
+ * - **The menu follows the modules (G19).** This is the one place a menu
+ *   entry is gated: the published navigation keeps every module page, each
+ *   carrying its kind, and the live read says which are on, so turning a
+ *   module off (or back on) changes the menu without a republish. The
+ *   header's main button follows the same modules (`headerAction` in
+ *   saroh.app), so "Order" goes with Shop. A menu left holding only Home
+ *   once its module pages are off is no menu either.
+ *
+ * A menu with a free-form entry is the merchant's own and keeps its shape,
+ * less any module page that is off; a menu without module pages comes back
+ * exactly as it was published, so an existing site's header doesn't change.
+ */
+export function siteMenu(
+    navigation: readonly SiteNavItem[],
+    modules?: ModulePageStates | null,
+): SiteNavItem[] {
+    const shown = navigation.filter(
+        (item) => !item.kind || modules?.[item.kind] !== "off",
+    );
+    // A menu that was "Home · Shop" is Home alone once Commerce is off
+    // (G19), and Home alone is no menu. One the merchant published as
+    // Home alone is theirs, and is drawn as it was.
+    if (shown.length < navigation.length && shown.every(isHome)) return [];
+    const moduleOnly =
+        navigation.length > 0 && navigation.every((item) => item.kind);
+    if (!moduleOnly || shown.length === 0) return shown;
+    return [{ label: "Home", href: "/" }, ...shown];
+}
+
+/** An entry that opens the home page: "/" (or "", as a page path can be). */
+function isHome(item: SiteNavItem): boolean {
+    return item.href === "/" || item.href === "";
+}
+
+/**
  * The site's header (#206, G17), in one row: the name, the menu, the bag,
  * Sign in or the avatar, and the main button ("Book" or "Order").
  *
@@ -156,9 +210,16 @@ export function SiteHeader({
     action = null,
     bag,
     account,
+    modules,
 }: {
     name: string;
     navigation: SiteNavItem[];
+    /**
+     * Whether each module page shows now (G15), from the public site read.
+     * An entry whose module is off leaves the menu; one not named here
+     * stays (see `siteMenu`).
+     */
+    modules?: ModulePageStates | null;
     /**
      * Prefix for every link, "" on a live site. A draft preview (#198) lives
      * under /preview/<token>, and a menu that pointed at "/about" would drop
@@ -174,7 +235,7 @@ export function SiteHeader({
 }) {
     const to = (href: string) =>
         basePath && href.startsWith("/") ? `${basePath}${href}` : href;
-    const items = navigation.map((item) => ({
+    const items = siteMenu(navigation, modules).map((item) => ({
         label: item.label,
         href: to(item.href),
     }));
@@ -187,7 +248,7 @@ export function SiteHeader({
                 <Link
                     href={to("/")}
                     aria-label={`${name} — home`}
-                    className="text-site-fg focus-visible:ring-site-accent flex min-w-0 items-center rounded-[var(--site-radius)] focus-visible:outline-none focus-visible:ring-2"
+                    className="text-site-fg focus-visible:ring-site-accent flex min-w-0 cursor-pointer items-center rounded-[var(--site-radius)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 active:opacity-70"
                 >
                     <span className="font-site-heading truncate text-lg font-semibold tracking-[-0.02em]">
                         {name}
@@ -200,7 +261,7 @@ export function SiteHeader({
                 {main ? (
                     <Link
                         href={main.href}
-                        className="bg-site-accent text-site-accent-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg coarse:min-h-11 hidden h-10 shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] px-4 text-sm font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 min-[820px]:inline-flex"
+                        className="bg-site-accent text-site-accent-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg coarse:min-h-11 hidden h-10 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-[var(--site-radius)] px-4 text-sm font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-80 min-[820px]:inline-flex"
                     >
                         {main.label}
                     </Link>

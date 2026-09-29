@@ -13,8 +13,10 @@ import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
 import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
-import type { BookSignedIn, Result } from "./api";
+import type { BookSignedIn, CreditFor, Result } from "./api";
 import {
+    CREDIT_GONE,
+    creditRequest,
     fetchDays,
     fetchHold,
     OFFLINE_RESULT,
@@ -44,6 +46,8 @@ import type {
 } from "./model";
 import {
     asksWhere,
+    creditChoice,
+    creditUsedText,
     dateIn,
     dateText,
     depositUnpayable,
@@ -52,6 +56,7 @@ import {
     restAfterDeposit,
     rulesText,
     timeIn,
+    visitsOf,
     whereText,
 } from "./model";
 import { DetailsStep } from "./steps/details-step";
@@ -60,9 +65,14 @@ import { ExpiredCard } from "./steps/expired-card";
 import { PayStep } from "./steps/pay-step";
 import { PayingCard } from "./steps/paying-card";
 import { ServiceStep } from "./steps/service-step";
+import { WaitlistCard } from "./steps/waitlist-card";
 import { WhenStep } from "./steps/when-step";
 import { card } from "./styles";
 import { PhoneBar, SummaryAside } from "./summary";
+import { useCredit } from "./use-credit";
+import { useWaitlist } from "./use-waitlist";
+import type { WaitlistApi, WaitlistJoined } from "./waitlist";
+import { heldForYouText, LEFT_WAITLIST, waitlistTerms } from "./waitlist";
 
 /**
  * The customer's booking page on a merchant's site (U19), `/<domain>/book`:
@@ -82,9 +92,16 @@ import { PhoneBar, SummaryAside } from "./summary";
  *
  * Pay now holds the place for 15 minutes while the booker pays through the
  * business's own provider; the page watches the hold and confirms when the
- * provider's webhook does. Pay at the desk books it outright. No credits
- * online yet (A10): packs and memberships are used at the desk or by the
- * team in the calendar.
+ * provider's webhook does. Pay at the desk books it outright. A signed-in
+ * customer with a class credit — a pack that covers it, or a membership's
+ * class that month — is offered "Use 1 credit" first (A10); the API says
+ * which (`useCredit`), and the booking spends it at once.
+ *
+ * A full class offers its waitlist (A12): the session can still be chosen,
+ * says "Full — join waitlist", and the last step joins the line instead of
+ * booking — nothing to pay. A place held for them reads "Held for you
+ * until ‹time›" and is booked the normal way; one they are waiting for can
+ * be left (`useWaitlist`).
  *
  * Drawn from `--site-*` only (gate G2): the merchant's palette, never
  * Saroh's. Nothing here promises an email or a text — Saroh sends neither.
@@ -107,6 +124,13 @@ const SESSIONS_SHOWN = 10;
 const SIGNED_OUT = "Your sign-in has ended. Sign in again to book.";
 
 /**
+ * Signed in, they turned out to hold a credit for this class (A10): the page
+ * stops before booking so they never pay for what their credit covers.
+ */
+const CREDIT_FOUND =
+    "You have a class credit for this, so we've picked it. Book with 1 credit, or choose another way to pay.";
+
+/**
  * Signing in on the business's site (A9): always on, never a guest path.
  * The app that draws the page passes its server actions in, since the
  * session lives in a host-only cookie only the site's server can read.
@@ -120,8 +144,18 @@ export interface BookingAccount {
     signIn: SignInApi;
     /** Book, with the session. */
     book: BookSignedIn;
+    /**
+     * The class credit they could pay with, with the session (A10). Absent:
+     * no credit is ever offered, and booking works as before.
+     */
+    credit?: CreditFor;
     /** "Not you?": sign out of this site. */
     signOut: () => Promise<{ ok: boolean }>;
+    /**
+     * A full class's waitlist, with the session (A12). Absent: a full class
+     * is closed, as before.
+     */
+    waitlist?: WaitlistApi;
 }
 
 export interface BookingFlowProps {
@@ -307,16 +341,55 @@ export default function BookingFlow({
         (isClass ? sessions : (day?.starts ?? [])).find(
             (s) => s.startAt === start.startAt,
         );
+    // A full class stays choosable while it has a waitlist to join (A12).
+    const waitlistOn = !!account.waitlist && isClass;
     const chosenStart =
-        chosen && (!isClass || (chosen.placesLeft ?? 0) > 0) ? chosen : null;
+        chosen && (!isClass || (chosen.placesLeft ?? 0) > 0 || waitlistOn)
+            ? chosen
+            : null;
+    const {
+        placeOf,
+        put: putPlace,
+        drop: dropPlace,
+    } = useWaitlist(
+        account.waitlist,
+        customer?.email ?? null,
+        waitlistOn ? service.id : null,
+    );
+    const full = !!chosenStart && isClass && (chosenStart.placesLeft ?? 0) <= 0;
+    const place = full ? placeOf(chosenStart.startAt) : undefined;
+    // Joining the line, already in it, or a place held for them to book.
+    const waitMode: "join" | "waiting" | "held" | null = !full
+        ? null
+        : place?.status === "OFFERED"
+          ? "held"
+          : place
+            ? "waiting"
+            : "join";
+    const waiting = waitMode === "join" || waitMode === "waiting";
 
     const price = service
         ? formatMoney(service.priceCents, service.currency)
         : null;
+    // A class credit of their own (A10), once signed in with a time chosen:
+    // the API says which, and it is offered first.
+    const {
+        credit,
+        reload: reloadCredit,
+        ask: askCredit,
+    } = useCredit(
+        account.credit,
+        customer?.email ?? null,
+        service?.id ?? null,
+        chosenStart?.startAt ?? null,
+    );
     // The ways this service may be paid (E8): the one chosen, else the
     // first — and a service that takes a deposit is never at the desk.
     const choices = service
-        ? payChoices(service, page.payOnline, page.businessName)
+        ? [
+              ...(credit ? [creditChoice(credit, service.currency)] : []),
+              ...payChoices(service, page.payOnline, page.businessName),
+          ]
         : [];
     const chosenPay =
         choices.find((c) => c.pay === payChoice) ?? choices.at(0) ?? null;
@@ -357,36 +430,54 @@ export default function BookingFlow({
           }`
         : "";
 
-    const dueLabel =
-        pay === "DEPOSIT"
+    const dueLabel = waiting
+        ? "Waitlist"
+        : pay === "CREDIT"
+          ? "Uses 1 credit"
+          : pay === "DEPOSIT"
             ? "Deposit now"
             : pay === "NOW"
               ? "To pay now"
               : price
                 ? "Pay at the desk"
                 : "To pay";
-    const due =
-        chosenPay?.amount ??
-        price ??
-        formatMoney(0, service?.currency ?? "INR") ??
-        "₹0";
+    const due = waiting
+        ? (formatMoney(0, service?.currency ?? "INR") ?? "₹0")
+        : (chosenPay?.amount ??
+          price ??
+          formatMoney(0, service?.currency ?? "INR") ??
+          "₹0");
     // Not signed in yet, the last step is signing in (A9, the Customer Site
     // design's "Continue to sign in"); the booking follows the code.
     const confirmLabel = !customer
         ? "Continue to sign in"
-        : pay === "DEPOSIT"
-          ? `Pay ${payingNow} deposit and book`
-          : pay === "NOW"
-            ? `Pay ${price ?? ""} and book`
-            : price
-              ? "Book — pay at the desk"
-              : "Book";
+        : waitMode === "join"
+          ? "Join the waitlist"
+          : waitMode === "waiting"
+            ? "Leave the waitlist"
+            : pay === "CREDIT"
+              ? "Book with 1 credit"
+              : pay === "DEPOSIT"
+                ? `Pay ${payingNow} deposit and book`
+                : pay === "NOW"
+                  ? `Pay ${price ?? ""} and book`
+                  : price
+                    ? "Book — pay at the desk"
+                    : "Book";
     const barLabel = !customer
         ? "Continue to sign in"
-        : pay === "NOW" || pay === "DEPOSIT"
-          ? "Pay and book"
-          : "Book";
-    const rules = rulesText(page.rules, pay === "NOW" || pay === "DEPOSIT");
+        : waitMode === "join"
+          ? "Join waitlist"
+          : waitMode === "waiting"
+            ? "Leave waitlist"
+            : pay === "CREDIT"
+              ? "Book with 1 credit"
+              : pay === "NOW" || pay === "DEPOSIT"
+                ? "Pay and book"
+                : "Book";
+    const rules = waiting
+        ? waitlistTerms()
+        : rulesText(page.rules, pay === "NOW" || pay === "DEPOSIT");
 
     // ── Watching a hold ─────────────────────────────────────────────────
 
@@ -501,12 +592,90 @@ export default function BookingFlow({
             setSheetOpen(true);
             return;
         }
+        if (waitMode === "join") return joinWaitlist(customer);
+        if (waitMode === "waiting") return leaveWaitlist();
         await submit(customer, false);
     };
 
+    /** Join a full class's line (A12); a place already held is booked. */
+    const joinWaitlist = async (who: SignedInCustomer) => {
+        if (!account.waitlist || !service || !chosenStart) return;
+        setSubmitting(true);
+        setSubmitError(null);
+        const result = await account.waitlist
+            .join({ serviceId: service.id, startAt: chosenStart.startAt })
+            .catch((): Result<WaitlistJoined> => OFFLINE_RESULT);
+        setSubmitting(false);
+        if (!result.ok) {
+            if (result.status === 401) {
+                setCustomer(null);
+                setSubmitError(SIGNED_OUT);
+                return;
+            }
+            // A place is free now: the times are read again, so it books.
+            if (result.reason === "room") loadDays(service.id);
+            setSubmitError(result.message);
+            return;
+        }
+        const joined = result.value;
+        putPlace(joined);
+        if (joined.status === "OFFERED") {
+            setSubmitError(heldForYouText(joined.offeredUntil, zone));
+            return;
+        }
+        setPhase({
+            kind: "waitlisted",
+            serviceName: service.name,
+            when: whenText,
+            first: (who.name ?? name).trim().split(/\s+/)[0] ?? "",
+            placeInLine: joined.placeInLine,
+            reach: joined.reach,
+            email: who.email,
+        });
+    };
+
+    /** Leave the line for the chosen class (A12). */
+    const leaveWaitlist = async () => {
+        if (!account.waitlist || !service || !chosenStart) return;
+        const startAt = chosenStart.startAt;
+        setSubmitting(true);
+        setSubmitError(null);
+        const result = await account.waitlist
+            .leave({ serviceId: service.id, startAt })
+            .catch((): Result<{ left: boolean }> => OFFLINE_RESULT);
+        setSubmitting(false);
+        if (!result.ok) {
+            setSubmitError(result.message);
+            return;
+        }
+        dropPlace(startAt);
+        setStart(null);
+        setSubmitError(LEFT_WAITLIST);
+    };
+
     /** Signed in from the sheet: book straight away, on what was chosen. */
-    const signedIn = (who: SignedInCustomer) => {
+    const signedIn = async (who: SignedInCustomer) => {
         setCustomer(who);
+        // A full class: they came to join its line (A12).
+        if (waitMode === "join") {
+            await joinWaitlist(who);
+            return;
+        }
+        // A credit that covers this class (A10): shown and chosen, and
+        // nothing booked or charged until they say so.
+        if (service && chosenStart && pay !== "CREDIT") {
+            const offered = await askCredit(
+                who.email,
+                service.id,
+                chosenStart.startAt,
+            );
+            if (offered) {
+                attemptKey.current = null;
+                setPayChoice("CREDIT");
+                setSubmitError(CREDIT_FOUND);
+                return;
+            }
+        }
         void submit(who, true);
     };
 
@@ -541,11 +710,21 @@ export default function BookingFlow({
                 idempotencyKey: attemptKey.current,
                 staffId: chosenStart.staffId ?? undefined,
                 pay,
+                ...(pay === "CREDIT" ? creditRequest(credit) : {}),
                 ...extras,
             })
             .catch((): Result<BookResult> => OFFLINE_RESULT);
         setSubmitting(false);
         if (!result.ok) {
+            if (result.reason === CREDIT_GONE) {
+                // Spent or changed meanwhile (another tab, the desk): say
+                // so, keep the time, and ask again what they can pay with.
+                attemptKey.current = null;
+                setPayChoice(null);
+                setSubmitError(result.message);
+                reloadCredit();
+                return;
+            }
             if (result.reason === "already-booked") {
                 // Theirs already: nothing to pick again, nothing to retry.
                 attemptKey.current = null;
@@ -606,6 +785,8 @@ export default function BookingFlow({
             paid: false,
             price,
             rest: null,
+            creditText:
+                pay === "CREDIT" && credit ? creditUsedText(credit) : null,
             when: whenText,
             first: firstName,
         });
@@ -820,6 +1001,13 @@ export default function BookingFlow({
                                     : null
                             }
                             rules={page.rules}
+                            visits={visitsOf(service)}
+                            onAgain={bookAnother}
+                        />
+                    ) : phase.kind === "waitlisted" ? (
+                        <WaitlistCard
+                            phase={phase}
+                            headingRef={headingRef}
                             onAgain={bookAnother}
                         />
                     ) : phase.kind === "paying" ? (
@@ -896,6 +1084,9 @@ export default function BookingFlow({
                                             (n) => n + SESSIONS_SHOWN,
                                         )
                                     }
+                                    waitlist={
+                                        waitlistOn ? { placeOf } : undefined
+                                    }
                                 />
                             ) : null}
 
@@ -914,10 +1105,14 @@ export default function BookingFlow({
                                     note={note}
                                     onWhere={pickWhere}
                                     onNote={setNote}
+                                    forWaitlist={waiting}
                                 />
                             ) : null}
 
-                            {chosenStart && whoOk && choices.length > 0 ? (
+                            {chosenStart &&
+                            whoOk &&
+                            !waiting &&
+                            choices.length > 0 ? (
                                 <PayStep
                                     choices={choices}
                                     pay={pay}
@@ -940,6 +1135,7 @@ export default function BookingFlow({
                 {choosing && !phone && services.length > 0 && page.open ? (
                     <SummaryAside
                         serviceName={service?.name ?? null}
+                        visits={visitsOf(service)}
                         whenText={whenText}
                         name={
                             bookerName !== ""
@@ -975,7 +1171,7 @@ export default function BookingFlow({
                 options={account.options}
                 api={account.signIn}
                 purpose="book"
-                onSignedIn={signedIn}
+                onSignedIn={(who) => void signedIn(who)}
             />
         </div>
     );

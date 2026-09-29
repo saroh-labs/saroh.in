@@ -156,6 +156,10 @@ const SITE_LAYER_ALLOWED = new Set([
     // order, the same category and drawing no block.
     "apps/saroh.app/app/pay/o/[token]/page.tsx",
     "apps/saroh.app/components/order-pay.tsx",
+    // A receipt in the customer's account (plan A, A5): the invoice pay
+    // page's paper for their own paid invoice, with a way back to Me. The
+    // same category, drawing no block.
+    "apps/saroh.app/app/[domain]/account/receipts/[invoiceId]/page.tsx",
     "apps/saroh.app/components/provider-handoff.tsx",
     "apps/saroh.app/components/post-view.tsx",
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",

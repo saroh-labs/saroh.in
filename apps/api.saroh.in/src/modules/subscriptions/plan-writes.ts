@@ -3,6 +3,7 @@ import {
     ConflictException,
     NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromCents, toCents } from "../invoices/totals";
@@ -92,6 +93,15 @@ export async function updatePlanRow(
             select: PLAN_SNAPSHOT_SELECT,
         });
         if (!plan) planNotFound();
+        // A draft is edited only through its revision-checked autosave (D5);
+        // this whole-plan PATCH is the old form's, kept for one release
+        // (follow-up Z6), and never saw a draft.
+        if (plan.status === PLAN_DRAFT) {
+            throw new ConflictException({
+                message: "This plan is a draft. Change it in the plan editor.",
+                details: { field: "status" },
+            });
+        }
         // An archived plan's name is checked when it is sold again.
         if (dto.name !== undefined && plan.status !== "ARCHIVED") {
             await assertPlanNameFree(tx, organizationId, dto.name, id);
@@ -114,7 +124,7 @@ export async function updatePlanRow(
             where: { id, organizationId },
             data,
         });
-        await recordPlanEdit(
+        const changed = await recordPlanEdit(
             tx,
             organizationId,
             id,
@@ -122,6 +132,20 @@ export async function updatePlanRow(
             planSnapshot(plan),
             planSnapshot({ ...plan, ...data }),
         );
+        // A Plan Editor open on it (D5) holds an older revision now, and is
+        // told who changed it instead of saving over them.
+        if (changed) await bumpRevision(tx, organizationId, id);
+    });
+}
+
+async function bumpRevision(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    id: string,
+): Promise<void> {
+    await tx.subscriptionPlan.updateMany({
+        where: { id, organizationId },
+        data: { draftRevision: { increment: 1 } },
     });
 }
 
@@ -163,6 +187,7 @@ export async function setPlanStatusRow(
         // Archiving an archived plan, or restoring a live one, changes
         // nothing, and nothing is recorded.
         if (plan.status !== status) {
+            await bumpRevision(tx, organizationId, id);
             await recordPlanEvent(
                 tx,
                 organizationId,

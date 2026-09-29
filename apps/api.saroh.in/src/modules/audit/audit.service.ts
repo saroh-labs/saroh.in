@@ -15,6 +15,15 @@ export const AuditAction = {
     MembershipAccept: "membership.accept",
     MembershipRemove: "membership.remove",
     MembershipRoleUpdate: "membership.role.update",
+    // A person's extra permissions given or taken away (F17, DEC-039),
+    // naming who did it. Metadata lists the action keys and their labels
+    // (`given`, `taken`, `givenLabels`, `takenLabels`) and the person's role.
+    MembershipExtrasUpdate: "membership.extras.update",
+    // Someone on a storefront put on the business's team as Storefront team
+    // (F16, DEC-048), by accepting a storefront invite or by the backfill.
+    // Written in the join's own transaction by `joinTeamFromStorefront`
+    // (`@saroh/database`); metadata names the storefront and the source.
+    MembershipStorefrontJoin: "membership.storefront-join",
     TeamCreate: "team.create",
     TeamUpdate: "team.update",
     TeamDelete: "team.delete",
@@ -34,6 +43,10 @@ export const AuditAction = {
     // How a storefront's orders leave, or when they count as late (B17);
     // metadata names the storefront and each change as words.
     StorefrontFulfilmentUpdate: "storefront.fulfilment.update",
+    // Customers who share an email linked on their own, or left for staff
+    // (DEC-055, C15); metadata names the storefront and the setting as it
+    // was and became.
+    StorefrontSameEmailUpdate: "storefront.same-email.update",
     // An untracked product marked Sold out by hand at a storefront, or
     // available again (#515); metadata names the product and storefront.
     ProductSoldOutMark: "product.sold-out.mark",
@@ -51,6 +64,18 @@ export const AuditAction = {
     // transaction with the survivor as the target. Ids and counts only,
     // never the discarded name, email or phone (DEC-035).
     CustomerMerged: "customer.merged",
+    // A customer's details edited by staff (C8), written with the edit;
+    // the timeline reads it as "Details changed". Metadata names the parts
+    // that changed (`fields`: firstName, email, address, …), never a value.
+    CustomerDetailsChanged: "customer.details.changed",
+    // A customer's details removed for a privacy request (DEC-042, C11),
+    // written in the removal's transaction with the contact as the target.
+    // Counts only (what was deleted, blanked or cancelled), never a value.
+    CustomerRemoved: "customer.removed",
+    // Someone changed one of their own alerts (F14): which alert, which
+    // channel, and on or off as it was and became. Their own choice, about
+    // no one else, so it carries the value.
+    MemberAlertsUpdate: "member.alerts.update",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

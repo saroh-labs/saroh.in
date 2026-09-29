@@ -44,7 +44,7 @@ export default async function ActivityPage() {
     const header = (
         <SettingsPanelHeader
             title="Activity"
-            description="The last changes to this business's settings, newest first."
+            description="The last changes to this business's settings, team and customer records, newest first."
         />
     );
     const may = navCan(

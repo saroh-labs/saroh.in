@@ -138,6 +138,25 @@ export async function siteAccountsFetch(
     path: string,
     init: { method?: string; body?: unknown; session?: string } = {},
 ): Promise<SiteCall> {
+    return relayedFetch(`/public/site-accounts/${path}`, init);
+}
+
+/**
+ * Call `public/sites/<path>` with the signed relay, and the session when
+ * `session` is given — the site's checkout (G13), whose routes hang off the
+ * site.
+ */
+export async function sitesFetch(
+    path: string,
+    init: { method?: string; body?: unknown; session?: string } = {},
+): Promise<SiteCall> {
+    return relayedFetch(`/public/sites/${path}`, init);
+}
+
+async function relayedFetch(
+    apiPath: string,
+    init: { method?: string; body?: unknown; session?: string },
+): Promise<SiteCall> {
     const requestHeaders = await headers();
     const host = servedHost(requestHeaders);
     if (!host) return { ok: false, reason: "no-host" };
@@ -152,7 +171,7 @@ export async function siteAccountsFetch(
     if (init.session) sent[CUSTOMER_SESSION_HEADER] = init.session;
     if (init.body !== undefined) sent["content-type"] = "application/json";
     try {
-        const res = await fetch(`${API_URL}/public/site-accounts/${path}`, {
+        const res = await fetch(`${API_URL}${apiPath}`, {
             method: init.method ?? "GET",
             cache: "no-store",
             headers: sent,
@@ -196,6 +215,22 @@ export async function accountFetch(
     const session = await readSessionToken();
     if (!session) return null;
     const call = await siteAccountsFetch(path, { ...init, session });
+    if (call.ok && (await sessionEnded(call.res))) await clearSessionCookie();
+    return call;
+}
+
+/**
+ * {@link accountFetch} for a signed-in route under `public/sites/` (the
+ * checkout, G13): null without a session, and a 401 that ends it clears the
+ * cookie.
+ */
+export async function accountSitesFetch(
+    path: string,
+    init: { method?: string; body?: unknown } = {},
+): Promise<SiteCall | null> {
+    const session = await readSessionToken();
+    if (!session) return null;
+    const call = await sitesFetch(path, { ...init, session });
     if (call.ok && (await sessionEnded(call.res))) await clearSessionCookie();
     return call;
 }

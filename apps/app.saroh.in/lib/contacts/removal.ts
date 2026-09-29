@@ -1,4 +1,4 @@
-import type { ContactRemoval } from "./service";
+import type { ContactRemoval, RemovalPreview } from "./service";
 
 const count = (n: number, one: string, many: string) =>
     `${n} ${n === 1 ? one : many}`;
@@ -71,4 +71,65 @@ export function holdingsSentence(h: Holdings): string {
             ? ", and their bookings paid with a pack or for a course are cancelled"
             : "";
     return `Their ${list} ${one ? "goes" : "go"} too${bookings}. `;
+}
+
+// ── Privacy removal (DEC-042, C11) ──────────────────────────────────────
+
+/**
+ * "Remove their details (privacy request)…"'s paragraph, after the design:
+ * what goes, and that their orders stay. Around the design's two sentences
+ * it adds only what this person has: bookings still to come (cancelled),
+ * autopay (cancelled at the provider first) and the leads and form entries
+ * that stay (DEC-041, 2026-09-27).
+ */
+export function removalBody(p: Pick<RemovalPreview, "goes" | "stays">): string {
+    const parts = [
+        "Their name, email, phone and address are removed and cannot be brought back.",
+    ];
+    const { orders } = p.stays;
+    if (orders > 0) {
+        parts.push(
+            `Their ${count(orders, "order", "orders")} ${orders === 1 ? "stays" : "stay"} in Orders as “Removed customer”, so your totals and records stay right.`,
+        );
+    }
+    const { bookingsCancelled } = p.goes;
+    if (bookingsCancelled > 0) {
+        parts.push(
+            `Their ${count(bookingsCancelled, "booking", "bookings")} still to come ${bookingsCancelled === 1 ? "is" : "are"} cancelled.`,
+        );
+    }
+    if (p.goes.autopay > 0) {
+        parts.push("Their autopay is cancelled first.");
+    }
+    const crm = [
+        p.stays.leads > 0 ? count(p.stays.leads, "lead", "leads") : null,
+        p.stays.submissions > 0
+            ? count(p.stays.submissions, "form entry", "form entries")
+            : null,
+    ].filter((s): s is string => s !== null);
+    if (crm.length > 0) {
+        const one = p.stays.leads + p.stays.submissions === 1;
+        parts.push(
+            `Their ${crm.join(" and ")} ${one ? "stays" : "stay"} as ${one ? "it is" : "they are"}.`,
+        );
+    }
+    return parts.join(" ");
+}
+
+/**
+ * "Type ‹name› to confirm", as the design asks: the name as the page shows
+ * it, ignoring spaces around it and runs of spaces within.
+ */
+export function confirmMatches(typed: string, name: string): boolean {
+    const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+    return norm(name).length > 0 && norm(typed) === norm(name);
+}
+
+/** The toast once they're removed, in the design's words. */
+export const REMOVED_TOAST = "Details removed. Their orders stay in Orders.";
+
+/** An API sentence, ended with a full stop for the page. */
+export function asSentence(message: string): string {
+    const m = message.trim();
+    return /[.!?]$/.test(m) ? m : `${m}.`;
 }

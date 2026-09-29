@@ -119,6 +119,13 @@ const envSchema = z.object({
     // to see the "couldn't send" path and alert. Development, or named
     // outright off production (the CI browser stack); never in production.
     SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
+    // The customer account area on merchant sites (round-2 plan A, A5):
+    // `on` serves `public/site-accounts/me`, home and receipts; anything else
+    // (unset included) answers 404, so the area stays dark until A6–A8 and
+    // A13 ship with it (waves plan, release boundary 4). saroh.app has its
+    // own `SITE_ACCOUNT_AREA`, which hides the header entry and the pages;
+    // this one is the server half that keeps it private.
+    SITE_ACCOUNT_AREA: z.enum(["on", "off"]).optional(),
 
     // Payments (S5-002 — org merchant credential encryption at rest).
     // A 32-byte AES-256-GCM key, supplied as base64 or 64-hex. OPTIONAL in the

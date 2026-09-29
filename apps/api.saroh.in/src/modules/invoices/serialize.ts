@@ -2,6 +2,8 @@ import { toMoneyString } from "../../common/money";
 import { stateName } from "./gst-states";
 import type { InvoiceStanding } from "./invoice-state";
 import { invoiceStanding } from "./invoice-state";
+import type { InvoiceTitle } from "./invoice-title";
+import { invoiceTitle, isExemptSupply } from "./invoice-title";
 import type { InvoiceSendView, InvoiceSentView } from "./send-view";
 
 interface Money {
@@ -69,6 +71,7 @@ export const INVOICE_SELECT = {
 /**
  * The list adds its first line and how many there are — enough to say what
  * an invoice is for ("Personal training × 4") without sending every line.
+ * Whether it is a bill of supply is read beside it (`exemptInvoiceIds`).
  */
 export const INVOICE_LIST_SELECT = {
     ...INVOICE_SELECT,
@@ -223,6 +226,16 @@ export interface InvoiceViewModel {
     standing: InvoiceStanding;
     /** INVOICE | CREDIT_NOTE | SUPPLEMENTARY (ADR-008). */
     kind: string;
+    /**
+     * What the paper is called (D15): "Bill of supply" when a registered
+     * business's every line is exempt or nil-rated, as frozen on issue.
+     */
+    title: InvoiceTitle;
+    /**
+     * A registered business's paper with every line at 0%: it prints no
+     * tax columns. True on a bill of supply and on a credit note against one.
+     */
+    exempt: boolean;
     /** The invoice a credit note or supplementary invoice corrects. */
     related: { id: string; number: string | null } | null;
     /** Credit notes and supplementary invoices against this one. */
@@ -338,15 +351,37 @@ const iso = (d: Date | null) => (d ? d.toISOString() : null);
 export function serializeInvoice(
     row: InvoiceRow,
     now: Date,
-    { detail = false }: { detail?: boolean } = {},
+    {
+        detail = false,
+        exempt: exemptHint,
+    }: {
+        detail?: boolean;
+        /**
+         * Whether every line is exempt (D15), for a row read without its
+         * lines — the list's `exemptInvoiceIds`.
+         */
+        exempt?: boolean;
+    } = {},
 ): InvoiceViewModel {
     const first = row.lines?.[0];
+    const standing = invoiceStanding(row, now);
+    const paper = {
+        kind: row.kind ?? "INVOICE",
+        sellerGstin: row.sellerGstin ?? null,
+        standing,
+    };
+    // A list row carries its first line only, so its caller says; a detail
+    // row carries every line and is judged on them.
+    const exempt =
+        exemptHint ?? isExemptSupply({ ...paper, lines: row.lines ?? [] });
     return {
         id: row.id,
         number: row.number,
         status: row.status,
-        standing: invoiceStanding(row, now),
-        kind: row.kind ?? "INVOICE",
+        standing,
+        kind: paper.kind,
+        title: invoiceTitle(paper, exempt),
+        exempt,
         related: row.relatedInvoice ?? null,
         corrections: (row.corrections ?? []).map((c) => ({
             id: c.id,

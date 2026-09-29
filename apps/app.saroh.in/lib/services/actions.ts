@@ -14,6 +14,7 @@ import type {
 import {
     archiveService as archiveServiceApi,
     bookByHand as bookByHandApi,
+    bookVisit as bookVisitApi,
     cancelBooking as cancelBookingApi,
     createBookingPayLink as createBookingPayLinkApi,
     createService as createServiceApi,
@@ -36,6 +37,14 @@ import {
 
 export async function bookByHand(serviceId: string, input: BookByHandInput) {
     return bookByHandApi(serviceId, input);
+}
+
+/** Book the next visit of a treatment (E10), against its order. */
+export async function bookVisit(
+    orderId: string,
+    input: { visitNumber: number; startAt: string; staffId?: string },
+) {
+    return bookVisitApi(orderId, input);
 }
 
 /** "Send a pay link" for a booking just made (E4). */
@@ -67,7 +76,7 @@ export async function replaceRules(
 
 export async function cancelBooking(
     bookingId: string,
-    options: { returnCredit?: boolean } = {},
+    options: { returnCredit?: boolean; closesClass?: boolean } = {},
 ) {
     return cancelBookingApi(bookingId, options);
 }

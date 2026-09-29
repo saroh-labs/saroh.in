@@ -1,28 +1,26 @@
 "use client";
 
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { Unlink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { deleteContact } from "@/lib/contacts/actions";
-import { deletedLine } from "@/lib/contacts/removal";
 import {
     restoreOffersAction,
     stopOffersAction,
-    unlinkAccountAction,
-    unlinkPreviewAction,
 } from "@/lib/customer-workspace/actions";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
-import type { IdentitySuggestion } from "@/lib/customer-workspace/service";
-import type { UnlinkPreview } from "@/lib/customer-workspace/site-account";
-import {
-    signsInLine,
-    unlinkConfirm,
-    unlinkedLine,
-} from "@/lib/customer-workspace/site-account";
-import type { OrderFilter, TabKey } from "@/lib/customer-workspace/view";
+import { pageMissing } from "@/lib/customer-workspace/packs";
+import type {
+    DuplicateSuggestion,
+    IdentitySuggestion,
+} from "@/lib/customer-workspace/service";
+import { signsInLine } from "@/lib/customer-workspace/site-account";
+import type {
+    OrderFilter,
+    ReviewsRead,
+    TabKey,
+    ThreadRead,
+} from "@/lib/customer-workspace/view";
 import {
     canStopOffers,
     initials,
@@ -33,22 +31,26 @@ import {
     tagFor,
 } from "@/lib/customer-workspace/view";
 
-import { IdentityLinkDialog } from "../identity-link-dialog";
 import {
     AttentionCard,
     AttentionEditor,
     HeaderAttention,
     useAttention,
 } from "./attention";
+import { AttentionSuggestions } from "./attention-suggestions";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
-import { EditSheet } from "./edit-sheet";
 import { Crumbs, Header, Tabs } from "./header";
+import { MessagesTab } from "./messages-tab";
+import { useMoreActions } from "./more-actions";
 import { Notes } from "./notes";
-import { PartialNotice, PossibleMatch } from "./notices";
+import { DuplicateNotice, PartialNotice, PossibleMatch } from "./notices";
 import { OrdersTab } from "./orders-tab";
 import { Overview } from "./overview";
-import { Empty } from "./parts";
+import type { PackSale } from "./packs-tab";
+import { useCustomerPacks } from "./packs-tab";
+import { Failed } from "./parts";
+import { ReviewsTab } from "./reviews-tab";
 
 /**
  * Customer Detail (plan 2026-09-23-003, U18), after "Saroh Customer Detail":
@@ -65,9 +67,18 @@ export function CustomerDetailScreen({
     bizName,
     sells,
     canWrite,
+    canMerge,
+    canRemove = false,
     canConsent,
+    canSensitive,
     userId,
     suggestions,
+    duplicates,
+    thread = null,
+    reviews = null,
+    canReplyReviews = false,
+    packSale = null,
+    canExtendPacks = false,
     nowIso,
 }: {
     d: CustomerDetail;
@@ -77,31 +88,64 @@ export function CustomerDetailScreen({
     sells: boolean;
     /** `contact:write`: edit, link, delete, add notes. */
     canWrite: boolean;
+    /** `customer:merge`: merge with a duplicate (C10). */
+    canMerge: boolean;
+    /** `customer:remove`: remove their details for a privacy request (C11). */
+    canRemove?: boolean;
     /** `consent:write`: record that they asked to stop. */
     canConsent: boolean;
+    /** `customer:sensitive`: may mark a Needs attention note sensitive. */
+    canSensitive: boolean;
     userId: string | null;
     suggestions: IdentitySuggestion[];
+    /** Other records that look like the same person (C2). */
+    duplicates: DuplicateSuggestion[];
+    /** Their message thread (A13), for the Messages tab. */
+    thread?: ThreadRead;
+    /** Their product reviews (C6), for the Reviews tab. */
+    reviews?: ReviewsRead;
+    /** `product-review:write`: reply to and hide a review. */
+    canReplyReviews?: boolean;
+    /** Selling them a pack (C7); null when this viewer may not. */
+    packSale?: PackSale | null;
+    /** `pack:write`: give one of their packs more days (E16). */
+    canExtendPacks?: boolean;
     nowIso: string;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
     const kind = kindOf(d);
-    const tabs = tabsFor(d);
+    const tabs = tabsFor(d, thread, reviews);
     const [tab, setTab] = useState<TabKey>(initialTab);
     const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
-    const [editing, setEditing] = useState(0);
-    const [linking, setLinking] = useState(false);
-    const [removing, setRemoving] = useState(false);
     const [stopping, setStopping] = useState(false);
-    const [notThem, setNotThem] = useState<UnlinkPreview | null>(null);
     const attention = useAttention({
         contactId: d.contact.id,
         attention: d.attention,
     });
     const name = d.contact.name;
+    // Edit details and ⋯ More actions, and what each opens (C14).
+    const more = useMoreActions({
+        d,
+        name,
+        sells,
+        canWrite,
+        canMerge,
+        canRemove,
+        suggestions,
+        duplicates,
+    });
     const first = d.contact.firstName?.trim()
         ? d.contact.firstName.trim()
         : (name.split(" ")[0] ?? name);
+    // Their packs (C7): the tab, and selling and extending from here.
+    const packs = useCustomerPacks({
+        d,
+        sale: packSale,
+        canExtend: canExtendPacks,
+        first,
+        nowIso,
+    });
 
     const go = (key: TabKey) => {
         setTab(key);
@@ -129,54 +173,6 @@ export function CustomerDetailScreen({
         });
     }
 
-    // "This isn't them" (A4): read what would move, then ask.
-    async function askNotThem() {
-        const res = await unlinkPreviewAction(d.contact.id);
-        if (!res.ok) return showError(res.error);
-        setNotThem(res.data);
-    }
-
-    async function separate(preview: UnlinkPreview) {
-        setNotThem(null);
-        const res = await unlinkAccountAction(d.contact.id);
-        if (!res.ok) return showError(res.error);
-        showSuccess(unlinkedLine(preview.email));
-        router.refresh();
-    }
-
-    async function remove() {
-        setRemoving(false);
-        const res = await deleteContact(d.contact.id);
-        if (!res.ok) return showError(res.error);
-        showSuccess(deletedLine(name, res.data));
-        router.push(sells ? "/commerce/customers" : "/contacts");
-    }
-
-    // Drawn for every role, disabled with its reason for one that may not.
-    const menu = [
-        ...(d.linkedCustomers !== undefined
-            ? [
-                  {
-                      label: "Link a store customer…",
-                      go: () => setLinking(true),
-                  },
-              ]
-            : []),
-        ...(d.siteAccount?.canUnlink
-            ? [
-                  {
-                      label: "This isn't them…",
-                      go: () => void askNotThem(),
-                  },
-              ]
-            : []),
-        {
-            label: "Delete their record…",
-            danger: true,
-            go: () => setRemoving(true),
-        },
-    ];
-
     const panel = () => {
         switch (tab) {
             case "ord":
@@ -198,6 +194,8 @@ export function CustomerDetailScreen({
                 ) : (
                     <Failed what="Bookings" />
                 );
+            case "pk":
+                return packs.tab;
             case "sub":
                 return d.subscriptions ? (
                     <SubscriptionsTab
@@ -224,6 +222,28 @@ export function CustomerDetailScreen({
                     />
                 ) : (
                     <Failed what="Invoices" />
+                );
+            case "rev":
+                return reviews && reviews !== "failed" ? (
+                    <ReviewsTab
+                        reviews={reviews}
+                        firstName={first}
+                        canReply={canReplyReviews}
+                    />
+                ) : (
+                    <Failed what="Reviews" />
+                );
+            case "msg":
+                return thread && thread !== "failed" ? (
+                    <MessagesTab
+                        contactId={d.contact.id}
+                        thread={thread}
+                        firstName={first}
+                        timeZone={d.timezone}
+                        now={now}
+                    />
+                ) : (
+                    <Failed what="Messages" />
                 );
             case "notes":
                 return d.notes ? (
@@ -264,6 +284,7 @@ export function CustomerDetailScreen({
                             go("ord");
                         }}
                         onBookings={() => go("bk")}
+                        onSellPack={packs.onSell}
                     />
                 );
         }
@@ -281,15 +302,29 @@ export function CustomerDetailScreen({
                     email={d.contact.email}
                     phone={d.contact.phone}
                     signsIn={
-                        d.siteAccount
-                            ? signsInLine(d.siteAccount, canWrite)
-                            : null
+                        d.siteAccount ? signsInLine(d.siteAccount, true) : null
                     }
                     attention={<HeaderAttention state={attention} />}
                     canEdit={canWrite}
-                    onEdit={() => setEditing((n) => n + 1)}
-                    menu={menu}
+                    canMore={canWrite || canMerge || canRemove}
+                    onEdit={more.edit}
+                    menu={more.menu}
                 />
+                <DuplicateNotice
+                    duplicates={duplicates}
+                    onMerge={more.mergeDuplicate}
+                />
+                {canWrite && d.attention?.suggestions?.length ? (
+                    <AttentionSuggestions
+                        contactId={d.contact.id}
+                        suggestions={d.attention.suggestions}
+                        choices={d.notes?.allergenChoices ?? []}
+                        firstName={first}
+                        timeZone={d.timezone}
+                        now={now}
+                        canSensitive={canSensitive}
+                    />
+                ) : null}
                 <Tabs tabs={tabs} value={tab} onChange={go} />
             </div>
             <div
@@ -298,79 +333,27 @@ export function CustomerDetailScreen({
                 aria-labelledby={`tab-${tab}`}
                 className="px-[26px] pb-[30px] pt-5"
             >
-                <PartialNotice
-                    first={first}
-                    missing={d.unavailable.map((u) => u.label)}
-                />
+                <PartialNotice first={first} missing={pageMissing(d)} />
                 {tab === "over" || tab === "ord" ? (
                     <PossibleMatch
                         matches={d.possibleMatches ?? []}
                         canLink={canWrite}
-                        onLink={() => setLinking(true)}
+                        onLink={more.link}
                     />
                 ) : null}
                 {panel()}
             </div>
 
-            {editing ? (
-                <EditSheet
-                    key={editing}
-                    open
-                    onOpenChange={(o) => (o ? null : setEditing(0))}
-                    contactId={d.contact.id}
-                    email={d.contact.email}
-                    initial={{
-                        firstName: d.contact.firstName ?? "",
-                        lastName: d.contact.lastName ?? "",
-                        phone: d.contact.phone ?? "",
-                        company: d.contact.company ?? "",
-                    }}
-                />
-            ) : null}
+            {more.dialogs}
+            {packs.dialogs}
             {canWrite ? (
                 <AttentionEditor
                     state={attention}
                     contactId={d.contact.id}
                     choices={d.notes?.allergenChoices ?? []}
+                    canSensitive={canSensitive}
                 />
             ) : null}
-            {canWrite ? (
-                <IdentityLinkDialog
-                    contactId={d.contact.id}
-                    suggestions={suggestions}
-                    open={linking}
-                    onOpenChange={setLinking}
-                />
-            ) : null}
-            {notThem ? (
-                <ConfirmDialog
-                    open
-                    onOpenChange={(o) => (o ? null : setNotThem(null))}
-                    {...unlinkConfirm(name, notThem)}
-                    confirmLabel="Separate them"
-                    cancelLabel="Keep them together"
-                    icon={Unlink}
-                    onConfirm={() => void separate(notThem)}
-                />
-            ) : null}
-            <ConfirmDialog
-                open={removing}
-                onOpenChange={setRemoving}
-                title={`Delete ${name}?`}
-                description={`Their notes, leads, subscriptions and class packs go with them, and future classes paid with those packs are cancelled. Orders, bookings and invoices stay on record under the name they gave, and a store customer with the same email is kept. This cannot be undone.`}
-                confirmLabel="Delete record"
-                cancelLabel="Keep them"
-                onConfirm={() => void remove()}
-            />
         </>
-    );
-}
-
-function Failed({ what }: { what: string }) {
-    return (
-        <Empty title={`${what} couldn't be read`}>
-            The connection dropped while we were fetching them. Nothing has
-            changed — try again in a minute.
-        </Empty>
     );
 }

@@ -461,7 +461,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - **"Placed" means the order's `createdAt`**, and the late clock starts there for every order, online and pay-later ones included.
     - **Which types a storefront offers** is one setting on the storefront (Pick-up, Local delivery, Shipping). Digital and the appointment types follow the product.
     - **Changing how an order is fulfilled takes a delivery amount typed by staff.** There is no delivery fee per storefront yet; the shop's checkout brings one later.
-    - **A walk-in order has no customer record**: its name, and a phone if given, stay on the order, and no contact is made without an email.
+    - **A walk-in order has no customer record**: its name, and a phone if given, stay on the order, and no contact is made without an email. _Amended 2026-09-28 (user, round-2 B13b):_ only a walk-in with **just a name** stays a walk-in with no customer and no contact. **A walk-in whose phone is given is a customer**: the order is made for the store customer that phone finds (the business's contact with it, compared as C2's `duplicates.ts` compares phones; never a contact removed for privacy) or makes, with a contact linked by the staff member (MANUAL), so it joins their history and duplicate matching and a privacy removal reaches it. Someone known only by a phone carries the reserved `phone+<random>@phone.invalid` placeholder as their email (`contacts/contact-email.ts`). `Order.walkInPhone` is no longer written.
     - **An appointment order's shape** is set by [DEC-050](#dec-050-a-treatment-is-one-order-whose-line-bills-a-service).
 
 ## DEC-046 Brand and fonts are their own track, and Saroh's fonts stop reaching merchant sites now
@@ -591,4 +591,22 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the booking page promised "UPI or card", and Razorpay's window was limited to UPI and card by Saroh, while Cashfree's showed whatever the account had switched on.
 - Decision: **Saroh doesn't choose or restrict payment methods.** The provider's window shows the methods the business has switched on in its Razorpay or Cashfree account. Saroh's copy names no methods it can't vouch for: at most, it shows methods the provider reports as switched on for that account.
 - Consequences: Razorpay's UPI-and-card-only display block is removed. "UPI or card" becomes neutral copy, such as "Pay online in the ‹Razorpay› window", unless the provider reports the account's methods.
+- Migration: none.
+
+## DEC-060 Three small calls on customers and orders (2026-09-28)
+
+**Status: Accepted — 2026-09-28** · round-2 plans B (B15, B13) and F (F10, F12)
+
+- **A Member sees a customer's email on an order.** On the order read and the quick view, `contact:read` alone shows the customer's own phone and email, the same as on the list's rows. Without it, neither is shown, as review #19 set; the delivery phone is always shown.
+- **Onboarding's "Registered" saves no business type.** It used to save `company`, which Settings reads as Private limited, so an LLP or partnership was mislabelled. The business picks its real type in Settings. F12's go-live checklist nudges for it until one is set.
+- **A walk-in who gives a phone is a customer.** A name-only walk-in stays a walk-in, with no customer and no contact. With a phone, the order is made for a customer found by that phone, or one created and linked (DEC-045 is amended). This lets their history, duplicate matching and a privacy removal reach them.
+- Migration: none.
+
+## DEC-061 Sensitive notes are their own capability
+
+**Status: Accepted — 2026-09-28** · round-2 plan C (C13), permission matrix Q2
+
+- Context: C13 split the customer capabilities, and matrix Q2 asked whether sensitive notes (medical and similar) should need a power of their own, or come with `contact:write`.
+- Decision: **`customer:sensitive` is its own capability.** Owner and Admin hold it; Member and Reviewer don't; nothing implies it. `canSeeSensitive` asks for it, and every surface that shows sensitive notes follows it.
+- Consequences: custom roles saved before C13 that hold `contact:write` no longer see sensitive notes. No migration grants the capability back; a business re-grants it in Team › Roles. This is on purpose: the matrix's front-desk template exists so that it doesn't see medical notes.
 - Migration: none.

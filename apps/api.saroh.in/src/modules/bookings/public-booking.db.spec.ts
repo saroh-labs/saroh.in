@@ -23,6 +23,7 @@ import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { ContactAttentionService } from "../customer-workspace/contact-attention.service";
 import { PaymentsService } from "../payments/payments.service";
 import {
     FakeMerchantProvider,
@@ -912,5 +913,177 @@ describe("Where and the intake note (E7, real database)", () => {
             expect(JSON.stringify(listed)).not.toContain("blood");
             expect(listed.every((b) => !("intakeNote" in b))).toBe(true);
         }
+    });
+});
+
+describe("booking-page notes into Needs attention (C12, real database)", () => {
+    const attention = new ContactAttentionService();
+    let member: OrganizationContext;
+    let clinic: string;
+
+    beforeAll(async () => {
+        member = { ...owner, role: "MEMBER" };
+        clinic = (
+            await bookings.createService(owner, {
+                name: "Check-up",
+                durationMinutes: 30,
+                timezone: "UTC",
+                priceCents: 60_000,
+                currency: "INR",
+            })
+        ).id;
+        await prisma.availabilityRule.create({
+            data: {
+                organizationId: owner.organizationId,
+                serviceId: clinic,
+                dayOfWeek: MONDAY,
+                startMinute: 10 * 60,
+                endMinute: 12 * 60,
+            },
+        });
+    });
+
+    const RAHUL_NOTE =
+        "I take amlodipine 5mg for blood pressure. Please check before the numbing.";
+
+    it("turns Rahul's note into a sensitive suggestion only an owner sees, and Add puts a Medical tag on him", async () => {
+        const request = {
+            ...booker("rahul@example.in", "DESK", nextMonday(10, 5)),
+            bookerName: "Rahul Verma",
+            intakeNote: RAHUL_NOTE,
+        };
+        const { booking } = await publicBookings.bookOnline(
+            clinic,
+            request,
+            "ip_c12",
+        );
+        const contactId = booking.contactId ?? "";
+
+        const asOwner = await attention.list(owner, contactId);
+        expect(asOwner.entries).toEqual([]);
+        expect(asOwner.suggestions).toHaveLength(1);
+        const [suggestion] = asOwner.suggestions ?? [];
+        expect(suggestion).toMatchObject({
+            kind: "MEDICAL",
+            label: "I take amlodipine 5mg for blood pressure",
+            detail: RAHUL_NOTE,
+            sensitive: true,
+            source: "BOOKING_PAGE",
+            status: "SUGGESTED",
+            bookingId: booking.id,
+            addedBy: null,
+        });
+
+        // A Member sees neither the suggestion nor a count of it.
+        const asMember = await attention.list(member, contactId);
+        expect(asMember).toEqual({ entries: [], hiddenSensitiveCount: 0 });
+
+        // The booking page retried: still one suggestion.
+        await publicBookings.bookOnline(clinic, request, "ip_c12");
+        expect(
+            await prisma.contactAttention.count({
+                where: { bookingId: booking.id },
+            }),
+        ).toBe(1);
+
+        const added = await attention.confirm(owner, contactId, suggestion.id, {
+            kind: "MEDICAL",
+            label: "Takes amlodipine",
+            sensitive: true,
+        });
+        expect(added).toMatchObject({
+            kind: "MEDICAL",
+            label: "Takes amlodipine",
+            detail: RAHUL_NOTE,
+            sensitive: true,
+            status: "ACTIVE",
+            source: "BOOKING_PAGE",
+            confirmedByUserId: owner.userId,
+        });
+        const after = await attention.list(owner, contactId);
+        expect(after.entries.map((e) => e.label)).toEqual(["Takes amlodipine"]);
+        expect(after.suggestions).toEqual([]);
+        // On the record now: a Member is told one is there, never its words.
+        const memberAfter = await attention.list(member, contactId);
+        expect(memberAfter.hiddenSensitiveCount).toBe(1);
+        expect(JSON.stringify(memberAfter)).not.toContain("amlodipine");
+
+        const audit = await prisma.auditEvent.findFirstOrThrow({
+            where: {
+                organizationId: owner.organizationId,
+                action: "contact.attention.confirmed",
+                targetId: suggestion.id,
+            },
+        });
+        expect(JSON.stringify(audit.metadata)).not.toContain("amlodipine");
+    });
+
+    it("Nothing to add sets it aside; the booking keeps its note for someone who may read it", async () => {
+        const { booking } = await publicBookings.bookOnline(
+            clinic,
+            {
+                ...booker("meera@example.in", "DESK", nextMonday(10, 6)),
+                intakeNote: "Nervous about needles",
+            },
+            "ip_c12",
+        );
+        const contactId = booking.contactId ?? "";
+        const [suggestion] =
+            (await attention.list(owner, contactId)).suggestions ?? [];
+
+        await attention.remove(owner, contactId, suggestion.id);
+
+        const after = await attention.list(owner, contactId);
+        expect(after.suggestions).toEqual([]);
+        expect(after.entries).toEqual([]);
+        await expect(
+            attention.confirm(owner, contactId, suggestion.id),
+        ).rejects.toThrow("Entry not found");
+        expect(await bookings.getBooking(owner, booking.id)).toMatchObject({
+            intakeNote: "Nervous about needles",
+        });
+        expect(
+            "intakeNote" in (await bookings.getBooking(member, booking.id)),
+        ).toBe(false);
+    });
+
+    it("waits for a pay-now booking's payment before suggesting its note", async () => {
+        const { booking, payToken } = await publicBookings.bookOnline(
+            clinic,
+            {
+                ...booker("paid-note@example.in", "NOW", nextMonday(11, 5)),
+                intakeNote: "Pregnant (20 weeks)",
+            },
+            "ip_c12",
+        );
+        expect(booking.status).toBe("PENDING");
+        expect(
+            await prisma.contactAttention.count({
+                where: { bookingId: booking.id },
+            }),
+        ).toBe(0);
+
+        const intent = await publicInvoices.createIntent(payToken ?? "", {
+            idempotencyKey: "tab-c12",
+            amount: 1,
+        });
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: intent.providerIntentId,
+            providerPaymentRef: "pay_c12",
+        });
+
+        const rows = await prisma.contactAttention.findMany({
+            where: { bookingId: booking.id },
+        });
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+            label: "Pregnant",
+            detail: "Pregnant (20 weeks)",
+            status: "SUGGESTED",
+            sensitive: true,
+            contactId: booking.contactId,
+        });
     });
 });

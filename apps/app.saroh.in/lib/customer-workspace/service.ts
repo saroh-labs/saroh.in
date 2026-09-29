@@ -3,8 +3,14 @@ import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
-import type { AttentionEntry, AttentionInput } from "./attention";
+import type {
+    AttentionEntry,
+    AttentionInput,
+    SuggestionInput,
+} from "./attention";
+import type { MergeBody, MergePreview, MergeResult } from "./merge";
 import type { UnlinkPreview } from "./site-account";
+import type { CustomerThread, ThreadMessage } from "./thread";
 
 /**
  * Unified customer workspace data access (#120). Server-only. The workspace
@@ -12,7 +18,7 @@ import type { UnlinkPreview } from "./site-account";
  * explicit and reversible, and only exact email/phone produce a suggestion.
  */
 export type TimelineEventType =
-    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK";
+    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "MERGE" | "DETAILS";
 
 export interface TimelineEvent {
     type: TimelineEventType;
@@ -21,10 +27,7 @@ export interface TimelineEvent {
     moduleKey: string;
 }
 
-/**
- * A store customer to link. The API also suggests other contacts to merge
- * (`?include=contacts`, C2); this screen doesn't ask for them yet.
- */
+/** A store customer to link (#120). */
 export interface IdentitySuggestion {
     kind: "customer";
     customerId: string;
@@ -32,6 +35,20 @@ export interface IdentitySuggestion {
     email: string;
     matchedOn: ("email" | "phone")[];
 }
+
+/** Another contact who is likely the same person (C2): merge them (C10). */
+export interface DuplicateSuggestion {
+    kind: "contact";
+    contactId: string;
+    name: string | null;
+    /** Never a reserved placeholder. */
+    email: string | null;
+    matchedOn: ("email" | "phone")[];
+    /** They sign in on the business's website. */
+    signsIn: boolean;
+}
+
+export type Suggestion = IdentitySuggestion | DuplicateSuggestion;
 
 export type WorkspaceResult = { ok: true } | { ok: false; error: string };
 
@@ -46,17 +63,62 @@ export async function getTimeline(contactId: string): Promise<TimelineEvent[]> {
     return ((await res.json()) as { events: TimelineEvent[] }).events;
 }
 
+/**
+ * Store customers to link and, with `includeContacts`, other contacts to
+ * merge (`?include=contacts`, C2). Each item says its `kind`.
+ */
 export async function getSuggestions(
     contactId: string,
-): Promise<IdentitySuggestion[]> {
+    { includeContacts = false }: { includeContacts?: boolean } = {},
+): Promise<Suggestion[]> {
     const base = await orgBase();
     if (!base) return [];
     const res = await apiFetch(
-        `${base}/customers/${encodeURIComponent(contactId)}/suggestions`,
+        `${base}/customers/${encodeURIComponent(contactId)}/suggestions` +
+            (includeContacts ? "?include=contacts" : ""),
     );
     if (res.status === 404) return [];
     if (!res.ok) throw new Error(`GET suggestions failed: ${res.status}`);
-    return (await res.json()) as IdentitySuggestion[];
+    return (await res.json()) as Suggestion[];
+}
+
+const mergePath = (contactId: string, otherId: string) =>
+    `/customers/${encodeURIComponent(contactId)}/merge/${encodeURIComponent(otherId)}`;
+
+/**
+ * What merging `otherId` with this customer would do (C9), keeping
+ * `survivorId` — or, left out, the one the API offers: the older record.
+ */
+export async function getMergePreview(
+    contactId: string,
+    otherId: string,
+    survivorId?: string,
+): Promise<CrmResult<MergePreview>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const query = survivorId
+        ? `?${new URLSearchParams({ survivorId }).toString()}`
+        : "";
+    const res = await apiFetch(
+        `${base}${mergePath(contactId, otherId)}/preview${query}`,
+    );
+    const data: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: data as MergePreview };
+    return toFailure(data, "Couldn't check what the merge would do.");
+}
+
+/** Merge the two into `body.survivorId` (C9). Final. */
+export function mergeContacts(
+    contactId: string,
+    otherId: string,
+    body: MergeBody,
+): Promise<CrmResult<MergeResult>> {
+    return mutate<MergeResult>(
+        mergePath(contactId, otherId),
+        "POST",
+        body,
+        "Couldn't merge them. Nothing has changed.",
+    );
 }
 
 export async function linkCustomer(
@@ -101,6 +163,103 @@ export function unlinkAccount(
         {},
         "Couldn't separate them.",
     );
+}
+
+/** Who already holds an email the sheet tried to give (C8's 409). */
+export interface EmailHolder {
+    contactId: string;
+    name: string | null;
+}
+
+export type DetailsResult =
+    | { ok: true }
+    | {
+          ok: false;
+          error: string;
+          field?: string;
+          /** Set when another customer holds the email. */
+          holder?: EmailHolder;
+      };
+
+function holderOf(body: unknown): EmailHolder | undefined {
+    const b = (body ?? {}) as { error?: unknown; details?: unknown };
+    const inner =
+        b.error && typeof b.error === "object"
+            ? (b.error as { details?: unknown }).details
+            : b.details;
+    const d = (inner ?? {}) as { contactId?: unknown; name?: unknown };
+    return typeof d.contactId === "string" && d.contactId
+        ? {
+              contactId: d.contactId,
+              name: typeof d.name === "string" ? d.name : null,
+          }
+        : undefined;
+}
+
+/**
+ * Save the edit sheet (C8): name, phone, company, email and address, on
+ * the contact. A refusal keeps its field, and an email another customer
+ * holds names them.
+ */
+export async function updateDetails(
+    contactId: string,
+    input: Record<string, string>,
+): Promise<DetailsResult> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(
+        `${base}/contacts/${encodeURIComponent(contactId)}`,
+        { method: "PATCH", body: JSON.stringify(input) },
+    );
+    if (res.ok) return { ok: true };
+    const body: unknown = await res.json().catch(() => null);
+    const failure = toFailure(body, "Couldn't save their details.");
+    const holder = res.status === 409 ? holderOf(body) : undefined;
+    return holder ? { ...failure, holder } : failure;
+}
+
+/** Add customer's fields (DEC-056): an email, and whatever else is known. */
+export interface AddCustomerInput {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+}
+
+export type AddCustomerResult =
+    | { ok: true; contactId: string }
+    | {
+          ok: false;
+          error: string;
+          field?: string;
+          /** Set when a contact already holds the email. */
+          holder?: EmailHolder;
+      };
+
+/**
+ * Add customer on the Customers list (DEC-056, C14): a contact only, never a
+ * storefront's customer. An email a contact already holds names them, so the
+ * screen can open that person instead.
+ */
+export async function addCustomer(
+    input: AddCustomerInput,
+): Promise<AddCustomerResult> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(`${base}/customers`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const body: unknown = await res.json().catch(() => null);
+    if (res.ok) {
+        const id = (body as { contactId?: unknown } | null)?.contactId;
+        return typeof id === "string"
+            ? { ok: true, contactId: id }
+            : { ok: false, error: "Couldn't add them." };
+    }
+    const failure = toFailure(body, "Couldn't add them.");
+    const holder = res.status === 409 ? holderOf(body) : undefined;
+    return holder ? { ...failure, holder } : failure;
 }
 
 export interface NoteInput {
@@ -172,6 +331,26 @@ export function updateAttention(
     return writeAttention(attentionPath(contactId, entryId), "PATCH", input);
 }
 
+/**
+ * "Add to Needs attention" on a booking-page note (C12), with the kind,
+ * label and sensitive tick staff settled on. A refusal keeps its field.
+ */
+export async function confirmAttention(
+    contactId: string,
+    entryId: string,
+    input: SuggestionInput,
+): Promise<ApiResult<AttentionEntry>> {
+    const base = await orgBase();
+    if (!base) return { ok: false, error: "No active business." };
+    const res = await apiFetch(
+        `${base}${attentionPath(contactId, entryId)}/confirm`,
+        { method: "POST", body: JSON.stringify(input) },
+    );
+    const body: unknown = await res.json().catch(() => null);
+    if (res.ok) return { ok: true, data: body as AttentionEntry };
+    return toFailure(body, "Could not add that to Needs attention.");
+}
+
 /** Take an entry off the list; the API keeps the row, stamped removed. */
 export function removeAttention(
     contactId: string,
@@ -180,5 +359,49 @@ export function removeAttention(
     return destroy<{ ok: true }>(
         attentionPath(contactId, entryId),
         "Could not take that off Needs attention.",
+    );
+}
+
+const threadPath = (contactId: string) =>
+    `/customers/${encodeURIComponent(contactId)}/thread`;
+
+/**
+ * The customer's message thread (A13), or null when there is none to show:
+ * the viewer can't read messages (403) or the account area is still off
+ * (404). A failed read throws, so the page can say so.
+ */
+export async function getThread(
+    contactId: string,
+): Promise<CustomerThread | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const res = await apiFetch(`${base}${threadPath(contactId)}`);
+    if (res.status === 403 || res.status === 404) return null;
+    if (!res.ok) throw new Error(`GET thread failed: ${res.status}`);
+    return (await res.json()) as CustomerThread;
+}
+
+/** The team opened the thread: the customer's messages are read. */
+export function markThreadRead(
+    contactId: string,
+): Promise<CrmResult<{ unread: 0 }>> {
+    return mutate<{ unread: 0 }>(
+        `${threadPath(contactId)}/read`,
+        "POST",
+        {},
+        "Couldn't mark their messages as read.",
+    );
+}
+
+/** Answer the customer (`message:write`). */
+export function replyToThread(
+    contactId: string,
+    text: string,
+): Promise<CrmResult<ThreadMessage>> {
+    return mutate<ThreadMessage>(
+        `${threadPath(contactId)}/messages`,
+        "POST",
+        { text },
+        "Couldn't send your reply. Nothing was sent.",
     );
 }

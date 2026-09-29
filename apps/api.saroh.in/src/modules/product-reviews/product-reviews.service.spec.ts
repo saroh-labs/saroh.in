@@ -12,7 +12,7 @@ jest.mock("@saroh/database", () => ({
         order: { findFirst: jest.fn(), findMany: jest.fn() },
         reviewInvitation: { upsert: jest.fn() },
         customerIdentityLink: { findMany: jest.fn() },
-        contact: { findMany: jest.fn() },
+        contact: { findMany: jest.fn(), findFirst: jest.fn() },
         consent: { findFirst: jest.fn() },
         productReview: {
             findMany: jest.fn(),
@@ -219,6 +219,51 @@ describe("invite", () => {
         );
     });
 
+    // B13: a walk-in left no email, so there is nobody to invite.
+    it("never invites a walk-in, who has no customer and no email", async () => {
+        db.order!.findFirst!.mockResolvedValue(
+            order({ customerId: null, customer: null, walkInName: "Asha" }),
+        );
+        const [result] = await make().invite(ctx, ["o_1"]);
+        expect(result).toMatchObject({ status: "skipped", reason: "no-email" });
+        expect(send).not.toHaveBeenCalled();
+        expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
+    });
+
+    it("leaves walk-ins out of the orders it offers to invite", async () => {
+        db.order!.findMany!.mockResolvedValue([
+            {
+                id: "o_1",
+                orderId: "1001",
+                storeId: "s_1",
+                createdAt: new Date("2026-09-20T10:00:00Z"),
+                store: { name: "High Street" },
+                customer: null,
+                _count: { items: 1 },
+            },
+            {
+                id: "o_2",
+                orderId: "1002",
+                storeId: "s_1",
+                createdAt: new Date("2026-09-20T11:00:00Z"),
+                store: { name: "High Street" },
+                customer: {
+                    email: "ananya@example.com",
+                    firstName: "Ananya",
+                    lastName: null,
+                },
+                _count: { items: 1 },
+            },
+        ]);
+        const offered = await make().invitableOrders("org_1");
+        expect(offered.map((o) => o.id)).toEqual(["o_2"]);
+        expect(db.order!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ customerId: { not: null } }),
+            }),
+        );
+    });
+
     it("stops at the business's daily cap", async () => {
         const results = await make(1).invite(ctx, ["o_1", "o_2"]);
         expect(results.map((r) => r.status)).toEqual(["sent", "skipped"]);
@@ -313,6 +358,77 @@ describe("reply and hide", () => {
             NotFoundException,
         );
         expect(db.productReview!.update).not.toHaveBeenCalled();
+    });
+});
+
+describe("list by contact (C6)", () => {
+    beforeEach(() => {
+        db.contact!.findFirst!.mockResolvedValue({
+            email: "asha@example.com",
+            removedAt: null,
+        });
+        db.productReview!.findMany!.mockResolvedValue([]);
+    });
+
+    it("reads the reviews of every store customer linked to them", async () => {
+        db.customerIdentityLink!.findMany!.mockResolvedValue([
+            { customerId: "cu_1" },
+            { customerId: "cu_2" },
+        ]);
+        await make().list("org_1", { contactId: "ct_1" });
+        expect(db.contact!.findFirst!.mock.calls[0][0].where).toEqual({
+            id: "ct_1",
+            organizationId: "org_1",
+        });
+        expect(
+            db.customerIdentityLink!.findMany!.mock.calls[0][0].where,
+        ).toEqual({ organizationId: "org_1", contactId: "ct_1" });
+        const where = db.productReview!.findMany!.mock.calls[0][0].where;
+        expect(where.organizationId).toBe("org_1");
+        expect(where.OR).toEqual([
+            { customerId: { in: ["cu_1", "cu_2"] } },
+            {
+                customerId: null,
+                invitation: {
+                    order: { customerId: { in: ["cu_1", "cu_2"] } },
+                },
+            },
+        ]);
+    });
+
+    it("never matches by email: no link, no reviews, and no query", async () => {
+        db.customerIdentityLink!.findMany!.mockResolvedValue([]);
+        expect(await make().list("org_1", { contactId: "ct_1" })).toEqual([]);
+        expect(db.productReview!.findMany).not.toHaveBeenCalled();
+    });
+
+    it("shows nothing for a customer removed for a privacy request", async () => {
+        db.contact!.findFirst!.mockResolvedValue({
+            email: "removed+ct_1@removed.invalid",
+            removedAt: new Date(),
+        });
+        db.customerIdentityLink!.findMany!.mockResolvedValue([
+            { customerId: "cu_1" },
+        ]);
+        expect(await make().list("org_1", { contactId: "ct_1" })).toEqual([]);
+        expect(db.productReview!.findMany).not.toHaveBeenCalled();
+    });
+
+    it("404s a contact in another business", async () => {
+        db.contact!.findFirst!.mockResolvedValue(null);
+        await expect(
+            make().list("org_1", { contactId: "ct_x" }),
+        ).rejects.toThrow(NotFoundException);
+        expect(db.productReview!.findMany).not.toHaveBeenCalled();
+    });
+
+    it("leaves the product page's list as it was", async () => {
+        await make().list("org_1", { productId: "p_1" });
+        expect(db.contact!.findFirst).not.toHaveBeenCalled();
+        expect(db.productReview!.findMany!.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            productId: "p_1",
+        });
     });
 });
 

@@ -71,7 +71,7 @@ export function ListFirstRun({
         <EmptyState
             icon={<Users />}
             title="No customers yet"
-            description="Customers are people who've paid or signed in on your website. Everyone else is in Contacts."
+            description="Customers are people who've paid, signed in on your website or been added here. Everyone else is in Contacts."
             action={
                 <div className="flex flex-wrap justify-center gap-2">
                     <Button asChild variant="outline">
@@ -95,14 +95,15 @@ export function ListFirstRun({
 }
 
 /**
- * The line under the list: who is on it, so someone added by hand — or
- * who ordered and hasn't paid — isn't taken to be lost.
+ * The line under the list: who is on it, so someone who ordered and hasn't
+ * paid, or a lead, isn't taken to be lost. Someone added here with Add
+ * customer is on it from the start (DEC-056).
  */
 export function ListNote() {
     return (
         <p className="mt-2.5 text-pretty text-[12px] text-muted-foreground">
-            Customers are people who&apos;ve paid or signed in on your website.
-            Everyone else is in{" "}
+            Customers are people who&apos;ve paid, signed in on your website or
+            been added here. Everyone else is in{" "}
             <Link
                 href="/contacts"
                 className="font-medium text-brand hover:text-foreground"

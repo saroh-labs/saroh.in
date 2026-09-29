@@ -146,6 +146,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/fulfilment.spec.ts",
         "<rootDir>/src/modules/orders/order-refunds.spec.ts",
         "<rootDir>/src/modules/orders/order-read.spec.ts",
+        // B14: a treatment's Visits card and its next action, pure.
+        "<rootDir>/src/modules/orders/order-visits.spec.ts",
         "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
@@ -159,6 +161,8 @@ module.exports = {
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
         // G11: pure serialisers of the public catalogue.
         "<rootDir>/src/modules/products/public-catalogue.serialize.spec.ts",
+        // G12: what a Product grid asks the catalogue — pure.
+        "<rootDir>/src/modules/products/product-grid.spec.ts",
         // #513 the stock log's words and arithmetic — pure.
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
@@ -192,12 +196,23 @@ module.exports = {
         "<rootDir>/src/modules/orders/organization-orders.controller.spec.ts",
         // B2d: the legacy fulfilment words are refused.
         "<rootDir>/src/modules/orders/dto.spec.ts",
+        // B6: the bulk move body; the rows are in order-stage-batch.db.spec.ts.
+        "<rootDir>/src/modules/orders/order-stage-batch.dto.spec.ts",
         // Plan B, B1: the Orders list's filters and its row, DB-free. The SQL
         // runs against Postgres in order-list.db.spec.ts.
         "<rootDir>/src/modules/orders/order-list-filters.spec.ts",
         "<rootDir>/src/modules/orders/order-row.spec.ts",
         // B4: the filter bar's options, DB-free.
         "<rootDir>/src/modules/orders/order-list-options.spec.ts",
+        // B13: New order's rules and how a walk-in reads, DB-free. The
+        // writes are in new-order.db.spec.ts.
+        "<rootDir>/src/modules/orders/new-order.spec.ts",
+        "<rootDir>/src/modules/orders/walk-in.spec.ts",
+        // B13b: the phone a walk-in is kept by, DB-free.
+        "<rootDir>/src/modules/orders/walk-in-customer.spec.ts",
+        // G13: the site bag's pricing, DB-free. The real rows are in
+        // public-checkout.db.spec.ts.
+        "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
@@ -222,6 +237,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         // Which refunds make no credit note — a jest-mocked transaction.
         "<rootDir>/src/modules/invoices/order-invoicing.spec.ts",
+        // D18: what narrows the list by source, pack, course or order, and
+        // its query (list-filter.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/list-filter.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
@@ -242,9 +260,17 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/plan-on-sale.spec.ts",
         // D10: a subscription's own classes a month, and the fallback.
         "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
+        // G9: the order a site lists plans in, and Most chosen.
+        "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
+        // E14: which packs are on sale; a DRAFT is refused.
+        "<rootDir>/src/modules/class-packs/pack-on-sale.spec.ts",
+        // A10: spending a pack as the team and as the customer, mocked tx.
+        "<rootDir>/src/modules/class-packs/redeem-pack.spec.ts",
+        // A11: a pack bought online — its snapshot, words and dates. Pure.
+        "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

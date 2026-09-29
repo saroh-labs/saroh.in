@@ -178,6 +178,45 @@ export interface VisitUsContent {
     showHours?: boolean;
 }
 
+/**
+ * `journal` — how the site's latest posts show (G10). The posts themselves
+ * are read live by the site, never stored here. `count` is 3 or 6 (absent:
+ * 3); both switches read as on when absent.
+ */
+export interface JournalContent {
+    title?: string;
+    count?: 3 | 6;
+    showExcerpts?: boolean;
+    showImages?: boolean;
+}
+
+/**
+ * `plans` — how the business's plans on sale show (G9). The plans themselves
+ * are read live by the site, never stored here. `highlight` absent means
+ * `first`; `showDescriptions` absent means shown.
+ */
+export interface PlansContent {
+    title?: string;
+    highlight?: "first" | "none";
+    buttonLabel?: string;
+    showDescriptions?: boolean;
+}
+
+/**
+ * `productGrid` — which products from the catalogue show (G12): the newest,
+ * a collection's or picked by hand, by id. The products themselves are read
+ * live by the site, never stored here. `source` absent means `newest`,
+ * `count` absent four, `showPrices` absent shown.
+ */
+export interface ProductGridContent {
+    title?: string;
+    source?: "newest" | "collection" | "picked";
+    collectionId?: string;
+    productIds?: string[];
+    count?: number;
+    showPrices?: boolean;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -237,6 +276,9 @@ export interface SectionContentByType {
     contact: ContactContent;
     servicesList: ServicesListContent;
     visitUs: VisitUsContent;
+    journal: JournalContent;
+    plans: PlansContent;
+    productGrid: ProductGridContent;
 }
 
 /**
@@ -1125,7 +1167,11 @@ export type FlagType =
     | "phoneWidth"
     // The shop (G11): raised only while it is open for the business.
     | "storefrontUnchosen"
-    | "reservedAddress";
+    | "reservedAddress"
+    // The checkout (G13): the shop can't take an online order now.
+    | "shopCantTakeOrders"
+    // A Product grid (G12) naming products that aren't on sale there.
+    | "productsNotOnSale";
 
 export interface Flag {
     type: FlagType;

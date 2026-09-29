@@ -6,9 +6,10 @@ import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
-import { canReadPacks, canWritePacks } from "@/lib/class-packs/access";
+import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
@@ -69,13 +70,15 @@ export default async function BookingsPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [params, organization, staffList, rules, services] =
+    const [params, organization, staffList, rules, services, notices] =
         await Promise.all([
             searchParams,
             resolveActiveOrganization(),
             readStaff(),
             getBookingRules().catch(() => null),
             listServices(),
+            // What a cancelled class tells everyone on it (A14).
+            readNoticeReach(),
         ]);
 
     const may = (action: string) =>
@@ -150,10 +153,12 @@ export default async function BookingsPage({
                 staff={staffList?.staff ?? null}
                 services={services}
                 rules={rules}
+                notices={notices}
                 people={people}
                 can={{
                     book: may("booking:write"),
                     hours: may("service:write"),
+                    order: may("order:read"),
                 }}
                 newBooking={
                     may("booking:write") ? (
@@ -174,7 +179,7 @@ export default async function BookingsPage({
                             // while Class packs is on (E12).
                             canUsePacks={
                                 canReadPacks(organization) &&
-                                canWritePacks(organization) &&
+                                canUsePacksOnBookings(organization) &&
                                 packsOn(await modulesOrUnknown())
                             }
                         />

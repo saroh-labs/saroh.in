@@ -17,29 +17,53 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
 import { encryptSecret } from "../payments/crypto";
+import type {
+    NoticeChannels,
+    NoticeReach,
+} from "../site-accounts/notice-reach";
+import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
 import type { MessageSendPayload } from "./message-send.handler";
 import { MESSAGE_SEND_TYPE } from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
-import type { InvoiceMailVars, TransactionalTemplate } from "./transactional";
+import type {
+    InvoiceMailVars,
+    InvoiceTemplate,
+    NoticeTemplate,
+    RenderedMessage,
+    TeamTemplate,
+} from "./transactional";
 import { renderTransactional } from "./transactional";
 
 type Db = Prisma.TransactionClient;
 
 /**
- * Who a transactional message may go to — only ever one of two addresses
- * (D17): the bill-to email the invoice kept when it was issued, or the
- * email a customer verified when they made their site account. Never an
- * address the caller typed, so the path cannot be turned into a way to
- * email anyone.
+ * Who a transactional message may go to — only ever one of three addresses
+ * (D17): the bill-to email the invoice kept when it was issued, the email
+ * a customer verified when they made their site account, or (F14) the
+ * sign-in email of someone on the business's own team. Never an address
+ * the caller typed, so the path cannot be turned into a way to email
+ * anyone.
  */
 export type TransactionalRecipient =
     | { kind: "INVOICE_BILL_TO"; invoiceId: string }
-    | { kind: "SITE_ACCOUNT"; contactId: string };
+    | { kind: "SITE_ACCOUNT"; contactId: string }
+    | { kind: "TEAM_MEMBER"; userId: string };
+
+/**
+ * What a transactional message says: an invoice's template with its
+ * values, or one of A14's notices or F14's team alerts, already worded by
+ * its handler (`site-accounts/notify-templates.ts`,
+ * `notifications/team-alert.handler.ts`).
+ */
+export type TransactionalWords =
+    | { template: InvoiceTemplate; vars: InvoiceMailVars }
+    | { template: NoticeTemplate | TeamTemplate; rendered: RenderedMessage };
 
 /** Input for {@link CommunicationsService.queueTransactional}. */
-export interface TransactionalInput {
-    template: TransactionalTemplate;
-    vars: InvoiceMailVars;
+export type TransactionalInput = TransactionalWords & TransactionalSend;
+
+/** Who it goes to and what it carries, whatever it says. */
+export interface TransactionalSend {
     recipient: TransactionalRecipient;
     /**
      * Makes the secret link the body points at (a fresh pay link). Called
@@ -555,13 +579,28 @@ export class CommunicationsService {
      * null when there is none. An invoice's bill-to email comes first (a
      * draft's is the contact's, which issuing copies); a reserved
      * placeholder (DEC-049) is no email, and then the contact's verified
-     * site-account email is used, if they have an active account.
+     * site-account email is used, if they have an active account. A team
+     * member (F14) is their sign-in email, only while they are on this
+     * business's team; no contact is involved.
      */
     async transactionalAddress(
         db: Db,
         organizationId: string,
         recipient: TransactionalRecipient,
     ): Promise<TransactionalAddress | null> {
+        if (recipient.kind === "TEAM_MEMBER") {
+            const member = await db.membership.findUnique({
+                where: {
+                    organizationId_userId: {
+                        organizationId,
+                        userId: recipient.userId,
+                    },
+                },
+                select: { user: { select: { email: true } } },
+            });
+            const email = member?.user.email.trim();
+            return email ? { address: email, contactId: null } : null;
+        }
         let contactId: string | null;
         let candidate: string | null = null;
         if (recipient.kind === "INVOICE_BILL_TO") {
@@ -636,10 +675,10 @@ export class CommunicationsService {
             );
         }
 
-        const { subject, body } = renderTransactional(
-            input.template,
-            input.vars,
-        );
+        const { subject, body } =
+            "rendered" in input
+                ? input.rendered
+                : renderTransactional(input.template, input.vars);
         const base = {
             organizationId,
             channel: "EMAIL",
@@ -699,6 +738,30 @@ export class CommunicationsService {
             },
         });
         return { id: message.id, status: "QUEUED", toAddress: to.address };
+    }
+
+    /**
+     * How a notice about a customer's own booking or order reaches them
+     * (A14, R17): the business's channels, and for `contactId` that
+     * customer's reach (`site-accounts/notice-reach.ts`). `contact:read`,
+     * as the booking peek that asks it. Another business's contact reads
+     * as reaching nobody, never as a 404 that would confirm it exists.
+     */
+    async noticeReach(
+        ctx: OrganizationContext,
+        contactId: string | null,
+    ): Promise<NoticeChannels & { reach: NoticeReach | null }> {
+        authorize(ctx, "contact:read");
+        const channels = await noticeChannels(prisma, ctx.organizationId);
+        const reach = contactId
+            ? await contactReach(
+                  prisma,
+                  ctx.organizationId,
+                  contactId,
+                  channels,
+              )
+            : null;
+        return { ...channels, reach };
     }
 
     // ---- Reads (auditable lifecycle) --------------------------------------

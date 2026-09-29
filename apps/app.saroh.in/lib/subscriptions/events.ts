@@ -135,7 +135,17 @@ export function changeWhat(
         case "MANDATE_SET_UP":
             return "Autopay set up";
         case "MANDATE_CANCELLED":
-            return "Autopay cancelled";
+            // D20: autopay ends with what it was authorised for.
+            switch (data.reason) {
+                case "SUBSCRIPTION_ENDED":
+                    return "Autopay cancelled — subscription ended";
+                case "MERGED":
+                    return "Autopay cancelled — customers merged";
+                case "PRIVACY_REMOVAL":
+                    return "Autopay cancelled — their details were removed";
+                default:
+                    return "Autopay cancelled";
+            }
         case "CHARGED":
             return `Paid by autopay${invoice}`;
         default:

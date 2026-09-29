@@ -5,9 +5,15 @@ import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { OrderReviews } from "@/components/stores/order-reviews";
 import { customerHref } from "@/lib/customers/links";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
-import { orderLockedText, ordersAccess } from "@/lib/orders/access";
+import {
+    orderLockedText,
+    orderPowers,
+    ordersAccess,
+} from "@/lib/orders/access";
+import { allergyNotesOf } from "@/lib/orders/attention";
 import { getAllergyNotes, getOrderRead } from "@/lib/orders/kitchen-service";
 import type { AllergyNote } from "@/lib/orders/read";
+import { arrivalOf } from "@/lib/orders/row-menu";
 import { sellablesOf } from "@/lib/orders/sellables";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrderPayments } from "@/lib/payments/service";
@@ -28,10 +34,11 @@ export const metadata = { title: "Order" };
  * store, so this page no longer uses it. `?storefront=` in older links is
  * ignored: the organization scopes the read.
  *
- * Beside it, each read on its own so one failing costs only its panel: the
- * customer's allergy notes (the contact's detail read, U8 — only for a
- * customer confirmed as a contact), the provider's payment attempts (money
- * roles), and the review invitation (`order:read`).
+ * The allergy check reads the customer's Needs attention from the order
+ * read itself (B15), so the kitchen's view has it too. Beside it, each read
+ * on its own so one failing costs only its panel: the provider's payment
+ * attempts (money roles) and the review invitation (`order:read`) — and,
+ * from an API before B15 only, the contact's allergy notes (U8).
  *
  * Someone holding neither `order:read` nor `order:stage` gets the design's
  * locked card before the order is read (B7), rather than the generic denial
@@ -39,13 +46,16 @@ export const metadata = { title: "Order" };
  */
 export default async function OrderPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ orderId: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [{ orderId }, organization] = await Promise.all([
+    const [{ orderId }, organization, query] = await Promise.all([
         params,
         resolveActiveOrganization(),
+        searchParams,
     ]);
     if (organization && !ordersAccess(organization).open) {
         return <OrderLocked text={orderLockedText(organization)} />;
@@ -57,20 +67,28 @@ export default async function OrderPage({
         organization?.actions
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    // What this person may do to it, each the power its endpoint asks (B16).
+    const powers = orderPowers(organization);
 
     const contactId = order.customer?.contactId ?? null;
-    // A pay link (B11) is offered only to someone who may change the order,
-    // on an order that shows money, and only while a provider can open the
-    // checkout window (DEC-054).
+    // A pay link (B11) is offered only to someone who may take or change
+    // orders, on an order that shows money, and only while a provider can
+    // open the checkout window (DEC-054).
     const payOnline =
-        may("order:write") && order.money
+        powers.payLink && order.money
             ? hasPaymentProvider().catch(() => false)
             : Promise.resolve(false);
+    // The allergy check reads the order's own Needs attention (B15), which
+    // reaches the kitchen too; an API before B15 sends none, and the
+    // contact's notes are read instead.
+    const fromOrder = allergyNotesOf(order.attention);
     const [notes, payments, reviewState, canPayOnline, addable] =
         await Promise.all([
-            contactId
-                ? getAllergyNotes(contactId)
-                : Promise.resolve<AllergyNote[]>([]),
+            fromOrder !== undefined
+                ? Promise.resolve(fromOrder)
+                : contactId
+                  ? getAllergyNotes(contactId)
+                  : Promise.resolve<AllergyNote[]>([]),
             order.money
                 ? getOrderPayments(order.id).catch(() => null)
                 : Promise.resolve(null),
@@ -81,7 +99,7 @@ export default async function OrderPage({
             payOnline,
             // "Add an item" (B8): only while items can change, for someone who
             // may change them — from the order's own storefront (DEC-032).
-            may("order:write") && order.next.editable
+            powers.edit && order.next.editable
                 ? listProducts({ storefront: order.store.id })
                       .then((products) =>
                           // Set to Not sold (archived): nobody orders it.
@@ -110,11 +128,16 @@ export default async function OrderPage({
             notes={notes ?? "unavailable"}
             payments={payments}
             can={{
-                stage: may("order:stage"),
-                write: may("order:write"),
-                refund: may("payment:manage"),
+                stage: powers.stage,
+                edit: powers.edit,
+                payLink: powers.payLink,
+                refund: powers.refund,
                 payOnline: canPayOnline,
                 manageProviders: may("payment:manage"),
+                contact: may("contact:read"),
+                // A treatment's visits (B14): open one, book the next.
+                bookingRead: may("booking:read"),
+                bookingWrite: may("booking:write"),
             }}
             customerHref={
                 contactId
@@ -124,6 +147,9 @@ export default async function OrderPage({
                       : null
             }
             addable={addable}
+            // From the Orders list's row menu or quick view (B5): open the
+            // refund or courier panel, or print the ticket, once.
+            arrival={arrivalOf(query)}
             aside={
                 reviewState ? (
                     <OrderReviews

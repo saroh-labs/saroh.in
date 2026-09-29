@@ -13,6 +13,12 @@ import { useId, useState, useSyncExternalStore } from "react";
 export interface SiteNavItem {
     label: string;
     href: string;
+    /**
+     * The module page this entry opens (G14), as the publisher resolved it:
+     * `BOOK`, `SHOP`, … Absent for a free-form page. The header leaves the
+     * entry out while its module is off (G15, `siteMenu`).
+     */
+    kind?: string;
 }
 
 /** The header's one main button: "Book" or "Order", or nothing. */
@@ -74,10 +80,10 @@ export function SiteNavRow({ items }: { items: SiteNavItem[] }) {
                         href={item.href}
                         aria-current={on ? "page" : undefined}
                         className={
-                            "focus-visible:ring-site-accent coarse:min-h-11 inline-flex h-[34px] shrink-0 items-center whitespace-nowrap rounded-full px-3 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 " +
+                            "focus-visible:ring-site-accent coarse:min-h-11 inline-flex h-[34px] shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full px-3 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 " +
                             (on
-                                ? "bg-site-fg text-site-bg"
-                                : "text-site-body hover:text-site-fg")
+                                ? "bg-site-fg text-site-bg active:opacity-80"
+                                : "text-site-body hover:bg-site-border/40 hover:text-site-fg active:bg-site-border/70")
                         }
                     >
                         {item.label}
@@ -123,7 +129,7 @@ export function SiteMenu({
                 onKeyDown={(e) => {
                     if (e.key === "Escape") close();
                 }}
-                className="border-site-border bg-site-surface text-site-fg focus-visible:ring-site-accent coarse:size-11 flex size-10 shrink-0 items-center justify-center rounded-[var(--site-radius)] border focus-visible:outline-none focus-visible:ring-2 min-[820px]:hidden"
+                className="border-site-border bg-site-surface text-site-fg focus-visible:ring-site-accent coarse:size-11 hover:bg-site-border/40 active:bg-site-border/70 aria-expanded:bg-site-border/40 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-[var(--site-radius)] border transition-colors focus-visible:outline-none focus-visible:ring-2 min-[820px]:hidden"
             >
                 <svg
                     width="18"
@@ -158,10 +164,10 @@ export function SiteMenu({
                                 onClick={close}
                                 aria-current={on ? "page" : undefined}
                                 className={
-                                    "text-site-fg focus-visible:ring-site-accent flex h-[46px] items-center rounded-[var(--site-radius)] px-3 text-left text-base focus-visible:outline-none focus-visible:ring-2 " +
+                                    "text-site-fg focus-visible:ring-site-accent active:bg-site-border/70 flex h-[46px] cursor-pointer items-center rounded-[var(--site-radius)] px-3 text-left text-base transition-colors focus-visible:outline-none focus-visible:ring-2 " +
                                     (on
                                         ? "bg-site-border/40 font-bold"
-                                        : "font-medium")
+                                        : "hover:bg-site-border/25 font-medium")
                                 }
                             >
                                 {item.label}
@@ -172,7 +178,7 @@ export function SiteMenu({
                         <Link
                             href={action.href}
                             onClick={close}
-                            className="bg-site-accent text-site-accent-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg mt-2 flex h-12 w-full items-center justify-center rounded-[var(--site-radius)] text-[15px] font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                            className="bg-site-accent text-site-accent-fg focus-visible:ring-site-accent focus-visible:ring-offset-site-bg mt-2 flex h-12 w-full cursor-pointer items-center justify-center rounded-[var(--site-radius)] text-[15px] font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-80"
                         >
                             {action.label}
                         </Link>

@@ -43,6 +43,9 @@ jest.mock("@saroh/database", () => {
         },
         invoice: { findFirst: jest.fn(), findMany: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
+        // D20: a subscription's autopay ends with it.
+        paymentMandate: { findMany: jest.fn(), updateMany: jest.fn() },
+        job: { create: jest.fn() },
     };
     return {
         ...actual,
@@ -175,6 +178,7 @@ beforeEach(() => {
     tx.subscriptionSkip!.findFirst!.mockResolvedValue(null);
     tx.subscriptionSkip!.findMany!.mockResolvedValue([]);
     tx.customerSubscription!.count!.mockResolvedValue(0);
+    tx.paymentMandate!.findMany!.mockResolvedValue([]);
     tx.customerSubscription!.create!.mockResolvedValue({ id: "sub_1" });
     tx.customerSubscription!.findFirst!.mockResolvedValue(sub());
     tx.customerSubscription!.findUnique!.mockResolvedValue(sub());
@@ -505,6 +509,59 @@ describe("cancelling", () => {
         });
     });
 
+    it("ends its autopay with it, and asks the provider by a job (D20)", async () => {
+        tx.paymentMandate!.findMany!.mockResolvedValue([
+            { id: "man_1", subscriptionId: "sub_1", providerMandateId: "p_1" },
+        ]);
+        tx.paymentMandate!.updateMany!.mockResolvedValue({ count: 1 });
+        await service.cancel(owner, "sub_1", { when: "now" });
+        expect(tx.paymentMandate!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    organizationId: "org_1",
+                    subscriptionId: "sub_1",
+                }),
+            }),
+        );
+        expect(tx.paymentMandate!.updateMany).toHaveBeenCalledWith({
+            where: {
+                id: "man_1",
+                status: { in: ["PENDING", "ACTIVE", "PAUSED"] },
+            },
+            data: expect.objectContaining({
+                status: "CANCELLED",
+                cancelReason: "SUBSCRIPTION_ENDED",
+                cancelConfirmedAt: null,
+            }),
+        });
+        expect(tx.subscriptionEvent!.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                kind: "MANDATE_CANCELLED",
+                actorKind: "JOB",
+                data: { reason: "SUBSCRIPTION_ENDED" },
+            }),
+        });
+        expect(tx.job!.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "mandate.cancel",
+                payload: { subscriptionId: "sub_1" },
+            }),
+        });
+    });
+
+    it("leaves autopay alone until a cancel at period end takes effect", async () => {
+        await service.cancel(owner, "sub_1", { when: "periodEnd" });
+        expect(tx.paymentMandate!.findMany).not.toHaveBeenCalled();
+        expect(tx.job!.create).not.toHaveBeenCalled();
+    });
+
+    it("queues nothing when there is no autopay to end", async () => {
+        await service.cancel(owner, "sub_1", { when: "now" });
+        expect(tx.paymentMandate!.findMany).toHaveBeenCalled();
+        expect(tx.paymentMandate!.updateMany).not.toHaveBeenCalled();
+        expect(tx.job!.create).not.toHaveBeenCalled();
+    });
+
     it("can be taken back before the period runs out", async () => {
         tx.customerSubscription!.findFirst!.mockResolvedValue(
             sub({ cancelAtPeriodEnd: true }),
@@ -585,6 +642,17 @@ describe("renewal", () => {
             },
         });
         expect(issueInTx).not.toHaveBeenCalled();
+        // Its autopay ends with it (D20).
+        expect(tx.paymentMandate!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ subscriptionId: "sub_1" }),
+            }),
+        );
+    });
+
+    it("keeps autopay on a subscription that renews", async () => {
+        await service.renewOne("sub_1", now);
+        expect(tx.paymentMandate!.findMany).not.toHaveBeenCalled();
     });
 
     it("ends a paused one that was set to end, without an invoice", async () => {
@@ -901,6 +969,21 @@ describe("a plan's read (D1)", () => {
         expect(db.customerSubscription!.groupBy).not.toHaveBeenCalled();
     });
 
+    it.each([
+        [{}, { status: { not: "DRAFT" } }],
+        [{ include: "drafts" as const }, {}],
+        [{ status: "DRAFT" as const }, { status: "DRAFT" }],
+        [{ status: "ACTIVE" as const }, { status: "ACTIVE" }],
+    ])("lists drafts only when asked (D5): %p", async (query, where) => {
+        db.subscriptionPlan!.findMany!.mockResolvedValue([]);
+        await service.listPlans(owner, query);
+        expect(db.subscriptionPlan!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { ...where, organizationId: "org_1" },
+            }),
+        );
+    });
+
     it("answers another business's plan with a 404", async () => {
         db.subscriptionPlan!.findMany!.mockResolvedValue([]);
         await expect(service.getPlan(owner, "plan_x")).rejects.toBeInstanceOf(
@@ -971,14 +1054,34 @@ describe("a plan's name and classes (D1)", () => {
     });
 
     it("changes classes a month, or clears them with null", async () => {
+        // Leaving out the draft revision each recorded change bumps (D5).
+        const writes = () =>
+            tx
+                .subscriptionPlan!.updateMany!.mock.calls.map((c) => c[0].data)
+                .filter((d) => !("draftRevision" in d));
         await service.updatePlan(owner, "plan_1", { classesPerMonth: 12 });
-        expect(tx.subscriptionPlan!.updateMany!.mock.calls[0]![0].data).toEqual(
-            { classesPerMonth: 12 },
-        );
+        expect(writes()[0]).toEqual({ classesPerMonth: 12 });
         await service.updatePlan(owner, "plan_1", { classesPerMonth: null });
-        expect(tx.subscriptionPlan!.updateMany!.mock.calls[1]![0].data).toEqual(
-            { classesPerMonth: null },
-        );
+        expect(writes()[1]).toEqual({ classesPerMonth: null });
+    });
+
+    it("bumps the draft revision when a change is recorded (D5)", async () => {
+        await service.updatePlan(owner, "plan_1", { classesPerMonth: 12 });
+        expect(tx.subscriptionPlan!.updateMany).toHaveBeenCalledWith({
+            where: { id: "plan_1", organizationId: "org_1" },
+            data: { draftRevision: { increment: 1 } },
+        });
+    });
+
+    it("refuses the old whole-plan save on a draft (D5)", async () => {
+        tx.subscriptionPlan!.findFirst!.mockResolvedValue({
+            ...PLAN,
+            status: "DRAFT",
+        });
+        await expect(
+            service.updatePlan(owner, "plan_1", { classesPerMonth: 12 }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.subscriptionPlan!.updateMany).not.toHaveBeenCalled();
     });
 
     it("refuses a name another live plan has, ignoring case, naming it", async () => {

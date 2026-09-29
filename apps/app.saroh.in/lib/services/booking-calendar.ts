@@ -6,6 +6,22 @@ import type { BookingOutcome, BookingStatus } from "./booking-state";
  * and tests can use it; `service.ts` does the fetching.
  */
 
+/**
+ * A visit of a treatment (E10, DEC-050): which visit of how many, the order
+ * it belongs to, and the visit staff can book next — null once every visit
+ * is booked or the order was cancelled or refunded.
+ */
+export interface TreatmentView {
+    orderId: string;
+    /** The order's number: "ORD-004". */
+    orderNumber: string;
+    visitNumber: number;
+    visits: number;
+    booked: number;
+    nextVisit: number | null;
+    closed: boolean;
+}
+
 /** How a booking was paid (U3); null when nobody said (older bookings). */
 export type PaidWith = "MEMBERSHIP" | "PACK" | "PAID" | "DESK";
 
@@ -47,6 +63,8 @@ export interface DiaryBooking {
     /** The pack paying for it, while its class is still spent on it. */
     packName: string | null;
     subscriptionId: string | null;
+    /** A visit of a treatment (E10); absent from an older API. */
+    treatment?: TreatmentView | null;
 }
 
 /** One start of a class: places, who holds them and how each paid. */

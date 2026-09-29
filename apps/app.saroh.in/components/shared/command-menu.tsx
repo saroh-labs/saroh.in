@@ -130,7 +130,7 @@ const ACTIONS: {
     label: string;
     icon: typeof UserRound;
     moduleKey?: string;
-    action?: NavAction;
+    action?: NavAction | readonly NavAction[];
     /**
      * Offered only while the business may still make one: one website
      * (ADR-006), storefronts up to the plan (ADR-010).
@@ -162,7 +162,8 @@ const ACTIONS: {
         label: "Sell a pack",
         icon: Ticket,
         moduleKey: "CLASS_PACKS",
-        action: "pack:write",
+        // `pack:sell` (E26); an API from before it asked `pack:write`.
+        action: ["pack:sell", "pack:write"],
     },
     {
         href: "/sites/new",

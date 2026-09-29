@@ -99,7 +99,7 @@ export function ageWords(minutes: number): string {
  * How long a row has waited, and "Late · 3 h" once the API says it is late.
  * Only while the order is still on its way: a finished, refunded or
  * cancelled order has nothing to wait for. An appointment goes by its
- * visits, not the clock, so it shows none (B14 brings "Next visit").
+ * visits, not the clock, so it shows none ("Next 19 Sep" is a follow-up to B14).
  */
 export function rowAge(
     row: Pick<
@@ -171,14 +171,22 @@ export function rowSubline(
         .join(" · ");
 }
 
-/** The customer's name, or their email when there is no name. */
-export function rowCustomer(row: Pick<OrderRow, "customer">): string {
+/**
+ * The customer's name, or their email when there is no name; a walk-in
+ * (B13) by the name they gave.
+ */
+export function rowCustomer(
+    row: Pick<OrderRow, "customer"> & Partial<Pick<OrderRow, "walkIn">>,
+): string {
+    if (!row.customer && row.walkIn) return row.walkIn.name;
     return row.customer?.name ?? row.customer?.email ?? "Unknown customer";
 }
 
 /** Two letters from the name, or one from the email when there is no name. */
-export function rowInitials(row: Pick<OrderRow, "customer">): string {
-    const name = row.customer?.name ?? "";
+export function rowInitials(
+    row: Pick<OrderRow, "customer"> & Partial<Pick<OrderRow, "walkIn">>,
+): string {
+    const name = row.customer?.name ?? row.walkIn?.name ?? "";
     const letters = name
         .split(/[\s&]+/)
         .filter((w) => /^[A-Za-zÀ-ÿ]/.test(w))

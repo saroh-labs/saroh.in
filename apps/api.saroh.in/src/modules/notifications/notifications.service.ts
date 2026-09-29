@@ -2,7 +2,8 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
+import { hiddenNotificationTypes } from "./alert-preferences";
 
 /** Options for {@link NotificationsService.list}. */
 export interface ListNotificationsOptions {
@@ -21,6 +22,11 @@ export interface ListNotificationsOptions {
  * policy (OWNER/ADMIN-only), so one org can never read or mutate another's
  * notifications, and a cross-tenant id is a 404 (not a 403) so callers can't
  * probe which notifications exist elsewhere.
+ *
+ * The inbox is the business's, but what each person sees of it is theirs
+ * (round-2 F14): a notice for an alert they turned the bell off for, or
+ * that their role can't read, is left out of their list and their count,
+ * and "Mark all read" leaves it alone.
  */
 @Injectable()
 export class NotificationsService {
@@ -34,6 +40,7 @@ export class NotificationsService {
             where: {
                 organizationId: ctx.organizationId,
                 ...(options.unreadOnly ? { readAt: null } : {}),
+                ...(await this.hiddenFor(ctx)),
             },
             orderBy: { createdAt: "desc" },
         });
@@ -43,7 +50,11 @@ export class NotificationsService {
     async unreadCount(ctx: OrganizationContext): Promise<{ count: number }> {
         authorize(ctx, "notification:read");
         const count = await prisma.notification.count({
-            where: { organizationId: ctx.organizationId, readAt: null },
+            where: {
+                organizationId: ctx.organizationId,
+                readAt: null,
+                ...(await this.hiddenFor(ctx)),
+            },
         });
         return { count };
     }
@@ -70,10 +81,35 @@ export class NotificationsService {
     async markAllRead(ctx: OrganizationContext): Promise<{ updated: number }> {
         authorize(ctx, "notification:write");
         const res = await prisma.notification.updateMany({
-            where: { organizationId: ctx.organizationId, readAt: null },
+            where: {
+                organizationId: ctx.organizationId,
+                readAt: null,
+                ...(await this.hiddenFor(ctx)),
+            },
             data: { readAt: new Date() },
         });
         return { updated: res.count };
+    }
+
+    /**
+     * The notice types this person doesn't see (F14), as a filter to spread
+     * into a query; nothing when they see everything.
+     */
+    private async hiddenFor(
+        ctx: OrganizationContext,
+    ): Promise<{ type?: { notIn: string[] } }> {
+        const stored = await prisma.notificationPreference.findMany({
+            where: {
+                organizationId: ctx.organizationId,
+                userId: ctx.userId,
+                channel: "bell",
+            },
+            select: { event: true, channel: true, enabled: true },
+        });
+        const hidden = hiddenNotificationTypes(stored, (action) =>
+            allows(ctx, action),
+        );
+        return hidden.length > 0 ? { type: { notIn: hidden } } : {};
     }
 
     /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ModuleStates } from "./panels";
-import { contactPanels, moduleOn, viewerCan } from "./panels";
+import { contactPanels, moduleOn, sellPacksOnly, viewerCan } from "./panels";
 
 const on = (...keys: string[]): ModuleStates =>
     ["PAYMENTS", "APPOINTMENTS", "CLASS_PACKS", "COURSES", "CRM"].map(
@@ -47,6 +47,21 @@ describe("contactPanels", () => {
         expect(plan.panels).toEqual(["packs", "courses"]);
         expect(plan.canAct.packs).toBe(false);
         expect(plan.canAct.courses).toBe(false);
+    });
+
+    it("offers Sell a pack to a role that sells packs, and not to one that only reads them (E26)", () => {
+        const seller = contactPanels(
+            { role: "MEMBER", actions: ["pack:sell", "pack:read"] },
+            ALL,
+        );
+        expect(seller.panels).toEqual(["packs"]);
+        expect(seller.canAct.packs).toBe(true);
+        // An API from before E26 sends pack:write, which sold then.
+        const legacy = contactPanels(
+            { role: "MEMBER", actions: ["pack:read", "pack:write"] },
+            ALL,
+        );
+        expect(legacy.canAct.packs).toBe(true);
     });
 
     it("drops the money panels with Payments off, keeping packs and courses without invoice mentions", () => {
@@ -100,6 +115,21 @@ describe("moduleOn", () => {
         ).toBe(true);
         expect(moduleOn(on("CRM"), "PAYMENTS")).toBe(false);
         expect(moduleOn(on("CRM"), "SOMETHING_NEW")).toBe(true);
+    });
+});
+
+describe("sellPacksOnly (C7)", () => {
+    it("asks for no panel, only what selling a pack needs", () => {
+        const plan = sellPacksOnly();
+        expect(plan.panels).toEqual([]);
+        expect(plan.canAct).toEqual({
+            subscriptions: false,
+            packs: true,
+            courses: false,
+            invoices: false,
+        });
+        // Nothing read through it may mention an invoice.
+        expect(plan.mentionInvoices).toBe(false);
     });
 });
 

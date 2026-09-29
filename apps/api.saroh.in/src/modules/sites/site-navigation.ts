@@ -1,5 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
 
+import type { ModulePageKind } from "./page-kinds";
+import { isModulePageKind, MODULE_PAGE_KINDS } from "./page-kinds";
+
 /**
  * The site menu (#206).
  *
@@ -91,24 +94,79 @@ export function parseSiteNavigation(input: unknown): SiteNavigation | null {
 export interface PublishedNavigationItem {
     label: string;
     href: string;
+    /**
+     * The module page this entry opens (G14), so the site can take it out of
+     * the menu while its module is off (G15, G19) without a republish.
+     * Absent for a free-form page, so a menu without module pages is exactly
+     * what it was.
+     */
+    kind?: ModulePageKind;
+}
+
+/** A page as the menu needs it. `kind` and `inMenu` absent: FREE and shown. */
+export interface NavigablePage {
+    id: string;
+    path: string;
+    title: string;
+    kind?: string;
+    inMenu?: boolean;
 }
 
 /**
- * Resolve a menu against the pages being published. An entry whose page is
- * hidden or gone is dropped — the flag engine surfaced it before publish, and
- * a dead entry on a live menu is the failure this whole model exists to stop.
+ * Resolve a menu against the pages being published.
+ *
+ * - An entry whose page is hidden or gone is dropped — the flag engine
+ *   surfaced it before publish, and a dead entry on a live menu is the
+ *   failure this whole model exists to stop.
+ * - A page with "Show in menu" off is dropped too (G14): reachable by link,
+ *   never listed.
+ * - A module page is in the menu while it is shown there (G14), where the
+ *   menu puts it, else after the menu's own entries in the kinds' order
+ *   (Shop, Book, Prices, Journal, Contact). Its title is its menu name.
+ *
+ * A site with no module pages resolves exactly as it did before them.
+ *
+ * **Whether a module is on is not decided here (G19).** Every module page
+ * is resolved with its `kind`, whether its module is on or off at publish,
+ * and the site drops the entry at view time while the public read says the
+ * module is off (`siteMenu` in site-blocks, from `publicModulePageStates`).
+ * Dropping it here would freeze the menu at publish: a module turned off
+ * would keep its entry until the next publish, and one turned back on would
+ * stay missing. A hand-made entry to a free-form page carries no kind, so
+ * no module ever takes it out.
  */
 export function resolveSiteNavigation(
     navigation: SiteNavigation | null,
-    pages: readonly { id: string; path: string; title: string }[],
+    pages: readonly NavigablePage[],
 ): PublishedNavigationItem[] {
-    if (!navigation) return [];
     const byId = new Map(pages.map((p) => [p.id, p]));
     const out: PublishedNavigationItem[] = [];
-    for (const item of navigation.items) {
+    const listed = new Set<string>();
+    for (const item of navigation?.items ?? []) {
         const page = byId.get(item.pageId);
         if (!page) continue;
-        out.push({ label: item.label ?? page.title, href: page.path });
+        listed.add(page.id);
+        if (page.inMenu === false) continue;
+        out.push(
+            isModulePageKind(page.kind)
+                ? { label: page.title, href: page.path, kind: page.kind }
+                : { label: item.label ?? page.title, href: page.path },
+        );
+    }
+    const modulePages = pages
+        .filter(
+            (p): p is NavigablePage & { kind: ModulePageKind } =>
+                isModulePageKind(p.kind) &&
+                p.inMenu !== false &&
+                !listed.has(p.id),
+        )
+        .sort(
+            (a, b) =>
+                MODULE_PAGE_KINDS.indexOf(a.kind) -
+                MODULE_PAGE_KINDS.indexOf(b.kind),
+        );
+    for (const page of modulePages) {
+        out.push({ label: page.title, href: page.path, kind: page.kind });
     }
     return out;
 }

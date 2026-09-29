@@ -13,6 +13,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
+import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
 import type {
     LineRefundRequest,
     PlannedLineRefund,
@@ -26,6 +27,7 @@ import {
     planLineRefund,
     planRemainingLines,
 } from "../orders/order-refunds";
+import { orderMoneyIntents } from "../orders/treatment-ledger";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
@@ -111,6 +113,8 @@ export interface InitiateRefundResult {
 interface RefundRow {
     id: string;
     paymentIntentId: string;
+    /** A cancel's refund carries its key (`orders/order-cancel.ts`, B9). */
+    idempotencyKey: string | null;
     amountCents: number;
     currency: string;
     status: string;
@@ -540,7 +544,8 @@ export class PaymentsService {
 
     /**
      * Refund an Order's money, by line or in full (S5-003; ADR-008, U6).
-     * `payment:manage` — a Member never refunds.
+     * `order:refund` (B16), which `payment:manage` implies — a Member
+     * never refunds.
      *
      * - The Order must belong to `ctx.organizationId` (else 404) and have a
      *   SUCCEEDED payment (else 400) — only money actually collected goes
@@ -569,7 +574,7 @@ export class PaymentsService {
         orderId: string,
         input: RefundRequest = {},
     ): Promise<InitiateRefundResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         if (input.kind === "goodwill") {
             return this.refundGoodwill(ctx, orderId, input);
         }
@@ -618,7 +623,7 @@ export class PaymentsService {
     /**
      * "Or another amount" (B8): hand back an amount that no line explains —
      * late, a goodwill gesture — with the reason it was given. The caller
-     * holds `payment:manage` ({@link initiateRefund}).
+     * holds `order:refund` ({@link initiateRefund}).
      *
      * The same two phases as a refund by line: it is capped at what was
      * paid and not yet handed back, read under the order's row lock (a
@@ -645,7 +650,7 @@ export class PaymentsService {
 
     /**
      * Hand back a fixed amount because the order was edited down before
-     * anyone started on it (U6). `payment:manage`; the caller has already
+     * anyone started on it (U6). `order:refund` (B16); the caller has already
      * lowered the order total. No lines: nothing that was bought is being
      * refunded — the order simply costs less now.
      */
@@ -655,7 +660,7 @@ export class PaymentsService {
         amountCents: number,
         idempotencyKey: string,
     ): Promise<InitiateRefundResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         const order = await this.requireOwnedOrder(ctx, orderId);
         return this.refundOrder(ctx, order, {
             idempotencyKey,
@@ -666,9 +671,49 @@ export class PaymentsService {
     }
 
     /**
+     * "Cancel order…" (B9): everything still refundable, by what is left of
+     * each line, with the reason, through the same two phases as any
+     * refund. `order:refund` (B16). `guard` runs under the order's row lock
+     * before anything is reserved, so the cancel's own refusals (handed
+     * over, cancelled already) are read where no stage move can slip in.
+     * The refund rows carry the cancel's key (`order-cancel.ts`); the order
+     * is marked cancelled as the provider answers for them.
+     */
+    async refundOrderForCancel(
+        ctx: OrganizationContext,
+        orderId: string,
+        input: {
+            reason: string | null;
+            idempotencyKey: string;
+            guard: (tx: Prisma.TransactionClient) => Promise<void>;
+        },
+    ): Promise<InitiateRefundResult> {
+        authorize(ctx, "order:refund");
+        const order = await this.requireOwnedOrder(ctx, orderId);
+        return this.refundOrder(ctx, order, {
+            idempotencyKey: input.idempotencyKey,
+            reason: input.reason,
+            forEdit: false,
+            plan: async (tx) => {
+                await input.guard(tx);
+                const refundable = await refundableLines(tx, order.id);
+                return {
+                    amountCents: "REMAINING",
+                    lines: planRemainingLines(
+                        refundable,
+                        totalToCents(order.discount),
+                    ),
+                };
+            },
+        });
+    }
+
+    /**
      * Take the difference when an order is edited up after it was paid (U6):
      * a new payment on the ORDER for exactly that amount — the order stays
-     * the ledger for its own payments. `payment:manage`. Idempotent by key.
+     * the ledger for its own payments. `order:refund` (B16): settling the
+     * money of a changed paid order is the order's money power, either way.
+     * Idempotent by key.
      */
     async createDifferenceIntent(
         ctx: OrganizationContext,
@@ -676,7 +721,7 @@ export class PaymentsService {
         amountCents: number,
         idempotencyKey: string,
     ): Promise<CreateIntentResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         const order = await this.requireOwnedOrder(ctx, orderId);
         if (amountCents <= 0) {
             throw new BadRequestException("Nothing more to take on this order");
@@ -705,7 +750,7 @@ export class PaymentsService {
 
     /**
      * Try again a refund whose provider answer was lost (#508, U1).
-     * `payment:manage`; the refund must be a PENDING row of an order of the
+     * `order:refund` (B16); the refund must be a PENDING row of an order of the
      * caller's organization (else 404).
      *
      * It looks before it sends: the provider is asked for the refund made
@@ -721,13 +766,13 @@ export class PaymentsService {
         orderId: string,
         refundId: string,
     ): Promise<InitiateRefundResult> {
-        authorize(ctx, "payment:manage");
+        authorize(ctx, "order:refund");
         const order = await this.requireOwnedOrder(ctx, orderId);
         const row = await prisma.paymentRefund.findFirst({
             where: {
                 id: refundId,
                 organizationId: ctx.organizationId,
-                paymentIntent: { orderId: order.id },
+                paymentIntent: orderMoneyIntents(order.id),
             },
             include: {
                 ...REFUND_ROW_INCLUDE,
@@ -830,6 +875,71 @@ export class PaymentsService {
         return refundResult([outcome.row]);
     }
 
+    /**
+     * Send an automatic refund from its job (`SEND_REFUND_TYPE`): a
+     * refused site checkout's (G13, DEC-032). It looks before it sends, as
+     * try-again does (DEC-026): the provider is asked for the refund made
+     * under the row's id, and only when it has none is it sent — under the
+     * same reference, so a repeat is the same refund. Idempotent: a row
+     * already taken, settled or failed is left as it is.
+     *
+     * Reads what became of it: `ACCEPTED` (the provider has it; its webhook
+     * settles it), `REFUSED` (the row is FAILED — money still owed, which
+     * the order shows staff), `UNKNOWN` (no answer; the job tries again)
+     * or `DONE` (nothing to send).
+     */
+    async sendQueuedRefund(
+        organizationId: string,
+        refundId: string,
+    ): Promise<"ACCEPTED" | "REFUSED" | "UNKNOWN" | "DONE"> {
+        const row = await prisma.paymentRefund.findFirst({
+            where: { id: refundId, organizationId },
+            include: {
+                ...REFUND_ROW_INCLUDE,
+                paymentIntent: {
+                    select: {
+                        id: true,
+                        orderId: true,
+                        provider: true,
+                        providerIntentId: true,
+                        currency: true,
+                    },
+                },
+            },
+        });
+        if (row?.status !== "PENDING" || row.providerRefundId) {
+            return "DONE";
+        }
+        let found: RefundResult | null;
+        try {
+            const call = await this.refundCall(
+                organizationId,
+                row.paymentIntent,
+            );
+            found = await this.factory.get(call.provider).findRefund({
+                reference: row.id,
+                providerIntentId: row.paymentIntent.providerIntentId ?? "",
+                providerPaymentRef: call.providerPaymentRef,
+                credentials: call.credentials,
+            });
+        } catch {
+            // No answer about it: it may exist, so nothing is sent yet.
+            return "UNKNOWN";
+        }
+        const outcome = found
+            ? await this.settleFromProvider(row.id, found)
+            : await this.sendRefund(organizationId, row, row.paymentIntent);
+        if (outcome.kind === "ACCEPTED" && row.paymentIntent.orderId) {
+            await this.recordRefundTaken(
+                { organizationId, userId: null },
+                row.paymentIntent.orderId,
+                row.reason,
+                [outcome],
+            );
+        }
+        return outcome.kind;
+    }
+
     /** The shared two-phase refund core — see {@link initiateRefund}. */
     private async refundOrder(
         ctx: OrganizationContext,
@@ -860,7 +970,7 @@ export class PaymentsService {
                 where: {
                     organizationId: ctx.organizationId,
                     idempotencyKey: k,
-                    paymentIntent: { orderId: order.id },
+                    paymentIntent: orderMoneyIntents(order.id),
                 },
                 include: REFUND_ROW_INCLUDE,
                 orderBy: { createdAt: "asc" },
@@ -882,9 +992,13 @@ export class PaymentsService {
                 if (replay.length > 0) return { replay, done: true as const };
             }
 
+            // The order's own payments, and a treatment's paid at booking on
+            // the booking invoice that names the order (E9, DEC-050): a
+            // visit never refunds on its own, so this is where that money
+            // comes back. Its credit note lands on that invoice.
             const payments = await tx.paymentIntent.findMany({
                 where: {
-                    orderId: order.id,
+                    ...orderMoneyIntents(order.id),
                     organizationId: ctx.organizationId,
                     status: "SUCCEEDED",
                 },
@@ -1146,6 +1260,23 @@ export class PaymentsService {
                 );
             }
         }
+        // A cancel's refund (B9): once the provider has every part of it,
+        // the order is marked cancelled — here, or by whichever path hears
+        // of its last part.
+        if (taken.some(({ row }) => isCancelRefundKey(row.idempotencyKey))) {
+            try {
+                await prisma.$transaction(async (tx) => {
+                    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+                    await finishCancelInTx(tx, orderId, ctx.userId);
+                });
+            } catch (err) {
+                this.logger.warn(
+                    `Refund for cancelling order ${orderId} taken; the cancel waits for the webhook: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
     }
 
     /**
@@ -1356,6 +1487,77 @@ export class PaymentsService {
             },
             options.idempotencyKey,
             () => payLinkProvider(prisma, order.organizationId, order.storeId),
+        );
+    }
+
+    /**
+     * The site checkout's create-intent (round-2 G13), for an unpaid online
+     * order the signed-in customer started. Beside
+     * {@link createIntentForOrderPublic}, through the same core: the amount
+     * is `order.total` and nothing else, so a tampered client can't change
+     * what is charged. The provider is the one the storefront takes payment
+     * through ({@link payLinkProvider}, B11's rule), never one the request
+     * names.
+     *
+     * Refused unless the order is this business's, was placed online by
+     * this customer's store customer, is still open and owed, and its
+     * storefront isn't paused. The same idempotency key returns the same
+     * intent.
+     */
+    async createIntentForOnlineOrder(
+        customer: { organizationId: string; customerIds: readonly string[] },
+        orderId: string,
+        idempotencyKey: string,
+    ): Promise<CreateIntentResult> {
+        const order = await prisma.order.findFirst({
+            where: {
+                id: orderId,
+                organizationId: customer.organizationId,
+                placedOnline: true,
+            },
+            select: {
+                id: true,
+                storeId: true,
+                customerId: true,
+                total: true,
+                currency: true,
+                status: true,
+                paymentStatus: true,
+                store: { select: { settings: { select: { pausedAt: true } } } },
+            },
+        });
+        if (
+            !order?.customerId ||
+            !customer.customerIds.includes(order.customerId)
+        ) {
+            throw new NotFoundException("Order not found");
+        }
+        if (order.status === "CANCELLED") {
+            throw new ConflictException("This checkout has closed.");
+        }
+        if (
+            order.paymentStatus !== "UNPAID" &&
+            order.paymentStatus !== "FAILED"
+        ) {
+            throw new ConflictException("This order is already paid.");
+        }
+        if (order.store.settings?.pausedAt) {
+            throw new ConflictException(
+                "This storefront is paused and is not taking payments.",
+            );
+        }
+        await assertOrganizationOpen(customer.organizationId);
+        const { organizationId } = customer;
+        return this.createIntentFor(
+            organizationId,
+            {
+                kind: "order",
+                id: order.id,
+                amountCents: totalToCents(order.total),
+                currency: order.currency,
+            },
+            idempotencyKey,
+            () => payLinkProvider(prisma, organizationId, order.storeId),
         );
     }
 

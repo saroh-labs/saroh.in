@@ -53,40 +53,154 @@ this was written, led by `sites.service.ts`, `site-editor.tsx` and
 Still over after #508 split the booking page and the bookings service (U10),
 each with why it stops there:
 
-- `bookings/bookings.service.ts` (1,298) — the merchant's side: service and
-  rule CRUD, the calendar read, cancel, outcome, reschedule and booking by
-  hand behind one controller. Under 400 means one injectable per feature and
-  a controller and DI change, not a move.
-- `bookings/public-bookings.service.ts` (477) and `bookings/reservation.ts`
-  (418) — one class sharing its rate limiters, and one serializable write
-  with its helpers; a little over, and cutting them splits a method.
-- `site-blocks/src/booking-flow/booking-flow.tsx` (892; 643 before E7, E11,
-  G18 and A9's sign-in at the last step) — its state, effects and handlers
-  (the hold poll, confirm, letting a hold go, signing in and "Not you?")
-  share one component's state; the drawing is already in `steps/` and the
-  pure rules in `flow-helpers.ts` and `initial-start.ts`. Less means a
-  reducer or hook seam, which is new logic; the sign-in handlers are the
-  first one to take out.
+- `bookings/bookings.service.ts` (1,364; 1,712 before A6) — the merchant's
+  side: service and rule CRUD, the calendar read, cancel, outcome,
+  reschedule and booking by hand behind one controller. A6 moved the cancel
+  and move writes, which the customer's account shares, to
+  `booking-cancel.ts` and `booking-move.ts`, and B14 the outcome write,
+  which Order Detail's "Mark visit N attended" shares, to
+  `booking-outcome.ts`; what is left calls them. Under
+  400 means one injectable per feature and a controller and DI change, not
+  a move.
+- `bookings/public-bookings.service.ts` (820 after A10, C12 and E9) and
+  `bookings/reservation.ts` (725) — one class sharing its rate limiters, and
+  one serializable write with its helpers; cutting them splits a method.
+  A10's credit rules went to `bookings/booking-credit.ts` rather than grow
+  them further; `bookOnline` is the seam when they are next cut.
+- `site-blocks/src/booking-flow/booking-flow.tsx` (1,068; 643 before E7,
+  E11, G18, A9's sign-in at the last step and A10's credit) — its state,
+  effects and handlers (the hold poll, confirm, letting a hold go, signing
+  in and "Not you?") share one component's state; the drawing is already in
+  `steps/`, the pure rules in `flow-helpers.ts` and `initial-start.ts`, and
+  A10's credit read in the `use-credit.ts` hook. Less means a reducer or
+  more hook seams, which is new logic; the sign-in handlers are the next
+  one to take out.
 - Deferred from #508, not yet split: `customer-workspace/customer-detail.service.ts`
-  (1,173), `calendar/calendar.service.ts` (1,051),
-  `orders/order-kitchen.service.ts` (857), `staff/staff.service.ts` (744).
-- `organizations/organization-settings-form.tsx` (1,246) — one form holds
+  (1,289 after C14, whose Spent read — net of refunds, the list's rule — is
+  `customer-spent.ts` over `spent.sql.ts`; 1,293 after C7, which moved the
+  packs read out to `customer-detail-packs.ts`; 1,351 before). Beside it,
+  `customer-workspace/customers-list.service.ts` (565; C14 added only
+  "added by hand" on a row, and Add customer is `customer-add.service.ts`)
+  and the app's `lib/customer-workspace/view.ts` (799 after C14 took the
+  dates to `when.ts` and "added by hand" to `added.ts`; 823 before) — the
+  list's read and the detail's words, each a set of small functions whose
+  seams are the parts of the page. `calendar/calendar.service.ts` (1,418 after E19, E20, B13 and E27, whose range,
+  days-off, payments and working-hours reads already sit in their own files;
+  E27 added only the response's `hours` field; split next),
+  `orders/order-kitchen.service.ts` (about 1,020 after B6 took the stage writes out; 1,220 after B2b–B15, B9, A14 and B14), `staff/staff.service.ts` (744).
+  B9 kept its change of fulfilment and its cancel out of the kitchen
+  service (`order-fulfilment-change.service.ts`, 402, one transaction and
+  its money; `order-cancel.service.ts`, `order-cancel.ts`,
+  `order-change-options.ts`, `order-customer-note.ts`); it added only the
+  read's change options and exported `lockOrder`. B14 kept a treatment's
+  visits out of it too — the read in `order-visits.ts`, "Mark visit N
+  attended" in `order-visit-attend.ts`, the order following its visits in
+  `treatment-fulfil.ts`, and the paper's title (D15) in
+  `order-invoice-title.ts` — adding only the read's `visits`, the title's
+  select and a one-line delegate. The edit is the next cut.
+  B13 (walk-ins, New order v2) left it untouched: who the order is for, the
+  counter payment and the ways a cart may leave are `orders/new-order.ts`,
+  and how a walk-in reads everywhere is `orders/walk-in.ts`.
+  B6 (bulk kitchen moves) took the single move, its Undo and `lockOrder`
+  out to `orders/order-stage-write.ts`, which every batch line shares;
+  the batch itself is `order-stage-batch.service.ts` and its lines'
+  helpers `order-stage-batch-lines.ts`.
+- `orders/order-read.ts` (654; 638 before B14) — the one read Order Detail
+  renders and its DTOs. B14 added the `visits` and `title` fields and put
+  what fills them in their own files; the DTO interfaces are the seam.
+- `orders/orders.service.ts` (683 after B13) and `orders/dto.ts` (583) —
+  the storefront-scoped create, its pricing, discount code and stock
+  promise in one serializable write, and the order DTOs. B13 added only the
+  calls into `new-order.ts` and the DTO's optional fields, whose classes are
+  in `new-order.dto.ts`. The create's pricing is the next seam.
+- `payments/payments.service.ts` (2,045 after B8, B9, E8 and B13's null-safe
+  customer check) — every money
+  path of an order (intents, refunds and their two phases, the pay link's
+  intent) shares one private refund core and provider call; B9 added only
+  a thin `refundOrderForCancel` onto that core and the cancel's finish in
+  `recordRefundTaken`. Refunds as their own service is the seam.
+- `app.saroh.in/components/commerce/order-detail/order-detail.tsx` (579
+  after B8, B11, B9, B13 and B14) — the page's panels share its one `panel` and hold
+  state. B9's sheets went to `change-sheets.tsx`, `fulfilment-panel.tsx`,
+  `cancel-panel.tsx` and `use-order-changes.ts`, B13's walk-in card to
+  `walk-in-card.tsx`; B14's Visits card, its
+  stepper and next action to `visits-card.tsx` and `visits-next.tsx`, their
+  words to `lib/orders/visits.ts`, and the timeline's lines to
+  `lib/orders/timeline-steps.ts`. The header and the money column are the
+  next seams.
+- `app.saroh.in/components/commerce/orders/order-quick-view.tsx` (407; 401
+  before B14's "1 of 3 visits" line) — the panel, its read and retry, and
+  the body share one open state; the body is the seam.
+- The calendar's `lib/calendar/layers.ts` (443) — the layers' order,
+  tones, words and day lines. E22 put the named problems and their fixes
+  in their own `lib/calendar/problems.ts`, and E23 the money (in, out,
+  due, the strip and the day's line) in `lib/calendar/money.ts` and the
+  export in `lib/calendar/export.ts`, rather than grow it; the month
+  summary and the item lines are its next seams. E24 left it untouched:
+  days off are `lib/calendar/days-off.ts`, and the team filter's
+  narrowing of the month is `lib/calendar/team.ts`.
+  `components/calendar/business-calendar.tsx` (404 after E22) went back
+  under when E23 took the switches row to `layer-switches.tsx` and the
+  month strip to `month-strip.tsx`; E24 (388) moved the ‹ › month steps
+  to `month-step.tsx` to make room for the team filter, whose select is
+  `team-filter.tsx`. `calendar/calendar.service.ts` is unchanged by E24,
+  which needed nothing new from the API. E25 (the Week's card columns)
+  left `layers.ts` and the API untouched too — the week is one E20
+  `from`/`to` read — and brought `business-calendar.tsx` down to 304: the
+  row under the title (‹ › , Month | Week, the team filter, the switches)
+  went to `calendar-toolbar.tsx` and `view-switch.tsx`, the missing-layer
+  notice to `calendar-missing.tsx` and the day's sheet to `day-sheet.tsx`,
+  which the Week shares. The Week itself is `business-week.tsx`, its
+  columns `week-columns.tsx`, and its rules `lib/calendar/week.ts` (dates,
+  title, edges, address) and `lib/calendar/week-columns.ts` (what each
+  column and card says).
+  E27 (the Week's hour grid for a business with a team) left `layers.ts`
+  and `business-calendar.tsx` untouched too: the grid is
+  `week-hour-grid.tsx`, its days `lib/calendar/week-hours.ts` and its
+  geometry `lib/calendar/hour-layout.ts`; `business-week.tsx` (243) only
+  chooses between it and the columns. The API's working hours are
+  `calendar/working-hours.ts`, read beside the days off.
+- `organizations/organization-settings-form.tsx` (1,321 after F10, F20 and
+  F12) — one form holds
   every Business card (profile, tax and invoices, address, number format)
   and the cross-field rules that re-check them together; the number-format
   editor already went to `invoice-number-fields.tsx`, the time zone picker
   to `time-zone-select.tsx`, and the Hours card, which saves to the
-  storefronts, to `business-hours-section.tsx`. Less
+  storefronts, to `business-hours-section.tsx`. F12's Undo on a save kept
+  its rules out (`lib/organizations/settings-undo.ts`, and the hold and
+  toast in `use-settings-undo.ts`), adding only the calls. Less
   means a card per file sharing one form context.
-- `organizations/team-screen.tsx` (1,237) — the Roles and People tabs, the
-  member drawer and the invite dialog share the screen's roster and role
-  state. Each piece is its own function already; moving them is a file split
-  with props threaded through, not yet done.
+- `organizations/team-screen.tsx` (1,377 after F16 and F17) — the Roles and
+  People tabs, the member drawer and the invite dialog share the screen's
+  roster and role state. Each piece is its own function already; moving them
+  is a file split with props threaded through, not yet done. F17 put a
+  person's extra permissions in `member-extras.tsx` (the column's chips, the
+  drawer's list and its draft hook) and `lib/organizations/extras.ts`, adding
+  only the calls, the drawer's two-step save and the column's grid; the
+  drawer is the next cut.
 - `shared/nav-items.tsx` (1,176; Sell › Stock and its Track stock rule, #527) — the nav's data (`NAV_GROUPS`,
   `SETTINGS_PAGES`) and every rule that filters it by role, module and
   site; half of it is the table itself. Splitting data from rules is a move,
   not yet made.
 - `modules/module-list.tsx` (430) — one list and its row, switch and state
   tag; a little over, and the row carries most of it.
+- `site-accounts/customer-view.ts` (502 after A6) — the account area's one
+  allow-list (ADR-011): every answer a signed-in customer gets is built here,
+  so a reviewer reads one file to know what can leave. A7's Track words went
+  to `account-track.ts`, and A6's bookings to `account-bookings-view.ts`,
+  the second allow-list file it re-exports; the order serializers are the
+  next seam if A8 and A13 grow it further.
+- `home/home.service.ts` (778 after F11; 785 after F4; 797 before F2) — `build()` is one parallel
+  read of every Home source, each behind its own guard, and the ranking of
+  what they return. Round 2 put each source in its own file
+  (`home-money-sources.ts`, `home-site-stock-sources.ts`,
+  `home-people-sources.ts`, `home-today.ts`, `home-week.ts`, …); F2 also
+  moved the CRM reads to `home-crm-sources.ts` rather than grow it, and
+  F4's inline actions are `HomeInlineService` in `home-inline.ts`, called
+  once. F11's staff landing is `home-staff.ts` (who is narrowed to which
+  storefronts and diary, and the where-helpers each source takes), and it
+  moved the schedule band to `home-schedule.ts`. The refunds-owed read (to
+  `home-money-sources.ts` once D13 has landed there) is the next seam.
 
 Added or grown past 400 by the Products and Stock release (#510–#531), each
 with why it stops there:
@@ -179,7 +293,10 @@ went along its row, its add row and its save — `variant-row.tsx`,
 `variant-add-row.tsx`, `variant-save.ts`, with the row rules in
 `lib/products/variant-rows.ts`; and `stock-section.tsx` (491 before; 332
 now) along its two ways of counting, to `stock-fields.tsx` and
-`lib/products/editor-stock.ts`.
+`lib/products/editor-stock.ts`. Customer Detail's
+`customers/detail/detail-screen.tsx` (489 before; 359 after C14) went along
+its header's actions: Edit details, ⋯ More actions and every sheet and
+dialog they open are `useMoreActions` in `more-actions.tsx`.
 
 ## 7. No `any`, no `@ts-ignore`
 

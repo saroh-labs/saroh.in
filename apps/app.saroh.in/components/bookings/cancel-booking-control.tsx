@@ -12,6 +12,7 @@ import {
 } from "@saroh/ui/alert-dialog";
 import { Button, buttonVariants } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -38,6 +39,7 @@ export function CancelBookingControl({
     freeCancelUntil,
     timezone,
     canRefund = false,
+    canReadOrder = false,
 }: {
     bookingId: string;
     money?: BookingMoney;
@@ -45,6 +47,8 @@ export function CancelBookingControl({
     timezone?: string;
     /** `payment:manage`: may refund what a late cancel keeps. */
     canRefund?: boolean;
+    /** `order:read`: a treatment's visit links to its order (E9). */
+    canReadOrder?: boolean;
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
@@ -106,6 +110,17 @@ export function CancelBookingControl({
                         </AlertDialogTitle>
                         <AlertDialogDescription className="text-[13px] leading-[1.55] text-muted-foreground">
                             {plan?.body}
+                            {plan?.treatmentOrderId && canReadOrder ? (
+                                <>
+                                    {" "}
+                                    <Link
+                                        href={`/commerce/orders/${encodeURIComponent(plan.treatmentOrderId)}`}
+                                        className="cursor-pointer font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground/70"
+                                    >
+                                        Open the order
+                                    </Link>
+                                </>
+                            ) : null}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="flex-wrap gap-2 px-[22px] py-[18px] sm:space-x-0">
@@ -128,9 +143,11 @@ export function CancelBookingControl({
                             })}
                             onClick={() => void cancel(false)}
                         >
-                            {plan?.keeps
-                                ? `Cancel, keep the ${plan.what}`
-                                : "Cancel booking"}
+                            {plan?.treatmentOrderId
+                                ? "Cancel visit"
+                                : plan?.keeps
+                                  ? `Cancel, keep the ${plan.what}`
+                                  : "Cancel booking"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

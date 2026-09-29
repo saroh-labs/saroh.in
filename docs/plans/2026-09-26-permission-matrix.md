@@ -148,8 +148,19 @@ business-wide.
 | `message:read` / `message:write` | Read and answer customer messages (plan A) |
 
 A storefront role (Admin, Manager, Editor, Viewer; DEC-048) is a default
-bundle narrowed to one storefront. The bundles stay what they grant today;
-F16 lists them on this page when it reads `StoreMembers` in detail.
+bundle narrowed to one storefront. The bundles stay what they grant today.
+What each reaches, as F16 read it (`StoresService`, `MembersService`; checked
+in `members/storefront-team.db.spec.ts` on both the legacy and the
+`ORG_AUTHORIZATION` path):
+
+| Storefront role | Its storefront (read) | Its storefront (write, `canWrite`) | Its people and invites | Other storefronts |
+|---|---|---|---|---|
+| Admin, Manager, Editor | ✓ | ✓ | — (the storefront's owner only) | — |
+| Viewer | ✓ | — | — | — |
+
+The `StoreMembers.permissions` bitmask is never read. Joining the team as
+Storefront team adds `store:read` business-wide (every storefront's page, read
+only) and the team, module, media and review reads, and nothing else.
 
 **Storefront people on the team (F16, DEC-048 amended 2026-09-27).** Someone
 who joins through a storefront, or who the backfill adds, gets a business

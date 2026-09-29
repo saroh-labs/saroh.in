@@ -16,7 +16,10 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { PRODUCT_LINES } from "../orders/order-line";
+import { contactReviewsWhere } from "./contact-reviews";
 import type { IneligibleReason } from "./eligibility";
 import { INELIGIBLE_MESSAGE, orderIneligibility } from "./eligibility";
 import { MAX_REVIEW_SENDS, mintReviewToken, REVIEW_LINK_DAYS } from "./token";
@@ -163,11 +166,21 @@ export class ProductReviewsService {
 
     async list(
         organizationId: string,
-        filter: { productId?: string; status?: string } = {},
+        filter: {
+            productId?: string;
+            status?: string;
+            contactId?: string;
+        } = {},
     ): Promise<ReviewView[]> {
+        // One customer's reviews (C6): through their confirmed links only.
+        const byContact = filter.contactId
+            ? await contactReviewsWhere(organizationId, filter.contactId)
+            : undefined;
+        if (byContact === null) return [];
         const rows = await prisma.productReview.findMany({
             where: {
                 organizationId,
+                ...byContact,
                 ...(filter.productId ? { productId: filter.productId } : {}),
                 ...(filter.status === "PUBLISHED" || filter.status === "HIDDEN"
                     ? { status: filter.status }
@@ -215,6 +228,10 @@ export class ProductReviewsService {
                 createdAt: {
                     gte: new Date(Date.now() - INVITABLE_WINDOW_DAYS * DAY_MS),
                 },
+                // A treatment's order (E9) has no product to review.
+                items: { some: PRODUCT_LINES },
+                // A walk-in (B13) left no email: nobody to invite.
+                customerId: { not: null },
             },
             orderBy: { createdAt: "desc" },
             take: 200,
@@ -227,24 +244,31 @@ export class ProductReviewsService {
                 customer: {
                     select: { email: true, firstName: true, lastName: true },
                 },
-                _count: { select: { items: true } },
+                _count: { select: { items: { where: PRODUCT_LINES } } },
             },
         });
-        return orders
-            .filter((o) => o.customer.email.trim())
-            .map((o) => ({
-                id: o.id,
-                orderNumber: o.orderId,
-                storeId: o.storeId,
-                storeName: o.store.name,
-                customerName:
-                    [o.customer.firstName, o.customer.lastName]
-                        .filter(Boolean)
-                        .join(" ") || null,
-                customerEmail: o.customer.email,
-                placedAt: o.createdAt.toISOString(),
-                itemCount: o._count.items,
-            }));
+        return orders.flatMap((o) => {
+            const customer = o.customer;
+            // No email, or a placeholder (a walk-in kept by phone, B13b).
+            if (!customer || !contactEmailForDisplay(customer.email)) {
+                return [];
+            }
+            return [
+                {
+                    id: o.id,
+                    orderNumber: o.orderId,
+                    storeId: o.storeId,
+                    storeName: o.store.name,
+                    customerName:
+                        [customer.firstName, customer.lastName]
+                            .filter(Boolean)
+                            .join(" ") || null,
+                    customerEmail: customer.email,
+                    placedAt: o.createdAt.toISOString(),
+                    itemCount: o._count.items,
+                },
+            ];
+        });
     }
 
     /** Where one order's invitation stands — the order page's Reviews section. */
@@ -307,7 +331,10 @@ export class ProductReviewsService {
         const blocked = this.blockedReason(order);
         if (blocked) return skip(blocked);
 
-        const email = order.customer.email.trim();
+        // A walk-in (B13) has no customer and no email: never invited.
+        const email =
+            contactEmailForDisplay(order.customer?.email)?.trim() ?? "";
+        if (!email || !order.customerId) return skip("no-email");
         const consent = await this.consentFor(
             ctx.organizationId,
             order.customerId,
@@ -469,7 +496,7 @@ export class ProductReviewsService {
                 customerId: true,
                 store: { select: { name: true } },
                 customer: { select: { email: true } },
-                _count: { select: { items: true } },
+                _count: { select: { items: { where: PRODUCT_LINES } } },
                 reviewInvitation: {
                     select: {
                         completedAt: true,
@@ -492,7 +519,8 @@ export class ProductReviewsService {
             organizationId: order.organizationId,
             status: order.status,
             paymentStatus: order.paymentStatus,
-            customerEmail: order.customer.email,
+            customerEmail: order.customer?.email ?? null,
+            productLines: order._count.items,
         });
         if (ineligible) return ineligible;
         if (order.reviewInvitation?.completedAt) return "completed";

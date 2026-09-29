@@ -231,4 +231,13 @@ describe("rowCustomer", () => {
         expect(rowCustomer(row({ customer: null }))).toBe("Unknown customer");
         expect(rowInitials(row())).toBe("PR");
     });
+
+    it("names a walk-in by the name they gave (B13)", () => {
+        const walkIn = row({
+            customer: null,
+            walkIn: { name: "Ravi Kumar", phone: null },
+        });
+        expect(rowCustomer(walkIn)).toBe("Ravi Kumar");
+        expect(rowInitials(walkIn)).toBe("RK");
+    });
 });

@@ -42,24 +42,44 @@ import { useForm, useWatch } from "react-hook-form";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
+import {
+    anyoneHasExtras,
+    beyondViewer,
+    extraLabels,
+    roleGrants,
+} from "@/lib/organizations/extras";
 import type { InviteValues } from "@/lib/organizations/invitations";
 import { invitationMeta, inviteSchema } from "@/lib/organizations/invitations";
 import {
     inviteMember,
     removeMember,
     revokeInvitation,
+    setMemberExtraActions,
     updateMemberRole,
 } from "@/lib/organizations/member-actions";
 import type {
     OrganizationInvitation,
     OrganizationMember,
+    StorefrontTeamNoticePerson,
 } from "@/lib/organizations/members";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
 import type { OrganizationRole } from "@/lib/organizations/service";
+import {
+    STOREFRONT_TEAM_LABEL,
+    STOREFRONT_TEAM_ROLE,
+    storefrontRolesLine,
+} from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
 import { LastActiveLine } from "./last-active-line";
+import {
+    ExtraPermissions,
+    ExtrasCell,
+    ExtrasLine,
+    useMemberExtras,
+} from "./member-extras";
 import { RolesTab } from "./roles-tab";
+import { StorefrontTeamNotice } from "./storefront-team-notice";
 
 const ROLES: OrganizationRole[] = ["OWNER", "ADMIN", "MEMBER", "REVIEWER"];
 
@@ -123,6 +143,14 @@ interface RoleBook {
      * to hand out, change or remove such a role; the screen says so first.
      */
     withinReach: (key: string) => boolean;
+    /** Everything the role grants, implied holds included (F17). */
+    grantsOf: (key: string) => ReadonlySet<string>;
+    /** The same question of a person: their role and their extras (F17). */
+    personWithinReach: (member: OrganizationMember) => boolean;
+    /** Names for extra permissions; null when the list could not be read. */
+    catalogue: RoleCatalogue | null;
+    /** What the viewer holds; null when unknown, and nothing is held back. */
+    myActions: string[] | null;
 }
 
 function isBuiltIn(key: string): key is OrganizationRole {
@@ -141,17 +169,22 @@ const TEAM_TABS = ["roles", "people"] as const;
  * active, the role in words beside a dot of the same colour, a Remove on the
  * row and an Edit drawer that changes the role.
  *
- * Team is business-scoped: there is no storefront anywhere on this screen. A
- * role is held in a business and covers everything that business has, and an
- * invitation adds someone to this business only.
+ * Team is business-scoped: a role is held in a business and covers
+ * everything that business has, and an invitation adds someone to this
+ * business only. A storefront's people are on it too (DEC-048, F16): their
+ * storefront roles show under their name as a narrower grant on top, and
+ * those the storefront backfill added are named once in a notice with
+ * Change role.
  *
  * Roles a business invents live in `RolesTab`, backed by the API's own
  * catalogue. Still not built, because nothing backs them yet: choosing a
  * role's ring colour (the avatar has one token per built-in, so invented roles
- * wear a neutral ring), per-person extra permissions (the People column for
- * them comes back with the grants, F17 — until then it would say "—" for
- * everyone, DEC-048), and requiring two-step sign-in (the switch is drawn off and says
- * so — Saroh has no two-step sign-in).
+ * wear a neutral ring), and requiring two-step sign-in (the switch is drawn
+ * off and says so — Saroh has no two-step sign-in).
+ *
+ * A person's extra permissions (F17) are set in the Edit drawer under their
+ * role, and People shows an "Extra permissions" column once anyone has one
+ * (`member-extras.tsx`, `lib/organizations/extras.ts`).
  */
 export function TeamScreen({
     organizationName,
@@ -163,6 +196,7 @@ export function TeamScreen({
     roles,
     catalogue,
     myActions,
+    joinedFromStorefronts = [],
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -177,6 +211,11 @@ export function TeamScreen({
     catalogue: RoleCatalogue | null;
     /** What the viewer may do here; `null` when unknown, and nothing is held back. */
     myActions: string[] | null;
+    /**
+     * People the storefront backfill put on the team (F16), for the one-time
+     * notice. Empty for anyone who may not change roles.
+     */
+    joinedFromStorefronts?: StorefrontTeamNoticePerson[];
 }) {
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
@@ -205,6 +244,12 @@ export function TeamScreen({
             if (!role || myActions === null) return true;
             return role.actions.every((a) => myActions.includes(a));
         },
+        grantsOf: (key) => roleGrants(byKey.get(key)),
+        personWithinReach: (m) =>
+            book.withinReach(m.roleKey ?? m.role) &&
+            !beyondViewer(new Set(), m.extraActions ?? [], myActions),
+        catalogue,
+        myActions,
     };
 
     // For someone who may look but not change: who can, and who to ask.
@@ -319,8 +364,31 @@ export function TeamScreen({
                     invitations={invitations}
                     canManage={canManage}
                     book={book}
-                    onEdit={setEditing}
+                    // Changing a role or a person's extras is
+                    // `member:role:update`, which a custom role may hold
+                    // without inviting anyone (F17).
+                    onEdit={canManage || canEditRoles ? setEditing : undefined}
                     onRemove={setRemoving}
+                    notice={
+                        canEditRoles ? (
+                            <StorefrontTeamNotice
+                                // Only people still on the roster.
+                                people={joinedFromStorefronts.filter((p) =>
+                                    members.some((m) => m.userId === p.userId),
+                                )}
+                                roleLabel={
+                                    byKey.get(STOREFRONT_TEAM_ROLE)?.label ??
+                                    STOREFRONT_TEAM_LABEL
+                                }
+                                onChangeRole={(userId) => {
+                                    const member = members.find(
+                                        (m) => m.userId === userId,
+                                    );
+                                    if (member) setEditing(member);
+                                }}
+                            />
+                        ) : null
+                    }
                 />
             )}
 
@@ -329,6 +397,7 @@ export function TeamScreen({
                 members={members}
                 organizationName={organizationName}
                 book={book}
+                canEditExtras={canEditRoles}
                 onClose={() => setEditing(null)}
                 onRemove={(m) => {
                     setEditing(null);
@@ -367,27 +436,35 @@ function PeopleTab({
     book,
     onEdit,
     onRemove,
+    notice,
 }: {
     organizationName: string;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
     canManage: boolean;
     book: RoleBook;
-    onEdit: (member: OrganizationMember) => void;
+    /** Absent for a viewer who can neither manage people nor change roles. */
+    onEdit?: (member: OrganizationMember) => void;
     onRemove: (member: OrganizationMember) => void;
+    /** The storefront-people notice (F16), above the roster. */
+    notice?: React.ReactNode;
 }) {
     // The design's columns need about 600px; the panel is that wide only
     // once the settings list sits beside it on a wide screen. Narrower, a
-    // row is the person — role under their name — and their buttons. The
-    // design's Extra permissions column is left out until something can
-    // grant one person more than their role (F17, DEC-048).
-    const grid =
-        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]";
+    // row is the person — role and extras under their name — and their
+    // buttons. The Extra permissions column shows only once someone has
+    // one (F15, F17): a column that says "—" for everyone says nothing.
+    const withExtras = anyoneHasExtras(members);
+    const grid = withExtras
+        ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_150px]"
+        : "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]";
     const rowButton = "text-[12.5px]";
 
     return (
         <div className="space-y-3.5">
             {canManage ? <TwoStepRequirement /> : null}
+
+            {notice}
 
             {canManage && invitations.length > 0 ? (
                 <PendingInvites invitations={invitations} book={book} />
@@ -402,19 +479,24 @@ function PeopleTab({
                 >
                     <span>Person</span>
                     <span>Role</span>
+                    {withExtras ? <span>Extra permissions</span> : null}
                     <span />
                 </div>
                 <ul>
                     {members.map((m) => {
                         const role = m.roleKey ?? m.role;
+                        const extras = extraLabels(
+                            m.extraActions ?? [],
+                            book.catalogue,
+                        );
                         // An owner is moved to another role first (Edit), and
-                        // no one is removed by someone they outrank. Leaving
-                        // is not removing yourself from a row.
+                        // no one is removed by someone they outrank, by role
+                        // or by extras. Leaving is not removing yourself.
                         const canRemove =
                             canManage &&
                             role !== "OWNER" &&
                             !m.isSelf &&
-                            book.withinReach(role);
+                            book.personWithinReach(m);
                         return (
                             <li
                                 key={m.userId}
@@ -450,6 +532,14 @@ function PeopleTab({
                                                 ? ` · ${m.siteIds.length} site${m.siteIds.length === 1 ? "" : "s"}`
                                                 : ""}
                                         </p>
+                                        {m.storefronts &&
+                                        m.storefronts.length > 0 ? (
+                                            <p className="mt-px truncate text-[11.5px] text-muted-foreground">
+                                                {storefrontRolesLine(
+                                                    m.storefronts,
+                                                )}
+                                            </p>
+                                        ) : null}
                                         {/* The role, where there is no Role
                                             column to hold it. */}
                                         <p className="mt-px flex min-w-0 items-center gap-1.5 text-[11.5px] xl:hidden">
@@ -458,6 +548,7 @@ function PeopleTab({
                                                 {book.labelOf(role)}
                                             </span>
                                         </p>
+                                        <ExtrasLine labels={extras} />
                                         <LastActiveLine at={m.lastActiveAt} />
                                     </div>
                                 </div>
@@ -467,6 +558,11 @@ function PeopleTab({
                                         {book.labelOf(role)}
                                     </span>
                                 </div>
+                                {withExtras ? (
+                                    <div className="hidden min-w-0 xl:block">
+                                        <ExtrasCell labels={extras} />
+                                    </div>
+                                ) : null}
                                 <div className="flex flex-wrap justify-end gap-1.5">
                                     {canRemove ? (
                                         <Button
@@ -482,12 +578,12 @@ function PeopleTab({
                                             Remove
                                         </Button>
                                     ) : null}
-                                    {canManage ? (
+                                    {onEdit ? (
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             onClick={() => onEdit(m)}
-                                            aria-label={`Edit ${nameOf(m)}’s role`}
+                                            aria-label={`Edit ${nameOf(m)}’s role and permissions`}
                                             className={rowButton}
                                         >
                                             Edit
@@ -687,6 +783,7 @@ function MemberDrawer({
     members,
     organizationName,
     book,
+    canEditExtras,
     onClose,
     onRemove,
 }: {
@@ -694,6 +791,8 @@ function MemberDrawer({
     members: OrganizationMember[];
     organizationName: string;
     book: RoleBook;
+    /** Holds `member:role:update`, which also sets extras (F17). */
+    canEditExtras: boolean;
     onClose: () => void;
     /** Hands an owner to the one Remove confirmation; see below. */
     onRemove: (member: OrganizationMember) => void;
@@ -709,14 +808,30 @@ function MemberDrawer({
     ).length;
     // The workspace keeps an owner: the last one cannot be changed or removed.
     const lastOwner = current === "OWNER" && owners === 1;
-    // Someone who can do more than the viewer cannot be changed by them — the
-    // API refuses it, so the drawer says so instead of offering the attempt.
-    const outranks = !!member && !book.withinReach(current);
+    // Someone who can do more than the viewer, by role or by extras, cannot
+    // be changed by them — the API refuses it, so the drawer says so instead
+    // of offering the attempt.
+    const outranks = !!member && !book.personWithinReach(member);
     const locked = lastOwner || outranks;
-    const changed = !!member && role !== current;
+    const extras = useMemberExtras({
+        extras: member?.extraActions,
+        currentGrants: book.grantsOf(current),
+        draftGrants: book.grantsOf(role),
+        draftRoleLabel: book.labelOf(role),
+        reviewer: role === "REVIEWER",
+        isSelf: !!member?.isSelf,
+        canEdit: canEditExtras,
+        beyond: outranks,
+        name: member ? nameOf(member) : "",
+        catalogue: book.catalogue,
+        myActions: book.myActions,
+    });
+    const roleChanged = !!member && role !== current;
+    const changed = roleChanged || extras.changed;
 
     function close() {
         setDraft(null);
+        extras.reset();
         onClose();
     }
 
@@ -731,17 +846,30 @@ function MemberDrawer({
             return;
         }
         setSaving(true);
-        const res = await updateMemberRole(member.userId, {
-            role,
-            ...(role === "REVIEWER" ? { siteIds: member.siteIds } : {}),
-        });
+        // The role first: the extras are judged against the role they'll
+        // sit on top of.
+        const res = roleChanged
+            ? await updateMemberRole(member.userId, {
+                  role,
+                  ...(role === "REVIEWER" ? { siteIds: member.siteIds } : {}),
+              })
+            : null;
+        const extrasRes =
+            (res === null || res.ok) && extras.changed
+                ? await setMemberExtraActions(member.userId, extras.chosen)
+                : null;
         setSaving(false);
-        if (!res.ok) {
-            showError(res.error);
+        const failed = [res, extrasRes].find((r) => r && !r.ok);
+        if (failed && !failed.ok) {
+            showError(failed.error);
+            // A role that saved before the extras were refused is still new.
+            if (res?.ok) router.refresh();
             return;
         }
         showSuccess(
-            `${nameOf(member)} is now ${book.labelOf(role)} in ${organizationName}.`,
+            roleChanged
+                ? `${nameOf(member)} is now ${book.labelOf(role)} in ${organizationName}.`
+                : `${nameOf(member)}’s permissions in ${organizationName} are saved.`,
         );
         close();
         router.refresh();
@@ -832,6 +960,14 @@ function MemberDrawer({
                                 })}
                             </div>
 
+                            <ExtraPermissions
+                                roleLabel={book.labelOf(role)}
+                                groups={extras.groups}
+                                lockedReason={extras.lockedReason}
+                                disabled={saving}
+                                onToggle={extras.toggle}
+                            />
+
                             <div className="mt-4 flex items-start gap-[9px] rounded-[9px] bg-foreground/[0.03] px-[13px] py-[11px]">
                                 <Info
                                     aria-hidden
@@ -842,7 +978,8 @@ function MemberDrawer({
                                         ? `${organizationName} keeps at least one owner. Make someone else an owner before changing or removing this one.`
                                         : outranks
                                           ? `${nameOf(member)} can do more than you can here, so you cannot change their role or remove them.`
-                                          : `${book.labelOf(role)}: ${book.blurbOf(role)}`}
+                                          : (extras.summary ??
+                                            `${book.labelOf(role)}: ${book.blurbOf(role)}`)}
                                 </p>
                             </div>
                         </div>
@@ -850,9 +987,13 @@ function MemberDrawer({
                         <div className="flex flex-wrap items-center gap-[9px] border-t border-muted px-[18px] py-3.5">
                             <Button
                                 onClick={save}
-                                disabled={!changed || saving || locked}
+                                disabled={!changed || saving || outranks}
                             >
-                                {saving ? "Saving…" : "Save role"}
+                                {saving
+                                    ? "Saving…"
+                                    : changed
+                                      ? "Save changes"
+                                      : "No changes yet"}
                             </Button>
                             <Button variant="outline" onClick={close}>
                                 Cancel
@@ -931,7 +1072,11 @@ function RemoveMember({
                 if (!open) onClose();
             }}
             title={`Remove ${name} from ${organizationName}?`}
-            description={`${name} loses access to ${organizationName} now, and any share links they made stop working. Their work stays, and nothing changes in their other businesses. To bring them back, invite them again.`}
+            description={`${name} loses access to ${organizationName} now, and any share links they made stop working.${
+                member?.storefronts && member.storefronts.length > 0
+                    ? ` They come off ${new Intl.ListFormat("en", { type: "conjunction" }).format(member.storefronts.map((s) => s.name))} too.`
+                    : ""
+            } Their work stays, and nothing changes in their other businesses. To bring them back, invite them again.`}
             confirmLabel="Remove from team"
             onConfirm={remove}
         />

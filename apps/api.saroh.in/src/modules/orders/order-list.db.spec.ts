@@ -374,12 +374,34 @@ describe("filters, tabs and rows", () => {
         ).toEqual([raviOrder]);
     });
 
+    it("says when a row's pay link was made, never the link (B5)", async () => {
+        const made = new Date("2026-09-27T09:30:00.000Z");
+        await prisma.order.update({
+            where: { id: unpaidDelivery },
+            data: { payTokenHash: "a".repeat(64), payLinkCreatedAt: made },
+        });
+        const rows = (await list({ payment: "UNPAID" })).rows;
+        const row = rows.find((r) => r.id === unpaidDelivery);
+        expect(row?.payLinkCreatedAt).toEqual(made);
+        expect(JSON.stringify(row)).not.toContain("a".repeat(64));
+        const kitchen = await list(
+            { payment: "UNPAID" },
+            { money: false, contact: true },
+        );
+        expect(kitchen.rows[0]).not.toHaveProperty("payLinkCreatedAt");
+        await prisma.order.update({
+            where: { id: unpaidDelivery },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
+        });
+    });
+
     it("gives the kitchen rows without money, and still the counts", async () => {
         const kitchen = await list({}, { money: false, contact: true });
         expect(kitchen.rows.length).toBeGreaterThan(0);
         for (const row of kitchen.rows) {
             expect(row).not.toHaveProperty("total");
             expect(row).not.toHaveProperty("unpaidAmount");
+            expect(row).not.toHaveProperty("payLinkCreatedAt");
         }
         expect(kitchen.counts).toEqual((await list()).counts);
     });

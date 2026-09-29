@@ -27,9 +27,10 @@ import {
     NUMBER_SEPARATORS,
 } from "../invoices/numbering";
 
-/** Recognized business-profile types. Free-form-ish but constrained for hygiene. */
-export const BUSINESS_TYPES = ["individual", "company"] as const;
-export type BusinessType = (typeof BUSINESS_TYPES)[number];
+import type { AcceptedBusinessType } from "./business-type";
+import { ACCEPTED_BUSINESS_TYPES } from "./business-type";
+
+export { BUSINESS_TYPES, type BusinessType } from "./business-type";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -48,11 +49,14 @@ export class BusinessProfileDto {
     @MaxLength(200)
     legalName?: string;
 
-    @IsOptional()
+    /**
+     * The legal form (`business-type.ts`): one of the six, or the old
+     * `company` for one more release. "" clears it to Not set.
+     */
+    @ValidateIf((_o, v: unknown) => v != null && v !== "")
     @Transform(trimLower)
-    @IsString()
-    @IsIn(BUSINESS_TYPES, { message: "Unknown business type" })
-    type?: BusinessType;
+    @IsIn(ACCEPTED_BUSINESS_TYPES, { message: "Unknown business type" })
+    type?: AcceptedBusinessType | "";
 
     @IsOptional()
     @Transform(trim)

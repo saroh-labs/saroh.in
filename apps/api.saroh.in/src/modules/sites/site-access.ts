@@ -1,9 +1,10 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
-import type { Prisma } from "@saroh/database";
+import type { PageKind, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { TemplateContext } from "@saroh/templates";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { reservedAgainst, reservedPathFor } from "./page-kinds";
 
 /**
  * Tenancy guards and write plumbing shared by every sites surface.
@@ -21,16 +22,109 @@ import type { OrganizationContext } from "../../common/types/organization-contex
  * touching a row. Reading them in one file is how you check none is missing.
  */
 
-/** Refuse a path another page on this site already holds. */
-export async function assertPathIsFree(siteId: string, path: string) {
+// The reserved addresses live with the page kinds (pure, so the flag engine
+// reads them without the database); re-exported here beside the guard that
+// enforces them.
+export {
+    RESERVED_PAGE_PATHS,
+    reservedAgainst,
+    reservedPathFor,
+} from "./page-kinds";
+
+/** An address as a single lowercase, hyphenated segment, or "" for none. */
+function pathSegment(text: string): string {
+    const collapsed = text
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[^a-z0-9\s-]/g, "")
+        .trim()
+        .replace(/[\s-]+/g, "-")
+        .slice(0, 60);
+    // Trimmed by index, as `slugify` in sites.service does (js/polynomial-redos).
+    let start = 0;
+    let end = collapsed.length;
+    while (start < end && collapsed[start] === "-") start++;
+    while (end > start && collapsed[end - 1] === "-") end--;
+    return collapsed.slice(start, end);
+}
+
+/**
+ * A free address to offer instead of one that is taken or reserved: the
+ * first of `candidates` no page holds and no route owns, else the last with
+ * a number after it. Suggested, never applied: the merchant picks.
+ */
+export async function suggestFreePath(
+    siteId: string,
+    candidates: readonly string[],
+): Promise<string> {
+    const taken = new Set(
+        (
+            await prisma.page.findMany({
+                where: { siteId },
+                select: { path: true },
+            })
+        ).map((p) => p.path),
+    );
+    const usable = (p: string) =>
+        p.length > 1 && !taken.has(p) && reservedPathFor(p) === null;
+    const tried = candidates.filter((c) => c.startsWith("/") && c.length > 1);
+    const found = tried.find(usable);
+    if (found) return found;
+    const base = tried[tried.length - 1] ?? "/page";
+    for (let n = 2; n < 100; n++) {
+        if (usable(`${base}-${n}`)) return `${base}-${n}`;
+    }
+    return `${base}-${Date.now().toString(36)}`;
+}
+
+/**
+ * Refuse an address a page of `kind` can't have on this site: one another
+ * page holds, or one a route owns (G14). Each refusal says what the address
+ * is for, and offers another in `details.suggestion`.
+ *
+ * `title` is the page's, so the suggestion for a page reads like it
+ * ("Book a walkthrough" → /book-a-walkthrough); `alternatives` are addresses
+ * to offer first (a Contact page's /contact-us).
+ */
+export async function assertPathIsFree(
+    siteId: string,
+    path: string,
+    options: {
+        kind?: PageKind;
+        title?: string;
+        alternatives?: readonly string[];
+    } = {},
+) {
+    const kind = options.kind ?? "FREE";
+    const fromTitle = options.title ? `/${pathSegment(options.title)}` : "";
+    const reserved = reservedPathFor(path);
+    if (reserved && reservedAgainst(path, kind)) {
+        const rest = path.slice(reserved.root.length);
+        const suggestion = await suggestFreePath(siteId, [
+            ...(options.alternatives ?? []),
+            fromTitle,
+            rest,
+            `${reserved.root}-info`,
+        ]);
+        throw new BadRequestException({
+            message: `${reserved.root} is ${reserved.purpose}, so a page can't use ${path}. Pick another address, such as ${suggestion}.`,
+            details: { field: "path", reason: "reserved", suggestion },
+        });
+    }
     const clash = await prisma.page.findFirst({
         where: { siteId, path },
         select: { title: true },
     });
     if (clash) {
-        throw new BadRequestException(
-            `The path ${path} is already used by "${clash.title}".`,
-        );
+        const suggestion = await suggestFreePath(siteId, [
+            ...(options.alternatives ?? []),
+            fromTitle,
+            path,
+        ]);
+        throw new BadRequestException({
+            message: `The path ${path} is already used by "${clash.title}". Pick another address, such as ${suggestion}.`,
+            details: { field: "path", reason: "taken", suggestion },
+        });
     }
 }
 

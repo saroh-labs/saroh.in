@@ -8,8 +8,10 @@ import {
 import type { Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { toMinor } from "../../common/money";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
+import { completePackDraftInTx } from "../class-packs/pack-checkout";
 import {
     CAPTURED_NEEDS_REFUND,
     ONLINE_PAYMENT_METHOD,
@@ -21,15 +23,20 @@ import {
     invoiceSupersededPayment,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { PaymentStatus } from "../orders/dto";
+import { finishCancelInTx } from "../orders/order-cancel";
 import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
+import { orderMoneyIntents } from "../orders/treatment-ledger";
 import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
 import { PaymentsService } from "../payments/payments.service";
+import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
+import { applyOnlineOrderSuccess } from "./online-order-payment";
 import type {
     NormalizedWebhookEvent,
     WebhookHeaders,
@@ -336,7 +343,7 @@ export class WebhooksService {
                         event,
                     );
                 case "FAILED":
-                    return this.applyIntentFailure(tx, intent);
+                    return this.applyInvoiceFailure(tx, intent, invoiceId);
                 case "REFUNDED":
                     return this.applyInvoiceRefund(tx, intent, event);
                 case "REFUND_FAILED":
@@ -414,6 +421,43 @@ export class WebhooksService {
         const intent = { ...found, status: await lockIntent(tx, found) };
         if (intent.status === SUPERSEDED_INTENT) {
             return this.applySupersededSuccess(tx, intent, orderId, event);
+        }
+
+        // An order the site's checkout started (G13) holds its units only
+        // now, and becomes an order only if they held. Read without a lock:
+        // `placedOnline` is set when the order is made and never changes,
+        // and the order's lock comes after the intent's (reserve.ts).
+        const placed = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { placedOnline: true },
+        });
+        if (placed?.placedOnline) {
+            const online = await applyOnlineOrderSuccess(
+                tx,
+                intent,
+                orderId,
+                event,
+                (target) => this.moveOrderPayment(tx, orderId, target),
+            );
+            // A refused checkout's refund is sent from a job written here,
+            // with the refusal (G13, DEC-032): retried with backoff until
+            // the provider answers, and never lost to a failed call.
+            if (online.refundId && online.refundCreated) {
+                await enqueueRefundSendInTx(
+                    tx,
+                    intent.organizationId,
+                    online.refundId,
+                );
+            }
+            // Paid and held: the team's "New order" (F14). The alert reads
+            // the order again and says nothing of a refused checkout.
+            if (online.applied) {
+                await enqueueTeamAlert(tx, intent.organizationId, {
+                    event: "order",
+                    orderId,
+                });
+            }
+            return { applied: online.applied };
         }
 
         // Read before the move: money arriving on an order cancelled in the
@@ -544,13 +588,37 @@ export class WebhooksService {
         // is IGNORED rather than forced through an illegal transition.
         const order = await tx.order.findUnique({
             where: { id: orderId },
-            select: { paymentStatus: true },
+            select: { paymentStatus: true, placedOnline: true },
         });
-        if (order?.paymentStatus === "UNPAID") {
+        // A checkout's failed attempt (G13) leaves its order UNPAID: until it
+        // is paid it is an abandoned checkout, which Orders leaves out (B1),
+        // and the customer may try again on the same order.
+        if (order?.paymentStatus === "UNPAID" && !order.placedOnline) {
             const changed = await this.moveOrderPayment(tx, orderId, "FAILED");
             applied = applied || changed;
         }
         return { applied };
+    }
+
+    /**
+     * An invoice's pay link failed: the intent moves (below), and the
+     * team's "Payment failed" alert (F14) is queued with it, once per
+     * attempt that actually failed.
+     */
+    private async applyInvoiceFailure(
+        tx: Tx,
+        intent: IntentRow,
+        invoiceId: string,
+    ): Promise<{ applied: boolean }> {
+        const result = await this.applyIntentFailure(tx, intent);
+        if (result.applied) {
+            await enqueueTeamAlert(tx, intent.organizationId, {
+                event: "failed",
+                invoiceId,
+                paymentIntentId: intent.id,
+            });
+        }
+        return result;
     }
 
     /**
@@ -593,10 +661,20 @@ export class WebhooksService {
         // already-REFUNDED orders pass.
         const order = await tx.order.findUnique({
             where: { id: orderId },
-            select: { paymentStatus: true },
+            select: { paymentStatus: true, placedOnline: true },
         });
         if (!order) return { applied: false };
         const current = order.paymentStatus as PaymentStatus;
+        // A checkout whose payment was refused (G13): the money came in but
+        // the order never became paid, so its refund settles on its own row
+        // and the order stays as it is: closed, nothing held or invoiced.
+        if (
+            order.placedOnline &&
+            (current === "UNPAID" || current === "FAILED")
+        ) {
+            const { applied } = await this.settleRefund(tx, intent, event);
+            return { applied };
+        }
         if (current !== "REFUNDED" && current !== "PAID") {
             assertPaymentTransition(current, "REFUNDED");
         }
@@ -628,7 +706,10 @@ export class WebhooksService {
         // Refunded in full: whatever of the invoice no refund credited is
         // credited now, and it reads CREDITED.
         if (moved) await creditRestOfOrder(tx, orderId, "Refunded", null);
-        return { applied: moved || applied };
+        // The last part of a cancel's refund, heard here first: the order
+        // is marked cancelled now (B9), under the lock this call holds.
+        const cancelled = await finishCancelInTx(tx, orderId, null);
+        return { applied: moved || applied || cancelled };
     }
 
     /**
@@ -667,11 +748,75 @@ export class WebhooksService {
         intent: IntentRow,
         event: NormalizedWebhookEvent,
     ): Promise<{ applied: boolean }> {
+        // A treatment's booking invoice names its order (E9, DEC-050): its
+        // refund is the order's, so the order is locked first, as every
+        // refund of an order takes it.
+        const invoice = intent.invoiceId
+            ? await tx.invoice.findUnique({
+                  where: { id: intent.invoiceId },
+                  select: { orderId: true, source: true, kind: true },
+              })
+            : null;
+        const orderId =
+            invoice?.source === "BOOKING" && invoice.kind === "INVOICE"
+                ? invoice.orderId
+                : null;
+        if (orderId) {
+            await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+        }
         const settled = await this.settleRefund(tx, intent, event);
         if (settled.refundId && settled.settledNow) {
             await creditNoteForRefund(tx, settled.refundId);
         }
-        return settled;
+        // Paid in full online and every rupee of it back: the treatment's
+        // order is refunded, and books no more visits. A balance recorded
+        // by hand was not handed back here, so that order stays as it is.
+        let moved = false;
+        if (orderId && (await this.treatmentRefundedInFull(tx, orderId))) {
+            moved = await this.moveOrderPayment(tx, orderId, "REFUNDED");
+        }
+        // A treatment cancelled with its deposit refunded (B9): cancelled
+        // once the provider has answered for all of it.
+        const cancelled = orderId
+            ? await finishCancelInTx(tx, orderId, null)
+            : false;
+        return { ...settled, applied: settled.applied || moved || cancelled };
+    }
+
+    /**
+     * Whether a treatment's order took its whole total online (its own
+     * payments and its booking invoice's) and has had all of it back —
+     * settled refunds only.
+     */
+    private async treatmentRefundedInFull(
+        tx: Tx,
+        orderId: string,
+    ): Promise<boolean> {
+        const order = await tx.order.findUnique({
+            where: { id: orderId },
+            select: { paymentStatus: true, total: true },
+        });
+        if (order?.paymentStatus !== "PAID") return false;
+        const payments = await tx.paymentIntent.findMany({
+            where: { ...orderMoneyIntents(orderId), status: "SUCCEEDED" },
+            select: {
+                amountCents: true,
+                refunds: {
+                    where: { status: "SUCCEEDED" },
+                    select: { amountCents: true },
+                },
+            },
+        });
+        const captured = payments.reduce((s, p) => s + p.amountCents, 0);
+        const refunded = payments.reduce(
+            (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
+            0,
+        );
+        return (
+            captured > 0 &&
+            captured >= toMinor(order.total) &&
+            refunded >= captured
+        );
     }
 
     /**
@@ -943,6 +1088,19 @@ export class WebhooksService {
                       payment,
                   })
                 : null;
+        // A pack bought online (A11): the purchase is made from the draft's
+        // snapshot and the invoice numbered and paid — unless the draft was
+        // discarded or its buyer removed meanwhile, and then the money is
+        // owed back, below.
+        const bought =
+            invoice?.status === "DRAFT" && invoice.source === "PACK"
+                ? await completePackDraftInTx(tx, {
+                      invoiceId,
+                      organizationId: intent.organizationId,
+                      now: new Date(),
+                      payment,
+                  })
+                : null;
         // A booking's pay link (E4) paid after the booking was cancelled:
         // cancelling retires the link, but a checkout already open can still
         // take the money. The place is gone, so it is owed back, not a
@@ -957,7 +1115,8 @@ export class WebhooksService {
                 : false;
         if (
             (invoice?.status === "ISSUED" && !cancelledBooking) ||
-            held === "confirmed"
+            held === "confirmed" ||
+            bought === "bought"
         ) {
             if (invoice?.status === "ISSUED") {
                 await tx.invoice.update({
@@ -987,9 +1146,11 @@ export class WebhooksService {
         const found =
             held === "released"
                 ? "RELEASED_HOLD"
-                : cancelledBooking
-                  ? "CANCELLED_BOOKING"
-                  : (invoice?.status ?? "MISSING");
+                : bought === "gone"
+                  ? "PACK_NOT_BOUGHT"
+                  : cancelledBooking
+                    ? "CANCELLED_BOOKING"
+                    : (invoice?.status ?? "MISSING");
         await tx.paymentAttempt.create({
             data: {
                 organizationId: intent.organizationId,

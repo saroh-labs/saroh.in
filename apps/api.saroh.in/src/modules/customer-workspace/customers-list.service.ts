@@ -8,8 +8,9 @@ import {
     isReservedContactEmail,
 } from "../contacts/contact-email";
 import type { OrgAction } from "../organizations/organization-actions";
-import { allows, authorize } from "../organizations/organization-policy";
+import { allows } from "../organizations/organization-policy";
 import { attentionFor, canSeeSensitive } from "./attention-read";
+import { requireCustomerPower } from "./customer-access";
 import type { MoneyTotal } from "./customer-detail.service";
 import type {
     CustomerChip,
@@ -66,6 +67,11 @@ export interface CustomerRow {
     possibleDuplicate: boolean;
     /** A GRANTED marketing consent on any channel. */
     offers: boolean;
+    /**
+     * Added on the Customers list by hand (DEC-056, C14): listed before
+     * they have paid, and "Added by hand" until they order.
+     */
+    addedByHand: boolean;
     attention: CustomerAttentionTag[];
     /** Sensitive entries on the record this viewer may not see. */
     hiddenSensitiveCount: number;
@@ -168,6 +174,8 @@ interface PeopleRow {
     paid_invoices: number;
     subscriber: boolean;
     offers: boolean;
+    /** Absent from a test double that predates C14. */
+    added_by_hand?: boolean;
 }
 
 function personName(p: {
@@ -200,7 +208,7 @@ export class CustomersListService {
         ctx: OrganizationContext,
         query: ListCustomersQueryDto,
     ): Promise<CustomersPage> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         const organizationId = ctx.organizationId;
         const sees = {
             orders: allows(ctx, "order:read"),
@@ -211,12 +219,12 @@ export class CustomersListService {
         const chip = query.chip ?? "all";
         const sort = query.sort ?? (sees.orders ? "last" : "name");
         for (const action of [...CHIP_NEEDS[chip], ...SORT_NEEDS[sort]]) {
-            authorize(ctx, action);
+            requireCustomerPower(ctx, action);
         }
         // "Bought at" is about orders; a storefront of another business is
         // a 404, as every cross-tenant id.
         if (query.store) {
-            authorize(ctx, "order:read");
+            requireCustomerPower(ctx, "order:read");
             await this.requireStore(organizationId, query.store);
         }
         const page = query.page ?? 1;
@@ -241,7 +249,7 @@ export class CustomersListService {
                     SELECT m.id, m."firstName", m."lastName", m.email, m.phone,
                         m.account_email, m.orders, m.paid_orders,
                         m.open_orders, m.last_order_at, m.paid_invoices,
-                        m.subscriber, m.offers
+                        m.subscriber, m.offers, m.added_by_hand
                     FROM m
                     WHERE ${matches} AND ${chipSql(chip, invoicesToo)}
                     ORDER BY ${orderBySql(sort)}
@@ -284,6 +292,7 @@ export class CustomersListService {
                     signsIn: r.account_email != null,
                     possibleDuplicate: duplicates.has(r.id),
                     offers: r.offers,
+                    addedByHand: r.added_by_hand === true,
                     attention: (read?.entries ?? []).map((e) => ({
                         kind: e.kind,
                         label: e.label,
@@ -328,11 +337,11 @@ export class CustomersListService {
         ctx: OrganizationContext,
         query: ListUnlinkedQueryDto,
     ): Promise<UnlinkedPage> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         const organizationId = ctx.organizationId;
         // Who paid at a storefront is about orders, as `list`'s filter is.
         if (query.store) {
-            authorize(ctx, "order:read");
+            requireCustomerPower(ctx, "order:read");
             await this.requireStore(organizationId, query.store);
         }
         const orders = allows(ctx, "order:read");

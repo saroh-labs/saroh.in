@@ -2,13 +2,23 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { BookingEventType } from "../bookings/booking-event-type";
+import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
+import {
+    autopayRefusal,
+    cancelAutopayFirst,
+    openMandatesWhere,
+} from "../payments/mandate-gate";
+import { MandatesService } from "../payments/mandates.service";
+import { emailHeldBy, planContactEdit } from "./contact-edit";
 import type { ContactSearchResult } from "./contact-search";
 import { SEARCH_LIMIT, searchContacts } from "./contact-search";
 import type { CreateContactDto, UpdateContactDto } from "./dto";
@@ -95,6 +105,13 @@ export interface ContactRemoval {
 @Injectable()
 export class ContactsService {
     /**
+     * D20's mandates, so a hard delete cancels their autopay at the
+     * provider first. Optional: built by hand (a unit), an open mandate
+     * refuses the delete instead.
+     */
+    constructor(@Optional() private readonly mandates?: MandatesService) {}
+
+    /**
      * The org's contacts, newest first, each carrying the rollup that makes the
      * row worth reading — see {@link ContactListItem}.
      *
@@ -109,8 +126,13 @@ export class ContactsService {
         authorize(ctx, "contact:read");
 
         const contacts = await prisma.contact.findMany({
-            // A merge's tombstone is never a row (C9): its survivor is.
-            where: { organizationId: ctx.organizationId, mergedIntoId: null },
+            // A merge's tombstone is never a row (C9): its survivor is. Nor
+            // is someone whose details were removed (C11).
+            where: {
+                organizationId: ctx.organizationId,
+                mergedIntoId: null,
+                removedAt: null,
+            },
             orderBy: { createdAt: "desc" },
         });
         if (contacts.length === 0) return [];
@@ -294,13 +316,15 @@ export class ContactsService {
          */
         const newest = await prisma.order.groupBy({
             by: ["customerId"],
-            where: { customerId: { in: customerIds } },
+            // Never an abandoned site checkout (B1).
+            where: { customerId: { in: customerIds }, ...realOrderWhere() },
             _max: { createdAt: true },
         });
 
         const newestByCustomer = new Map<string, Date>();
         for (const row of newest) {
-            if (row._max.createdAt) {
+            // `customerId IN (…)` never matches a walk-in's null (B13).
+            if (row.customerId && row._max.createdAt) {
                 newestByCustomer.set(row.customerId, row._max.createdAt);
             }
         }
@@ -310,6 +334,7 @@ export class ContactsService {
             where: {
                 customerId: { in: [...newestByCustomer.keys()] },
                 createdAt: { in: [...newestByCustomer.values()] },
+                ...realOrderWhere(),
             },
             select: {
                 customerId: true,
@@ -320,6 +345,7 @@ export class ContactsService {
         });
 
         for (const order of orders) {
+            if (!order.customerId) continue;
             // Re-check the pair: the `IN` above matches any customer at any of
             // the collected instants, so a coincidental timestamp collision
             // between two customers would otherwise cross-attribute an order.
@@ -436,9 +462,16 @@ export class ContactsService {
     }
 
     /**
-     * Patch a contact's descriptive fields (never its email identity). Authorizes
-     * `contact:write`; cross-tenant or missing ids 404 before any write. Only the
-     * fields present in the DTO are applied — a sparse patch.
+     * Patch a contact: name, phone, company, email and address (C8), as
+     * `contact-edit.ts` works out. Authorizes `contact:write`; cross-tenant
+     * or missing ids 404 before any write. Only the fields present in the
+     * DTO are applied — a sparse patch.
+     *
+     * An email another contact holds is a 409 naming them. A changed email
+     * clears the verified stamp (DEC-049) and leaves a site account's
+     * sign-in email alone. What changed is recorded for the timeline
+     * ("Details changed"), by name only; an edit that changes nothing
+     * writes nothing.
      */
     async update(
         ctx: OrganizationContext,
@@ -447,21 +480,50 @@ export class ContactsService {
     ): Promise<Contact> {
         authorize(ctx, "contact:write");
 
-        await this.requireOwned(ctx, contactId);
+        const current = await this.requireOwned(ctx, contactId);
+        const edit = planContactEdit(current, dto);
+        if (edit.changed.length === 0) return current;
 
-        return prisma.contact.update({
-            where: { id: contactId },
-            data: {
-                ...(dto.firstName !== undefined
-                    ? { firstName: dto.firstName }
-                    : {}),
-                ...(dto.lastName !== undefined
-                    ? { lastName: dto.lastName }
-                    : {}),
-                ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
-                ...(dto.company !== undefined ? { company: dto.company } : {}),
-            },
-        });
+        if (edit.email) {
+            const holder = await prisma.contact.findFirst({
+                where: {
+                    organizationId: ctx.organizationId,
+                    id: { not: contactId },
+                    email: { equals: edit.email, mode: "insensitive" },
+                },
+                select: { id: true, firstName: true, lastName: true },
+            });
+            if (holder) throw emailHeldBy(holder);
+        }
+
+        try {
+            return await prisma.$transaction(async (tx) => {
+                const updated = await tx.contact.update({
+                    where: { id: contactId },
+                    data: edit.data,
+                });
+                await tx.auditEvent.create({
+                    data: {
+                        action: AuditAction.CustomerDetailsChanged,
+                        actorUserId: ctx.userId,
+                        organizationId: ctx.organizationId,
+                        targetType: "contact",
+                        targetId: contactId,
+                        outcome: "SUCCESS",
+                        metadata: auditMetadata(ctx.roleKey, {
+                            fields: edit.changed,
+                        }),
+                    },
+                });
+                return updated;
+            });
+        } catch (err) {
+            // Lost a race for the email to another write.
+            if ((err as { code?: string }).code === "P2002") {
+                throw emailHeldBy(null);
+            }
+            throw err;
+        }
     }
 
     /**
@@ -490,8 +552,37 @@ export class ContactsService {
     ): Promise<ContactRemoval> {
         authorize(ctx, "contact:write");
         await this.requireOwned(ctx, contactId);
+        // Their autopay ends at the provider before the rows that say who
+        // authorised it cascade away (D20): after the delete, the
+        // `mandate.cancel` job would find nothing left to ask about.
+        const autopay = await cancelAutopayFirst(
+            prisma,
+            this.mandates,
+            { organizationId: ctx.organizationId, contactId },
+            "STAFF",
+        );
+        if (!autopay.ok) {
+            throw new ConflictException({
+                message: autopayRefusal(autopay.provider, "deleted"),
+                details: { reason: "autopay" },
+            });
+        }
         const now = new Date();
         return prisma.$transaction(async (tx) => {
+            // Under the contact's lock, nothing set up since: checked again.
+            await tx.$queryRaw`SELECT id FROM "Contact"
+                WHERE id = ${contactId} AND "organizationId" = ${ctx.organizationId}
+                FOR UPDATE`;
+            const stillOpen = await tx.paymentMandate.findFirst({
+                where: openMandatesWhere(ctx.organizationId, contactId),
+                select: { provider: true },
+            });
+            if (stillOpen) {
+                throw new ConflictException({
+                    message: autopayRefusal(stillOpen.provider, "deleted"),
+                    details: { reason: "autopay" },
+                });
+            }
             const leads = await tx.lead.count({ where: { contactId } });
             const subscriptions = await tx.customerSubscription.count({
                 where: { contactId, status: { in: ["ACTIVE", "PAUSED"] } },
@@ -584,6 +675,11 @@ export class ContactsService {
                 message: "This contact was merged into another",
                 details: { mergedInto: contact.mergedIntoId },
             });
+        }
+        // Removed for a privacy request (C11): nothing is left to read or
+        // edit, and an edit would put details back.
+        if (contact.removedAt) {
+            throw new NotFoundException("This contact's details were removed");
         }
         return contact;
     }

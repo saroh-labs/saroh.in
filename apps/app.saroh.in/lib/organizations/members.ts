@@ -31,6 +31,32 @@ export interface OrganizationMember {
      * absent from an older API. The Team row says nothing when it is null.
      */
     lastActiveAt?: string | null;
+    /**
+     * The storefronts this person works on and their role at each (Admin,
+     * Manager, Editor or Viewer; DEC-048), shown under their name. Absent
+     * from an older API.
+     */
+    storefronts?: MemberStorefront[];
+    /**
+     * What this person holds beyond their role (F17): their extra
+     * permissions as action keys, less anything the role already grants.
+     * Absent from an older API.
+     */
+    extraActions?: string[];
+}
+
+export interface MemberStorefront {
+    storeId: string;
+    name: string;
+    role: string;
+}
+
+/** Someone the storefront backfill put on the team (F16), for Team's notice. */
+export interface StorefrontTeamNoticePerson {
+    userId: string;
+    name: string | null;
+    email: string;
+    storefronts: string[];
 }
 
 export interface OrganizationInvitation {
@@ -73,6 +99,40 @@ export async function listInvitations(): Promise<OrganizationInvitation[]> {
 }
 
 /**
+ * The people the storefront backfill put on the team as Storefront team and
+ * whose role nobody has changed since (F16, DEC-048), for Team's one-time
+ * notice. Empty rather than throwing — for a viewer who may not change
+ * roles, an older API, or a failed read — because the notice is an aside on
+ * a page that must still render the roster.
+ */
+export async function getStorefrontTeamNotice(): Promise<
+    StorefrontTeamNoticePerson[]
+> {
+    const base = await orgBase();
+    if (!base) return [];
+    const res = await apiFetch(`${base}/storefront-team-notice`).catch(
+        () => null,
+    );
+    if (!res?.ok) return [];
+    const data = (await res.json().catch(() => null)) as {
+        people?: StorefrontTeamNoticePerson[];
+    } | null;
+    return data?.people ?? [];
+}
+
+/** Dismiss that notice for the whole business. */
+export async function dismissStorefrontTeamNotice(): Promise<
+    CrmResult<{ dismissed: boolean }>
+> {
+    return mutate(
+        "/storefront-team-notice/dismiss",
+        "POST",
+        {},
+        "Could not dismiss that notice.",
+    );
+}
+
+/**
  * Invite someone — or, for an address already invited, send it again: the API
  * refreshes that invitation in place with a new link and a fresh week.
  *
@@ -102,6 +162,23 @@ export async function updateMemberRole(
         "PATCH",
         input,
         "Could not change that role.",
+    );
+}
+
+/**
+ * Set a person's extra permissions, the whole list (F17). The API refuses
+ * anything beyond the caller's own reach, their own list, and anyone who can
+ * do more than they can, in words.
+ */
+export async function setMemberExtraActions(
+    userId: string,
+    actions: string[],
+): Promise<CrmResult<{ userId: string; extraActions: string[] }>> {
+    return mutate(
+        `/members/${userId}/extra-actions`,
+        "PUT",
+        { actions },
+        "Could not change those permissions.",
     );
 }
 

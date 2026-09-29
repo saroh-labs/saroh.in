@@ -1,5 +1,6 @@
 import {
     checkPage,
+    checkShop,
     checkSite,
     FLAGS_AWAITING_NAVIGATION,
     type FlagPageInput,
@@ -725,5 +726,123 @@ describe("example text left in an added block", () => {
             ["/"],
         );
         expect(flags).toEqual([]);
+    });
+});
+
+describe("module pages and reserved addresses (G14)", () => {
+    const reserved = (flags: { type: FlagType; pageId: string | null }[]) =>
+        flags.filter((f) => f.type === "reservedAddress");
+
+    it("flags a free-form page at /book: it can't be seen, and says why", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([], { id: "home" }),
+                    page([], {
+                        id: "walk",
+                        path: "/book",
+                        title: "Book a walkthrough",
+                    }),
+                ],
+            }),
+        );
+        expect(reserved(flags)).toEqual([
+            {
+                type: "reservedAddress",
+                message:
+                    "This page can't be seen: /book is your booking page. Change its address so visitors can reach it.",
+                pageId: "walk",
+                sectionIndex: null,
+                field: "path",
+            },
+        ]);
+    });
+
+    it("flags pages under /book and at /checkout, but not a Book page at /book", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([], { id: "under", path: "/book/intro" }),
+                    page([], { id: "pay", path: "/checkout" }),
+                    page([], { id: "book", path: "/book", kind: "BOOK" }),
+                    page([], { id: "trial", path: "/book-a-trial" }),
+                ],
+            }),
+        );
+        expect(reserved(flags).map((f) => f.pageId)).toEqual(["under", "pay"]);
+    });
+
+    it("leaves a hidden page at /book, and a page at /shop, to their own checks", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([], { id: "gone", path: "/book", hidden: true }),
+                    page([], { id: "range", path: "/shop" }),
+                ],
+            }),
+        );
+        expect(reserved(flags)).toEqual([]);
+    });
+
+    it("flags a free-form page at /account, which the account area's route owns (G15)", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([], { id: "acct", path: "/account" }),
+                    page([], { id: "accounts", path: "/accounts" }),
+                ],
+            }),
+        );
+        expect(reserved(flags).map((f) => [f.pageId, f.message])).toEqual([
+            [
+                "acct",
+                "This page can't be seen: /account is where your customers see their account. Change its address so visitors can reach it.",
+            ],
+        ]);
+    });
+
+    it("doesn't ask for a module page, or one kept out of the menu, to be added to it", () => {
+        const flags = checkSite(
+            site({
+                navigation: { items: [{ pageId: "home" }] },
+                pages: [
+                    page([], { id: "home" }),
+                    page([], { id: "book", path: "/book", kind: "BOOK" }),
+                    page([], { id: "quiet", path: "/quiet", inMenu: false }),
+                    page([], { id: "about", path: "/about", title: "About" }),
+                ],
+            }),
+        );
+        const notInMenu = flags.filter((f) => f.type === "pageNotInNavigation");
+        expect(notInMenu.map((f) => f.pageId)).toEqual(["about"]);
+    });
+
+    it("doesn't say a menu is missing when every other page decided its own", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    page([], { id: "home" }),
+                    page([], {
+                        id: "journal",
+                        path: "/journal",
+                        kind: "JOURNAL",
+                    }),
+                ],
+            }),
+        );
+        expect(types(flags)).not.toContain("pageNotInNavigation");
+    });
+
+    it("never flags the Shop page for sitting at the shop's address", () => {
+        const flags = checkShop({
+            storefrontChosen: true,
+            candidates: 1,
+            isShopPath: (p) => p === "/shop" || p.startsWith("/shop/"),
+            pages: [
+                { id: "shop", path: "/shop", hidden: false, kind: "SHOP" },
+                { id: "range", path: "/shop/range", hidden: false },
+            ],
+        });
+        expect(flags.map((f) => f.pageId)).toEqual(["range"]);
     });
 });

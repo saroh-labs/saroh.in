@@ -3,6 +3,7 @@ import {
     isReservedContactEmail,
     reservedAccountEmail,
     reservedMergedEmail,
+    reservedPhoneEmail,
     reservedRemovedEmail,
 } from "./contact-email";
 
@@ -100,6 +101,18 @@ describe("contact-email placeholders", () => {
         it("shows nothing when there is no email at all", () => {
             expect(contactEmailForDisplay(null)).toBeNull();
             expect(contactEmailForDisplay("", "")).toBeNull();
+        });
+    });
+
+    describe("a walk-in known by their phone (B13b)", () => {
+        it("is a reserved placeholder, never shown, and new each time", () => {
+            const a = reservedPhoneEmail();
+            const b = reservedPhoneEmail();
+            expect(a).toMatch(/^phone\+[0-9a-f-]{36}@phone\.invalid$/);
+            expect(a).not.toBe(b);
+            expect(isReservedContactEmail(a)).toBe(true);
+            expect(isReservedContactEmail(a.toUpperCase())).toBe(true);
+            expect(contactEmailForDisplay(a)).toBeNull();
         });
     });
 });

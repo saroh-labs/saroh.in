@@ -17,6 +17,7 @@ import type {
 import {
     buildCorrection,
     buildCreditNote,
+    buildManualInvoice,
     buildOrderInvoice,
     buildPaymentSupplementary,
     formatSellerAddress,
@@ -195,7 +196,12 @@ export async function ensureOrderInvoice(
         where: { orderId, kind: "INVOICE" },
         select: { id: true, number: true },
     });
-    if (existing) return { ...existing, created: false };
+    if (existing) {
+        // A treatment paid by deposit at booking (E9): the rest, paid now,
+        // gets its one balance invoice.
+        await ensureTreatmentBalanceInvoice(tx, orderId, existing.id, opts);
+        return { ...existing, created: false };
+    }
 
     const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -218,6 +224,7 @@ export async function ensureOrderInvoice(
             customer: {
                 select: { firstName: true, lastName: true, email: true },
             },
+            walkInName: true,
             items: {
                 orderBy: { id: "asc" },
                 select: {
@@ -226,6 +233,10 @@ export async function ensureOrderInvoice(
                     price: true,
                     product: {
                         select: { name: true, gstRate: true, hsnCode: true },
+                    },
+                    // A treatment's line bills a service (E9, DEC-050).
+                    service: {
+                        select: { name: true, gstRate: true, sacCode: true },
                     },
                     variant: { select: { title: true } },
                 },
@@ -423,6 +434,86 @@ function asOriginal(row: OriginalRow): Original {
         total: row.total,
         lines: row.lines,
     };
+}
+
+/**
+ * A treatment's balance invoice (E9, DEC-050, DEC-023). A treatment paid by
+ * deposit at booking has one invoice, the deposit's (source BOOKING, naming
+ * the order). When the rest is paid — recorded at the clinic, or through
+ * the order's pay link — it gets one balance invoice for exactly the rest,
+ * a supplementary invoice against the deposit's, so the two total the
+ * treatment's price and a refund of the order can credit both. Once there,
+ * nothing more is written. Anything else is left alone.
+ */
+async function ensureTreatmentBalanceInvoice(
+    tx: Tx,
+    orderId: string,
+    invoiceId: string,
+    opts: { at?: Date; method?: string | null; reference?: string | null },
+): Promise<void> {
+    const which = await tx.invoice.findUnique({
+        where: { id: invoiceId },
+        select: { source: true },
+    });
+    if (which?.source !== "BOOKING") return;
+    // Under the invoice's lock (after the order's, the documented order): a
+    // payment and a hand-recorded balance racing make one balance invoice.
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoiceId} FOR UPDATE`;
+    const original = await tx.invoice.findUnique({
+        where: { id: invoiceId },
+        select: { ...ORIGINAL_SELECT, source: true },
+    });
+    if (original?.source !== "BOOKING" || original.status !== "PAID") return;
+    const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+            total: true,
+            items: {
+                where: { serviceId: { not: null } },
+                select: {
+                    id: true,
+                    service: {
+                        select: { name: true, gstRate: true, sacCode: true },
+                    },
+                },
+            },
+        },
+    });
+    const line = order?.items[0];
+    if (!order || !line?.service) return;
+    const invoiced = await tx.invoice.aggregate({
+        where: { relatedInvoiceId: original.id, kind: "SUPPLEMENTARY" },
+        _sum: { total: true },
+    });
+    const balanceCents =
+        toCents(order.total.toString()) -
+        toCents(original.total.toString()) -
+        toCents((invoiced._sum.total ?? 0).toString());
+    if (balanceCents <= 0) return;
+    const profile = await loadTaxProfile(tx, original.organizationId);
+    const doc = buildManualInvoice(
+        [
+            {
+                description: `Balance for ${line.service.name}`,
+                quantity: 1,
+                unitCents: balanceCents,
+                rateBps: rateToBps(line.service.gstRate?.toString() ?? null),
+                code: line.service.sacCode,
+                orderItemId: line.id,
+            },
+        ],
+        // The paper follows the deposit's: a receipt stays a receipt.
+        { ...profile, registered: original.sellerGstin !== null },
+        original.billToState,
+        0,
+    );
+    await writeCorrection(tx, original, "SUPPLEMENTARY", doc, {
+        status: "PAID",
+        at: opts.at ?? new Date(),
+        method: opts.method ?? null,
+        reference: opts.reference ?? null,
+        note: "Balance of the treatment",
+    });
 }
 
 /**
@@ -775,6 +866,10 @@ export async function invoiceSupersededPayment(
  * the price and rate the line was bought at, referencing the order's
  * invoice. Never an edit to the invoice itself. Nothing when the order has
  * no invoice yet (unpaid: its invoice, when it comes, is the edited order).
+ *
+ * A change of delivery charge (B9, "Change how it's fulfilled") is a line
+ * with no product: it names its own rate and SAC, the business's delivery
+ * ones, as the order's invoice bills delivery.
  */
 export async function correctOrderInvoiceForEdit(
     tx: Tx,
@@ -782,10 +877,14 @@ export async function correctOrderInvoiceForEdit(
         orderId: string;
         changes: {
             orderItemId: string | null;
-            productId: string;
+            /** Null for a delivery charge, which brings its own rate. */
+            productId: string | null;
             description: string;
             deltaQuantity: number;
             unitCents: number;
+            /** The line's rate and code when it has no product. */
+            rateBps?: number | null;
+            code?: string | null;
         }[];
         note: string | null;
         createdByUserId: string | null;
@@ -809,19 +908,27 @@ export async function correctOrderInvoiceForEdit(
     });
     if (!original) return none;
 
+    const productIds = input.changes.flatMap((c) =>
+        c.productId ? [c.productId] : [],
+    );
     const products = await tx.product.findMany({
-        where: { id: { in: input.changes.map((c) => c.productId) } },
+        where: { id: { in: productIds } },
         select: { id: true, gstRate: true, hsnCode: true },
     });
     const byProduct = new Map(products.map((p) => [p.id, p]));
-    const line = (c: (typeof input.changes)[number], quantity: number) => ({
-        description: c.description,
-        quantity,
-        unitCents: c.unitCents,
-        rateBps: rateToBps(byProduct.get(c.productId)?.gstRate ?? null),
-        code: byProduct.get(c.productId)?.hsnCode ?? null,
-        orderItemId: c.orderItemId,
-    });
+    const line = (c: (typeof input.changes)[number], quantity: number) => {
+        const product = c.productId ? byProduct.get(c.productId) : undefined;
+        return {
+            description: c.description,
+            quantity,
+            unitCents: c.unitCents,
+            rateBps: c.productId
+                ? rateToBps(product?.gstRate ?? null)
+                : (c.rateBps ?? null),
+            code: c.productId ? (product?.hsnCode ?? null) : (c.code ?? null),
+            orderItemId: c.orderItemId,
+        };
+    };
     const up = input.changes
         .filter((c) => c.deltaQuantity > 0)
         .map((c) => line(c, c.deltaQuantity));

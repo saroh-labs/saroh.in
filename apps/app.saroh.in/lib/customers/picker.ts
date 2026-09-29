@@ -36,7 +36,11 @@ export type CustomerPick =
       }
     /** Someone new: made a contact by whatever saves the booking or order. */
     | { kind: "new"; name: string; email: string; phone: string }
-    /** No record at all (B13's walk-in): a name, and a phone if given. */
+    /**
+     * A walk-in (B13): a name, and a phone if given. A name alone makes no
+     * record; with a phone the API keeps them as a customer, found or made
+     * by it (B13b).
+     */
     | { kind: "walk-in"; name: string; phone: string };
 
 /** The fields "add new" opens with. */
@@ -100,6 +104,39 @@ export function exactly(
 ): CustomerSearchResult | undefined {
     return results.find((r) => r.exactOn.includes(on));
 }
+
+/**
+ * Fewest digits a walk-in's phone keeps them by: the API's rule (C2's
+ * `normalisePhone`). Only counted here, to say so before it is sent.
+ */
+export const MIN_WALK_IN_PHONE_DIGITS = 7;
+
+/** What a walk-in's phone field holds: nothing, too little, or a phone. */
+export type WalkInPhone = "none" | "short" | "phone";
+
+export function walkInPhone(phone: string): WalkInPhone {
+    const digits = phone.replace(/\D/g, "").length;
+    if (!phone.trim()) return "none";
+    return digits >= MIN_WALK_IN_PHONE_DIGITS ? "phone" : "short";
+}
+
+/**
+ * What the walk-in form says under its fields, and its button (B13b): a
+ * phone keeps them as a customer, and the form says so before it is used.
+ */
+export function walkInCopy(phone: string): { hint: string; action: string } {
+    return walkInPhone(phone) === "phone"
+        ? {
+              hint: "They'll be kept as a customer, by this phone.",
+              action: "Keep as customer",
+          }
+        : {
+              hint: "Add a phone to keep them as a customer.",
+              action: "Use walk-in",
+          };
+}
+
+export const WALK_IN_PHONE_ERROR = "That doesn't look like a phone number.";
 
 /** What a chip says for someone found. */
 export function resultLabel(r: {

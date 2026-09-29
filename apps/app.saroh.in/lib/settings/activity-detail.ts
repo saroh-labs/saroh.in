@@ -1,3 +1,9 @@
+import {
+    ALERT_CHANNEL_LABELS,
+    ALERT_CHANNELS,
+    ALERTS,
+} from "@/lib/notifications/preferences";
+
 import type { AuditEventRow, RoleLabels } from "./activity";
 import { personName, roleName } from "./activity";
 import type { ChangeValue, RecordedChange } from "./activity-changes";
@@ -9,8 +15,11 @@ import {
     moduleName,
     record,
     recordedChanges,
+    recordedValueText,
     text,
 } from "./activity-changes";
+import { detailsLabels, mergedMoves } from "./activity-customers";
+import { extrasRows } from "./activity-extras";
 
 /**
  * The sheet a Settings › Activity row opens (#509): when, to the minute and
@@ -47,6 +56,12 @@ export interface ActivityDetail {
     withoutValues: boolean;
 }
 
+/** What a merge did with the website sign-in (C9's `account`). */
+const ACCOUNT_OUTCOME: Partial<Record<string, string>> = {
+    move: "Moved to the record kept",
+    retire: "The other sign-in was retired",
+};
+
 /** What a storefront's fulfilment change names each field (B17). */
 const FULFILMENT_FIELD_LABEL: Partial<Record<string, string>> = {
     fulfilmentTypes: "How orders leave",
@@ -62,7 +77,7 @@ function shown(field: string, value: ChangeValue): string {
         return value === true ? "Registered" : "Not registered";
     }
     if (typeof value === "boolean") return value ? "On" : "Off";
-    return String(value);
+    return recordedValueText(field, value);
 }
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -192,6 +207,41 @@ function detailRows(
                 withoutValues: false,
             };
         }
+        case "storefront.same-email.update": {
+            // Customers who share an email (C15): On or Off, and where.
+            const changes = recordedChanges(meta) ?? [];
+            const where = text(meta.storefront);
+            const label = "Link customers who share an email";
+            return {
+                rows: changes.map((c) =>
+                    row(
+                        where ? `${label}, ${where}` : label,
+                        shown(c.field, c.before),
+                        shown(c.field, c.after),
+                    ),
+                ),
+                withoutValues: false,
+            };
+        }
+        case "member.alerts.update": {
+            // One of their own alerts (F14): "New order by Email", On or Off.
+            const alert = ALERTS.find((a) => a.key === meta.alert)?.label;
+            const channel = ALERT_CHANNELS.find((c) => c === meta.channel);
+            const label =
+                alert && channel
+                    ? `${alert} by ${ALERT_CHANNEL_LABELS[channel]}`
+                    : "An alert";
+            return {
+                rows: (recordedChanges(meta) ?? []).map((c) =>
+                    row(
+                        label,
+                        shown(c.field, c.before),
+                        shown(c.field, c.after),
+                    ),
+                ),
+                withoutValues: false,
+            };
+        }
         case "storefront.hours.update": {
             const changes = recordedChanges(meta) ?? [];
             const where = text(meta.storefront);
@@ -244,9 +294,28 @@ function detailRows(
                     : [],
                 withoutValues: false,
             };
+        case "membership.storefront-join":
+            return {
+                rows: [
+                    ...(role(meta.role)
+                        ? [row("Role", null, role(meta.role))]
+                        : []),
+                    ...(text(meta.storefront)
+                        ? [row("From storefront", null, text(meta.storefront))]
+                        : []),
+                ],
+                withoutValues: false,
+            };
         case "membership.role.update":
             return {
                 rows: [row("Role", role(meta.from), role(meta.to))],
+                withoutValues: false,
+            };
+        case "membership.extras.update":
+            // A person's extra permissions (F17): what was given and what
+            // was taken away, in the owner's words.
+            return {
+                rows: extrasRows(meta).map((r) => row(r.label, null, r.value)),
                 withoutValues: false,
             };
         case "membership.remove":
@@ -289,6 +358,29 @@ function detailRows(
                     event.action === "business.stock-tracking.on",
                     meta,
                     true,
+                ),
+                withoutValues: false,
+            };
+        case "customer.merged": {
+            const moves = mergedMoves(meta);
+            const account = ACCOUNT_OUTCOME[text(meta.account) ?? ""];
+            return {
+                rows: [
+                    row(
+                        "Moved to the record kept",
+                        null,
+                        moves.length ? moves.join(", ") : "Nothing",
+                    ),
+                    ...(account ? [row("Website sign-in", null, account)] : []),
+                ],
+                withoutValues: false,
+            };
+        }
+        case "customer.details.changed":
+            // Names only: a person's details are never kept (DEC-035).
+            return {
+                rows: detailsLabels(meta).map((label) =>
+                    row(label, null, null),
                 ),
                 withoutValues: false,
             };

@@ -1,5 +1,7 @@
 import type { ContactEmailVerifiedVia } from "@saroh/database";
 
+import type { ContactAddress } from "../contacts/contact-address";
+import { ADDRESS_FIELDS, isEmptyAddress } from "../contacts/contact-address";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { maskEmail } from "../site-accounts/account-linking.service";
 
@@ -11,18 +13,16 @@ import { maskEmail } from "../site-accounts/account-linking.service";
  *
  * `merge.relations.spec.ts` reads the Prisma schema and fails when a
  * relation to `Contact` has no rule in {@link MERGE_RULES}, so a new table
- * that names a contact can't be forgotten. The rules for `CustomerThread`
- * (A13), `ClassWaitlistEntry` (A12) and `PaymentMandate` (D11) are in the
- * customers plan; whichever of those units lands after C9 adds its row here
- * and its move in the service:
- * - `CustomerThread`: the survivor's thread absorbs the other's messages in
- *   time order, and the other thread row is deleted;
- * - `ClassWaitlistEntry`: same class, the better place stays (OFFERED, then
- *   the earlier position); a second hold is released through
- *   `waitlist.offer`; different classes re-point;
- * - `PaymentMandate`: never moved; cancelled after commit through D20's
- *   `mandates.service.cancelFor({ contactId: other }, MERGED)` (the seam is
- *   `MergeService.afterCommit`).
+ * that names a contact can't be forgotten. `CustomerThread` (A13) has its
+ * row: the survivor's thread absorbs the other's messages in time order,
+ * and the other thread row is deleted (`site-accounts/thread-store.ts`,
+ * `absorbThread`). `PaymentMandate` (D20) has its row: never moved, the
+ * merged contact's are cancelled in the merge's transaction
+ * (`payments/mandate-cancel-job.ts`, `cancelMandatesInTx`) and at the
+ * provider by the `mandate.cancel` job after commit. `ClassWaitlistEntry`
+ * (A12) has its row: same class, the better place stays (OFFERED, then the
+ * earlier position); a second hold is released through `waitlist.offer`;
+ * different classes re-point (`bookings/waitlist-merge.ts`).
  */
 
 export type MergeSide = "survivor" | "other";
@@ -45,7 +45,13 @@ export type MergeRuleKind =
     /** "This isn't them" follows the person to the survivor. */
     | "unlinked-from"
     /** Tombstones of the merged contact point at the survivor instead. */
-    | "tombstones";
+    | "tombstones"
+    /** One thread: the survivor's absorbs the other's messages (A13). */
+    | "absorb-thread"
+    /** Never moved: the merged contact's autopay is cancelled (D20). */
+    | "cancel-mandates"
+    /** Moves; one place per class's line, the better one kept (A12). */
+    | "waitlist";
 
 export interface MergeRule {
     kind: MergeRuleKind;
@@ -112,6 +118,18 @@ export const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
         kind: "tombstones",
         note: "Earlier tombstones point at the survivor, so a chain is one hop.",
     },
+    "CustomerThread.contactId": {
+        kind: "absorb-thread",
+        note: "One thread: the survivor's takes the other's messages in time order (A13).",
+    },
+    "PaymentMandate.contactId": {
+        kind: "cancel-mandates",
+        note: "Autopay isn't moved: the survivor never authorised it, so it is cancelled (D20).",
+    },
+    "ClassWaitlistEntry.contactId": {
+        kind: "waitlist",
+        note: "Places in line follow them; in one class the better place stays, and a second held place goes to the next in line (A12).",
+    },
 };
 
 /**
@@ -145,7 +163,7 @@ export function unruledContactRelations(
 
 // ── The people ──────────────────────────────────────────────────────────
 
-export interface MergeContact {
+export interface MergeContact extends ContactAddress {
     id: string;
     firstName: string | null;
     lastName: string | null;
@@ -229,7 +247,7 @@ export function fieldOptions(
 }
 
 /** The survivor's contact fields after the merge. */
-export interface SurvivorFields {
+export interface SurvivorFields extends ContactAddress {
     firstName: string | null;
     lastName: string | null;
     /** The email to hold; the survivor's own when neither side offers one. */
@@ -248,9 +266,10 @@ function pick<T>(
 }
 
 /**
- * Name, email and phone as picked (DEC-042, default 89); company is the
- * survivor's, filled from the other where the survivor has none. (Address
- * joins company when C8 adds it to Contact.)
+ * Name, email and phone as picked (DEC-042, default 89); company and
+ * address are the survivor's, filled from the other where the survivor has
+ * none (R11). The address moves whole, never line by line: a survivor with
+ * any line of its own keeps its own, so two addresses are never mixed.
  */
 export function survivorFields(
     survivor: MergeContact,
@@ -275,7 +294,14 @@ export function survivorFields(
         company: survivor.company?.trim()
             ? survivor.company
             : (other.company ?? null),
+        ...addressOf(isEmptyAddress(survivor) ? other : survivor),
     };
+}
+
+function addressOf(c: ContactAddress): ContactAddress {
+    return Object.fromEntries(
+        ADDRESS_FIELDS.map((f) => [f, c[f] ?? null]),
+    ) as ContactAddress;
 }
 
 // ── Consent ─────────────────────────────────────────────────────────────

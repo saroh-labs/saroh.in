@@ -1,5 +1,5 @@
 import {
-    BadRequestException,
+    ForbiddenException,
     Injectable,
     Logger,
     Optional,
@@ -14,8 +14,11 @@ import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { isPastDue } from "../invoices/invoice-state";
+import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
 import { dateKey } from "../subscriptions/collections";
+import type { CalendarStaff, DayOff } from "./days-off";
+import { readDaysOff } from "./days-off";
 import type { MoneyEntry, MoneySource } from "./money";
 import { moneyByDay, moneyCells, placeMoney } from "./money";
 import { readFees, readPaperMoney } from "./money-read";
@@ -31,14 +34,17 @@ import type {
 import {
     buildDays,
     dayOf,
-    isMonth,
     LAYER_LABELS,
     LAYERS,
     mergeToActOn,
-    monthWindow,
     sumMoney,
 } from "./month";
+import { orderFlagger } from "./order-flags";
+import { readPayments } from "./payments-layer";
+import type { CalendarQuery } from "./range";
+import { assertWithinReach, monthOf, reachOf, spanOf, windowOf } from "./range";
 import { collectionsInMonth, upcomingRenewals } from "./schedules";
+import type { WorkingHours } from "./working-hours";
 
 /**
  * The Business Calendar's month (plan 2026-09-23-003, U4, R8, R18): one
@@ -94,6 +100,16 @@ import { collectionsInMonth, upcomingRenewals } from "./schedules";
  * nothing and is not on the calendar; a live one takes its place and shows
  * as `held` — never as booked, since nobody has paid for it yet.
  *
+ * ## Range (plan 005 E20)
+ *
+ * The read takes `from`/`to` (local dates, both inclusive) and is refused
+ * wholly before the joined month or past three months ahead (`range.ts`);
+ * `month` stays as an alias for one release (Z3). A caller who reads none
+ * of the layers is refused outright (403), which the app shows as locked.
+ * Items carry their person, length and flags; the read also returns the
+ * days off, the team and the joined day. A business with no orders gets a
+ * Payments layer of paid invoices (`payments-layer.ts`).
+ *
  * ## Days
  *
  * Days are local dates in the business's zone — `BusinessProfile.timezone`,
@@ -106,15 +122,16 @@ export interface CalendarUnavailable {
     /**
      * A layer, or `takings` / `money` when only those could not be added up.
      */
-    source: LayerKey | "takings" | "money";
+    source: LayerKey | "takings" | "money" | "days_off";
     label: string;
 }
 
 export interface CalendarMonth {
+    /** The month asked for; for a range, the month `from` is in. */
     month: string;
     timezone: string;
     timezoneSource: ZoneSource;
-    /** The month's first and after-last instants in that zone. */
+    /** The first day's and the after-last day's midnights in that zone. */
     from: string;
     to: string;
     /** The layers this viewer gets, in order. */
@@ -144,6 +161,38 @@ export interface CalendarMonth {
      * source could not be read.
      */
     money?: { total: MoneyCell[] | null; entries: MoneyEntry[] };
+    /**
+     * Closures and time off touching the days read (plan 005 E20,
+     * `days-off.ts`); time off names its person only for `booking:read`.
+     * Empty without Appointments; null when it could not be read.
+     */
+    daysOff: DayOff[] | null;
+    /** Whether the business has anyone on its team; null when unread. */
+    hasStaff: boolean | null;
+    /** `booking:read` only: the team, for the team filter. */
+    staff?: CalendarStaff[];
+    /**
+     * The team's working hours on each day read (E27, `working-hours.ts`),
+     * whose only with `booking:read`; null when days off could not be read.
+     */
+    hours: WorkingHours[] | null;
+}
+
+/**
+ * The reads a calendar layer rests on. A caller holding none has nothing
+ * to see and is refused (E20), which the app shows as its locked card.
+ */
+const LAYER_READS = [
+    "order:read",
+    "booking:read",
+    "subscription:read",
+    "invoice:read",
+    "payment:read",
+] as const;
+
+/** Whole minutes from one instant to another. */
+function minutesBetween(start: Date, end: Date): number {
+    return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60_000));
 }
 
 /**
@@ -177,6 +226,7 @@ const LEAD_ORDER: LayerKey[] = [
     "collections",
     "subscriptions",
     "invoices",
+    "payments",
 ];
 
 function personName(
@@ -227,15 +277,29 @@ export class CalendarService {
         @Optional() private readonly db: typeof prisma = prisma,
     ) {}
 
-    async month(
+    /** One month: the query the previous app sends (alias until Z3). */
+    month(
         ctx: OrganizationContext,
         month: string,
         now: Date = new Date(),
     ): Promise<CalendarMonth> {
+        return this.read(ctx, { month }, now);
+    }
+
+    /** The days asked for: `from`/`to`, or the `month` alias. */
+    async read(
+        ctx: OrganizationContext,
+        query: CalendarQuery,
+        now: Date = new Date(),
+    ): Promise<CalendarMonth> {
         authorize(ctx, "org:read");
-        if (!isMonth(month)) {
-            throw new BadRequestException("month must be YYYY-MM.");
+        if (!LAYER_READS.some((a) => allows(ctx, a))) {
+            throw new ForbiddenException(
+                "Your role can't see orders, bookings, subscriptions, invoices or payments.",
+            );
         }
+        const span = spanOf(query);
+        const month = monthOf(span);
         const organizationId = ctx.organizationId;
 
         // NOT guarded: without the zone there are no days, and without
@@ -252,7 +316,9 @@ export class CalendarService {
         const on = new Set(
             views.filter((v) => v.readiness !== "DISABLED").map((v) => v.key),
         );
-        const window = monthWindow(month, zone.zone);
+        const joinedAt = created ? dayOf(created, zone.zone) : null;
+        assertWithinReach(span, reachOf(joinedAt, dayOf(now, zone.zone)));
+        const window = windowOf(span, zone.zone);
 
         const money =
             allows(ctx, "payment:read") && allows(ctx, "invoice:read");
@@ -267,7 +333,11 @@ export class CalendarService {
             invoices: on.has("PAYMENTS") && allows(ctx, "invoice:read"),
             bookings: on.has("APPOINTMENTS") && allows(ctx, "booking:read"),
             classes: on.has("APPOINTMENTS") && allows(ctx, "booking:read"),
+            // A business with no orders, and no Invoices layer to list its
+            // payments, sees them here (the design's clinic).
+            payments: false,
         };
+        sees.payments = cells && !on.has("COMMERCE") && !sees.invoices;
         const layers = LAYERS.filter((l) => sees[l]);
         // Orders are read for the takings too, where the layer is not shown.
         const readOrders =
@@ -291,6 +361,8 @@ export class CalendarService {
             invoices,
             bookings,
             classes,
+            payments,
+            off,
         ] = await Promise.all([
             attempt("orders", readOrders, () =>
                 this.readOrders(
@@ -299,6 +371,7 @@ export class CalendarService {
                     zone.zone,
                     orderAmounts,
                     money,
+                    now,
                 ),
             ),
             attempt("collections", sees.collections, () =>
@@ -322,7 +395,21 @@ export class CalendarService {
             attempt("classes", sees.classes, () =>
                 this.readClasses(organizationId, window, zone.zone, now),
             ),
+            attempt("payments", sees.payments, () =>
+                readPayments(this.db, organizationId, window, zone.zone),
+            ),
+            this.readOff(
+                organizationId,
+                window,
+                zone.zone,
+                on.has("APPOINTMENTS"),
+                allows(ctx, "booking:read"),
+            ),
         ]);
+
+        if (off === null) {
+            unavailable.push({ source: "days_off", label: "Days off" });
+        }
 
         const items: DatedItem[] = [
             ...(sees.orders ? (orders?.items ?? []) : []),
@@ -331,6 +418,7 @@ export class CalendarService {
             ...(invoices?.items ?? []),
             ...(bookings ?? []),
             ...(classes ?? []),
+            ...(payments?.items ?? []),
         ];
 
         const toActOn = mergeToActOn(
@@ -344,11 +432,13 @@ export class CalendarService {
         if (money) {
             takingsKnown =
                 (!readOrders || orders !== null) &&
-                (!readInvoices || invoices !== null);
+                (!readInvoices || invoices !== null) &&
+                (!sees.payments || payments !== null);
             if (takingsKnown) {
                 takings = [
                     ...(orders?.takings ?? []),
                     ...(invoices?.takings ?? []),
+                    ...(payments?.takings ?? []),
                 ];
             } else if (!sees.orders && orders === null) {
                 // The orders read only fed the takings: name what is missing.
@@ -426,9 +516,43 @@ export class CalendarService {
                   }
                 : {}),
             unavailable,
-            joinedAt: created ? dayOf(created, zone.zone) : null,
+            joinedAt,
             ...(moneyOut ? { money: moneyOut } : {}),
+            daysOff: off?.daysOff ?? null,
+            hasStaff: off ? off.hasStaff : null,
+            ...(off?.staff ? { staff: off.staff } : {}),
+            hours: off?.hours ?? null,
         };
+    }
+
+    /**
+     * Days off and the team (`days-off.ts`); without Appointments there are
+     * none. A failed read is named and leaves the rest of the calendar.
+     */
+    private async readOff(
+        organizationId: string,
+        window: Parameters<typeof readDaysOff>[2],
+        zone: string,
+        appointments: boolean,
+        named: boolean,
+    ): Promise<Awaited<ReturnType<typeof readDaysOff>> | null> {
+        if (!appointments) return { daysOff: [], hasStaff: false, hours: [] };
+        try {
+            return await readDaysOff(
+                this.db,
+                organizationId,
+                window,
+                zone,
+                named,
+            );
+        } catch (error) {
+            this.logger.error(
+                `Calendar days off failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
     }
 
     /**
@@ -516,6 +640,7 @@ export class CalendarService {
         zone: string,
         amounts: boolean,
         money: boolean,
+        now: Date,
     ): Promise<{
         items: DatedItem[];
         takings: TakingEntry[];
@@ -527,6 +652,8 @@ export class CalendarService {
                 where: {
                     organizationId,
                     createdAt: { gte: window.start, lt: window.end },
+                    // Never an abandoned site checkout, as Orders (B1).
+                    ...realOrderWhere(),
                 },
                 orderBy: { createdAt: "asc" },
                 select: {
@@ -537,6 +664,9 @@ export class CalendarService {
                     total: true,
                     currency: true,
                     createdAt: true,
+                    storeId: true,
+                    stage: true,
+                    fulfilment: true,
                     customer: {
                         select: {
                             firstName: true,
@@ -544,6 +674,8 @@ export class CalendarService {
                             email: true,
                         },
                     },
+                    // A walk-in (B13) is named by the name they gave.
+                    walkInName: true,
                     invoices: {
                         where: { kind: "INVOICE" },
                         select: { id: true },
@@ -554,6 +686,7 @@ export class CalendarService {
                 ? this.readOrderTakings(organizationId, window, zone)
                 : Promise.resolve([]),
         ]);
+        const flagsOf = await orderFlagger(this.db, rows, now);
         // A paid order with no invoice (placed before orders were invoiced)
         // has no payment date on record: when it was placed is the best
         // there is, as it always was.
@@ -566,29 +699,33 @@ export class CalendarService {
                 kind: "order_paid" as const,
                 layer: "orders" as const,
                 title: o.orderId,
-                subtitle: personName(o.customer),
+                subtitle: personName(o.customer) ?? o.walkInName,
                 currency: o.currency,
                 cents: toMinor(o.total),
                 links: [{ type: "order" as const, id: o.id }],
             })),
-            items: rows.map((o) => ({
-                layer: "orders" as const,
-                date: dayOf(o.createdAt, zone),
-                item: {
-                    id: o.id,
-                    kind: o.status === "CANCELLED" ? "cancelled" : "placed",
-                    title: o.orderId,
-                    subtitle: personName(o.customer),
-                    at: o.createdAt.toISOString(),
-                    ...(amounts
-                        ? {
-                              amount: toMoneyString(o.total),
-                              currency: o.currency,
-                          }
-                        : {}),
-                    link: { type: "order" as const, id: o.id },
-                },
-            })),
+            items: rows.map((o) => {
+                const flags = flagsOf(o);
+                return {
+                    layer: "orders" as const,
+                    date: dayOf(o.createdAt, zone),
+                    item: {
+                        id: o.id,
+                        kind: o.status === "CANCELLED" ? "cancelled" : "placed",
+                        ...(flags.length ? { flags } : {}),
+                        title: o.orderId,
+                        subtitle: personName(o.customer) ?? o.walkInName,
+                        at: o.createdAt.toISOString(),
+                        ...(amounts
+                            ? {
+                                  amount: toMoneyString(o.total),
+                                  currency: o.currency,
+                              }
+                            : {}),
+                        link: { type: "order" as const, id: o.id },
+                    },
+                };
+            }),
             takings: [
                 ...taken,
                 ...(money ? unpapered : []).map((o) => ({
@@ -857,6 +994,7 @@ export class CalendarService {
                     item: {
                         id: `${c.id}:failed`,
                         kind: "failed",
+                        flags: ["failed"],
                         title: who,
                         subtitle: sub.plan.name,
                         at: c.dueAt.toISOString(),
@@ -1086,6 +1224,8 @@ export class CalendarService {
             select: {
                 id: true,
                 startAt: true,
+                endAt: true,
+                staffId: true,
                 status: true,
                 outcome: true,
                 paidWith: true,
@@ -1148,6 +1288,11 @@ export class CalendarService {
                         ? { amount: fromMinor(priceCents), currency }
                         : {}),
                     link: { type: "booking" as const, id: b.id },
+                    staffId: b.staffId,
+                    durationMinutes: minutesBetween(b.startAt, b.endAt),
+                    ...(b.outcome === "NO_SHOW"
+                        ? { flags: ["no_show" as const] }
+                        : {}),
                 },
             };
         });
@@ -1208,6 +1353,8 @@ export class CalendarService {
             select: {
                 serviceId: true,
                 startAt: true,
+                endAt: true,
+                staffId: true,
                 status: true,
                 service: { select: { name: true, capacity: true } },
                 staff: { select: { name: true } },
@@ -1221,6 +1368,8 @@ export class CalendarService {
                 name: string;
                 capacity: number;
                 staff: string | null;
+                staffId: string | null;
+                minutes: number;
                 booked: number;
                 held: number;
             }
@@ -1233,12 +1382,15 @@ export class CalendarService {
                 name: r.service.name,
                 capacity: r.service.capacity,
                 staff: null,
+                staffId: null,
+                minutes: minutesBetween(r.startAt, r.endAt),
                 booked: 0,
                 held: 0,
             };
             if (r.status === "PENDING") s.held += 1;
             else s.booked += 1;
             s.staff ??= r.staff?.name ?? null;
+            s.staffId ??= r.staffId ?? null;
             sessions.set(key, s);
         }
         return [...sessions.entries()].map(([key, s]) => ({
@@ -1258,6 +1410,8 @@ export class CalendarService {
                     .join(" · "),
                 at: s.startAt.toISOString(),
                 link: { type: "service" as const, id: s.serviceId },
+                staffId: s.staffId,
+                durationMinutes: s.minutes,
             },
         }));
     }

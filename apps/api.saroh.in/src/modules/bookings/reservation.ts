@@ -16,9 +16,10 @@ import { BookingEventType } from "./booking-event-type";
 import { holdsPlace, releaseHoldInTx } from "./booking-hold";
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
-import { courseSeatsHeld } from "./course-seats";
-import type { BookingLocationType, BookPay, PaidWith } from "./dto";
+import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
+import { seatsHeld } from "./held-seats";
 import { depositCents } from "./service-fields";
+import { acceptWaitlistInTx } from "./waitlist-queue";
 
 /*
  * The reservation both booking services share (#508): the booking page's
@@ -40,8 +41,14 @@ export interface BookInput {
      * 15 minutes (`HOLD_MINUTES`) while they pay online, DEPOSIT does the
      * same for the service's deposit only (E8), DESK books it to pay on the
      * day. Absent — the one-service booking block — books as before.
+     * CREDIT (A10, signed in only) spends one class of the pack or
+     * membership named below (`creditChoiceOf`).
      */
-    pay?: BookPay;
+    pay?: AccountBookPay;
+    /** Paying with CREDIT (A10): the pack purchase it comes out of… */
+    packPurchaseId?: string;
+    /** …or the membership. */
+    subscriptionId?: string;
     /**
      * Where, for a service offered either way (E7). Absent: in person. See
      * {@link bookingLocation}.
@@ -54,6 +61,11 @@ export interface BookInput {
     intakeNote?: string;
 }
 
+/** The pack or the membership a class credit comes out of (A10). */
+export type CreditChoice =
+    | { kind: "PACK"; packPurchaseId: string }
+    | { kind: "MEMBERSHIP"; subscriptionId: string };
+
 /** Who a booking is with and how it is paid, for {@link reserveInTx}. */
 export interface ReserveWith {
     staffId: string | null;
@@ -63,6 +75,12 @@ export interface ReserveWith {
     subscriptionId?: string | null;
     /** A pay-now hold (U19): PENDING, holding its place until then. */
     holdUntil?: Date | null;
+    /**
+     * A later visit of a treatment (E9, DEC-050): the order that sold it
+     * and which visit this is. Written with the booking, so the one-live-
+     * visit unique refuses a second booking of the same visit at once.
+     */
+    visit?: { orderId: string; visitNumber: number };
 }
 
 /** Who a reservation is made by. */
@@ -215,6 +233,9 @@ export async function bookingByKey(
     });
 }
 
+/** A serialization failure that nothing else explained: the race was lost. */
+class RaceLost extends ConflictException {}
+
 /**
  * The reservation itself, shared by the booking page and a booking made
  * by hand: re-count inside a Serializable transaction, upsert the contact,
@@ -229,6 +250,52 @@ export async function bookingByKey(
  * caller says what to tell the booker (`also.onRace`).
  */
 export async function reserve(
+    activation: ActivationEvents | undefined,
+    service: Service,
+    startAt: Date,
+    endAt: Date,
+    input: BookInput,
+    by: ReserveBy,
+    also?: {
+        inTx: (tx: Prisma.TransactionClient, booking: Booking) => Promise<void>;
+        onRace: string;
+        /**
+         * Try once more after losing a serialization race, so the answer is
+         * true now (`backend-billing-and-classes.md`): a customer spending
+         * their last credit in two tabs is told the pack is empty, not that
+         * something changed (A10).
+         */
+        retryOnce?: boolean;
+    },
+    person?: ReserveWith,
+): Promise<Booking> {
+    try {
+        return await reserveOnce(
+            activation,
+            service,
+            startAt,
+            endAt,
+            input,
+            by,
+            also,
+            person,
+        );
+    } catch (err) {
+        if (!also?.retryOnce || !(err instanceof RaceLost)) throw err;
+        return reserveOnce(
+            activation,
+            service,
+            startAt,
+            endAt,
+            input,
+            by,
+            also,
+            person,
+        );
+    }
+}
+
+async function reserveOnce(
     activation: ActivationEvents | undefined,
     service: Service,
     startAt: Date,
@@ -286,9 +353,7 @@ export async function reserve(
         // Serialization failure — Postgres aborted the loser of a race.
         // On its own, the only thing two bookings contend for is the slot.
         if (code === "P2034") {
-            throw new ConflictException(
-                also?.onRace ?? "This slot is fully booked",
-            );
+            throw new RaceLost(also?.onRace ?? "This slot is fully booked");
         }
         throw err;
     }
@@ -368,13 +433,18 @@ export async function reserveInTx(
         });
         // Seats an open course still holds count as taken (ADR-007) —
         // other courses' seats, for a course's own booking: its unsold
-        // seats are the ones it is filling.
-        const held = await courseSeatsHeld(
+        // seats are the ones it is filling. So does a place held for
+        // someone on the waitlist (A12), except for that person, who takes
+        // it by booking it.
+        const held = await seatsHeld(
             tx,
             serviceId,
             clear.startAt,
             clear.endAt,
-            course?.courseId,
+            {
+                exceptCourseId: course?.courseId,
+                exceptContactId: by.account?.contactId ?? null,
+            },
         );
         if (confirmed + held >= service.capacity) {
             throw new ConflictException("This slot is fully booked");
@@ -455,13 +525,28 @@ export async function reserveInTx(
                       subscriptionId: person.subscriptionId ?? null,
                   }
                 : {}),
+            ...(person?.visit
+                ? {
+                      orderId: person.visit.orderId,
+                      visitNumber: person.visit.visitNumber,
+                  }
+                : {}),
         },
+    });
+
+    // A place they were waiting for, or held for them, is taken (A12).
+    await acceptWaitlistInTx(tx, {
+        serviceId,
+        startAt,
+        contactId: contact.id,
+        bookingId: booking.id,
+        now: new Date(),
     });
 
     // Where the history starts. No `fromStartAt`: there was no before.
     // The actor is whoever made it by hand; a booker who did it
     // themselves leaves it empty.
-    await tx.bookingEvent.create({
+    const booked = await tx.bookingEvent.create({
         data: {
             bookingId: booking.id,
             organizationId,
@@ -472,14 +557,15 @@ export async function reserveInTx(
         select: { id: true },
     });
 
-    // A course session's booking is not notified: nothing sends these yet,
-    // and one enrolment would queue a dead letter per session (ADR-007).
+    // A course session's booking is not notified one by one: one enrolment
+    // books every session (ADR-007).
     if (course) return booking;
+    // A pay-now hold is confirmed, and told, once it is paid
+    // (`booking-hold.ts`).
+    if (booking.status !== "CONFIRMED") return booking;
 
-    // Transactional outbox: a committed booking always has a queued
-    // notification job. The handler never landed: the worker dead-letters
-    // booking.notify until one is registered (see
-    // jobs/job-consumers.spec.ts).
+    // Transactional outbox: a committed booking always has its notice
+    // queued. A14's `booking-notify.handler.ts` tells the customer.
     await tx.job.create({
         data: {
             organizationId,
@@ -488,6 +574,8 @@ export async function reserveInTx(
                 bookingId: booking.id,
                 serviceId,
                 contactId: contact.id,
+                reason: "booked",
+                eventId: booked.id,
             },
         },
     });
@@ -517,7 +605,10 @@ async function releaseOwnHoldInTx(
         startAt,
         now,
     );
-    if (hold) await releaseHoldInTx(tx, hold, now);
+    // Nothing frees: they are booking this very session again.
+    if (hold) {
+        await releaseHoldInTx(tx, hold, now, null, { freesPlace: false });
+    }
 }
 
 /**

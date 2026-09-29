@@ -220,6 +220,7 @@ describe("subscriptions, invoices, courses and class packs (ADR-007)", () => {
         "course:read",
         "course:write",
         "pack:read",
+        "pack:sell",
         "pack:write",
     ] as const;
 
@@ -308,5 +309,322 @@ describe("customer:merge (DEC-042, C9)", () => {
             actions: resolveCapabilities("front-desk", ["contact:write"]),
         };
         expect(outOfReach(editor, merger)).toEqual(["customer:merge"]);
+    });
+});
+
+describe("customer:remove (DEC-042, C11)", () => {
+    it("is Owner's and Admin's, never a Member's or a Reviewer's", () => {
+        expect(can("OWNER", "customer:remove")).toBe(true);
+        expect(can("ADMIN", "customer:remove")).toBe(true);
+        expect(can("MEMBER", "customer:remove")).toBe(false);
+        expect(can("REVIEWER", "customer:remove")).toBe(false);
+    });
+
+    it("is not implied by contact:write or customer:merge", () => {
+        const editor = resolveCapabilities("front-desk", [
+            "contact:read",
+            "contact:write",
+            "customer:merge",
+        ]);
+        expect(editor.has("contact:write")).toBe(true);
+        expect(editor.has("customer:remove")).toBe(false);
+    });
+
+    it("is granted only within the granter's reach", () => {
+        const remover = resolveCapabilities("remover", ["customer:remove"]);
+        expect(remover.has("customer:remove")).toBe(true);
+        const editor: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", ["contact:write"]),
+        };
+        expect(outOfReach(editor, remover)).toEqual(["customer:remove"]);
+    });
+});
+
+describe("the split order powers (DEC-039, B16)", () => {
+    const parts = [
+        "order:create",
+        "order:edit",
+        "order:refund",
+        "order:export",
+    ] as const;
+
+    it("are Owner's and Admin's; the Member and Reviewer bundles don't change here (F18)", () => {
+        for (const part of parts) {
+            expect(can("OWNER", part)).toBe(true);
+            expect(can("ADMIN", part)).toBe(true);
+            expect(can("MEMBER", part)).toBe(false);
+            expect(can("REVIEWER", part)).toBe(false);
+        }
+    });
+
+    it("a saved order:write role is judged on its parts when someone edits it", () => {
+        // A Manager holding only order:read can't edit a role that takes and
+        // changes orders — its implied parts count against them.
+        const manager: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "manager",
+            actions: resolveCapabilities("manager", [
+                "member:role:update",
+                "order:read",
+            ]),
+        };
+        expect(
+            outOfReach(manager, resolveCapabilities("senior", ["order:write"])),
+        ).toEqual([
+            "order:write",
+            "order:create",
+            "order:edit",
+            "order:export",
+        ]);
+    });
+
+    it("a granter holding payment:manage may grant order:refund (it is implied)", () => {
+        const cashier: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "cashier",
+            actions: resolveCapabilities("cashier", [
+                "member:role:update",
+                "payment:manage",
+            ]),
+        };
+        expect(withinReach(cashier, ["order:refund", "order:read"])).toBe(true);
+    });
+});
+
+/**
+ * The customer rows of the permission matrix (DEC-039, C13; matrix §2 and
+ * §4). Each row here is one line of the matrix page, so the page and the
+ * policy can't drift apart.
+ */
+describe("the customer capabilities (DEC-039, C13)", () => {
+    const BUNDLES: [OrgAction, Record<OrgRole, boolean>][] = [
+        [
+            "contact:read",
+            { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
+        ],
+        [
+            "contact:write",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "customer:sensitive",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "customer:merge",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "customer:remove",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+    ];
+
+    it.each(BUNDLES)(
+        "%s follows matrix §4's default bundles",
+        (action, want) => {
+            for (const role of ORG_ROLES) {
+                expect(can(role, action)).toBe(want[role]);
+            }
+        },
+    );
+
+    it("contact:write implies contact:read, so a role saved with only the write still sees", () => {
+        const set = resolveCapabilities("editor", ["contact:write"]);
+        expect([...set].sort()).toEqual(["contact:read", "contact:write"]);
+    });
+
+    it("nothing implies customer:sensitive, merge or remove", () => {
+        const set = resolveCapabilities("front-desk", [
+            "contact:write",
+            "booking:write",
+            "order:write",
+            "payment:manage",
+        ]);
+        for (const action of [
+            "customer:sensitive",
+            "customer:merge",
+            "customer:remove",
+        ] as const) {
+            expect(set.has(action)).toBe(false);
+        }
+    });
+
+    it("a Practitioner holds customer:sensitive and contact:read, and can't edit", () => {
+        const practitioner: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "practitioner",
+            actions: resolveCapabilities("practitioner", [
+                "booking:read",
+                "service:read",
+                "contact:read",
+                "customer:sensitive",
+            ]),
+        };
+        expect(() =>
+            authorize(practitioner, "customer:sensitive"),
+        ).not.toThrow();
+        expect(() => authorize(practitioner, "contact:write")).toThrow(
+            ForbiddenException,
+        );
+    });
+
+    it("is granted only within the granter's reach", () => {
+        const editor: OrganizationContext = {
+            organizationId: "org",
+            userId: "u",
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: resolveCapabilities("front-desk", [
+                "member:role:update",
+                "contact:write",
+            ]),
+        };
+        expect(
+            outOfReach(
+                editor,
+                resolveCapabilities("practitioner", [
+                    "contact:read",
+                    "customer:sensitive",
+                ]),
+            ),
+        ).toEqual(["customer:sensitive"]);
+        // The read it implies is theirs to give.
+        expect(withinReach(editor, ["contact:read"])).toBe(true);
+    });
+});
+
+describe("the booking and class-pack capabilities (DEC-039, E26)", () => {
+    const BUNDLES: [OrgAction, Record<OrgRole, boolean>][] = [
+        [
+            "booking:read",
+            { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
+        ],
+        [
+            "service:read",
+            { OWNER: true, ADMIN: true, MEMBER: true, REVIEWER: false },
+        ],
+        [
+            "booking:write",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "service:write",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        // Whether a Member holds pack:read and pack:sell is F18's (Q1).
+        [
+            "pack:read",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "pack:sell",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+        [
+            "pack:write",
+            { OWNER: true, ADMIN: true, MEMBER: false, REVIEWER: false },
+        ],
+    ];
+
+    it.each(BUNDLES)(
+        "%s follows matrix §4's default bundles",
+        (action, want) => {
+            for (const role of ORG_ROLES) {
+                expect(can(role, action)).toBe(want[role]);
+            }
+        },
+    );
+
+    const role = (key: string, actions: string[]): OrganizationContext => ({
+        organizationId: "org",
+        userId: "u",
+        role: "MEMBER",
+        roleKey: key,
+        actions: resolveCapabilities(key, actions),
+    });
+
+    it("a role with pack:sell alone can sell and see packs, and can't change them", () => {
+        const trainer = role("trainer", ["pack:sell"]);
+        expect(() => authorize(trainer, "pack:sell")).not.toThrow();
+        expect(() => authorize(trainer, "pack:read")).not.toThrow();
+        expect(() => authorize(trainer, "pack:write")).toThrow(
+            ForbiddenException,
+        );
+    });
+
+    it("a role saved with pack:write before the split still sells, and sees", () => {
+        const set = resolveCapabilities("packs-lead", ["pack:write"]);
+        expect([...set].sort()).toEqual(
+            ["pack:read", "pack:sell", "pack:write"].sort(),
+        );
+    });
+
+    it("pack:read alone shows the whole pack and sells nothing", () => {
+        const set = resolveCapabilities("viewer", ["pack:read"]);
+        expect([...set]).toEqual(["pack:read"]);
+    });
+
+    it("booking:write and service:write imply their reads, and nothing more", () => {
+        expect(
+            [...resolveCapabilities("desk", ["booking:write"])].sort(),
+        ).toEqual(["booking:read", "booking:write"]);
+        expect(
+            [...resolveCapabilities("setup", ["service:write"])].sort(),
+        ).toEqual(["service:read", "service:write"]);
+    });
+
+    it("no booking power implies a pack power, nor the other way round", () => {
+        const desk = resolveCapabilities("desk", [
+            "booking:write",
+            "service:write",
+        ]);
+        expect(desk.has("pack:read")).toBe(false);
+        expect(desk.has("pack:sell")).toBe(false);
+        const seller = resolveCapabilities("seller", ["pack:write"]);
+        expect(seller.has("booking:write")).toBe(false);
+        expect(seller.has("booking:read")).toBe(false);
+    });
+
+    it("the Front desk template (matrix §4) books and sells, and changes no set-up", () => {
+        const desk = role("front-desk", [
+            "booking:write",
+            "order:stage",
+            "order:create",
+            "contact:write",
+            "pack:sell",
+        ]);
+        for (const action of [
+            "booking:read",
+            "booking:write",
+            "pack:read",
+            "pack:sell",
+        ] as const) {
+            expect(() => authorize(desk, action)).not.toThrow();
+        }
+        for (const action of ["service:write", "pack:write"] as const) {
+            expect(() => authorize(desk, action)).toThrow(ForbiddenException);
+        }
+    });
+
+    it("pack:sell is granted only within the granter's reach", () => {
+        const lead = role("lead", ["member:role:update", "pack:sell"]);
+        expect(
+            outOfReach(lead, resolveCapabilities("editor", ["pack:write"])),
+        ).toEqual(["pack:write"]);
+        // What pack:sell implies is theirs to give.
+        expect(
+            withinReach(lead, resolveCapabilities("seller", ["pack:sell"])),
+        ).toBe(true);
     });
 });

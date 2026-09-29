@@ -23,6 +23,8 @@ export interface AttentionEntry {
     allergen: { id: string; name: string } | null;
     source: AttentionSource;
     status: "SUGGESTED" | "ACTIVE";
+    /** The booking whose note suggested it (C12). */
+    bookingId?: string | null;
     createdByUserId: string | null;
     /** Who added it, by name; null for the booking page or the customer. */
     addedBy: string | null;
@@ -74,7 +76,7 @@ export function tagText(e: AttentionTagInput): string {
 const FROM: Record<AttentionSource, string | null> = {
     STAFF: null,
     BOOKING_PAGE: "from the booking page",
-    CUSTOMER: "from the customer",
+    CUSTOMER: "from their account",
 };
 
 /**
@@ -161,13 +163,17 @@ interface Choice {
 
 const nameKey = (name: string) => name.trim().toLowerCase();
 
-/** A new entry starts as the design's does: Medical, and sensitive. */
-export function emptyDraft(): AttentionDraft {
+/**
+ * A new entry starts as the design's does: Medical, and sensitive — unless
+ * the viewer can't see sensitive notes (`customer:sensitive`, C13), since
+ * the API refuses a sensitive note from someone who couldn't read it back.
+ */
+export function emptyDraft(canSensitive = true): AttentionDraft {
     return {
         kind: "MEDICAL",
         label: "",
         detail: "",
-        sensitive: true,
+        sensitive: canSensitive,
         sensitiveSet: false,
         allergenId: null,
     };
@@ -196,17 +202,27 @@ export function draftFrom(
     };
 }
 
-/** Pick a kind: Medical is sensitive by default, unless ticked by hand. */
+/**
+ * Pick a kind: Medical is sensitive by default, unless ticked by hand, or
+ * the viewer can't see sensitive notes.
+ */
 export function pickKind(
     draft: AttentionDraft,
     kind: AttentionKind,
+    canSensitive = true,
 ): AttentionDraft {
     return {
         ...draft,
         kind,
-        sensitive: draft.sensitiveSet ? draft.sensitive : kind === "MEDICAL",
+        sensitive: draft.sensitiveSet
+            ? draft.sensitive
+            : kind === "MEDICAL" && canSensitive,
     };
 }
+
+/** Said where the sensitive tick would be, to a role without it. */
+export const NO_SENSITIVE_NOTE =
+    "Your role can't add sensitive notes, so everyone who can see customers will read this one.";
 
 /** The allergen is picked from the list, when the business has one. */
 export function picksAllergen(
@@ -300,6 +316,113 @@ export function draftTag(draft: AttentionDraft, choices: Choice[]): string {
         ? (choices.find((c) => c.id === draft.allergenId)?.name ?? "")
         : draft.label.trim();
     return tagText({ kind: draft.kind, label });
+}
+
+// ------------------------------------------------- booking-page notes (C12)
+
+/** The kinds the booking-page card offers, as the design draws them. */
+export const SUGGESTION_KINDS: AttentionKind[] = [
+    "MEDICAL",
+    "ALLERGY",
+    "ACCESS",
+];
+
+/** The card's "Short label for the team" is kept short, as in the design. */
+export const SUGGESTION_LABEL_MAX = 40;
+
+/**
+ * A note from the booking page, to add: the label the API suggested (its
+ * first words), Medical unless it was suggested as another of the card's
+ * kinds, and sensitive — which then follows Medical until someone ticks it
+ * by hand, as in the editor. The booker's words stay the detail.
+ */
+export function suggestionDraft(
+    e: AttentionEntry,
+    choices: Choice[],
+): AttentionDraft {
+    const kind = SUGGESTION_KINDS.includes(e.kind) ? e.kind : "MEDICAL";
+    return {
+        ...draftFrom(e, choices),
+        kind,
+        label: Array.from(e.label).slice(0, SUGGESTION_LABEL_MAX).join(""),
+        sensitiveSet: false,
+    };
+}
+
+/** What the confirm route takes (C12). */
+export interface SuggestionInput {
+    kind: AttentionKind;
+    label: string;
+    sensitive: boolean;
+    allergenId: string | null;
+}
+
+/** The card's draft, as sent: the detail is the booker's and isn't sent. */
+export function toSuggestionInput(
+    draft: AttentionDraft,
+    choices: Choice[],
+): SuggestionInput {
+    const { detail: _detail, ...rest } = toInput(draft, choices);
+    return rest;
+}
+
+/** Where the suggestions came from, in words: one place, or both. */
+function suggestionPlace(sources: AttentionSource[]): string {
+    const from = new Set(sources);
+    if (from.size === 1 && from.has("CUSTOMER")) return "from their account";
+    if (from.size === 1 && from.has("BOOKING_PAGE")) {
+        return "from the booking page";
+    }
+    return "from the customer";
+}
+
+/**
+ * The card's heading, by where the notes came from: "1 note from the
+ * booking page", "2 notes from their account" (a health note sent from Me
+ * on the site, A5), or "3 notes from the customer" when both. Only someone
+ * who may read them is sent any, so there is never a count of notes they
+ * can't.
+ */
+export function suggestionsTitle(
+    entries: Pick<AttentionEntry, "source">[],
+): string {
+    const count = entries.length;
+    return `${count} ${count === 1 ? "note" : "notes"} ${suggestionPlace(entries.map((e) => e.source))}`;
+}
+
+/**
+ * "Rahul wrote this when booking online, 18 Sep at 10:42", or, for a note
+ * sent from their account on the site, "Rahul sent this from their account,
+ * 18 Sep at 10:42".
+ */
+export function suggestionWhen(
+    first: string | null,
+    entry: Pick<AttentionEntry, "source" | "createdAt">,
+    timeZone: string,
+    now: Date,
+): string {
+    const time = new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+    }).format(new Date(entry.createdAt));
+    const who = first?.trim() ? first.trim() : "They";
+    const how =
+        entry.source === "CUSTOMER"
+            ? "sent this from their account"
+            : "wrote this when booking online";
+    return `${who} ${how}, ${dayText(entry.createdAt, timeZone, now)} at ${time}`;
+}
+
+/**
+ * The Undo toast's words for "Nothing to add": a booking page note stays on
+ * its booking; one sent from their account is simply not added.
+ */
+export function setAsideText(entry: Pick<AttentionEntry, "source">): string {
+    return entry.source === "CUSTOMER"
+        ? "Set aside. It won't be added to their record."
+        : "Set aside. The note stays in their booking history.";
 }
 
 /** A field the API named in a refusal, if the sheet has one like it. */

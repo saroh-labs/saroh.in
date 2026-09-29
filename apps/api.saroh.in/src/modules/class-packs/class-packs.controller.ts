@@ -19,9 +19,15 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { ClassPacksService } from "./class-packs.service";
 import {
+    DeletePackDraftQueryDto,
+    ExtendPurchaseDto,
+    ListPackEventsQueryDto,
     ListPacksQueryDto,
     ListPurchasesQueryDto,
+    PackDraftDto,
     PackInputDto,
+    PackRevisionDto,
+    PackUsedQueryDto,
     SellPackDto,
     UsePackDto,
 } from "./dto";
@@ -74,9 +80,54 @@ export class ClassPacksController {
         return this.packs.getPurchase(ctx, id);
     }
 
+    /** Give a holder's pack more days: at most 30 at a time, with a reason. */
+    @Post("purchases/:purchaseId/extend")
+    @HttpCode(200)
+    extend(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("purchaseId") id: string,
+        @Body() dto: ExtendPurchaseDto,
+    ) {
+        return this.packs.extend(ctx, id, dto);
+    }
+
+    /** The pack with Pack Detail's Overview figures (E13). */
     @Get(":packId")
     get(@OrgContext() ctx: OrganizationContext, @Param("packId") id: string) {
         return this.packs.getPack(ctx, id);
+    }
+
+    // — Pack Detail's tabs (E13). `pack:read` covers each, money included.
+
+    @Get(":packId/holders")
+    holders(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+    ) {
+        return this.packs.listHolders(ctx, id);
+    }
+
+    @Get(":packId/used")
+    used(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+        @Query() query: PackUsedQueryDto,
+    ) {
+        return this.packs.listUsed(ctx, id, query);
+    }
+
+    @Get(":packId/sales")
+    sales(@OrgContext() ctx: OrganizationContext, @Param("packId") id: string) {
+        return this.packs.listSales(ctx, id);
+    }
+
+    @Get(":packId/events")
+    events(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+        @Query() query: ListPackEventsQueryDto,
+    ) {
+        return this.packs.listEvents(ctx, id, query);
     }
 
     @Post()
@@ -85,6 +136,74 @@ export class ClassPacksController {
         return this.packs.createPack(ctx, dto);
     }
 
+    // — The Pack Editor's drafts (E14) ——————————————————————————————
+    // Each write answers with the pack as the editor reads it; a stale
+    // `revision` is a 409 naming who saved since, and writes nothing.
+
+    /** The editor's first save of a new pack, which makes it a DRAFT. */
+    @Post("drafts")
+    @HttpCode(201)
+    createDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: PackInputDto,
+    ) {
+        return this.packs.createPackDraft(ctx, dto);
+    }
+
+    /** The pack as the editor reads it, with its draft revision. */
+    @Get(":packId/draft")
+    getDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+    ) {
+        return this.packs.getPackEditor(ctx, id);
+    }
+
+    /** Autosave: a draft's fields, or a live pack's unpublished changes. */
+    @Patch(":packId/draft")
+    saveDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+        @Body() dto: PackDraftDto,
+    ) {
+        return this.packs.savePackDraft(ctx, id, dto);
+    }
+
+    @Post(":packId/publish")
+    @HttpCode(200)
+    publish(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+        @Body() dto: PackRevisionDto,
+    ) {
+        return this.packs.publishPack(ctx, id, dto.revision);
+    }
+
+    @Post(":packId/discard")
+    @HttpCode(200)
+    discard(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+        @Body() dto: PackRevisionDto,
+    ) {
+        return this.packs.discardPackChanges(ctx, id, dto.revision);
+    }
+
+    /** Delete a draft nobody has bought; a published pack is archived. */
+    @Delete(":packId")
+    @HttpCode(204)
+    async remove(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("packId") id: string,
+        @Query() query: DeletePackDraftQueryDto,
+    ): Promise<void> {
+        await this.packs.deletePackDraft(ctx, id, query.revision);
+    }
+
+    /**
+     * The old pack form's whole-pack save, kept while the app moves to the
+     * Pack Editor (E18). Refuses a draft.
+     */
     @Patch(":packId")
     update(
         @OrgContext() ctx: OrganizationContext,

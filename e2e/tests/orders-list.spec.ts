@@ -378,7 +378,7 @@ test.describe("orders list filters (B4)", () => {
         await expect(page).not.toHaveURL(/step=|date=/);
     });
 
-    test("Late is a toggle in the address; Needs attention waits for B15", async ({
+    test("Late and Needs attention are toggles in the address (B15)", async ({
         page,
     }) => {
         await signIn(page);
@@ -390,8 +390,355 @@ test.describe("orders list filters (B4)", () => {
         await late.click();
         await expect(page).toHaveURL(/late=true/);
         await expect(late).toHaveAttribute("aria-pressed", "true");
+
+        const attention = bar.getByRole("button", { name: "Needs attention" });
+        await expect(attention).toHaveAttribute("aria-pressed", "false");
+        await attention.click();
+        await expect(page).toHaveURL(/attention=true/);
+        await expect(attention).toHaveAttribute("aria-pressed", "true");
+        await page.reload();
         await expect(
             bar.getByRole("button", { name: "Needs attention" }),
+        ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    test("a customer's allergy tags their orders, and the filter keeps them (B15)", async ({
+        page,
+    }) => {
+        // Rye & Co. is read here, never changed: Priya's sesame allergy.
+        await signIn(page);
+        await page.goto(`/open/${RYE}`);
+        await page.goto("/commerce/orders?attention=true");
+        const tag = page
+            .getByRole("img", { name: /Needs attention: Allergy: Sesame/ })
+            .locator("visible=true")
+            .first();
+        await expect(tag).toBeVisible();
+        await expect(tag).toHaveText(/Allergy: Sesame/);
+        await expect(
+            page.getByRole("img", { name: /Needs attention couldn't/ }),
         ).toHaveCount(0);
+    });
+});
+
+/**
+ * The quick view and the row menu (plan B, B5), at the desk. Opening,
+ * reading and closing are read-only; the writes (a step and its Undo, a new
+ * pay link) happen on Northwind only, never on a demo store.
+ */
+test.describe("orders quick view and row menu (B5)", () => {
+    test.beforeEach(async ({ page }, testInfo) => {
+        test.skip(
+            testInfo.project.name === "phone",
+            "The quick view and row menu are drawn from 760px only; a phone's card opens the order's page.",
+        );
+        await page.setViewportSize({ width: 1440, height: 900 });
+    });
+
+    const grid = (page: Page) =>
+        page.getByRole("list", { name: "Orders" }).first();
+    const rowOf = (page: Page, orderId: string) =>
+        grid(page)
+            .getByRole("listitem")
+            .filter({ hasText: `#${orderId}` });
+    const quickView = (page: Page) => page.getByRole("dialog");
+    /** The customer's name, which opens the row's quick view. */
+    const openerOf = (page: Page, orderId: string) =>
+        rowOf(page, orderId).locator('button[aria-haspopup="dialog"]');
+
+    test("keyboard only: open, read and close, with focus back on the row", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(page, NORTHWIND);
+        const top = rows.at(0);
+        test.skip(!top, "No orders here.");
+        if (!top) return;
+
+        await page.goto("/commerce/orders");
+        const opener = openerOf(page, top.orderId);
+        await opener.focus();
+        await page.keyboard.press("Enter");
+        const panel = quickView(page);
+        await expect(panel).toBeVisible();
+        await expect(panel).toContainText(`#${top.orderId}`);
+        await expect(panel.getByRole("list", { name: "Steps" })).toBeVisible();
+        await expect(
+            panel.getByRole("link", { name: /Open full page/ }),
+        ).toBeVisible();
+
+        await page.keyboard.press("Escape");
+        await expect(panel).toHaveCount(0);
+        await expect(opener).toBeFocused();
+        // The list stayed where it was.
+        await expect(page).toHaveURL(/\/commerce\/orders(\?|$)/);
+    });
+
+    test("the row menu opens by keyboard and names what's off, and why", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(page, NORTHWIND);
+        const top = rows.at(0);
+        test.skip(!top, "No orders here.");
+        if (!top) return;
+
+        await page.goto("/commerce/orders");
+        const trigger = rowOf(page, top.orderId).getByRole("button", {
+            name: `More actions for order #${top.orderId}`,
+        });
+        await trigger.focus();
+        await page.keyboard.press("Enter");
+        const menu = page.getByRole("menu");
+        await expect(menu).toBeVisible();
+        await expect(
+            menu.getByRole("menuitem", { name: "Open full page" }),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(menu).toHaveCount(0);
+        await expect(trigger).toBeFocused();
+    });
+
+    test("Mark ready from the quick view updates the row, and Undo puts it back", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(
+            page,
+            NORTHWIND,
+            "&tab=open&step=preparing",
+        );
+        const target = rows.find((r) => r.fulfilmentType === "PICKUP");
+        test.skip(!target, "Needs a Pick-up order at Preparing on Northwind.");
+        if (!target) return;
+
+        await page.goto("/commerce/orders?tab=open&step=preparing");
+        await openerOf(page, target.orderId).click();
+        const panel = quickView(page);
+        await panel.getByRole("button", { name: "Mark ready" }).click();
+        await expect(page.getByText(`#${target.orderId} ready.`)).toBeVisible();
+        // The panel reads the order again: it is at Ready now.
+        await expect(panel.locator('[aria-current="step"]')).toHaveText(
+            "Ready",
+        );
+        await page.keyboard.press("Escape");
+        // Put it back, so the next run finds it where it was.
+        await page.getByRole("button", { name: "Undo" }).click();
+        await expect(
+            page.getByText(`#${target.orderId} is back to preparing.`),
+        ).toBeVisible();
+    });
+
+    test("a quick view that can't be read says so in the panel; the list stays", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(page, NORTHWIND);
+        const top = rows.at(0);
+        test.skip(!top, "No orders here.");
+        if (!top) return;
+
+        await page.goto("/commerce/orders");
+        // The read goes through a Server Action: fail every one of them.
+        await page.route("**/commerce/orders*", async (route) => {
+            if (route.request().headers()["next-action"]) {
+                await route.fulfill({ status: 500, body: "" });
+            } else {
+                await route.continue();
+            }
+        });
+        await openerOf(page, top.orderId).click();
+        await expect(quickView(page).getByRole("alert")).toBeVisible();
+        // Behind the modal the list is hidden from the accessibility tree;
+        // closing the panel shows it is still there, not replaced by an error.
+        await page.keyboard.press("Escape");
+        await expect(quickView(page)).toHaveCount(0);
+        await expect(grid(page)).toBeVisible();
+    });
+
+    test("the kitchen's quick view and menu have no money, refund or pay link", async ({
+        browser,
+    }) => {
+        const page = await memberPage(browser);
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.goto(`/open/${RYE}`);
+        const { rows } = await list(page, RYE);
+        const top = rows.at(0);
+        if (top) {
+            await page.goto("/commerce/orders");
+            await rowOf(page, top.orderId)
+                .getByRole("button", {
+                    name: `More actions for order #${top.orderId}`,
+                })
+                .click();
+            const menu = page.getByRole("menu");
+            await expect(menu).toBeVisible();
+            await expect(
+                menu.getByRole("menuitem", { name: /Refund|pay link|Cancel/ }),
+            ).toHaveCount(0);
+            await page.keyboard.press("Escape");
+
+            await openerOf(page, top.orderId).click();
+            const panel = quickView(page);
+            await expect(
+                panel.getByRole("list", { name: "Steps" }),
+            ).toBeVisible();
+            await expect(panel.getByText(/₹/)).toHaveCount(0);
+            await expect(panel.getByText("Payment")).toHaveCount(0);
+        }
+        await page.close();
+    });
+
+    test("New pay link shows a new address once, and the old one stops working", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(
+            page,
+            NORTHWIND,
+            "&tab=open&payment=UNPAID",
+        );
+        const target = rows.at(0);
+        test.skip(!target, "Needs an unpaid open order on Northwind.");
+        if (!target) return;
+
+        // A link made first, through the API, as Order Detail would.
+        const first = await page.request.post(
+            `${urls.API_URL}/organizations/${NORTHWIND}/orders/${target.id}/pay-link`,
+            {
+                headers: {
+                    "x-organization-id": NORTHWIND,
+                    origin: urls.APP_URL,
+                },
+            },
+        );
+        test.skip(
+            !first.ok(),
+            "Northwind has no provider that can take a pay link.",
+        );
+        const old = ((await first.json()) as { url: string }).url;
+        const oldToken = old.split("/").at(-1) ?? "";
+
+        await page.goto("/commerce/orders?tab=open&payment=unpaid");
+        await rowOf(page, target.orderId)
+            .getByRole("button", {
+                name: `More actions for order #${target.orderId}`,
+            })
+            .click();
+        await page.getByRole("menuitem", { name: "New pay link" }).click();
+        await expect(
+            page.getByText(
+                "The link you sent before stops working straight away.",
+            ),
+        ).toBeVisible();
+        await page.getByRole("button", { name: "Make a new link" }).click();
+        const shown = page.getByRole("dialog", {
+            name: `Pay link for #${target.orderId}`,
+        });
+        await expect(shown).toBeVisible();
+        const fresh = (await shown.locator("code").textContent()) ?? "";
+        expect(fresh).not.toBe(old);
+        await shown.getByRole("button", { name: "Done" }).click();
+        await expect(shown).toHaveCount(0);
+
+        const stale = await page.request.get(
+            `${urls.API_URL}/public/order-pay/${oldToken}`,
+        );
+        expect(stale.status()).toBe(404);
+    });
+});
+
+test.describe("orders bulk kitchen moves (B6)", () => {
+    test.beforeEach(async ({ page }, testInfo) => {
+        test.skip(
+            testInfo.project.name === "phone",
+            "Drawn at the desk here; the phone's cards carry the same box.",
+        );
+        await page.setViewportSize({ width: 1440, height: 900 });
+    });
+
+    const rowOf = (page: Page, orderId: string) =>
+        page
+            .getByRole("list", { name: "Orders" })
+            .first()
+            .getByRole("listitem")
+            .filter({ hasText: `#${orderId}` });
+    const bar = (page: Page) =>
+        page.getByRole("region", { name: "Selected orders" });
+
+    test("select Preparing rows, Mark ready, and Undo all during the hold moves nothing", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(
+            page,
+            NORTHWIND,
+            "&tab=open&step=preparing",
+        );
+        const picked = rows
+            .filter((r) => r.fulfilmentType === "PICKUP")
+            .slice(0, 2);
+        test.skip(
+            picked.length < 2,
+            "Needs two Pick-up orders at Preparing on Northwind.",
+        );
+
+        await page.goto("/commerce/orders?tab=open&step=preparing");
+        for (const r of picked) {
+            await rowOf(page, r.orderId)
+                .getByRole("checkbox", {
+                    name: `Select order number ${r.orderId}`,
+                })
+                .click();
+        }
+        await expect(bar(page)).toContainText("2 orders selected");
+        await bar(page).getByRole("button", { name: "Mark ready (2)" }).click();
+
+        const held = page.getByRole("status").filter({
+            hasText: /Marking 2 ready in \d+s/,
+        });
+        await expect(held).toBeVisible();
+        await expect(held).toContainText(
+            "It still goes ahead if you leave this page.",
+        );
+        await held.getByRole("button", { name: "Undo all" }).click();
+        await expect(
+            page.getByText("Back to Preparing. Nothing was sent."),
+        ).toBeVisible();
+
+        // Nothing moved on the server.
+        const after = await list(page, NORTHWIND, "&tab=open&step=preparing");
+        for (const r of picked) {
+            expect(after.rows.some((x) => x.id === r.id)).toBe(true);
+        }
+    });
+
+    test("select every row by keyboard, and Clear empties the selection", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const { rows } = await list(page, NORTHWIND);
+        test.skip(rows.length === 0, "No orders here.");
+
+        await page.goto("/commerce/orders");
+        const all = page.getByRole("checkbox", {
+            name: "Select every order in this view",
+        });
+        await all.focus();
+        await page.keyboard.press("Space");
+        await expect(bar(page)).toContainText(
+            rows.length === 1
+                ? "1 order selected"
+                : `${rows.length} orders selected`,
+        );
+        await bar(page).getByRole("button", { name: "Clear" }).click();
+        await expect(bar(page)).toHaveCount(0);
     });
 });

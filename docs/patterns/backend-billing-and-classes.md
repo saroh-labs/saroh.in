@@ -143,9 +143,13 @@
   (lines held at placement say nothing about it). A payment that lost the
   last unit, or reached a closed order, records one
   refusal (`CAPTURED_NEEDS_REFUND`) and one PENDING refund of the whole
-  payment keyed `sold-out:<intent>`, sent after commit
-  (`PaymentsService.sendAutomaticRefund`) and confirmed by the refund
-  webhook (DEC-026).
+  payment keyed `sold-out:<intent>`, sent from a `payments.send-refund`
+  job written on the same transaction (`send-refund.handler.ts`: looks
+  before it sends, retried with backoff while the provider's answer is
+  unknown) and confirmed by the refund webhook (DEC-026). A refused
+  checkout had money reach it, so it is a real order (`realOrderWhere`):
+  staff see it and its refund in Orders, and the customer is told the
+  money is on its way only once the provider has the refund.
 - **A refund moves stock only in the transaction that moves it into
   SUCCEEDED** — the provider's word, never the request — so a redelivered
   webhook changes nothing. By line, each line gives back min(refunded,
@@ -155,6 +159,29 @@
   back) writes a RETURNED entry then; a refund that fails puts nothing back.
   A line-less refund (the provider's dashboard) releases only when it brings
   the order to fully refunded; an edit's difference never does.
+- **Cancel is a refund in full (round-2 B9, `orders/order-cancel.ts`).**
+  An order paid online is cancelled through the one refund path
+  (`PaymentsService.refundOrderForCancel`, everything left by line); its
+  refund rows carry the key `order-cancel:<order>:<request>`, and the order
+  is marked CANCELLED only once nothing taken online is left and the
+  provider has answered for every refund (`finishCancelInTx`). Every path
+  that learns of a refund calls it under the order's lock — the cancel
+  itself (`recordRefundTaken`), try-again, the `payments.send-refund` job
+  the cancel writes for an unanswered part, and the refund webhook — so a
+  lost answer keeps the order open with the money held, and whichever
+  hears last finishes it once. Its stock comes back as each refund is
+  confirmed (above), never on the cancel. Unpaid or paid by hand, it is
+  cancelled at once and its stock released there. A treatment's visits
+  still to come are cancelled with it (`bookings/treatment-cancel.ts`).
+  Refused from the handover on, and once a visit was attended.
+- **Changing how an order is fulfilled (B9)** re-prices only its delivery
+  charge, typed by staff, under the order's lock. On an order paid online
+  more is a supplementary invoice and the difference is owed — the order's
+  pay link takes it (`payLinkStanding` reads a paid order that owes more as
+  DUE, except a site checkout's, whose first payment held its stock) — and
+  less is a refund of the difference (`forEdit`) with a credit note, as an
+  edit's. The invoice correction is a line with no product, at the
+  business's delivery rate and SAC.
 - **A kitchen undo of a fulfilment** reverses each line's sale and holds it
   again, refused once a line has a confirmed refund or the order a RETURNED
   entry. An edit refuses a variant the order's storefront doesn't sell and
@@ -234,10 +261,12 @@
   (`lockBookingInTx`), the webhook's order. The other way round, a release
   and a payment arriving together deadlock (#508).
 - **Hold drafts are not the business's paper**: `NOT_A_BOOKING_HOLD` keeps
-  an unnumbered booking invoice out of the invoice list and customer paper.
+  an unnumbered booking invoice — and an unnumbered online pack draft
+  (A11, below) — out of the invoice list and customer paper.
 - **The price is the service's, on the server.** The book request has no
   amount field (the validation pipe refuses one); pay at the desk books
-  CONFIRMED with `paidWith` DESK. No credits online (ADR-008).
+  CONFIRMED with `paidWith` DESK. A class credit online is below (A10,
+  ADR-011).
 - **A deposit rides the same hold** (E8, default 39). `pay: "DEPOSIT"` makes
   the hold's draft invoice for `depositCents(price, depositMode)`, worked
   out on the server, and the snapshot records `deposit.cents`; the rest is
@@ -259,6 +288,14 @@
   business's `returnCredit` override refunds it only with `payment:manage`.
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
+- **Cancel and move have one write each, whoever acts** (A6):
+  `bookings/booking-cancel.ts` and `booking-move.ts`. The team calls them
+  from `BookingsService`, the customer from their account
+  (`site-accounts/account-bookings.service.ts`) with no actor, so the
+  history reads "by the customer". The customer's own rules sit on top: no
+  move inside the free-cancel window ("Call ‹business› to change this"), a
+  new time only where the booking page would offer it, and never a refund
+  by hand. A visit of a treatment takes its order's lock first.
 - **The anonymous `POST public/services/:id/book` answers 410** "Sign in to
   book" and reads no body (A9); bookings from a site go through
   `POST public/site-accounts/bookings`.
@@ -325,6 +362,65 @@
   lists plans for sale — the site's plan lists and blocks — filters by
   `PLANS_ON_SALE`. "Sell again" and Archive refuse a DRAFT; a draft goes on
   sale only by being published.
+- **Plan drafts** (round-2 D5). The shared rules are in
+  `common/drafts/draft-record.ts`, which class packs reuse in E14. The Plan
+  Editor's first save makes a DRAFT (`subscriptions/plan-drafts.ts`); its autosaves
+  write the draft's columns and record no event. A live plan's autosaves
+  write `pendingChanges` — only the fields that differ from the published
+  columns, null when none — and buyers keep reading the published columns
+  until Publish. Every editor write takes the plan's row lock (Publish takes
+  the name lock first), checks the `revision` it carries against
+  `draftRevision`, and bumps it; a stale one is a 409 with details
+  `{ yours, current, changedBy, changedAt }` (`changedBy` a display name,
+  Saroh support for an operator) and writes nothing. No other refusal
+  carries those keys: the editor shell reads them as "Priya changed this
+  plan". A name another plan has, or no price, is kept on autosave, listed
+  in the read's `problems`, and refused at Publish as a 409 on that field.
+  Publishing a draft records PUBLISHED; publishing a live plan's changes
+  records the change as the old form did (PRICE_CHANGED, …); Discard
+  records DRAFT_DISCARDED. Delete is for a DRAFT nobody is on or switching
+  to. The old whole-plan `PATCH :planId` stays until Z6: it refuses a draft,
+  and a recorded change or an archive bumps the revision. **The staff list
+  hides drafts unless asked** (`include=drafts` or `status=DRAFT`), so an
+  app from before the Plan Editor never draws one as a live card.
+- **Pack drafts** (round-2 E14) follow the plan's rules on the same shared
+  helper, with the same routes under `class-packs` and the same editor
+  shape (`class-packs/{pack-drafts,pack-draft-view}.ts`). Only an ACTIVE
+  pack is sold: `assertPackOnSale` (`class-packs/pack-on-sale.ts`; a DRAFT
+  is a 409 "This pack isn't published yet"), and a list of packs a buyer
+  can choose filters by `PACKS_ON_SALE`. A pack's services are a draft
+  field too (a sorted id list; `sameValue` compares lists): a draft's are
+  written to `ClassPackService` directly, a live pack's wait in the pending
+  set, and sales and redemptions keep reading the published ones until
+  Publish. Who moved the revision is kept on the pack itself (`revisedAt`,
+  `revisedById`; null for an operator, named Saroh support). Draft
+  autosaves record no event.
+- **A pack's kind, first pack only, paid by, extensions and history**
+  (round-2 E13, defaults 45 and 46; `class-packs/pack-kind.ts`).
+  `ClassPack.kind` is CLASSES (pays for classes, `capacity > 1`) or
+  ONE_TO_ONE (`capacity` 1). Every read that offers or spends a pack for a
+  booking — `redeemPackInTx`, New booking's `purchases?serviceId=`, and the
+  customer's credit online (`booking-credit.ts`) — filters with
+  `purchasesPayingFor(service)`, so what is offered is what is spent. The
+  kind is locked once sold: the old `PATCH` is a 409 on `kind`; an autosave
+  keeps a pending kind change and lists it in `problems`, and Publish
+  refuses it. Validity is at least 7 days. A `firstPackOnly` pack is sold
+  only to someone with no earlier purchase of a pack of its kind
+  (`first-pack.ts`: an advisory lock per person on the sale's transaction,
+  after `resolveContact`; A11's online sale calls it too). The sale holds
+  the pack FOR SHARE, so a publish or kind change waits for it.
+  `PackPurchase.paidBy` records how the desk was paid (CASH, UPI, CARD,
+  BANK, ONLINE, NONE; null before E13) and never restricts how anyone pays
+  (DEC-059). An extension adds 1–30 days to `expiresAt` under the
+  purchase's FOR UPDATE lock (the redeem lock), with a reason, as a
+  `PackExtension` row; a pack with nothing left can't be extended, and an
+  expired one can if the new date is still to come. Every create, publish,
+  change, sale, extension, archive and restore writes one `PackEvent` in
+  its own transaction (`pack-events.ts`, actors as `event-actors.ts`);
+  without a CREATED event the read says `earlierUnrecorded`. Pack Detail's
+  reads (`GET class-packs/:id` with `overview`, `…/holders`, `…/used`,
+  `…/sales`, `…/events`) need only `pack:read`, money included (DEC-039);
+  only an invoice id needs `invoice:read`.
 - **Every plan change is a plan event** (plan 2026-09-26-004, D2). A plan
   write (`subscriptions/plan-writes.ts`) takes the plan's row lock (FOR NO
   KEY UPDATE, after the name lock), reads what it was, and writes one
@@ -352,6 +448,20 @@
   without `invoice:read`. No backfill: without a SUBSCRIBED event the read
   says `earlierUnrecorded`. Home's failed-renewal source reads its
   RENEWAL_FAILED and MANDATE_LIMIT_LOW events (F1, written by D13).
+- **A mandate ends with its subscription, a privacy removal or a merge**
+  (round-2 D20, DEC-038). A `PaymentMandate` belongs to one subscription.
+  Every write that moves a subscription to CANCELLED calls
+  `cancelMandatesInTx` (`payments/mandate-cancel-job.ts`) in its own
+  transaction, after its event: the live mandates are marked CANCELLED at
+  once — never charged again — with a MANDATE_CANCELLED event (actor JOB,
+  `data.reason`), and a `mandate.cancel` job asks the provider after
+  commit, so a provider timeout never undoes the cancel. A new path to
+  CANCELLED must call it too. A merge does the same for the merged-away
+  contact's mandates (never moved to the survivor). A privacy removal
+  (C11) calls `MandatesService.cancelFor({ organizationId, contactId },
+"PRIVACY_REMOVAL")` before its transaction and refuses while
+  `unconfirmed` isn't zero. `cancelConfirmedAt` null on a CANCELLED row is
+  "being confirmed" (DEC-026); a confirmed row is never asked again.
 - **Payment failed** is derived — the latest invoice unpaid past due — never
   stored. "Retry now" mints a new pay link for that invoice, replacing the
   old one; nothing is charged.
@@ -378,6 +488,43 @@
   before the business's free-cancellation window; after it (**Adopted**,
   ADR-008) the cancel is late and the credit stays used.
   Balance is derived (credits − live redemptions).
+- **A class credit online** (round-2 A10, ADR-011;
+  `bookings/booking-credit.ts`). Only a signed-in customer, on
+  `public/site-accounts`. The API decides the offer
+  (`GET …/bookings/credit`, `offeredCredit`): a membership's class first —
+  ACTIVE, an allowance with one left in the class's month, and only for a
+  class (capacity > 1); a membership with no allowance is not a class plan
+  and never pays online — then the pack the desk would spend (soonest to
+  expire, covers the service, a class left, valid at the start), and no
+  pack while Class packs is off. The booking (`pay: "CREDIT"` with
+  `packPurchaseId` or `subscriptionId`) spends it on the reservation's
+  transaction through the desk's own `redeemPackInTx` / `useMembershipInTx`
+  with `actor: "customer"`: the booking is written, then the purchase (or
+  subscription) is locked and counted, so a refusal takes the booking back.
+  For a customer, someone else's pack or membership is a 404, a named one is
+  required (never "whichever"), and every refusal carries
+  `details.reason: "credit-gone"` in their words, so the page re-reads its
+  offer and keeps the time. A lost serialization race is retried once
+  (`reserve`'s `retryOnce`), so two tabs spending the last class get one
+  booking and one "no classes left". The booking reads at the desk exactly
+  as a desk-made one (`paidWith`, the redemption, the money).
+- **A pack bought online** (round-2 A11, ADR-011;
+  `class-packs/{pack-checkout,public-pack-purchase.service}.ts`). Only a
+  signed-in customer, at `public/site-accounts/me/packs`, only an ACTIVE
+  pack (a draft or archived one is a 404), and only while Class packs is
+  rolled out and on (`packs-offered.ts`, DEC-057). Starting makes a DRAFT
+  invoice (source PACK, no number) priced from the pack on the server, with
+  its terms snapshotted in `Invoice.packTerms`, and an intent through the
+  invoice payment path on a provider whose window can open. The webhook
+  (`applyInvoiceSuccess` → `completePackDraftInTx`, under the intent's and
+  the invoice's locks) makes the `PackPurchase` from the snapshot — expiry
+  counted from the payment — and numbers the invoice PAID (`ONLINE`), so a
+  pack changed or archived meanwhile still sells on the terms shown; a
+  second payment on it, or one on a discarded draft, is
+  `CAPTURED_NEEDS_REFUND`. The same pack on the same terms reuses its
+  draft; changed terms void the old one; at most three packs wait at once.
+  The hold sweep voids drafts unpaid after 24 hours
+  (`discardStalePackDrafts`), so no abandoned attempt ever takes a number.
 - **Contact deletion** cancels the person's future course and pack-paid
   bookings and deletes their enrolments **before** the contact (a booking
   references both; one cascade trips a foreign key — `DEV_LEARNINGS.md`).

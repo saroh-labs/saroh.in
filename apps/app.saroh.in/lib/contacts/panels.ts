@@ -26,7 +26,12 @@ export const PANEL_ORDER: readonly ContactPanel[] = [
 
 const NEEDS: Record<
     ContactPanel,
-    { read: string; write: string; moduleKey: string }
+    {
+        read: string;
+        /** Any one of them offers the panel's action. */
+        write: string | readonly string[];
+        moduleKey: string;
+    }
 > = {
     subscriptions: {
         read: "subscription:read",
@@ -34,9 +39,11 @@ const NEEDS: Record<
         moduleKey: "PAYMENTS",
     },
     // A pack is booked time sold ahead: its own module, Class packs (E12).
+    // "Sell a pack" is `pack:sell` (E26); an API from before it asked
+    // `pack:write`, which implies it now.
     packs: {
         read: "pack:read",
-        write: "pack:write",
+        write: ["pack:sell", "pack:write"],
         moduleKey: "CLASS_PACKS",
     },
     courses: {
@@ -96,6 +103,26 @@ export interface PanelPlan {
     paymentsOn: boolean;
 }
 
+/**
+ * Only what selling a pack needs — the packs on sale and whether a sale
+ * issues an invoice — and no panel. Customer Detail (round-2 C7) has the
+ * person's packs in its own read, and asks for this only once the viewer
+ * may sell and Class packs is on there.
+ */
+export function sellPacksOnly(): PanelPlan {
+    return {
+        panels: [],
+        canAct: {
+            subscriptions: false,
+            packs: true,
+            courses: false,
+            invoices: false,
+        },
+        mentionInvoices: false,
+        paymentsOn: false,
+    };
+}
+
 export function contactPanels(
     viewer: Viewer,
     modules: ModuleStates,
@@ -107,7 +134,10 @@ export function contactPanels(
     const canAct = Object.fromEntries(
         PANEL_ORDER.map((p) => [
             p,
-            panels.includes(p) && viewerCan(viewer, NEEDS[p].write),
+            panels.includes(p) &&
+                [NEEDS[p].write]
+                    .flat()
+                    .some((action) => viewerCan(viewer, action)),
         ]),
     ) as Record<ContactPanel, boolean>;
     return {

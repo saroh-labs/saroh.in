@@ -30,6 +30,7 @@ import {
     taxView,
     touchesTax,
 } from "./business-tax-settings";
+import { businessTypeWrite } from "./business-type";
 import type { UpdateOrganizationDto } from "./dto";
 import { authorize } from "./organization-policy";
 import { settingsChanges, settingsSnapshot } from "./settings-audit";
@@ -272,6 +273,10 @@ export class OrganizationSettingsService {
 
         const profileData = reduceProfile(dto.profile);
         const timezone = zoneWrite(profileData.timezone);
+        // "" clears it; a private limited company is still kept as
+        // `company` this release (`business-type.ts`, boundary 9).
+        const typeValue = businessTypeWrite(profileData.type);
+        const businessType = typeValue === undefined ? {} : { type: typeValue };
         // Checked and made E.164 before anything is written; "" clears it.
         const phone = phoneWrite(dto.profile?.phone);
         const taxSent = {
@@ -324,6 +329,7 @@ export class OrganizationSettingsService {
 
             const written = {
                 ...profileData,
+                ...businessType,
                 ...timezone,
                 ...phone,
                 ...taxData,

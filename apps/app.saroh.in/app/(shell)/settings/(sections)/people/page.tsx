@@ -1,6 +1,10 @@
 import { TeamScreen } from "@/components/organizations/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
-import { listInvitations, listMembers } from "@/lib/organizations/members";
+import {
+    getStorefrontTeamNotice,
+    listInvitations,
+    listMembers,
+} from "@/lib/organizations/members";
 import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -37,7 +41,14 @@ export default async function PeoplePage() {
     const canManage = may("member:invite");
     const canEditRoles = may("member:role:update");
 
-    const [members, invitations, sites, roles, catalogue] = await Promise.all([
+    const [
+        members,
+        invitations,
+        sites,
+        roles,
+        catalogue,
+        joinedFromStorefronts,
+    ] = await Promise.all([
         listMembers(),
         // Empty for anyone who may not see them, rather than an error: this is
         // one page and a member should still get the roster.
@@ -49,6 +60,9 @@ export default async function PeoplePage() {
         // not be loaded" rather than as an empty list that looks like a role
         // with no powers available to it.
         getRoleCatalogue().catch(() => null),
+        // The storefront people the F16 backfill added, for whoever can
+        // change their role (DEC-048); empty for everyone else.
+        canEditRoles ? getStorefrontTeamNotice() : Promise.resolve([]),
     ]);
 
     return (
@@ -63,6 +77,7 @@ export default async function PeoplePage() {
                 roles={roles}
                 catalogue={catalogue}
                 myActions={organization?.actions ?? null}
+                joinedFromStorefronts={joinedFromStorefronts}
             />
         </SettingsPanel>
     );

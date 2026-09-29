@@ -34,6 +34,7 @@ import {
     AddRuleDto,
     BookByHandDto,
     BookingsRangeQueryDto,
+    BookVisitDto,
     CreateServiceDto,
     RecordOutcomeDto,
     ReplaceRulesDto,
@@ -255,18 +256,39 @@ export class BookingsController {
     }
 
     /**
+     * Book visit `n` of a treatment (E9, DEC-050): a treatment is one order
+     * with a booking per visit. 409 past its visits, before the previous
+     * visit is booked, or when this one already is; never invoiced.
+     */
+    @Post("treatments/:orderId/visits")
+    @HttpCode(201)
+    bookVisit(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+        @Body() dto: BookVisitDto,
+    ): Promise<WithoutIntakeNote<Booking>> {
+        return this.bookings
+            .bookVisit(ctx, orderId, dto)
+            .then(withoutIntakeNote);
+    }
+
+    /**
      * `?returnCredit=true` when the business calls it off (a whole class):
      * the class paid for goes back even inside the free-cancellation window.
+     * `?closesClass=true` when the whole class is cancelled: its waitlist is
+     * closed rather than offered the place (A12).
      */
     @Delete("bookings/:bookingId")
     cancelBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Query("returnCredit") returnCredit?: string,
+        @Query("closesClass") closesClass?: string,
     ): Promise<WithoutIntakeNote<CancelledBooking>> {
         return this.bookings
             .cancelBooking(ctx, bookingId, undefined, {
                 returnCredit: returnCredit === "true",
+                closesClass: closesClass === "true",
             })
             .then(withoutIntakeNote);
     }

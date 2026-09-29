@@ -10,39 +10,28 @@ import type { Booking, Service } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 import { IANAZone } from "luxon";
 
-import { isSerializationFailure } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
-import { redeemPackInTx, reversePackInTx } from "../class-packs/redeem-pack";
+import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { isGstRate } from "../invoices/gst";
-import { allows, authorize } from "../organizations/organization-policy";
-import {
-    bookingPaymentInTx,
-    lockBookingIntentsInTx,
-    reserveBookingRefundInTx,
-} from "../payments/booking-refund";
+import { allows } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
 import { OPENS_CHECKOUT } from "../payments/public-key";
-import { guarded, guardMinutes, isValidSlotStart } from "./availability";
+import { isValidSlotStart } from "./availability";
+import { CANT_USE_PACKS, requireBookingPower } from "./booking-access";
 import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
-import { BookingEventType } from "./booking-event-type";
-import {
-    holdsPlace,
-    isExpiredHold,
-    lockBookingInTx,
-    releaseHoldInTx,
-} from "./booking-hold";
+import type { CancelledBooking } from "./booking-cancel";
+import { cancelFoundBooking, sendCancelRefund } from "./booking-cancel";
+import { isExpiredHold } from "./booking-hold";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { intakeNoteFor } from "./booking-intake";
 import type { BookingMoney } from "./booking-money";
 import { bookingMoney } from "./booking-money";
-import { bookingPayLinkInTx, retirePayLinkInTx } from "./booking-pay-link";
-import {
-    isLateCancel,
-    loadBookingRules,
-    refundsAutomatically,
-} from "./booking-rules";
+import { moveFoundBooking } from "./booking-move";
+import { lockVisitOrderInTx, writeOutcomeInTx } from "./booking-outcome";
+import { bookingPayLinkInTx } from "./booking-pay-link";
+import { loadBookingRules } from "./booking-rules";
 import type { AvailableSlot } from "./booking-slots";
 import {
     loadStaffing,
@@ -52,7 +41,6 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
-import { courseSeatsHeld } from "./course-seats";
 import type {
     AvailabilityRuleDto,
     BookingOutcome,
@@ -62,16 +50,22 @@ import type {
     UpdateServiceDto,
 } from "./dto";
 import type { BookInput, ReserveBy, ReserveWith } from "./reservation";
-import {
-    assertPersonFreeInTx,
-    loadBookableService,
-    reserve,
-    reserveInTx,
-} from "./reservation";
+import { loadBookableService, reserve, reserveInTx } from "./reservation";
 import type { ServiceView } from "./service-fields";
 import { assertDepositPriced, toServiceView } from "./service-fields";
 import { businessZone } from "./staff-availability";
+import type { TreatmentView } from "./treatment-view";
+import { treatmentOf, treatmentOrderSelect } from "./treatment-view";
 import { useMembershipInTx } from "./use-membership";
+import type { BookVisitInput } from "./visits";
+import {
+    assertTreatmentSellable,
+    bookVisit,
+    isTreatment,
+    startTreatmentInTx,
+    treatmentEmail,
+    treatmentStorefront,
+} from "./visits";
 
 /** Exactly what {@link BookingsService.getBooking} reads, named so the
  *  controller's inferred return type stays portable. */
@@ -103,6 +97,9 @@ const bookingDetailInclude = {
     },
     // Who takes it (U3) — the name the diary shows, never their hours.
     staff: { select: { id: true, name: true } },
+    // The treatment it is a visit of (E10): read for `treatment`, then
+    // dropped, so the answer carries the view and never the order row.
+    order: { select: treatmentOrderSelect },
 } satisfies Prisma.BookingInclude;
 
 export type BookingDetail = Prisma.BookingGetPayload<{
@@ -115,8 +112,9 @@ export type BookingDetail = Prisma.BookingGetPayload<{
  * money worked out on the server (E8).
  */
 export type BookingDetailView = (
-    BookingDetail | WithoutIntakeNote<BookingDetail>
-) & { money: BookingMoney };
+    | Omit<BookingDetail, "order">
+    | WithoutIntakeNote<Omit<BookingDetail, "order">>
+) & { money: BookingMoney; treatment: TreatmentView | null };
 
 /** What the bookings calendar reads per booking (see {@link DiaryRow}). */
 const diarySelect = {
@@ -145,6 +143,7 @@ const diarySelect = {
             durationMinutes: true,
             priceCents: true,
             currency: true,
+            visits: true,
         },
     },
     // Name and email only: `booking:read` is not `contact:read`.
@@ -158,31 +157,16 @@ const diarySelect = {
             purchase: { select: { pack: { select: { name: true } } } },
         },
     },
+    // A visit of a treatment (E10): "Visit 2 of 3" and its order.
+    visitNumber: true,
+    order: { select: treatmentOrderSelect },
 } satisfies Prisma.BookingSelect;
 
-/**
- * Where a cancel's refund stands (E8): SENT once the provider took it,
- * CONFIRMING while its answer is awaited (the money is held), REFUSED when
- * the provider made none.
- */
-export type RefundStatus = "SENT" | "CONFIRMING" | "REFUSED";
-
-/** What a cancel did with money paid online for the booking (E8). */
-export interface CancelMoney {
-    /** Handed back: cancelled in time, or by someone who may refund. */
-    refund: {
-        amountCents: number;
-        currency: string;
-        status: RefundStatus;
-    } | null;
-    /** Kept: cancelled late (DEC-051). */
-    kept: { amountCents: number; currency: string } | null;
-}
-
-const NOTHING_MOVED: CancelMoney = { refund: null, kept: null };
-
-/** A cancelled booking, and what happened to its money. */
-export type CancelledBooking = Booking & { money: CancelMoney };
+export type {
+    CancelledBooking,
+    CancelMoney,
+    RefundStatus,
+} from "./booking-cancel";
 
 /** The widest range the bookings calendar reads at once: two years. */
 const MAX_CALENDAR_RANGE_MS = 731 * 86_400_000;
@@ -245,7 +229,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         dto: CreateServiceDto,
     ): Promise<ServiceView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
 
         this.assertValidTimezone(dto.timezone);
         if (dto.siteId) {
@@ -257,6 +241,15 @@ export class BookingsService {
         );
         const depositMode = dto.depositMode ?? "NONE";
         assertDepositPriced(dto.priceCents ?? null, depositMode);
+        // A treatment needs a storefront to sell from (E10, DEC-050).
+        await assertTreatmentSellable(
+            { organizationId: ctx.organizationId, siteId: dto.siteId ?? null },
+            {
+                visits: dto.visits ?? 1,
+                capacity: dto.capacity ?? 1,
+                wasTreatment: false,
+            },
+        );
 
         const created = await prisma.service.create({
             data: {
@@ -285,7 +278,7 @@ export class BookingsService {
 
     /** List the org's services, newest first (excludes soft-deleted). `service:read`. */
     async listServices(ctx: OrganizationContext): Promise<ServiceView[]> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         const services = await prisma.service.findMany({
             where: { organizationId: ctx.organizationId, deletedAt: null },
             orderBy: { createdAt: "desc" },
@@ -298,7 +291,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         serviceId: string,
     ): Promise<ServiceView> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         return toServiceView(await this.requireOwnedService(ctx, serviceId));
     }
 
@@ -311,7 +304,7 @@ export class BookingsService {
         serviceId: string,
         dto: UpdateServiceDto,
     ): Promise<ServiceView> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
 
         const service = await this.requireOwnedService(ctx, serviceId);
 
@@ -369,6 +362,14 @@ export class BookingsService {
                 ),
             );
         }
+        if (dto.visits !== undefined || dto.capacity !== undefined) {
+            // A treatment needs a storefront to sell from (E10, DEC-050).
+            await assertTreatmentSellable(service, {
+                visits: dto.visits ?? service.visits,
+                capacity: dto.capacity ?? service.capacity,
+                wasTreatment: isTreatment(service),
+            });
+        }
         if (dto.visits !== undefined) data.visits = dto.visits;
         if (dto.showOnBookingPage !== undefined) {
             data.showOnBookingPage = dto.showOnBookingPage;
@@ -402,7 +403,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         serviceId: string,
     ): Promise<{ id: string; deleted: true }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
 
         const service = await this.requireOwnedService(ctx, serviceId);
         await prisma.service.update({
@@ -416,7 +417,7 @@ export class BookingsService {
 
     /** List a service's availability rules. `service:read`. */
     async listRules(ctx: OrganizationContext, serviceId: string) {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         await this.requireOwnedService(ctx, serviceId);
         return prisma.availabilityRule.findMany({
             where: { serviceId, organizationId: ctx.organizationId },
@@ -434,7 +435,7 @@ export class BookingsService {
         serviceId: string,
         rules: AvailabilityRuleDto[],
     ) {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         await this.requireOwnedService(ctx, serviceId);
         rules.forEach((rule) => this.assertRuleWellFormed(rule));
 
@@ -464,7 +465,7 @@ export class BookingsService {
         serviceId: string,
         rule: AvailabilityRuleDto,
     ) {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         await this.requireOwnedService(ctx, serviceId);
         this.assertRuleWellFormed(rule);
 
@@ -485,7 +486,7 @@ export class BookingsService {
         serviceId: string,
         ruleId: string,
     ): Promise<{ id: string; deleted: true }> {
-        authorize(ctx, "service:write");
+        requireBookingPower(ctx, "service:write");
         await this.requireOwnedService(ctx, serviceId);
 
         const rule = await prisma.availabilityRule.findUnique({
@@ -514,7 +515,7 @@ export class BookingsService {
         toISO: string,
         staffId?: string,
     ): Promise<AvailableSlot[]> {
-        authorize(ctx, "service:read");
+        requireBookingPower(ctx, "service:read");
         const service = await this.requireOwnedService(ctx, serviceId);
         const { from, to } = parseRange(fromISO, toISO);
         const rules = await prisma.availabilityRule.findMany({
@@ -541,7 +542,7 @@ export class BookingsService {
      * `contact:read`.
      */
     async listBookings(ctx: OrganizationContext, serviceId?: string) {
-        authorize(ctx, "booking:read");
+        requireBookingPower(ctx, "booking:read");
         if (serviceId) {
             // Ensure the service is owned before filtering by it (404 otherwise).
             await this.requireOwnedService(ctx, serviceId);
@@ -585,7 +586,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         query: { from: string; to: string; staffId?: string },
     ): Promise<BookingsCalendar> {
-        authorize(ctx, "booking:read");
+        requireBookingPower(ctx, "booking:read");
         const from = new Date(query.from);
         const to = new Date(query.to);
         if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
@@ -687,152 +688,27 @@ export class BookingsService {
         ctx: OrganizationContext,
         bookingId: string,
         now: Date = new Date(),
-        options: { returnCredit?: boolean } = {},
+        options: { returnCredit?: boolean; closesClass?: boolean } = {},
     ): Promise<CancelledBooking> {
-        authorize(ctx, "booking:write");
-
+        requireBookingPower(ctx, "booking:write");
         const found = await this.requireOwnedBooking(ctx, bookingId);
-        if (found.status === "CANCELLED") {
-            return { ...found, money: NOTHING_MOVED };
-        }
-        const rules = await loadBookingRules(prisma, ctx.organizationId);
-        const done = await prisma.$transaction(async (tx) => {
-            // Where it stands now, under its locks — the payment's, then
-            // the invoice's, then the booking's: the webhook's order (#508,
-            // E8) — so a second cancel, or a payment landing on a hold, is
-            // seen rather than overwritten.
-            await lockBookingIntentsInTx(tx, found.id);
-            await lockBookingInTx(tx, found.id);
-            const booking =
-                (await tx.booking.findUnique({ where: { id: found.id } })) ??
-                found;
-            if (booking.status === "CANCELLED") {
-                return { booking, money: NOTHING_MOVED, send: null };
-            }
-            // A pay-now hold nobody has paid: let it go as the booker would,
-            // so its draft invoice is voided and its pay link stops working.
-            // A payment that lands after is recorded as owed back.
-            if (booking.status === "PENDING") {
-                await releaseHoldInTx(tx, booking.id, now, ctx.userId);
-                return {
-                    booking:
-                        (await tx.booking.findUnique({
-                            where: { id: booking.id },
-                        })) ?? booking,
-                    money: NOTHING_MOVED,
-                    send: null,
-                };
-            }
-            const inTime = !isLateCancel(booking, now, rules);
-            const late = !options.returnCredit && !inTime;
-            const cancelled = await tx.booking.update({
-                where: { id: booking.id },
-                data: {
-                    status: "CANCELLED",
-                    cancelledAt: now,
-                    cancelledLate: late,
-                },
-            });
-            // A class paid for with a pack goes back to it (ADR-007) —
-            // unless it was cancelled too late to (U3).
-            if (!late) await reversePackInTx(tx, booking.id);
-            // Money paid online goes back once when cancelled in time and
-            // the business's policy refunds (E8, DEC-058). Otherwise only
-            // someone who may refund hands it back, by hand.
-            const automatic = refundsAutomatically(inTime, rules);
-            const refunds =
-                automatic ||
-                (!!options.returnCredit && allows(ctx, "payment:manage"));
-            const reserved = refunds
-                ? await reserveBookingRefundInTx(tx, {
-                      organizationId: ctx.organizationId,
-                      bookingId: booking.id,
-                      reason: automatic
-                          ? "Booking cancelled in time"
-                          : "Booking cancelled by the business",
-                  })
-                : null;
-            const kept = reserved
-                ? null
-                : await bookingPaymentInTx(tx, ctx.organizationId, booking.id);
-            // A pay link sent for it (E4) stops working with the place.
-            await retirePayLinkInTx(tx, booking.id);
-            // The slot it was cancelled OUT of, so the history reads as a
-            // sequence rather than a list of states with the times missing.
-            await tx.bookingEvent.create({
-                data: {
-                    bookingId: booking.id,
-                    organizationId: ctx.organizationId,
-                    type: BookingEventType.Cancelled,
-                    actorUserId: ctx.userId,
-                    fromStartAt: booking.startAt,
-                },
-                select: { id: true },
-            });
-            const money: CancelMoney = {
-                refund: reserved
-                    ? {
-                          amountCents: reserved.amountCents,
-                          currency: reserved.currency,
-                          status: "CONFIRMING",
-                      }
-                    : null,
-                kept: kept
-                    ? {
-                          amountCents: kept.leftCents,
-                          currency: kept.currency,
-                      }
-                    : null,
-            };
-            return {
-                booking: cancelled,
-                money,
-                send: reserved?.reservedNow ? reserved.refundId : null,
-            };
-        });
-        // Phase two, after commit: the provider, under the row's id.
-        if (done.send && done.money.refund) {
-            done.money.refund.status = await this.sendRefund(
-                ctx.organizationId,
-                done.send,
-            );
-        }
-        return { ...done.booking, money: done.money };
-    }
-
-    /**
-     * Send a cancel's reserved refund (DEC-026), and say where it stands:
-     * SENT once the provider took it, REFUSED when it definitely made none
-     * (the row is FAILED, the money freed), CONFIRMING when no answer came —
-     * the row stays PENDING with the money held until the refund webhook
-     * settles it. Never throws: the cancel has already happened.
-     */
-    private async sendRefund(
-        organizationId: string,
-        refundId: string,
-    ): Promise<RefundStatus> {
-        if (!this.payments) {
-            this.logger.warn(
-                `Refund ${refundId} reserved with no payments service; held until the provider says`,
-            );
-            return "CONFIRMING";
-        }
-        try {
-            const sent = await this.payments.sendAutomaticRefund(
-                organizationId,
-                refundId,
-            );
-            if (sent.status === "FAILED") return "REFUSED";
-            if (sent.status === "SUCCEEDED") return "SENT";
-            return sent.beingConfirmed ? "CONFIRMING" : "SENT";
-        } catch (err) {
-            this.logger.warn(
-                `Refund ${refundId}: ${
-                    err instanceof Error ? err.message : String(err)
-                }; held until the provider says`,
-            );
-            return "CONFIRMING";
-        }
+        return cancelFoundBooking(
+            found,
+            {
+                organizationId: ctx.organizationId,
+                userId: ctx.userId,
+                mayRefundByHand: allows(ctx, "payment:manage"),
+            },
+            now,
+            options,
+            (refundId) =>
+                sendCancelRefund(
+                    this.payments,
+                    this.logger,
+                    ctx.organizationId,
+                    refundId,
+                ),
+        );
     }
 
     /**
@@ -867,7 +743,7 @@ export class BookingsService {
         outcome: BookingOutcome,
         now: Date = new Date(),
     ): Promise<Booking> {
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "booking:write");
         const booking = await this.requireOwnedBooking(ctx, bookingId);
 
         if (booking.status === "CANCELLED") {
@@ -882,27 +758,11 @@ export class BookingsService {
             return booking;
         }
 
+        // A visit of a treatment (E9) takes its order's lock first, and its
+        // last visit attended fulfils the order (B14, `booking-outcome.ts`).
         return prisma.$transaction(async (tx) => {
-            const updated = await tx.booking.update({
-                where: { id: booking.id },
-                data: { outcome },
-            });
-            await tx.bookingEvent.create({
-                data: {
-                    bookingId: booking.id,
-                    organizationId: ctx.organizationId,
-                    type:
-                        outcome === "ATTENDED"
-                            ? BookingEventType.Attended
-                            : BookingEventType.NoShow,
-                    actorUserId: ctx.userId,
-                    // The slot it is about, like CANCELLED — so a history line
-                    // says which appointment, not just what was decided.
-                    fromStartAt: booking.startAt,
-                },
-                select: { id: true },
-            });
-            return updated;
+            await lockVisitOrderInTx(tx, booking.orderId);
+            return writeOutcomeInTx(tx, ctx, booking, outcome);
         });
     }
 
@@ -919,7 +779,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         bookingId: string,
     ): Promise<BookingDetailView> {
-        authorize(ctx, "booking:read");
+        requireBookingPower(ctx, "booking:read");
         await this.requireOwnedBooking(ctx, bookingId);
         const booking = await prisma.booking.findUniqueOrThrow({
             where: { id: bookingId },
@@ -929,8 +789,11 @@ export class BookingsService {
         // the business's refund policy the screen states (E30).
         const rules = await loadBookingRules(prisma, ctx.organizationId);
         const money = await bookingMoney(prisma, booking, rules);
+        // A visit of a treatment (E10): which visit, and the next to book.
+        const { order, ...rest } = booking;
+        const treatment = treatmentOf({ ...rest, order });
         // The booker's note (E7) only behind C1's sensitive gate.
-        return { ...intakeNoteFor(ctx, booking), money };
+        return { ...intakeNoteFor(ctx, rest), money, treatment };
     }
 
     /**
@@ -962,7 +825,7 @@ export class BookingsService {
         bookingId: string,
         input: { startAt: string },
     ): Promise<Booking> {
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "booking:write");
         const booking = await this.requireOwnedBooking(ctx, bookingId);
 
         if (booking.status === "CANCELLED") {
@@ -1003,166 +866,13 @@ export class BookingsService {
                 "This service is archived, so its bookings cannot be moved. Make it active again first, or cancel the booking.",
             );
         }
-        await refuseIfClosed(
-            service.organizationId,
+        return moveFoundBooking(
+            booking,
+            service,
             startAt,
-            new Date(startAt.getTime() + service.durationMinutes * 60_000),
+            { organizationId: ctx.organizationId, userId: ctx.userId },
+            { audience: "team" },
         );
-        const rules = await prisma.availabilityRule.findMany({
-            where: { serviceId: service.id },
-        });
-        const availService = toAvailabilityService(service);
-        // A booking with a person moves within that person's diary (U3):
-        // one-to-one, to one of their free starts; a class, on the class's
-        // own grid with its instructor checked for a clash.
-        const staffing = booking.staffId
-            ? await loadStaffing(service)
-            : { people: [], perPerson: false, zone: null };
-        let person: ReserveWith = { staffId: null, perPerson: false };
-        if (booking.staffId && staffing.perPerson) {
-            person = await resolvePerson(
-                service,
-                rules,
-                staffing,
-                startAt,
-                booking.staffId,
-                "team",
-                booking.id,
-            );
-        } else {
-            if (!isValidSlotStart(availService, rules, startAt)) {
-                throw new BadRequestException(
-                    "That is not a bookable slot for this service",
-                );
-            }
-            if (booking.staffId) {
-                const instructor = staffing.people.find(
-                    (p) => p.id === booking.staffId,
-                );
-                person = {
-                    staffId: booking.staffId,
-                    staffName: instructor?.name,
-                    perPerson: false,
-                };
-            }
-        }
-        const endAt = new Date(
-            startAt.getTime() + service.durationMinutes * 60_000,
-        );
-        // The buffers either side stay clear (DEC-052), as the listing keeps.
-        const clear = guarded({ startAt, endAt }, availService);
-
-        try {
-            return await prisma.$transaction(
-                async (tx) => {
-                    if (!person.perPerson) {
-                        const taken = await tx.booking.count({
-                            where: {
-                                serviceId: service.id,
-                                ...holdsPlace(new Date()),
-                                startAt: { lt: clear.endAt },
-                                endAt: { gt: clear.startAt },
-                                // Itself is not a competitor for its own seat.
-                                id: { not: booking.id },
-                            },
-                        });
-                        const held = await courseSeatsHeld(
-                            tx,
-                            service.id,
-                            clear.startAt,
-                            clear.endAt,
-                        );
-                        if (taken + held >= service.capacity) {
-                            throw new ConflictException(
-                                "That slot is fully booked",
-                            );
-                        }
-                    }
-                    await assertPersonFreeInTx(
-                        tx,
-                        person,
-                        service.id,
-                        startAt,
-                        endAt,
-                        booking.id,
-                        guardMinutes(availService),
-                    );
-                    // A class paid with a pack is only paid while the pack
-                    // is good on the day (ADR-007): the same rule as spending.
-                    const paid = await tx.packRedemption.findFirst({
-                        where: { bookingId: booking.id, reversedAt: null },
-                        select: { purchase: { select: { expiresAt: true } } },
-                    });
-                    if (paid && paid.purchase.expiresAt <= startAt) {
-                        throw new ConflictException(
-                            "The class pack that paid for this booking expires before that time. Pick an earlier time, or take the pack off the booking first.",
-                        );
-                    }
-                    // A membership's class is one of the month it lands in
-                    // (#508): moved into another month, it needs a class
-                    // left there, on a membership still active. The booking
-                    // itself is not counted, so a move within its month fits.
-                    if (
-                        booking.paidWith === "MEMBERSHIP" &&
-                        booking.subscriptionId
-                    ) {
-                        await useMembershipInTx(tx, {
-                            organizationId: ctx.organizationId,
-                            bookingId: booking.id,
-                            contactId: booking.contactId ?? "",
-                            subscriptionId: booking.subscriptionId,
-                            startAt,
-                        });
-                    }
-
-                    const moved = await tx.booking.update({
-                        where: { id: booking.id },
-                        data: { startAt, endAt },
-                    });
-                    await tx.bookingEvent.create({
-                        data: {
-                            bookingId: booking.id,
-                            organizationId: ctx.organizationId,
-                            type: BookingEventType.Rescheduled,
-                            actorUserId: ctx.userId,
-                            fromStartAt: booking.startAt,
-                            toStartAt: startAt,
-                        },
-                        select: { id: true },
-                    });
-                    // Same transactional outbox as booking: a committed move
-                    // always has a queued notification job, so a failed send
-                    // cannot drop it. It is NOT delivered yet: no handler is
-                    // registered for booking.notify, so the worker dead-letters
-                    // these jobs (see jobs/job-consumers.spec.ts), and until one
-                    // is, nothing tells the booker their time moved.
-                    await tx.job.create({
-                        data: {
-                            organizationId: ctx.organizationId,
-                            type: "booking.notify",
-                            payload: {
-                                bookingId: booking.id,
-                                serviceId: service.id,
-                                contactId: booking.contactId,
-                                reason: "rescheduled",
-                            },
-                        },
-                        select: { id: true },
-                    });
-                    return moved;
-                },
-                {
-                    isolationLevel:
-                        Prisma.TransactionIsolationLevel.Serializable,
-                },
-            );
-        } catch (err) {
-            // Lost the race with a concurrent booking for the same seat.
-            if (isSerializationFailure(err)) {
-                throw new ConflictException("That slot is fully booked");
-            }
-            throw err;
-        }
     }
 
     /**
@@ -1198,7 +908,7 @@ export class BookingsService {
             subscriptionId?: string;
         },
     ): Promise<Booking> {
-        authorize(ctx, "booking:write");
+        requireBookingPower(ctx, "booking:write");
         const withPack =
             dto.useClassPack === true ||
             !!dto.packPurchaseId ||
@@ -1226,12 +936,32 @@ export class BookingsService {
         }
         // Spending someone's prepaid classes is its own power (ADR-007) —
         // a pack's, or a membership's month (U3).
-        if (withPack) authorize(ctx, "pack:write");
-        if (withMembership) authorize(ctx, "subscription:write");
+        if (withPack) requireBookingPower(ctx, "pack:sell", CANT_USE_PACKS);
+        if (withMembership) requireBookingPower(ctx, "subscription:write");
 
         const { service, rules } = await loadBookableService(serviceId);
         if (service.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Service not found");
+        }
+        // A treatment is sold as one order (E9, DEC-050), paid on it: never
+        // with a pack or a membership, and never without a storefront.
+        const treatment = isTreatment(service);
+        if (treatment && (withPack || withMembership)) {
+            throw new BadRequestException({
+                message:
+                    "A treatment is paid for on its order, not with a pack or a membership.",
+                field: "paidWith",
+            });
+        }
+        const treatmentStore = treatment
+            ? await treatmentStorefront(prisma, service)
+            : null;
+        if (treatment && !treatmentStore) {
+            throw new ConflictException({
+                message:
+                    "Treatments are sold as orders. Add a storefront first.",
+                details: { reason: "no-storefront" },
+            });
         }
 
         const startAt = new Date(dto.startAt);
@@ -1323,6 +1053,10 @@ export class BookingsService {
             });
         }
 
+        // Its bill goes to an email (DEC-050): a contact with none is asked
+        // for one.
+        if (treatmentStore) treatmentEmail(booker.bookerEmail);
+
         if (dto.idempotencyKey) {
             const existing = await prisma.booking.findUnique({
                 where: {
@@ -1347,6 +1081,32 @@ export class BookingsService {
         const paidWith: PaidWith | null = withPack
             ? "PACK"
             : (dto.paidWith ?? null);
+
+        if (treatmentStore) {
+            // The treatment's order, with this booking its visit 1.
+            const booked = await reserve(
+                this.activation,
+                service,
+                startAt,
+                endAt,
+                booker,
+                { source: "manual", actorUserId: ctx.userId },
+                {
+                    inTx: async (tx, booking) => {
+                        await startTreatmentInTx(tx, {
+                            service,
+                            booking,
+                            storeId: treatmentStore.id,
+                        });
+                    },
+                    onRace: "That changed while you were booking. Try again.",
+                },
+                { ...person, paidWith },
+            );
+            return prisma.booking.findUniqueOrThrow({
+                where: { id: booked.id },
+            });
+        }
 
         return reserve(
             this.activation,
@@ -1396,6 +1156,19 @@ export class BookingsService {
     }
 
     /**
+     * Book visit `n` of a treatment (E9, DEC-050) — see {@link bookVisit}.
+     * `booking:write`; another business's order is a 404.
+     */
+    async bookVisit(
+        ctx: OrganizationContext,
+        orderId: string,
+        dto: BookVisitInput,
+    ): Promise<Booking> {
+        requireBookingPower(ctx, "booking:write");
+        return bookVisit(ctx, orderId, dto);
+    }
+
+    /**
      * "Send a pay link" for a booking (E4): issue its invoice and hand back
      * the link to copy (`booking-pay-link.ts`). It issues an invoice, so it
      * needs `invoice:write` as well as `booking:write`. Another business's
@@ -1406,8 +1179,12 @@ export class BookingsService {
         bookingId: string,
         now: Date = new Date(),
     ): Promise<{ token: string }> {
-        authorize(ctx, "booking:write");
-        authorize(ctx, "invoice:write");
+        requireBookingPower(ctx, "booking:write");
+        requireBookingPower(
+            ctx,
+            "invoice:write",
+            "Your role can't send pay links, because it can't issue invoices.",
+        );
         await this.requireOwnedBooking(ctx, bookingId);
         // Only a connection that can open the checkout window counts: a
         // Razorpay one still missing its public key id would make a link

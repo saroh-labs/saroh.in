@@ -7,6 +7,9 @@ import type {
     RenderedFeatures,
     RenderedGallery,
     RenderedHero,
+    RenderedJournal,
+    RenderedPlans,
+    RenderedProductGrid,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -16,7 +19,12 @@ import { BLOCK_META, blockFixture } from "@saroh/block-contract";
 import { act, render, screen } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { SAMPLE_VISIT } from "./block-fixture-preview";
+import {
+    SAMPLE_PLANS,
+    SAMPLE_POSTS,
+    SAMPLE_PRODUCTS,
+    SAMPLE_VISIT,
+} from "./block-fixture-preview";
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
@@ -25,12 +33,16 @@ import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
+import JournalSection from "./blocks/journal";
+import PlansSection from "./blocks/plans";
+import ProductGridSection from "./blocks/product-grid";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 import VisitUsSection from "./blocks/visit-us";
 import BookingFlow from "./booking-flow/booking-flow";
 import type { BookingPageData } from "./booking-flow/model";
+import { ModulePageUnavailable } from "./module-page-unavailable";
 import { SiteTheme } from "./site-theme";
 import { SITE_FONT_STACK, siteFontFamily } from "./tailwind-preset";
 
@@ -392,6 +404,83 @@ describe("block rendering", () => {
         expect(container.innerHTML).toMatchSnapshot();
     });
 
+    // Sample posts rather than a fetch: the page serving the site reads them
+    // and hands them in (G10).
+    it("journal", () => {
+        const { container } = render(
+            <JournalSection
+                content={BLOCK_META.journal.fixtures.default as RenderedJournal}
+                feed={{ posts: SAMPLE_POSTS, basePath: "/blog" }}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("journal, words only", () => {
+        const { container } = render(
+            <JournalSection
+                content={BLOCK_META.journal.cases.plain as RenderedJournal}
+                feed={{ posts: SAMPLE_POSTS, basePath: "/news" }}
+            />,
+        );
+        expect(container.querySelector("img")).toBeNull();
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    // Sample plans rather than a fetch: the page serving the site reads them
+    // and hands them in (G9).
+    it("plans", () => {
+        const { container } = render(
+            <PlansSection
+                content={BLOCK_META.plans.fixtures.default as RenderedPlans}
+                feed={{ plans: SAMPLE_PLANS, joinHref: "/contact#enquiry" }}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("plans, no highlight or descriptions, the merchant's button", () => {
+        const { container } = render(
+            <PlansSection
+                content={BLOCK_META.plans.cases.plain as RenderedPlans}
+                feed={{ plans: SAMPLE_PLANS, joinHref: "/" }}
+            />,
+        );
+        expect(screen.queryByText("Most chosen")).toBeNull();
+        expect(screen.getAllByText("Ask to join")).toHaveLength(3);
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    // Sample products rather than a fetch: the page serving the site reads
+    // each grid's own and hands them in (G12).
+    it("productGrid", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={
+                    BLOCK_META.productGrid.fixtures
+                        .default as RenderedProductGrid
+                }
+                feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
+            />,
+        );
+        expect(screen.getAllByRole("listitem")).toHaveLength(3);
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("productGrid, picked, two, no prices", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={
+                    BLOCK_META.productGrid.cases.picked as RenderedProductGrid
+                }
+                feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
+            />,
+        );
+        expect(screen.getAllByRole("listitem")).toHaveLength(2);
+        expect(screen.queryByText("₹950")).toBeNull();
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
     /**
      * The forward-compatibility property, asserted rather than assumed: a
      * snapshot published against a newer contract, carrying a section type this
@@ -551,5 +640,46 @@ describe("the merchant's type (H1)", () => {
         }
         expect(SITE_FONT_STACK).toContain('"Noto Sans Devanagari"');
         expect(SITE_FONT_STACK).not.toMatch(/Geist|Bricolage|Grotesk|Mono/);
+    });
+});
+
+describe("a module page whose module is off (G15)", () => {
+    it("says it isn't available right now, with a link home, naming no module", () => {
+        const { container } = render(
+            <ModulePageUnavailable business="Pulse Fitness" />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "This isn't available right now",
+            }),
+        ).toBeInTheDocument();
+        expect(container.textContent).toContain(
+            "Pulse Fitness isn't offering this on their site at the moment.",
+        );
+        expect(container.textContent).not.toMatch(
+            /Appointments|Commerce|Payments|module/i,
+        );
+        const home = screen.getByRole("link", { name: "Go to the home page" });
+        expect(home).toHaveAttribute("href", "/");
+        // The site's own palette, with visible focus and pressed states.
+        expect(home).toHaveClass(
+            "bg-site-accent",
+            "text-site-accent-fg",
+            "focus-visible:ring-2",
+            "active:opacity-80",
+        );
+    });
+
+    it("leads home inside a preview", () => {
+        render(
+            <ModulePageUnavailable
+                business="Pulse Fitness"
+                homeHref="/preview/tok"
+            />,
+        );
+        expect(
+            screen.getByRole("link", { name: "Go to the home page" }),
+        ).toHaveAttribute("href", "/preview/tok");
     });
 });

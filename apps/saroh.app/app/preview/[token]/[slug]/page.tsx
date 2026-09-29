@@ -2,15 +2,19 @@ import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
 import { PreviewGone } from "@/components/preview-gone";
-import { PageSections } from "@saroh/site-blocks";
+import { ModulePageUnavailable, PageSections } from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
+import { moduleOff } from "@/lib/module-pages";
 import {
     findPageByPath,
     getPreviewByToken,
+    getPreviewJournalFeed,
     getPreviewPosts,
     postsPrefix,
 } from "@/lib/publication";
+import { getPreviewPlansFeed } from "@/lib/site-plans";
+import { getPreviewProductGridFeeds } from "@/lib/site-product-grids";
 
 /** A draft's inner page, or its posts index, behind a preview token (#198). */
 export default async function PreviewPage({
@@ -44,11 +48,34 @@ export default async function PreviewPage({
     const page = findPageByPath(preview.snapshot, `/${slug}`);
     if (!page) notFound();
 
+    // A module page whose module is off says so, as its live address will
+    // (G15, G19), rather than showing what publishing wouldn't.
+    if (moduleOff(page, preview.modules)) {
+        return <ModulePageUnavailable business={preview.snapshot.site.name} />;
+    }
+
+    // The draft's posts (G10), as the preview's own index shows them, and
+    // the plans on sale now (G9) and each Product grid's products (G12): a
+    // draft plan or product never shows, even here.
+    const [journal, plans, productGrids] = await Promise.all([
+        getPreviewJournalFeed(page.sections, preview.snapshot, token),
+        getPreviewPlansFeed(
+            page.sections,
+            preview.snapshot,
+            preview.siteId,
+            token,
+        ),
+        getPreviewProductGridFeeds(page.sections, preview.siteId),
+    ]);
+
     return (
         <PageSections
             sections={page.sections}
             apiUrl={publicApiUrl()}
             siteId={preview.siteId}
+            journal={journal}
+            plans={plans}
+            productGrids={productGrids}
         />
     );
 }

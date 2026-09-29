@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { formatRecent } from "@/lib/format/datetime";
 
 import type { AuditEventRow } from "./activity";
-import { activityLine, activityLines } from "./activity";
+import { ACTIVITY_ACTIONS, activityLine, activityLines } from "./activity";
 import { FIELD_PHRASES } from "./activity-changes";
 
 const sanjay = { name: "Sanjay", email: "sanjay@ryeandco.in" };
@@ -49,6 +49,28 @@ describe("activityLine — settings saves", () => {
         expect(
             said({ metadata: { fields: ["invoicePrefix"], value: "RC" } }),
         ).toBe("Sanjay updated the invoice prefix → Tax and invoices");
+    });
+
+    it("says a business type by its name, the old company as Private limited (F10)", () => {
+        const typeChange = (before: string | null, after: string | null) =>
+            said({
+                metadata: {
+                    fields: ["type"],
+                    changes: [{ field: "type", before, after }],
+                },
+            });
+        expect(typeChange("individual", "llp")).toBe(
+            "Sanjay changed the type of business to LLP → Identity",
+        );
+        expect(typeChange("llp", "company")).toBe(
+            "Sanjay changed the type of business to Private limited company → Identity",
+        );
+        expect(typeChange(null, "individual")).toBe(
+            "Sanjay changed the type of business to Individual / sole proprietor → Identity",
+        );
+        expect(typeChange("trust", null)).toBe(
+            "Sanjay cleared the type of business → Identity",
+        );
     });
 
     it("says the address once, however many of its lines changed", () => {
@@ -231,6 +253,56 @@ describe("activityLine — values a save recorded (#509)", () => {
                 metadata: { fields: ["fulfilmentTypes"], changes: [] },
             }),
         ).toBe("Sanjay changed how orders leave → Storefronts");
+    });
+
+    it("says a storefront turned linking customers who share an email on or off (C15)", () => {
+        const sameEmail = (before: boolean, after: boolean) =>
+            said({
+                action: "storefront.same-email.update",
+                targetType: "storefront",
+                targetId: "st_1",
+                metadata: {
+                    fields: ["linkSameEmailCustomers"],
+                    storefront: "Rye Online",
+                    changes: [
+                        { field: "linkSameEmailCustomers", before, after },
+                    ],
+                },
+            });
+        expect(sameEmail(false, true)).toBe(
+            "Sanjay turned on linking customers who share an email at Rye Online → Storefronts",
+        );
+        expect(sameEmail(true, false)).toBe(
+            "Sanjay turned off linking customers who share an email at Rye Online → Storefronts",
+        );
+        expect(ACTIVITY_ACTIONS).toContain("storefront.same-email.update");
+    });
+
+    it("says someone changed one of their own alerts (F14)", () => {
+        const alert = (channel: string, before: boolean, after: boolean) =>
+            said({
+                action: "member.alerts.update",
+                targetType: "member",
+                metadata: {
+                    alert: "order",
+                    channel,
+                    changes: [{ field: "alertOn", before, after }],
+                },
+            });
+        expect(alert("email", false, true)).toBe(
+            "Sanjay turned email on for New order, for themselves → Alerts",
+        );
+        expect(alert("bell", true, false)).toBe(
+            "Sanjay turned the bell off for New order, for themselves → Alerts",
+        );
+        // An alert this page doesn't know is said generally, never as a key.
+        expect(
+            said({
+                action: "member.alerts.update",
+                metadata: { alert: "weekly", channel: "email", changes: [] },
+            }),
+        ).toBe("Sanjay changed their own alerts → Alerts");
+        expect(ACTIVITY_ACTIONS).toContain("member.alerts.update");
     });
 
     it("says opening hours, modules and plans", () => {
@@ -460,6 +532,44 @@ describe("activityLine — the team", () => {
                 metadata: { role: "MEMBER" },
             }),
         ).toBe("Priya removed aditya@ryeandco.in from the team → Team");
+    });
+
+    it("says who joined from a storefront, and who the backfill added (F16)", () => {
+        const labels = { "storefront-team": "Storefront team" };
+        expect(
+            said(
+                {
+                    action: "membership.storefront-join",
+                    actor: { name: "Meera", email: "meera@ryeandco.in" },
+                    targetType: "membership",
+                    metadata: {
+                        role: "storefront-team",
+                        storefront: "Hill Road",
+                        source: "invite",
+                    },
+                },
+                labels,
+            ),
+        ).toBe(
+            "Meera joined the team as Storefront team, from Hill Road → Team",
+        );
+        expect(
+            said(
+                {
+                    action: "membership.storefront-join",
+                    actor: { name: "Ravi", email: "ravi@ryeandco.in" },
+                    targetType: "membership",
+                    metadata: {
+                        role: "storefront-team",
+                        storefront: "Market",
+                        source: "backfill",
+                    },
+                },
+                labels,
+            ),
+        ).toBe(
+            "Ravi was added to the team as Storefront team, from Market → Team",
+        );
     });
 
     it("opens the Team page on its people", () => {

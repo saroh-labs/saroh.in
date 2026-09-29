@@ -1,4 +1,5 @@
 import { cn } from "../lib/utils";
+import { laterVisitsText } from "./model";
 import { confirmClasses, onDarkMuted } from "./styles";
 
 /** What both confirm surfaces — the aside and the phone bar — show. */
@@ -15,6 +16,7 @@ export interface ConfirmSummary {
 /** The booking so far, beside the steps on a wide screen. */
 export function SummaryAside({
     serviceName,
+    visits = 1,
     whenText,
     name,
     hasService,
@@ -28,6 +30,8 @@ export function SummaryAside({
     onConfirm,
 }: ConfirmSummary & {
     serviceName: string | null;
+    /** More than one: a treatment, whose first visit is booked here (E10). */
+    visits?: number;
     whenText: string;
     name: string;
     hasService: boolean;
@@ -43,23 +47,19 @@ export function SummaryAside({
                 Your booking
             </p>
             <dl>
-                {(
-                    [
-                        ["What", serviceName ?? "—"],
-                        ["When", whenText || "—"],
-                        ["Who", name.trim() || "—"],
-                    ] as const
-                ).map(([k, v]) => (
-                    <div
-                        key={k}
-                        className="flex gap-2.5 border-b border-[color-mix(in_srgb,hsl(var(--site-bg))_12%,transparent)] py-1.5 text-sm"
-                    >
-                        <dt className={cn("flex-[0_0_64px]", onDarkMuted)}>
-                            {k}
-                        </dt>
-                        <dd className="min-w-0 flex-1 font-medium">{v}</dd>
-                    </div>
-                ))}
+                {summaryRows({ serviceName, visits, whenText, name }).map(
+                    ([k, v]) => (
+                        <div
+                            key={k}
+                            className="flex gap-2.5 border-b border-[color-mix(in_srgb,hsl(var(--site-bg))_12%,transparent)] py-1.5 text-sm"
+                        >
+                            <dt className={cn("flex-[0_0_64px]", onDarkMuted)}>
+                                {k}
+                            </dt>
+                            <dd className="min-w-0 flex-1 font-medium">{v}</dd>
+                        </div>
+                    ),
+                )}
             </dl>
             <div className="mt-3 flex items-baseline">
                 <span className={cn("flex-1 text-sm", onDarkMuted)}>
@@ -101,6 +101,35 @@ export function SummaryAside({
             ) : null}
         </aside>
     );
+}
+
+/**
+ * The aside's rows. A treatment (E10) names its visits, calls the time its
+ * first visit, and says when the rest are booked.
+ */
+function summaryRows({
+    serviceName,
+    visits,
+    whenText,
+    name,
+}: {
+    serviceName: string | null;
+    visits: number;
+    whenText: string;
+    name: string;
+}): [string, string][] {
+    const then = laterVisitsText(visits);
+    return [
+        [
+            "What",
+            serviceName
+                ? `${serviceName}${visits > 1 ? ` · ${visits} visits` : ""}`
+                : "—",
+        ],
+        [then ? "First visit" : "When", whenText || "—"],
+        ...(then ? [["Then", then] as [string, string]] : []),
+        ["Who", name.trim() || "—"],
+    ];
 }
 
 /** The same, as a bar pinned to the bottom of a phone. */

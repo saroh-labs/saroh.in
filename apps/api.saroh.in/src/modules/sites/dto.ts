@@ -16,6 +16,10 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { PageKind } from "@saroh/database";
+
+import { PAGE_KINDS } from "./page-kinds";
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -172,17 +176,44 @@ const PAGE_PATH_MSG =
  * Moving the home page is a separate operation nobody has asked for yet.
  */
 export class CreatePageDto {
+    /**
+     * What the page is (G14). ABSENT means FREE, a page laid out by hand, as
+     * every page was before module pages: a client that predates this field
+     * sends none and gets what it always got.
+     */
+    @IsOptional()
+    @IsIn(PAGE_KINDS, {
+        message: `kind must be one of ${PAGE_KINDS.join(", ")}`,
+    })
+    kind?: PageKind;
+
+    /** Required for a free-form page; a module page defaults to its kind's. */
+    @ValidateIf((o: CreatePageDto) => isFreeKind(o) || o.title !== undefined)
     @Transform(trim)
     @IsString()
     @MinLength(1, { message: "Title is required" })
     @MaxLength(200, { message: "Title must be at most 200 characters" })
-    title!: string;
+    title?: string;
 
+    /**
+     * Required for a free-form page. A Book or Shop page's is fixed (/book,
+     * /shop); a Prices, Journal or Contact page defaults to its kind's.
+     */
+    @ValidateIf((o: CreatePageDto) => isFreeKind(o) || o.path !== undefined)
     @Transform(trim)
     @IsString()
     @Matches(PAGE_PATH_RE, { message: PAGE_PATH_MSG })
     @MaxLength(200, { message: "Path must be at most 200 characters" })
-    path!: string;
+    path?: string;
+
+    /** "Show in menu" (G14). ABSENT means on. */
+    @IsOptional()
+    @IsBoolean({ message: "inMenu must be a boolean" })
+    inMenu?: boolean;
+}
+
+function isFreeKind(dto: CreatePageDto): boolean {
+    return dto.kind === undefined || dto.kind === "FREE";
 }
 
 /**
@@ -221,6 +252,14 @@ export class UpdatePageDto {
     // so `@IsBoolean` is the whole rule again.
     @IsBoolean({ message: "hidden must be a boolean" })
     hidden?: boolean;
+
+    /**
+     * "Show in menu" (G14). Absent means LEAVE ALONE, as for `hidden`. Off,
+     * the page is reachable by link but not listed in the site's menu.
+     */
+    @IsOptional()
+    @IsBoolean({ message: "inMenu must be a boolean" })
+    inMenu?: boolean;
 }
 
 /**

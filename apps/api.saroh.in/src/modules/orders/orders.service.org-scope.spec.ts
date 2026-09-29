@@ -27,6 +27,11 @@ jest.mock("../invoices/order-invoicing", () => ({
         .mockResolvedValue({ supplementary: null, creditNote: null }),
 }));
 
+// The team's "New order" alert (F14) is its own job; here, only that it is queued.
+jest.mock("../notifications/team-alerts", () => ({
+    enqueueTeamAlert: jest.fn(),
+}));
+
 jest.mock("@saroh/database", () => {
     const order = { create: jest.fn(), count: jest.fn() };
     const customer = { findFirst: jest.fn() };
@@ -47,10 +52,11 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { NotFoundException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { StoresService } from "../stores/stores.service";
 import { OrdersService } from "./orders.service";
 
@@ -72,10 +78,22 @@ const DTO = {
     items: [{ productId: PRODUCT, quantity: 2 }],
 };
 
-/** `writableOrganization` returning null means "not writable" (#173). */
-function makeService(writable: { organizationId: string | null } | null) {
+/**
+ * `orderWriteOrganization` returning null means "may not take orders here"
+ * (#173, B16); `reachable` is whether the caller can see the storefront at
+ * all, which decides between a 403 and a 404.
+ */
+function makeService(
+    writable: { organizationId: string | null } | null,
+    reachable = false,
+) {
     const stores = {
-        writableOrganization: jest.fn().mockResolvedValue(writable),
+        orderWriteOrganization: jest.fn().mockResolvedValue(writable),
+        getForUser: reachable
+            ? jest.fn().mockResolvedValue({ id: STORE })
+            : jest
+                  .fn()
+                  .mockRejectedValue(new NotFoundException("Store not found")),
     } as unknown as StoresService;
     // Activation events are fire-and-forget instrumentation (#176); a stub
     // keeps these tests about order writes rather than about analytics.
@@ -142,12 +160,52 @@ describe("OrdersService.create — organization stamping (#173)", () => {
         expect(orderCreate.mock.calls[0][0].data.organizationId).toBeNull();
     });
 
+    it("queues the team's New order alert with the order, naming who took it (F14)", async () => {
+        await makeService({ organizationId: ORG }).create(STORE, USER, DTO);
+
+        expect(enqueueTeamAlert).toHaveBeenCalledTimes(1);
+        expect((enqueueTeamAlert as jest.Mock).mock.calls[0].slice(1)).toEqual([
+            ORG,
+            { event: "order", orderId: "order_1", actorUserId: USER },
+        ]);
+    });
+
+    it("queues no alert for a legacy org-less store: there is no team to tell", async () => {
+        await makeService({ organizationId: null }).create(STORE, USER, DTO);
+        expect(enqueueTeamAlert).not.toHaveBeenCalled();
+    });
+
     it("still 404s and writes nothing when the store is not writable", async () => {
         await expect(
             makeService(null).create(STORE, USER, DTO),
         ).rejects.toBeInstanceOf(NotFoundException);
 
         expect(orderCreate).not.toHaveBeenCalled();
+    });
+
+    it("403s in words, and writes nothing, for a role that sees the storefront but can't take orders (B16)", async () => {
+        const made = makeService(null, true).create(STORE, USER, DTO);
+        await expect(made).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(made).rejects.toThrow("Your role can't take new orders.");
+        expect(orderCreate).not.toHaveBeenCalled();
+    });
+
+    it("asks for order:create, not store:write (B16)", async () => {
+        const stores = {
+            orderWriteOrganization: jest
+                .fn()
+                .mockResolvedValue({ organizationId: ORG }),
+        };
+        await new OrdersService(stores as unknown as StoresService).create(
+            STORE,
+            USER,
+            DTO,
+        );
+        expect(stores.orderWriteOrganization).toHaveBeenCalledWith(
+            STORE,
+            USER,
+            "order:create",
+        );
     });
 });
 
@@ -174,5 +232,48 @@ describe("OrdersService.create — the storefront's currency", () => {
     it("falls back as before when the storefront never chose one", async () => {
         await makeService(writable).create(STORE, USER, DTO);
         expect(orderCreate.mock.calls[0][0].data.currency).toBe("USD");
+    });
+});
+
+describe("OrdersService.create — what New order v2 asks beyond the storefront (B13)", () => {
+    const writable = { organizationId: ORG };
+    function withMember(allowed: string[]) {
+        const stores = {
+            orderWriteOrganization: jest.fn().mockResolvedValue(writable),
+            memberAllows: jest.fn((_s: string, _u: string, action: string) =>
+                Promise.resolve(allowed.includes(action)),
+            ),
+        } as unknown as StoresService;
+        return new OrdersService(stores);
+    }
+
+    it("a picked person takes contact:read, and nothing is written without it", async () => {
+        await expect(
+            withMember([]).create(STORE, USER, {
+                items: DTO.items,
+                contactId: "contact_1",
+            }),
+        ).rejects.toThrow(/can't look customers up/);
+        expect(orderCreate).not.toHaveBeenCalled();
+    });
+
+    it("a pay link takes order:create (B16)", async () => {
+        await expect(
+            withMember(["contact:read"]).create(STORE, USER, {
+                items: DTO.items,
+                walkIn: { name: "Asha" },
+                payment: { kind: "LINK" },
+            }),
+        ).rejects.toThrow(/can't make a pay link/);
+        expect(orderCreate).not.toHaveBeenCalled();
+    });
+
+    it("an order for nobody is refused before anything is read", async () => {
+        await expect(
+            withMember(["contact:read"]).create(STORE, USER, {
+                items: DTO.items,
+            }),
+        ).rejects.toThrow(/Say who the order is for/);
+        expect(productFindFirst).not.toHaveBeenCalled();
     });
 });

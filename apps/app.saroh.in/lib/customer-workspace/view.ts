@@ -1,8 +1,9 @@
 import { clock } from "@/lib/calendar/layers";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { goesToAddress } from "@/lib/orders/lifecycle";
+import type { Review } from "@/lib/product-reviews/service";
 import { dayText, money, shortPrice } from "@/lib/subscriptions/view";
 
+import { addedLine } from "./added";
 import type {
     CustomerDetail,
     DetailBooking,
@@ -13,6 +14,11 @@ import type {
     MembershipAllowance,
     MoneyTotal,
 } from "./detail";
+import { packHref } from "./packs";
+import type { CustomerThread } from "./thread";
+import { monthText, whenText } from "./when";
+
+export { monthText, whenText };
 
 /**
  * How Customer Detail says a customer (plan 2026-09-23-003, U18, after
@@ -35,7 +41,8 @@ export function kindOf(d: Pick<CustomerDetail, "orders" | "bookings">): Kind {
         : "commerce";
 }
 
-export type TabKey = "over" | "ord" | "bk" | "sub" | "inv" | "notes";
+export type TabKey =
+    "over" | "ord" | "bk" | "pk" | "sub" | "inv" | "rev" | "msg" | "notes";
 
 export interface Tab {
     key: TabKey;
@@ -48,9 +55,14 @@ export interface Tab {
  * The tabs by business kind — commerce: Overview, Orders, Subscriptions,
  * Invoices, Notes; bookings: Overview, Bookings, Membership, Invoices, Notes.
  * A block this viewer may not read is absent from the read, so its tab is
- * too: a Member sees no Subscriptions or Invoices.
+ * too: a Member sees no Subscriptions or Invoices. Reviews (C6) follow
+ * Invoices, from their own read (`product-review:read`), where they sell.
  */
-export function tabsFor(d: CustomerDetail): Tab[] {
+export function tabsFor(
+    d: CustomerDetail,
+    thread: ThreadRead = null,
+    reviews: ReviewsRead = null,
+): Tab[] {
     const kind = kindOf(d);
     const tabs: Tab[] = [{ key: "over", label: "Overview", count: null }];
     if (d.orders !== undefined) {
@@ -67,6 +79,14 @@ export function tabsFor(d: CustomerDetail): Tab[] {
             count: d.bookings ? upcomingOf(d.bookings.upcoming).length : null,
         });
     }
+    // Their class packs (C7), where the design's Courses tab sits.
+    if (d.packs !== undefined) {
+        tabs.push({
+            key: "pk",
+            label: "Packs",
+            count: d.packs ? d.packs.rows.length : null,
+        });
+    }
     if (d.subscriptions !== undefined) {
         tabs.push({
             key: "sub",
@@ -81,12 +101,53 @@ export function tabsFor(d: CustomerDetail): Tab[] {
             count: d.invoices ? d.invoices.rows.length : null,
         });
     }
+    if (reviews !== null) {
+        tabs.push({
+            key: "rev",
+            label: "Reviews",
+            count: reviews === "failed" ? null : reviews.length,
+        });
+    }
+    if (showsThread(thread)) {
+        tabs.push({
+            key: "msg",
+            label: "Messages",
+            // New from the customer: the tab's count is what's unread.
+            count: thread === "failed" ? null : thread.unread || null,
+        });
+    }
     tabs.push({
         key: "notes",
         label: "Notes",
         count: d.notes ? d.notes.rows.length : null,
     });
     return tabs;
+}
+
+/**
+ * The Messages tab's read (A13): the thread, "failed" when it couldn't be
+ * read, or null when there is nothing to show — the viewer can't read
+ * messages, or the account area is still off.
+ */
+export type ThreadRead = CustomerThread | "failed" | null;
+
+/**
+ * The Reviews tab's read (C6): their reviews, "failed" when it couldn't be
+ * read, or null when the tab doesn't belong — the viewer can't read reviews
+ * or the business doesn't sell.
+ */
+export type ReviewsRead = Review[] | "failed" | null;
+
+/**
+ * Messages shows for someone who can write in (they sign in on the site) or
+ * has written already, and when the read failed, so the failure is said.
+ */
+export function showsThread(
+    thread: ThreadRead,
+): thread is CustomerThread | "failed" {
+    if (thread === null) return false;
+    if (thread === "failed") return true;
+    return thread.signsIn || thread.messages.length > 0;
 }
 
 /** `?tab=` — one of this customer's tabs, else Overview. */
@@ -110,38 +171,13 @@ export function totals(list: MoneyTotal[]): string {
         : "—";
 }
 
-/** "August 2026" in the business's zone. */
-export function monthText(at: string, timeZone: string): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        month: "long",
-        year: "numeric",
-    }).format(new Date(at));
-}
-
-function localDate(at: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-CA", {
-        timeZone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    }).format(new Date(at));
-}
-
-/** "Today", "Yesterday" or "18 Sep" — the design's short when. */
-export function whenText(at: string, timeZone: string, now: Date): string {
-    const day = localDate(at, timeZone);
-    if (day === localDate(now.toISOString(), timeZone)) return "Today";
-    const yesterday = new Date(now.getTime() - 86_400_000).toISOString();
-    if (day === localDate(yesterday, timeZone)) return "Yesterday";
-    return dayText(at, timeZone, now);
-}
-
 // ---------------------------------------------------------------- header
 
 export interface Tag {
     label: string;
     tone: Tone;
+    /** What the word means, on hover: "Returning: 2 or more orders". */
+    title?: string;
 }
 
 /**
@@ -161,9 +197,10 @@ export function tagFor(d: CustomerDetail): Tag | null {
     }
     const orders = d.stats.orders;
     if (orders === undefined || orders === null) return null;
+    const title = "Returning: 2 or more orders";
     return orders >= 2
-        ? { label: "Returning", tone: "ok" }
-        : { label: "New", tone: "off" };
+        ? { label: "Returning", tone: "ok", title }
+        : { label: "New", tone: "off", title };
 }
 
 /** The line under the name: since when, and where or how often. */
@@ -196,7 +233,7 @@ export function sinceLine(
             .filter(Boolean)
             .join(" · ");
     }
-    const added = `Added ${dayText(d.contact.createdAt, tz, now)}`;
+    const added = addedLine(d.contact, tz, now);
     // Orders not read for this viewer, or not read at all, say nothing of
     // orders: "no orders yet" would be a claim the page cannot make.
     if (!d.orders) return added;
@@ -207,7 +244,6 @@ export function sinceLine(
     return [
         `Customer since ${monthText(first, tz)}`,
         `buys at ${joinAnd(where)}`,
-        "Returning means 2 or more orders",
     ].join(" · ");
 }
 
@@ -267,8 +303,10 @@ export interface Tile {
 
 /**
  * The four figures over a shop customer: orders, spent, average order and
- * last order. Money tiles only for a viewer who reads money; a figure whose
- * source failed is not stated.
+ * last order. Each follows its own read (DEC-039, matrix §1 rule 3): the
+ * average comes from the orders themselves, which `order:read` shows whole;
+ * Spent sums orders and invoices, so the API sends it only to whoever reads
+ * both. A figure whose source failed is not stated.
  */
 export function orderTiles(d: CustomerDetail, now: Date): Tile[] {
     const rows = d.orders?.rows ?? [];
@@ -285,36 +323,36 @@ export function orderTiles(d: CustomerDetail, now: Date): Tile[] {
             opens: open.length ? "open" : "all",
         },
     ];
-    const first = rows.map((o) => o.placedAt).sort()[0];
     if (d.money && d.stats.spent) {
         const owed = d.stats.owed?.totals ?? [];
         tiles.push({
             label: "Spent",
             value: totals(d.stats.spent),
+            // Net of refunds and credit notes (C14); an order's delivery is
+            // part of what they paid.
             note: owed.length
                 ? `${totals(owed)} still owed`
-                : first
-                  ? `Since ${monthText(first, tz)}`
-                  : "",
+                : "Including delivery",
             opens: null,
         });
-        const paid = rows.filter(
-            (o) =>
-                o.paymentStatus === "PAID" &&
-                o.total !== undefined &&
-                o.currency !== undefined,
-        );
-        const currency = paid[0]?.currency;
-        const same = paid.filter((o) => o.currency === currency);
-        if (currency && same.length) {
-            const sum = same.reduce((n, o) => n + Number(o.total), 0);
-            tiles.push({
-                label: "Average order",
-                value: money(String(Math.round(sum / same.length)), currency),
-                note: `Across ${same.length} ${same.length === 1 ? "order" : "orders"}`,
-                opens: null,
-            });
-        }
+    }
+    // An API before C13 sent no totals without a money read.
+    const paid = rows.filter(
+        (o) =>
+            o.paymentStatus === "PAID" &&
+            o.total !== undefined &&
+            o.currency !== undefined,
+    );
+    const currency = paid[0]?.currency;
+    const same = paid.filter((o) => o.currency === currency);
+    if (currency && same.length) {
+        const sum = same.reduce((n, o) => n + Number(o.total), 0);
+        tiles.push({
+            label: "Average order",
+            value: money(String(Math.round(sum / same.length)), currency),
+            note: `Across ${same.length} ${same.length === 1 ? "order" : "orders"}`,
+            opens: null,
+        });
     }
     const last = rows.at(0);
     if (last) {
@@ -346,6 +384,8 @@ export function favourites(rows: DetailOrder[]): Favourite[] {
     for (const o of rows) {
         const seen = new Set<string>();
         for (const i of o.items) {
+            // A treatment's line (E9) bills a service, not a product.
+            if (!i.productId) continue;
             const f = byProduct.get(i.productId) ?? {
                 name: i.name,
                 orders: 0,
@@ -391,9 +431,16 @@ export function howTheyGet(rows: DetailOrder[]): string {
     return `Collects at ${where} — ${collected.length} of ${rows.length} orders. The rest were delivered.`;
 }
 
-/** Where their last delivery went. */
-export function deliveryAddress(rows: DetailOrder[]): string {
+/**
+ * Their delivery address: the one kept on their record (C8, as one line),
+ * else where their last delivery went.
+ */
+export function deliveryAddress(
+    rows: DetailOrder[],
+    kept: string | null = null,
+): string {
     return (
+        kept ??
         rows.find((o) => o.delivery)?.delivery ??
         "No address — they have only collected."
     );
@@ -526,6 +573,8 @@ export const BOOKINGS_EMPTY: Record<BookingFilter, string> = {
 
 export interface CreditLine {
     name: string;
+    /** Its Pack Detail (C7). */
+    href: string;
     left: string;
     pct: number;
     bar: "ok" | "accent" | "off";
@@ -564,6 +613,7 @@ export function packLines(
             }`;
             return {
                 name: `${p.pack.name} pack`,
+                href: packHref(p.pack.id),
                 left: expired ? "Ended" : `${p.left} of ${p.credits}`,
                 pct: Math.round((100 * p.left) / Math.max(1, p.credits)),
                 bar: expired ? "off" : soon ? "accent" : "ok",

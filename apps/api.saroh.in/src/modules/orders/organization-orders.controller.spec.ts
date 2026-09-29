@@ -15,8 +15,11 @@ import { ForbiddenException } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import type { OrderCancelService } from "./order-cancel.service";
+import type { OrderFulfilmentChangeService } from "./order-fulfilment-change.service";
 import type { OrderKitchenService } from "./order-kitchen.service";
 import type { OrderPayLinkService } from "./order-pay-link.service";
+import type { OrderStageBatchService } from "./order-stage-batch.service";
 import type { OrdersService } from "./orders.service";
 import { OrganizationOrdersController } from "./organization-orders.controller";
 
@@ -37,14 +40,27 @@ describe("OrganizationOrdersController", () => {
         .fn()
         .mockResolvedValue({ types: [], steps: [], product: null });
     const searchProducts = jest.fn().mockResolvedValue({ products: [] });
+    const readOrder = jest.fn();
+    const changeFulfilment = jest.fn().mockResolvedValue({ id: "ord_1" });
+    const cancelOrder = jest.fn().mockResolvedValue({ id: "ord_1" });
+    const batches = {
+        create: jest.fn().mockResolvedValue({ id: "b1" }),
+        get: jest.fn().mockResolvedValue({ id: "b1" }),
+        commit: jest.fn().mockResolvedValue({ id: "b1" }),
+        cancel: jest.fn().mockResolvedValue({ id: "b1" }),
+        undo: jest.fn().mockResolvedValue({ id: "b1" }),
+    };
     const controller = new OrganizationOrdersController(
         {
             listRows,
             filterOptions,
             searchProducts,
         } as unknown as OrdersService,
-        {} as unknown as OrderKitchenService,
+        { read: readOrder } as unknown as OrderKitchenService,
         {} as unknown as OrderPayLinkService,
+        { change: changeFulfilment } as unknown as OrderFulfilmentChangeService,
+        { cancel: cancelOrder } as unknown as OrderCancelService,
+        batches as unknown as OrderStageBatchService,
     );
 
     const as = (
@@ -73,7 +89,11 @@ describe("OrganizationOrdersController", () => {
         expect(listRows).toHaveBeenCalledWith(
             "org_1",
             {},
-            { money: false, contact: true },
+            expect.objectContaining({
+                money: false,
+                contact: true,
+                viewer: expect.anything(),
+            }),
         );
     });
 
@@ -84,7 +104,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 {},
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         },
     );
@@ -104,6 +128,47 @@ describe("OrganizationOrdersController", () => {
         expect(() => controller.list(tidier)).toThrow(ForbiddenException);
     });
 
+    describe("Export (B16): order:export", () => {
+        const custom = (actions: string[]) =>
+            as("MEMBER", {
+                roleKey: "custom",
+                actions: resolveCapabilities("custom", actions),
+            });
+
+        it("refuses an export page to a role that only reads orders", () => {
+            expect(() =>
+                controller.list(custom(["order:read"]), { export: "true" }),
+            ).toThrow(ForbiddenException);
+            expect(listRows).not.toHaveBeenCalled();
+        });
+
+        it("still lists for that role without the export flag", async () => {
+            await controller.list(custom(["order:read"]));
+            expect(listRows).toHaveBeenCalled();
+        });
+
+        it("answers an export page to order:export, or a role saved with order:write", async () => {
+            for (const actions of [["order:export"], ["order:write"]]) {
+                listRows.mockClear();
+                await controller.list(custom(actions), { export: "true" });
+                // The flag is the export's own, never a filter.
+                expect(listRows).toHaveBeenCalledWith(
+                    "org_1",
+                    {},
+                    expect.objectContaining({ money: true }),
+                );
+            }
+        });
+
+        it("lets an Owner export; refuses the kitchen's Member", async () => {
+            await controller.list(as("OWNER"), { export: "true" });
+            expect(listRows).toHaveBeenCalled();
+            expect(() =>
+                controller.list(as("MEMBER"), { export: "true" }),
+            ).toThrow(ForbiddenException);
+        });
+    });
+
     describe("rows, counts and a cursor (plan B, B1)", () => {
         it("answers the paged rows without v=2 too: the bare array is gone (B2d)", async () => {
             const page = await controller.list(as("OWNER"), {
@@ -118,7 +183,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { storeId: "s1", q: "x" },
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -127,7 +196,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { storeId: "s1" },
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -141,7 +214,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { tab: "open", late: true, stage: ["READY"] },
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -150,7 +227,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { late: false },
-                { money: false, contact: true },
+                expect.objectContaining({
+                    money: false,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -163,7 +244,11 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { late: undefined },
-                { money: false, contact: false },
+                expect.objectContaining({
+                    money: false,
+                    contact: false,
+                    viewer: expect.anything(),
+                }),
             );
         });
 
@@ -183,7 +268,27 @@ describe("OrganizationOrdersController", () => {
             expect(listRows).toHaveBeenCalledWith(
                 "org_1",
                 { step: "handed-to-courier", date: "7d", late: undefined },
-                { money: true, contact: true },
+                expect.objectContaining({
+                    money: true,
+                    contact: true,
+                    viewer: expect.anything(),
+                }),
+            );
+        });
+
+        it("passes Needs attention through as a boolean, with the caller (B15)", async () => {
+            const ctx = as("MEMBER");
+            await controller.list(ctx, { v: "2", attention: "true" });
+            expect(listRows).toHaveBeenLastCalledWith(
+                "org_1",
+                expect.objectContaining({ attention: true }),
+                expect.objectContaining({ viewer: ctx }),
+            );
+            await controller.list(ctx, { v: "2", attention: "false" });
+            expect(listRows).toHaveBeenLastCalledWith(
+                "org_1",
+                expect.objectContaining({ attention: false }),
+                expect.anything(),
             );
         });
     });
@@ -216,6 +321,98 @@ describe("OrganizationOrdersController", () => {
             );
             expect(filterOptions).not.toHaveBeenCalled();
             expect(searchProducts).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("the quick view's read (B5)", () => {
+        const order = {
+            id: "o1",
+            customer: {
+                id: "c1",
+                name: "Asha Rao",
+                phone: "+91 98765 43210",
+                email: "asha@example.in",
+                contactId: null,
+                orderCount: 1,
+                firstOrderAt: null,
+            },
+        };
+
+        beforeEach(() => {
+            readOrder.mockReset();
+            readOrder.mockResolvedValue(order);
+        });
+
+        it("is Order Detail's read, whole, without ?view=quick", async () => {
+            const counter = as("MEMBER", {
+                roleKey: "counter",
+                actions: resolveCapabilities("counter", ["order:stage"]),
+            });
+            await expect(controller.read(counter, "o1")).resolves.toBe(order);
+            expect(readOrder).toHaveBeenCalledWith(counter, "o1");
+        });
+
+        it("keeps the customer's phone and email for a role that reads contacts", async () => {
+            const read = await controller.read(as("OWNER"), "o1", "quick");
+            expect(read.customer).toMatchObject({
+                phone: "+91 98765 43210",
+                email: "asha@example.in",
+            });
+        });
+
+        it("leaves them out for one that doesn't", async () => {
+            const counter = as("MEMBER", {
+                roleKey: "counter",
+                actions: resolveCapabilities("counter", ["order:stage"]),
+            });
+            const read = await controller.read(counter, "o1", "quick");
+            expect(read.customer?.phone).toBeNull();
+            expect(read.customer).not.toHaveProperty("email");
+        });
+    });
+
+    describe("B9: change how it's fulfilled, and cancel", () => {
+        it("hands the change to its service with the caller and the body", async () => {
+            const owner = as("OWNER");
+            const dto = {
+                fulfilment: "LOCAL_DELIVERY" as const,
+                shipping: "40",
+            };
+            await controller.changeFulfilment(owner, "o1", dto);
+            expect(changeFulfilment).toHaveBeenCalledWith(owner, "o1", dto);
+        });
+
+        it("hands the cancel to its service with the caller and the body", async () => {
+            const owner = as("OWNER");
+            const dto = { reason: "Late", idempotencyKey: "k1" };
+            await controller.cancel(owner, "o1", dto);
+            expect(cancelOrder).toHaveBeenCalledWith(owner, "o1", dto);
+        });
+    });
+
+    describe("B6: bulk kitchen moves", () => {
+        it("hands each batch route to its service with the caller", async () => {
+            const member = as("MEMBER");
+            const dto = {
+                batchId: "0f8fad5b-d9cb-469f-a165-70867728950e",
+                lines: [
+                    {
+                        orderId: "o1",
+                        from: "PREPARING" as const,
+                        to: "READY" as const,
+                    },
+                ],
+            };
+            await controller.createBatch(member, dto);
+            expect(batches.create).toHaveBeenCalledWith(member, dto);
+            await controller.readBatch(member, "b1");
+            expect(batches.get).toHaveBeenCalledWith(member, "b1");
+            await controller.commitBatch(member, "b1");
+            expect(batches.commit).toHaveBeenCalledWith(member, "b1");
+            await controller.cancelBatch(member, "b1");
+            expect(batches.cancel).toHaveBeenCalledWith(member, "b1");
+            await controller.undoBatch(member, "b1");
+            expect(batches.undo).toHaveBeenCalledWith(member, "b1");
         });
     });
 });

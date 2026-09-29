@@ -10,8 +10,12 @@ import {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    DeleteDraftQueryDto,
+    DraftRevisionDto,
     ListPlanEventsQueryDto,
+    ListPlansQueryDto,
     PauseSubscriptionDto,
+    PlanDraftDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
@@ -197,5 +201,53 @@ describe("what a page of a plan's history accepts (D2)", () => {
                 "limit",
             );
         }
+    });
+});
+
+describe("what the Plan Editor's draft routes accept (D5)", () => {
+    it("an autosave takes the plan's fields with the revision it holds", async () => {
+        expect(
+            await refused(PlanDraftDto, { price: "1500", revision: 4 }),
+        ).toEqual([]);
+    });
+
+    it("an autosave without a revision is refused", async () => {
+        expect(await refused(PlanDraftDto, { price: "1500" })).toContain(
+            "revision",
+        );
+    });
+
+    it("an autosave still checks each field", async () => {
+        expect(
+            await refused(PlanDraftDto, { classesPerMonth: 61, revision: 0 }),
+        ).toContain("classesPerMonth");
+    });
+
+    it.each([undefined, -1, 1.5, "4"])(
+        "publish and discard refuse a revision of %p",
+        async (revision) => {
+            expect(await refused(DraftRevisionDto, { revision })).toContain(
+                "revision",
+            );
+        },
+    );
+
+    it("deleting a draft reads its revision from the query string", async () => {
+        expect(await refused(DeleteDraftQueryDto, { revision: "3" })).toEqual(
+            [],
+        );
+        expect(await refused(DeleteDraftQueryDto, {})).toContain("revision");
+    });
+
+    it("the staff list filters to drafts, or includes them", async () => {
+        expect(await refused(ListPlansQueryDto, { status: "DRAFT" })).toEqual(
+            [],
+        );
+        expect(await refused(ListPlansQueryDto, { include: "drafts" })).toEqual(
+            [],
+        );
+        expect(await refused(ListPlansQueryDto, { include: "all" })).toContain(
+            "include",
+        );
     });
 });

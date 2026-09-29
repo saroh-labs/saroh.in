@@ -44,8 +44,15 @@ export default async function ServiceEditorPage({
         );
     }
     const service = read.service;
-    const { services, staff, hasPage, canEdit, timezone, currency } =
-        context.context;
+    const {
+        services,
+        staff,
+        hasPage,
+        hasStorefront,
+        canEdit,
+        timezone,
+        currency,
+    } = context.context;
     const usage = await readServiceUsage([service.id], timezone);
 
     return (
@@ -61,6 +68,7 @@ export default async function ServiceEditorPage({
             canEdit={canEdit}
             kindUp={showKind(services, service)}
             hasPage={hasPage}
+            hasStorefront={hasStorefront}
         />
     );
 }

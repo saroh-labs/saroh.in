@@ -58,4 +58,9 @@ export interface SiteEditorProps {
     styleOptions: SiteStyleOptions;
     /** Where this site lives, shown in the bar. Null before a subdomain exists. */
     address?: string | null;
+    /**
+     * Whether the shop is open for the business (G11–G13, `SITE_SHOP`):
+     * only then are blocks that sell, the Product grid (G12), offered.
+     */
+    shopOpen?: boolean;
 }

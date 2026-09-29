@@ -30,7 +30,8 @@ export interface RedeemableDiscount extends DiscountWindow {
 }
 
 export interface OrderLineView {
-    productId: string;
+    /** Null on a service line (E9): no product-scoped code reaches it. */
+    productId: string | null;
     categoryId: string | null;
     unitCents: number;
     quantity: number;
@@ -100,7 +101,10 @@ export function redeem(
                     discount.categoryIds.includes(line.categoryId)
                 );
             case "PRODUCT":
-                return discount.productIds.includes(line.productId);
+                return (
+                    line.productId !== null &&
+                    discount.productIds.includes(line.productId)
+                );
         }
     });
     if (eligible.length === 0) return { ok: false, reason: "NO_MATCH" };

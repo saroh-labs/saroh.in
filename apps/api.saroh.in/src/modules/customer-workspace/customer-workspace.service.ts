@@ -5,7 +5,9 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction } from "../audit/audit.service";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
-import { allows, authorize } from "../organizations/organization-policy";
+import { realOrderWhere } from "../orders/open-orders";
+import { allows } from "../organizations/organization-policy";
+import { requireCustomerPower } from "./customer-access";
 import type { MatchedOn } from "./duplicates";
 import { duplicatesOf, storeCustomerMatches } from "./duplicates";
 import {
@@ -50,7 +52,7 @@ export interface ContactDuplicateSuggestion {
 export type Suggestion = IdentitySuggestion | ContactDuplicateSuggestion;
 
 export type TimelineEventType =
-    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "MERGE";
+    "LEAD" | "BOOKING" | "ORDER" | "MESSAGE" | "LINK" | "MERGE" | "DETAILS";
 
 export interface TimelineEvent {
     type: TimelineEventType;
@@ -65,6 +67,7 @@ const LINK_TITLES: Record<CustomerLinkReason, string> = {
     BACKFILL: "Linked when the list was set up",
     PAYMENT: "Linked when they paid",
     SITE_ACCOUNT: "Linked when they signed in on your website",
+    BOOKING: "Linked when they booked a treatment",
 };
 
 @Injectable()
@@ -86,7 +89,7 @@ export class CustomerWorkspaceService {
         contactId: string,
         opts: { includeContacts?: boolean } = {},
     ): Promise<Suggestion[]> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         const me = (
             await loadContactIdentities(this.db, ctx.organizationId, [
                 contactId,
@@ -140,7 +143,7 @@ export class CustomerWorkspaceService {
         contactId: string,
         customerId: string,
     ): Promise<void> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         await this.requireContact(ctx, contactId);
         await this.requireCustomer(ctx, customerId);
 
@@ -172,7 +175,7 @@ export class CustomerWorkspaceService {
 
     /** Reverse a link (records are untouched). */
     async unlink(ctx: OrganizationContext, linkId: string): Promise<void> {
-        authorize(ctx, "contact:write");
+        requireCustomerPower(ctx, "contact:write");
         await this.db.$transaction(async (tx) => {
             const deleted = await tx.customerIdentityLink.deleteMany({
                 where: { id: linkId, organizationId: ctx.organizationId },
@@ -201,7 +204,7 @@ export class CustomerWorkspaceService {
         ctx: OrganizationContext,
         customerId: string,
     ): Promise<{ contactId: string | null }> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         const link = await this.db.customerIdentityLink.findFirst({
             where: { organizationId: ctx.organizationId, customerId },
             orderBy: { createdAt: "asc" },
@@ -215,7 +218,7 @@ export class CustomerWorkspaceService {
         ctx: OrganizationContext,
         contactId: string,
     ): Promise<{ events: TimelineEvent[] }> {
-        authorize(ctx, "contact:read");
+        requireCustomerPower(ctx, "contact:read");
         await this.requireContact(ctx, contactId);
 
         const views = await this.availability.listViews({
@@ -282,6 +285,8 @@ export class CustomerWorkspaceService {
                 where: {
                     customerId: { in: customerIds },
                     organizationId: ctx.organizationId,
+                    // Never an abandoned site checkout (B1).
+                    ...realOrderWhere(),
                 },
                 select: { createdAt: true, status: true },
                 take: 50,
@@ -310,25 +315,41 @@ export class CustomerWorkspaceService {
                 });
         }
 
-        // A merge into this person (C9): the audit row names them as the
-        // target. It is about the person, not a module, so it always shows.
-        const merges = await this.db.auditEvent.findMany({
+        // A merge into this person (C9), or staff editing their details
+        // (C8): the audit row names them as the target. It is about the
+        // person, not a module, so it always shows.
+        const personal = await this.db.auditEvent.findMany({
             where: {
                 organizationId: ctx.organizationId,
-                action: AuditAction.CustomerMerged,
+                action: {
+                    in: [
+                        AuditAction.CustomerMerged,
+                        AuditAction.CustomerDetailsChanged,
+                    ],
+                },
                 targetType: "contact",
                 targetId: contactId,
             },
-            select: { createdAt: true },
+            select: { action: true, createdAt: true },
+            orderBy: { createdAt: "desc" },
             take: 50,
         });
-        for (const merge of merges)
-            events.push({
-                type: "MERGE",
-                at: merge.createdAt.toISOString(),
-                title: "Merged with a duplicate",
-                moduleKey: "CRM",
-            });
+        for (const row of personal)
+            events.push(
+                row.action === AuditAction.CustomerMerged
+                    ? {
+                          type: "MERGE",
+                          at: row.createdAt.toISOString(),
+                          title: "Merged with a duplicate",
+                          moduleKey: "CRM",
+                      }
+                    : {
+                          type: "DETAILS",
+                          at: row.createdAt.toISOString(),
+                          title: "Details changed",
+                          moduleKey: "CRM",
+                      },
+            );
 
         events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
         return { events };

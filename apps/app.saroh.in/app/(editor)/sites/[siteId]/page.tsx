@@ -141,6 +141,9 @@ export default async function SiteEditorPage({
             initialStyle={site.style}
             styleOptions={site.styleOptions}
             address={site.subdomain ? `${site.subdomain}.${ROOT_DOMAIN}` : null}
+            // The API sends where the site sells from only while the shop is
+            // open for the business; only then is a Product grid offered.
+            shopOpen={site.sellsFrom != null}
         />
     );
 }

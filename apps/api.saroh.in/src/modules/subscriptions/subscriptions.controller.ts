@@ -3,6 +3,7 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     Param,
     Patch,
@@ -20,18 +21,23 @@ import {
     IgnoreModuleReadiness,
     RequireModule,
 } from "../capabilities/require-module.decorator";
+import { payLinkUrl } from "../invoices/pay-link-url";
 import {
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
+    DeleteDraftQueryDto,
+    DraftRevisionDto,
     ListPlanEventsQueryDto,
     ListPlansQueryDto,
     ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
     PauseSubscriptionDto,
+    PlanDraftDto,
     PlanInputDto,
     SkipCollectionDto,
     SubscribeDto,
+    SubscriptionSettingsDto,
 } from "./dto";
 import { SubscriptionsService } from "./subscriptions.service";
 
@@ -76,6 +82,74 @@ export class SubscriptionPlansController {
         return this.subscriptions.createPlan(ctx, dto);
     }
 
+    // — The Plan Editor's drafts (D5) ——————————————————————————————
+    // Each write answers with the plan as the editor reads it; a stale
+    // `revision` is a 409 naming who saved since, and writes nothing.
+
+    /** The editor's first save of a new plan, which makes it a DRAFT. */
+    @Post("drafts")
+    @HttpCode(201)
+    createDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: PlanInputDto,
+    ) {
+        return this.subscriptions.createPlanDraft(ctx, dto);
+    }
+
+    /** The plan as the editor reads it, with its draft revision. */
+    @Get(":planId/draft")
+    getDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+    ) {
+        return this.subscriptions.getPlanEditor(ctx, id);
+    }
+
+    /** Autosave: a draft's fields, or a live plan's unpublished changes. */
+    @Patch(":planId/draft")
+    saveDraft(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Body() dto: PlanDraftDto,
+    ) {
+        return this.subscriptions.savePlanDraft(ctx, id, dto);
+    }
+
+    @Post(":planId/publish")
+    @HttpCode(200)
+    publish(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Body() dto: DraftRevisionDto,
+    ) {
+        return this.subscriptions.publishPlan(ctx, id, dto.revision);
+    }
+
+    @Post(":planId/discard")
+    @HttpCode(200)
+    discard(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Body() dto: DraftRevisionDto,
+    ) {
+        return this.subscriptions.discardPlanChanges(ctx, id, dto.revision);
+    }
+
+    /** Delete a draft nobody has bought; a published plan is archived. */
+    @Delete(":planId")
+    @HttpCode(204)
+    async remove(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Query() query: DeleteDraftQueryDto,
+    ): Promise<void> {
+        await this.subscriptions.deletePlanDraft(ctx, id, query.revision);
+    }
+
+    /**
+     * The old Plans form's whole-plan save, kept for one release while the
+     * app moves to the editor (D7); removed by follow-up Z6. Refuses a draft.
+     */
     @Patch(":planId")
     update(
         @OrgContext() ctx: OrganizationContext,
@@ -124,6 +198,20 @@ export class SubscriptionsController {
     @Get("renewals")
     renewals(@OrgContext() ctx: OrganizationContext) {
         return this.subscriptions.renewals(ctx);
+    }
+
+    /** "Members can pause from their account" (A8); before `:subscriptionId` too. */
+    @Get("settings")
+    settings(@OrgContext() ctx: OrganizationContext) {
+        return this.subscriptions.settings(ctx);
+    }
+
+    @Patch("settings")
+    updateSettings(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: SubscriptionSettingsDto,
+    ) {
+        return this.subscriptions.updateSettings(ctx, dto);
     }
 
     @Get(":subscriptionId")
@@ -246,14 +334,17 @@ export class SubscriptionsController {
 
     /**
      * Retry a failed charge: a new pay link for the overdue latest invoice,
-     * replacing the old one. Answers with the token, shown once.
+     * replacing the old one. Answers with the token and the link's address
+     * (Home's "Retry by pay link", F4), shown once.
      */
     @Post(":subscriptionId/retry")
     @HttpCode(200)
-    retry(
+    @Header("Cache-Control", "no-store")
+    async retry(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
     ) {
-        return this.subscriptions.retryPayment(ctx, id);
+        const link = await this.subscriptions.retryPayment(ctx, id);
+        return { ...link, url: payLinkUrl(link.token) };
     }
 }

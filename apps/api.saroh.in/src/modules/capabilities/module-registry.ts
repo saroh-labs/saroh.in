@@ -174,7 +174,7 @@ export const MODULES: readonly ModuleDescriptor[] = [
         // Appointments like Courses; a business that takes bookings need not
         // sell packs (round 2 E12, default 44). Reached with `pack:read`, the
         // read a role holds to see packs at all; writes and sales are refused
-        // per route (`pack:write`).
+        // per route (`pack:sell`, `pack:write`).
         key: "CLASS_PACKS",
         label: "Class packs",
         description:

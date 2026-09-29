@@ -1,64 +1,39 @@
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
+import { AddCustomerForm } from "@/components/customers/add-customer-form";
 import { PageContainer } from "@/components/shared/page-container";
-import { CustomerForm } from "@/components/stores/customer-form";
-import { newCustomerHref } from "@/lib/customers/links";
 import { requireSession } from "@/lib/session";
-import { pickStorefront } from "@/lib/stores/pick";
-import { listBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Add customer" };
 
 /**
- * Sell → Customers → Add customer. Someone who has not ordered yet — met at
- * the counter, or on the phone — added at one storefront.
+ * Sell → Customers → Add customer (DEC-056, C14). Someone who has not
+ * ordered yet — met at the counter, or on the phone — added to the business
+ * as a contact, not to one storefront, so no storefront is asked for. An old
+ * `?storefront=` link opens the same form.
  */
-export default async function NewCustomerPage({
-    searchParams,
-}: {
-    searchParams: Promise<{ storefront?: string }>;
-}) {
+export default async function NewCustomerPage() {
     await requireSession();
-    const [{ storefront }, stores] = await Promise.all([
-        searchParams,
-        listBusinessStores(),
-    ]);
-    const store = pickStorefront(stores, storefront);
 
     return (
         <PageContainer width="form">
-            {store ? (
-                <>
-                    <PageHeader
-                        breadcrumb={[
-                            "Sell",
-                            <Link
-                                key="customers"
-                                href="/commerce/customers"
-                                className="hover:text-foreground"
-                            >
-                                Customers
-                            </Link>,
-                            "Add customer",
-                        ]}
-                        title="Add customer"
-                        description={`Added at ${store.name}. An email is enough; the rest is whatever you know.`}
-                    />
-                    <CustomerForm storeId={store.id} />
-                </>
-            ) : (
-                <StorefrontChooser
-                    section="Customers"
-                    sectionHref="/commerce/customers"
-                    crumb="Add customer"
-                    title="Which storefront are they a customer of?"
-                    description="A customer is kept per storefront. The same person at another one is linked by their email."
-                    stores={stores}
-                    hrefFor={newCustomerHref}
-                />
-            )}
+            <PageHeader
+                breadcrumb={[
+                    "Sell",
+                    <Link
+                        key="customers"
+                        href="/commerce/customers"
+                        className="hover:text-foreground"
+                    >
+                        Customers
+                    </Link>,
+                    "Add customer",
+                ]}
+                title="Add customer"
+                description="An email is enough; the rest is whatever you know. They join your business, not one storefront, and show on Customers straight away."
+            />
+            <AddCustomerForm />
         </PageContainer>
     );
 }

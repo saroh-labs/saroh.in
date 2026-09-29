@@ -4,23 +4,17 @@ import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
-import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
 import type { OverviewReview } from "@/lib/products/overview-rules";
 
-const REPLY_MAX = 1000;
+import { REPLY_MAX, useReviewActions } from "./use-review-actions";
 
 /**
  * The latest reviews, each with what the merchant can do: reply once (shown
- * under the review on the shop), and hide or show. Hiding takes
- * an Undo rather than a confirm — it is reversible, and the review stays
- * listed here, marked.
+ * under the review on the shop), and hide or show (`useReviewActions`).
  */
 export function ReviewList({
     reviews,
@@ -31,58 +25,16 @@ export function ReviewList({
     canReply: boolean;
     storeId: string;
 }) {
-    const router = useRouter();
-    const [replyingTo, setReplyingTo] = useState<string | null>(null);
-    const [draft, setDraft] = useState("");
-    const [pending, startTransition] = useTransition();
-
-    function startReply(review: OverviewReview) {
-        setReplyingTo(review.id);
-        setDraft("");
-    }
-
-    function postReply(review: OverviewReview) {
-        const text = draft.trim();
-        if (!text) return;
-        startTransition(async () => {
-            const res = await replyToReview(review.id, text);
-            if (!res.ok) {
-                showError("Your reply wasn't posted. Try again.");
-                return;
-            }
-            showSuccess("Reply posted.");
-            setReplyingTo(null);
-            router.refresh();
-        });
-    }
-
-    function toggleHidden(review: OverviewReview) {
-        const hide = review.status !== "HIDDEN";
-        startTransition(async () => {
-            const res = await setReviewHidden(review.id, hide);
-            if (!res.ok) {
-                showError(
-                    hide
-                        ? "The review wasn't hidden. Try again."
-                        : "The review wasn't shown again. Try again.",
-                );
-                return;
-            }
-            router.refresh();
-            if (hide) {
-                showUndo(
-                    "Review hidden from the shop — it stays here, marked.",
-                    () => {
-                        void setReviewHidden(review.id, false).then(() =>
-                            router.refresh(),
-                        );
-                    },
-                );
-            } else {
-                showSuccess("Review shown on the shop again.");
-            }
-        });
-    }
+    const {
+        replyingTo,
+        draft,
+        setDraft,
+        pending,
+        startReply,
+        cancelReply,
+        postReply,
+        toggleHidden,
+    } = useReviewActions();
 
     return (
         <ul className="flex flex-col gap-2.5">
@@ -158,7 +110,7 @@ export function ReviewList({
                                     className="mt-[9px]"
                                     onSubmit={(e) => {
                                         e.preventDefault();
-                                        postReply(r);
+                                        postReply(r.id);
                                     }}
                                 >
                                     <Textarea
@@ -184,7 +136,7 @@ export function ReviewList({
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            onClick={() => setReplyingTo(null)}
+                                            onClick={cancelReply}
                                             disabled={pending}
                                             className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
                                         >
@@ -203,7 +155,7 @@ export function ReviewList({
                                     {r.reply ? null : (
                                         <button
                                             type="button"
-                                            onClick={() => startReply(r)}
+                                            onClick={() => startReply(r.id)}
                                             disabled={pending}
                                             className="text-[12.5px] font-semibold text-brand hover:text-foreground disabled:opacity-50 coarse:min-h-11"
                                         >
@@ -212,7 +164,9 @@ export function ReviewList({
                                     )}
                                     <button
                                         type="button"
-                                        onClick={() => toggleHidden(r)}
+                                        onClick={() =>
+                                            toggleHidden(r.id, r.status)
+                                        }
                                         disabled={pending}
                                         className="text-[12.5px] text-muted-foreground hover:text-foreground disabled:opacity-50 coarse:min-h-11"
                                     >

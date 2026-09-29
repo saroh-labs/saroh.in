@@ -30,3 +30,54 @@ describe("serializeOrderDetail", () => {
         expect(serializeOrderDetail(base).updatedAt).toBeNull();
     });
 });
+
+describe("serializeOrderDetail: what a line bills (E9)", () => {
+    const line = {
+        id: "li_1",
+        quantity: 1,
+        price: "12000.00",
+        variantId: null,
+        variant: null,
+    };
+
+    it("names a product line from its product", () => {
+        const [item] = serializeOrderDetail({
+            ...base,
+            items: [
+                {
+                    ...line,
+                    productId: "p_1",
+                    product: { name: "Sourdough" },
+                },
+            ],
+        }).items;
+        expect(item).toMatchObject({
+            productId: "p_1",
+            serviceId: null,
+            kind: "product",
+            name: "Sourdough",
+        });
+    });
+
+    it("names a treatment's line from its service, with no product", () => {
+        const [item] = serializeOrderDetail({
+            ...base,
+            items: [
+                {
+                    ...line,
+                    productId: null,
+                    product: null,
+                    serviceId: "svc_rct",
+                    service: { name: "Root canal treatment" },
+                },
+            ],
+        }).items;
+        expect(item).toMatchObject({
+            productId: null,
+            serviceId: "svc_rct",
+            kind: "service",
+            name: "Root canal treatment",
+            price: "12000.00",
+        });
+    });
+});
