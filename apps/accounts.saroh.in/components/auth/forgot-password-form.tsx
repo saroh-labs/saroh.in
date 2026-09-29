@@ -77,7 +77,7 @@ export function ForgotPasswordForm() {
                 Remembered it?{" "}
                 <Link
                     href="/login"
-                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
                     Log in
                 </Link>

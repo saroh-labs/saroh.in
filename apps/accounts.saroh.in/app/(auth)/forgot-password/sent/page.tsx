@@ -45,7 +45,7 @@ export default async function ResetLinkSentPage({
                 Nothing arrived? Check spam, or{" "}
                 <Link
                     href="/forgot-password"
-                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
                     ask again
                 </Link>
@@ -54,7 +54,7 @@ export default async function ResetLinkSentPage({
             <p className="sa-rise text-muted-foreground mt-5 text-[12.5px]">
                 <Link
                     href="/login"
-                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
                     Back to log in
                 </Link>
