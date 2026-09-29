@@ -71,6 +71,7 @@ import {
     phoneProblem,
 } from "@/lib/organizations/business-phone";
 import {
+    BUSINESS_TYPE_ANCHOR,
     BUSINESS_TYPE_OPTIONS,
     BUSINESS_TYPE_VALUES,
     businessTypeLabel,
@@ -897,7 +898,16 @@ export function OrganizationSettingsForm({
                     control={form.control}
                     name="type"
                     render={({ field }) => (
-                        <FormItem {...at("220px")}>
+                        // The go-live checklist's "Choose your business
+                        // type" lands here (`#business-type`).
+                        <FormItem
+                            {...at("220px")}
+                            id={BUSINESS_TYPE_ANCHOR}
+                            className={cn(
+                                at("220px").className,
+                                "scroll-mt-24",
+                            )}
+                        >
                             <FormLabel>Type</FormLabel>
                             <FormControl>
                                 <OptionSelect
