@@ -771,3 +771,19 @@ branch history. Internal material — prices, plan limits, anything the user
 calls internal — lives outside the repo (the user names where). Before a
 push, read the file list of what is going up.
 **Category**: repo · `AGENTS.md` → Rules that bite
+
+## E2E — 23 local browser failures, none of them a bug (prepush --e2e)
+
+**Problem**: `pnpm prepush --e2e` on batch 2026-09-29-2 failed 23 specs on
+`desk` and `phone`; CI would have passed 21 of them.
+**Root cause**: The stack ran against the long-lived local `saroh-dev`,
+not a fresh seed: Kavi Dental (E29) was never seeded there, a Northwind
+fixture variant was sold out after days of spec runs, the E12
+`MODULE_CLASS_PACKS` row and the C1 Needs attention backfill had never run.
+Two were real test problems (one assumed Z2a's removed allergen picker; a
+walk-in helper read the radios before they drew — `9a372faa`).
+**Fix**: Browser specs run against a database seeded the way CI seeds it —
+`pnpm prepush --e2e` must point the stack at a fresh `saroh-test-e2e`
+(`db:push --force-reset`, `db:seed:showcase`) before it runs. A failure
+against `saroh-dev` is a data question before it is a code question.
+**Category**: e2e · local dev · `scripts/prepush.sh`
