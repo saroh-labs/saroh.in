@@ -32,6 +32,7 @@ import {
     NO_SENSITIVE_NOTE,
     pickKind,
     picksAllergen,
+    sensitiveTickText,
     setAsideText,
     SUGGESTION_KINDS,
     SUGGESTION_LABEL_MAX,
@@ -70,7 +71,8 @@ export function AttentionSuggestions({
     contactId,
     suggestions,
     choices,
-    firstName,
+    name,
+    sensitiveRoles = null,
     timeZone,
     now,
     canSensitive = true,
@@ -79,7 +81,10 @@ export function AttentionSuggestions({
     suggestions: AttentionEntry[];
     /** The business's allergens, one per name; empty when it keeps none. */
     choices: Choice[];
-    firstName: string | null;
+    /** Their full name, as the design writes it (DEC-073). */
+    name: string | null;
+    /** Who can read a sensitive note, by role; null when not read. */
+    sensitiveRoles?: string[] | null;
     timeZone: string;
     now: Date;
     /** `customer:sensitive`: may mark a note sensitive (C13). */
@@ -148,9 +153,10 @@ export function AttentionSuggestions({
                     contactId={contactId}
                     entry={s}
                     choices={choices}
-                    when={suggestionWhen(firstName, s, timeZone, now)}
+                    when={suggestionWhen(name, s, timeZone, now)}
                     onSetAside={() => setAside(s)}
                     canSensitive={canSensitive}
+                    sensitiveRoles={sensitiveRoles}
                 />
             ))}
         </section>
@@ -165,6 +171,7 @@ function SuggestionCard({
     when,
     onSetAside,
     canSensitive,
+    sensitiveRoles,
 }: {
     contactId: string;
     entry: AttentionEntry;
@@ -172,6 +179,7 @@ function SuggestionCard({
     when: string;
     onSetAside: () => void;
     canSensitive: boolean;
+    sensitiveRoles: string[] | null;
 }) {
     const router = useRouter();
     const id = useId();
@@ -358,8 +366,7 @@ function SuggestionCard({
                             })
                         }
                     />
-                    Sensitive — only people who can see sensitive notes can read
-                    it
+                    {sensitiveTickText(sensitiveRoles)}
                 </label>
             ) : (
                 <p className="text-[12.5px] text-muted-foreground">

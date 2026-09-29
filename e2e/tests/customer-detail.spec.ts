@@ -424,6 +424,18 @@ test.describe("needs attention", () => {
         ).toBeVisible();
         await expect(nameRow(page).getByText("Allergy: Latex")).toBeVisible();
         await expect(page.getByRole("main")).not.toContainText("you can't see");
+
+        // His booking-page note (C12), as the design writes it (DEC-073):
+        // by his full name, and the tick names who can read it.
+        const notes = page.getByRole("region", {
+            name: /from the booking page/,
+        });
+        await expect(notes).toContainText(
+            /Rahul \S+ wrote this when booking online/,
+        );
+        await expect(notes).toContainText(
+            /only people who can see sensitive notes \([^)]*Owner[^)]*\) can read it/,
+        );
     });
 });
 
