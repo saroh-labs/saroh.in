@@ -209,21 +209,21 @@ test.describe("customer detail", () => {
         ).toBeVisible();
     });
 
-    test("a note with an allergy, deleted, brought back, deleted", async ({
+    test("a note is text only; deleted, brought back, deleted (Z2a)", async ({
         page,
     }) => {
         await signIn(page, RYE);
         await page.goto(`/customers/${PRIYA}?tab=notes`);
         const text = `E2E note ${Date.now()}`;
         await page.getByLabel("New note").fill(text);
-        await page
-            .getByRole("group", { name: "Allergy" })
-            .getByRole("button", { name: "Mustard" })
-            .click();
+        // Allergies live on Needs attention, not on a note (Z2a).
+        await expect(page.getByRole("group", { name: "Allergy" })).toHaveCount(
+            0,
+        );
         await page.getByRole("button", { name: "Add note" }).click();
         const note = page.getByRole("article").filter({ hasText: text });
         await expect(note).toBeVisible();
-        await expect(note).toContainText("Allergy: Mustard");
+        await expect(note).not.toContainText("Allergy:");
 
         await note.getByRole("button", { name: "Delete" }).click();
         await expect(page.getByText(text)).toHaveCount(0);

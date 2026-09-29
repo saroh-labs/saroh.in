@@ -72,7 +72,12 @@ const NW: Storefront = { organizationId: "seed_org", storeId: "seed_store" };
 
 /** Pick-up where the storefront offers it; else its first way, addressed. */
 async function leaves(sheet: Locator) {
-    const pickUp = sheet.getByRole("radio", { name: "Pick-up" });
+    // The choices draw once the lines are priced: wait for them before
+    // counting, or a slow quote reads as "no Pick-up" and takes the
+    // delivery branch.
+    const ways = sheet.getByRole("radiogroup", { name: "How it leaves" });
+    await expect(ways.getByRole("radio").first()).toBeVisible();
+    const pickUp = ways.getByRole("radio", { name: "Pick-up" });
     if (await pickUp.count()) {
         await pickUp.click();
         return;
