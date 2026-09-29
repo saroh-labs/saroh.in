@@ -355,7 +355,10 @@ test.describe("the Plan Editor (D7)", () => {
         ).toBeVisible();
         await expect(page).toHaveURL(/\/billing\/plans\/[^/]+\/edit$/);
         await expect(
-            page.getByRole("button", { name: "Publish" }).first(),
+            page
+                .getByRole("button", { name: "Publish" })
+                .filter({ visible: true })
+                .first(),
         ).toBeDisabled();
 
         await page.getByRole("textbox", { name: /^Price/ }).fill("999");
@@ -364,7 +367,11 @@ test.describe("the Plan Editor (D7)", () => {
         ).toBeVisible();
         const editAddress = page.url();
         try {
-            await page.getByRole("button", { name: "Publish" }).first().click();
+            await page
+                .getByRole("button", { name: "Publish" })
+                .filter({ visible: true })
+                .first()
+                .click();
             await expect(
                 page.getByText(`${name} is open for sign-ups.`),
             ).toBeVisible();
@@ -379,6 +386,7 @@ test.describe("the Plan Editor (D7)", () => {
             ).toBeVisible();
             await page
                 .getByRole("button", { name: "Publish changes" })
+                .filter({ visible: true })
                 .first()
                 .click();
             await expect(page.getByText("Changes published.")).toBeVisible();
@@ -387,6 +395,7 @@ test.describe("the Plan Editor (D7)", () => {
             await expect(page.getByText("Changes not live")).toBeVisible();
             await page
                 .getByRole("button", { name: "Discard changes" })
+                .filter({ visible: true })
                 .first()
                 .click();
             await page
