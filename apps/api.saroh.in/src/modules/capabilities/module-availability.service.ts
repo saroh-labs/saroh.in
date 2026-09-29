@@ -27,7 +27,7 @@ import type {
     ModuleLifecycle,
     ModuleReadiness,
 } from "./module-registry";
-import { MODULE_BY_KEY, MODULE_KEYS } from "./module-registry";
+import { MODULE_BY_KEY, MODULE_KEYS, moduleRolledOut } from "./module-registry";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
 /** A single reason a module is unavailable or not fully ready. */
@@ -124,8 +124,11 @@ export class ModuleAvailabilityService {
         const authorized = mayIn(input, descriptor.requiredAction);
         const canManage = mayIn(input, "module:manage");
 
-        const rolloutAllowed = await this.flags.isEnabled(
-            descriptor.rolloutFlag,
+        // A hidden module (DEC-068) reads as not rolled out, so the app's
+        // `rolledOut` hides it as it hides one whose flag is off.
+        const rolloutAllowed = await moduleRolledOut(
+            this.flags,
+            input.moduleKey,
             input.organizationId,
         );
 

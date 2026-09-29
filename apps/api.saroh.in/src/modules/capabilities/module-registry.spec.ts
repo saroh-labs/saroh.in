@@ -1,6 +1,7 @@
 import {
     MODULES,
     MODULE_KEYS,
+    moduleRolledOut,
     validateModuleRegistry,
     type ModuleDescriptor,
     type ModuleKey,
@@ -179,5 +180,39 @@ describe("Class packs (E12, default 44)", () => {
             dependencies: ["APPOINTMENTS"],
             rolloutFlag: "MODULE_CLASS_PACKS",
         });
+    });
+});
+
+describe("hidden modules (DEC-068)", () => {
+    const flagsOn = { isEnabled: jest.fn().mockResolvedValue(true) };
+    const flagsOff = { isEnabled: jest.fn().mockResolvedValue(false) };
+
+    it("Automations is the one module hidden until it has a screen", () => {
+        expect(MODULES.filter((m) => m.hidden).map((m) => m.key)).toEqual([
+            "AUTOMATIONS",
+        ]);
+    });
+
+    it("reads as not rolled out whatever its flag says", async () => {
+        await expect(
+            moduleRolledOut(flagsOn, "AUTOMATIONS", "org_1"),
+        ).resolves.toBe(false);
+        await expect(
+            moduleRolledOut(undefined, "AUTOMATIONS", "org_1"),
+        ).resolves.toBe(false);
+    });
+
+    it("leaves every other module to its rollout flag", async () => {
+        await expect(moduleRolledOut(flagsOn, "CRM", "org_1")).resolves.toBe(
+            true,
+        );
+        await expect(moduleRolledOut(flagsOff, "CRM", "org_1")).resolves.toBe(
+            false,
+        );
+        expect(flagsOff.isEnabled).toHaveBeenCalledWith("MODULE_CRM", "org_1");
+        // No flag reader (unit tests): rolled out.
+        await expect(moduleRolledOut(undefined, "CRM", "org_1")).resolves.toBe(
+            true,
+        );
     });
 });
