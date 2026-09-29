@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { startPayment } from "@/app/pay/[token]/actions";
+import { InvoiceAutopay } from "@/components/invoice-autopay";
 import { ProviderHandoff } from "@/components/provider-handoff";
 import type { CheckoutIntent } from "@/lib/checkout-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
@@ -20,6 +21,9 @@ import { payDate, payMoney, payTitle } from "@/lib/invoice-pay-shape";
  * the provider exactly as order checkout does; the page never claims a
  * payment went through — "Check again" re-reads the invoice, which only the
  * provider's webhook moves to paid.
+ *
+ * A plan's invoice, where the business's provider takes autopay, offers
+ * "Pay and turn on autopay" first (D12, `invoice-autopay.tsx`).
  *
  * Styled in the business's `--site-*` tokens, never Saroh's brand. Status is
  * an opaque fill with its own foreground, for the reason checkout gives: the
@@ -47,6 +51,12 @@ export function InvoicePay({
     const issued = payDate(invoice.issuedAt);
     const due = payDate(invoice.dueAt);
     const payable = invoice.status === "ISSUED" || invoice.status === "OVERDUE";
+    // Autopay for the invoice's plan (D12): offered, or on already.
+    const autopay =
+        invoice.autopay &&
+        (invoice.autopay.on || invoice.autopay.methods.length > 0)
+            ? invoice.autopay
+            : null;
 
     function pay() {
         setError(null);
@@ -160,6 +170,18 @@ export function InvoicePay({
                             intent={intent}
                             after="Once you've paid, use “Check again” to see this invoice marked paid."
                         />
+                    ) : autopay ? (
+                        // A plan's invoice with autopay offered (D12).
+                        <InvoiceAutopay
+                            token={token}
+                            autopay={autopay}
+                            businessName={invoice.businessName}
+                            billedTo={invoice.billedTo}
+                            total={money(invoice.total)}
+                            payable
+                            onJustPay={pay}
+                            justPayBusy={pending}
+                        />
                     ) : (
                         <button
                             type="button"
@@ -184,12 +206,27 @@ export function InvoicePay({
                     </button>
                 </div>
             ) : (
-                <div className="mt-6 rounded-xl border border-site-border bg-site-surface p-5 text-center">
-                    <p className="text-site-fg">
-                        {invoice.status === "PAID"
-                            ? `This invoice is paid. Thank you — there's nothing more to do.`
-                            : `This invoice is no longer payable. If you think that's a mistake, ask ${invoice.businessName}.`}
-                    </p>
+                <div className="mt-6 space-y-4">
+                    <div className="rounded-xl border border-site-border bg-site-surface p-5 text-center">
+                        <p className="text-site-fg">
+                            {invoice.status === "PAID"
+                                ? `This invoice is paid. Thank you — there's nothing more to do.`
+                                : `This invoice is no longer payable. If you think that's a mistake, ask ${invoice.businessName}.`}
+                        </p>
+                    </div>
+                    {invoice.status === "PAID" && autopay ? (
+                        // Paid, and the plan can still turn autopay on (D12).
+                        <InvoiceAutopay
+                            token={token}
+                            autopay={autopay}
+                            businessName={invoice.businessName}
+                            billedTo={invoice.billedTo}
+                            total={money(invoice.total)}
+                            payable={false}
+                            onJustPay={pay}
+                            justPayBusy={pending}
+                        />
+                    ) : null}
                 </div>
             )}
         </section>

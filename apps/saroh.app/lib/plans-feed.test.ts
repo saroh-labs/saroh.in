@@ -40,6 +40,8 @@ describe("the Plans block's plans on a served page (G9)", () => {
             plans: [PLAN],
             joinHref: "/contact",
             payOnline: true,
+            // An API from before D12 names no autopay methods: none.
+            autopayMethods: [],
         });
     });
 
@@ -47,7 +49,23 @@ describe("the Plans block's plans on a served page (G9)", () => {
         const feed = await plansFeed([{ type: "plans" }], null, () =>
             Promise.resolve({ plans: [], payOnline: false }),
         );
-        expect(feed).toEqual({ plans: [], joinHref: null, payOnline: false });
+        expect(feed).toEqual({
+            plans: [],
+            joinHref: null,
+            payOnline: false,
+            autopayMethods: [],
+        });
+    });
+
+    it("hands the join sheet the provider's autopay methods (D12)", async () => {
+        const feed = await plansFeed([{ type: "plans" }], "/contact", () =>
+            Promise.resolve({
+                plans: [PLAN],
+                payOnline: true,
+                autopayMethods: ["UPI", "CARD"],
+            }),
+        );
+        expect(feed?.autopayMethods).toEqual(["UPI", "CARD"]);
     });
 
     it("knows a Plans block when it sees one", () => {

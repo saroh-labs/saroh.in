@@ -61,6 +61,7 @@ export {
     joinHref,
     planEvery,
     planPrice,
+    plansAutopayMethods,
     plansOf,
     plansPayOnline,
 } from "./blocks/plans";
@@ -294,6 +295,38 @@ export type {
 } from "./prices/api";
 export { JoinSheet } from "./prices/join-sheet";
 export type { JoinSheetProps, JoinablePlan } from "./prices/join-sheet";
+// D12: the customer sets up autopay (the join, My plan, the pay link).
+export type { AutopayStartResult } from "./account/plan-api";
+export {
+    AUTOPAY_METHODS,
+    autopayMethodsOf,
+    autopayOutcomeOf,
+    autopayStartOf,
+    autopayStateOf,
+    isAutopayMethod,
+} from "./autopay/api";
+export type {
+    AutopayMethod,
+    AutopayOutcome,
+    AutopayStart,
+    AutopayState,
+} from "./autopay/api";
+export {
+    AutopayMethodChoice,
+    landOnBusinessSite,
+    openAutopayWindow,
+} from "./autopay/choice";
+export type { AutopayWindowOutcome } from "./autopay/choice";
+export { AutopayDone } from "./autopay/done";
+export type { AutopayDoneProps, AutopayDoneState } from "./autopay/done";
+export {
+    autopayMethodLabel,
+    autopayMethodSub,
+    autopayStateLine,
+    autopayWith,
+} from "./autopay/words";
+export { openProviderCheckout } from "./booking-flow/checkout";
+export { PayOption } from "./booking-flow/steps/pay-option";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";

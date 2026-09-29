@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { RenderedPlans } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import type { AutopayMethod } from "../autopay/api";
+import { autopayMethodsOf } from "../autopay/api";
 import { cn } from "../lib/utils";
 import type { PricesActions } from "../prices/api";
 import { PricesDone, useSignInFirst } from "../prices/flow";
@@ -37,7 +39,7 @@ import { askAboutHref } from "../shop/ask-about-ordering";
  * first. Otherwise it opens the site's enquiry form with the plan named:
  * "Ask about joining". A site with neither shows no button. No copy here
  * names a way to pay (DEC-059) or promises automatic renewals: autopay is
- * D12's.
+ * offered only in the join sheet, from the provider's own list (D12).
  *
  * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
  */
@@ -69,6 +71,11 @@ export interface PlansFeed {
      * can take the payment. Absent or false: "Ask about joining".
      */
     payOnline?: boolean;
+    /**
+     * Every way the business's provider can take autopay (D12), for the
+     * join sheet's "Pay with". Absent or empty: autopay isn't offered.
+     */
+    autopayMethods?: AutopayMethod[];
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -107,6 +114,13 @@ export function plansOf(body: unknown): PublicPlan[] | null {
 /** Whether a read says Join works (G20); an older API that doesn't say: no. */
 export function plansPayOnline(body: unknown): boolean {
     return (body as { payOnline?: unknown } | null)?.payOnline === true;
+}
+
+/** The autopay methods the plans read names (D12); none when it names none. */
+export function plansAutopayMethods(body: unknown): AutopayMethod[] {
+    return autopayMethodsOf(
+        (body as { autopayMethods?: unknown } | null)?.autopayMethods,
+    );
 }
 
 // Said the same way on the cards and in the join sheet (G20).
@@ -444,6 +458,7 @@ function PlanCards({
                             businessName={prices.businessName}
                             customer={flow.customer}
                             api={prices.join}
+                            autopayMethods={feed.autopayMethods ?? []}
                             onJoined={(message) => {
                                 setJoining(null);
                                 setDone(message);

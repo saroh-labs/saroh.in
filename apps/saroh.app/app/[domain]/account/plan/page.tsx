@@ -14,6 +14,7 @@ import {
     pausePlan,
     payPlanNow,
     resumePlan,
+    startPlanAutopay,
 } from "./actions";
 
 /**
@@ -61,6 +62,7 @@ export default async function AccountPlanPage({
                 resume: resumePlan,
                 cancel: cancelPlan,
                 payNow: payPlanNow,
+                startAutopay: startPlanAutopay,
             }}
             packs={
                 onSale

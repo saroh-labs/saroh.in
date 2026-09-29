@@ -3,6 +3,9 @@
 import type {
     AccountPackAttempt,
     AccountPackCheckout,
+    AutopayMethod,
+    AutopayStart,
+    AutopayStartResult,
     JoinResult,
     PackResult,
     PayNowResult,
@@ -17,6 +20,7 @@ import {
     packCheckoutAnswer,
 } from "@/lib/account-packs-shape";
 import { payNowAnswer, planChangeAnswer } from "@/lib/account-shape";
+import { AUTOPAY_METHOD, autopayStartAnswer } from "@/lib/autopay-shape";
 import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
 import { joinStandingAnswer, joinStartAnswer } from "@/lib/plan-join-shape";
@@ -162,13 +166,14 @@ const SIGNED_OUT: JoinResult<never> = {
 
 /**
  * Start paying to join a plan: the API makes the payment from the plan's
- * own price, and answers with the provider's handoff. Only the plan's ref
- * and the page's idempotency key travel on — never an amount, and no way
- * to pay (DEC-059; autopay is D12's).
+ * own price, and answers with the provider's handoff. Only the plan's ref,
+ * the page's idempotency key and, with autopay (D12), the method picked
+ * from the provider's own list travel on — never an amount (DEC-059).
  */
 export async function joinPlan(
     ref: string,
     idempotencyKey: string,
+    autopay?: AutopayMethod,
 ): Promise<JoinResult<PlanJoinStarted>> {
     if (!(await siteOrigin())) return OFFLINE_JOIN;
     if (!accountAreaOn()) return OFFLINE_JOIN;
@@ -176,9 +181,15 @@ export async function joinPlan(
     if (typeof idempotencyKey !== "string" || !KEY.test(idempotencyKey)) {
         return OFFLINE_JOIN;
     }
+    if (
+        autopay !== undefined &&
+        (typeof autopay !== "string" || !AUTOPAY_METHOD.test(autopay))
+    ) {
+        return OFFLINE_JOIN;
+    }
     const call = await accountFetch(`me/plans/${ref}/join`, {
         method: "POST",
-        body: { idempotencyKey },
+        body: autopay ? { idempotencyKey, autopay } : { idempotencyKey },
     });
     if (call === null) return SIGNED_OUT;
     if (!call.ok) return OFFLINE_JOIN;
@@ -202,4 +213,61 @@ export async function planJoinStanding(
         call.res.status,
         await call.res.json().catch(() => null),
     );
+}
+
+// ---- Autopay (D12) ----------------------------------------------------------
+
+/**
+ * Turn autopay on for a plan of theirs, or change how it pays: "Set up
+ * autopay" on My plan, and the join's eMandate step. Only the plan's ref,
+ * the method picked from the provider's own list and a key travel on; the
+ * API sets the amount and the limit, and finds the plan by the signed-in
+ * member, so a ref is only ever theirs.
+ */
+export async function startPlanAutopay(
+    ref: string,
+    method: AutopayMethod,
+    idempotencyKey: string,
+): Promise<AutopayStartResult> {
+    if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (!accountAreaOn()) return { ok: false, message: OFFLINE };
+    if (
+        typeof ref !== "string" ||
+        !REF.test(ref) ||
+        typeof method !== "string" ||
+        !AUTOPAY_METHOD.test(method) ||
+        typeof idempotencyKey !== "string" ||
+        !KEY.test(idempotencyKey)
+    ) {
+        return { ok: false, message: OFFLINE };
+    }
+    const call = await accountFetch(`me/autopay/plans/${ref}`, {
+        method: "POST",
+        body: { method, idempotencyKey },
+    });
+    if (call === null) {
+        return { ok: false, message: "Sign in again to set up autopay." };
+    }
+    if (!call.ok) return { ok: false, message: OFFLINE };
+    return autopayStartAnswer(
+        call.res.status,
+        await call.res.json().catch(() => null),
+    );
+}
+
+/** The join's eMandate step, in the join sheet's answer shape. */
+export async function joinStartAutopay(
+    subscriptionRef: string,
+    method: AutopayMethod,
+    idempotencyKey: string,
+): Promise<JoinResult<AutopayStart>> {
+    if (!(await siteOrigin())) return OFFLINE_JOIN;
+    const result = await startPlanAutopay(
+        subscriptionRef,
+        method,
+        idempotencyKey,
+    );
+    return result.ok
+        ? result
+        : { ok: false, reason: "error", message: result.message };
 }

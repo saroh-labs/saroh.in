@@ -1,3 +1,6 @@
+import type { AutopayMethod } from "@saroh/site-blocks";
+import { autopayMethodsOf, isAutopayMethod } from "@saroh/site-blocks";
+
 /**
  * The public invoice a pay link shows, and the checks that narrow it. Kept
  * apart from `invoice-pay.ts`, which reads the app's env, so they can be
@@ -33,6 +36,34 @@ export interface PayInvoice {
     billOfSupply?: boolean;
     /** `--site-*` variables for the business's theme, or null for defaults. */
     theme: Record<string, string> | null;
+    /**
+     * Autopay for the plan this invoice is for (D12): every method the
+     * business's provider offers, and whether it is on already. Absent or
+     * null: not a plan's invoice, or no autopay with this business.
+     */
+    autopay?: PayAutopay | null;
+}
+
+export interface PayAutopay {
+    plan: string;
+    methods: AutopayMethod[];
+    on: { method: AutopayMethod | null; hint: string | null } | null;
+}
+
+/** The invoice's autopay, checked; null when it has none or it is strange. */
+export function payAutopayOf(v: unknown): PayAutopay | null {
+    if (!isRecord(v) || !isString(v.plan)) return null;
+    const on = v.on;
+    return {
+        plan: v.plan,
+        methods: autopayMethodsOf(v.methods),
+        on: isRecord(on)
+            ? {
+                  method: isAutopayMethod(on.method) ? on.method : null,
+                  hint: isString(on.hint) ? on.hint : null,
+              }
+            : null,
+    };
 }
 
 /** What the page calls the paper: "Bill of supply" when it is one (D15). */
