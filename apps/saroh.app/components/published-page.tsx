@@ -1,4 +1,5 @@
 import type {
+    EnquiryThread,
     PacksFeed,
     PlansFeed,
     PricesActions,
@@ -10,6 +11,7 @@ import {
     requestSignInCode,
     verifySignInCode,
 } from "@/app/[domain]/account/actions";
+import { sendMessage } from "@/app/[domain]/account/messages/actions";
 import {
     buyPack,
     joinPlan,
@@ -51,7 +53,10 @@ export async function PublishedPage({
         getPacksFeed(page.sections, snapshot, siteId),
         getProductGridFeeds(page.sections, siteId),
     ]);
-    const prices = await pricesActions(snapshot.site.name, plans, packs);
+    const [prices, thread] = await Promise.all([
+        pricesActions(snapshot.site.name, plans, packs),
+        threadActions(snapshot.site.name, page.sections),
+    ]);
 
     return (
         <PageSections
@@ -63,9 +68,33 @@ export async function PublishedPage({
             plans={plans}
             packs={packs}
             prices={prices}
+            thread={thread}
             productGrids={productGrids}
         />
     );
+}
+
+/**
+ * The Contact page's form for a signed-in customer (A13): it writes to
+ * their thread with the business instead of starting an enquiry. Only on a
+ * page with a form, while the account area is on (SITE_ACCOUNT_AREA, the
+ * switch the account's Messages sit behind), and when someone is signed in;
+ * otherwise the form is the public enquiry, as before.
+ */
+async function threadActions(
+    businessName: string,
+    sections: PublicationPage["sections"],
+): Promise<EnquiryThread | null> {
+    if (!sections.some((s) => s.type === "enquiry")) return null;
+    if (!accountAreaOn()) return null;
+    const customer = await getSignedInCustomer().catch(() => null);
+    if (!customer) return null;
+    return {
+        businessName,
+        customer,
+        send: sendMessage,
+        messagesHref: "/account/messages",
+    };
 }
 
 /**

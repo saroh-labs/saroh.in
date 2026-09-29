@@ -20,6 +20,7 @@ import type {
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
+import type { EnquiryThread } from "./blocks/enquiry";
 import EnquirySection from "./blocks/enquiry";
 import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
@@ -75,6 +76,7 @@ export default function SectionRenderer({
     plans,
     packs,
     prices,
+    thread,
     productGrid,
 }: {
     section: Section;
@@ -116,6 +118,11 @@ export default function SectionRenderer({
      */
     prices?: PricesActions | null;
     /**
+     * A signed-in customer's thread (A13), handed in by the live site while
+     * the account area is on: the Contact page's form writes to it.
+     */
+    thread?: EnquiryThread | null;
+    /**
      * This section's products, read by the page that serves the site (G12),
      * for a Product grid. Undefined on the editor's canvas, where the block
      * reads them itself and says why when there are none.
@@ -151,6 +158,7 @@ export default function SectionRenderer({
                 <EnquirySection
                     content={section.content as RenderedEnquiry}
                     apiUrl={apiUrl}
+                    thread={thread}
                 />
             );
         case "features":
@@ -276,6 +284,7 @@ export function PageSections({
     plans,
     packs,
     prices,
+    thread,
     productGrids,
 }: {
     sections: Section[];
@@ -293,6 +302,8 @@ export function PageSections({
     packs?: PacksFeed;
     /** Join and Buy's actions on a live site (G20). */
     prices?: PricesActions | null;
+    /** A signed-in customer's thread, for the Contact page's form (A13). */
+    thread?: EnquiryThread | null;
     /**
      * Each Product grid's products (G12), by the section's index in
      * `sections`: every grid asks for its own.
@@ -313,6 +324,7 @@ export function PageSections({
                         plans={plans}
                         packs={packs}
                         prices={prices}
+                        thread={thread}
                         productGrid={productGrids?.[i]}
                     />
                 );

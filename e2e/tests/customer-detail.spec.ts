@@ -6,6 +6,7 @@ import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
+import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
  * Customer Detail (plan 2026-09-23-003, U18): one page per person, rooted on
@@ -553,5 +554,95 @@ test.describe("customer detail on a 375px phone", () => {
         ).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(more).toBeFocused();
+    });
+});
+
+/**
+ * Messages (round-2 A13): a customer signed in on Northwind's site writes
+ * from the Contact page's form, the team reads it on Customer Detail's
+ * Messages tab and replies, and the reply shows in the customer's account.
+ * The account area ships dark, so this runs only on a stack started with
+ * `SITE_ACCOUNT_AREA=on` in both the api and saroh.app. It makes a new
+ * customer (a new email and address) and changes only that customer.
+ */
+test.describe("customer detail: Messages (A13)", () => {
+    test.skip(
+        process.env.SITE_ACCOUNT_AREA !== "on",
+        "SITE_ACCOUNT_AREA is off on this stack",
+    );
+
+    test("the customer writes from the Contact page, the team replies, and the reply reaches their account", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const renderer = new URL(urls.RENDERER_URL);
+        const site = `${renderer.protocol}//northwind.${renderer.host}`;
+        const email = `a13-${testInfo.project.name}-${Date.now()}@example.in`;
+        const asked = `Do you have 40 pallets of shrink wrap? (${Date.now()})`;
+        const answer = `Yes — 40 are on the shelf. (${Date.now()})`;
+
+        // The customer, in a browser of their own, signed in on the site.
+        const customer = await browser.newContext({ ignoreHTTPSErrors });
+        const visitor = await customer.newPage();
+        await asNewVisitor(visitor);
+        await visitor.goto(`${site}/contact`);
+        await visitor
+            .getByRole("banner")
+            .getByRole("button", { name: "Sign in" })
+            .filter({ visible: true })
+            .click();
+        await signInOnSheet(visitor, email);
+
+        // Signed in, the Contact page's form asks only for the message.
+        await visitor.goto(`${site}/contact`);
+        await expect(
+            visitor.getByText(
+                `Signed in as ${email}. The reply comes to your Messages.`,
+            ),
+        ).toBeVisible();
+        await expect(visitor.getByLabel(/Your name/)).toHaveCount(0);
+        await visitor.getByLabel("What do you need?").fill(asked);
+        await visitor
+            .getByRole("button", { name: "Send enquiry" })
+            .filter({ visible: true })
+            .click();
+        await expect(visitor.getByRole("status")).toContainText(
+            /Sent\. .+ will reply in your Messages\./,
+        );
+
+        // The team: the customer found through the API by their email.
+        await signIn(page, NORTHWIND);
+        const found = await page.request.get(
+            `${urls.API_URL}/organizations/${NORTHWIND}/customers?q=${encodeURIComponent(email)}`,
+            { headers: { "x-organization-id": NORTHWIND } },
+        );
+        expect(found.ok()).toBe(true);
+        const { rows } = (await found.json()) as {
+            rows: { contactId: string }[];
+        };
+        expect(rows).toHaveLength(1);
+        await page.goto(`/customers/${rows[0]?.contactId ?? ""}?tab=msg`);
+        await expect(tab(page, /^Messages/)).toHaveAttribute(
+            "aria-selected",
+            "true",
+        );
+        await expect(
+            page.getByRole("list", { name: /^Messages with / }),
+        ).toContainText(asked);
+
+        const reply = page.getByRole("textbox", { name: /^Reply to / });
+        await reply.fill(answer);
+        await page.getByRole("button", { name: "Send reply" }).click();
+        await expect(
+            page.getByRole("list", { name: /^Messages with / }),
+        ).toContainText(answer, { timeout: 15_000 });
+
+        // The customer sees the reply in their account's Messages.
+        await visitor.goto(`${site}/account/messages`);
+        const thread = visitor.getByRole("list", { name: /^Messages with / });
+        await expect(thread).toContainText(asked);
+        await expect(thread).toContainText(answer);
+        await customer.close();
     });
 });
