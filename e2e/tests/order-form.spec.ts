@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/commerce/orders app:/commerce/orders/new api:orders api:products api:customers api:contacts api:stores
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

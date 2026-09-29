@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/sites site:/ site:/book api:sites pkg:site-blocks
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

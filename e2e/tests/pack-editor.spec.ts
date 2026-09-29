@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/class-packs app:/class-packs/new api:class-packs
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

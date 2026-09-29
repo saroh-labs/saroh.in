@@ -1,3 +1,4 @@
+// @covers accounts:/login site:/book api:bookings api:site-accounts api:payments pkg:site-blocks
 import type { Page, Request } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

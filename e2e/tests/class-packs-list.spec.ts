@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/class-packs api:class-packs api:invoices api:payments
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

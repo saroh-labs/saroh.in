@@ -9,13 +9,17 @@
 #                                tests and vitest specs the branch's changes
 #                                reach (what .husky/pre-push runs)
 #   pnpm prepush --int           … plus the full unit suites and the API
-#                                integration tests, in groups, on parallel
-#                                test databases
-#   pnpm prepush --e2e           … plus the browser specs for the screens this
-#                                branch touched, on desk AND phone, against CI's
-#                                seeded stack built from HEAD (E2E_DATABASE_URL)
-#   pnpm prepush --all           everything; the browser step runs alongside
-#                                the integration groups
+#                                integration specs the branch's changes reach
+#                                (jest --findRelatedTests, plus an always-run
+#                                set), in groups, on parallel test databases
+#   pnpm prepush --e2e           … plus the browser specs that cover what the
+#                                branch changed (scripts/e2e-affected.mjs), on
+#                                desk AND phone, against CI's seeded stack
+#                                built from HEAD (E2E_DATABASE_URL)
+#   pnpm prepush --all           --int and --e2e; the browser step runs
+#                                alongside the integration groups
+#   … --full                     the WHOLE integration suite and every browser
+#                                spec (alone: --all --full). CI always does.
 #   … --no-cache                 run every step, even ones already passed on
 #                                this tree, and bypass turbo's cache
 #
@@ -40,15 +44,24 @@
 #     over the whole suite can segfault, so the suite is cut into
 #     PREPUSH_INT_GROUPS (default 16) shards; a shard that crashes without a
 #     jest summary is retried once.
-#   - --e2e and --all stop this repo's `pnpm dev` stack first (next dev, nest
-#     watch and turbo dev started from this repo or one of its worktrees,
-#     matched by command line and path) to free the CPU, and say how to start
-#     it again. PREPUSH_KEEP_DEV=1 leaves it running. The quick run never stops
-#     anything.
+#   - Integration and browser runs are targeted, as the quick run's unit
+#     tests are: only the integration specs related to the changed api files
+#     (and the permission, RLS and module-annotation specs, always), and only
+#     the browser specs whose `// @covers` keys the changes reach. A change
+#     to the schema, seed, auth, common/ or the harness runs everything, and
+#     --full forces it. A full pass counts for a targeted one.
+#   - --e2e and --all, when they have specs to run, stop this repo's `pnpm
+#     dev` stack (next dev, nest watch and turbo dev started from this repo
+#     or one of its worktrees, matched by command line and path) to free the
+#     CPU, and say how to start it again. PREPUSH_KEEP_DEV=1 leaves it
+#     running. The quick run never stops anything.
 #
 # Measured 2026-09-29 (12-core Mac, a batch 209 files ahead): the hook 3s on a
 # tree that passed, 19–32s after a code change (was 75s); --int 95s (was
 # ~7 min); --all 10.7 min (was ~25), nearly all of it the browser specs.
+# Targeted, on a commit touching one screen and one api module: --e2e 105s
+# for 2 spec files (was 657s for 25), the integration step 9s for 10 specs
+# (was 84s for 381).
 #
 # Integration needs TEST_DATABASE_URL naming a database with "test" in it (and a
 # changed migration needs REPLAY_DATABASE_URL, a throwaway one; the browser step
@@ -58,16 +71,19 @@
 set -o pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-INT=0; E2E=0; USE_CACHE=1
+INT=0; E2E=0; USE_CACHE=1; FULL=0
 for a in "$@"; do
     case "$a" in
         --int) INT=1 ;;
         --e2e) E2E=1 ;;
         --all) INT=1; E2E=1 ;;
+        --full) FULL=1 ;;
         --no-cache) USE_CACHE=0 ;;
         *) echo "unknown option $a"; exit 2 ;;
     esac
 done
+# --full alone means everything, all of it.
+[ "$FULL" = 1 ] && [ "$INT" = 0 ] && [ "$E2E" = 0 ] && { INT=1; E2E=1; }
 QUICK=1; { [ "$INT" = 1 ] || [ "$E2E" = 1 ]; } && QUICK=0
 T0=$(date +%s)
 
@@ -352,29 +368,42 @@ EOF
 }
 
 E2E_PID=""; E2E_STATUS=""
+# The specs are chosen by scripts/e2e-affected.mjs: every spec names what it
+# exercises (`// @covers app:/commerce/orders api:orders …`), and the branch's
+# changed files are mapped onto those keys through an import scan of the apps
+# and the api. A global change (schema, seed, ui, auth, tooling, CI, root
+# config) picks all of them; so does --full. CI always runs every spec.
 e2e_start() {
-    local keys k f p busy
+    local p busy total
     # Keyed on HEAD's tree even when files are modified: HEAD is what it tests.
     E2E_TREE=$(git rev-parse 'HEAD^{tree}')
-    if [ "$USE_CACHE" = 1 ] && [ -f "$PASSES/$E2E_TREE-e2e-desk-phone" ]; then
+    if [ "$FULL" = 1 ]; then E2E_STEP=e2e-desk-phone; else E2E_STEP=e2e-desk-phone:affected; fi
+    if [ "$USE_CACHE" = 1 ] && { [ -f "$PASSES/$E2E_TREE-$E2E_STEP" ] ||
+        [ -f "$PASSES/$E2E_TREE-e2e-desk-phone" ]; }; then
         E2E_STATUS=cached; return 0
     fi
-    keys=$(echo "$CHANGED" | sed -nE \
-        -e 's#^apps/app\.saroh\.in/app/\(shell\)/([^/]+)/.*#\1#p' \
-        -e 's#^apps/app\.saroh\.in/components/([^/]+)/.*#\1#p' \
-        -e 's#^e2e/tests/([^/]+)\.spec\.ts$#\1#p' | sort -u)
-    specs=""
-    for k in $keys; do
-        for f in $(grep -lE "/${k}[/\"'?]|$k" e2e/tests/*.spec.ts 2>/dev/null); do
-            case " $specs " in *" $f "*) ;; *) specs="$specs $f" ;; esac
-        done
-    done
-    specs=$(echo "$specs" | sed 's#e2e/##g')
+    total=$(ls e2e/tests/*.spec.ts | wc -l | tr -d ' ')
+    if [ "$FULL" = 1 ]; then
+        specs=$(cd e2e && ls tests/*.spec.ts)
+        echo "=== e2e selection   all $total specs (--full)"
+    else
+        specs=$(echo "$CHANGED" | node scripts/e2e-affected.mjs --stdin 2>"$W/e2e-why.log")
+        echo "=== e2e selection   $(head -1 "$W/e2e-why.log" | sed 's/^e2e: //')"
+        sed -n '2,60p' "$W/e2e-why.log"
+        [ "$(wc -l <"$W/e2e-why.log")" -gt 60 ] && echo "      … (full list: $W/e2e-why.log)"
+    fi
+    specs=$(echo $specs)
     e2e_db=$(echo "${E2E_DATABASE_URL:-}" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
     if [ -z "$specs" ]; then
         E2E_STATUS=none; return 0
     elif [ -z "${E2E_DATABASE_URL:-}" ] || ! echo "$e2e_db" | grep -q test; then
         E2E_STATUS=nodb; return 0
+    fi
+    # Only a run that has specs to run takes the CPU back from `pnpm dev`.
+    if [ "${PREPUSH_KEEP_DEV:-}" = 1 ]; then
+        echo "    (PREPUSH_KEEP_DEV=1: the dev stack is left running)"
+    else
+        stop_dev_stack
     fi
     busy=""
     for p in 3333 3000 3003 3005; do
@@ -387,7 +416,7 @@ e2e_start() {
         echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
     SHA=$(git rev-parse HEAD)
     E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
-    echo "=== e2e (in the background) specs:$specs"
+    echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
     E2E_T0=$(date +%s)
     trap stop_stack EXIT
     (e2e_stack "$E2E_DATABASE_URL" "$e2e_db" "$E2E_DIR" "$specs") \
@@ -396,8 +425,8 @@ e2e_start() {
 }
 e2e_finish() {
     case "$E2E_STATUS" in
-        cached) say e2e-desk-phone "PASS (cached)"; return 0 ;;
-        none) say e2e "no spec names a changed screen"; return 0 ;;
+        cached) say "$E2E_STEP" "PASS (cached)"; return 0 ;;
+        none) say e2e "no spec covers what changed (scripts/e2e-affected.mjs); CI runs them all"; return 0 ;;
         nodb) say e2e "FAIL — set E2E_DATABASE_URL to a throwaway *test* database (it is dropped and re-created)"
             FAILED="$FAILED e2e(db)"; return 0 ;;
         ports:*) say e2e "FAIL — CI's ports are taken:${E2E_STATUS#ports:} (stop whatever listens there)"
@@ -406,15 +435,15 @@ e2e_finish() {
     [ -n "$E2E_PID" ] || return 0
     [ "$INT" = 1 ] && echo "    (waiting for the browser run)"
     if wait "$E2E_PID"; then
-        say e2e-desk-phone "PASS ($(( $(date +%s) - E2E_T0 ))s)"
+        say "$E2E_STEP" "PASS ($(( $(date +%s) - E2E_T0 ))s)"
         # It tested HEAD's tree, whatever the working tree holds.
-        date +%s >"$PASSES/$E2E_TREE-e2e-desk-phone"
+        date +%s >"$PASSES/$E2E_TREE-$E2E_STEP"
     else
-        say e2e-desk-phone "FAIL ($(( $(date +%s) - E2E_T0 ))s)"
+        say "$E2E_STEP" "FAIL ($(( $(date +%s) - E2E_T0 ))s)"
         grep -E "✘|^\s+[0-9]+ (failed|passed|skipped|flaky)|never came up|Error:" \
             "$E2E_LOGS/run.log" | tail -40
         echo "    run log and server logs: $E2E_LOGS"
-        FAILED="$FAILED e2e-desk-phone"
+        FAILED="$FAILED $E2E_STEP"
     fi
     stop_stack
     trap - EXIT
@@ -440,11 +469,6 @@ fi
 
 E2E_DIR=${PREPUSH_E2E_DIR:-${TMPDIR:-/tmp}/saroh-prepush-e2e}
 if [ "$E2E" = 1 ]; then
-    if [ "${PREPUSH_KEEP_DEV:-}" = 1 ]; then
-        echo "    (PREPUSH_KEEP_DEV=1: the dev stack is left running)"
-    else
-        stop_dev_stack
-    fi
     # Started now: it builds from its own worktree while everything else runs.
     e2e_start
 fi
@@ -458,6 +482,7 @@ fi
 bg_step routes pnpm run check:routes
 bg_step blocks pnpm run check:blocks
 bg_step cycles pnpm run check:cycles
+bg_step e2e-covers pnpm run check:e2e-covers
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,
@@ -557,9 +582,11 @@ int_worker() {
             while :; do
                 tries=$((tries + 1))
                 s=$(date +%s)
+                # shellcheck disable=SC2086
                 ( cd apps/api.saroh.in && TEST_DATABASE_URL=$url TMPDIR=$tmp \
                     SKIP_ENV_VALIDATION=1 pnpm -s exec jest -c jest.integration.config.js \
-                    --shard="$k/$INT_GROUPS" --cacheDirectory="$JEST_CACHE" --ci ) \
+                    --shard="$k/$INT_GROUPS" --cacheDirectory="$JEST_CACHE" --ci --no-watchman \
+                    ${INT_PATHS:+--runTestsByPath $INT_PATHS} ) \
                     >"$W/int-$k.log" 2>&1
                 rc=$?
                 if [ $rc != 0 ] && [ $tries = 1 ] && ! grep -qE '^Tests:' "$W/int-$k.log"; then
@@ -584,6 +611,13 @@ int_run() {
     local n i name url maint exists k rc bad="" pids=""
     n=${PREPUSH_INT_DBS:-3}
     INT_GROUPS=${PREPUSH_INT_GROUPS:-16}
+    if [ -n "$INT_PATHS" ]; then
+        # A few specs a shard: each shard pays for its own schema reset.
+        k=$(echo "$INT_PATHS" | wc -w | tr -d ' ')
+        k=$(( (k + 2) / 3 ))
+        [ "$k" -lt "$INT_GROUPS" ] && INT_GROUPS=$k
+        [ "$INT_GROUPS" -lt "$n" ] && n=$INT_GROUPS
+    fi
     JEST_CACHE=${TMPDIR:-/tmp}/saroh-prepush-jest
     name=$(echo "$TEST_DATABASE_URL" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
     maint=$(echo "$TEST_DATABASE_URL" | sed -E 's#/[^/?]+(\?.*)?$#/postgres\1#')
@@ -623,13 +657,55 @@ int_run() {
     done
     [ -z "$bad" ]
 }
+# Which integration specs. Locally, only those the change reaches: jest
+# --findRelatedTests over the api files that changed (and the api files that
+# import a changed workspace package), plus the specs that guard every module
+# at once. A change to what every spec stands on runs the whole suite, as
+# --full does. CI always runs the whole suite (and again under RLS).
+INT_FULL_RE='^(packages/(database|auth)/|apps/api\.saroh\.in/(src/common/|src/[^/]+\.ts$|test/|jest[^/]*$|package\.json$|tsconfig[^/]*$)|pnpm-lock\.yaml$)'
+INT_ALWAYS_RE='/(capabilities/module-annotations\.spec|rls/[^/]+|[^/]+-rls\.db\.spec|[^/]*permissions?[^/.]*(\.db)?\.spec)\.ts$'
+INT_PATHS=""; INT_WHY=""
+if [ "$FULL" = 1 ]; then INT_STEP=int; INT_WHY="the whole suite (--full)"
+else
+    INT_WHY=$(echo "$CHANGED" | grep -E "$INT_FULL_RE" | head -1)
+    if [ -n "$INT_WHY" ]; then INT_STEP=int; INT_WHY="the whole suite: $INT_WHY changed"
+    else INT_STEP=int:affected
+    fi
+fi
+int_select() {
+    local srcs="" f p all related always
+    for f in $(echo "$CHANGED" | grep -E '^apps/api\.saroh\.in/src/.*\.ts$'); do
+        [ -f "$f" ] && srcs="$srcs ${f#apps/api.saroh.in/}"
+    done
+    # A workspace package the api imports (templates, object-storage, …).
+    for p in $(echo "$CHANGED" | sed -nE 's#^packages/([^/]+)/.*#\1#p' | sort -u); do
+        for f in $(grep -rlE "from [\"']@saroh/$p[/\"']" apps/api.saroh.in/src --include='*.ts' 2>/dev/null); do
+            srcs="$srcs ${f#apps/api.saroh.in/}"
+        done
+    done
+    all=$(cd apps/api.saroh.in && SKIP_ENV_VALIDATION=1 pnpm -s exec jest -c jest.integration.config.js \
+        --listTests --no-watchman 2>/dev/null) || return 1
+    always=$(echo "$all" | grep -E "$INT_ALWAYS_RE")
+    related=""
+    if [ -n "$srcs" ]; then
+        # shellcheck disable=SC2086
+        related=$(cd apps/api.saroh.in && SKIP_ENV_VALIDATION=1 pnpm -s exec jest -c jest.integration.config.js \
+            --listTests --no-watchman --findRelatedTests $srcs 2>/dev/null) || return 1
+    fi
+    INT_PATHS=$(printf '%s\n%s\n' "$related" "$always" | grep . | sort -u | tr '\n' ' ')
+    INT_WHY="$(echo "$related" | grep -c .) related to $(echo "$srcs" | wc -w | tr -d ' ') changed api files + $(echo "$always" | grep -c .) always-run (permissions, RLS, module annotations) = $(echo "$INT_PATHS" | wc -w | tr -d ' ') of $(echo "$all" | grep -c .) specs"
+}
 if [ "$INT" = 1 ]; then
-    if cached int; then say int "PASS (cached)"; else
+    if cached "$INT_STEP" int; then say "$INT_STEP" "PASS (cached)"; else
         # The api's workspace packages are consumed built, as in CI.
         step int-build $TURBO build --filter='@saroh/api^...'
         s=$(date +%s)
-        if int_run; then say int "PASS ($(( $(date +%s) - s ))s)"; record int
-        else say int "FAIL ($(( $(date +%s) - s ))s)"; FAILED="$FAILED int"
+        if [ "$INT_STEP" = int ] || int_select; then
+            say int "$INT_WHY"
+            if int_run; then say "$INT_STEP" "PASS ($(( $(date +%s) - s ))s)"; record "$INT_STEP"
+            else say "$INT_STEP" "FAIL ($(( $(date +%s) - s ))s)"; FAILED="$FAILED $INT_STEP"
+            fi
+        else say "$INT_STEP" "FAIL — could not list the integration specs"; FAILED="$FAILED $INT_STEP"
         fi
     fi
 fi

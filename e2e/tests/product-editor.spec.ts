@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/commerce/products app:/commerce/products/new api:products api:catalogue api:stock api:media api:stores
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/sites api:sites pkg:site-blocks
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

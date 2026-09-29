@@ -917,3 +917,38 @@ code change. `--int` takes 95s, and `--all` 10.7 min, most of it the
 browser specs.
 **Category**: tooling · `scripts/prepush.sh`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
+## Tooling — `--e2e` picked 25 spec files for a batch, and `--int` ran all 381
+
+**Problem**: After the gate got fast, a batch's browser step still took about
+11 min. The integration step still ran every spec, whatever the batch touched.
+Batch 2's `--e2e` chose 25 of the 34 spec files.
+**Root cause**: The browser step chose specs by grepping them for a changed
+folder's name. Short names such as `orders`, `home` and `shared` match nearly
+every spec, and the grep did not look at api or package changes. The
+integration step had no selection at all.
+**Fix**: Every spec's first line names what it exercises
+(`// @covers app:/commerce/orders api:orders site:/shop pkg:site-blocks`).
+`scripts/e2e-affected.mjs` maps the changed files onto those keys through an
+import scan and prints why it chose each spec. `--int` runs
+`jest --findRelatedTests` plus the permission, RLS and module-annotation
+specs. Global changes, and `--full`, still run everything, and CI always
+does. `check:e2e-covers` keeps the keys honest. On a commit that touches one
+screen and one api module, `--e2e` picked 2 spec files (24 tests) and took
+105s instead of 657s. The integration run picked 10 of 381 specs and took 9s
+instead of 84s. Batch 2 would still have run every spec, because it changed
+the schema and CI.
+**Merging with a branch that edits the same specs**: the `@covers` line sits
+above the imports. A branch that rewrites a spec's first import line (the
+storageState sign-in change drops `demoUser` and `Page`) makes git report a
+conflict between two edits that do not touch each other. Resolve it with a
+one-off union merge, never a committed one: add
+`e2e/tests/*.spec.ts merge=union` to `.git/info/attributes`, merge, then
+remove the line. A union merge keeps both sides of the hunk, so the import
+line the other branch deleted comes back (tried on a scratch repo: the
+merged spec had the `@covers` line and the stale `import type { Page }`).
+Delete those lines by hand, then run `pnpm run check:e2e-covers` and the e2e
+lint. Or take the other branch's spec whole and put the one `@covers` line
+back on top (`git show r2/e2e-b:<spec> | head -1`).
+**Category**: tooling · `scripts/e2e-affected.mjs`, `scripts/prepush.sh`,
+`docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast

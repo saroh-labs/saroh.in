@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/bookings app:/bookings/availability app:/services app:/services/new app:/customers api:bookings api:staff api:customer-workspace api:contacts
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
