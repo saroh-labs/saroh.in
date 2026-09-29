@@ -44,6 +44,7 @@ const SET_UP_FROM: Record<string, string> = {
     ACCOUNT: "from their account",
     PRICES: "from the Prices page",
     PAY_LINK: "from the pay link",
+    SETUP_LINK: "from a set-up link",
 };
 
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
@@ -161,9 +162,20 @@ export function changeWhat(
                     return "Autopay cancelled — customers merged";
                 case "PRIVACY_REMOVAL":
                     return "Autopay cancelled — their details were removed";
+                case "REPLACED":
+                    return "Autopay replaced — they approved a new one";
                 default:
                     return "Autopay cancelled";
             }
+        case "MANDATE_LINK_SENT": {
+            // D14: staff made a set-up link; "emailed" when Saroh sent it.
+            const method = str(data.method);
+            const how = method ? AUTOPAY_METHOD[method] : undefined;
+            const what = how
+                ? `Autopay set-up link made for ${how}`
+                : "Autopay set-up link made";
+            return data.emailed === true ? `${what} and emailed` : what;
+        }
         case "CHARGED":
             return `Paid by autopay${invoice}`;
         default:

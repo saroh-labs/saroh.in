@@ -306,12 +306,35 @@ export function rowWhen(
             danger: true,
         };
     }
+    const badge = autopayBadgeText(sub.autopayOn);
     return {
         text: sub.nextRenewalAt
-            ? `Next ${dayText(sub.nextRenewalAt, tz, now)}`
+            ? [`Next ${dayText(sub.nextRenewalAt, tz, now)}`, badge]
+                  .filter(Boolean)
+                  .join(" · ")
             : "—",
         danger: false,
     };
+}
+
+const BADGE_METHOD: Record<string, string> = {
+    UPI: "UPI Autopay",
+    CARD: "Card autopay",
+    EMANDATE: "Bank autopay",
+};
+
+/**
+ * The list's autopay mark (D14, after "Saroh Subscriptions": "Next 2 Oct ·
+ * UPI Autopay · priya.raman@okhdfc"): "UPI Autopay · mo•••@okicici",
+ * "Autopay paused". Null: no autopay on.
+ */
+export function autopayBadgeText(
+    badge: Subscription["autopayOn"],
+): string | null {
+    if (!badge) return null;
+    if (badge.paused) return "Autopay paused";
+    const head = (badge.method && BADGE_METHOD[badge.method]) ?? "Autopay";
+    return badge.hint ? `${head} · ${badge.hint}` : head;
 }
 
 /** A person's initials, for the round avatar: "Nisha Kulkarni" → "NK". */

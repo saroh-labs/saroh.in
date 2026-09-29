@@ -22,6 +22,7 @@ import {
     setPlanArchived,
     updatePlan,
 } from "@/lib/subscriptions/actions";
+import { renewalWords } from "@/lib/subscriptions/autopay";
 import type { Interval, Plan } from "@/lib/subscriptions/service";
 
 const CURRENCIES = ["INR", "USD", "GBP", "EUR", "AED", "SGD", "AUD", "CAD"];
@@ -40,9 +41,15 @@ const INTERVALS: { value: Interval; label: string }[] = [
 export function PlanDialog({
     plan,
     onClose,
+    autopayOffered = false,
 }: {
     plan: Plan | null;
     onClose: () => void;
+    /**
+     * The business offers autopay (D14): only then does the copy say
+     * renewals may be paid by it. Unknown reads as not.
+     */
+    autopayOffered?: boolean;
 }) {
     const router = useRouter();
     const ids = {
@@ -122,7 +129,7 @@ export function PlanDialog({
                     <DialogDescription>
                         {plan && plan.subscriberCount > 0
                             ? `Changes reach new sign-ups only. The ${plan.subscriberCount} ${plan.subscriberCount === 1 ? "person" : "people"} on it keep the price they agreed.`
-                            : "What you sell on repeat. Each period is invoiced; nothing is charged."}
+                            : renewalWords(autopayOffered).plan}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4">

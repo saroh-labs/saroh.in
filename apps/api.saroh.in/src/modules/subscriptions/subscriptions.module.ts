@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { env } from "../../env";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
+import { CommunicationsModule } from "../communications/communications.module";
 import { InvoicesModule } from "../invoices/invoices.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
@@ -24,6 +25,7 @@ import { AccountPlanJoinController } from "./account-plan-join.controller";
 import { PublicPlanJoinService } from "./public-plan-join.service";
 import { PublicPlansController } from "./public-plans.controller";
 import { PublicPlansService } from "./public-plans.service";
+import { SubscriptionAutopayService } from "./subscription-autopay.service";
 import {
     SUBSCRIPTION_CHARGE_TYPE,
     SubscriptionChargeHandler,
@@ -61,6 +63,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         SiteAccountsModule,
         // Joining a plan online (G20): the invoice payment path.
         PaymentsModule,
+        // Emailing an autopay set-up link through D17's path (D14).
+        CommunicationsModule,
     ],
     controllers: [
         SubscriptionPlansController,
@@ -81,6 +85,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         AccountAutopayService,
         // A renewal's autopay charge, step by step (D13).
         SubscriptionChargeHandler,
+        // Staff see and manage a subscription's autopay (D14).
+        SubscriptionAutopayService,
         // "Pay now" is hidden, and a 409, while a charge is under way (D13).
         {
             provide: AUTOPAY_CHARGE_PENDING,

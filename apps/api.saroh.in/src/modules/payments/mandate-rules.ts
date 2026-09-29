@@ -69,6 +69,13 @@ export function providerName(provider: string | null | undefined): string {
 /** How long a set-up waits for the customer before it lapses. */
 export const SETUP_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * How long a set-up link staff send (D14) waits: a week, since it goes by
+ * email or message and may be opened days later. The customer approves on
+ * the provider's own page; its link stops working after this.
+ */
+export const LINK_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** How long the authority itself lasts at the provider (Razorpay's default). */
 export const MANDATE_TERM_YEARS = 10;
 

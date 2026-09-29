@@ -209,6 +209,7 @@ describe("cancelling now (cancelFor, for a privacy removal)", () => {
             cancelled: 1,
             awaitingProvider: 1,
             unconfirmed: 0,
+            refused: 0,
         });
         expect(tx.paymentMandate!.findMany).toHaveBeenCalledWith(
             expect.objectContaining({

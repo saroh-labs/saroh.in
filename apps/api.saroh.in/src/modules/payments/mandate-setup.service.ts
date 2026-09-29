@@ -192,7 +192,9 @@ export class MandateSetupService {
             firstAmountCents === 0
                 ? checkCentsFor(connection.mandates, method)
                 : 0;
-        const setupExpiresAt = new Date(now.getTime() + SETUP_TTL_MS);
+        const setupExpiresAt = new Date(
+            now.getTime() + (input.setupTtlMs ?? SETUP_TTL_MS),
+        );
         const expiresAt = new Date(now);
         expiresAt.setFullYear(expiresAt.getFullYear() + MANDATE_TERM_YEARS);
         const frequency = input.frequency ?? "AS_PRESENTED";
@@ -554,11 +556,21 @@ export interface CreateSetupInput {
      * page for a set-up link sent to the customer (D13/D14).
      */
     handoff?: MandateSetupHandoff;
+    /** How long the set-up waits for the customer; a day by default. */
+    setupTtlMs?: number;
     now?: Date;
 }
 
-/** Where a customer set autopay up (D12), for the subscription's log. */
-export const MANDATE_SETUP_SOURCES = ["PAY_LINK", "PRICES", "ACCOUNT"] as const;
+/**
+ * Where a customer set autopay up (D12), for the subscription's log:
+ * `SETUP_LINK` is the provider's page from a link staff sent (D14).
+ */
+export const MANDATE_SETUP_SOURCES = [
+    "PAY_LINK",
+    "PRICES",
+    "ACCOUNT",
+    "SETUP_LINK",
+] as const;
 export type MandateSetupSource = (typeof MANDATE_SETUP_SOURCES)[number];
 
 export interface CreateJoinSetupInput {

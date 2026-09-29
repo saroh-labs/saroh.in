@@ -26,6 +26,7 @@ import type { MessageSendPayload } from "./message-send.handler";
 import { MESSAGE_SEND_TYPE } from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
 import type {
+    AutopayTemplate,
     InvoiceMailVars,
     InvoiceTemplate,
     NoticeTemplate,
@@ -53,11 +54,15 @@ export type TransactionalRecipient =
  * What a transactional message says: an invoice's template with its
  * values, or one of A14's notices or F14's team alerts, already worded by
  * its handler (`site-accounts/notify-templates.ts`,
- * `notifications/team-alert.handler.ts`).
+ * `notifications/team-alert.handler.ts`), or D14's autopay set-up link
+ * (`renderAutopaySetupLink`).
  */
 export type TransactionalWords =
     | { template: InvoiceTemplate; vars: InvoiceMailVars }
-    | { template: NoticeTemplate | TeamTemplate; rendered: RenderedMessage };
+    | {
+          template: NoticeTemplate | TeamTemplate | AutopayTemplate;
+          rendered: RenderedMessage;
+      };
 
 /** Input for {@link CommunicationsService.queueTransactional}. */
 export type TransactionalInput = TransactionalWords & TransactionalSend;

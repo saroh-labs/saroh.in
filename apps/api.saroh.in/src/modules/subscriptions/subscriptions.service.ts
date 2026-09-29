@@ -82,6 +82,14 @@ import type { PlanView } from "./plans";
 import { planViews, readPlan } from "./plans";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 import type {
+    AutopayBadge,
+    AutopayCardView,
+} from "./subscription-autopay.service";
+import {
+    autopayBadges,
+    SubscriptionAutopayService,
+} from "./subscription-autopay.service";
+import type {
     EventPlanRef,
     SubscriptionEventLog,
     SubscriptionEventsPage,
@@ -247,6 +255,18 @@ export interface SubscriptionView {
      * Subscription Detail's read carries it.
      */
     retryVia?: RetryVia | null;
+    /**
+     * Subscription Detail's autopay card for staff (D14): whether the
+     * business offers autopay now, how the mandate was set up, a cancel
+     * still being confirmed, "limit too low", and where a set-up link
+     * would be emailed. Only Subscription Detail's read carries it.
+     */
+    autopayCard?: AutopayCardView | null;
+    /**
+     * Its autopay on the list (D14): the ACTIVE or PAUSED mandate's method
+     * and hint. Only the list carries it; null: none.
+     */
+    autopayOn?: AutopayBadge | null;
 }
 
 /** How a failed renewal is retried (D13). */
@@ -394,6 +414,9 @@ export class SubscriptionsService {
         // A renewal charges the customer's autopay (D13); absent where a
         // test builds the service by hand, and then renewals only invoice.
         @Optional() private readonly charges?: MandateChargesService,
+        // Subscription Detail's autopay card (D14); absent where a test
+        // builds the service by hand.
+        @Optional() private readonly autopayStaff?: SubscriptionAutopayService,
     ) {}
 
     // — Plans ——————————————————————————————————————————————————————
@@ -550,25 +573,34 @@ export class SubscriptionsService {
             select: SUBSCRIPTION_SELECT,
         });
         const ids = rows.map((r) => r.id);
-        const [invoices, skips] = await Promise.all([
+        const [invoices, skips, badges] = await Promise.all([
             this.invoicesFor(ctx.organizationId, ids),
             this.skipsFor(ctx.organizationId, ids),
+            // "UPI Autopay · …" on the row (D14).
+            autopayBadges(ctx.organizationId, ids),
         ]);
         const now = new Date();
         return rows.map((r) =>
-            forViewer(
-                ctx,
-                this.view(r, invoices.get(r.id), skips.get(r.id), now),
-            ),
+            forViewer(ctx, {
+                ...this.view(r, invoices.get(r.id), skips.get(r.id), now),
+                autopayOn: badges.get(r.id) ?? null,
+            }),
         );
     }
 
     async get(ctx: OrganizationContext, id: string): Promise<SubscriptionView> {
         authorize(ctx, "subscription:read");
         const view = await this.read(ctx, id);
-        // How autopay stands (D12): read-only here; D14 adds its actions.
+        // How autopay stands (D12), and the card staff manage it from (D14).
         const autopay = this.autopay
             ? await this.autopay.line(ctx.organizationId, id)
+            : null;
+        const autopayCard = this.autopayStaff
+            ? await this.autopayStaff.card(
+                  ctx.organizationId,
+                  id,
+                  view.currency,
+              )
             : null;
         // A charge under way, and how Retry would go (D13).
         const charging = (
@@ -582,6 +614,7 @@ export class SubscriptionsService {
             autopay,
             autopayCharge: charging ? { at: charging.at.toISOString() } : null,
             retryVia,
+            autopayCard,
         };
     }
 

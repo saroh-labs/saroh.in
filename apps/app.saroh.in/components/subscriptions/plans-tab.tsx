@@ -37,10 +37,13 @@ export function PlansTab({
     canWrite,
     showClasses,
     settings = null,
+    autopayOffered = false,
 }: {
     plans: Plan[] | null;
     canWrite: boolean;
     showClasses: boolean;
+    /** The business offers autopay (D14): the plan copy may say so. */
+    autopayOffered?: boolean;
     /**
      * "Members can pause from their account" (A8): its row shows once
      * customers have an account on the site, and not when unread.
@@ -150,6 +153,7 @@ export function PlansTab({
                 <PlanDialog
                     plan={editing === "new" ? null : editing}
                     onClose={() => setEditing(null)}
+                    autopayOffered={autopayOffered}
                 />
             ) : null}
         </>

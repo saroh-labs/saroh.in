@@ -188,6 +188,23 @@ a note saying so.
   calendar's fees leave out `purpose` AUTHORISATION. A set-up that fails
   after the capture is refunded all the same. Code:
   `payments/authorisation-check.ts`.
+- **Current** (D14) — **Staff send a set-up link: the provider's hosted
+  page for one method they pick.** `POST subscriptions/:id/autopay/link`
+  (`subscription:write`) makes a PENDING mandate with `handoff`
+  `HOSTED_LINK` (Razorpay: a registration link), `setupSource`
+  `SETUP_LINK`, a week to approve (`LINK_SETUP_TTL_MS`) and a limit over
+  the larger of the price, a booked plan change and any unpaid invoice —
+  so a link sent after MANDATE_LIMIT_LOW covers the renewal that didn't
+  fit. The picker lists every method the account offers (DEC-059); nothing
+  is owed on the link, so UPI and card take the ₹1 check (DEC-064). No
+  `callback_url` is sent: the D11 spike never saw a registration link take
+  one. The link is answered once and never stored (the log keeps the
+  mandate id); emailing it goes through D17's transactional path
+  (`AUTOPAY_SET_UP_LINK`, the link sealed into the job like a pay link).
+  403 while `mandateMethods` is empty — the provider can't, or its rollout
+  flag is off. "Cancel autopay" (`…/autopay/cancel`) is `cancelFor` with
+  reason STAFF and the team member as the event's actor, and never waits on
+  the flag. Code: `subscriptions/subscription-autopay.service.ts`.
 - **Current** — **The refund webhook settles at the provider's amount**
   (#508 U2). Adapters normalise the refunded amount in paise, Saroh's
   reference and a `REFUND_FAILED` outcome (Razorpay `refund.failed`; Cashfree
