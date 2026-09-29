@@ -524,15 +524,12 @@ export function OrderDetail({
                                 customer={order.customer}
                                 href={customerHref ?? "/commerce/customers"}
                                 // A treatment's Needs attention is on its
-                                // Visits card (B14).
+                                // Visits card (B14) and here too, as the
+                                // design shows (DEC-073).
                                 notes={
-                                    notes === "unavailable" || appointment
-                                        ? null
-                                        : noteList
+                                    notes === "unavailable" ? null : noteList
                                 }
-                                attention={
-                                    appointment ? undefined : order.attention
-                                }
+                                attention={order.attention}
                                 contact={can.contact ?? true}
                                 address={delivery ? addressText : null}
                                 deliveryPhone={

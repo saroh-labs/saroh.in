@@ -91,6 +91,23 @@ describe("CustomerCard — Needs attention (DEC-073)", () => {
         expect(render(null)).toContain("Needs attention: not available.");
     });
 
+    it("says a treatment's Medical entry too, as the Visits card does (DEC-073)", () => {
+        const html = render({
+            entries: [
+                entry({
+                    kind: "MEDICAL",
+                    label: "Diabetic",
+                    detail: "Check sugar before a long visit",
+                    sensitive: true,
+                    allergen: null,
+                }),
+            ],
+            hiddenSensitiveCount: 0,
+        });
+        expect(seen(html)).toContain("Needs attention: Diabetic");
+        expect(html).toContain(", Check sugar before a long visit");
+    });
+
     it("draws nothing when there is none", () => {
         const html = render({ entries: [], hiddenSensitiveCount: 0 });
         expect(html).not.toContain("Needs attention");
