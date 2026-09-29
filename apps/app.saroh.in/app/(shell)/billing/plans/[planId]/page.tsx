@@ -9,7 +9,6 @@ import { requireSession } from "@/lib/session";
 import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
 import { detailTabFromQuery } from "@/lib/subscriptions/plan-detail";
 import {
-    getAutopayOffer,
     getPlan,
     listPlanEvents,
     listPlanSubscriptions,
@@ -60,12 +59,10 @@ export default async function PlanPage({
     const plan = await getPlan(planId);
     if (!plan) notFound();
 
-    const [subscriptions, events, modules, autopay] = await Promise.all([
+    const [subscriptions, events, modules] = await Promise.all([
         listPlanSubscriptions(plan.id),
         listPlanEvents(plan.id),
         modulesOrUnknown(),
-        // Whether the plan's copy may promise autopay (D14).
-        getAutopayOffer(),
     ]);
     const appointments = modules
         ? modules.some(
@@ -89,7 +86,6 @@ export default async function PlanPage({
                 canWrite={may("subscription:write")}
                 initialTab={detailTabFromQuery(query.tab)}
                 nowIso={new Date().toISOString()}
-                autopayOffered={autopay?.offered ?? false}
             />
         </PageContainer>
     );

@@ -9,25 +9,27 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { HOLD_UNDO_MS } from "@/lib/hold-undo";
+
 import { setPlanArchived } from "@/lib/subscriptions/actions";
 import type { PlanCardView } from "@/lib/subscriptions/plan-cards";
 import { archiveToast, planCard } from "@/lib/subscriptions/plan-cards";
+import { editHref } from "@/lib/subscriptions/plan-editor";
 import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
 
 import { MembersPauseRow } from "./members-pause-row";
 import { Pill } from "./pill";
-import { PlanDialog } from "./plan-dialog";
-
-/** An Undo toast lasts ten seconds (round-2 default 136). */
-const UNDO_MS = 10_000;
 
 const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
+
+const NEW_PLAN_HREF = "/billing/plans/new";
 
 /**
  * Subscriptions → Plans (D3, after "Saroh Subscriptions", Plans tab): one
  * card per plan, which opens Plan Detail. Archive and Sell again act at once
- * and offer Undo, which calls the opposite. New plan and Edit open today's
- * dialog until the Plan Editor page lands (D7).
+ * and offer Undo, which calls the opposite, for the shared ten-second hold
+ * (`lib/hold-undo.ts`). New plan and Edit open the Plan Editor (D7); a
+ * draft is listed too (`?include=drafts`), badged, with nothing to archive.
  *
  * `plans` is null when the read failed: the tab says so and the
  * subscriptions beside it are untouched.
@@ -37,13 +39,10 @@ export function PlansTab({
     canWrite,
     showClasses,
     settings = null,
-    autopayOffered = false,
 }: {
     plans: Plan[] | null;
     canWrite: boolean;
     showClasses: boolean;
-    /** The business offers autopay (D14): the plan copy may say so. */
-    autopayOffered?: boolean;
     /**
      * "Members can pause from their account" (A8): its row shows once
      * customers have an account on the site, and not when unread.
@@ -51,7 +50,6 @@ export function PlansTab({
     settings?: SubscriptionSettings | null;
 }) {
     const router = useRouter();
-    const [editing, setEditing] = useState<Plan | "new" | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
     const [, start] = useTransition();
 
@@ -76,7 +74,7 @@ export function PlansTab({
                         if (!back.ok) showError(back.error);
                         router.refresh();
                     }),
-                { duration: UNDO_MS },
+                { duration: HOLD_UNDO_MS },
             );
         });
     }
@@ -109,11 +107,8 @@ export function PlansTab({
                     Everyone already on a plan keeps what they agreed to.
                 </p>
                 {canWrite ? (
-                    <Button
-                        className={BUTTON}
-                        onClick={() => setEditing("new")}
-                    >
-                        New plan
+                    <Button asChild className={BUTTON}>
+                        <Link href={NEW_PLAN_HREF}>New plan</Link>
                     </Button>
                 ) : null}
             </div>
@@ -125,8 +120,8 @@ export function PlansTab({
                     description="A plan is what you sell on repeat — a monthly membership, a weekly loaf. Make one, then put people on it."
                     action={
                         canWrite ? (
-                            <Button onClick={() => setEditing("new")}>
-                                Make a plan
+                            <Button asChild>
+                                <Link href={NEW_PLAN_HREF}>Make a plan</Link>
                             </Button>
                         ) : undefined
                     }
@@ -139,7 +134,6 @@ export function PlansTab({
                                 card={planCard(p, showClasses)}
                                 canWrite={canWrite}
                                 busy={busyId === p.id}
-                                onEdit={() => setEditing(p)}
                                 onArchive={() =>
                                     setArchived(p, p.status !== "ARCHIVED")
                                 }
@@ -148,14 +142,6 @@ export function PlansTab({
                     ))}
                 </ul>
             )}
-
-            {editing ? (
-                <PlanDialog
-                    plan={editing === "new" ? null : editing}
-                    onClose={() => setEditing(null)}
-                    autopayOffered={autopayOffered}
-                />
-            ) : null}
         </>
     );
 }
@@ -164,13 +150,11 @@ function PlanCard({
     card,
     canWrite,
     busy,
-    onEdit,
     onArchive,
 }: {
     card: PlanCardView;
     canWrite: boolean;
     busy: boolean;
-    onEdit: () => void;
     onArchive: () => void;
 }) {
     return (
@@ -216,11 +200,16 @@ function PlanCard({
             {canWrite ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                     <Button
+                        asChild
                         variant="outline"
                         className={cn(BUTTON, "coarse:h-11")}
-                        onClick={onEdit}
                     >
-                        Edit
+                        <Link
+                            href={editHref(card.id)}
+                            aria-label={`Edit ${card.name}`}
+                        >
+                            Edit
+                        </Link>
                     </Button>
                     {card.canArchive ? (
                         <Button

@@ -334,8 +334,8 @@ one is a 409 naming who saved since. The rules are in
   D7 never asks, so if D7 is rolled back after drafts exist, its Plans tab
   doesn't draw a draft as a live card. D7's Plans tab asks with
   `include=drafts`.
-- **The old form's `PATCH :planId` stays** until follow-up Z6 (a checkpoint
-  after D7). It refuses a draft, and a change through it moves the draft
+- **The old form's `PATCH :planId` stays** until follow-up Z6 (one release
+  after D7 reaches production, see below). It refuses a draft, and a change through it moves the draft
   revision, so an editor open on the plan is told instead of saving over it.
 
 ### Verify
@@ -360,14 +360,45 @@ the drafts first:
 SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
 ```
 
-### Release #708 carries D5 and D7 together (user, 2026-09-29)
+### D5 went out in #708; D7's Plan Editor ships with batch 2026-09-29 (corrected 2026-09-29)
 
-CP-3 wasn't released on its own, so D5's writers and D7's Plan Editor reach
-production in one release. The API still deploys before the apps. Rolling
-the API back below D5 after this release: **roll the Vercel apps back with
-it**, and first archive or delete any DRAFT plan (the query above), so the
-old Plans list doesn't draw one as a live card. Nothing can sell a draft
-either way (D21).
+An earlier note here said release #708 carried D5 and D7 together. It
+didn't: #708 carried **D5 only**. D7 (`r2/d7`) was never merged into it, so
+CP-3 held after all. D7's app ships in the **next** release, batch
+2026-09-29 (`r2/d7-int`).
+
+- **D5 is live since #708.** Its draft writers are in production and nothing
+  calls them yet.
+- **Between #708 and this batch nothing draws a draft.** The #708 app still
+  has `PlanDialog` and its Plans tab calls `GET subscription-plans` without
+  `include=drafts`, and the API leaves drafts out of that list. Nothing in
+  that app creates a draft either, so none should exist. Nothing can sell
+  one anyway (D21).
+- **This batch is app-only for D7.** Its API change is a comment on the old
+  `PATCH :planId`. D5's API is already in production, so the usual "API
+  before app" order is already met. The Plans tab now asks for
+  `include=drafts`, New plan and Edit open `/billing/plans/new` and
+  `/billing/plans/[planId]/edit`, and `PlanDialog` is gone. The editor's
+  "how it's paid" line mentions autopay only when
+  `GET subscriptions/autopay` says the business offers it (D14's honest
+  copy).
+- **Rolling the workspace back below D7** is safe while no DRAFT plan
+  exists. Once one does, the older app can't see it or finish it (its list
+  leaves drafts out and its `PATCH :planId` refuses them), though nothing
+  sells it. Before rolling back, check the count, and publish or delete any
+  drafts from the editor first:
+
+    ```sql
+    SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
+    ```
+
+- **Rolling the API back below D5 (#708)** still needs the app rolled back
+  below D7 with it, and the drafts cleared first (the query above). An API
+  without D5 has no draft routes, and its unfiltered list would show a
+  draft as a live card.
+- **Z6 (remove D5's temporary `PATCH :planId`)** can go one release after
+  this batch reaches production, once no live app image calls it. Not done
+  yet.
 
 ## E14: pack drafts (wave 4; the Pack Editor, E18, ships in a later release)
 

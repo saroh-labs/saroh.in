@@ -151,7 +151,9 @@ export class SubscriptionPlansController {
 
     /**
      * The old Plans form's whole-plan save, kept for one release while the
-     * app moves to the editor (D7); removed by follow-up Z6. Refuses a draft.
+     * app moves to the editor. Since D7 no app screen calls it; it stays
+     * for the previous app image until follow-up Z6 removes it, at least a
+     * checkpoint later. Refuses a draft.
      */
     @Patch(":planId")
     update(

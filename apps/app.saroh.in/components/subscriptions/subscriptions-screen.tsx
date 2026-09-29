@@ -252,7 +252,6 @@ export function SubscriptionsScreen({
                         canWrite={canWrite}
                         showClasses={showClasses}
                         settings={settings}
-                        autopayOffered={autopayOffered}
                     />
                 ) : (
                     <>
