@@ -22,6 +22,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { createPayLink } from "@/lib/invoices/actions";
+import { downloadInvoicePdf, hasPdf } from "@/lib/invoices/pdf";
 import { canSend, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
@@ -55,7 +56,9 @@ async function copy(text: string): Promise<boolean> {
  * Actions by status — a draft is issued, edited or deleted; an unpaid one
  * gets its pay link copied, is marked paid, printed or cancelled; a paid one
  * is printed or refunded (an order's refund is made on the order, so stock
- * and the kitchen stay right).
+ * and the kitchen stay right). Any issued paper, whatever its status, has
+ * "Download PDF" beside Print (D16): the same paper, drawn by the API. A
+ * draft has none: it has no number yet.
  *
  * Sending (D17): where the API's `send` flag names a channel — the
  * business's own email, and later the customer's account thread — a draft
@@ -106,6 +109,7 @@ export function InvoiceDetail({
     const [open, setOpen] = useState<Dialog | null>(null);
     const [url, setUrl] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [downloading, setDownloading] = useState(false);
     const s = invoice.standing;
     const credit = invoice.kind === "CREDIT_NOTE";
     const owed = (s === "ISSUED" || s === "OVERDUE") && !credit && !orderHref;
@@ -144,6 +148,23 @@ export function InvoiceDetail({
     }
 
     const print = () => window.print();
+
+    async function downloadPdf() {
+        setDownloading(true);
+        const res = await downloadInvoicePdf(invoice);
+        setDownloading(false);
+        if (!res.ok) showError(res.error);
+    }
+    // Reading the invoice is enough: the PDF is the paper the page shows.
+    const pdf = hasPdf(invoice)
+        ? [
+              {
+                  label: downloading ? "Making the PDF…" : "Download PDF",
+                  disabled: downloading,
+                  onClick: () => void downloadPdf(),
+              },
+          ]
+        : [];
     interface Action {
         label: string;
         primary?: boolean;
@@ -207,6 +228,7 @@ export function InvoiceDetail({
                 onClick: () => setOpen("pay"),
             },
             { label: "Print", onClick: print },
+            ...pdf,
             {
                 label: "Cancel invoice",
                 danger: true,
@@ -214,7 +236,7 @@ export function InvoiceDetail({
             },
         );
     } else {
-        actions.push({ label: "Print", primary: true, onClick: print });
+        actions.push({ label: "Print", primary: true, onClick: print }, ...pdf);
         if (canWrite && s === "PAID" && !credit) {
             actions.push(
                 orderHref
@@ -253,7 +275,7 @@ export function InvoiceDetail({
                 <div className="flex flex-wrap gap-2">
                     {actions.map((a) => {
                         const cls = cn(
-                            "h-[38px] rounded-[9px] px-4 text-[14px]",
+                            "h-[38px] cursor-pointer rounded-[9px] px-4 text-[14px]",
                             a.danger &&
                                 "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
                         );
