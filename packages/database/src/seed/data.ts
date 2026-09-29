@@ -32,6 +32,15 @@ export const OWNER_PASSWORD = "demo-password-123";
 export const REVIEWER_EMAIL = "reviewer@saroh.dev";
 export const REVIEWER_PASSWORD = "demo-password-123";
 
+/**
+ * Farah, on Northwind Store's counter: on the team as "Storefront team"
+ * (F16), with a Viewer's role on Northwind Store and not on Online. She
+ * sees and moves Northwind Store's orders and never Online's (DEC-074);
+ * the browser spec `storefront-team-orders.spec.ts` signs in as her.
+ */
+export const STOREFRONT_TEAM_EMAIL = "farah.storefront@saroh.dev";
+export const STOREFRONT_TEAM_PASSWORD = "demo-password-123";
+
 export const ORG_SLUG = "demo-org";
 export const ORG_NAME = "Northwind Supply";
 /**
