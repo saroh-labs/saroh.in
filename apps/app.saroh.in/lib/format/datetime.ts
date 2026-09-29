@@ -56,7 +56,9 @@ export function formatDayLabel(iso: string | Date, timeZone: string): string {
         day: "numeric",
         month: "short",
         year: "numeric",
-    }).format(new Date(iso));
+    })
+        .format(new Date(iso))
+        .replace("Sept", "Sep");
 }
 
 /**
@@ -191,12 +193,17 @@ export function formatWaiting(
  * want the viewer's zone should use `<ViewerDate>`, which resolves it safely.
  */
 export function formatShortDate(iso: string | Date, timeZone: string): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    }).format(new Date(iso));
+    return (
+        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+            timeZone,
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        })
+            .format(new Date(iso))
+            // ICU writes "Sept"; the designs write three letters every month.
+            .replace("Sept", "Sep")
+    );
 }
 
 /** A short date and time for a timeline, e.g. "21 Jul 2026, 14:05". */
@@ -212,5 +219,7 @@ export function formatShortDateTime(
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23",
-    }).format(new Date(iso));
+    })
+        .format(new Date(iso))
+        .replace("Sept", "Sep");
 }
