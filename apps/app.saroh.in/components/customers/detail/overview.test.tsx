@@ -5,6 +5,7 @@ import type {
     CustomerDetail,
     DetailOrder,
 } from "@/lib/customer-workspace/detail";
+import { canStopOffers } from "@/lib/customer-workspace/view";
 
 import { Overview } from "./overview";
 
@@ -109,5 +110,47 @@ describe("Usually buys", () => {
         expect(html).not.toContain("Usually buys");
         // The rest of the order picture still shows.
         expect(html).toContain('aria-label="How they get orders"');
+    });
+});
+
+describe("Offers and news (DEC-073)", () => {
+    const withConsent = (consent: CustomerDetail["consent"]) =>
+        renderToStaticMarkup(
+            <Overview
+                d={{ ...customer([]), consent }}
+                now={NOW}
+                canStop={canStopOffers(consent)}
+                stopping={false}
+                canConsent
+                onStop={vi.fn()}
+                onOrders={vi.fn()}
+                onBookings={vi.fn()}
+            />,
+        );
+
+    it('with nothing recorded says only that: no "They asked to stop"', () => {
+        const html = withConsent({ status: null, source: null, at: null });
+        expect(html).toContain("Nothing recorded yet.");
+        expect(html).not.toContain("They asked to stop");
+    });
+
+    it('offers "They asked to stop" once they have said yes', () => {
+        const html = withConsent({
+            status: "GRANTED",
+            source: "checkout",
+            at: "2026-09-18T00:00:00Z",
+        });
+        expect(html).toContain("Said yes to offers by email");
+        expect(html).toContain("They asked to stop</button>");
+    });
+
+    it("not again once they asked to stop", () => {
+        const html = withConsent({
+            status: "REVOKED",
+            source: null,
+            at: "2026-09-20T00:00:00Z",
+        });
+        expect(html).toContain("Asked to stop");
+        expect(html).not.toContain("They asked to stop</button>");
     });
 });
