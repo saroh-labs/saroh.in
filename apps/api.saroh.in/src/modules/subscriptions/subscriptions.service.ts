@@ -27,6 +27,8 @@ import {
 } from "../payments/charge-under-way";
 import { cancelMandatesInTx } from "../payments/mandate-cancel-job";
 import { MandateChargesService } from "../payments/mandate-charges.service";
+import type { AutopayChargeTiming } from "./autopay-timing";
+import { earlyIssueAt, effectiveChargeTiming } from "./autopay-timing";
 import { allowanceData } from "./classes-allowance";
 import type { UpcomingCollection } from "./collections";
 import {
@@ -55,6 +57,8 @@ import type {
     SubscribeDto,
     SubscriptionSettingsDto,
 } from "./dto";
+import type { EarlyDropReason } from "./early-renewal";
+import { dropEarlyRenewalInTx } from "./early-renewal";
 import { overdueInvoiceOf, takesPaymentOnline } from "./member-invoices";
 import type { PauseEnded } from "./pause-until";
 import {
@@ -798,6 +802,7 @@ export class SubscriptionsService {
             data: { status: "PAUSED", pausedAt: now, pausedUntil },
         });
         await log("PAUSED", { data: pausedEventData(pausedUntil) });
+        await this.dropEarly(tx, sub, "PAUSED", log, now);
         return pausedUntil;
     }
 
@@ -1026,7 +1031,9 @@ export class SubscriptionsService {
                         pendingPlanId: null,
                     },
                 });
-                await this.log(tx, ctx, id)("CANCELLED");
+                const log = this.log(tx, ctx, id);
+                await log("CANCELLED");
+                await this.dropEarly(tx, sub, "CANCELLED", log);
                 await endMandates(tx, ctx.organizationId, id);
                 return;
             }
@@ -1035,13 +1042,11 @@ export class SubscriptionsService {
                 where: { id },
                 data: { cancelAtPeriodEnd: true },
             });
-            await this.log(
-                tx,
-                ctx,
-                id,
-            )("CANCEL_SCHEDULED", {
+            const log = this.log(tx, ctx, id);
+            await log("CANCEL_SCHEDULED", {
                 data: { endsAt: sub.currentPeriodEnd.toISOString() },
             });
+            await this.dropEarly(tx, sub, "CANCELLED", log);
         });
         return this.read(ctx, id);
     }
@@ -1091,6 +1096,7 @@ export class SubscriptionsService {
                     },
                 });
                 await log("CANCELLED");
+                await this.dropEarly(tx, sub, "CANCELLED", log, now);
                 await endMandates(tx, member.organizationId, id);
                 return { outcome: "now", endsAt: now, timezone: sub.timezone };
             }
@@ -1101,6 +1107,7 @@ export class SubscriptionsService {
             await log("CANCEL_SCHEDULED", {
                 data: { endsAt: sub.currentPeriodEnd.toISOString() },
             });
+            await this.dropEarly(tx, sub, "CANCELLED", log);
             return { outcome: "scheduled", ...said };
         });
     }
@@ -1369,17 +1376,16 @@ export class SubscriptionsService {
                 where: { id },
                 data: { pendingPlanId: plan.id },
             });
-            await this.log(
-                tx,
-                ctx,
-                id,
-            )("PLAN_CHANGE_BOOKED", {
+            const log = this.log(tx, ctx, id);
+            await log("PLAN_CHANGE_BOOKED", {
                 data: {
                     to: planRef(plan),
                     from: sub.currentPeriodEnd.toISOString(),
                     replaced: sub.pendingPlan ? planRef(sub.pendingPlan) : null,
                 },
             });
+            // An early invoice (D13B) was for the old terms.
+            await this.dropEarly(tx, sub, "PLAN_CHANGED", log);
         });
         return this.read(ctx, id);
     }
@@ -1401,15 +1407,14 @@ export class SubscriptionsService {
                 where: { id },
                 data: { pendingPlanId: null },
             });
-            await this.log(
-                tx,
-                ctx,
-                id,
-            )("PLAN_CHANGE_CANCELLED", {
+            const log = this.log(tx, ctx, id);
+            await log("PLAN_CHANGE_CANCELLED", {
                 data: {
                     plan: sub.pendingPlan ? planRef(sub.pendingPlan) : null,
                 },
             });
+            // An early invoice (D13B) was for the booked plan's terms.
+            await this.dropEarly(tx, sub, "PLAN_CHANGED", log);
         });
         return this.read(ctx, id);
     }
@@ -1555,18 +1560,65 @@ export class SubscriptionsService {
         ctx: OrganizationContext,
     ): Promise<SubscriptionSettingsView> {
         authorize(ctx, "subscription:read");
-        return readSubscriptionSettings(ctx.organizationId);
+        return readSubscriptionSettings(
+            ctx.organizationId,
+            await this.autopayAvailable(ctx.organizationId),
+        );
     }
 
-    /** Turn "Members can pause from their account" on or off (A8). */
+    /**
+     * Turn "Members can pause from their account" on or off (A8), and set
+     * "When autopay charges" (D13B). A new timing reaches charges queued
+     * from now on; one already queued keeps its date (DEC-065).
+     */
     async updateSettings(
         ctx: OrganizationContext,
         dto: SubscriptionSettingsDto,
     ): Promise<SubscriptionSettingsView> {
         authorize(ctx, "subscription:write");
-        return writeSubscriptionSettings(ctx.organizationId, {
-            membersCanPause: dto.membersCanPause,
+        if (
+            dto.membersCanPause === undefined &&
+            dto.autopayChargeTiming === undefined
+        ) {
+            fieldError("Nothing to change", "membersCanPause");
+        }
+        return writeSubscriptionSettings(
+            ctx.organizationId,
+            {
+                membersCanPause: dto.membersCanPause,
+                autopayChargeTiming: dto.autopayChargeTiming,
+            },
+            await this.autopayAvailable(ctx.organizationId),
+        );
+    }
+
+    /**
+     * A plan's own "When autopay charges" (D13B), or null for the
+     * business's setting. Set straight on the plan, not through its draft:
+     * buyers never see it. Charges already queued keep their date.
+     */
+    async setPlanChargeTiming(
+        ctx: OrganizationContext,
+        planId: string,
+        timing: AutopayChargeTiming | null,
+    ): Promise<PlanView> {
+        authorize(ctx, "subscription:write");
+        const { count } = await prisma.subscriptionPlan.updateMany({
+            where: { id: planId, organizationId: ctx.organizationId },
+            data: { autopayChargeTiming: timing },
         });
+        if (count === 0) notFound("Plan");
+        return readPlan(ctx.organizationId, planId);
+    }
+
+    /** Whether autopay can charge for this business (D13B's setting shows). */
+    private async autopayAvailable(organizationId: string): Promise<boolean> {
+        if (!this.charges) return false;
+        try {
+            return await this.charges.chargingAvailable(organizationId);
+        } catch {
+            return false;
+        }
     }
 
     /**
@@ -1762,11 +1814,13 @@ export class SubscriptionsService {
                         ...(uncharged ? { uncharged: true } : {}),
                     },
                 });
+            // An early renewal invoice (D13B) is this period's; one voided
+            // or credited before the period began is not (DEC-065).
             const live = await tx.invoice.findFirst({
                 where: {
                     subscriptionId: id,
                     periodStart: period.start,
-                    status: { not: "VOID" },
+                    status: { notIn: ["VOID", "CREDITED"] },
                 },
                 select: { id: true },
             });
@@ -1794,13 +1848,140 @@ export class SubscriptionsService {
             // With autopay on, the charge is queued in this transaction
             // (D13): its intent and first step, or MANDATE_LIMIT_LOW. With
             // none, or its provider's charging off, the pay link as before.
+            // Its debit follows the merchant's timing (D13B).
             await this.charges?.queueInTx(tx, {
                 organizationId: sub.organizationId,
                 subscriptionId: id,
                 invoiceId,
                 now,
+                schedule: {
+                    timing: await effectiveChargeTiming(
+                        tx,
+                        sub.organizationId,
+                        terms.planId,
+                    ),
+                    periodStart: period.start,
+                    timezone: sub.timezone,
+                },
             });
             return "renewed";
+        });
+    }
+
+    /**
+     * Invoice the next period early, when its renewal charges autopay "on
+     * the renewal date" (D13B, DEC-065): {@link AUTOPAY_LEAD_DAYS} days
+     * before the period ends, so the bank's notice goes out with it and the
+     * debit lands on the renewal date. Called by the renewal job for an
+     * ACTIVE subscription, not set to end, with a chargeable mandate and
+     * Payments on. Once per period: a period with any invoice at all — one
+     * dropped by a cancel or pause included — is left to the renewal.
+     */
+    async renewEarlyOne(id: string, now: Date): Promise<"issued" | "skipped"> {
+        return prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${id} FOR UPDATE`;
+            const sub = await tx.customerSubscription.findUnique({
+                where: { id },
+                select: SUBSCRIPTION_SELECT,
+            });
+            if (
+                sub?.status !== "ACTIVE" ||
+                sub.cancelAtPeriodEnd ||
+                sub.currentPeriodEnd <= now ||
+                now < earlyIssueAt(sub.currentPeriodEnd, sub.timezone) ||
+                !this.charges
+            ) {
+                return "skipped";
+            }
+            const terms = await this.nextTerms(tx, sub);
+            const timing = await effectiveChargeTiming(
+                tx,
+                sub.organizationId,
+                terms.planId,
+            );
+            if (
+                timing !== "ON_RENEWAL_DATE" ||
+                !(await paymentsOn(tx, sub.organizationId)) ||
+                !(await this.charges.chargeableMandate(
+                    sub.organizationId,
+                    id,
+                    tx,
+                ))
+            ) {
+                return "skipped";
+            }
+            const anchor =
+                terms.interval !== sub.interval
+                    ? sub.currentPeriodEnd
+                    : sub.anchorAt;
+            const period = periodContaining(
+                anchor,
+                terms.interval,
+                sub.timezone,
+                sub.currentPeriodEnd,
+            );
+            const any = await tx.invoice.findFirst({
+                where: { subscriptionId: id, periodStart: period.start },
+                select: { id: true },
+            });
+            if (any || (await this.allSkipped(tx, sub, period))) {
+                return "skipped";
+            }
+            const invoiceId = await this.invoicePeriod(tx, {
+                organizationId: sub.organizationId,
+                subscriptionId: id,
+                contactId: sub.contactId,
+                planName: terms.planName,
+                price: terms.price,
+                currency: terms.currency,
+                timezone: sub.timezone,
+                period,
+                createdByUserId: null,
+                issuedAt: now,
+            });
+            await subscriptionEventLog(
+                tx,
+                sub.organizationId,
+                id,
+                JOB,
+            )("INVOICED", {
+                invoiceId,
+                data: {
+                    periodStart: period.start.toISOString(),
+                    periodEnd: period.end.toISOString(),
+                    early: true,
+                },
+            });
+            await this.charges.queueInTx(tx, {
+                organizationId: sub.organizationId,
+                subscriptionId: id,
+                invoiceId,
+                now,
+                schedule: {
+                    timing,
+                    periodStart: period.start,
+                    timezone: sub.timezone,
+                },
+            });
+            return "issued";
+        });
+    }
+
+    /** Drop the next period's early renewal invoice, if any (D13B). */
+    private dropEarly(
+        tx: Tx,
+        sub: SubscriptionRow,
+        reason: EarlyDropReason,
+        log: SubscriptionEventLog,
+        now: Date = new Date(),
+    ) {
+        return dropEarlyRenewalInTx(tx, {
+            organizationId: sub.organizationId,
+            subscriptionId: sub.id,
+            periodStart: sub.currentPeriodEnd,
+            reason,
+            now,
+            log,
         });
     }
 
@@ -2033,9 +2214,12 @@ export class SubscriptionsService {
             timezone: string;
             period: Period;
             createdByUserId: string | null;
+            /** When it is issued; now unless the job says (D13B). */
+            issuedAt?: Date;
         },
     ): Promise<string> {
         const issued = await this.invoices.issueInTx(tx, input.organizationId, {
+            ...(input.issuedAt ? { issuedAt: input.issuedAt } : {}),
             contactId: input.contactId,
             currency: input.currency,
             lines: [

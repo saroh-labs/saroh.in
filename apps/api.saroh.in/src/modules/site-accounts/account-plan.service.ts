@@ -11,6 +11,7 @@ import { toMoneyString } from "../../common/money";
 import { payLinkUrl } from "../invoices/pay-link-url";
 import { AutopayService } from "../payments/autopay.service";
 import { subscriptionChargesUnderWay } from "../payments/charge-under-way";
+import { MandateChargesService } from "../payments/mandate-charges.service";
 import type { MandateMethod } from "../payments/providers/provider.port";
 import { ALLOWANCE_SELECT } from "../subscriptions/classes-allowance";
 import type { PauseWeeks } from "../subscriptions/dto";
@@ -19,6 +20,7 @@ import {
     overdueInvoiceOf,
     takesPaymentOnline,
 } from "../subscriptions/member-invoices";
+import { nextAutopayCharge } from "../subscriptions/next-autopay-charge";
 import { paymentsOffered } from "../subscriptions/public-plans.service";
 import { membersCanPause } from "../subscriptions/subscription-settings";
 import type { CustomerScope } from "../subscriptions/subscriptions.service";
@@ -83,6 +85,8 @@ export class AccountPlanService {
         private readonly chargePending: AutopayChargePending = NO_AUTOPAY_YET,
         // Autopay on My plan (D12); absent where a test builds this by hand.
         @Optional() private readonly autopay?: AutopayService,
+        // "Next autopay charge" (D13B); absent, none is said.
+        @Optional() private readonly charges?: MandateChargesService,
     ) {}
 
     // ---- Reading ---------------------------------------------------------
@@ -163,6 +167,9 @@ export class AccountPlanService {
                 take: PLAN_ROWS,
                 select: {
                     id: true,
+                    organizationId: true,
+                    planId: true,
+                    pendingPlanId: true,
                     status: true,
                     price: true,
                     currency: true,
@@ -211,6 +218,15 @@ export class AccountPlanService {
                           }),
                       ])
                     : [null, null];
+                const nextCharge =
+                    line?.state === "ON" || underWay
+                        ? await nextAutopayCharge(
+                              this.charges,
+                              row,
+                              underWay,
+                              now,
+                          )
+                        : null;
                 return {
                     ...subscriptionView({
                         row,
@@ -228,6 +244,9 @@ export class AccountPlanService {
                         : null,
                     autopayCharging: underWay
                         ? { at: underWay.at.toISOString() }
+                        : null,
+                    autopayNextCharge: nextCharge
+                        ? { at: nextCharge.toISOString() }
                         : null,
                     autopayPays: owed
                         ? {

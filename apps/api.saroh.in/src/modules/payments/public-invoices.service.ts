@@ -19,13 +19,16 @@ import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
+import { nextAutopayCharge } from "../subscriptions/next-autopay-charge";
 import type {
     AutopayCheck,
     AutopayOutcome,
     AutopayStart,
 } from "./autopay.service";
 import { AutopayService } from "./autopay.service";
+import type { ChargeUnderWay } from "./charge-under-way";
 import { autopayChargeInProgress, chargeUnderWayOn } from "./charge-under-way";
+import { MandateChargesService } from "./mandate-charges.service";
 import type { CreateIntentResult } from "./payments.service";
 import { PaymentsService } from "./payments.service";
 import type { MandateMethod } from "./providers/provider.port";
@@ -76,6 +79,12 @@ export interface PublicInvoiceView {
      * for) and offers no payment, which the API would refuse (409).
      */
     autopayCharging?: { at: string } | null;
+    /**
+     * "Next autopay charge: ‹date›" (D13B, DEC-065): the planned debit of a
+     * charge queued on this invoice and not yet asked for, or — the invoice
+     * paid, autopay on — the next renewal's, by the business's timing.
+     */
+    autopayNextCharge?: { at: string } | null;
 }
 
 /** What the pay page may say about autopay (D12). */
@@ -217,6 +226,8 @@ export class PublicInvoicesService {
         // Autopay on a plan's invoice (D12); absent where a test builds
         // this by hand, and then the page offers none.
         @Optional() private readonly autopay?: AutopayService,
+        // "Next autopay charge" (D13B); absent, only a queued charge's.
+        @Optional() private readonly charges?: MandateChargesService,
     ) {}
 
     async read(token: string, callerHash?: string): Promise<PublicInvoiceView> {
@@ -238,13 +249,49 @@ export class PublicInvoicesService {
             const view: PublicInvoiceView = autopay
                 ? { ...paper, autopay }
                 : paper;
-            return charging
-                ? {
-                      ...view,
-                      autopayCharging: { at: charging.at.toISOString() },
-                  }
-                : view;
+            // "Next autopay charge" (D13B): this invoice's planned debit, or
+            // once it's paid with autopay on, the next renewal's.
+            const next =
+                charging || (autopay?.on && paper.status === "PAID")
+                    ? await this.nextCharge(found, charging)
+                    : null;
+            return {
+                ...view,
+                ...(charging
+                    ? { autopayCharging: { at: charging.at.toISOString() } }
+                    : {}),
+                ...(next
+                    ? { autopayNextCharge: { at: next.toISOString() } }
+                    : {}),
+            };
         });
+    }
+
+    /** When autopay next takes money for the invoice's plan (D13B). */
+    private async nextCharge(
+        found: { id: string; organizationId: string },
+        charging: ChargeUnderWay | null,
+    ): Promise<Date | null> {
+        const invoice = await prisma.invoice.findFirst({
+            where: { id: found.id, organizationId: found.organizationId },
+            select: {
+                subscription: {
+                    select: {
+                        id: true,
+                        organizationId: true,
+                        planId: true,
+                        pendingPlanId: true,
+                        status: true,
+                        cancelAtPeriodEnd: true,
+                        currentPeriodEnd: true,
+                        timezone: true,
+                    },
+                },
+            },
+        });
+        const sub = invoice?.subscription;
+        if (!sub) return null;
+        return nextAutopayCharge(this.charges, sub, charging, new Date());
     }
 
     /**

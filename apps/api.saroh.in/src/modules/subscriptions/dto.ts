@@ -13,6 +13,8 @@ import {
     ValidateIf,
 } from "class-validator";
 
+import type { AutopayChargeTiming } from "./autopay-timing";
+import { AUTOPAY_CHARGE_TIMINGS } from "./autopay-timing";
 import type { Interval } from "./periods";
 import { INTERVALS } from "./periods";
 
@@ -245,10 +247,31 @@ export class CancelSubscriptionDto {
     when!: "now" | "periodEnd";
 }
 
-/** The business's subscription settings (A8): "Members can pause from their account". */
+/**
+ * The business's subscription settings: "Members can pause from their
+ * account" (A8) and "When autopay charges" (D13B). Either or both; a save
+ * that names neither is refused.
+ */
 export class SubscriptionSettingsDto {
+    @IsOptional()
     @IsBoolean()
-    membersCanPause!: boolean;
+    membersCanPause?: boolean;
+
+    @IsOptional()
+    @IsIn(AUTOPAY_CHARGE_TIMINGS, {
+        message: "Pick when autopay charges",
+    })
+    autopayChargeTiming?: AutopayChargeTiming;
+}
+
+/** A plan's own "When autopay charges" (D13B); null uses the business's. */
+export class PlanChargeTimingDto {
+    // Present and null, or one of the timings; absent is refused.
+    @ValidateIf((o: PlanChargeTimingDto) => o.autopayChargeTiming !== null)
+    @IsIn(AUTOPAY_CHARGE_TIMINGS, {
+        message: "Pick when autopay charges, or use the business setting",
+    })
+    autopayChargeTiming!: AutopayChargeTiming | null;
 }
 
 export class ListSubscriptionsQueryDto {

@@ -3,6 +3,7 @@ import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { PAYMENTS_SWITCHED_OFF } from "../invoices/payments-on";
+import { AUTOPAY_LEAD_DAYS } from "./autopay-timing";
 import { pauseEndedWhere, refusedPauseIds } from "./pause-until";
 import { SUBSCRIPTION_RENEW_TYPE } from "./renew-job";
 import type { RenewOutcome } from "./subscriptions.service";
@@ -20,7 +21,9 @@ export const RENEW_BATCH = 200;
 export const RENEW_ROUNDS = 25;
 
 /**
- * Issues each subscription period's invoice on its renewal date (ADR-007).
+ * Issues each subscription period's invoice on its renewal date (ADR-007) —
+ * or, when its autopay charges "on the renewal date" (D13B, DEC-065), two
+ * days before it (`renewEarly`), and the renewal then finds it issued.
  *
  * There is no scheduler, so the job reschedules itself: every run ends by
  * enqueueing the next, and module start-up does the same. A partial unique
@@ -138,7 +141,77 @@ export class SubscriptionRenewHandler {
         if (seen.length > 0) {
             this.logger.log(`Subscription renewals: ${JSON.stringify(counts)}`);
         }
+        // Renewals whose autopay charges "on the renewal date" (D13B) are
+        // invoiced early. Never let it stop the run.
+        try {
+            await this.renewEarly(now);
+        } catch (error) {
+            this.logger.error(
+                `Early renewal invoices failed before they finished: ${String(error)}`,
+            );
+        }
         return more;
+    }
+
+    /**
+     * Invoice early the renewals that charge autopay "on the renewal date"
+     * (D13B, DEC-065): ACTIVE, not set to end, renewing within the lead
+     * window, with an ACTIVE mandate and no invoice yet for the next
+     * period, under that timing (the booked plan's, else the plan's, else
+     * the business's). `renewEarlyOne` checks each again under its lock.
+     */
+    async renewEarly(now: Date): Promise<number> {
+        const horizon = new Date(
+            now.getTime() + (AUTOPAY_LEAD_DAYS + 1) * 24 * 60 * 60 * 1000,
+        );
+        const due = await prisma.$queryRaw<{ id: string }[]>`
+            SELECT s.id
+            FROM "CustomerSubscription" s
+            JOIN "SubscriptionPlan" p ON p.id = s."planId"
+            LEFT JOIN "SubscriptionPlan" pp ON pp.id = s."pendingPlanId"
+            LEFT JOIN "BusinessProfile" b ON b."organizationId" = s."organizationId"
+            WHERE s.status = 'ACTIVE'
+              AND NOT s."cancelAtPeriodEnd"
+              AND s."currentPeriodEnd" > ${now}
+              AND s."currentPeriodEnd" <= ${horizon}
+              AND COALESCE(
+                    pp."autopayChargeTiming",
+                    CASE WHEN s."pendingPlanId" IS NULL THEN p."autopayChargeTiming" END,
+                    b."autopayChargeTiming",
+                    'DAY_AFTER_RENEWAL'
+                  ) = 'ON_RENEWAL_DATE'
+              AND EXISTS (
+                    SELECT 1 FROM "PaymentMandate" m
+                    WHERE m."subscriptionId" = s.id
+                      AND m.status = 'ACTIVE'
+                      AND m."providerMandateId" IS NOT NULL)
+              AND NOT EXISTS (
+                    SELECT 1 FROM "Invoice" i
+                    WHERE i."subscriptionId" = s.id
+                      AND i."periodStart" = s."currentPeriodEnd")
+            ORDER BY s."currentPeriodEnd" ASC
+            LIMIT ${RENEW_BATCH * RENEW_ROUNDS}`;
+        let issued = 0;
+        for (const { id } of due) {
+            try {
+                if (
+                    (await this.subscriptions.renewEarlyOne(id, now)) ===
+                    "issued"
+                ) {
+                    issued += 1;
+                }
+            } catch (error) {
+                this.logger.error(
+                    `Subscription ${id} was not invoiced early: ${String(error)}`,
+                );
+            }
+        }
+        if (issued > 0) {
+            this.logger.log(
+                `Early renewal invoices (autopay on the renewal date): ${issued}`,
+            );
+        }
+        return issued;
     }
 
     /**

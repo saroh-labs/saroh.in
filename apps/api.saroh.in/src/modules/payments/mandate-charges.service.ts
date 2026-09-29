@@ -3,6 +3,8 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
+import type { AutopayChargeTiming } from "../subscriptions/autopay-timing";
+import { chargePlan } from "../subscriptions/autopay-timing";
 import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
 import { OPEN_MANDATE_CHARGE } from "./charge-under-way";
 import { mandateChargingOn } from "./mandate-charge-gate";
@@ -107,6 +109,11 @@ export interface PrepareChargeInput {
     key: string;
     /** When the debit should happen; at least {@link earliestDebitAt}. */
     debitAt: Date;
+    /**
+     * The charge's planned debit (D13B): never debited before it, even by a
+     * method that needs no notice. Absent: as soon as the provider allows.
+     */
+    notBefore?: Date | null;
 }
 
 const OPEN_CHARGE = OPEN_MANDATE_CHARGE;
@@ -266,12 +273,18 @@ export class MandateChargesService {
                 debitAt: input.debitAt,
                 credentials: connection.credentials,
             });
+            // A planned debit (D13B) holds for a card too, whose provider
+            // would take it at once.
+            const debitAfter =
+                input.notBefore && input.notBefore > prepared.debitAfter
+                    ? input.notBefore
+                    : prepared.debitAfter;
             await prisma.paymentIntent.update({
                 where: { id: intent.id },
                 data: {
                     providerIntentId: prepared.providerIntentId,
                     status: "REQUIRES_PAYMENT",
-                    debitAfter: prepared.debitAfter,
+                    debitAfter,
                     preDebitStatus: prepared.preDebitStatus,
                     preDebitRef: prepared.preDebitRef,
                 },
@@ -280,7 +293,7 @@ export class MandateChargesService {
                 status: "PREPARED",
                 intentId: intent.id,
                 providerIntentId: prepared.providerIntentId,
-                debitAfter: prepared.debitAfter,
+                debitAfter,
                 preDebitStatus: prepared.preDebitStatus,
             };
         } catch (err) {
@@ -498,6 +511,7 @@ export class MandateChargesService {
         provider: string;
         maxAmountCents: number | null;
         currency: string;
+        method: string | null;
     } | null> {
         const mandate = await db.paymentMandate.findFirst({
             where: {
@@ -511,6 +525,7 @@ export class MandateChargesService {
                 provider: true,
                 maxAmountCents: true,
                 currency: true,
+                method: true,
             },
         });
         if (!mandate) return null;
@@ -531,6 +546,12 @@ export class MandateChargesService {
      * "Autopay charge in progress" from this commit on. Above the limit,
      * MANDATE_LIMIT_LOW is written and nothing is charged. Otherwise
      * nothing is written (never enqueue a no-op).
+     *
+     * A renewal passes its `schedule` (D13B): under ON_RENEWAL_DATE or
+     * ON_DUE_DATE the planned debit is written on the intent
+     * (`debitAfter`) and the first step waits until the notice is due, so
+     * the setting changing later never moves this charge. Retry, and
+     * DAY_AFTER_RENEWAL, prepare at once as D13 did.
      */
     async queueInTx(
         tx: Tx,
@@ -539,6 +560,12 @@ export class MandateChargesService {
             subscriptionId: string;
             invoiceId: string;
             now?: Date;
+            schedule?: {
+                timing: AutopayChargeTiming;
+                /** The renewal date: the invoiced period's start. */
+                periodStart: Date;
+                timezone: string;
+            };
         },
     ): Promise<QueueChargeResult> {
         const { organizationId, subscriptionId, invoiceId } = input;
@@ -589,6 +616,15 @@ export class MandateChargesService {
             },
         });
         const key = chargeKey(invoiceId, earlier + 1);
+        const now = input.now ?? new Date();
+        const plan = input.schedule
+            ? chargePlan(input.schedule.timing, {
+                  now,
+                  periodStart: input.schedule.periodStart,
+                  timezone: input.schedule.timezone,
+                  method: mandate.method,
+              })
+            : null;
         const intent = await tx.paymentIntent.create({
             data: {
                 organizationId,
@@ -600,6 +636,8 @@ export class MandateChargesService {
                 idempotencyKey: key,
                 viaMandateId: mandate.id,
                 preDebitStatus: "PENDING",
+                // The planned debit, before the provider has the order.
+                debitAfter: plan?.debitAt ?? null,
             },
             select: { id: true },
         });
@@ -607,9 +645,34 @@ export class MandateChargesService {
             tx,
             organizationId,
             { invoiceId, mandateId: mandate.id, key, step: "PREPARE" },
-            input.now ?? new Date(),
+            plan?.prepareAt ?? now,
         );
         return { status: "QUEUED", intentId: intent.id, key };
+    }
+
+    /**
+     * Whether Saroh may charge autopay for this business at all (D13B): a
+     * connected provider that takes mandates, with its charging on
+     * (`RAZORPAY_AUTOPAY`). Off, the workspace hides "When autopay
+     * charges" (DEC-057's spirit: nothing shown that can't happen).
+     */
+    async chargingAvailable(organizationId: string): Promise<boolean> {
+        const connected = await prisma.merchantPaymentProvider.findMany({
+            where: { organizationId, status: "CONNECTED" },
+            select: { provider: true },
+        });
+        for (const c of connected) {
+            if (
+                await mandateChargingOn(
+                    this.providers,
+                    organizationId,
+                    c.provider,
+                )
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

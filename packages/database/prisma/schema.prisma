@@ -388,6 +388,14 @@ model BusinessProfile {
   // account shows no Pause and the API refuses a customer's pause (403).
   // Staff pause either way. No profile yet reads as on.
   membersCanPause Boolean @default(true)
+
+  // When autopay debits a renewal (round-2 D13B, DEC-065): ON_RENEWAL_DATE
+  // (the invoice and bank notice go out early so the debit lands on the
+  // renewal date), DAY_AFTER_RENEWAL (D13: invoice on the renewal date,
+  // debit about a day later) or ON_DUE_DATE (debit on the invoice's due
+  // date). A plan's `autopayChargeTiming` wins when set. A CHECK constraint
+  // holds the values. No profile yet reads as DAY_AFTER_RENEWAL.
+  autopayChargeTiming String @default("DAY_AFTER_RENEWAL")
 }
 
 // Membership: links a User to an Organization with a role (renamed from
@@ -5073,6 +5081,12 @@ model SubscriptionPlan {
   // Bumped by every draft save, publish, discard and plan write, so an
   // editor holding an older revision is refused instead of overwriting (#285).
   draftRevision      Int       @default(0)
+
+  // When autopay debits this plan's renewals (round-2 D13B, DEC-065): one
+  // of BusinessProfile.autopayChargeTiming's values, or null to use the
+  // business's setting. Set straight from Plan Detail, not through a draft:
+  // it is billing, never shown to buyers. A CHECK constraint holds the values.
+  autopayChargeTiming String?
 }
 
 // One change to a plan: who made it, when, and each changed field's value
@@ -5350,8 +5364,10 @@ model Invoice {
 
   @@unique([organizationId, number])
   // One live invoice per subscription period: the renewal job's idempotency
-  // key. Voided invoices are left out, so a voided period can be reissued.
-  @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID'"))
+  // key. Voided and fully credited invoices are left out, so such a period
+  // can be reissued: a GST business credits an early renewal invoice a
+  // cancel or pause drops (D13B, DEC-065) where others void it.
+  @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID' AND status <> 'CREDITED'"))
   // One invoice per order and per booking (ADR-008): the idempotency key of
   // the payment reconciliation. Corrections are other kinds.
   @@unique([orderId], map: "Invoice_one_per_order", where: raw("kind = 'INVOICE'"))

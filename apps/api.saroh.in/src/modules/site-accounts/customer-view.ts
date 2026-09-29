@@ -173,6 +173,14 @@ export interface AccountSubscription extends AccountPlan {
      * is hidden meanwhile. Null: none. Absent from an API older than D13.
      */
     autopayCharging?: { at: string } | null;
+    /**
+     * When autopay next takes money for this plan (D13B, DEC-065): "Next
+     * autopay charge: ‹date›". A charge queued but not yet asked for gives
+     * its planned debit; with none queued, the next renewal's by the
+     * business's timing. Null: autopay won't charge (none, off, paused, or
+     * the plan ends). Absent from an API older than D13B.
+     */
+    autopayNextCharge?: { at: string } | null;
 }
 
 /** A plan's autopay as the member sees it (D12). */

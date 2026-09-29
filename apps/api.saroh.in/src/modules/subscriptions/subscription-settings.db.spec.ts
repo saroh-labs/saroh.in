@@ -48,13 +48,13 @@ describe("subscription settings (A8)", () => {
     it("an owner turns it off and on; the profile is made if missing", async () => {
         env.SITE_ACCOUNT_AREA = "on";
         const ctx = await business();
-        expect(await service.settings(ctx)).toEqual({
+        expect(await service.settings(ctx)).toMatchObject({
             membersCanPause: true,
             accountArea: true,
         });
         expect(
             await service.updateSettings(ctx, { membersCanPause: false }),
-        ).toEqual({ membersCanPause: false, accountArea: true });
+        ).toMatchObject({ membersCanPause: false, accountArea: true });
         expect(await membersCanPause(ctx.organizationId)).toBe(false);
         await service.updateSettings(ctx, { membersCanPause: true });
         expect(await membersCanPause(ctx.organizationId)).toBe(true);
