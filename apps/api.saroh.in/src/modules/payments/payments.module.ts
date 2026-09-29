@@ -6,6 +6,7 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { AutopayService } from "./autopay.service";
 import { MANDATE_CANCEL_TYPE } from "./mandate-cancel-job";
 import { MandateCancelHandler } from "./mandate-cancel.handler";
 import { MandateChargesService } from "./mandate-charges.service";
@@ -54,8 +55,11 @@ import { SEND_REFUND_TYPE, SendRefundHandler } from "./send-refund.handler";
         // Set-up and the two-step charge (D11).
         MandateSetupService,
         MandateChargesService,
+        // The customer turns autopay on (D12).
+        AutopayService,
     ],
     exports: [
+        AutopayService,
         PaymentsService,
         MandatesService,
         MandateSetupService,

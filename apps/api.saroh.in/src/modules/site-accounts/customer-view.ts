@@ -156,6 +156,24 @@ export interface AccountSubscription extends AccountPlan {
     canResume: boolean;
     /** Not ended, and not already set to end. */
     canCancel: boolean;
+    /**
+     * How its autopay stands (D12): ON (or PAUSED in their UPI app), being
+     * set up, or failed; with the method and only the provider's
+     * displayable hint. Null: none. Absent from an API older than D12.
+     */
+    autopay?: AccountAutopay | null;
+    /**
+     * What turning autopay on pays now (D12): the plan's oldest unpaid
+     * invoice, which UPI or card pay in the same window. Null: nothing owed.
+     */
+    autopayPays?: { total: string; currency: string } | null;
+}
+
+/** A plan's autopay as the member sees it (D12). */
+export interface AccountAutopay {
+    state: "ON" | "PAUSED" | "PENDING" | "FAILED";
+    method: "UPI" | "CARD" | "EMANDATE" | null;
+    hint: string | null;
 }
 
 export interface AccountPack {
@@ -173,6 +191,11 @@ export interface AccountPlanTab {
     packs: Block<AccountPack[]>;
     /** The weeks a pause may last (2, 4, 8); empty when members can't pause. */
     pauseWeeks: number[];
+    /**
+     * The ways the business's provider can take autopay (D12), every one
+     * it offers; empty when it takes none, and then autopay isn't offered.
+     */
+    autopayMethods?: ("UPI" | "CARD" | "EMANDATE")[];
 }
 
 /** What a pause, resume or cancel answers: what happened, and the tab now. */

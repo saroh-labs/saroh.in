@@ -1141,6 +1141,8 @@ export class WebhooksService {
                       organizationId: intent.organizationId,
                       now: new Date(),
                       payment,
+                      // Autopay chosen at join starts with it (D12).
+                      providerIntentId: intent.providerIntentId,
                   })
                 : null;
         // A booking's pay link (E4) paid after the booking was cancelled:

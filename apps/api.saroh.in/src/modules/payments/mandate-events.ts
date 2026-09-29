@@ -1,10 +1,14 @@
 import { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import type { SubscriptionActor } from "../subscriptions/subscription-events";
 import {
+    customerActor,
     JOB,
     recordSubscriptionEvent,
 } from "../subscriptions/subscription-events";
+
+import { heldReportOf, readJoinAutopay } from "./join-autopay";
 
 import { enqueueMandateCancelInTx } from "./mandate-cancel-job";
 import type { MandateStatus, ReportedMandateChange } from "./mandate-rules";
@@ -38,6 +42,9 @@ interface MandateRow {
     activatedAt: Date | null;
     providerMandateId: string | null;
     cancelConfirmedAt: Date | null;
+    method: string | null;
+    setupSource: string | null;
+    setupAccountId: string | null;
 }
 
 const ROW_SELECT = {
@@ -47,6 +54,9 @@ const ROW_SELECT = {
     activatedAt: true,
     providerMandateId: true,
     cancelConfirmedAt: true,
+    method: true,
+    setupSource: true,
+    setupAccountId: true,
 } as const;
 
 /** The mandate a change names: by the provider's id, else by its set-up. */
@@ -93,7 +103,16 @@ export async function applyMandateChangeInTx(
     change: ReportedMandateChange,
     now: Date = new Date(),
 ): Promise<{ applied: boolean }> {
-    const row = await findMandate(tx, organizationId, provider, change);
+    let row = await findMandate(tx, organizationId, provider, change);
+    if (!row) {
+        // A plan joined with autopay has no row until its payment starts
+        // the subscription (D12): the report waits on the join's draft.
+        if (await holdForJoinInTx(tx, organizationId, provider, change)) {
+            return { applied: true };
+        }
+        // The join was paid meanwhile, and its row made.
+        row = await findMandate(tx, organizationId, provider, change);
+    }
     if (!row) {
         logger.warn(
             `${provider} reported a mandate Saroh doesn't have (${change.status}); acknowledged, nothing written`,
@@ -276,12 +295,13 @@ async function activate(
             organizationId,
             row.subscriptionId,
             "MANDATE_SET_UP",
-            JOB,
+            setUpBy(row),
             {
                 data: {
                     method: isMandateMethod(change.method)
                         ? change.method
-                        : null,
+                        : row.method,
+                    ...(row.setupSource ? { source: row.setupSource } : {}),
                 },
             },
         );
@@ -293,6 +313,81 @@ async function activate(
         });
     }
     return { applied: true };
+}
+
+/**
+ * Who set a mandate up, for the log (D12): the customer from their site
+ * account (the Prices page or the account), the customer from a pay link
+ * (no account: whoever holds the link is taken as the customer the invoice
+ * is for), or Saroh when nothing says.
+ */
+function setUpBy(
+    row: Pick<MandateRow, "setupSource" | "setupAccountId">,
+): SubscriptionActor {
+    if (row.setupAccountId) return customerActor(row.setupAccountId);
+    if (row.setupSource === "PAY_LINK") {
+        return {
+            actorKind: "CUSTOMER",
+            actorUserId: null,
+            customerAccountId: null,
+        };
+    }
+    return JOB;
+}
+
+/**
+ * Hold a report for a set-up started while joining a plan (D12), whose row
+ * doesn't exist until the join's payment lands: kept on the draft, under
+ * its lock, and applied when the row is made (`plan-join-autopay.ts`).
+ * False when no waiting draft started this set-up.
+ */
+async function holdForJoinInTx(
+    tx: Tx,
+    organizationId: string,
+    provider: string,
+    change: ReportedMandateChange,
+): Promise<boolean> {
+    if (!change.setupReference) return false;
+    const draft = await tx.invoice.findFirst({
+        where: {
+            organizationId,
+            source: "SUBSCRIPTION",
+            status: "DRAFT",
+            number: null,
+            planTerms: {
+                path: ["autopay", "setupReference"],
+                equals: change.setupReference,
+            },
+        },
+        select: { id: true },
+    });
+    if (!draft) return false;
+    // The payment's webhook takes the same lock before it joins.
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${draft.id} AND "organizationId" = ${organizationId} FOR UPDATE`;
+    const locked = await tx.invoice.findFirst({
+        where: { id: draft.id, organizationId, status: "DRAFT" },
+        select: { planTerms: true },
+    });
+    const autopay = readJoinAutopay(locked?.planTerms);
+    if (
+        !locked?.planTerms ||
+        typeof locked.planTerms !== "object" ||
+        Array.isArray(locked.planTerms) ||
+        autopay?.provider !== provider ||
+        autopay.setupReference !== change.setupReference
+    ) {
+        return false;
+    }
+    await tx.invoice.update({
+        where: { id: draft.id },
+        data: {
+            planTerms: {
+                ...locked.planTerms,
+                autopay: { ...autopay, reported: { ...heldReportOf(change) } },
+            },
+        },
+    });
+    return true;
 }
 
 function isWholePositive(value: unknown): value is number {

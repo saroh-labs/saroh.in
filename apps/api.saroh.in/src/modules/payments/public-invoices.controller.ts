@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { hashClientIp } from "../../common/client-ip";
 
+import type { AutopayOutcome, AutopayStart } from "./autopay.service";
 import type { CreateIntentResult } from "./payments.service";
 import type { PublicInvoiceView } from "./public-invoices.service";
 import { PublicInvoicesService } from "./public-invoices.service";
@@ -56,5 +57,37 @@ export class PublicInvoicesController {
         @Ip() ip: string,
     ): Promise<CreateIntentResult> {
         return this.invoices.createIntent(token, body, hashClientIp(ip));
+    }
+
+    /**
+     * "Pay and turn on autopay" for a plan's invoice (D12). The body names
+     * the method the customer picked from the page's offer, and an
+     * idempotency key; read by hand as the intent's is, so nothing else in
+     * it — an amount, a limit — is taken. 409 for an invoice that isn't a
+     * plan's, or a business without autopay.
+     */
+    @Post(":token/autopay")
+    @HttpCode(201)
+    @Header("Referrer-Policy", "no-referrer")
+    @Header("X-Robots-Tag", "noindex, nofollow")
+    @Header("Cache-Control", "no-store")
+    startAutopay(
+        @Param("token") token: string,
+        @Body() body: unknown,
+        @Ip() ip: string,
+    ): Promise<AutopayStart> {
+        return this.invoices.startAutopay(token, body, hashClientIp(ip));
+    }
+
+    /** How autopay stands, for the page on the business's site after (D12). */
+    @Get(":token/autopay")
+    @Header("Referrer-Policy", "no-referrer")
+    @Header("X-Robots-Tag", "noindex, nofollow")
+    @Header("Cache-Control", "no-store")
+    autopay(
+        @Param("token") token: string,
+        @Ip() ip: string,
+    ): Promise<AutopayOutcome & { payUrl: string }> {
+        return this.invoices.autopayOutcome(token, hashClientIp(ip));
     }
 }

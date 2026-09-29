@@ -16,6 +16,8 @@ import {
     NO_AUTOPAY_YET,
 } from "../site-accounts/account-plan.service";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
+import { AccountAutopayController } from "./account-autopay.controller";
+import { AccountAutopayService } from "./account-autopay.service";
 import { AccountPlanJoinController } from "./account-plan-join.controller";
 import { PublicPlanJoinService } from "./public-plan-join.service";
 import { PublicPlansController } from "./public-plans.controller";
@@ -60,6 +62,7 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         PublicPlansController,
         AccountPlanController,
         AccountPlanJoinController,
+        AccountAutopayController,
     ],
     providers: [
         SubscriptionsService,
@@ -68,6 +71,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         OrganizationGuard,
         AccountPlanService,
         PublicPlanJoinService,
+        // The customer turns autopay on from their account (D12).
+        AccountAutopayService,
         // No autopay charge is ever under way until D13 provides the check.
         { provide: AUTOPAY_CHARGE_PENDING, useValue: NO_AUTOPAY_YET },
     ],

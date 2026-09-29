@@ -11,6 +11,8 @@ import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { AutopayService } from "../payments/autopay.service";
+import type { MandateMethod } from "../payments/providers/provider.port";
 import { PLANS_ON_SALE } from "./plan-on-sale";
 
 /**
@@ -72,6 +74,12 @@ export interface PublicPlans {
      * never reads it keeps working.
      */
     payOnline: boolean;
+    /**
+     * Every way the business's provider can take autopay (D12), for the
+     * join sheet's "Pay with"; empty when it takes none, or Join isn't
+     * paid online. Added beside the rest, so an older site ignores it.
+     */
+    autopayMethods: MandateMethod[];
 }
 
 function notFound(): never {
@@ -147,6 +155,8 @@ export class PublicPlansService {
             READS_PER_WINDOW,
             READ_WINDOW_MS,
         ),
+        // Autopay's methods (D12); absent where a test builds this by hand.
+        @Optional() private readonly autopay?: AutopayService,
     ) {}
 
     async list(
@@ -200,8 +210,21 @@ export class PublicPlansService {
                 ]);
             },
         );
+        // How the join sheet can offer autopay (D12): the provider's own
+        // list, only where Join is paid online; a provider that can't say
+        // offers none.
+        const autopay = this.autopay;
+        const autopayMethods =
+            payOnline && autopay
+                ? await runInOrgContext(organizationId, () =>
+                      autopay
+                          .offer(organizationId)
+                          .catch((): MandateMethod[] => []),
+                  )
+                : [];
         return {
             payOnline,
+            autopayMethods,
             plans: orderPlans(
                 rows.map(({ _count, ...row }) => ({
                     ...row,

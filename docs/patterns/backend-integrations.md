@@ -138,6 +138,22 @@ a note saying so.
   PROCESSING) before the call, so it is asked once; the payment's own
   webhook settles the invoice as a pay link's does. Ask for a debit at
   least `PRE_DEBIT_LEAD_HOURS` (26) ahead: `earliestDebitAt`.
+- **Current** (D12) — **Setting autopay up pays the invoice in the same
+  flow, where the method allows.** For UPI and card the authorisation's
+  first payment is the invoice's: `createSetup` gets `firstAmountCents` =
+  the invoice, and the invoice's PaymentIntent is recorded under the
+  set-up's `setupReference` (the adapter must make that the provider order
+  the first payment is taken on), so its capture webhook pays the invoice
+  as a pay link's does. eMandate authorises for ₹0 after a normal payment.
+  The customer comes back to `returnUrl`, a page on the business's own site
+  (`sites/site-origin.ts`); a Razorpay window takes `clientParams`
+  `razorpayOrderId`, `razorpayCustomerId` and `recurring: true`
+  (`site-blocks/booking-flow/checkout.ts`). A plan joined online has no
+  subscription until paid (DEC-062), so its set-up is kept on the draft's
+  `planTerms.autopay` (`payments/join-autopay.ts`), a provider report that
+  comes first is held there, and the mandate row is made when the payment
+  starts the subscription (`subscriptions/plan-join-autopay.ts`). Code:
+  `payments/autopay.service.ts`.
 - **Current** — **The refund webhook settles at the provider's amount**
   (#508 U2). Adapters normalise the refunded amount in paise, Saroh's
   reference and a `REFUND_FAILED` outcome (Razorpay `refund.failed`; Cashfree
@@ -219,4 +235,6 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
 - **Still open** (D19's test-mode run): the notice's delivery and the debit
   after `payment_after` in test mode, a debit above `max_amount`, a cancel
   answered twice, and whether card and eMandate debits need the notice
-  step at all — the port lets a method answer `NOT_NEEDED`.
+  step at all — the port lets a method answer `NOT_NEEDED`; and whether a
+  UPI or card authorisation with nothing owed (D12's account set-up, which
+  sends `firstAmountCents` 0) is taken, or needs the ₹1 minimum.
