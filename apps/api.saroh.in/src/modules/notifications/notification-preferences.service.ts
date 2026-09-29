@@ -176,7 +176,9 @@ export class NotificationPreferencesService {
     ): Promise<AlertEvent[]> {
         const has = (action: Parameters<typeof allows>[1]) =>
             allows(ctx, action);
-        const readable = ALERT_EVENTS.filter((e) => mayHearAbout(e, has));
+        const readable = ALERT_EVENTS.filter((e) =>
+            mayHearAbout(e, has, ctx.roleKey),
+        );
         const modules = [
             ...new Set(
                 readable

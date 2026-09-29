@@ -106,8 +106,10 @@ export class NotificationsService {
             },
             select: { event: true, channel: true, enabled: true },
         });
-        const hidden = hiddenNotificationTypes(stored, (action) =>
-            allows(ctx, action),
+        const hidden = hiddenNotificationTypes(
+            stored,
+            (action) => allows(ctx, action),
+            ctx.roleKey,
         );
         return hidden.length > 0 ? { type: { notIn: hidden } } : {};
     }

@@ -472,6 +472,11 @@ export interface HomeInput {
     /** The viewer: a Reviewer's Home reads only their own grants (F9). */
     userId?: string;
     organizationRole: OrgRole;
+    /**
+     * The role as stored: a Storefront team holder's orders are their
+     * storefronts' only (DEC-074), so none means none, not every one.
+     */
+    organizationRoleKey?: string;
     /** Resolved permissions; see `AvailabilityInput.organizationActions`. */
     organizationActions?: ReadonlySet<OrgAction>;
     projectId?: string;

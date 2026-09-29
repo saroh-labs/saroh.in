@@ -46,6 +46,10 @@ import { adjustReservation, applyInventoryTransition } from "./order-inventory";
 import { INVOICE_TITLE_SELECT } from "./order-invoice-title";
 import { isServiceLine } from "./order-line";
 import {
+    assertOrdersAtOwnLocation,
+    orderLocationWhere,
+} from "./order-location";
+import {
     fromCents,
     notSold,
     priceOrderLines,
@@ -112,7 +116,13 @@ export class OrderKitchenService {
             authorize(ctx, "order:stage");
         }
         const found = await prisma.order.findFirst({
-            where: { id: orderId, organizationId: ctx.organizationId },
+            where: {
+                id: orderId,
+                organizationId: ctx.organizationId,
+                // A location's team reads its own storefronts' orders
+                // (DEC-074): another's is not there.
+                ...orderLocationWhere(ctx),
+            },
             include: READ_INCLUDE,
         });
         if (!found) throw new NotFoundException("Order not found");
@@ -193,11 +203,13 @@ export class OrderKitchenService {
      * "Mark visit N attended" (B14): `order:stage`, once the visit has
      * started; the last one fulfils the order (`order-visit-attend.ts`).
      */
-    markVisitAttended(
+    async markVisitAttended(
         ctx: OrganizationContext,
         orderId: string,
         visitNumber: number,
     ): Promise<VisitAttended> {
+        authorize(ctx, "order:stage");
+        await assertOrdersAtOwnLocation(ctx, [orderId]);
         return markVisitAttended(ctx, orderId, visitNumber);
     }
 
@@ -254,6 +266,7 @@ export class OrderKitchenService {
         dto: MoveStageDto,
     ): Promise<{ id: string; stage: string; status: string; eventId: string }> {
         authorize(ctx, "order:stage");
+        await assertOrdersAtOwnLocation(ctx, [orderId]);
         return prisma.$transaction((tx) =>
             writeStageMove(tx, ctx, orderId, dto),
         );
@@ -280,6 +293,7 @@ export class OrderKitchenService {
         told: boolean;
     }> {
         authorize(ctx, "order:stage");
+        await assertOrdersAtOwnLocation(ctx, [orderId]);
         return prisma.$transaction((tx) =>
             writeStageUndo(tx, ctx, orderId, eventId),
         );
@@ -335,6 +349,7 @@ export class OrderKitchenService {
         if (!touchesOrder && courier.length === 0) {
             throw new BadRequestException("Nothing to change");
         }
+        await assertOrdersAtOwnLocation(ctx, [orderId]);
         // A repeated itemId would apply its delta twice against the same
         // stale snapshot below (and `[{a,0},{a,1}]` deletes, then updates,
         // a row that is already gone) — refused before any of that runs.

@@ -25,6 +25,7 @@ export class HomeController {
             organizationId: ctx.organizationId,
             userId: ctx.userId,
             organizationRole: ctx.role,
+            organizationRoleKey: ctx.roleKey,
             organizationActions: ctx.actions,
             projectId,
         });

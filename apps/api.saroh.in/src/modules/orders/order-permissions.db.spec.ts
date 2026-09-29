@@ -23,6 +23,10 @@
  * changes and exports; `payment:manage` still refunds. The provider is the
  * network-free fake; only the app env is stubbed. Runs in the integration
  * project.
+ *
+ * The Storefront team role (DEC-074) holds `order:stage` narrowed to the
+ * storefronts its holder works on: every read and move above for their
+ * storefront's orders; another storefront's read is a 404, its move a 403.
  */
 jest.mock("../../env", () => ({
     env: {
@@ -54,6 +58,7 @@ import { OrganizationContextService } from "../organizations/organization-contex
 import { OrganizationMembersService } from "../organizations/organization-members.service";
 import type { OrgAction } from "../organizations/organization-policy";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import { joinTeamFromStorefront } from "../organizations/storefront-team-role";
 import { PaymentsService } from "../payments/payments.service";
 import {
     FakeMerchantProvider,
@@ -582,6 +587,132 @@ describe("an extra permission for one person (F17)", () => {
                 controller.cancel(taken, third, {
                     idempotencyKey: `f17-${third}`,
                 }),
+            ),
+        ).toBe("refused");
+    });
+});
+
+/** A location's team (DEC-074): the matrix's rows for the Storefront team. */
+describe("a location's team: the Storefront team role (DEC-074)", () => {
+    const contexts = new OrganizationContextService();
+    let clerkId = "";
+    let marketId = "";
+    let marketBread = "";
+
+    beforeAll(async () => {
+        clerkId = (
+            await prisma.user.create({
+                data: { email: `dec074-clerk-${tag}@example.com` },
+            })
+        ).id;
+        await prisma.$transaction(async (tx) => {
+            await tx.storeMembers.create({
+                data: { storeId, userId: clerkId, role: "VIEWER" },
+            });
+            await joinTeamFromStorefront(tx, {
+                organizationId: orgId,
+                userId: clerkId,
+                store: { id: storeId, name: "Hill Road" },
+                source: "invite",
+                actorUserId: clerkId,
+            });
+        });
+        marketId = (
+            await stores.createForUser(ownerId, orgId, {
+                name: "Market",
+                slug: `b16-market-${tag}`,
+            })
+        ).id;
+        await prisma.storeSettings.upsert({
+            where: { storeId: marketId },
+            create: {
+                storeId: marketId,
+                currency: "INR",
+                fulfilmentTypes: ["PICKUP"],
+                collectionEnabled: true,
+            },
+            update: { currency: "INR", fulfilmentTypes: ["PICKUP"] },
+        });
+        marketBread = (
+            await products.create(marketId, ownerId, {
+                name: "Market loaf",
+                price: "120",
+            })
+        ).id;
+    });
+
+    const paid = (id: string) =>
+        prisma.order.update({
+            where: { id },
+            data: { paymentStatus: "PAID" },
+        });
+
+    /** A paid order at Market, which the clerk doesn't work on. */
+    async function marketOrder(): Promise<string> {
+        const made = await orders.create(marketId, ownerId, {
+            items: [{ productId: marketBread, quantity: 1 }],
+            fulfilment: "PICKUP",
+            walkIn: { name: "Asha" },
+            payment: { kind: "LATER" },
+        } as CreateOrderDto);
+        await paid(made.id);
+        return made.id;
+    }
+
+    it("reads and moves Hill Road's orders as the kitchen does", async () => {
+        const clerk = await contexts.resolve(clerkId, orgId);
+        const id = await freshOrder();
+        await paid(id);
+        expect(await gate(() => controller.list(clerk))).toBe("allowed");
+        expect(await gate(() => controller.filters(clerk))).toBe("allowed");
+        expect(await gate(() => controller.products(clerk))).toBe("allowed");
+        const read = await controller.read(clerk, id);
+        expect(read.money).toBeNull();
+        expect(
+            await gate(() =>
+                controller.moveStage(clerk, id, { to: "PREPARING" }),
+            ),
+        ).toBe("allowed");
+        expect(
+            await gate(() =>
+                controller.edit(clerk, id, { courierName: "Dunzo" }),
+            ),
+        ).toBe("allowed");
+    });
+
+    it("Market's order: a 404 to read, a 403 to move, and not listed", async () => {
+        const clerk = await contexts.resolve(clerkId, orgId);
+        const id = await marketOrder();
+        await expect(controller.read(clerk, id)).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        await expect(
+            controller.moveStage(clerk, id, { to: "PREPARING" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        const listed = await controller.list(clerk);
+        expect(listed.rows.some((r) => r.id === id)).toBe(false);
+    });
+
+    it("takes, changes, refunds, pays and exports nothing", async () => {
+        const clerk = await contexts.resolve(clerkId, orgId);
+        const id = await freshOrder();
+        expect(
+            await gate(() => controller.list(clerk, { export: "true" })),
+        ).toBe("refused");
+        expect(
+            await gate(() => controller.edit(clerk, id, { notes: "Hi" })),
+        ).toBe("refused");
+        expect(await gate(() => controller.payLink(clerk, id))).toBe("refused");
+        expect(
+            await gate(() =>
+                controller.cancel(clerk, id, {
+                    idempotencyKey: `dec074-${id}`,
+                }),
+            ),
+        ).toBe("refused");
+        expect(
+            await storeGate(() =>
+                orders.create(storeId, clerkId, newOrderDto()),
             ),
         ).toBe("refused");
     });
