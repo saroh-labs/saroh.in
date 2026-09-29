@@ -166,6 +166,25 @@ a note saying so.
   comes first is held there, and the mandate row is made when the payment
   starts the subscription (`subscriptions/plan-join-autopay.ts`). Code:
   `payments/autopay.service.ts`.
+- **Current** (D12B, DEC-064) — **Nothing owed: UPI and card take the ₹1
+  check, and it is refunded automatically.** A method whose authorisation
+  must take a payment says its minimum on the mandate capability
+  (`authorisationMinimumCents`; Razorpay UPI and card 100 paise) — never a
+  literal in a service; eMandate names none and stays ₹0. `createSetup`
+  with `firstAmountCents` 0 sends that minimum and records it as an
+  AUTHORISATION PaymentIntent on no order or invoice
+  (`checkForMandateId` = the set-up), under the provider order its payment
+  is made on (`MandateSetupResult.paymentReference`, else
+  `setupReference`). Its capture — the webhook, or `refresh` finding the
+  payment (`ProviderMandate.setupPayment`) when the webhook is lost —
+  reserves one refund keyed per payment (`CHECK_REFUND_KEY`) with its
+  `payments.send-refund` job on the same transaction; the job looks before
+  it sends and sends under the refund's id (DEC-026), and `refund.*`
+  settle it (matched by the check's own intent, since it has no order or
+  invoice). It is never a sale: no invoice, no credit note, and the
+  calendar's fees leave out `purpose` AUTHORISATION. A set-up that fails
+  after the capture is refunded all the same. Code:
+  `payments/authorisation-check.ts`.
 - **Current** — **The refund webhook settles at the provider's amount**
   (#508 U2). Adapters normalise the refunded amount in paise, Saroh's
   reference and a `REFUND_FAILED` outcome (Razorpay `refund.failed`; Cashfree
@@ -283,10 +302,7 @@ Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:
 - **Still open** (D19's test-mode run): the notice's delivery and the debit
   after `payment_after` in test mode, a debit above `max_amount`, a cancel
   answered twice, and whether card and eMandate debits need the notice
-  step at all — the port lets a method answer `NOT_NEEDED`; and whether a
-  UPI or card authorisation with nothing owed (D12's account set-up, which
-  sends `firstAmountCents` 0) is taken, or needs the ₹1 minimum. **Open
-  product question** until then: the ₹0 order is sent as it is, and a
-  refusal fails safe — the set-up FAILED, and the customer told
-  "Couldn't start autopay without a payment — turn it on when you next
-  pay" (`AUTOPAY_NEEDS_A_PAYMENT`, `mandate-setup.service.ts`).
+  step at all — the port lets a method answer `NOT_NEEDED`. The ₹0 UPI
+  or card authorisation question is settled: with nothing owed the set-up
+  takes the ₹1 check and refunds it (DEC-064, above); still to see in test
+  mode is the check's own `refund.processed` delivery.
