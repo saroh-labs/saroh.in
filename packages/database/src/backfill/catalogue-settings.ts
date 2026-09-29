@@ -6,7 +6,8 @@
  * its storefronts both have "Breads" (by slug) or "Size" (by name), they
  * become one, and everything that named the one that goes is re-pointed:
  * products, discount categories, field categories, defaults, sub-categories,
- * variants' option values, product and customer-note allergens.
+ * variants' option values and product allergens (customer notes no longer
+ * name allergens, Z2a: an old note row naming one that goes is cleared).
  *
  * What does not merge:
  * - categories under different parents (a "Tops" under Men and one under
@@ -569,14 +570,8 @@ async function mergeAllergens(ctx: OrgRun): Promise<void> {
             await tx.productAllergen.deleteMany({
                 where: { allergenId: loser.id },
             });
-            const inNotes = await tx.contactNoteAllergen.findMany({
-                where: { allergenId: loser.id },
-                select: { noteId: true, organizationId: true },
-            });
-            await tx.contactNoteAllergen.createMany({
-                data: inNotes.map((n) => ({ ...n, allergenId: winner.id })),
-                skipDuplicates: true,
-            });
+            // Notes no longer name allergens (Z2a): old rows are not moved,
+            // only cleared so they don't block the delete. Gone with Z2.
             await tx.contactNoteAllergen.deleteMany({
                 where: { allergenId: loser.id },
             });

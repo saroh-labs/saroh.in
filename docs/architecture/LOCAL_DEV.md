@@ -138,7 +138,7 @@ the boutique without one:
   billed by hand — paid, due, overdue, a draft, and one in Goa in IGST.
   Subscribers' contacts are linked to their store customers; Rohan Das is a
   contact and a customer with the same email, left unlinked (a possible
-  match). Priya Raman's note names sesame and today's order holds a loaf that
+  match). Priya Raman's Needs attention names sesame and today's order holds a loaf that
   may contain it (the allergy banner). The products screens' sample data
   (#526, `bakery-catalogue.ts`, `bakery-stock.ts`): two storefronts, Hill
   Road and Online (`seed_sc_rc_store`, `seed_sc_rc_store_online`), and one
