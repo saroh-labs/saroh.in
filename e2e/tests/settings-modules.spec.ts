@@ -11,7 +11,10 @@ import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
  */
 
 /** The rail's names for the two modules the API calls otherwise. */
-const RAIL: Record<string, string> = { CRM: "Contacts", COMMERCE: "Sell" };
+const RAIL: Partial<Record<string, string>> = {
+    CRM: "Contacts",
+    COMMERCE: "Sell",
+};
 
 interface ModuleView {
     key: string;
@@ -68,7 +71,8 @@ test("turning a module off names every module that goes with it, and Keep it on 
     if (!pick) return;
 
     await page.goto("/settings/modules");
-    const name = nameOf(pick.key);
+    const key = pick.key;
+    const name = nameOf(key);
     await page.getByRole("switch", { name }).click();
     const ask = page
         .getByRole("alert")
@@ -86,5 +90,5 @@ test("turning a module off names every module that goes with it, and Keep it on 
     await keep.click();
     await expect(ask).toHaveCount(0);
     const after = await api<ModuleView[]>(page, "/modules");
-    expect(after.find((m) => m.key === pick?.key)?.lifecycle).toBe("ENABLED");
+    expect(after.find((m) => m.key === key)?.lifecycle).toBe("ENABLED");
 });
