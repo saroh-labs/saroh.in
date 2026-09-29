@@ -171,6 +171,11 @@ jobs:
       - name: Site blocks gate
         run: pnpm run check:blocks
 
+      # Every browser spec names what it exercises (`// @covers …`), so the
+      # local gate can run only the specs a batch reaches. CI still runs all.
+      - name: Browser spec coverage keys
+        run: pnpm run check:e2e-covers
+
   unit:
     name: Unit tests
     runs-on: ubuntu-latest

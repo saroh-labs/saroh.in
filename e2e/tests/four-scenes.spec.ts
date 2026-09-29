@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/ app:/bookings app:/commerce app:/contacts api:home api:bookings
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

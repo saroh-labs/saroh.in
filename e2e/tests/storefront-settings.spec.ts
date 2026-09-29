@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/commerce/storefronts api:stores
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

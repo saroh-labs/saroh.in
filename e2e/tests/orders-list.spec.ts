@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/commerce/orders app:/commerce/orders/tickets api:orders api:payments api:customer-workspace
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

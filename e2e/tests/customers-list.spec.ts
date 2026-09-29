@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/commerce/customers app:/stores app:/customers api:customer-workspace api:customers api:stores
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

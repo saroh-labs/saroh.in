@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/calendar api:calendar api:orders api:bookings api:staff
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

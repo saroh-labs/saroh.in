@@ -1,3 +1,4 @@
+// @covers accounts:/login app:/open app:/customers app:/commerce/customers site:/[slug] site:/account/messages api:organizations api:customer-workspace api:contacts api:customers api:orders api:subscriptions api:invoices api:class-packs api:bookings api:enquiry api:site-accounts pkg:site-blocks
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

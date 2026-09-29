@@ -1,3 +1,4 @@
+// @covers accounts:/login site:/ site:/book api:site-accounts api:bookings api:sites pkg:site-blocks
 import { createHmac, randomBytes } from "node:crypto";
 
 import type { Page } from "@playwright/test";
