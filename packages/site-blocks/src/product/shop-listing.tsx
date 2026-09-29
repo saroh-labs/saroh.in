@@ -1,13 +1,21 @@
 "use client";
 
+import { useState } from "react";
+
+import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
+import { addToBag, openBag } from "../shop/bag-store";
 import { formatAmount, percentOff } from "./product-page";
 
 /**
  * The shop on a merchant's site (round-2 G11): `/shop`, a grid of every
  * product its sells-from storefront sells. Each card opens the product's
- * page. Adding to a bag from the card arrives with the bag and checkout
- * (G13); until then the whole card is the link.
+ * page. Where the site takes online orders (G13, `bagSite`), each card also
+ * carries the design's button beside its price: "Add to bag" adds the
+ * first option on offer that can be sold now (another is chosen on the
+ * product page) and then reads "Add another"; "Sold out" when nothing can
+ * be sold. It sits outside the card's link, so the rest of the card still
+ * opens the product.
  *
  * Follows the Customer Site design's list page: the page title and a lead,
  * then cards of a photo, an eyebrow (the sizes it comes in), the name, two
@@ -29,7 +37,17 @@ export interface ShopListingCard {
     variantTitles: string[];
     blurb: string | null;
     soldOut: boolean;
+    /** The listing at the site's storefront: what the bag holds (G13). */
+    listingId?: string;
+    /** The option the card's Add to bag adds; null for none. */
+    bagVariantId?: string | null;
 }
+
+/* The design's card button: the merchant's accent, the site's radius. */
+const cardButton = cn(
+    "bg-site-accent text-site-accent-fg inline-flex h-[38px] shrink-0 cursor-pointer items-center whitespace-nowrap rounded-[var(--site-radius,2px)] px-3.5 text-[13.5px] font-bold transition-[opacity,transform] duration-100 hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
+    focusRing,
+);
 
 export default function ShopListing({
     title = "Shop",
@@ -37,6 +55,7 @@ export default function ShopListing({
     products,
     basePath = "/shop",
     locale = "en-IN",
+    bagSite = null,
 }: {
     title?: string;
     lead?: string | null;
@@ -44,7 +63,35 @@ export default function ShopListing({
     /** Where product pages live: `/shop/<slug>`. */
     basePath?: string;
     locale?: string;
+    /**
+     * The site whose bag the cards add to, when it takes online orders
+     * (G13). Null: no bag, and no button on the cards.
+     */
+    bagSite?: string | null;
 }) {
+    const [added, setAdded] = useState<ReadonlySet<string>>(() => new Set());
+    const [notice, setNotice] = useState<string | null>(null);
+
+    function add(p: ShopListingCard) {
+        if (!bagSite || !p.listingId || p.soldOut) return;
+        const variantId = p.bagVariantId ?? null;
+        const bag = addToBag(bagSite, {
+            listingId: p.listingId,
+            variantId,
+            quantity: 1,
+        });
+        // A full bag keeps what it had: say so, never "added".
+        const inBag = bag.some(
+            (i) => i.listingId === p.listingId && i.variantId === variantId,
+        );
+        if (!inBag) {
+            setNotice("Your bag is full. Take something out to add this.");
+            return;
+        }
+        setAdded((was) => new Set(was).add(p.slug));
+        setNotice(`${p.name} added to your bag.`);
+    }
+
     return (
         <section className="mx-auto w-full max-w-[1120px] px-[18px] pb-10 pt-6">
             <h1 className="font-site-heading text-site-fg m-0 text-[clamp(32px,7vw,46px)] font-semibold leading-tight tracking-tight">
@@ -58,11 +105,12 @@ export default function ShopListing({
             <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
                 {products.map((p) => {
                     const amount = formatAmount(p.price, p.currency, locale);
+                    const canAdd = Boolean(bagSite && p.listingId);
                     return (
-                        <li key={p.slug} className="min-w-0">
+                        <li key={p.slug} className="relative min-w-0">
                             <a
                                 href={`${basePath}/${encodeURIComponent(p.slug)}`}
-                                className="border-site-border bg-site-surface text-site-fg focus-visible:outline-site-accent grid h-full min-w-0 content-start overflow-hidden rounded-[14px] border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                className="border-site-border bg-site-surface text-site-fg focus-visible:outline-site-accent grid h-full min-w-0 grid-rows-[auto_1fr] overflow-hidden rounded-[14px] border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                             >
                                 <span className="bg-site-bg relative block h-[140px]">
                                     {p.image ? (
@@ -80,7 +128,7 @@ export default function ShopListing({
                                         </span>
                                     )}
                                 </span>
-                                <span className="grid min-w-0 content-start gap-1.5 p-4">
+                                <span className="flex min-w-0 flex-col gap-1.5 p-4">
                                     <span className="flex items-center gap-2">
                                         <span className="text-site-muted flex-1 truncate text-[11.5px] font-bold uppercase tracking-[0.08em]">
                                             {p.variantTitles.join(" · ")}
@@ -101,7 +149,10 @@ export default function ShopListing({
                                     ) : null}
                                     <span
                                         className={cn(
-                                            "mt-1.5 flex flex-wrap items-baseline gap-x-2 text-base font-bold tabular-nums",
+                                            "mt-auto flex flex-wrap items-baseline gap-x-2 pt-1.5 text-base font-bold tabular-nums",
+                                            // Room for the button beside it.
+                                            canAdd &&
+                                                "min-h-[38px] content-center items-center pr-32",
                                             p.soldOut && "text-site-muted",
                                         )}
                                     >
@@ -125,10 +176,59 @@ export default function ShopListing({
                                     </span>
                                 </span>
                             </a>
+                            {canAdd ? (
+                                <button
+                                    type="button"
+                                    onClick={() => add(p)}
+                                    disabled={p.soldOut}
+                                    aria-label={
+                                        p.soldOut
+                                            ? `${p.name}: sold out`
+                                            : `Add ${p.name} to your bag`
+                                    }
+                                    className={cn(
+                                        cardButton,
+                                        "absolute bottom-4 right-4",
+                                    )}
+                                >
+                                    {p.soldOut
+                                        ? "Sold out"
+                                        : added.has(p.slug)
+                                          ? "Add another"
+                                          : "Add to bag"}
+                                </button>
+                            ) : null}
                         </li>
                     );
                 })}
             </ul>
+            {bagSite ? (
+                <div
+                    role="status"
+                    className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4"
+                >
+                    {notice ? (
+                        <p className="bg-site-fg text-site-bg pointer-events-auto flex max-w-[min(100%,420px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-[calc(var(--site-radius,2px)*2)] px-4 py-2.5 text-sm shadow-lg">
+                            <span className="min-w-0 [overflow-wrap:anywhere]">
+                                {notice}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setNotice(null);
+                                    openBag();
+                                }}
+                                className={cn(
+                                    "shrink-0 cursor-pointer rounded-sm font-semibold underline underline-offset-2 hover:no-underline active:opacity-80",
+                                    focusRing,
+                                )}
+                            >
+                                View bag
+                            </button>
+                        </p>
+                    ) : null}
+                </div>
+            ) : null}
         </section>
     );
 }

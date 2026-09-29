@@ -50,7 +50,10 @@ function isCard(v: unknown): v is ShopListingCard {
         Array.isArray(v.variantTitles) &&
         v.variantTitles.every(isString) &&
         isStringOrNull(v.blurb) &&
-        typeof v.soldOut === "boolean"
+        typeof v.soldOut === "boolean" &&
+        // What the card's Add to bag holds (an older API sends neither).
+        (v.listingId === undefined || isString(v.listingId)) &&
+        (v.bagVariantId === undefined || isStringOrNull(v.bagVariantId))
     );
 }
 

@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import { readBag } from "../shop/bag-store";
 import type { ShopListingCard } from "./shop-listing";
 import ShopListing from "./shop-listing";
 
@@ -63,5 +64,67 @@ describe("ShopListing (G11)", () => {
         expect(screen.getByRole("link", { name: /Bun/ })).not.toHaveTextContent(
             "MRP",
         );
+    });
+
+    describe("Add to bag on the card (the design's shop, G13)", () => {
+        beforeEach(() => window.localStorage.clear());
+
+        const offered: ShopListingCard = {
+            ...sourdough,
+            listingId: "listing-sourdough",
+            bagVariantId: "variant-large",
+        };
+
+        it("adds the first option on offer, then says Add another and offers the bag", () => {
+            render(<ShopListing products={[offered]} bagSite="site-1" />);
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: "Add Sourdough to your bag",
+                }),
+            );
+            expect(readBag("site-1")).toEqual([
+                {
+                    listingId: "listing-sourdough",
+                    variantId: "variant-large",
+                    quantity: 1,
+                },
+            ]);
+            expect(
+                screen.getByRole("button", {
+                    name: "Add Sourdough to your bag",
+                }),
+            ).toHaveTextContent("Add another");
+            expect(screen.getByRole("status")).toHaveTextContent(
+                "Sourdough added to your bag.",
+            );
+            expect(
+                screen.getByRole("button", { name: "View bag" }),
+            ).toBeInTheDocument();
+            // The rest of the card still opens the product.
+            expect(
+                screen.getByRole("link", { name: /Sourdough/ }),
+            ).toHaveAttribute("href", "/shop/sourdough");
+        });
+
+        it("is off and says Sold out when nothing can be sold", () => {
+            render(
+                <ShopListing
+                    products={[
+                        { ...offered, soldOut: true, bagVariantId: null },
+                    ]}
+                    bagSite="site-1"
+                />,
+            );
+            const button = screen.getByRole("button", {
+                name: "Sourdough: sold out",
+            });
+            expect(button).toBeDisabled();
+            expect(button).toHaveTextContent("Sold out");
+        });
+
+        it("draws no button where the site takes no online orders", () => {
+            render(<ShopListing products={[offered]} />);
+            expect(screen.queryByRole("button")).toBeNull();
+        });
     });
 });
