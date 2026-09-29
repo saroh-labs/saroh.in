@@ -6,6 +6,7 @@ import type { RenderedServicesList } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
 import { CtaButton, ctaClasses } from "./cta";
 
@@ -85,15 +86,9 @@ export function formatPrice(
     locale?: string,
 ): string | null {
     if (priceCents === null || !currency) return null;
-    try {
-        return new Intl.NumberFormat(locale, {
-            style: "currency",
-            currency,
-        }).format(priceCents / 100);
-    } catch {
-        // An unknown currency code: better no price than a wrong one.
-        return null;
-    }
+    // Whole amounts without decimals (DEC-073 #11); an unknown currency
+    // code is no price rather than a wrong one.
+    return siteMoney(priceCents / 100, currency, locale);
 }
 
 export default function ServicesListSection({
