@@ -172,6 +172,9 @@ export async function readFees(
         where: {
             organizationId,
             feeCents: { gt: 0 },
+            // A sale's fee only: the ₹1 autopay check (DEC-064) is on no
+            // paper, and handed back — never a cell's money.
+            purpose: null,
             OR: [
                 {
                     attempts: {

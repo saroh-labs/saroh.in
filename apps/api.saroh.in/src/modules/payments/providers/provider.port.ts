@@ -186,7 +186,9 @@ export interface CreateMandateSetupInput {
     customer: { name: string; email: string | null; phone: string | null };
     /**
      * The authorisation's own payment, in minor units. UPI and card take at
-     * least ₹1, which D12 makes the invoice's own payment; eMandate's is 0.
+     * least ₹1, which D12 makes the invoice's own payment; with nothing
+     * owed it is the provider's minimum, refunded (the ₹1 check, DEC-064:
+     * {@link MandateCapability.authorisationMinimumCents}). eMandate's is 0.
      */
     firstAmountCents: number;
     /** The most one charge may take, in minor units. */
@@ -242,6 +244,14 @@ export interface MandateSetupResult {
      * `callback_url`.
      */
     clientParams: Record<string, unknown>;
+    /**
+     * The provider order the authorisation's own payment is made on, when
+     * it isn't `setupReference` (Razorpay's registration link: the link is
+     * `inv_…`, its payment's order `order_…`). Absent: `setupReference`.
+     * Saroh records that payment's intent under it, so the capture webhook
+     * finds it.
+     */
+    paymentReference?: string;
 }
 
 /** Read one mandate: by the provider's id, or by its set-up before that. */
@@ -267,6 +277,13 @@ export interface ProviderMandate {
     expiresAt: Date | null;
     /** The provider's reason code for a failed set-up. */
     failureReason: string | null;
+    /**
+     * The authorisation's own payment, when the read found it (read by the
+     * set-up, before the mandate is known): its provider id and whether the
+     * money was captured. Lets a lost capture webhook be recovered — the ₹1
+     * check is refunded all the same (DEC-064). Absent: not read.
+     */
+    setupPayment?: { providerPaymentRef: string; captured: boolean } | null;
 }
 
 /**
@@ -350,6 +367,16 @@ export interface MandateCapability {
      * cancelling a mandate already made never wait on it. None: no gate.
      */
     readonly rolloutFlag?: FlagKey;
+    /**
+     * The least an authorisation by each method must take, in minor units
+     * (Razorpay: UPI and card 100 — ₹1; eMandate none). With nothing owed,
+     * Saroh takes this as the ₹1 check and refunds it (DEC-064). A method
+     * not listed authorises for 0. A per-provider constant: never a
+     * literal in a service.
+     */
+    readonly authorisationMinimumCents?: Readonly<
+        Partial<Record<MandateMethod, number>>
+    >;
     /**
      * The methods this business's account can set up autopay with. Empty
      * means none: autopay isn't offered.

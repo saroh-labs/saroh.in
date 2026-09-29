@@ -13,6 +13,12 @@ import { prisma } from "@saroh/database";
 
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import {
+    AUTHORISATION_PURPOSE,
+    captureCheckInTx,
+    checkCentsFor,
+    recordCheckInTx,
+} from "./authorisation-check";
 import { mandateProviders, openMandateConnection } from "./mandate-connection";
 import { applyMandateChangeInTx } from "./mandate-events";
 import type { ReportedMandateStatus } from "./mandate-rules";
@@ -84,7 +90,14 @@ export class MandateSetupService {
                     credentials: connection.credentials,
                 });
                 const known = methods.filter(isMandateMethod);
-                if (known.length > 0) offers.push({ provider, methods: known });
+                const checkCents: MandateOffer["checkCents"] = {};
+                for (const m of known) {
+                    const cents = checkCentsFor(connection.mandates, m);
+                    if (cents > 0) checkCents[m] = cents;
+                }
+                if (known.length > 0) {
+                    offers.push({ provider, methods: known, checkCents });
+                }
             } catch {
                 this.logger.warn(
                     `${provider} didn't say which autopay methods it takes; autopay isn't offered through it for now`,
@@ -105,6 +118,11 @@ export class MandateSetupService {
      * The row is written first, so its id is the provider's reference and
      * a webhook always has a row to find. A refusal or no answer marks it
      * FAILED — the customer never saw a page to approve — and says so.
+     *
+     * Nothing to pay (`firstAmountCents` 0) by a method whose authorisation
+     * must take a payment (Razorpay UPI and card): the provider's minimum is
+     * taken as the ₹1 check, recorded as an AUTHORISATION intent — never a
+     * sale — and refunded once captured (`authorisation-check.ts`, DEC-064).
      */
     async createSetup(input: CreateSetupInput): Promise<MandateSetupView> {
         const { organizationId, subscriptionId, method } = input;
@@ -168,6 +186,12 @@ export class MandateSetupService {
         }
 
         const currency = subscription.plan.currency;
+        // The ₹1 check (DEC-064): only with nothing to pay, only where the
+        // method's authorisation must take a payment.
+        const checkCents =
+            firstAmountCents === 0
+                ? checkCentsFor(connection.mandates, method)
+                : 0;
         const setupExpiresAt = new Date(now.getTime() + SETUP_TTL_MS);
         const expiresAt = new Date(now);
         expiresAt.setFullYear(expiresAt.getFullYear() + MANDATE_TERM_YEARS);
@@ -208,7 +232,8 @@ export class MandateSetupService {
                         : contact.email,
                     phone: contact.phone ?? null,
                 },
-                firstAmountCents,
+                firstAmountCents:
+                    checkCents > 0 ? checkCents : firstAmountCents,
                 maxAmountCents: input.maxAmountCents,
                 currency,
                 frequency,
@@ -219,13 +244,29 @@ export class MandateSetupService {
                 ...(input.handoff ? { handoff: input.handoff } : {}),
                 credentials: connection.credentials,
             });
-            await prisma.paymentMandate.update({
-                where: { id: row.id },
-                data: {
-                    providerCustomerId: setup.providerCustomerId,
-                    setupReference: setup.setupReference,
-                    expiresAt,
-                },
+            const paymentReference =
+                setup.paymentReference ?? setup.setupReference;
+            await prisma.$transaction(async (tx) => {
+                await tx.paymentMandate.update({
+                    where: { id: row.id },
+                    data: {
+                        providerCustomerId: setup.providerCustomerId,
+                        setupReference: setup.setupReference,
+                        expiresAt,
+                    },
+                });
+                // Before the customer sees the window: the capture webhook
+                // always has the check's intent to find.
+                if (checkCents > 0) {
+                    await recordCheckInTx(tx, {
+                        organizationId,
+                        mandateId: row.id,
+                        provider: connection.provider,
+                        providerIntentId: paymentReference,
+                        amountCents: checkCents,
+                        currency,
+                    });
+                }
             });
             return {
                 mandateId: row.id,
@@ -237,6 +278,7 @@ export class MandateSetupService {
                 authorisationUrl: setup.authorisationUrl,
                 clientParams: setup.clientParams,
                 setupExpiresAt,
+                checkCents,
             };
         } catch (err) {
             const outcome =
@@ -253,22 +295,6 @@ export class MandateSetupService {
                 },
             });
             const at = providerName(connection.provider);
-            // TODO(D12 open question): a UPI or card authorisation with
-            // nothing owed goes out for ₹0, which Razorpay likely refuses
-            // (its minimum is ₹1). Until the user decides (take ₹1, or
-            // something else), the refusal fails safe: FAILED above, and
-            // the customer (who started it: `source`) is told to turn it
-            // on when they next pay.
-            if (
-                outcome === "REFUSED" &&
-                input.source !== undefined &&
-                refusedForNoPayment(method, firstAmountCents)
-            ) {
-                throw new ConflictException({
-                    message: AUTOPAY_NEEDS_A_PAYMENT,
-                    details: { reason: "needs-payment" },
-                });
-            }
             if (outcome === "REFUSED") {
                 throw new ConflictException(
                     `${at} didn't accept the autopay set-up. Try another way to pay, or pay this time without autopay`,
@@ -422,7 +448,7 @@ export class MandateSetupService {
             { connectedOnly: false },
         );
         if (!connection) return { status: row.status, applied: false };
-        let reported;
+        let reported: Awaited<ReturnType<typeof connection.mandates.get>>;
         try {
             reported = await connection.mandates.get({
                 providerMandateId: row.providerMandateId,
@@ -436,8 +462,18 @@ export class MandateSetupService {
             );
             return { status: row.status, applied: false };
         }
+        // The ₹1 check's capture webhook was lost: the read found its
+        // payment, so it is refunded all the same (DEC-064) — whatever
+        // became of the mandate.
+        const checkCaptured = reported.setupPayment?.captured
+            ? await this.captureCheck(
+                  organizationId,
+                  row.id,
+                  reported.setupPayment.providerPaymentRef,
+              )
+            : false;
         if (reported.status === "PENDING") {
-            return { status: row.status, applied: false };
+            return { status: row.status, applied: checkCaptured };
         }
         const { applied } = await prisma.$transaction((tx) =>
             applyMandateChangeInTx(tx, organizationId, row.provider, {
@@ -456,29 +492,40 @@ export class MandateSetupService {
             where: { id: row.id },
             select: { status: true },
         });
-        return { status: after.status, applied };
+        return { status: after.status, applied: applied || checkCaptured };
     }
-}
 
-/**
- * What the customer is told when a UPI or card authorisation with nothing
- * to pay is refused (the D12 open question on ₹0 authorisations).
- */
-export const AUTOPAY_NEEDS_A_PAYMENT =
-    "Couldn't start autopay without a payment — turn it on when you next pay";
-
-/** A refusal of an authorisation that took no payment, where one needs one. */
-function refusedForNoPayment(
-    method: MandateMethod,
-    firstAmountCents: number,
-): boolean {
-    return firstAmountCents === 0 && method !== "EMANDATE";
+    /** Capture a set-up's check, if it has one still waiting (DEC-064). */
+    private async captureCheck(
+        organizationId: string,
+        mandateId: string,
+        providerPaymentRef: string,
+    ): Promise<boolean> {
+        const check = await prisma.paymentIntent.findFirst({
+            where: {
+                organizationId,
+                checkForMandateId: mandateId,
+                purpose: AUTHORISATION_PURPOSE,
+            },
+            select: { id: true, organizationId: true },
+        });
+        if (!check) return false;
+        const { applied } = await prisma.$transaction((tx) =>
+            captureCheckInTx(tx, check, providerPaymentRef),
+        );
+        return applied;
+    }
 }
 
 /** A provider a customer can set up autopay through, and its methods. */
 export interface MandateOffer {
     provider: string;
     methods: MandateMethod[];
+    /**
+     * The check each method takes when nothing is owed, in minor units
+     * (DEC-064: Razorpay UPI and card 100). A method not here takes none.
+     */
+    checkCents: Partial<Record<MandateMethod, number>>;
 }
 
 export interface CreateSetupInput {
@@ -491,7 +538,8 @@ export interface CreateSetupInput {
     maxAmountCents: number;
     /**
      * The authorisation's own payment, in minor units (D12 makes it the
-     * invoice's). UPI and card take at least ₹1 at Razorpay; 0 by default.
+     * invoice's). 0 by default: nothing owed, and a method that must take a
+     * payment takes the ₹1 check instead (DEC-064).
      */
     firstAmountCents?: number;
     frequency?: MandateFrequency;
@@ -562,4 +610,9 @@ export interface MandateSetupView {
     /** Non-secret parameters for the provider's window otherwise. */
     clientParams: Record<string, unknown>;
     setupExpiresAt: Date;
+    /**
+     * The ₹1 check this set-up takes, in minor units (DEC-064): refunded
+     * once captured. 0: none (something is paid with it, or eMandate).
+     */
+    checkCents: number;
 }

@@ -169,8 +169,27 @@ const eventsOf = (subscriptionId: string) =>
 describe("what autopay is offered", () => {
     it("every method the account has, never narrowed", async () => {
         expect(await setups.mandateMethods(owner.organizationId)).toEqual([
-            { provider: "RAZORPAY", methods: ["UPI", "CARD", "EMANDATE"] },
+            {
+                provider: "RAZORPAY",
+                methods: ["UPI", "CARD", "EMANDATE"],
+                checkCents: {},
+            },
         ]);
+    });
+
+    it("says the ₹1 check each method takes with nothing owed (D12B)", async () => {
+        fake.authorisationMinimum.UPI = 100;
+        try {
+            expect(await setups.mandateMethods(owner.organizationId)).toEqual([
+                {
+                    provider: "RAZORPAY",
+                    methods: ["UPI", "CARD", "EMANDATE"],
+                    checkCents: { UPI: 100 },
+                },
+            ]);
+        } finally {
+            delete fake.authorisationMinimum.UPI;
+        }
     });
 
     it("an account with none offers no autopay", async () => {

@@ -8,6 +8,8 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
+import type { CheckView } from "./authorisation-check";
+import { CHECK_VIEW_SELECT, checkViewOf } from "./authorisation-check";
 import { mandateLimitCents } from "./mandate-rules";
 import type { MandateSetupSource } from "./mandate-setup.service";
 import { MandateSetupService } from "./mandate-setup.service";
@@ -29,6 +31,10 @@ import { MANDATE_METHODS } from "./providers/provider.port";
  *   authorisation's provider order, and that payment's own capture webhook
  *   pays the invoice as a pay link's does. eMandate authorises for ₹0, so
  *   the invoice is paid first as usual and then authorised.
+ * - **Nothing owed: the ₹1 check.** UPI and card must take a payment to
+ *   authorise, so with nothing to pay the set-up takes the provider's
+ *   minimum and refunds it straight away (DEC-064, `authorisation-check.ts`);
+ *   the start says so (`check`), and so does the page after.
  * - **A limit with headroom.** `mandateLimitCents` of the larger of the
  *   plan's price and the invoice.
  *
@@ -46,7 +52,10 @@ export const AUTOPAY_CHARGE_IN_PROGRESS = "Autopay charge in progress";
 /** What the site needs to open the provider's window. Never a secret. */
 export interface AutopayHandoff {
     provider: string;
-    /** What this window takes now: the invoice (UPI, card), or 0. */
+    /**
+     * What this window takes now: the invoice (UPI, card), the ₹1 check
+     * with nothing owed (UPI, card; refunded), or 0 (eMandate).
+     */
     amountCents: number;
     currency: string;
     providerIntentId: string | null;
@@ -61,9 +70,16 @@ export interface AutopayStart {
     method: MandateMethod;
     /**
      * PAY_AND_AUTHORISE: this one window pays the invoice and turns on
-     * autopay. AUTHORISE: it only authorises (nothing is taken now).
+     * autopay. AUTHORISE: it only authorises — nothing is kept, though the
+     * ₹1 `check` may be taken and handed back.
      */
     mode: "PAY_AND_AUTHORISE" | "AUTHORISE";
+    /**
+     * The check this window takes to authorise with nothing owed (UPI,
+     * card: the provider's minimum), refunded automatically (DEC-064).
+     * Null: none. Absent from an API older than D12B.
+     */
+    check: { amount: string; currency: string } | null;
     /** The most one charge may take, as money. */
     limit: string;
     currency: string;
@@ -89,6 +105,11 @@ export interface AutopayLine {
     /** FAILED: why, as a short code — never the provider's prose. */
     failure:
         "NOT_APPROVED" | "EXPIRED" | "PROVIDER_REFUSED" | "NO_ANSWER" | null;
+    /**
+     * The ₹1 check this set-up took, and whether it is back with the
+     * customer (DEC-064). Null: none was taken. Never income.
+     */
+    check: CheckView | null;
 }
 
 /** The page after set-up: the plan, its autopay, and what comes next. */
@@ -166,6 +187,27 @@ export class AutopayService {
     }
 
     /**
+     * The check each method takes to authorise when nothing is owed, as
+     * money (DEC-064): Razorpay's UPI and card ₹1. A method not here takes
+     * none. Told to the customer before they pick.
+     */
+    async checks(
+        organizationId: string,
+        currency: string,
+    ): Promise<Partial<Record<MandateMethod, AutopayCheck>>> {
+        const out: Partial<Record<MandateMethod, AutopayCheck>> = {};
+        for (const o of await this.setup.mandateMethods(organizationId)) {
+            for (const m of o.methods) {
+                const cents = o.checkCents[m];
+                if (out[m] === undefined && cents !== undefined && cents > 0) {
+                    out[m] = { amount: fromMinor(cents), currency };
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
      * Turn on autopay from a plan's invoice (the pay link, or the account
      * when something is owed). UPI and card on an unpaid invoice: one
      * window pays it and authorises. eMandate, or an invoice already paid:
@@ -239,11 +281,12 @@ export class AutopayService {
             ref: started.mandateId,
             method: started.method,
             mode: pays ? "PAY_AND_AUTHORISE" : "AUTHORISE",
+            check: checkOf(started),
             limit: fromMinor(started.maxAmountCents),
             currency: started.currency,
             handoff: {
                 provider: started.provider,
-                amountCents: pays ? invoiceCents : 0,
+                amountCents: pays ? invoiceCents : started.checkCents,
                 currency: started.currency,
                 providerIntentId: started.setupReference,
                 publicKey,
@@ -302,9 +345,8 @@ export class AutopayService {
             maxAmountCents: mandateLimitCents(
                 Math.max(toMinor(subscription.price), 1),
             ),
-            // Nothing is owed, so nothing is taken with the authorisation.
-            // Whether a provider takes a ₹0 UPI or card authorisation is
-            // D19's to confirm (backend-integrations.md, "Still open").
+            // Nothing is owed: nothing is kept. UPI and card take the ₹1
+            // check to authorise, refunded once captured (DEC-064).
             firstAmountCents: 0,
             source: input.source,
             accountId: input.accountId ?? null,
@@ -315,11 +357,12 @@ export class AutopayService {
             ref: started.mandateId,
             method: started.method,
             mode: "AUTHORISE",
+            check: checkOf(started),
             limit: fromMinor(started.maxAmountCents),
             currency: started.currency,
             handoff: {
                 provider: started.provider,
-                amountCents: 0,
+                amountCents: started.checkCents,
                 currency: started.currency,
                 providerIntentId: started.setupReference,
                 publicKey: await publicKeyOf(organizationId, started.provider),
@@ -416,6 +459,7 @@ export class AutopayService {
             ref: setup.mandateId,
             method: setup.method,
             mode: "PAY_AND_AUTHORISE",
+            check: null,
             limit: fromMinor(setup.maxAmountCents),
             currency: setup.currency,
             handoff: {
@@ -668,6 +712,22 @@ function readStoredStart(
         : null;
 }
 
+/** A check to take, as money: what the start tells the customer. */
+export interface AutopayCheck {
+    /** "1.00" */
+    amount: string;
+    currency: string;
+}
+
+function checkOf(started: {
+    checkCents: number;
+    currency: string;
+}): AutopayCheck | null {
+    return started.checkCents > 0
+        ? { amount: fromMinor(started.checkCents), currency: started.currency }
+        : null;
+}
+
 /** The connection's public key (Razorpay's key id), for the window. */
 async function publicKeyOf(
     organizationId: string,
@@ -708,6 +768,7 @@ interface MandateRow {
     activatedAt: Date | null;
     setupExpiresAt: Date | null;
     failureReason: string | null;
+    authorisationChecks?: Parameters<typeof checkViewOf>[0][];
 }
 
 const MANDATE_SELECT = {
@@ -721,6 +782,7 @@ const MANDATE_SELECT = {
     activatedAt: true,
     setupExpiresAt: true,
     failureReason: true,
+    authorisationChecks: { select: CHECK_VIEW_SELECT, take: 1 },
 } as const;
 
 /**
@@ -766,6 +828,7 @@ export function lineOf(row: MandateRow, now: Date): AutopayLine {
         limit:
             row.maxAmountCents === null ? null : fromMinor(row.maxAmountCents),
         currency: row.currency,
+        check: checkViewOf(row.authorisationChecks?.[0]),
     };
     switch (row.status) {
         case "ACTIVE":

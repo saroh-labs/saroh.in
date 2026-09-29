@@ -94,12 +94,37 @@ export class AccountPlanService {
             block("plan-subscriptions", () => this.plans(member, pausing, now)),
             block("plan-packs", () => this.packs(member, now)),
         ]);
+        const autopayMethods = await this.autopayMethods(member, subscriptions);
         return {
             subscriptions,
             packs,
             pauseWeeks: pausing ? [...PAUSE_WEEKS] : [],
-            autopayMethods: await this.autopayMethods(member, subscriptions),
+            autopayMethods,
+            autopayChecks: await this.autopayChecks(
+                member,
+                subscriptions,
+                autopayMethods,
+            ),
         };
+    }
+
+    /**
+     * The ₹1 check each offered method takes with nothing owed (DEC-064),
+     * so the sheet says so before they pick. None when autopay isn't
+     * offered; a provider that can't say is none, never a guess.
+     */
+    private async autopayChecks(
+        member: CustomerScope,
+        subscriptions: AccountPlanTab["subscriptions"],
+        methods: MandateMethod[],
+    ): Promise<AccountPlanTab["autopayChecks"]> {
+        if (!this.autopay || methods.length === 0) return {};
+        const currency =
+            (subscriptions.ok ? subscriptions.value[0]?.currency : null) ??
+            "INR";
+        return this.autopay
+            .checks(member.organizationId, currency)
+            .catch(() => ({}));
     }
 
     /**
@@ -189,6 +214,7 @@ export class AccountPlanService {
                               state: line.state,
                               method: line.method,
                               hint: line.hint,
+                              check: line.check,
                           }
                         : null,
                     autopayPays: owed

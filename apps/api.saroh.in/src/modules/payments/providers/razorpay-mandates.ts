@@ -62,6 +62,16 @@ export const RAZORPAY_MANDATE_METHODS: readonly MandateMethod[] = [
     "EMANDATE",
 ];
 
+/**
+ * The least a Razorpay authorisation takes by each method, in paise: UPI
+ * and card are real payments of at least ₹1 (D11 spike); eMandate
+ * authorises for 0. With nothing owed Saroh takes this as the ₹1 check and
+ * refunds it (DEC-064).
+ */
+export const RAZORPAY_AUTHORISATION_MINIMUM_CENTS: Readonly<
+    Partial<Record<MandateMethod, number>>
+> = { UPI: 100, CARD: 100 };
+
 /** Methods whose debit waits on Razorpay's pre-debit notice (D11 spike). */
 const PRE_DEBIT_METHODS: ReadonlySet<MandateMethod> = new Set(["UPI"]);
 
@@ -69,6 +79,7 @@ type Json = Record<string, unknown>;
 
 export class RazorpayMandates implements MandateCapability {
     readonly rolloutFlag = FlagKey.RAZORPAY_AUTOPAY;
+    readonly authorisationMinimumCents = RAZORPAY_AUTHORISATION_MINIMUM_CENTS;
     private readonly logger = new Logger("RazorpayMandates");
 
     constructor(private readonly baseUrl: string = BASE_URL) {}
@@ -90,14 +101,9 @@ export class RazorpayMandates implements MandateCapability {
      * for UPI and card its first payment (`firstAmountCents`) is the
      * invoice's, so that payment's `payment.captured` both pays the invoice
      * (by its order, the invoice intent's `providerIntentId`) and names the
-     * token (`mandate-link.ts`). eMandate's order is for 0.
-     *
-     * TODO(D12 open question, ₹0 UPI/card authorisation): from My plan with
-     * nothing owed D12 sends `firstAmountCents` 0 for UPI and card, which
-     * Razorpay is expected to refuse (its minimum is ₹1). It is sent as it
-     * is; a refusal marks the set-up FAILED and the customer is told to
-     * turn autopay on when they next pay (`MandateSetupService`). Whether
-     * to take ₹1, or offer only eMandate there, is the user's to decide.
+     * token (`mandate-link.ts`). With nothing owed, UPI and card take the
+     * ₹1 check instead ({@link RAZORPAY_AUTHORISATION_MINIMUM_CENTS},
+     * DEC-064), refunded once captured. eMandate's order is for 0.
      */
     private async createCheckoutSetup(
         input: CreateMandateSetupInput,
@@ -220,6 +226,9 @@ export class RazorpayMandates implements MandateCapability {
         return {
             providerCustomerId,
             setupReference,
+            // The link's payment is made on its order: a check's intent
+            // (DEC-064) is recorded under it, where its capture lands.
+            ...(orderId ? { paymentReference: orderId } : {}),
             authorisationUrl: text(link.short_url) ?? null,
             clientParams: {
                 ...(orderId ? { razorpayOrderId: orderId } : {}),
@@ -235,6 +244,7 @@ export class RazorpayMandates implements MandateCapability {
         const { credentials } = input;
         let customerId = input.providerCustomerId;
         let tokenId = input.providerMandateId;
+        let setupPayment: ProviderMandate["setupPayment"];
 
         if (!tokenId && input.setupReference?.startsWith("order_")) {
             // An in-page set-up (D12): the order's payment that made a token.
@@ -252,6 +262,15 @@ export class RazorpayMandates implements MandateCapability {
                     text(p.token_id) &&
                     (p.status === "captured" || p.status === "authorized"),
             );
+            // The authorisation's own payment, captured or not: a ₹1 check
+            // whose capture webhook was lost is refunded from this (DEC-064).
+            const captured = items.find(
+                (p) => text(p.id) && p.status === "captured",
+            );
+            const capturedId = captured ? text(captured.id) : undefined;
+            setupPayment = capturedId
+                ? { providerPaymentRef: capturedId, captured: true }
+                : null;
             if (!paid) {
                 return {
                     status: "PENDING",
@@ -262,6 +281,7 @@ export class RazorpayMandates implements MandateCapability {
                     maxAmountCents: null,
                     expiresAt: null,
                     failureReason: null,
+                    setupPayment,
                 };
             }
             tokenId = text(paid.token_id) ?? null;
@@ -310,7 +330,11 @@ export class RazorpayMandates implements MandateCapability {
             "GET",
             tokenPath(customerId, tokenId),
         );
-        return { ...razorpayTokenView(token), providerCustomerId: customerId };
+        return {
+            ...razorpayTokenView(token),
+            providerCustomerId: customerId,
+            ...(setupPayment !== undefined ? { setupPayment } : {}),
+        };
     }
 
     async prepareCharge(

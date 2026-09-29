@@ -264,6 +264,8 @@ describe("what autopay is offered", () => {
             plan: "Monthly unlimited",
             methods: ["CARD", "UPI"],
             on: null,
+            // The fake takes no ₹1 check unless a test says so (D12B).
+            checks: {},
         });
     });
 

@@ -47,6 +47,8 @@ export interface FakeMandateSetup {
     displayHint: string | null;
     failureReason: string | null;
     expiresAt: Date;
+    /** The authorisation's own payment, once the customer made it. */
+    paymentRef?: string | null;
 }
 
 /** One charge the fake has prepared (step one) and maybe debited (step two). */
@@ -96,6 +98,11 @@ export class FakeMerchantProvider implements MerchantProvider {
      */
     mandateMethodList: MandateMethod[] = [...MANDATE_METHODS];
     /**
+     * The least an authorisation takes by each method (DEC-064's ₹1
+     * check). None by default; a test sets Razorpay's (`UPI`/`CARD` 100).
+     */
+    readonly authorisationMinimum: Partial<Record<MandateMethod, number>> = {};
+    /**
      * Methods whose debit waits for a pre-debit notice. UPI's does (D11
      * spike); card and eMandate timing is still open, so a test chooses.
      */
@@ -122,6 +129,7 @@ export class FakeMerchantProvider implements MerchantProvider {
      * cancelled answers as a success, as a real provider's cancel does.
      */
     readonly mandates: MandateCapability = {
+        authorisationMinimumCents: this.authorisationMinimum,
         mandateMethods: (input) =>
             this.mandateCall("mandateMethods", input, () => [
                 ...this.mandateMethodList,
@@ -283,6 +291,14 @@ export class FakeMerchantProvider implements MerchantProvider {
         return setup;
     }
 
+    /**
+     * The customer paid the authorisation's own payment (a ₹1 check, or
+     * the invoice): a read of the set-up now names it as captured.
+     */
+    payAuthorisation(setupReference: string, paymentRef: string): void {
+        this.setupOrThrow(setupReference).paymentRef = paymentRef;
+    }
+
     /** The authorisation was refused or abandoned at the provider. */
     rejectSetup(
         setupReference: string,
@@ -391,6 +407,9 @@ export class FakeMerchantProvider implements MerchantProvider {
             maxAmountCents: setup.maxAmountCents,
             expiresAt: setup.expiresAt,
             failureReason: setup.failureReason,
+            setupPayment: setup.paymentRef
+                ? { providerPaymentRef: setup.paymentRef, captured: true }
+                : null,
         };
     }
 

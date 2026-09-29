@@ -13,8 +13,8 @@
  * - a lost webhook: the page asks Razorpay (the order's payment → token);
  * - joining from the Prices page, both arrival orders: the mandate row is
  *   made by the payment that starts the subscription, then linked;
- * - the account with nothing owed: a refused ₹0 UPI/card authorisation
- *   fails safe (the D12 open question).
+ * - the account with nothing owed, eMandate: a ₹0 authorisation (UPI and
+ *   card take the ₹1 check: `autopay-check.razorpay.db.spec.ts`, D12B).
  *
  * Only the app env is stubbed (the credential key, and the renderer's
  * apex). Runs in the integration project (TEST_DATABASE_URL).
@@ -51,10 +51,7 @@ import { SubscriptionsService } from "../subscriptions/subscriptions.service";
 import { DefaultWebhookProviderFactory } from "../webhooks/providers/webhook-provider.factory";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { AutopayService } from "./autopay.service";
-import {
-    AUTOPAY_NEEDS_A_PAYMENT,
-    MandateSetupService,
-} from "./mandate-setup.service";
+import { MandateSetupService } from "./mandate-setup.service";
 import { PaymentsService } from "./payments.service";
 import { DefaultProviderFactory } from "./providers/provider.factory";
 import { PublicInvoicesService } from "./public-invoices.service";
@@ -653,40 +650,7 @@ describe("while joining from the Prices page (DEC-062 pay-first)", () => {
     });
 });
 
-describe("from the account with nothing owed (open question: ₹0 UPI/card)", () => {
-    it("Razorpay refusing the ₹0 authorisation fails safe: FAILED, and the customer is told to wait for their next payment", async () => {
-        const { subscriptionId, customer, invoiceId } = await member();
-        await prisma.invoice.update({
-            where: { id: invoiceId },
-            data: { status: "PAID", paidAt: new Date() },
-        });
-        routes["POST /customers"] = authCustomer();
-        routes["POST /orders"] = new Response(
-            JSON.stringify({
-                error: {
-                    code: "BAD_REQUEST_ERROR",
-                    description: "The amount must be atleast INR 1.00",
-                    reason: "input_validation_failed",
-                },
-            }),
-            { status: 400 },
-        );
-
-        const err = await accountAutopay
-            .start(customer, subscriptionId, "UPI")
-            .catch((e: unknown) => e);
-        expect(err).toBeInstanceOf(ConflictException);
-        expect((err as ConflictException).getResponse()).toMatchObject({
-            message: AUTOPAY_NEEDS_A_PAYMENT,
-        });
-        expect(sent()[1]?.body).toMatchObject({ amount: 0, method: "upi" });
-        expect(
-            await prisma.paymentMandate.findFirstOrThrow({
-                where: { subscriptionId },
-            }),
-        ).toMatchObject({ status: "FAILED", failureReason: "SETUP_REFUSED" });
-    });
-
+describe("from the account with nothing owed", () => {
     it("eMandate's ₹0 authorisation is what it always is", async () => {
         const { subscriptionId, customer, invoiceId } = await member();
         await prisma.invoice.update({
