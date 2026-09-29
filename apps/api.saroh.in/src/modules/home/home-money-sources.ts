@@ -86,6 +86,9 @@ const EVENT_TAGS: Record<RenewalEventKind, string> = {
     MANDATE_LIMIT_LOW: "Autopay limit too low",
 };
 
+/** The tag of a renewal above its autopay's limit (D13): it needs a new set-up (D14). */
+export const LIMIT_LOW_TAG = EVENT_TAGS.MANDATE_LIMIT_LOW;
+
 /** The tags that say autopay failed: such a renewal is retried before its due date (D13). */
 export const AUTOPAY_FAILED_TAGS: readonly string[] = Object.values(EVENT_TAGS);
 

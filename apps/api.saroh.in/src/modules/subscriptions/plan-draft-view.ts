@@ -11,7 +11,7 @@ import {
     mergeForEditor,
     readPending,
 } from "../../common/drafts/draft-record";
-import { toMinor, toMoneyString } from "../../common/money";
+import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import { actorView, teamNames } from "./event-actors";
 import type { PlanActor, PlanActorKind, PlanSnapshot } from "./plan-events";
 import { PLAN_DRAFT } from "./plan-on-sale";
@@ -73,6 +73,22 @@ export interface PlanEditorView {
     problems: PlanProblem[];
     /** When the draft or the pending set was last saved; null when none. */
     pendingChangedAt: string | null;
+    /**
+     * What the autopay of members switching to this plan at their next
+     * renewal covers (D13): one entry per limit, lowest first. The renewal
+     * that moves them bills the plan's price, and a price above a member's
+     * limit is never charged (MANDATE_LIMIT_LOW) — they authorise again. The
+     * editor warns as the price is typed. Members already on the plan keep
+     * the price they agreed to, so their autopay is never affected. Empty
+     * for a draft, which nobody can switch to.
+     */
+    autopayLimits: AutopayLimit[];
+}
+
+/** Members whose autopay covers up to `limit` ("1500.00"). */
+export interface AutopayLimit {
+    limit: string;
+    members: number;
 }
 
 export const PLAN_DRAFT_SELECT = {
@@ -237,9 +253,12 @@ export async function planEditorView(
 ): Promise<PlanEditorView> {
     const isDraft = row.status === PLAN_DRAFT;
     const values = editorValues(row);
-    const [problems, sold] = await Promise.all([
+    const [problems, sold, autopayLimits] = await Promise.all([
         planProblems(db, organizationId, row.id, values),
         isDraft ? timesSold(db, organizationId, row.id) : Promise.resolve(0),
+        isDraft
+            ? Promise.resolve([])
+            : switchersAutopayLimits(db, organizationId, row.id),
     ]);
     return {
         id: row.id,
@@ -251,7 +270,46 @@ export async function planEditorView(
         canDelete: isDraft && sold === 0,
         problems,
         pendingChangedAt: row.pendingChangedAt?.toISOString() ?? null,
+        autopayLimits,
     };
+}
+
+/**
+ * The limits of the ACTIVE mandates on subscriptions booked to switch to
+ * this plan (D13's Plan Editor warning), grouped, lowest first. Only those
+ * renewals bill the plan's price as it will be; the charge handler refuses
+ * one above the limit (`mandate-charges.service.ts`).
+ */
+export async function switchersAutopayLimits(
+    db: Db,
+    organizationId: string,
+    planId: string,
+): Promise<AutopayLimit[]> {
+    const rows = await db.paymentMandate.groupBy({
+        by: ["maxAmountCents"],
+        where: {
+            organizationId,
+            status: "ACTIVE",
+            maxAmountCents: { not: null },
+            subscription: {
+                organizationId,
+                pendingPlanId: planId,
+                status: { in: ["ACTIVE", "PAUSED"] },
+            },
+        },
+        _count: { _all: true },
+        orderBy: { maxAmountCents: "asc" },
+    });
+    return rows.flatMap((r) =>
+        r.maxAmountCents === null
+            ? []
+            : [
+                  {
+                      limit: fromMinor(r.maxAmountCents),
+                      members: r._count._all,
+                  },
+              ],
+    );
 }
 
 /** Subscriptions on the plan, or booked to switch to it. */

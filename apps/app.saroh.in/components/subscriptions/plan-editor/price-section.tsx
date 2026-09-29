@@ -13,8 +13,10 @@ import {
 } from "@/components/services/service-editor/fields";
 import { Chip } from "@/components/shared/chip";
 import { currencySymbol } from "@/lib/format/money";
+import type { AutopayLimit } from "@/lib/subscriptions/plan-drafts";
 import type { PlanForm } from "@/lib/subscriptions/plan-editor";
 import {
+    autopayLimitWarning,
     everyNote,
     INTERVAL_LABEL,
     MAIN_INTERVALS,
@@ -29,27 +31,42 @@ export const CHIP = "h-[34px] px-3 text-[13px]";
  * Price and billing (D7): the price, then how often — month and year
  * first, week and quarter behind More (default 29) — and how it is paid,
  * which never promises autopay the business can't take (DEC-038): it says
- * so only when the business offers it (D14).
+ * so only when the business offers it (D14). A price above what the
+ * autopay of members switching to the plan covers warns that they will need
+ * to authorise again (D13).
  */
 export function PriceSection({
     fields,
     currency,
     autopayOffered = false,
+    autopayLimits,
 }: {
     fields: EditorFields<PlanForm>;
     /** The plan's currency, or the business's for a new one. */
     currency: string;
     /** The business offers autopay (D14); unknown reads as not. */
     autopayOffered?: boolean;
+    /** What switchers' autopay covers (D13), from the plan's read. */
+    autopayLimits?: readonly AutopayLimit[];
 }) {
     const { values, set, errors } = fields;
-    const ids = { price: useId(), priceErr: useId(), every: useId() };
+    const ids = {
+        price: useId(),
+        priceErr: useId(),
+        limit: useId(),
+        every: useId(),
+    };
     const [more, setMore] = useState(false);
     const moreOpen = more || MORE_INTERVALS.includes(values.interval);
     const shown = moreOpen
         ? [...MAIN_INTERVALS, ...MORE_INTERVALS]
         : MAIN_INTERVALS;
     const note = everyNote({ ...values, currency }, autopayOffered);
+    const limitWarning = autopayLimitWarning(values, autopayLimits, currency);
+    const describedBy =
+        [errors.price ? ids.priceErr : "", limitWarning ? ids.limit : ""]
+            .filter(Boolean)
+            .join(" ") || undefined;
     return (
         <Section title="Price and billing">
             <label htmlFor={ids.price} className={LABEL}>
@@ -61,11 +78,22 @@ export function PriceSection({
                 autoComplete="off"
                 value={values.price}
                 aria-invalid={Boolean(errors.price)}
-                aria-describedby={errors.price ? ids.priceErr : undefined}
+                aria-describedby={describedBy}
                 onChange={(e) => set({ price: e.target.value })}
                 className={cn(FIELD, "w-[140px] max-w-full")}
             />
             <FieldError id={ids.priceErr} message={errors.price} />
+            <p
+                id={ids.limit}
+                aria-live="polite"
+                className={cn(
+                    "text-pretty text-[12.5px] leading-[1.5] text-warning-subtle-foreground",
+                    limitWarning &&
+                        "mt-2 rounded-[8px] bg-warning-subtle px-3 py-2",
+                )}
+            >
+                {limitWarning}
+            </p>
             <p id={ids.every} className={cn(LABEL, "mt-3.5")}>
                 Charged
             </p>

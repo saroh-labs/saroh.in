@@ -93,6 +93,8 @@ function setup(opts: {
     noSending?: boolean;
     /** D13: each renewal's autopay, by subscription. */
     charges?: Record<string, "CHARGING" | "MANDATE">;
+    /** D14: the business offers autopay now. */
+    autopayOffered?: boolean;
 }) {
     const db = {
         order: { findMany: jest.fn().mockResolvedValue(opts.orders ?? []) },
@@ -123,6 +125,13 @@ function setup(opts: {
                       .mockResolvedValue(new Map(Object.entries(opts.charges))),
               }
             : {}),
+        ...(opts.autopayOffered === undefined
+            ? {}
+            : {
+                  autopayOffered: jest
+                      .fn()
+                      .mockResolvedValue(opts.autopayOffered),
+              }),
     };
     const service = new HomeInlineService(
         opts.noSending ? undefined : sending,
@@ -402,6 +411,64 @@ describe("HomeInlineService.decorate", () => {
         const b = make();
         await setup({ providers: 0 }).service.decorate(b, OWNER, NOW);
         expect(b[0].evidence?.[0].inline).toBeUndefined();
+    });
+
+    it("offers Send a set-up link beside Retry when the autopay limit is too low (D14)", async () => {
+        const { service } = setup({ autopayOffered: true });
+        const future = new Date(NOW.getTime() + DAY).toISOString();
+        const actions = [
+            action("PAYMENTS_FAILED_RENEWALS", [
+                ev("sub_1", { at: future, tag: "Autopay limit too low" }),
+                ev("sub_2", { at: future, tag: "Payment failed" }),
+            ]),
+        ];
+        await service.decorate(actions, OWNER, NOW);
+        const [low, failed] = actions[0].evidence ?? [];
+        expect(low.link).toEqual({
+            label: "Send a set-up link",
+            href: "/billing/subscriptions/sub_1?do=autopay-link",
+        });
+        // Retry by pay link stays: the renewal can still be paid today.
+        expect(low.inline).toMatchObject({ kind: "RETRY", via: "PAY_LINK" });
+        // A decline needs no new authorisation.
+        expect(failed.link).toBeUndefined();
+
+        // It rides onto the row.
+        const { needs } = flattenNeeds(actions, "Asia/Kolkata");
+        expect(needs.find((n) => n.id.endsWith("sub_1"))?.link).toEqual(
+            low.link,
+        );
+    });
+
+    it("offers no set-up link without subscription:write, without autopay, or while a charge is under way", async () => {
+        const future = new Date(NOW.getTime() + DAY).toISOString();
+        const make = (tag = "Autopay limit too low") => [
+            action("PAYMENTS_FAILED_RENEWALS", [
+                ev("sub_1", { at: future, tag }),
+            ]),
+        ];
+
+        const a = make();
+        await setup({ autopayOffered: true }).service.decorate(
+            a,
+            holding("invoice:write", "subscription:read"),
+            NOW,
+        );
+        expect(a[0].evidence?.[0].link).toBeUndefined();
+
+        const b = make();
+        await setup({ autopayOffered: false }).service.decorate(b, OWNER, NOW);
+        expect(b[0].evidence?.[0].link).toBeUndefined();
+
+        // No way to read the offer (a Home built by hand): nothing promised.
+        const c = make();
+        await setup({}).service.decorate(c, OWNER, NOW);
+        expect(c[0].evidence?.[0].link).toBeUndefined();
+
+        // A charge under way re-tags the row; it offers nothing.
+        const d = make("Autopay charge in progress · 29 Sep");
+        await setup({ autopayOffered: true }).service.decorate(d, OWNER, NOW);
+        expect(d[0].evidence?.[0].link).toBeUndefined();
     });
 
     it("offers Send reminder from D17's send flag, in its words", async () => {

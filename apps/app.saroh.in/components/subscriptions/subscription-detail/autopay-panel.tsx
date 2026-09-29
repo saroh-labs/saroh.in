@@ -36,6 +36,8 @@ const SMALL = "h-8 rounded-[8px] px-3 text-[12.5px] font-semibold coarse:h-11";
  * Autopay under the Plan card's "Pays by" line (D14): how it came to be,
  * what needs attention, and — for someone with `subscription:write` —
  * "Send a set-up link" and "Cancel autopay", each asked before it acts.
+ * `openSend` opens the set-up sheet straight away (Home's "Send a set-up
+ * link", D14), only when it is offered here.
  */
 export function AutopayActions({
     subscriptionId,
@@ -44,15 +46,19 @@ export function AutopayActions({
     firstName,
     timeZone,
     now,
+    openSend = false,
 }: {
     subscriptionId: string;
     panel: AutopayPanel;
     card: AutopayCard | null;
+    openSend?: boolean;
     firstName: string;
     timeZone: string;
     now: Date;
 }) {
-    const [open, setOpen] = useState<"send" | "cancel" | null>(null);
+    const [open, setOpen] = useState<"send" | "cancel" | null>(() =>
+        openSend && panel.sendLabel !== null && card ? "send" : null,
+    );
     const showsActions = panel.sendLabel !== null || panel.canCancel;
     if (!panel.detail && !panel.notice && !showsActions) return null;
     return (
@@ -123,6 +129,7 @@ export function AutopayActions({
                             subscriptionId={subscriptionId}
                             firstName={firstName}
                             provider={card?.provider ?? null}
+                            emailTo={card?.emailTo ?? null}
                             onClose={() => setOpen(null)}
                         />
                     ) : null}
@@ -337,11 +344,14 @@ function CancelBody({
     subscriptionId,
     firstName,
     provider,
+    emailTo,
     onClose,
 }: {
     subscriptionId: string;
     firstName: string;
     provider: string | null;
+    /** Where Saroh emails them to say so (D14); null: not emailed. */
+    emailTo: string | null;
     onClose: () => void;
 }) {
     const router = useRouter();
@@ -362,7 +372,7 @@ function CancelBody({
             router.refresh();
             return;
         }
-        const said = cancelledText(res.data);
+        const said = cancelledText(res.data, firstName);
         showSuccess(said.title, said.detail);
         onClose();
         router.refresh();
@@ -377,6 +387,9 @@ function CancelBody({
                 {firstName}&apos;s autopay stops now and {at} is asked to cancel
                 it. The subscription carries on: the next renewal is invoiced
                 with a pay link.
+                {emailTo
+                    ? ` Saroh emails ${firstName} at ${emailTo} to say so.`
+                    : ""}
             </DialogDescription>
             <Footer>
                 <Button variant="outline" className={BTN} onClick={onClose}>

@@ -43,9 +43,14 @@ export type TeamTemplate = (typeof TEAM_TEMPLATES)[number];
 /**
  * D14's autopay set-up link, sent when staff press "Send a set-up link" on
  * Subscription Detail: the provider's page to approve autopay on, as a
- * secret link like a pay link.
+ * secret link like a pay link. And the note that staff cancelled their
+ * autopay ("Cancel autopay"), which is also the `event` of the SYSTEM
+ * thread message it writes where the account thread is live.
  */
-export const AUTOPAY_TEMPLATES = ["AUTOPAY_SET_UP_LINK"] as const;
+export const AUTOPAY_TEMPLATES = [
+    "AUTOPAY_SET_UP_LINK",
+    "AUTOPAY_CANCELLED",
+] as const;
 export type AutopayTemplate = (typeof AUTOPAY_TEMPLATES)[number];
 
 export const TRANSACTIONAL_TEMPLATES = [
@@ -176,6 +181,47 @@ export function renderAutopaySetupLink(
         .join("\n");
     return {
         subject: `Turn on autopay for ${vars.plan} with ${vars.business}`,
+        body,
+    };
+}
+
+/** What the autopay-cancelled note says (D14). */
+export interface AutopayCancelledVars {
+    business: string;
+    /** "Asha", or null when there's no name. */
+    firstName: string | null;
+    plan: string;
+}
+
+/**
+ * The line in the customer's account thread when staff cancel their
+ * autopay (D14). Plain text: a thread message is never rendered as HTML.
+ */
+export function autopayCancelledSentence(vars: AutopayCancelledVars): string {
+    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.`;
+}
+
+/**
+ * The email when staff cancel a customer's autopay (D14): it stopped, the
+ * plan carries on, and how the next renewal is paid. Sent through D17's
+ * transactional path, so a revoked email consent still stops it.
+ */
+export function renderAutopayCancelled(
+    vars: AutopayCancelledVars,
+): RenderedMessage {
+    const business = escapeHtml(vars.business);
+    const plan = escapeHtml(vars.plan);
+    const greeting = vars.firstName
+        ? `Hi ${escapeHtml(vars.firstName)},`
+        : "Hello,";
+    const body = [
+        `<p>${greeting}</p>`,
+        `<p>${business} has turned off autopay for ${plan}. Nothing more will be taken automatically.</p>`,
+        `<p>Your plan carries on. From your next renewal, ${business} sends you an invoice with a link to pay it.</p>`,
+        `<p>${business}</p>`,
+    ].join("\n");
+    return {
+        subject: `Autopay for ${vars.plan} is off`,
         body,
     };
 }

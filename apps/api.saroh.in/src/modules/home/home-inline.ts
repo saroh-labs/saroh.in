@@ -6,6 +6,7 @@ import type { OrderStage } from "../orders/dto";
 import { nextStages } from "../orders/order-stage";
 import { chargesUnderWay } from "../payments/charge-under-way";
 import { MandateChargesService } from "../payments/mandate-charges.service";
+import { MandateSetupService } from "../payments/mandate-setup.service";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { orderContactId } from "../site-accounts/customer-notify.handler";
 import type { NoticeReach } from "../site-accounts/notice-reach";
@@ -26,13 +27,15 @@ import type {
     HomeRetryVia,
 } from "./home-model";
 import { holds } from "./home-model";
-import { AUTOPAY_FAILED_TAGS } from "./home-money-sources";
+import { AUTOPAY_FAILED_TAGS, LIMIT_LOW_TAG } from "./home-money-sources";
 
 /**
  * Needs you's inline actions (round 2, F4): which rows offer Mark sent,
  * Retry, Send reminder or Reply in place, and what each says. Read after
  * the sources and before the list is flattened, so the action rides on
- * the row's evidence into `HomeNeed.inline`.
+ * the row's evidence into `HomeNeed.inline`. A renewal whose autopay limit
+ * is too low also offers "Send a set-up link" (D14), which opens
+ * Subscription Detail's own sheet (`HomeNeed.link`).
  *
  * An action is offered only to a viewer who holds the target's own write,
  * and only when that write can take it now (the order's next step is its
@@ -73,7 +76,16 @@ export interface InlinePorts {
         organizationId: string,
         subscriptionIds: readonly string[],
     ) => Promise<Map<string, "CHARGING" | "MANDATE">>;
+    /**
+     * Whether the business offers autopay now (D14: a provider that takes
+     * mandates, with its rollout flag on). Absent (a spec's ports): read
+     * from the mandate set-up service, or not offered without one.
+     */
+    autopayOffered?: (organizationId: string) => Promise<boolean>;
 }
+
+/** The label Subscription Detail's own button has (D14). */
+export const SEND_SETUP_LINK = "Send a set-up link";
 
 @Injectable()
 export class HomeInlineService {
@@ -87,6 +99,8 @@ export class HomeInlineService {
         @Optional() private readonly ports: InlinePorts = defaultPorts(prisma),
         // Autopay's retry (D13); absent where a spec builds Home by hand.
         @Optional() private readonly charges?: MandateChargesService,
+        // Whether autopay is offered, for "Send a set-up link" (D14).
+        @Optional() private readonly setups?: MandateSetupService,
     ) {}
 
     /** Put each offered action on its row's evidence, in place. */
@@ -103,6 +117,9 @@ export class HomeInlineService {
             ),
             this.step("Retry", () =>
                 this.retry(of("PAYMENTS_FAILED_RENEWALS"), input, now),
+            ),
+            this.step(SEND_SETUP_LINK, () =>
+                this.setUpLink(of("PAYMENTS_FAILED_RENEWALS"), input),
             ),
             this.step("Send reminder", () =>
                 this.remind(of("PAYMENTS_OVERDUE_INVOICES"), input, now),
@@ -232,6 +249,41 @@ export class HomeInlineService {
                 via,
             };
         }
+    }
+
+    /**
+     * "Send a set-up link" (D14) on a renewal above its autopay's limit
+     * (D13's "Autopay limit too low"), beside its Retry: the customer
+     * authorises again for a limit that covers it. It opens Subscription
+     * Detail's own sheet, where the method is picked and the link is shown
+     * once, so Home adds no write. Offered to `subscription:write` (the
+     * set-up link's own gate) while the business offers autopay; not while
+     * a charge is under way, since that row's tag says so instead.
+     */
+    private async setUpLink(
+        evidence: HomeEvidence[],
+        input: HomeInput,
+    ): Promise<void> {
+        const low = evidence.filter((ev) => ev.tag === LIMIT_LOW_TAG);
+        if (low.length === 0 || !holds(input, "subscription:write")) return;
+        const offered = this.ports.autopayOffered ?? this.autopayOffered();
+        if (!offered || !(await offered(input.organizationId))) return;
+        for (const ev of low) {
+            ev.link = {
+                label: SEND_SETUP_LINK,
+                href: `/billing/subscriptions/${encodeURIComponent(ev.id)}?do=autopay-link`,
+            };
+        }
+    }
+
+    /** The production read behind `autopayOffered`, when set-up is wired. */
+    private autopayOffered(): InlinePorts["autopayOffered"] {
+        const setups = this.setups;
+        if (!setups) return undefined;
+        return async (organizationId) =>
+            (await setups.mandateMethods(organizationId)).some(
+                (o) => o.methods.length > 0,
+            );
     }
 
     /** The production read behind `renewalCharges`, when autopay is wired. */

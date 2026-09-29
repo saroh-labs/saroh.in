@@ -41,6 +41,12 @@ describe("messageFrom", () => {
         ).toBe("Invoice sent");
         expect(
             messageFrom(
+                { ...base, author: "SYSTEM", event: "AUTOPAY_CANCELLED" },
+                "Farah",
+            ),
+        ).toBe("Autopay cancelled");
+        expect(
+            messageFrom(
                 { ...base, author: "SYSTEM", event: "INVOICE_REMINDER" },
                 "Farah",
             ),

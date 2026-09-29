@@ -18,7 +18,12 @@ import {
 } from "@/lib/home/needs";
 import type { HomeNeed, HomeUnavailable } from "@/lib/home/service";
 
-import { InlineButton, InlineConfirm, InlineDone } from "./inline-action";
+import {
+    InlineButton,
+    InlineConfirm,
+    InlineDone,
+    InlineLink,
+} from "./inline-action";
 import { TONE_BADGE } from "./tone";
 import type { DoneRow, InlineActions } from "./use-inline-actions";
 import { useInlineActions } from "./use-inline-actions";
@@ -174,6 +179,9 @@ function NeedRow({
                     >
                         {need.tag}
                     </Badge>
+                ) : null}
+                {need.link && !done && !open ? (
+                    <InlineLink link={need.link} />
                 ) : null}
                 {inline && !done && !open ? (
                     <InlineButton

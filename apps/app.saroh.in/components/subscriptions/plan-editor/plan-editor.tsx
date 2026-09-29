@@ -149,6 +149,7 @@ export function PlanEditor({
                         fields={fields}
                         currency={fields.values.currency || currency}
                         autopayOffered={autopayOffered}
+                        autopayLimits={initial?.autopayLimits}
                     />
                     {withClasses ? (
                         <ClassesSection
