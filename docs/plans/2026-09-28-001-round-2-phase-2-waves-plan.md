@@ -200,7 +200,8 @@ one exists.
 | F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 | [x] 2026-09-29 (backfill CLI `business-type-pvt.cli.ts`; rollout doc F10b) |
 | Z4 | Remove the `company` business-type alias | A release after F10b |  |
 | Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it | [x] 2026-09-29 (`primaryAction`, `numbers`; `actions`, `upcoming` kept: the app reads them; rollout doc Z5) |
-| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 | Waits for D7's app side (`r2/d7`, not yet merged) |
+| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 | D7 merged to development 2026-09-29 (#716); do it the release after D7 reaches production |
+| Z7 | P3's contract step: a unique index on (organization, order number), after the backfill's second run prints nothing to change | Once no pre-P3 API image can run | |
 
 ## Risks and open questions
 

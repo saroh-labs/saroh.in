@@ -1121,6 +1121,48 @@ empty `allergens` / `matchAllergens` on the note view, and the two
 `contactNoteAllergen.deleteMany` calls (`allergens.service.ts`,
 `backfill/catalogue-settings.ts`).
 
+## P3: order numbers are one series per business (#712, DEC-066)
+
+Every order — site checkout, New order and walk-ins, treatments booked
+online or at the desk — takes its number from the business's
+`OrderNumberSequence` row, locked and incremented in the order's own
+transaction (`nextOrderNumberInTx`). `ORD-001` format unchanged. Migration
+`20261019100000_order_number_sequence`, additive only: the table (RLS,
+`org_isolation`) and a nullable `Order.renumberedFrom`, which the Orders
+search and global search also match.
+
+### Deploy
+
+1. Migrate and deploy the API (saroh-deploy). A business's first order on
+   the new API starts after its highest `ORD-` number across its
+   storefronts, so the counter needs no backfill to be correct.
+2. Backfill, dry run first, then for real:
+
+    ```bash
+    … pnpm --filter @saroh/database exec tsx src/backfill/order-numbers.cli.ts --dry-run
+    … pnpm --filter @saroh/database exec tsx src/backfill/order-numbers.cli.ts
+    ```
+
+    It seeds each business's counter to its highest number (never lowers
+    one) and renumbers duplicates within a business: the oldest order keeps
+    its number, later ones take the next, and their old number goes into
+    `renumberedFrom`. Idempotent; a second run prints nothing to change.
+
+3. Deploy the workspace.
+
+### Rollback
+
+Safe. The previous image still numbers per storefront and can run beside
+this one; the allocator steps past any number it takes. Rolling back
+reintroduces per-storefront duplicates for new orders until this API is
+back; run the backfill again afterwards.
+
+### Later (the contract step)
+
+Once no previous image can run, run the backfill once more (it must print
+nothing to change), then add a unique index on (organization, number). It
+is in the waves plan's follow-up table as Z7.
+
 ## Before switching a flag on (advisory)
 
 These browser suites are skipped in CI while their features are off. Run
