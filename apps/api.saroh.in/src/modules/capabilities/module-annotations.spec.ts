@@ -227,6 +227,11 @@ const NEVER: Record<string, string> = {
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
+    // P1: the buyer's browser reports a payment the moment the provider's
+    // window closes. Never module-gated: a payment already taken is settled
+    // whatever the business has switched off since.
+    "webhooks/checkout-return.controller.ts":
+        "a buyer's checkout return — settles a payment already taken",
     "billing/billing-webhook.controller.ts": "billing webhook inbox",
     "waitlist/waitlist.controller.ts": "public waitlist",
 };
