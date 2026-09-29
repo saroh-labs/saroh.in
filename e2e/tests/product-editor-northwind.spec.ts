@@ -2,9 +2,10 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
-import { demoUser, urls } from "../playwright.config";
+import { urls } from "../playwright.config";
 
 /**
  * The Editor to the new design (#525), the parts that write: allergens
@@ -26,13 +27,7 @@ const store = (path: string) =>
     `${urls.API_URL}/stores/${NW.storeId}/products${path}`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 interface Allergen {

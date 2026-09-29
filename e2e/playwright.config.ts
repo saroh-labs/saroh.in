@@ -137,7 +137,15 @@ export default defineConfig({
     },
     projects: [
         {
+            // Signs each seeded person in through the real form once and
+            // saves the session to e2e/.auth/ (fixtures/sessions.ts). Every
+            // spec that only needs to BE signed in reuses it.
+            name: "setup",
+            testMatch: /auth\.setup\.ts$/,
+        },
+        {
             name: "desk",
+            dependencies: ["setup"],
             use: {
                 ...devices["Desktop Chrome"],
                 viewport: { width: 1440, height: 900 },
@@ -147,6 +155,7 @@ export default defineConfig({
             // A real touch pointer, which is what makes `pointer: coarse`
             // match — the whole basis of the touch-target rules (#178).
             name: "phone",
+            dependencies: ["setup"],
             use: { ...devices["Pixel 7"] },
         },
     ],

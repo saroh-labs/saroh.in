@@ -31,6 +31,37 @@ instead of the page that was asked for. That is not a bug — it is the
 open-redirect guard doing its job — but it will fail #222's test and waste an
 hour if you do not know it.
 
+## Signing in: once per person, reused
+
+The `setup` project (`e2e/tests/auth.setup.ts`) signs each seeded person in
+through the real form once per run and saves the session to `e2e/.auth/`
+(gitignored): the demo owner, the site reviewer, Nisha (Rye's Member) and
+Divya (Kavi's desk). `desk` and `phone` depend on it, so it runs first
+whatever specs, shards or file filters are picked.
+
+A spec that only needs to BE signed in carries a saved session into its
+context with `useSession(page, "member")` (`e2e/fixtures/sessions.ts`, which
+also takes a `{ email }`), then opens what it needs — usually
+`/open/<org id>`. Never type a password in a spec that is not about signing
+in; about 150 UI sign-ins a run became four.
+
+- **A spec about signing in keeps the form** — `auth.spec.ts` (cross-origin
+  session, #222's return-to, sign-out) and `site-sign-in.spec.ts`.
+- **Never sign out, or revoke a session, on a saved one.** Signing out ends
+  the session on the server and every later spec would land on /login. Sign
+  in through the form in a fresh context instead, as `auth.spec.ts` does.
+- **Choosing a business is safe.** The open business is the workspace's own
+  cookie, written into that spec's context only.
+- A new person: add them to `people` in `fixtures/sessions.ts`; the setup
+  project picks them up.
+
+## Waiting
+
+No `waitForTimeout`. Wait on something that happens: `expect(...)` on the
+screen, `expect.poll` on the API or on a measurement that must settle, and
+for a timer in the page (a ten-second hold, an Undo toast) install
+`page.clock` before the page loads and `runFor` past it.
+
 ## Two projects, because the scenes differ
 
 - **`desk`** — 1440, mouse. `pointer: fine`, so `coarse:` utilities are inert.
@@ -102,6 +133,10 @@ names nothing real. To see what a diff would run:
 
 ## Rules
 
+- `pnpm prepush --e2e` copies the seeded database from a template rather
+  than seeding each run, and CI restores a cached dump
+  (`docs/patterns/devops-tooling-and-deploy.md`). A seed or migration change
+  rebuilds both on its own; nothing to do by hand.
 - Specs share one seeded Organization, so the config runs them serially. A spec
   that mutates shared state (disabling a module, changing a role) must put it
   back.

@@ -2,6 +2,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
 import { demoReviewer, demoUser, urls } from "../playwright.config";
@@ -33,13 +34,7 @@ async function signIn(
     page: Page,
     who: { email: string; password: string } = demoUser,
 ) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page, who);
 }
 
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;

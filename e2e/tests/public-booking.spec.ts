@@ -2,7 +2,8 @@
 import type { Page, Request } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
 import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
@@ -42,13 +43,7 @@ const SITE = (() => {
 const SERVICE = "Warehouse walkthrough";
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 /**

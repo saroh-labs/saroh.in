@@ -88,10 +88,25 @@ seconds). Shared setup is `.github/actions/setup`.
 - **Current** — **The integration shards read the unit job's Turbo cache**
   for the api's workspace packages. The env is the same, so the hashes match,
   and the shards write no cache of their own.
-- **Current** — **Each browser shard seeds and builds in one turbo run**, so
+- **Current** — **A browser shard that must seed (no cached dump, below)
+  seeds and builds in one turbo run**, so
   the seed (~40s) overlaps the build. `db:seed:showcase` waits for
   `@saroh/database`'s own build, because its `prisma generate` rewrites the
   client the seed uses.
+- **Current** (2026-09-29) — **Browser shards restore a cached, seeded
+  database** instead of migrating and seeding. The shard keys a
+  `pg_dump -Fc` on `hashFiles` of the migrations, schema, `packages/database/src`
+  (the seed and showcase), the block contract and the lockfile, plus a
+  four-hour window of the Indian day (the showcase is laid out relative to
+  when it runs, so an older dump is never used; there are no restore-keys).
+  A hit runs `pg_restore` inside the Postgres service container (its version
+  is the server's) and then `turbo run build`; a miss migrates, seeds and
+  builds in one turbo run as before, dumps the database before the stack
+  starts, and saves it (`continue-on-error`, since four shards race to save
+  one key). Saves ~40s per shard on a hit.
+- **Current** (2026-09-29) — **Specs sign in once per person.** The
+  Playwright `setup` project runs in every shard and signs the four seeded
+  people in; the specs reuse the sessions (browser-tests skill).
 - **Current** — **Postgres services poll `pg_isready -h 127.0.0.1` every 2s.**
   The check goes over TCP because the image's init server listens on the
   socket only.
@@ -230,6 +245,15 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
       instead of 657s. `--int` picked 10 of 381 specs (4 related, 6 always)
       and its integration step took 9s instead of 84s. The whole run took
       66s, most of it lint, which ran beside another browser run.
+- **Seeded template for the browser step.** The first `--e2e` run migrates
+  and seeds `<E2E db>` as CI does, then copies it to `<E2E db>-template`
+  (`CREATE DATABASE … TEMPLATE`) and writes a key on the template's
+  COMMENT: the object ids of the migrations, schema, `packages/database/src`,
+  the block contract and the lockfile at HEAD, plus the Indian date, and the
+  time it was seeded. A later run whose key matches, within
+  `PREPUSH_E2E_TEMPLATE_HOURS` (default 4), copies the template in about a
+  second and only builds. `--no-cache` reseeds. The template's name keeps
+  "test" in it, and nothing but this connects to it.
 - **Not mirrored:** CI also runs the integration suite under RLS
   (`TEST_RLS=on`); the local gate runs it plain only.
 

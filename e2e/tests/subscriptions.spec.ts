@@ -2,7 +2,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { demoUser, NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * Payments → Subscriptions (plan 2026-09-23-003, U12/U13) on Rye & Co., the
@@ -30,13 +31,7 @@ const member = {
 };
 
 async function signIn(page: Page, who = demoUser) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page, who);
     await page.goto(`/open/${ORG}`);
 }
 

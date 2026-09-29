@@ -2,7 +2,8 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * Pack Detail (round-2 E16) on Northwind, where browser checks may write:
@@ -20,13 +21,7 @@ const orgApi = (path: string) =>
     `${urls.API_URL}/organizations/${NORTHWIND_ORG}${path}`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${NORTHWIND_ORG}`);
 }
 

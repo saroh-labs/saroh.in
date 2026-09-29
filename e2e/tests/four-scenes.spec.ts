@@ -2,7 +2,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The four scenes, as tests rather than as a review checklist (§18, #178).
@@ -26,13 +27,7 @@ import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
 const ROUTES = ["/", "/bookings", "/commerce", "/contacts"] as const;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     // The owner is in several businesses: with none chosen, `/` is the
     // chooser, not Home — and every scene below would measure the wrong page.
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
@@ -134,18 +129,25 @@ test.describe("the phone tab bar", () => {
             // Scrolled until the page stops growing: a long list (Northwind's
             // contacts, with the showcase on) draws more rows as it nears its
             // end, so one jump lands above a foot that is still arriving.
-            await expect(async () => {
-                const before = await page.evaluate(() => {
-                    window.scrollTo(0, document.documentElement.scrollHeight);
-                    return document.documentElement.scrollHeight;
-                });
-                await page.waitForTimeout(300);
-                const after = await page.evaluate(() => {
-                    window.scrollTo(0, document.documentElement.scrollHeight);
-                    return document.documentElement.scrollHeight;
-                });
-                expect(after).toBe(before);
-            }).toPass({ timeout: 15_000 });
+            // Settled when two looks in a row find the same height.
+            let last = -1;
+            await expect
+                .poll(
+                    async () => {
+                        const height = await page.evaluate(() => {
+                            window.scrollTo(
+                                0,
+                                document.documentElement.scrollHeight,
+                            );
+                            return document.documentElement.scrollHeight;
+                        });
+                        const settled = height === last;
+                        last = height;
+                        return settled;
+                    },
+                    { timeout: 15_000, intervals: [300] },
+                )
+                .toBe(true);
             const hidden = await page.evaluate(() => {
                 const nav = document.querySelector('nav[aria-label="Main"]');
                 if (!nav) return ["no tab bar"];

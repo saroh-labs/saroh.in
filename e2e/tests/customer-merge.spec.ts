@@ -1,12 +1,10 @@
 // @covers accounts:/login app:/open app:/customers api:customer-workspace api:contacts
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-
-import type { Browser, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
+import type { Role } from "../fixtures/sessions";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Merging two customers (DEC-042, C10) on Customer Detail.
@@ -22,44 +20,11 @@ const NORTHWIND = "seed_org";
 const RYE = "seed_sc_rc_org";
 const PRIYA = "seed_sc_rc_contact_priya";
 
-const member = {
-    email: "nisha.kulkarni@saroh.dev",
-    password: "demo-password-123",
-};
-
-const OWNER_STATE = path.join(os.tmpdir(), "e2e-customer-merge-owner.json");
-const MEMBER_STATE = path.join(os.tmpdir(), "e2e-customer-merge-member.json");
-
-async function saveSession(
-    browser: Browser,
-    who: { email: string; password: string },
-    file: string,
-) {
-    const context = await browser.newContext({ ignoreHTTPSErrors });
-    const page = await context.newPage();
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
-    await context.storageState({ path: file });
-    await context.close();
-}
-
-async function signIn(page: Page, org: string, file: string) {
-    const state = JSON.parse(fs.readFileSync(file, "utf8")) as {
-        cookies: Parameters<ReturnType<Page["context"]>["addCookies"]>[0];
-    };
-    await page.context().addCookies(state.cookies);
+/** Carry the saved session into this test's browser, then open the business. */
+async function signIn(page: Page, org: string, who: Role = "owner") {
+    await useSession(page, who);
     await page.goto(`/open/${org}`);
 }
-
-test.beforeAll(async ({ browser }) => {
-    await saveSession(browser, demoUser, OWNER_STATE);
-    await saveSession(browser, member, MEMBER_STATE);
-});
 
 /** Make a Northwind contact through the API, as the signed-in owner. */
 async function makeContact(
@@ -85,7 +50,7 @@ test.describe("Customer Detail — merge", () => {
     test("an owner merges a suggested duplicate, and the old address leads to the one kept", async ({
         page,
     }) => {
-        await signIn(page, NORTHWIND, OWNER_STATE);
+        await signIn(page, NORTHWIND, "owner");
         const stamp = Date.now();
         // The same phone, two emails: the pair C2 suggests.
         const phone = `+91 90000 ${String(stamp).slice(-5)}`;
@@ -148,7 +113,7 @@ test.describe("Customer Detail — merge", () => {
     test("More offers a search when no duplicate is suggested", async ({
         page,
     }) => {
-        await signIn(page, NORTHWIND, OWNER_STATE);
+        await signIn(page, NORTHWIND, "owner");
         const stamp = Date.now();
         const lone = await makeContact(page, {
             email: `merge-lone-${stamp}@example.test`,
@@ -179,7 +144,7 @@ test.describe("Customer Detail — merge", () => {
     });
 
     test("a Member sees no way to merge", async ({ page }) => {
-        await signIn(page, RYE, MEMBER_STATE);
+        await signIn(page, RYE, "member");
         await page.goto(`/customers/${PRIYA}`);
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
         await expect(page.getByRole("button", { name: "Merge…" })).toHaveCount(

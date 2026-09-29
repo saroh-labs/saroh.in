@@ -2,9 +2,9 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
-import { demoUser, urls } from "../playwright.config";
 
 /**
  * New order v2 (plan B, B13): the sheet on the Orders list, at the counter
@@ -15,13 +15,7 @@ const RYE = "seed_sc_rc_org";
 const RYE_STORE = "seed_sc_rc_store";
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 /**

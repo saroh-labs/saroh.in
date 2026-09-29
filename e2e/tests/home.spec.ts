@@ -2,7 +2,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Home's inline actions (round 2, F4) on Northwind Supply, the generic dev
@@ -19,13 +20,7 @@ import { demoUser, urls } from "../playwright.config";
 const NORTHWIND = "seed_org";
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND}`);
 }
 
