@@ -56,6 +56,13 @@ const ROUTES: readonly Route[] = [
         args: [ctx, SITE],
     },
     {
+        handler: "get",
+        method: RequestMethod.GET,
+        path: ":releaseId",
+        call: "get",
+        args: [ctx, SITE, RELEASE],
+    },
+    {
         handler: "update",
         method: RequestMethod.PATCH,
         path: ":releaseId",

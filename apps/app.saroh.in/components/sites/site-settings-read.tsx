@@ -1,5 +1,7 @@
 import { EmptyState } from "@saroh/ui/empty-state";
 
+import type { PublishApproval } from "@/lib/sites/publish-approval";
+import { publishApprovalLine } from "@/lib/sites/publish-approval";
 import type { SiteDetail } from "@/lib/sites/service";
 import type { SiteAddress } from "@/lib/sites/share-links";
 
@@ -20,10 +22,13 @@ import type { SiteAddress } from "@/lib/sites/share-links";
 export function SiteSettingsRead({
     site,
     address,
+    approval = null,
 }: {
     site: SiteDetail;
     /** Where the site is reached (`siteAddressOf`); null without an address. */
     address: SiteAddress | null;
+    /** "Publishing needs approval" (DEC-071, T13); null leaves it out. */
+    approval?: PublishApproval | null;
 }) {
     return (
         <div className="space-y-8">
@@ -33,6 +38,14 @@ export function SiteSettingsRead({
                 owner&apos;s or an admin&apos;s. A connected domain is not shown
                 here: reading it needs the domain permission this role lacks.
             </p>
+
+            {approval ? (
+                <Section title="Publishing">
+                    <Row label="Needs approval">
+                        {publishApprovalLine(approval.on)}
+                    </Row>
+                </Section>
+            ) : null}
 
             <Section title="Web address">
                 <Row label="On Saroh">

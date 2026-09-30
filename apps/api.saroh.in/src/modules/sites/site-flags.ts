@@ -358,6 +358,41 @@ function checkSection(
             break;
         }
 
+        case "projects": {
+            /*
+             * Each project's photo must be described (K11), as the text
+             * block's is (G7): the contract saves a photo before it is
+             * described, so this is where it is asked for. A project's link
+             * to a path is checked against the site's pages, as a button's is.
+             */
+            const items = Array.isArray(c.items) ? c.items : [];
+            items.forEach((raw, i) => {
+                const item = obj(raw);
+                const name = str(item.title).trim();
+                const which = name ? `"${name}"` : `project ${i + 1}`;
+                const photo = obj(item.image);
+                if (
+                    str(photo.src).trim() !== "" &&
+                    str(photo.alt).trim() === ""
+                ) {
+                    at(
+                        "emptyRequiredField",
+                        `The photo for ${which} has no description, so someone using a screen reader won't know what it shows.`,
+                        "items",
+                    );
+                }
+                const link = str(item.link).trim();
+                if (link !== "" && isBrokenInternalLink(link, pagePaths)) {
+                    at(
+                        "brokenLink",
+                        `The link for ${which} points at ${link}, which is not a page on this site.`,
+                        "items",
+                    );
+                }
+            });
+            break;
+        }
+
         case "enquiry": {
             const fields = Array.isArray(c.fields) ? c.fields : [];
             if (fields.length === 0) {
@@ -631,7 +666,7 @@ export function checkSite(site: FlagSiteInput): Flag[] {
         }
         flags.push({
             type: "reservedAddress",
-            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its address so visitors can reach it.`,
+            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its path so visitors can reach it.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",
@@ -724,7 +759,7 @@ export function checkShop(input: ShopFlagInput): Flag[] {
         if (page.kind === "SHOP" && page.path === SHOP_ROOT) continue;
         flags.push({
             type: "reservedAddress",
-            message: `${page.path} is where your online shop lives. This page keeps showing there for now. Change its address so the shop can open.`,
+            message: `${page.path} is where your online shop lives. This page keeps showing there for now. Change its path so the shop can open.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",

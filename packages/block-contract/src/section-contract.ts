@@ -635,6 +635,45 @@ const packsV1 = z.object({
     showDescriptions: z.boolean().optional(),
 });
 
+/** How many projects a Projects block carries, at most (K11). */
+export const PROJECTS_MAX = 24;
+
+/**
+ * projects v1 — the merchant's own work: a photo, a title, a line about it
+ * and a link to more (K11, DEC-070).
+ *
+ * A STATIC block, not a bound one (KTD-13). A project is the merchant's own
+ * words and photo; there is no Project model to read, and
+ * `Organization.projects` is ADR-001's internal grouping, not portfolio
+ * work, so nothing here binds to it. What a merchant types is what a visitor
+ * reads, as with `features`.
+ *
+ * Every part of an item but the title is optional: a project with no photo
+ * draws without a gap where one would be, and one with no link has no
+ * "View project". The photo is the hero's shape, the address the media
+ * library served, so the library's "on a published site" guard finds it in a
+ * snapshot. Its description is asked for before publishing, not on save
+ * (`site-flags.ts`), for the reason the text block's photo gives: the photo
+ * is chosen first and the draft saves in between.
+ *
+ * `link` is a `linkHref`, so `javascript:` is refused when it is authored.
+ * Looks are `cards` and `list` (`LIST_LAYOUTS`), in `BLOCK_META`.
+ * Up to {@link PROJECTS_MAX}: past that it is a page of its own.
+ */
+const projectItemSchema = z.object({
+    image: imageSchema.optional(),
+    title: z.string().trim().min(1).max(120),
+    summary: z.string().max(600).optional(),
+    link: linkHref.optional(),
+});
+
+const projectsV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    items: z.array(projectItemSchema).min(1).max(PROJECTS_MAX),
+});
+
 /** How many products a Product grid shows, at most, and when it isn't set. */
 export const PRODUCT_GRID_MAX = 12;
 export const PRODUCT_GRID_DEFAULT_COUNT = 4;
@@ -791,6 +830,7 @@ export const SECTION_TYPES = [
     "plans",
     "productGrid",
     "packs",
+    "projects",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -944,6 +984,14 @@ const REGISTRY: Record<string, SectionContract> = {
         version: 1,
         // A title and display options; the packs are read live.
         schema: packsV1,
+        sanitizedFields: [],
+    },
+    [key("projects", 1)]: {
+        type: "projects",
+        version: 1,
+        // Plain text, photos and links checked by `linkHref`; nothing here
+        // is authored HTML.
+        schema: projectsV1,
         sanitizedFields: [],
     },
 };

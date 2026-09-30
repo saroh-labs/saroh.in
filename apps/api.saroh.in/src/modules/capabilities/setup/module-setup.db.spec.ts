@@ -8,7 +8,8 @@
  *   switch, not its audit event;
  * - a second enable applies nothing (`alreadyEnabled`);
  * - the previous app's call, without setup, behaves as before;
- * - the defaults the sheet prefills, and how they follow the kind (K8);
+ * - the defaults the sheet prefills, and how they follow the kind (K8,
+ *   and Website's template, K15);
  * - Automations is refused and hidden, a setting already on kept;
  * - `module:manage`, and the action for what a setup creates, are enforced.
  *
@@ -970,6 +971,55 @@ describe("the Bookings prefill follows the kind (DEC-070, K8)", () => {
             );
         }
     });
+});
+
+describe("Website starts from the kind's template (DEC-070, K15)", () => {
+    it("the sheet names the template a new site starts from", async () => {
+        for (const [kind, template] of [
+            ["BUSINESS", { id: "starter", name: "Starter" }],
+            [undefined, { id: "starter", name: "Starter" }],
+            ["SOLO", { id: "personal", name: "Personal" }],
+            ["WORK", { id: "portfolio", name: "Portfolio" }],
+        ] as const) {
+            const ctx = await business("Asha Rao", kind);
+            expect((await setup.defaults(ctx, "WEBSITE")).template).toEqual(
+                template,
+            );
+        }
+    });
+
+    it("says nothing of a template once there is a site", async () => {
+        const ctx = await business("Asha Rao", "WORK");
+        await prisma.site.create({
+            data: {
+                organizationId: ctx.organizationId,
+                name: "Asha Rao",
+                slug: "asha",
+                subdomain: `k15-${seq}-${tag}`,
+            },
+        });
+        expect((await setup.defaults(ctx, "WEBSITE")).template).toBeUndefined();
+    });
+
+    it.each([
+        ["WORK", ["/", "/about", "/work"]],
+        ["BUSINESS", ["/", "/about"]],
+    ] as const)(
+        "%s: turning Website on drafts the kind's pages",
+        async (kind, paths) => {
+            const ctx = await business("Asha Rao", kind);
+            const out = await setup.enable(ctx, "WEBSITE", {
+                siteName: "Asha Rao",
+                address: `k15-${seq}-${tag}`,
+            });
+            const pages = await prisma.page.findMany({
+                where: { siteId: out.created.siteId },
+                orderBy: { path: "asc" },
+                select: { path: true },
+            });
+            expect(pages.map((p) => p.path)).toEqual(paths);
+        },
+    );
 });
 
 describe("Automations (hidden, DEC-068)", () => {

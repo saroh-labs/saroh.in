@@ -55,10 +55,19 @@ pattern files refer back here.
   They use the kind's words ("Add your address", "Add your details"), and the
   checklist's heading follows its steps ("Get your site live" when only
   publishing is left).
-- **Not yet true** (DEC-070, K11–K15) — The Portfolio, Blog/writing and
-  Personal/consultant templates and the Projects block aren't built, so a
-  new site starts from the starter template for every kind. Its second
-  version (`starter@2`) no longer assumes a business and has no images.
+- **Current** (DEC-070, K10–K15) — A new site starts from the kind's
+  template: the starter (`starter@2`) for a business, Personal for Just me,
+  Portfolio (with the Projects block) for A site for my work. The Turn on
+  sheet's Website step says which ("Starts from the Portfolio template"),
+  and `/sites/new` starts its picker there; any registered template can be
+  chosen instead, Writing among them, and an explicit choice always wins.
+  There is no blank site. The kind only picks the default
+  (`sites/site-template.ts`, `KIND_TEMPLATE`), never which templates a
+  business may use. No template assumes a business, speaks as "we", or
+  names an image; every enquiry form a template lays down gets its Form
+  when the site is made, so it takes enquiries from the first publish.
+  Personal lists the real Services only with Bookings on and a service to
+  show; otherwise placeholder offers the owner writes over.
 - **Current** — A business is often a small team of 2–5 people with mixed
   roles, sharing one workspace; someone working for themselves is a team of
   one. Nobody is a full-time software operator (`PRODUCT.md`). Avoid
@@ -136,6 +145,9 @@ pattern files refer back here.
   (`ONLINE`: stock kept for online orders). A location has no public address
   of its own. The four addresses are named apart: _web address_,
   _registered address_, _location address_ and the blog's _posts path_.
+  A page's or a post's own part of the link is its _path_ ("Page path",
+  "Post path", "Change its path"), never its address; the web address has
+  one place, Settings › Business › Identity's Web address card.
 - **Current** — **Opening hours are edited once, for every storefront**
   (DEC-034): Business → Hours reads the first storefront's week and Save
   writes it to all of them, saying so first when their weeks differ.
@@ -285,6 +297,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   enforced in `putLive`, with the words and the owner check in
   `sites/publish-approval.ts`, so every way of going live obeys it, a
   scheduled go-live included.
+- **Current** (DEC-071, T12) — Reviewers review a test release on its own
+  page (`/sites/:siteId/releases/:releaseId`), drawn from its frozen
+  snapshot with the session and `site:read`, no link token. A verdict, a
+  request or a note there carries `testReleaseId` and never touches the
+  draft's review; a note pins a section by its position on the frozen page.
+  Every review panel says what it reviews: "Draft" or "Test release N ·
+  name". Version history says which release a go-live came from, badges
+  Approved, Bypassed and "Overridden by ‹owner›", and lists scheduled
+  go-lives.
 - **Current** — Section content validates against the versioned contract in
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing

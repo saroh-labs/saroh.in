@@ -140,7 +140,7 @@ describe("SitesService.createPage", () => {
                 }),
             );
             expect(body.message).toContain(`${root} is ${purpose}`);
-            expect(body.message).toContain("Pick another address");
+            expect(body.message).toContain("Pick another path");
             expect(body.details).toMatchObject({
                 field: "path",
                 reason: "reserved",

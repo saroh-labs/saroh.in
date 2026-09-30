@@ -33,8 +33,26 @@ import {
 import { createSite } from "@/lib/sites/actions";
 import type { NewSiteDefaults, Template } from "@/lib/sites/service";
 
-/** Sentinel Select value for "no template" — Radix forbids an empty item value. */
+/**
+ * Sentinel for "none picked": the API then starts the site from the kind's
+ * template. Only when no template could be listed (the picker is hidden).
+ */
 const NO_TEMPLATE = "none";
+
+/**
+ * The template the picker starts on: the kind's (DEC-070, K15) when it is
+ * listed, else the first listed. There is no blank site: a site always
+ * starts from a template, the kind's when none is sent.
+ */
+export function initialTemplateId(
+    templates: readonly Pick<Template, "id">[],
+    preferred: string | null | undefined,
+): string {
+    if (preferred && templates.some((t) => t.id === preferred)) {
+        return preferred;
+    }
+    return templates[0]?.id ?? NO_TEMPLATE;
+}
 
 const formSchema = z.object({
     name: z.string().trim().min(1, { message: "Name is required" }),
@@ -57,14 +75,21 @@ type FormValues = z.infer<typeof formSchema>;
  * like it — so a merchant normally never meets a refusal. When the API does
  * refuse one in use, it offers a free one, shown as "Use ‹address›" under the
  * field (as the Turn on sheet's Website step does), never applied unasked.
+ *
+ * The template starts on the one for what is being set up (DEC-070, K15):
+ * Portfolio for "A site for my work", Personal for "Just me", the starter
+ * for a business. Any other can be picked; the choice is always sent.
  */
 export function CreateSiteForm({
     templates,
     defaults = null,
+    defaultTemplateId = null,
 }: {
     templates: Template[];
     /** What the API offers a new site; null starts the form empty. */
     defaults?: NewSiteDefaults | null;
+    /** The kind's template (`kindDefaults(kind).starterTemplate`). */
+    defaultTemplateId?: string | null;
 }) {
     const router = useRouter();
     const form = useForm<FormValues>({
@@ -72,7 +97,7 @@ export function CreateSiteForm({
         defaultValues: {
             name: defaults?.siteName ?? "",
             subdomain: defaults?.address ?? "",
-            templateId: NO_TEMPLATE,
+            templateId: initialTemplateId(templates, defaultTemplateId),
         },
     });
     const [suggestion, setSuggestion] = useState<string | null>(null);
@@ -191,7 +216,7 @@ export function CreateSiteForm({
                         name="templateId"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Template (optional)</FormLabel>
+                                <FormLabel>Template</FormLabel>
                                 <Select
                                     value={field.value}
                                     onValueChange={field.onChange}
@@ -199,13 +224,10 @@ export function CreateSiteForm({
                                 >
                                     <FormControl>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Blank site" />
+                                            <SelectValue placeholder="Choose a template" />
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        <SelectItem value={NO_TEMPLATE}>
-                                            Blank site
-                                        </SelectItem>
                                         {templates.map((t) => (
                                             <SelectItem key={t.id} value={t.id}>
                                                 {t.name} (v{t.version})
@@ -213,6 +235,10 @@ export function CreateSiteForm({
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                <FormDescription>
+                                    Every page it starts with can be changed or
+                                    removed.
+                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}

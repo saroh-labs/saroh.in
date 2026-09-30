@@ -5,15 +5,12 @@
  * gets a client reference, not the value (`lib/server-imports.test.ts`).
  */
 
-/** What stays live on a test release (R6), in the words the sheet uses. */
-export const LIVE_OUTSIDE_RELEASE = [
-    "Products, prices and stock",
-    "Plans and packs",
-    "Opening hours",
-    "Where your online shop sells from",
-    "Posts",
-    "Which parts of your business are switched on",
-] as const;
+/**
+ * What stays live on a test release (R6). Shared with the editor's "Make a
+ * test release" sheet (T11) through `@saroh/site-blocks`, so the two never
+ * say it differently.
+ */
+export { LIVE_OUTSIDE_RELEASE } from "@saroh/site-blocks/test-release-words";
 
 /** The CSS variable the bar keeps at its own height. */
 export const BAR_HEIGHT_VAR = "--test-release-bar-h";

@@ -30,6 +30,8 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
     testimonials: null,
     // Typed by the merchant here, not read from a location.
     contact: null,
+    // The merchant's own work, typed here: there is nothing to read (K11).
+    projects: null,
     servicesList: {
         reads: "Reads your services live, so names, durations and prices are never out of date here.",
         notice: "What each service is called and what it costs follow Services — change them there, and this block follows.",

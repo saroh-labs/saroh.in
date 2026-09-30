@@ -373,16 +373,16 @@ export function PostEditor({
                         </div>
 
                         <Field
-                            label="Address"
-                            hint="The last part of the web address. Left empty, it follows the title."
+                            label="Post path"
+                            hint="The end of the post's link. Left empty, it follows the title."
                         >
                             <Input
                                 value={slug}
                                 onChange={(e) =>
                                     touched(setSlug)(e.target.value)
                                 }
-                                placeholder={slugFrom(title) || "post-address"}
-                                aria-label="Post address"
+                                placeholder={slugFrom(title) || "post-path"}
+                                aria-label="Post path"
                             />
                         </Field>
 
@@ -469,7 +469,7 @@ export function PostEditor({
                                     title="Delete this post?"
                                     description={
                                         liveAt
-                                            ? "It comes off the site and out of your posts, and its address stops working for anyone who saved it. This cannot be undone — to take it down and keep it, use Take off the site instead."
+                                            ? "It comes off the site and out of your posts, and its link stops working for anyone who saved it. This cannot be undone — to take it down and keep it, use Take off the site instead."
                                             : "It has never been published, so nobody outside your team has seen it. It cannot be brought back."
                                     }
                                     confirmLabel="Delete post"

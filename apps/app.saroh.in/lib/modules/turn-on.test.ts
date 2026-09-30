@@ -495,6 +495,34 @@ describe("decoding setup-defaults", () => {
             dependencies: [],
             hidden: false,
             read: false,
+            template: null,
         });
+    });
+
+    it("reads the prefill as the API sends it, under setup (K15)", () => {
+        const read = decodeSetupDefaults("WEBSITE", {
+            data: {
+                moduleKey: "WEBSITE",
+                hidden: false,
+                dependencies: [],
+                setup: { siteName: "Asha Rao", address: "asha-rao" },
+                existing: null,
+                template: { id: "portfolio", name: "Portfolio" },
+            },
+        });
+        expect(read.defaults).toEqual({
+            siteName: "Asha Rao",
+            address: "asha-rao",
+        });
+        expect(read.template).toEqual({ id: "portfolio", name: "Portfolio" });
+    });
+
+    it("says no template when the API names none, or one it can't read", () => {
+        expect(
+            decodeSetupDefaults("WEBSITE", { setup: {}, template: 3 }).template,
+        ).toBeNull();
+        expect(decodeSetupDefaults("COMMERCE", { setup: {} }).template).toBe(
+            null,
+        );
     });
 });

@@ -74,6 +74,19 @@ export class TestReleasesController {
         return this.releases.revokeLink(ctx, siteId, linkId);
     }
 
+    /**
+     * One test release with its frozen snapshot, to read it in the
+     * workspace (T12). `site:read`.
+     */
+    @Get(":releaseId")
+    get(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("releaseId") releaseId: string,
+    ) {
+        return this.releases.get(ctx, siteId, releaseId);
+    }
+
     /** Rename a test release, or change its note. `site:update`. */
     @Patch(":releaseId")
     update(

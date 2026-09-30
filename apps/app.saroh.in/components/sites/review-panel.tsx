@@ -12,12 +12,30 @@ import {
     setCommentResolved,
 } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
+import { reviewSubject } from "@/lib/sites/release-review";
 import type {
+    PublicationRelease,
     ReviewerVerdict,
     ReviewState,
     SiteCommentView,
     SitePage,
 } from "@/lib/sites/service";
+
+/** What this person may do in the panel. The editor's people may do all. */
+export interface ReviewPanelAbilities {
+    /** `site:approve`: Approve, Ask for changes. */
+    approve: boolean;
+    /** `site:update`: ask for a review. */
+    ask: boolean;
+    /** `section:write`: mark a note settled, or reopen it. */
+    settle: boolean;
+}
+
+const EVERYTHING: ReviewPanelAbilities = {
+    approve: true,
+    ask: true,
+    settle: true,
+};
 
 /**
  * The rail's Review tab (#193).
@@ -30,6 +48,12 @@ import type {
  * Scope is the issue's: notes and one approval. No assignment, no states, no
  * rounds. Resolving is the OWNER's action, not the reviewer's — the reviewer
  * says what they think and the owner decides when it is settled.
+ *
+ * It says what is being reviewed (DEC-071, T12): the draft, in the editor,
+ * or one test release, beside that release's frozen pages. On a release,
+ * every verdict, request and note carries its id, so it is about those bytes
+ * and leaves the draft's own review as it was (KTD-10). A release is shared
+ * by its own links, so the draft's preview links aren't offered there.
  */
 export function ReviewPanel({
     siteId,
@@ -38,6 +62,8 @@ export function ReviewPanel({
     review,
     onChanged,
     onJump,
+    release = null,
+    can = EVERYTHING,
 }: {
     siteId: string;
     pages: SitePage[];
@@ -47,6 +73,9 @@ export function ReviewPanel({
     /** Re-read after a note, a verdict or a request, so the bar follows. */
     onChanged: () => void;
     onJump: (pageId: string, sectionKey: string) => void;
+    /** The test release under review; null for the draft. */
+    release?: PublicationRelease | null;
+    can?: ReviewPanelAbilities;
 }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [showResolved, setShowResolved] = useState(false);
@@ -63,7 +92,7 @@ export function ReviewPanel({
      */
     async function record(outcome: ReviewerVerdict) {
         setRecording(true);
-        const res = await createApproval(siteId, outcome);
+        const res = await createApproval(siteId, outcome, release?.id);
         setRecording(false);
         if (!res.ok) {
             showError(res.error);
@@ -87,17 +116,42 @@ export function ReviewPanel({
      */
     async function ask() {
         setAsking(true);
-        const res = await requestReview(siteId);
+        const res = await requestReview(siteId, release?.id);
         setAsking(false);
         if (!res.ok) {
             showError(res.error);
             return;
         }
-        showSuccess("Asked for a review. Share a preview so they can read it.");
+        showSuccess(
+            release
+                ? "Asked for a review. Share a link to the test release so they can read it."
+                : "Asked for a review. Share a preview so they can read it.",
+        );
         onChanged();
     }
 
-    const verdict = (
+    /*
+     * What is being reviewed, first: a verdict below is about exactly this,
+     * and a reviewer who has two releases and a draft open must never have
+     * to guess which one they approved.
+     */
+    const subject = (
+        <div className="flex shrink-0 items-baseline gap-2 border-b px-3 py-2">
+            <span className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                Reviewing
+            </span>
+            <span
+                data-review-subject
+                className="min-w-0 truncate text-xs font-medium"
+            >
+                {reviewSubject(release)}
+            </span>
+        </div>
+    );
+
+    const shareLinks = release ? null : <PreviewLinks siteId={siteId} />;
+
+    const verdict = !can.approve ? null : (
         <div className="flex gap-2 border-b px-3 py-2">
             <Button
                 type="button"
@@ -122,7 +176,7 @@ export function ReviewPanel({
         </div>
     );
 
-    const askForReview = (
+    const askForReview = !can.ask ? null : (
         <div className="border-b px-3 py-2">
             {review.pending ? (
                 <p className="text-xs leading-relaxed text-muted-foreground">
@@ -141,7 +195,7 @@ export function ReviewPanel({
                     >
                         {asking ? "Asking…" : "Ask for a review"}
                     </Button>
-                    {review.approvalIsStale ? (
+                    {review.approvalIsStale && !release ? (
                         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                             This site was approved, and has been edited since.
                             The approval does not cover the changes.
@@ -173,7 +227,8 @@ export function ReviewPanel({
     if (comments.length === 0) {
         return (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                <PreviewLinks siteId={siteId} />
+                {subject}
+                {shareLinks}
                 {verdict}
                 {askForReview}
                 {/*
@@ -190,9 +245,9 @@ export function ReviewPanel({
                  * — the api took notes and no screen ever posted one.
                  */}
                 <p className="p-4 text-xs leading-relaxed text-muted-foreground">
-                    No notes on this site yet. Share a preview above so people
-                    can read the draft. Select a section to leave a note on it,
-                    and say here whether the site is good to go.
+                    {release
+                        ? "No notes on this test release yet. Select a section to leave a note on it, and say here whether it's good to go live."
+                        : "No notes on this site yet. Share a preview above so people can read the draft. Select a section to leave a note on it, and say here whether the site is good to go."}
                 </p>
             </div>
         );
@@ -230,7 +285,8 @@ export function ReviewPanel({
      */
     return (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            <PreviewLinks siteId={siteId} />
+            {subject}
+            {shareLinks}
             {verdict}
             {askForReview}
             <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
@@ -264,7 +320,11 @@ export function ReviewPanel({
                                     key={note.id}
                                     note={note}
                                     busy={busy === note.id}
-                                    onToggle={() => void toggle(note)}
+                                    onToggle={
+                                        can.settle
+                                            ? () => void toggle(note)
+                                            : null
+                                    }
                                     onJump={onJump}
                                 />
                             ))}
@@ -283,7 +343,11 @@ export function ReviewPanel({
                                     key={note.id}
                                     note={note}
                                     busy={busy === note.id}
-                                    onToggle={() => void toggle(note)}
+                                    onToggle={
+                                        can.settle
+                                            ? () => void toggle(note)
+                                            : null
+                                    }
                                     onJump={onJump}
                                 />
                             ))}
@@ -303,7 +367,8 @@ function Note({
 }: {
     note: SiteCommentView;
     busy: boolean;
-    onToggle: () => void;
+    /** Null for someone who can't settle notes: the control is absent. */
+    onToggle: (() => void) | null;
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
     const settled = note.resolvedAt !== null;
@@ -359,16 +424,18 @@ function Note({
                         Go to section
                     </Button>
                 )}
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    className="ml-auto h-6 px-1.5 text-[0.6875rem]"
-                    onClick={onToggle}
-                >
-                    {settled ? "Reopen" : "Mark settled"}
-                </Button>
+                {onToggle ? (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        className="ml-auto h-6 px-1.5 text-[0.6875rem]"
+                        onClick={onToggle}
+                    >
+                        {settled ? "Reopen" : "Mark settled"}
+                    </Button>
+                ) : null}
             </div>
         </li>
     );

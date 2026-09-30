@@ -9,6 +9,7 @@ import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { CreateSiteForm } from "@/components/sites/create-site-form";
 import { mayAddWebsite } from "@/lib/business-limits";
+import { kindDefaults } from "@/lib/organizations/kind";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import {
@@ -89,7 +90,14 @@ export default async function NewSitePage() {
                 title="Create a site"
                 description="Name your new site, check its web address and pick a template."
             />
-            <CreateSiteForm templates={templates} defaults={defaults} />
+            <CreateSiteForm
+                templates={templates}
+                defaults={defaults}
+                // The kind's template, picked to start with (DEC-070, K15).
+                defaultTemplateId={
+                    kindDefaults(organization?.kind).starterTemplate
+                }
+            />
         </PageContainer>
     );
 }

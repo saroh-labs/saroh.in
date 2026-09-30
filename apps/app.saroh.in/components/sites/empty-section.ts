@@ -100,6 +100,15 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { heading: "", items: [{ quote: "", name: "" }] },
             };
+        case "projects":
+            // Like `features`: one empty project, because the contract needs
+            // one, and no invented work (K11) — the merchant fills in theirs.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "", items: [{ title: "" }] },
+            };
         case "servicesList":
             // Empty until the merchant picks a service; the editor lists
             // theirs, or says there are none yet.

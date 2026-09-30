@@ -57,7 +57,7 @@ function alreadyHas(kind: ModulePageKind): ConflictException {
  * - the site has one already (409);
  * - a Book or Shop page asked for another address (400): theirs is fixed;
  * - a Book or Shop page whose address a free-form page holds (409, naming
- *   that page: "Change its address first");
+ *   that page: "Change its path first");
  * - a Prices, Journal or Contact address that is taken (400, "Pick another
  *   address", with a suggestion).
  */
@@ -104,7 +104,7 @@ export async function createModulePage(
         });
         if (holder) {
             throw new ConflictException({
-                message: `Your page "${holder.title}" uses ${path}. Change its address first.`,
+                message: `Your page "${holder.title}" uses ${path}. Change its path first.`,
                 details: {
                     field: "path",
                     reason: "held",
@@ -149,7 +149,7 @@ export async function createModulePage(
             });
             if (raced) throw alreadyHas(kind);
             throw new ConflictException({
-                message: `Another page took ${path} just now. Pick another address.`,
+                message: `Another page took ${path} just now. Pick another path.`,
                 details: { field: "path", reason: "taken" },
             });
         }

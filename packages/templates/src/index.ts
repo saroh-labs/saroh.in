@@ -37,12 +37,18 @@ export {
     starterTemplateV1,
 } from "./templates/starter";
 
-// Blog/writing (DEC-070, K13). Exported, not yet registered: K15 registers it.
+// Blog/writing (DEC-070, K13). Registered; no kind's default.
 export { WRITING_TEMPLATE_ID, writingTemplate } from "./templates/writing";
 
-// The Personal/consultant template (DEC-070, K14). K15 registers it.
+// The Personal/consultant template (DEC-070, K14): the default for "Just me".
 export {
     PERSONAL_TEMPLATE_ID,
     personalServiceIds,
     personalTemplate,
 } from "./templates/personal";
+
+// The Portfolio template (DEC-070, K12): the default for "A site for my work".
+export {
+    PORTFOLIO_TEMPLATE_ID,
+    portfolioTemplate,
+} from "./templates/portfolio";

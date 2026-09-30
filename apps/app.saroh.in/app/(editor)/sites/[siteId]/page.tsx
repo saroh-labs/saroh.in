@@ -17,6 +17,7 @@ import {
     readWebAddressLinks,
     RENDERER_APEX,
 } from "@/lib/sites/share-links-read";
+import { readTestReleases } from "@/lib/sites/test-releases-api";
 
 /**
  * Site editor host (S2-004). Resolves the site (notFound when missing / not
@@ -66,14 +67,18 @@ export default async function SiteEditorPage({
     // Flags are whole-site, so they load alongside the page rather than per
     // page — the pre-publish check groups them by page and cannot be answered
     // from the one page that happens to be open.
-    const [draft, flags, comments, review, webAddress] = await Promise.all([
-        getPageDraft(siteId, activePage.id),
-        getSiteFlags(siteId),
-        listComments(siteId),
-        getReviewState(siteId),
-        // Where the site is reached, custom domain first (DEC-069, L8).
-        readWebAddressLinks(),
-    ]);
+    const [draft, flags, comments, review, webAddress, testReleases] =
+        await Promise.all([
+            getPageDraft(siteId, activePage.id),
+            getSiteFlags(siteId),
+            listComments(siteId),
+            getReviewState(siteId),
+            // Where the site is reached, custom domain first (DEC-069, L8).
+            readWebAddressLinks(),
+            // Test releases (DEC-071, T11): `off` hides them; a failed read
+            // is said in their panel and never keeps the editor from opening.
+            readTestReleases(siteId),
+        ]);
     /*
      * Checked against the block contract, not cast into it (#275).
      *
@@ -155,6 +160,13 @@ export default async function SiteEditorPage({
             // The module pages the page menu may offer (G14, G16); the API
             // lists none for a role without `site:update`.
             addablePageKinds={site.addablePageKinds ?? []}
+            initialTestReleases={testReleases}
+            canPublish={site.can.publish}
+            // "Publishing needs approval" (DEC-071, R10), and whether this
+            // person is the owner who may go live past it (KTD-11).
+            publishNeedsApproval={site.publishNeedsApproval === true}
+            canOverride={site.canOverride === true}
+            livePublishedAt={site.currentPublication?.publishedAt ?? null}
         />
     );
 }

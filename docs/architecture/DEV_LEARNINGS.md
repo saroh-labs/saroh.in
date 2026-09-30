@@ -1786,4 +1786,73 @@ reviewers acting at the same moment.
 `sites/live-pointer.ts`, the latest approval in `sites.service.ts`). A
 `cuid()` grows within a process, so the id settles the tie.
 **Rule**: "the newest row" is never ordered by a timestamp alone; add the id.
+**Follow-up (T13's run)**: the order was right, but `reviewStanding` still
+compared `settling.createdAt >= asked.createdAt`, so a request written in the
+approval's millisecond was taken as settled. It now compares positions in the
+newest-first list (`review-route.ts`), with a unit test for the tie. The same
+rule: the list's order decides "before", never an equal-or-later timestamp.
 **Category**: data · ordering · tests
+
+## vitest — bookings-list.test.tsx throws "window is not defined" under load (K11)
+
+**Problem**: `pnpm prepush --int` failed its vitest step once on
+`@saroh/site-blocks`: "Vitest caught 1 unhandled error", a
+`ReferenceError: window is not defined` from
+`src/account/bookings-list.test.tsx`, with every test passing. The same
+suite then passed three times out of three, and the prepush rerun passed.
+**Root cause**: not found. It looks like something scheduled by the test
+(a timer or a state update) running after the jsdom environment was torn
+down, which only happens when several prepush runs share the machine.
+**Fix**: none yet. It was rerun. K11 did not touch the file.
+**Rule**: a lone unhandled "window is not defined" with all tests green is
+this flake. Rerun before hunting, and fix the test (clear its timers in
+`afterEach`) when it recurs.
+**Category**: vitest · tests · flake
+
+## vitest — merchant-copy.test.ts times out at 5s under load (K12)
+
+**Problem**: `pnpm prepush --int` failed its vitest step on
+`apps/app.saroh.in/lib/merchant-copy.test.ts` ("no workspace string a
+merchant reads says storefront"): "Test timed out in 5000ms". Alone it
+passes in about a second, and the prepush rerun passed. K12 did not touch
+the app.
+**Root cause**: the test walks and reads every source file under the app's
+roots synchronously. With several unit worktrees running prepush on one
+machine, disk and CPU contention push that walk past vitest's default 5s.
+**Fix**: none yet. It was rerun.
+**Rule**: a lone timeout in a source-scanning test is load, not a finding.
+Rerun first; if it recurs, give the scan an explicit timeout (as a third
+argument to `it`) rather than the default.
+**Category**: vitest · tests · flake
+
+## Turn on sheet — the API's prefill never reached the sheet (K15)
+
+**Problem**: `GET …/modules/:key/setup-defaults` answers
+`{ data: { setup, dependencies, hidden, existing } }`, but the app's
+decoder (`lib/modules/turn-on-schema.ts`) read the prefill from a
+`defaults` key the API never sends. Every sheet opened on the app's own
+fallback: Website's name and address blank, and K8's "Consultation" for
+Just me never shown. Nothing failed: the decode is lenient by design, and
+the unit tests fed it the same wrong key.
+**Root cause**: M1 wrote the app's contract and its tests against a shape
+agreed in the plan, and the API named the field differently. No test
+crossed the boundary with the API's real body.
+**Fix**: the decoder reads `setup` (then `defaults`), and a vitest feeds
+it the body the controller returns, envelope and all.
+**Rule**: a lenient decoder's test uses the producer's real body (copy it
+from the controller spec), never a shape written from the consumer's side.
+**Category**: contract · app↔api · tests
+## e2e — a new test release already reads Approved (T12)
+
+**Problem**: `site-review.spec.ts`'s new test passed on desk-serial and
+failed on phone-serial: the release it had just made already read "Priya
+(reviewer) approved this test release."
+**Root cause**: by design, not a bug. A verdict on a test release is bound
+to its fingerprint, not its id (DEC-071, KTD-10), so two releases with the
+same bytes share their verdicts. The desk run approved a release of the
+seed's draft and put the draft back; the phone run froze the same bytes.
+**Fix**: the spec freezes a draft with a stamped heading of its own, so its
+release has bytes no other run has, and puts the draft back.
+**Rule**: a spec that reviews a test release makes the release's content
+its own (a stamped section), never a release of the seed's draft as it is.
+**Category**: e2e · test releases · own data

@@ -357,7 +357,7 @@ describe("module pages (G14, real database)", () => {
                 }),
             );
             expect(status).toBe(400);
-            expect(body.message).toMatch(/Pick another address, such as/);
+            expect(body.message).toMatch(/Pick another path, such as/);
             expect(body.details).toMatchObject({
                 field: "path",
                 reason: "reserved",
@@ -378,7 +378,7 @@ describe("module pages (G14, real database)", () => {
         );
         expect(status).toBe(409);
         expect(body.message).toBe(
-            'Your page "Our range" uses /shop. Change its address first.',
+            'Your page "Our range" uses /shop. Change its path first.',
         );
 
         const { flags } = await sites.getSiteFlags(b.ctx, b.siteId);
@@ -399,7 +399,7 @@ describe("module pages (G14, real database)", () => {
         expect(flags.find((f) => f.type === "reservedAddress")).toMatchObject({
             pageId: walk.id,
             message:
-                "This page can't be seen: /book is your booking page. Change its address so visitors can reach it.",
+                "This page can't be seen: /book is your booking page. Change its path so visitors can reach it.",
         });
 
         // And a Book page waits for it to move.
@@ -428,7 +428,7 @@ describe("module pages (G14, real database)", () => {
         ).toEqual([
             [
                 fees.id,
-                "This page can't be seen: /pay is where your customers pay a link you sent. Change its address so visitors can reach it.",
+                "This page can't be seen: /pay is where your customers pay a link you sent. Change its path so visitors can reach it.",
             ],
         ]);
     });
@@ -587,7 +587,7 @@ describe("module pages (G14, real database)", () => {
             sites.createPage(b.ctx, b.siteId, { kind: "CONTACT" }),
         );
         expect(status).toBe(400);
-        expect(body.message).toContain("Pick another address");
+        expect(body.message).toContain("Pick another path");
         expect(body.details).toMatchObject({
             field: "path",
             reason: "taken",

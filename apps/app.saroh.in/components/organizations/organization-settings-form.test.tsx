@@ -37,9 +37,10 @@ vi.mock("@saroh/ui/toast", () => ({
 }));
 
 const refresh = vi.fn();
+let params = new URLSearchParams();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh }),
-    useSearchParams: () => new URLSearchParams(),
+    useSearchParams: () => params,
     usePathname: () => "/settings/organization",
 }));
 
@@ -100,6 +101,7 @@ beforeEach(() => {
     undoSettings.mockReset();
     showUndo.mockReset();
     refresh.mockReset();
+    params = new URLSearchParams();
 });
 
 afterEach(() => {
@@ -225,5 +227,27 @@ describe("What is this? (DEC-070, K5)", () => {
         draw(settings({ kind: undefined }));
         expect(card()?.textContent).toContain("A business");
         expect(card()?.textContent).toContain("Business name");
+    });
+});
+
+describe("the addresses named apart (DEC-069, L12)", () => {
+    it("draws no address row in Identity: the Web address card is its one place", () => {
+        draw(settings());
+        expect(card()?.textContent).not.toContain("Workspace address");
+        expect(card()?.textContent).not.toContain("Can't be changed");
+        expect(card()?.textContent).not.toContain("northwind");
+    });
+
+    it('names the registered address row "Registered address"', () => {
+        params = new URLSearchParams("section=address");
+        draw(settings());
+        const region = host.querySelector<HTMLElement>(
+            'section[aria-label="Registered address"]',
+        );
+        const labels = Array.from(region?.querySelectorAll("dt") ?? []).map(
+            (dt) => dt.textContent.trim(),
+        );
+        expect(labels).toContain("Registered address");
+        expect(labels).not.toContain("Address");
     });
 });

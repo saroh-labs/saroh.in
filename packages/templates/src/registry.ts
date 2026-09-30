@@ -1,5 +1,8 @@
 import type { TemplateManifest } from "./manifest";
+import { personalTemplate } from "./templates/personal";
+import { portfolioTemplate } from "./templates/portfolio";
 import { starterTemplate, starterTemplateV1 } from "./templates/starter";
+import { writingTemplate } from "./templates/writing";
 
 /** Registry key for an `id@version` pair. */
 function key(id: string, version: number): string {
@@ -11,9 +14,18 @@ function key(id: string, version: number): string {
  * version (rather than by id alone) is what lets a template evolve — a new
  * version is added alongside the old one, and sites built from the old version
  * keep resolving it.
+ *
+ * In the order the picker offers them: the starter, then the three DEC-070
+ * added for someone working for themselves or showing their work (K15).
  */
 const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
-    [starterTemplateV1, starterTemplate].map((t) => [key(t.id, t.version), t]),
+    [
+        starterTemplateV1,
+        starterTemplate,
+        personalTemplate,
+        portfolioTemplate,
+        writingTemplate,
+    ].map((t) => [key(t.id, t.version), t]),
 );
 
 /** The highest registered version for a given template id, or `undefined`. */

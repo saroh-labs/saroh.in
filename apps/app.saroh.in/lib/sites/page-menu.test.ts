@@ -45,11 +45,11 @@ describe("a page's address", () => {
         });
         expect(fixedAddress(page({ kind: "BOOK", path: "/book" }))).toEqual({
             path: "/book",
-            purpose: "your booking page's address",
+            purpose: "your booking page's path",
         });
         expect(
             fixedAddress(page({ kind: "SHOP", path: "/shop" }))?.purpose,
-        ).toBe("your online shop's address");
+        ).toBe("your online shop's path");
     });
 
     it("can move for free-form, Prices, Journal and Contact pages", () => {
@@ -92,7 +92,7 @@ describe("how the page menu marks a page", () => {
     it("names an option by its title and every mark", () => {
         const p = page({ hidden: true, inMenu: false });
         expect(pageOptionName(p, pageMenuMarks(p, [reserved]))).toBe(
-            "About, hidden from the site, not in menu, can't be seen at its address",
+            "About, hidden from the site, not in menu, can't be seen at its path",
         );
         expect(pageOptionName(page({}), pageMenuMarks(page({}), []))).toBe(
             "About",
