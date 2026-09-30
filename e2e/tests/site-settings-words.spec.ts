@@ -36,11 +36,12 @@ test("the site's settings say web address, posts path and your online shop", asy
     await signIn(page);
     const api = northwind(page.request);
     const sites = await api.get<SiteRow[]>("/sites");
-    const site = sites.find((s) => s.subdomain) ?? sites[0];
-    test.skip(!site, "Northwind has no website.");
-    const read = await api.get<SiteRead>(`/sites/${site?.id}`);
+    const site = sites.find((s) => s.subdomain);
+    test.skip(!site, "Northwind has no website with a web address.");
+    if (!site) return;
+    const read = await api.get<SiteRead>(`/sites/${site.id}`);
 
-    await page.goto(`/sites/${site?.id}/settings`);
+    await page.goto(`/sites/${site.id}/settings`);
     await expect(
         page
             .getByText("Web address", { exact: true })

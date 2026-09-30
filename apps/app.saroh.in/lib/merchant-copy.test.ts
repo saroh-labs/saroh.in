@@ -109,5 +109,7 @@ describe("merchant copy says location (DEC-069)", () => {
                     .map(({ line, text }) => `${rel}:${line} ${text}`),
             );
         expect(offenders).toEqual([]);
-    });
+        // Parses every source file in the app: seconds on its own, and
+        // more beside the rest of the suite.
+    }, 60_000);
 });
