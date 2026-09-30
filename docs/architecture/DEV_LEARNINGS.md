@@ -1495,6 +1495,7 @@ asserts), it passes without checking them.
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
 worth the same change.
 **Category**: e2e · tests
+
 ## E2E — a business a test sets up has no modules and no rollout flags (L4)
 
 **Problem**: L4's browser spec had to change a web address on a business of
@@ -1514,6 +1515,7 @@ forwarded. The forwarding half (the new host serves, the old one answers 307) wa
 **Rule**: before planning a spec on a business the test makes, check which
 flags it will have. Only a flag with a seeded global default reaches it.
 **Category**: e2e · flags · DEC-069
+
 ## Gate — the shared browser worktree ran a spec this tree doesn't have (T4)
 
 **Symptom**: T4's `pnpm prepush --e2e` failed on
@@ -1547,3 +1549,19 @@ page's first run stays in vitest.
 **Rule**: a spec that needs a module on uses a seeded business. A business
 the test makes (setup, the web-address change) is for what needs no module.
 **Category**: e2e · tests · modules
+
+## e2e — a booking test took "the first open day" and failed late in the day
+
+**Problem**: `site-sign-in.spec.ts` A9 failed on the phone in CI (#767) and in
+T7's local run, both in the afternoon: "element(s) not found" for the second
+free time.
+**Root cause**: the desk takes the first time on the first open day and the
+phone the second. Late in the day, today is still open but has one time
+left, so the phone's slot doesn't exist. The test assumed the day, and the
+clock decided.
+**Fix**: `chooseTime` reads each day's "N times free" and picks the first day
+with two.
+**Rule**: a booking test reads the day it books from the page or the API.
+Never "today", "the first open day" or "N days from now" (see also the
+Saturday failure above).
+**Category**: e2e · tests · dates
