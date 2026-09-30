@@ -82,6 +82,8 @@ async function business(
             organizationId: org.id,
             name: "Pulse",
             slug: uniq("g14-site-"),
+            // A site publishes only with an address (L5).
+            subdomain: uniq("g14-sub-"),
         },
     });
     await prisma.page.create({
