@@ -1,4 +1,5 @@
 import type { TemplateContext, TemplateManifest } from "../manifest";
+import { escapeHtml } from "./html";
 
 /**
  * `personal` — the Personal/consultant template (DEC-070, K14): a site for
@@ -16,6 +17,9 @@ import type { TemplateContext, TemplateManifest } from "../manifest";
  * or a small firm reads it the same, and every placeholder line says what to
  * write there rather than claiming anything. No images: a photo is the
  * owner's to add (the pre-publish check flags one with no description).
+ *
+ * The default for "Just me" (DEC-070, K15). The API makes the Contact
+ * form's Form with the site (`site-create.ts`).
  */
 
 export const PERSONAL_TEMPLATE_ID = "personal";
@@ -25,20 +29,6 @@ const APPOINTMENTS = "APPOINTMENTS";
 
 /** A services list holds at most this many (its contract). */
 const SERVICES_LIST_MAX = 24;
-
-/**
- * What the template reads from its context beyond the base fields.
- *
- * `modules` (the business's switched-on module keys) and `serviceIds` (its
- * services a new site may list, in order) arrive with K15, which owns
- * `TemplateContext` and `buildTemplateContext`. Until then they are read
- * defensively: absent, or not an array of strings, means "not known", and
- * the template lays down the placeholder offers.
- */
-type PersonalContext = TemplateContext & {
-    modules?: unknown;
-    serviceIds?: unknown;
-};
 
 function stringList(value: unknown): string[] {
     return Array.isArray(value)
@@ -53,19 +43,14 @@ function stringList(value: unknown): string[] {
  * invent an id.
  */
 export function personalServiceIds(ctx: TemplateContext): string[] {
-    const { modules, serviceIds } = ctx as PersonalContext;
+    // Read defensively: absent, or not a list of strings, is "not known",
+    // and the template lays down the placeholder offers.
+    const { modules, serviceIds } = ctx as {
+        modules?: unknown;
+        serviceIds?: unknown;
+    };
     if (!stringList(modules).includes(APPOINTMENTS)) return [];
     return [...new Set(stringList(serviceIds))].slice(0, SERVICES_LIST_MAX);
-}
-
-/** Escape text for the rich-text HTML it is woven into: a name is text, not markup. */
-function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
 }
 
 /** What the owner has said about themselves, if anything. */

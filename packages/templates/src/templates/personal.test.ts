@@ -10,8 +10,8 @@ import {
 } from "./personal";
 
 /**
- * The context K15 fills (`modules`, `serviceIds`) is not on
- * `TemplateContext` yet, so the tests pass it as the API will.
+ * `modules` and `serviceIds` are typed on `TemplateContext` (K15); the tests
+ * widen them to `unknown` to feed a malformed context too.
  */
 type WithModules = TemplateContext & {
     modules?: unknown;
@@ -120,7 +120,7 @@ describe("personal@1 (DEC-070, K14)", () => {
     });
 
     it.each([
-        ["no modules known (before K15)", nameOnly],
+        ["no modules known", nameOnly],
         ["Appointments off", { ...withBookings, modules: ["WEBSITE"] }],
         [
             "Appointments on, with no services yet",

@@ -1,4 +1,5 @@
 import type { TemplateContext, TemplateManifest } from "../manifest";
+import { escapeHtml } from "./html";
 
 /**
  * `writing` — a site for someone who writes: a blog, essays, notes
@@ -11,16 +12,15 @@ import type { TemplateContext, TemplateManifest } from "../manifest";
  *   aren't there: the hero never says "read the latest below".
  * - **About**: a few words in the writer's own voice. Until they write them,
  *   the text says plainly that it is theirs to replace.
- * - **Contact**: an enquiry form (name, email, message). Its Form is made
- *   the first time the site is saved in the editor, as for any enquiry
- *   section added there; until then the block draws nothing live.
+ * - **Contact**: an enquiry form (name, email, message). The API makes its
+ *   Form with the site (`site-create.ts`), so it takes enquiries from the
+ *   first publish.
  *
  * No images: a photo is the writer's to add, and a path to one the apps don't
  * serve is a broken image (what `starter@1` shipped). Every link it makes
  * goes somewhere: an email, or the Contact page it makes itself.
  *
- * Registered with the others by K15; until then `getTemplate("writing")`
- * doesn't find it.
+ * Registered (K15), and no kind's default: a writer picks it in `/sites/new`.
  */
 
 export const WRITING_TEMPLATE_ID = "writing";
@@ -31,20 +31,6 @@ const CONTACT_FIELDS = [
     { name: "email", label: "Email", type: "email", required: true },
     { name: "message", label: "Message", type: "textarea", required: true },
 ] as const;
-
-/**
- * Escape text for the rich-text HTML it is woven into: a name like
- * "Rye & Co." is text, not markup. (`starter.ts` keeps its own copy; K15,
- * which touches every template, is the place to share one.)
- */
-function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-}
 
 /** What the writer has said about themselves, if anything. */
 function ownWords(ctx: TemplateContext): string | undefined {

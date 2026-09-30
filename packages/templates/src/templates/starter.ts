@@ -1,4 +1,5 @@
 import type { TemplateContext, TemplateManifest } from "../manifest";
+import { escapeHtml } from "./html";
 
 /**
  * `starter` — the template a new site starts from.
@@ -145,19 +146,6 @@ export const starterTemplateV1: TemplateManifest = {
 // ---------------------------------------------------------------------------
 // v2 (DEC-070): the same two pages, in words that fit anyone, with no images.
 // ---------------------------------------------------------------------------
-
-/**
- * Escape text for the rich-text HTML it is woven into: a name like
- * "Rye & Co." is text, not markup. v1 interpolates raw and stays as shipped.
- */
-function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-}
 
 /** What the owner has said about themselves, if anything. */
 function ownWords(ctx: TemplateContext): string | undefined {
