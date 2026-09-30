@@ -25,6 +25,10 @@ const NEEDS_NOTE: Partial<Record<string, string>> = {
     APPOINTMENTS: "Bookings need someone to book, so Contacts comes with it.",
 };
 
+/** A job's card, whether it opens the Turn on sheet or goes somewhere. */
+const CARD =
+    "wk-press flex min-h-11 w-full min-w-0 cursor-pointer flex-col items-start gap-[5px] rounded-[12px] border border-border bg-card px-[18px] py-[17px] text-left text-foreground transition-colors hover:border-neutral-400 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-wait disabled:opacity-60";
+
 export function FirstRunJobs({
     modules,
     jobs,
@@ -47,12 +51,34 @@ export function FirstRunJobs({
             {/* The design's words. After a pick, Home leads with "Get ready
                 to take money" for the steps that pick needs (F8). */}
             <p className="mb-3.5 max-w-[62ch] text-pretty text-[12.5px] leading-[1.55] text-neutral-600 dark:text-neutral-400">
-                Pick one to start. It adds its own rows to the sidebar, and you
-                can add the others whenever.
+                {jobs.some((job) => job.href)
+                    ? "Pick one to start. Most add their own rows to the sidebar, and you can do the others whenever."
+                    : "Pick one to start. It adds its own rows to the sidebar, and you can add the others whenever."}
             </p>
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(232px,100%),1fr))] gap-3">
                 {jobs.map((job) => {
+                    // A job that turns nothing on ("Invoice a client") is a
+                    // link to where it is done, not a pick.
+                    if (job.href) {
+                        return (
+                            <Link
+                                key={job.key}
+                                href={job.href}
+                                className={CARD}
+                            >
+                                <span className="text-[14px] font-semibold">
+                                    {job.verb}
+                                </span>
+                                <span className="text-pretty text-[12px] leading-[1.45] text-neutral-600 dark:text-neutral-400">
+                                    {job.note}
+                                </span>
+                                <span className="mt-0.5 text-[11.5px] text-muted-foreground">
+                                    Nothing to turn on
+                                </span>
+                            </Link>
+                        );
+                    }
                     const { pulls } = job;
                     const needsNote =
                         pulls.length > 0
@@ -69,7 +95,7 @@ export function FirstRunJobs({
                                     ? `, and ${pulls.map(nameOf).join(" and ")} with it`
                                     : ""
                             }.`}
-                            className="wk-press flex min-h-11 w-full min-w-0 flex-col items-start gap-[5px] rounded-[12px] border border-border bg-card px-[18px] py-[17px] text-left text-foreground transition-colors hover:border-neutral-400 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-wait disabled:opacity-60"
+                            className={CARD}
                         >
                             <span className="text-[14px] font-semibold">
                                 {job.verb}
