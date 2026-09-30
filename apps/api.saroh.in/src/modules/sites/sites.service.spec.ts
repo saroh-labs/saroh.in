@@ -36,6 +36,12 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(async () => []),
             findFirst: jest.fn(async () => null),
         },
+        // What the template context reads (K15): no module on, no service.
+        organizationModule: { findMany: jest.fn(async () => []) },
+        service: { findMany: jest.fn(async () => []) },
+        // A template's enquiry sections get their Form (K15): the starter
+        // has none.
+        form: { create: jest.fn() },
         // The shop's rollout flag, never configured here: off.
         featureFlagOverride: { findUnique: jest.fn(async () => null) },
         featureFlag: { findUnique: jest.fn(async () => null) },

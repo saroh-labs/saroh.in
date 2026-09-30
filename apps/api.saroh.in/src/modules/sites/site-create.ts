@@ -9,7 +9,6 @@ import { prisma } from "@saroh/database";
 import {
     getTemplate,
     instantiateTemplate,
-    STARTER_TEMPLATE_ID,
     TemplateInstantiationError,
 } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
@@ -18,15 +17,20 @@ import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
+import { organizationKind } from "../organizations/organization-kind";
 import { authorize } from "../organizations/organization-policy";
 import { automaticStorefront } from "./sells-from";
-import { buildTemplateContext } from "./site-access";
 import {
     addressProblem,
     addressUse,
     freeAddress,
     releaseExpired,
 } from "./site-address";
+import {
+    buildTemplateContext,
+    KIND_TEMPLATE,
+    withEnquiryForms,
+} from "./site-template";
 
 /**
  * Creating a website from a template (S2-003), in two halves so a caller
@@ -38,7 +42,12 @@ import {
  * - {@link planSiteFromTemplate}: who may, the caps, the template, the
  *   slug and the instantiated pages. Reads only.
  * - {@link writeSiteFromTemplate}: the address rules and the whole tree —
- *   Site, Pages, DRAFT versions and their Sections — on the client given.
+ *   Site, Pages, DRAFT versions and their Sections, and a Form for each
+ *   enquiry section — on the client given.
+ *
+ * With no template asked for, a site starts from its business's kind's
+ * (DEC-070, K15): the starter for a business, Personal for "Just me",
+ * Portfolio for "A site for my work" (`site-template.ts`).
  */
 
 /** What creating a site returns to the caller: the new site's identity. */
@@ -95,9 +104,9 @@ export function slugify(input: string): string {
 }
 
 /**
- * Authorize `site:create`, enforce the caps, resolve the template (latest
- * starter by default), load the org's name + business profile and
- * instantiate the contract-validated pages.
+ * Authorize `site:create`, enforce the caps, resolve the template (the one
+ * asked for, else the latest of the kind's), load the org's name, business
+ * profile, modules and services and instantiate the contract-validated pages.
  */
 export async function planSiteFromTemplate(
     ctx: OrganizationContext,
@@ -123,7 +132,10 @@ export async function planSiteFromTemplate(
     }
     await entitlements.check(ctx.organizationId, "sites", siteCount);
 
-    const templateId = dto.templateId ?? STARTER_TEMPLATE_ID;
+    // The kind picks a default only; an explicit choice always wins.
+    const templateId =
+        dto.templateId ??
+        KIND_TEMPLATE[await organizationKind(prisma, ctx.organizationId)];
     const template = getTemplate(templateId, dto.templateVersion);
     if (!template) {
         throw new NotFoundException(
@@ -315,7 +327,19 @@ export async function writeSiteFromTemplate(
         throw error;
     }
 
-    for (const page of plan.pages) {
+    // A Form for every enquiry section, so it takes enquiries from the
+    // first publish (a template can lay down content only).
+    const pages = await withEnquiryForms(
+        tx,
+        {
+            organizationId: ctx.organizationId,
+            siteId: site.id,
+            siteName: plan.name,
+        },
+        plan.pages,
+    );
+
+    for (const page of pages) {
         await tx.page.create({
             data: {
                 siteId: site.id,

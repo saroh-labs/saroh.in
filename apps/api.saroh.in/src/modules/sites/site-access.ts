@@ -1,7 +1,6 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { PageKind, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { TemplateContext } from "@saroh/templates";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { reservedAgainst, reservedPathFor } from "./page-kinds";
@@ -229,42 +228,4 @@ export async function getOrCreateDraftVersion(
         },
         select: { id: true, revision: true },
     });
-}
-
-/**
- * Build the {@link TemplateContext} from the org's name + optional business
- * profile (S1-004). Only fields the profile actually carries are mapped;
- * `tagline`/`description` have no profile column yet, so builders fall back
- * to name-derived defaults.
- */
-export async function buildTemplateContext(
-    organizationId: string,
-): Promise<TemplateContext> {
-    const org = await prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: {
-            name: true,
-            businessProfile: {
-                select: {
-                    legalName: true,
-                    contactEmail: true,
-                    website: true,
-                },
-            },
-        },
-    });
-    if (!org) {
-        // The guard proved membership in this org, so it must exist; a miss
-        // here is a real integrity fault, not a client error.
-        throw new NotFoundException(
-            `Organization "${organizationId}" not found`,
-        );
-    }
-    const profile = org.businessProfile;
-    return {
-        organizationName: org.name,
-        legalName: profile?.legalName ?? undefined,
-        contactEmail: profile?.contactEmail ?? undefined,
-        websiteUrl: profile?.website ?? undefined,
-    };
 }
