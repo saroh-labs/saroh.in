@@ -2443,7 +2443,9 @@ export class SitesService {
                           }
                         : { testReleaseId: null }),
                 },
-                orderBy: { createdAt: "desc" },
+                // Two reviews can share a millisecond; the id (a cuid, which grows)
+                // keeps "newest" deterministic.
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 select: {
                     outcome: true,
                     createdAt: true,

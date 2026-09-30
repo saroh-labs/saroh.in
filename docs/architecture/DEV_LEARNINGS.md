@@ -1773,3 +1773,17 @@ space the two writes. Not fixed in K14, which doesn't own those files.
 on `createdAt` alone, wherever two rows can be written in one request or
 one test step.
 **Category**: tests · flaky · ordering
+
+## Sites — "the latest review" tied when two were written in one millisecond
+
+**Problem**: `test-release-review.db.spec.ts` › "unsettles on a later change
+request" failed about one run in three (found by K14).
+**Root cause**: the verdicts and the latest-approval read ordered by
+`createdAt` alone. An approval and a change request written back to back
+share a millisecond, so either could come first — in the test, and for two
+reviewers acting at the same moment.
+**Fix**: both reads order by `[createdAt desc, id desc]` (`readVerdicts` in
+`sites/live-pointer.ts`, the latest approval in `sites.service.ts`). A
+`cuid()` grows within a process, so the id settles the tie.
+**Rule**: "the newest row" is never ordered by a timestamp alone; add the id.
+**Category**: data · ordering · tests
