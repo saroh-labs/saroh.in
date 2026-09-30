@@ -200,7 +200,7 @@ export function WebsiteFields({
                     <Input
                         id={`${id}-address`}
                         value={w.address}
-                        maxLength={63}
+                        maxLength={57}
                         autoComplete="off"
                         spellCheck={false}
                         inputMode="url"

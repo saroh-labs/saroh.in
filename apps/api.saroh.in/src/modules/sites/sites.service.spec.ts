@@ -25,6 +25,10 @@ jest.mock("@saroh/database", () => {
         page: {
             create: jest.fn(),
         },
+        // Addresses held after a change (DEC-069, L1): none here.
+        addressReservation: {
+            findUnique: jest.fn(async () => null),
+        },
         // Where a new site sells from (G11): no storefront by default.
         store: {
             findMany: jest.fn(async () => []),
