@@ -337,6 +337,8 @@ describe("paying from an order's pay link (real database)", () => {
             currency: "INR",
             status: "DUE",
             theme: null,
+            // Where the link lives (DEC-069, L6): the apex, the flag off.
+            payUrl: `https://saroh.app/pay/o/${token}`,
         });
         // No email, phone, surname or ids reach the page.
         const text = JSON.stringify(view);

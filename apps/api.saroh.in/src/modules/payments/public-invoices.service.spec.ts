@@ -27,6 +27,9 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
         },
         paymentAttempt: { create: jest.fn(), findFirst: jest.fn() },
+        // PAY_LINK_ON_SITE never configured: the pay link stays on the apex.
+        featureFlagOverride: { findUnique: jest.fn().mockResolvedValue(null) },
+        featureFlag: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     return {
         ...actual,
@@ -172,6 +175,7 @@ describe("PublicInvoicesService.read", () => {
                 "issuedAt",
                 "lines",
                 "number",
+                "payUrl",
                 "status",
                 "tax",
                 "theme",
@@ -198,6 +202,8 @@ describe("PublicInvoicesService.read", () => {
             billedTo: "Asha Rao",
             billOfSupply: false,
             theme: null,
+            // The flag off (never configured): the apex, as before DEC-069.
+            payUrl: `https://saroh.app/pay/${TOKEN}`,
         });
         // Asked only for what it shows: no email, contact, ids or notes.
         const select = invoiceFindFirst.mock.calls[0][0].select;

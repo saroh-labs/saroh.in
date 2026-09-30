@@ -60,6 +60,14 @@ export const FlagKey = {
      * charging and cancelling a mandate already made never wait on it.
      */
     RAZORPAY_AUTOPAY: "RAZORPAY_AUTOPAY",
+
+    /**
+     * Pay links on the business's own address (DEC-069, R9): off, every
+     * pay link is `saroh.app/pay/…` as before; on, `<its site>/pay/…`
+     * (`invoices/pay-link-url.ts`, `payLinkUrlFor`). It goes on only once
+     * the renderer serves `/pay` on a tenant host (plan L6) in production.
+     */
+    PAY_LINK_ON_SITE: "PAY_LINK_ON_SITE",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -141,5 +149,13 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-01-31",
         removeWhen:
             "Razorpay autopay has run in production on every instance for a release and has needed no kill switch.",
+    },
+    PAY_LINK_ON_SITE: {
+        purpose:
+            "Issues pay links on the business's own web address (its custom domain, else its saroh.app address) instead of saroh.app/pay. Turn it on only after the renderer serves pay pages on a business's address in production; off, every link is on saroh.app, and links already sent keep working either way.",
+        owner: "Release manager",
+        reviewBy: "2027-01-31",
+        removeWhen:
+            "It has been on for every business on every instance for a release, and the apex-only link functions have been removed.",
     },
 };
