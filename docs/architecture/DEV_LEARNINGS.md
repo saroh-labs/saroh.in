@@ -1842,6 +1842,7 @@ it the body the controller returns, envelope and all.
 **Rule**: a lenient decoder's test uses the producer's real body (copy it
 from the controller spec), never a shape written from the consumer's side.
 **Category**: contract · app↔api · tests
+
 ## e2e — a new test release already reads Approved (T12)
 
 **Problem**: `site-review.spec.ts`'s new test passed on desk-serial and
@@ -1856,3 +1857,19 @@ release has bytes no other run has, and puts the draft back.
 **Rule**: a spec that reviews a test release makes the release's content
 its own (a stamped section), never a release of the seed's draft as it is.
 **Category**: e2e · test releases · own data
+
+## App — a test-release sheet stuck on "Going live…" when the API was down
+
+**Problem**: the release review found that the go-live, schedule, cancel and
+discard actions in the editor's test-release panel left their sheet busy,
+with both buttons disabled, if the API couldn't be reached.
+**Root cause**: `send()` in `lib/sites/test-releases-api.ts` awaited
+`apiFetch` bare. A dropped connection rejects instead of answering, so the
+server action threw and the sheet's `confirm()` never reset `busy`.
+**Fix**: `send()` catches the rejection and returns `{ ok: false }` with
+`SEND_UNREACHABLE`, like the read beside it already did
+(`test-releases-api.test.ts`).
+**Rule**: a server action's API call returns a result for every outcome,
+the unreachable one included; a sheet never depends on a throw to leave its
+busy state.
+**Category**: frontend · error feedback
