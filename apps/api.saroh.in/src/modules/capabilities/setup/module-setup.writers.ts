@@ -14,6 +14,12 @@
  * pipeline or a website keeps it and nothing is added. Sell is the exception
  * the sheet promises — its first storefront is renamed and given the ways
  * chosen, or made when there is none.
+ *
+ * Selling online leaves the shop ready to publish (DEC-069, L13): Sell and
+ * Website each finish what the other started, so whichever is turned on
+ * second completes it — the website sells from the location Sell named, and
+ * has a draft Shop page when that location delivers or ships. Only what is
+ * missing is added: a site keeps the Sells from and the pages it has.
  */
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
@@ -25,6 +31,8 @@ import { STOREFRONT_FULFILMENT_TYPES } from "../../orders/fulfilment";
 import { storefrontLimit } from "../../organizations/business-limits";
 import { authorize } from "../../organizations/organization-policy";
 import { DEFAULT_STAGES } from "../../pipelines/pipelines.service";
+import { addModulePageIfMissing } from "../../sites/module-page-create";
+import { anyListed, effectiveStorefront } from "../../sites/sells-from";
 import type { SitePlan } from "../../sites/site-create";
 import {
     planSiteFromTemplate,
@@ -138,8 +146,8 @@ async function prepareCommerce(
             throw new ForbiddenException({
                 message:
                     limit < 1
-                        ? "Your plan doesn't include a storefront. A bigger plan adds one."
-                        : `Your plan includes ${limit === 1 ? "one storefront" : `${limit} storefronts`}. A bigger plan adds more.`,
+                        ? "Your plan doesn't include a location. A bigger plan adds one."
+                        : `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
             });
         }
     }
@@ -191,6 +199,7 @@ async function writeCommerce(
             create: { storeId: existing.id, currency, ...ways },
             update: ways,
         });
+        await shopForSell(tx, ctx, existing.id, fulfilmentTypes);
         return { storefrontId: existing.id };
     }
 
@@ -204,6 +213,7 @@ async function writeCommerce(
         },
         select: { id: true },
     });
+    await shopForSell(tx, ctx, store.id, fulfilmentTypes);
     return { storefrontId: store.id };
 }
 
@@ -299,11 +309,16 @@ async function writeCrm(
 export function existingSite(
     db: Pick<ModuleTransaction, "site">,
     organizationId: string,
-): Promise<{ id: string; name: string; subdomain: string | null } | null> {
+): Promise<{
+    id: string;
+    name: string;
+    subdomain: string | null;
+    storefrontId: string | null;
+} | null> {
     return db.site.findFirst({
         where: { organizationId, deletedAt: null },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, subdomain: true },
+        select: { id: true, name: true, subdomain: true, storefrontId: true },
     });
 }
 
@@ -315,9 +330,12 @@ async function prepareWebsite(
     authorize(ctx, "site:create");
     const site = await existingSite(prisma, ctx.organizationId);
     if (site) {
-        // Turned on again: its website is still there, unpublished or not.
-        return () =>
-            Promise.resolve({ siteId: site.id, siteAddress: site.subdomain });
+        // Turned on again: its website is still there, unpublished or not,
+        // and only what selling online needs and it lacks is added.
+        return async (tx) => {
+            await shopForWebsite(tx, ctx, site.id);
+            return { siteId: site.id, siteAddress: site.subdomain };
+        };
     }
     // The `/sites/new` flow and its starter template, caps included.
     const plan: SitePlan = await planSiteFromTemplate(
@@ -330,6 +348,114 @@ async function prepareWebsite(
             subdomain: setup.address,
             addressField: "setup.address",
         });
+        await shopForWebsite(tx, ctx, created.siteId);
         return { siteId: created.siteId, siteAddress: setup.address };
     };
+}
+
+// --- Selling online on the website (DEC-069, L13) --------------------------
+
+/** The ways an order leaves that need the website: it is sent. */
+function sellsOnline(fulfilmentTypes: readonly string[]): boolean {
+    return fulfilmentTypes.some(
+        (t) => t === "LOCAL_DELIVERY" || t === "SHIPPING",
+    );
+}
+
+/**
+ * Finish the website's side once the location is known:
+ * - `link`: the site has no Sells from (none, or a closed one), so it sells
+ *   from this location;
+ * - the location delivers or ships: a draft Shop page, unless the site has
+ *   one, a page of the merchant's holds `/shop`, or the shop isn't open for
+ *   the business (`addModulePageIfMissing`).
+ */
+async function completeShop(
+    tx: ModuleTransaction,
+    ctx: OrganizationContext,
+    site: { id: string; name: string; storefrontId: string | null },
+    location: { id: string; fulfilmentTypes: readonly string[] },
+    link: boolean,
+): Promise<void> {
+    if (link) {
+        const current = await effectiveStorefront(tx, {
+            organizationId: ctx.organizationId,
+            storefrontId: site.storefrontId,
+        });
+        if (!current) {
+            await tx.site.update({
+                where: { id: site.id },
+                data: { storefrontId: location.id },
+            });
+        }
+    }
+    if (sellsOnline(location.fulfilmentTypes)) {
+        await addModulePageIfMissing(tx, ctx, site, "SHOP");
+    }
+}
+
+/**
+ * Sell was turned on (second, when the website came first): the site sells
+ * from the location the sheet just named — the merchant has answered — and
+ * gets its Shop page when that location delivers or ships.
+ */
+async function shopForSell(
+    tx: ModuleTransaction,
+    ctx: OrganizationContext,
+    storefrontId: string,
+    fulfilmentTypes: readonly string[],
+): Promise<void> {
+    const site = await existingSite(tx, ctx.organizationId);
+    if (!site) return;
+    await completeShop(
+        tx,
+        ctx,
+        site,
+        { id: storefrontId, fulfilmentTypes },
+        true,
+    );
+}
+
+/**
+ * Website was turned on (second, after Sell — the order the Turn on sheet
+ * uses): with Sell on, the site sells from Sell's location and gets its Shop
+ * page when that location delivers or ships.
+ *
+ * The Sells from is set here only while nothing is listed anywhere — the
+ * turn-on moment KTD-10 is about. A business already listing at several
+ * locations is asked which one, as G11 asks; the site is never pointed at
+ * "the first storefront" over products it sells elsewhere.
+ */
+async function shopForWebsite(
+    tx: ModuleTransaction,
+    ctx: OrganizationContext,
+    siteId: string,
+): Promise<void> {
+    const organizationId = ctx.organizationId;
+    const commerce = await tx.organizationModule.findUnique({
+        where: {
+            organizationId_moduleKey: { organizationId, moduleKey: "COMMERCE" },
+        },
+        select: { status: true },
+    });
+    if (commerce?.status !== "ENABLED") return;
+    const [site, location, listed] = await Promise.all([
+        tx.site.findUniqueOrThrow({
+            where: { id: siteId },
+            select: { id: true, name: true, storefrontId: true },
+        }),
+        firstStorefront(tx, organizationId),
+        anyListed(tx, organizationId),
+    ]);
+    if (!location) return;
+    await completeShop(
+        tx,
+        ctx,
+        site,
+        {
+            id: location.id,
+            fulfilmentTypes: location.settings?.fulfilmentTypes ?? [],
+        },
+        !listed,
+    );
 }
