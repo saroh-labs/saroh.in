@@ -1495,6 +1495,7 @@ asserts), it passes without checking them.
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
 worth the same change.
 **Category**: e2e · tests
+
 ## E2E — a business a test sets up has no modules and no rollout flags (L4)
 
 **Problem**: L4's browser spec had to change a web address on a business of
@@ -1514,6 +1515,7 @@ forwarded. The forwarding half (the new host serves, the old one answers 307) wa
 **Rule**: before planning a spec on a business the test makes, check which
 flags it will have. Only a flag with a seeded global default reaches it.
 **Category**: e2e · flags · DEC-069
+
 ## Gate — the shared browser worktree ran a spec this tree doesn't have (T4)
 
 **Symptom**: T4's `pnpm prepush --e2e` failed on
@@ -1530,3 +1532,23 @@ files (node_modules, .next) stay, so the build cache is kept.
 **Rule**: a failing browser spec that isn't in `e2e/tests` of your tree is
 the shared worktree's leftover, not your change.
 **Category**: gate · parallel units
+
+## Sites — the scheduled go-live was refused by the go-live it runs (T10)
+
+**Symptom**: the first draft of `site.go_live` called T7's
+`goLiveWithRelease` and got "Cancel the scheduled go-live first" for every
+release it ran: the release it was putting live was, by definition,
+scheduled. In a db spec, `jest.spyOn(prisma, "$transaction")` to fake a
+failed last attempt threw "mockRejectedValueOnce is not a function".
+**Cause**: T7 refuses any release with a `goLiveAt`, which is right for a
+person going live by hand and wrong for the job that owns that schedule.
+`prisma` from `@saroh/database` is the RLS proxy (`createRlsProxy`), so a
+spy on it doesn't replace what callers reach.
+**Fix**: `goLiveWithRelease` takes `scheduledFor`; a release scheduled for
+exactly that instant is let through, and any other schedule still refuses.
+The last-attempt write is `recordGaveUp`, exported and asserted directly;
+the order (retry, then record on the last try) is pinned with a mocked
+`@saroh/database` in `go-live.handler.spec.ts`.
+**Rule**: a guard that refuses "something is scheduled" needs a way for the
+schedule itself through. Fake `prisma` with `jest.mock`, not `spyOn`.
+**Category**: sites · jobs · tests
