@@ -132,10 +132,13 @@ export function reviewStanding(
         };
     }
 
-    // An approval settles only what came before it.
+    // An approval settles only what came before it. "Before" is the rows'
+    // order (newest first, ties broken by id), never a timestamp compare:
+    // an approval and a new request written in one millisecond tie on time.
     const settled =
         settling !== undefined &&
-        (asked === undefined || settling.createdAt >= asked.createdAt);
+        (asked === undefined ||
+            verdicts.indexOf(settling) < verdicts.indexOf(asked));
 
     return {
         outstanding: !settled,

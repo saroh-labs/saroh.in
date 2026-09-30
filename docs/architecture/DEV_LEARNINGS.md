@@ -1786,7 +1786,13 @@ reviewers acting at the same moment.
 `sites/live-pointer.ts`, the latest approval in `sites.service.ts`). A
 `cuid()` grows within a process, so the id settles the tie.
 **Rule**: "the newest row" is never ordered by a timestamp alone; add the id.
+**Follow-up (T13's run)**: the order was right, but `reviewStanding` still
+compared `settling.createdAt >= asked.createdAt`, so a request written in the
+approval's millisecond was taken as settled. It now compares positions in the
+newest-first list (`review-route.ts`), with a unit test for the tie. The same
+rule: the list's order decides "before", never an equal-or-later timestamp.
 **Category**: data · ordering · tests
+
 ## vitest — bookings-list.test.tsx throws "window is not defined" under load (K11)
 
 **Problem**: `pnpm prepush --int` failed its vitest step once on
