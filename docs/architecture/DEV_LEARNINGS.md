@@ -1178,3 +1178,41 @@ can't list B's holds, yet sees B's address as taken.
 goes through `outsideOrgContext`, never the request's client; such a read is
 outside the caller's transaction.
 **Category**: RLS · `docs/patterns/backend-data-and-money.md`
+
+## CI — four reds on batch 4 (#765) that the local gate passed
+
+**Problem**: `pnpm prepush --all` passed; CI failed four jobs. (1) Unit:
+`interaction-states.test.tsx` › Checkbox timed out at 5s (33s on the
+runner). (2) Integration, `rls` shard: the Turn on sheet's Website setup
+with a taken address threw Prisma's unique error, not a 409. (3) Browser,
+phone: a11y reported Orders' row name as a focus stop with no ring.
+(4) Permission states: F17/F19 found no "See orders" or "Manage payments".
+**Root cause**: (1) nwsapi answers `:modal` and `:popover-open` by calling
+`Element.matches`, which is nwsapi again, down to a stack overflow, and
+floating-ui asks both of every open menu after its test returns; the next
+test paid for it: 3s on a Mac, 33s on a runner. (2) `writeSiteFromTemplate`
+checked the address with its own `tx.site`/`tx.organization` reads, which
+RLS scopes to the caller; L1 had moved only `site-address.ts` outside the
+org context. (3) Not the page: the reduced-motion clamp makes every element
+transition `all` for 0.01ms, so a box-shadow read in the frame of a blur
+still has its old value. The walk's last stop was blurred just before the
+resting read, and a batch change put a ring-on-`::after` row name there.
+(4) `shownCatalogue` (DEC-073) kept a module's permissions only when the
+modules list named it; the suite's fake API names only what its scenarios
+need. The local gate runs integration without RLS and has no permission
+suite, and the unit and browser failures needed a slower runner or a
+different 20th stop.
+**Fix**: (1) `packages/ui/vitest.setup.ts` answers the two top-layer
+selectors false (jsdom has no top layer); the file went from 6s to 0.1s.
+(2) `addressUse` in `site-address.ts`, read across businesses, is what
+site creation checks; a held address is refused there too. (3) The a11y
+walk waits for running transitions before each read. (4) A permission hides
+only when the list names its module hidden (DEC-057) or it's Automations
+(DEC-068).
+**Rule**: a check on something other businesses own goes through
+`site-address.ts`, never the request's `tx`. A computed-style read right
+after a focus change waits a frame's transitions. A hide rule hides on
+evidence, never on absence. Run `TEST_RLS=on` for any spec touching a
+cross-business read, and the permission suite for anything on Team, until
+`scripts/prepush.sh` runs both.
+**Category**: CI · tests · RLS · a11y
