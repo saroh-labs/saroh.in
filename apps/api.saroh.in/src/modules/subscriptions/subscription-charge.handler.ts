@@ -245,6 +245,17 @@ export class SubscriptionChargeHandler {
                 // subscription's: nothing to say; the pay link stands.
                 return;
             case "ALREADY":
+                // Claimed and still PROCESSING: a delivery before this one
+                // may have died between the claim and writing its look-up,
+                // so nothing would ever ask. Unsure, as UNKNOWN is: look it
+                // up (a look-up already waiting is kept, not doubled).
+                if (result.intentStatus === "PROCESSING") {
+                    return this.next(
+                        organizationId,
+                        { ...p, step: "LOOK", tries: 0 },
+                        new Date(now.getTime() + DEBIT_RETRY_MS),
+                    );
+                }
                 return;
         }
     }

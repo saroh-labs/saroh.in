@@ -17,6 +17,32 @@ beforeEach(() => {
     global.fetch = fetchMock as unknown as typeof fetch;
 });
 
+/**
+ * A fetch that never answers on its own, as a provider that hangs does: it
+ * gives up only when the call's own signal aborts, as the real fetch does.
+ * `AbortSignal.timeout` is shortened so the test needn't wait 15 seconds,
+ * and asked what it was given.
+ */
+function hangUntilAborted() {
+    const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+    const timeout = jest
+        .spyOn(AbortSignal, "timeout")
+        .mockImplementation(() => realTimeout(20));
+    fetchMock.mockImplementation(
+        (_url: string, init?: RequestInit) =>
+            new Promise((_resolve, reject) => {
+                init?.signal?.addEventListener("abort", () =>
+                    reject(init.signal?.reason),
+                );
+            }),
+    );
+    return timeout;
+}
+
+afterEach(() => {
+    jest.restoreAllMocks();
+});
+
 function answer(status: number, body: unknown = {}) {
     return Promise.resolve(
         new Response(JSON.stringify(body), {
@@ -142,6 +168,32 @@ describe("RazorpayProvider.findOrderPayments (P1)", () => {
             toOrderPayment({ id: "pay_x", status: "refunded" }),
         ).toMatchObject({ status: "OTHER", amountCents: null });
     });
+});
+
+describe("a provider that never answers (release review)", () => {
+    it("Razorpay's lookup gives up after 15 seconds, as a network error", async () => {
+        const timeout = hangUntilAborted();
+        await expect(
+            new RazorpayProvider().findOrderPayments({
+                providerIntentId: "order_1",
+                merchantRef: null,
+                credentials: CREDS,
+            }),
+        ).rejects.toThrow("Razorpay payment lookup failed: network error");
+        expect(timeout).toHaveBeenCalledWith(15_000);
+    }, 2_000);
+
+    it("Cashfree's lookup gives up after 15 seconds, as a network error", async () => {
+        const timeout = hangUntilAborted();
+        await expect(
+            new CashfreeProvider().findOrderPayments({
+                providerIntentId: "2149460581",
+                merchantRef: "inv_1",
+                credentials: CREDS,
+            }),
+        ).rejects.toThrow("Cashfree payment lookup failed: network error");
+        expect(timeout).toHaveBeenCalledWith(15_000);
+    }, 2_000);
 });
 
 describe("CashfreeProvider.findOrderPayments (P1)", () => {

@@ -341,3 +341,37 @@ test.describe("flows stop short on a test release (T6)", () => {
         expect(writes).toEqual([]);
     });
 });
+
+/**
+ * The API's own refusal, through the real bootstrap (release review): the
+ * renderer's stops above never let a test host post, so this is the only
+ * check that `main.ts` wires `TestHostWriteGuard` in. A public write whose
+ * Origin is the test host is a 409 `TEST_RELEASE` before any route runs;
+ * the same write from the live host passes the guard and reaches the
+ * route, which answers for its unknown form.
+ */
+test.describe("the API refuses a test host's public write (KTD-8)", () => {
+    const submit = (request: APIRequestContext, origin: string) =>
+        request.post(`${urls.API_URL}/public/forms/e2e_no_such_form/submit`, {
+            headers: { Origin: origin },
+            data: {
+                data: { name: "Test host", email: "test-host@example.in" },
+            },
+            ignoreHTTPSErrors,
+            failOnStatusCode: false,
+        });
+
+    test("an enquiry from the test host is a 409 TEST_RELEASE; from the live host it reaches the form", async ({
+        request,
+    }) => {
+        const refused = await submit(request, TEST);
+        expect(refused.status()).toBe(409);
+        const body = (await refused.json()) as {
+            error?: { details?: { code?: string } };
+        };
+        expect(body.error?.details?.code).toBe("TEST_RELEASE");
+
+        const live = await submit(request, LIVE);
+        expect(live.status()).toBe(404);
+    });
+});

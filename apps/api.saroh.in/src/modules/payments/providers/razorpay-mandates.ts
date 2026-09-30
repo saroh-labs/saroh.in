@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 
 import { FlagKey } from "../../feature-flags/flags";
 import { maskVpa } from "../mandate-rules";
+import { providerCallSignal } from "./provider-call";
 import type {
     CancelMandateInput,
     CreateMandateSetupInput,
@@ -526,8 +527,11 @@ export class RazorpayMandates implements MandateCapability {
                     ...(body ? { "Content-Type": "application/json" } : {}),
                 },
                 body: body ? JSON.stringify(body) : undefined,
+                signal: providerCallSignal(),
             });
         } catch {
+            // A dropped connection, or no answer in time: it may have been
+            // done, so UNKNOWN, never a refusal.
             throw new MandateCallError(
                 `Razorpay ${what} failed: network error`,
                 "UNKNOWN",

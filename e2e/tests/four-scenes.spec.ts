@@ -115,7 +115,7 @@ test.describe("the phone tab bar", () => {
             page,
         }, testInfo) => {
             test.skip(
-                testInfo.project.name !== "phone",
+                !testInfo.project.name.startsWith("phone"),
                 "The tab bar is drawn below 760px only.",
             );
             await signIn(page);
@@ -205,7 +205,7 @@ test.describe("the phone tab bar", () => {
         page,
     }, testInfo) => {
         test.skip(
-            testInfo.project.name !== "phone",
+            !testInfo.project.name.startsWith("phone"),
             "The tab bar is drawn below 760px only.",
         );
         await signIn(page);
@@ -253,7 +253,7 @@ test.describe("touch targets", () => {
         page,
     }, testInfo) => {
         test.skip(
-            testInfo.project.name !== "phone",
+            !testInfo.project.name.startsWith("phone"),
             "Only the phone project has a coarse pointer; the desk keeps its density on purpose.",
         );
 
@@ -313,7 +313,7 @@ test.describe("Home's Needs you (F3)", () => {
         // At most twelve rows before "See all N" (default 121).
         expect(await rows.count()).toBeLessThanOrEqual(12);
 
-        if (testInfo.project.name !== "phone") return;
+        if (!testInfo.project.name.startsWith("phone")) return;
 
         // On a phone the list comes before Today (F5).
         const today = page.getByRole("region", { name: "Today" });

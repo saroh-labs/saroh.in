@@ -46,11 +46,17 @@ async function signIn(page: Page) {
 async function theSheet(page: Page, title: string): Promise<Locator> {
     const sheet = page.getByRole("dialog", { name: title });
     await expect(sheet).toBeVisible();
-    if (test.info().project.name === "phone") {
-        const box = await sheet.boundingBox();
+    if (test.info().project.name.startsWith("phone")) {
+        // Read once it has risen: visible from its first frame, the sheet
+        // slides up from below the screen, so an early read lands mid-way.
         const height = page.viewportSize()?.height ?? 0;
-        expect(box).not.toBeNull();
-        expect(Math.round((box?.y ?? -1) + (box?.height ?? 0))).toBe(height);
+        await expect
+            .poll(async () => {
+                const box = await sheet.boundingBox();
+                return box ? Math.round(box.y + box.height) : -1;
+            })
+            .toBe(height);
+        const box = await sheet.boundingBox();
         expect(box?.height ?? 0).toBeGreaterThanOrEqual(height - 1);
     }
     return sheet;
@@ -64,7 +70,7 @@ async function turnOnButton(page: Page, sheet: Locator): Promise<Locator> {
     await expect(button).toHaveCount(1);
     await expect(button).toBeEnabled();
     await expect(button).toHaveCSS("cursor", "pointer");
-    if (test.info().project.name === "phone") {
+    if (test.info().project.name.startsWith("phone")) {
         expect(
             await page.evaluate(
                 () => window.matchMedia("(pointer: coarse)").matches,

@@ -1,5 +1,6 @@
 import { Logger } from "@nestjs/common";
 
+import { providerCallSignal } from "./provider-call";
 import type {
     CheckoutReturnInput,
     CreateOrderIntentInput,
@@ -227,9 +228,11 @@ export class RazorpayProvider implements MerchantProvider {
                     headers: {
                         Authorization: `Basic ${basicAuth(credentials)}`,
                     },
+                    signal: providerCallSignal(),
                 },
             );
         } catch {
+            // A dropped connection, or no answer in time.
             throw new Error("Razorpay payment lookup failed: network error");
         }
         if (!res.ok) {

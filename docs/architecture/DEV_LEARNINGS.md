@@ -1493,7 +1493,8 @@ asserts), it passes without checking them.
 **Fix**: `project.name.startsWith("phone")` in the spec.
 **Rule**: in a spec that can be @serial, test the project with
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
-worth the same change.
+worth the same change. (Now a lint rule: see "the rule written down, not
+enforced", below.)
 **Category**: e2e · tests
 
 ## E2E — a business a test sets up has no modules and no rollout flags (L4)
@@ -2013,3 +2014,104 @@ server action threw and the sheet's `confirm()` never reset `busy`.
 the unreachable one included; a sheet never depends on a throw to leave its
 busy state.
 **Category**: frontend · error feedback
+## Payments — the pending sweep asks the same failing intents every minute
+
+**Problem**: (release review) an intent whose lookup threw — its business's
+credentials no longer decrypted, or a reconcile refused — was counted as an
+ERROR and asked again on the very next run, every 60 seconds. Enough of them
+filled `SWEEP_BATCH`, so the sweep re-ran at once and never reached the
+healthy intents behind them.
+**Root cause**: `lookUpAll` caught the throw but never stamped
+`lastLookupAt`. The sweep orders by `lastLookupAt` nulls first, so an
+unstamped intent is always first in line. The provider's own failure
+(ERROR from `lookUp`) was stamped; only the throw path wasn't.
+**Fix**: the catch stamps `lastLookupAt` best-effort (its own error
+swallowed), so a throwing intent waits for its tier's next turn.
+**Rule**: every outcome of a scheduled per-row attempt, a throw included,
+moves the row's "last tried" marker; a query that orders by it can
+otherwise be monopolised. Test: `payment-lookup.db.spec.ts` ("an intent
+whose ask throws takes its turn").
+**Category**: jobs · payments · starvation
+
+## Payments — a provider that never answers holds the sweep forever
+
+**Problem**: (release review) the pending-payment sweep, a hold's release
+and the autopay steps call Razorpay and Cashfree with a bare `fetch`. A
+provider that accepted the connection and never answered would have held
+the job for as long as the socket lived: the sweep's next run never came,
+and a hold waited on an ask that never finished.
+**Root cause**: Node's `fetch` has no timeout by default, and none of the
+lookup or mandate calls passed a signal.
+**Fix**: `findOrderPayments` (Razorpay and Cashfree) and the Razorpay
+mandate `call()` pass `signal: providerCallSignal()` (15 s,
+`payments/providers/provider-call.ts`). The abort rejects like a dropped
+connection, so the existing network-error path handles it: a lookup's ERROR,
+a mandate call's UNKNOWN. There is no Cashfree mandate adapter yet.
+**Rule**: `backend-integrations.md` — "A provider call has a deadline".
+Tests: `order-payments.spec.ts` and `razorpay-mandates.spec.ts`, with a
+fetch that settles only when its signal aborts.
+**Category**: integrations · payments · timeouts
+
+## Autopay — a debit retried after a crash is never looked up
+
+**Problem**: (release review) a renewal's autopay charge could sit in
+PROCESSING for good. The DEBIT step claims the intent (REQUIRES_PAYMENT →
+PROCESSING) before asking the provider; a worker that died after the claim
+and before writing the LOOK step left the job to be delivered again, and
+that delivery did nothing.
+**Root cause**: on the retry `charge()` finds the intent already claimed
+and answers ALREADY (`intentStatus: PROCESSING`); the handler's ALREADY
+case returned without a next step. No LOOK, so nothing ever asked the
+provider, and the pay link stayed shut behind "Autopay charge in progress".
+**Fix**: `subscription-charge.handler.ts` — ALREADY with PROCESSING
+enqueues the LOOK step, as UNKNOWN does (`enqueueChargeStepInTx` keeps a
+LOOK already waiting). The look-up finds no debit, puts the intent back to
+REQUIRES_PAYMENT and asks for it once.
+**Rule**: a step that claims a row before a side effect must leave a way
+back from every state its crash can leave behind; the redelivery's "already
+claimed" answer schedules the recovery step. `backend-jobs.md` → Autopay
+charges. Test: `subscriptions.charge.db.spec.ts` ("a debit retried after
+a crash mid-claim").
+**Category**: jobs · autopay · crash recovery
+
+## Test releases — the API's write guard was tested everywhere but where it is wired
+
+**Problem**: (release review) `TestHostWriteGuard` had unit specs and a
+route inventory (`test-host.guard.spec.ts`, `test-host-routes.spec.ts`),
+and the browser specs showed the renderer stopping every flow. Nothing
+failed if `main.ts` stopped installing the guard: the renderer's own stops
+never let a browser post from a test host, so the API's refusal was never
+reached in any test.
+**Root cause**: global guards are installed in `bootstrap()`, which only
+the real stack runs; the unit specs construct the guard themselves.
+**Fix**: `e2e/tests/site-test-release.spec.ts` ("the API refuses a test
+host's public write") posts an enquiry straight to the API with
+`Origin: test--northwind.<renderer>` and expects 409 `TEST_RELEASE`, and
+from the live host expects the route's own 404. With the guard removed
+from `main.ts` it fails (404 instead of 409).
+**Rule**: a guard, pipe or filter installed in `main.ts` gets one check
+through the real bootstrap (the e2e stack), besides its unit spec.
+**Category**: e2e · test releases · bootstrap wiring
+
+## e2e — the "phone-serial" rule was written down, and not enforced
+
+**Problem**: (release review) `module-turn-on.spec.ts`, a @serial spec,
+still tested `project.name === "phone"` at its two phone checks (the sheet
+rising full height, the 44px Turn on button), so on `phone-serial` they
+never ran. The entry above named this very file and rule; the prose did
+not stop it.
+**Root cause**: a rule that lives only in DEV_LEARNINGS is read after the
+fact. Nothing failed on an exact project-name comparison.
+**Fix**: every `=== "phone"`, `!== "phone"` and `=== "desk"` in
+`e2e/tests` is now `startsWith(…)` (only module-turn-on was @serial; the
+rest change nothing today but can't go wrong when a spec turns @serial),
+and `e2e/eslint.config.mjs` has a `no-restricted-syntax` rule that fails an
+equality comparison with the literal `"phone"` or `"desk"`. Lint runs on
+`@saroh/e2e` whenever a spec changes (prepush's lint step, CI's static job).
+Once they ran, the phone checks failed at once: the sheet's box was read
+the moment it was visible, mid-way through its slide up (bottom at 1565 on
+an 839px screen). They had never passed, only never run. The spec now
+polls until the sheet's bottom meets the screen's.
+**Rule**: compare a Playwright project by prefix; the lint rule says so. A
+geometry check on an animated sheet polls until it settles.
+**Category**: e2e · tests · lint
