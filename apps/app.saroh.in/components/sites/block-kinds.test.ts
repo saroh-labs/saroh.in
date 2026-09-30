@@ -47,7 +47,7 @@ describe("where a bound block's values are changed", () => {
 
     it("keeps a business-wide screen's link as it is", () => {
         expect(boundHref(bound("visitUs"), "site_rye")).toBe(
-            "/commerce/storefronts",
+            "/commerce/locations",
         );
     });
 

@@ -231,7 +231,7 @@ describe("what each role is offered", () => {
         expect(offeredWith(SITES)).not.toContain("/sites/new");
     });
 
-    it("names the row Storefronts only once there are several (ADR-010)", () => {
+    it("names the row Locations only once there are several (ADR-010, DEC-069)", () => {
         const label = (storefronts?: number | null) =>
             navFor({
                 role: "OWNER",
@@ -240,11 +240,11 @@ describe("what each role is offered", () => {
             })
                 .flatMap((g) => g.items)
                 .flatMap((i) => [i, ...(i.children ?? [])])
-                .find((row) => row.href === "/commerce/storefronts")?.label;
-        expect(label()).toBe("Storefront");
-        expect(label(null)).toBe("Storefront");
-        expect(label(1)).toBe("Storefront");
-        expect(label(2)).toBe("Storefronts");
+                .find((row) => row.href === "/commerce/locations")?.label;
+        expect(label()).toBe("Location");
+        expect(label(null)).toBe("Location");
+        expect(label(1)).toBe("Location");
+        expect(label(2)).toBe("Locations");
     });
 
     it("does not offer a member what it would be refused", () => {
@@ -556,14 +556,14 @@ describe("the storefront rows follow store:read", () => {
         );
     const sites: { id: string; name: string }[] = [];
     // Customers follows contact:read (matrix W-1, B16), below.
-    const storefront = ["/commerce/products", "/commerce/storefronts"];
+    const storefront = ["/commerce/products", "/commerce/locations"];
 
     it("still offers products and the storefront to a Member, whose floor includes it", () => {
         const hrefs = childHrefs(
             navFor({ role: "MEMBER", moduleKeys: null, sites }),
         );
         expect(hrefs).toContain("/commerce/products");
-        expect(hrefs).toContain("/commerce/storefronts");
+        expect(hrefs).toContain("/commerce/locations");
     });
 
     it("offers a store:read role both storefront rows", () => {

@@ -8,12 +8,12 @@ import { requireSession } from "@/lib/session";
 import { storefrontHref } from "@/lib/stores/links";
 import { getStore } from "@/lib/stores/service";
 
-export const metadata = { title: "Storefront details" };
+export const metadata = { title: "Location details" };
 
 /**
- * A storefront's name, web address, description and logo — what used to be
+ * A location's name, web address, description and logo — what used to be
  * its Settings tab under `/stores`. Checkout, hours and payments are on the
- * storefront's own panel in Storefronts.
+ * location's own panel in Locations (a storefront in code, DEC-069).
  */
 export default async function StorefrontDetailsPage({
     params,
@@ -29,7 +29,7 @@ export default async function StorefrontDetailsPage({
         <PageContainer width="form">
             <PageHeader
                 breadcrumb={sellCrumbs(
-                    { label: "Storefront", href: "/commerce/storefronts" },
+                    { label: "Location", href: "/commerce/locations" },
                     { label: store.name, href: storefrontHref(store.id) },
                     "Details",
                 )}

@@ -36,6 +36,27 @@ const nextConfig = {
     experimental: {
         authInterrupts: true,
     },
+    /*
+     * Sell's Storefronts became Locations (DEC-069, L9). The screens moved to
+     * `/commerce/locations`; the old path answers a permanent redirect so a
+     * bookmark, an email or an activity line written before the move still
+     * lands. The query (`?storefront=<id>`) is carried across. It stays: it
+     * costs nothing.
+     */
+    async redirects() {
+        return [
+            {
+                source: "/commerce/storefronts",
+                destination: "/commerce/locations",
+                permanent: true,
+            },
+            {
+                source: "/commerce/storefronts/:path*",
+                destination: "/commerce/locations/:path*",
+                permanent: true,
+            },
+        ];
+    },
     images: {
         domains: [
             "public.blob.vercel-storage.com",

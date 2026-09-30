@@ -361,7 +361,7 @@ export function showsGroupLabel(group: NavGroup): boolean {
  * promise a merge that has not happened — the same over-claim that was removed
  * from the marketing site.
  */
-const STOREFRONTS_HREF = "/commerce/storefronts";
+const STOREFRONTS_HREF = "/commerce/locations";
 const STOCK_HREF = "/commerce/stock";
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -450,8 +450,9 @@ export const NAV_GROUPS: NavGroup[] = [
                     {
                         href: STOREFRONTS_HREF,
                         // Singular for the business with one; `navFor`
-                        // names it "Storefronts" once there are more.
-                        label: "Storefront",
+                        // names it "Locations" once there are more
+                        // (DEC-069: storefronts are called locations).
+                        label: "Location",
                         action: "store:read",
                     },
                 ],
@@ -885,7 +886,7 @@ export function navFor({
     sites?: readonly { id: string; name: string }[];
     /**
      * How many storefronts the business has; with more than one the row
-     * reads "Storefronts" (ADR-010). `null` or absent keeps the singular.
+     * reads "Locations" (ADR-010, DEC-069). `null` or absent keeps the singular.
      */
     storefronts?: number | null;
     /**
@@ -921,10 +922,10 @@ function withoutStockRows(groups: NavGroup[]): NavGroup[] {
     }));
 }
 
-/** The Storefront row, named for a business that has several. */
+/** The Location row, named for a business that has several. */
 function pluralStorefronts(groups: NavGroup[]): NavGroup[] {
     const rename = <T extends { href?: string; label: string }>(row: T): T =>
-        row.href === STOREFRONTS_HREF ? { ...row, label: "Storefronts" } : row;
+        row.href === STOREFRONTS_HREF ? { ...row, label: "Locations" } : row;
     return groups.map((group) => ({
         ...group,
         items: group.items.map((item) => ({

@@ -39,7 +39,7 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
     visitUs: {
         reads: "Reads your shop's address and opening hours live, so they're never out of date here.",
         notice: "The address lives on the storefront, and the hours in Settings › Hours — change them there, and this block follows.",
-        href: "/commerce/storefronts",
+        href: "/commerce/locations",
         linkLabel: "Open Storefronts",
     },
     journal: {
