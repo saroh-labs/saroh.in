@@ -1697,3 +1697,20 @@ reads them without saving.
 business; one it makes itself can only check what needs no module (setup,
 the kind, invoices).
 **Category**: e2e · seed · modules
+## e2e — a business a test sets up can still write contacts and invoices (K4)
+
+**Problem**: K4 needed a "site for my work" with nothing that takes money
+and then a first invoice, on a business of its own. The module wall above
+suggested no contact or invoice could be made there.
+**Root cause**: the wall is the rollout check on `PUT modules/:key`, not the
+endpoints. `@RequireModule` is enforced only while `MODULE_ENFORCEMENT` is
+set, and neither the dev nor the e2e stack sets it, so `POST /contacts` and
+`POST /invoices` answer a test-made business like any other. The first run
+did fail, on the contact itself: one needs an email or a phone.
+**Fix**: `checklist-when-money.spec.ts` sets up a WORK business as
+`founder`, makes a contact with a stamped email and drafts an invoice
+through the API, then reads Settings and Home.
+**Rule**: a module that is off isn't a module you can't write through in
+e2e. Plan on turning one on only where the spec needs the module to read as
+on (Home, the rail, the checklist's module steps).
+**Category**: e2e · tests · modules

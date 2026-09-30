@@ -15,6 +15,9 @@ export const BUSINESS_DETAILS_CODE = "PAYMENTS_BUSINESS_DETAILS";
  * numbered paper and the address (or a registered business's GSTIN) is
  * still missing, Home says so, and the row leads to where it's added.
  *
+ * Its words fit a business and a person working for themselves alike
+ * (DEC-070): the API sends no kind-specific copy.
+ *
  * The caller has checked the viewer can change the business's settings
  * (`org:update`): the row is only worth showing to someone who can act.
  */
@@ -33,7 +36,7 @@ export async function businessDetailsGap(
     return {
         code: BUSINESS_DETAILS_CODE,
         title: address
-            ? "Add your registered address — invoices go out without it"
+            ? "Add the address your invoices print — they go out without it"
             : "Add your GSTIN — invoices go out without it",
         href: `/settings/organization?tab=${address ? "address" : "tax"}`,
         severity: "ATTENTION",

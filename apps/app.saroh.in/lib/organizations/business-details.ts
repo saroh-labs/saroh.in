@@ -1,5 +1,6 @@
 import { gstinProblem } from "@/lib/invoices/gstin";
 
+import { kindOf, kindWords } from "./kind";
 import type { RegisteredAddressValues } from "./registered-address";
 import { PIN_SHAPE } from "./registered-address";
 import type {
@@ -23,6 +24,23 @@ export const BUSINESS_DETAILS_MISSING = "BUSINESS_DETAILS_MISSING";
 export type BusinessDetail = "address" | "gstin";
 
 const DETAILS: readonly BusinessDetail[] = ["address", "gstin"];
+
+/**
+ * The address every invoice prints, in the kind's words (DEC-070, KTD-5):
+ * "your registered address" for a business, "your address" for someone
+ * working for themselves or showing their work. Unknown speaks as a business.
+ */
+export function yourAddress(kind: unknown): string {
+    const words = kindWords(kind).registeredAddress;
+    return words.startsWith("your ") ? words : `your ${words}`;
+}
+
+/** The step's title: "Add your business details", or "Add your details". */
+export function detailsTitle(kind: unknown): string {
+    return kindOf(kind) === "BUSINESS"
+        ? "Add your business details"
+        : "Add your details";
+}
 
 /**
  * What is missing, from a refusal's `details`; undefined for any other
@@ -146,14 +164,12 @@ export function detailsInput(
 export function detailsWhy(
     missing: readonly BusinessDetail[],
     then: string,
+    kind?: unknown,
 ): string {
     const address = missing.includes("address");
     const gstin = missing.includes("gstin");
+    const yours = yourAddress(kind);
     const what =
-        address && gstin
-            ? "your registered address and GSTIN"
-            : gstin
-              ? "your GSTIN"
-              : "your registered address";
+        address && gstin ? `${yours} and GSTIN` : gstin ? "your GSTIN" : yours;
     return `Every invoice prints ${what}. Add ${address && gstin ? "them" : "it"} once and we'll ${then}.`;
 }

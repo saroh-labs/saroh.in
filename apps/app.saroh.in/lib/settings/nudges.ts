@@ -8,7 +8,13 @@ import type { OrganizationSettings } from "@/lib/organizations/settings-service"
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import type { ReadyChecklist, ReadyItem, ReadyStep } from "./ready";
-import { business, emailAttention, on, readyChecklist } from "./ready";
+import {
+    business,
+    emailAttention,
+    handlesMoney,
+    on,
+    readyChecklist,
+} from "./ready";
 
 /**
  * Settings › Business's "Ready to take payments" is the take-money steps
@@ -22,6 +28,11 @@ import { business, emailAttention, on, readyChecklist } from "./ready";
  *   before the business goes live (user, 2026-09-28).
  * - **Logo**, which prints on every receipt and invoice.
  * - **A pipeline**, while Contacts is on without one.
+ *
+ * Business type and logo are paper a business hands someone who pays it, so
+ * like the registered address they are asked only once something invoices
+ * or takes money (`handlesMoney`, DEC-070): a site with nothing to sell is
+ * never told to pick a company type.
  *
  * Home keeps only the steps: these are not about taking money, so Home's
  * count is the steps' and Settings' is the steps' and these together.
@@ -117,14 +128,16 @@ export function settingsNudges({
     modules,
     messaging,
 }: {
-    settings: Pick<OrganizationSettings, "profile" | "logo">;
+    settings: Pick<OrganizationSettings, "profile" | "logo" | "setup">;
     modules: readonly ModuleView[] | null;
     messaging: readonly ConnectedCommsProvider[] | null;
 }): Nudge[] {
+    // Unknown (the modules could not be read) asks as it always did.
+    const money = handlesMoney(modules, settings.setup) !== false;
     return [
         email(modules, messaging),
-        businessType(settings),
-        logo(settings),
+        money ? businessType(settings) : null,
+        money ? logo(settings) : null,
         pipeline(modules),
     ].filter((n): n is Nudge => n !== null);
 }

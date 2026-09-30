@@ -77,6 +77,12 @@ export interface SetupFacts {
     services: number;
     sites: number;
     sitesNotLive: number;
+    /**
+     * Invoices that aren't void (DEC-070). Absent from an API older than
+     * it; whether the business handles money is then read from the modules
+     * alone.
+     */
+    invoices?: number;
 }
 
 export interface OrganizationSettings {
