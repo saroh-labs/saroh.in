@@ -52,6 +52,11 @@ import {
 import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
+import {
+    frozenPages,
+    isOnFrozenPage,
+    releaseUnderReview,
+} from "./release-under-review";
 import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import type { SellsFromView } from "./sells-from";
@@ -136,6 +141,12 @@ export interface CommentView {
 
 /** The site's review state — the latest verdict plus what is still open. */
 export interface ReviewState {
+    /**
+     * The test release this is the review of (T8), or null for the draft's.
+     * The two are kept apart: verdicts and notes on one never read on the
+     * other.
+     */
+    testRelease: { id: string; number: number; name: string } | null;
     openNotes: number;
     /** A review has been asked for and nobody has answered it yet (#278). */
     pending: boolean;
@@ -1980,13 +1991,33 @@ export class SitesService {
     async listComments(
         ctx: OrganizationContext,
         siteId: string,
+        /**
+         * A test release's notes instead of the draft's (T8), each resolved
+         * against the release's frozen pages rather than the draft.
+         */
+        testReleaseId?: string,
     ): Promise<CommentView[]> {
         authorize(ctx, "site:read");
         await assertSiteInOrg(ctx, siteId);
+        const release = testReleaseId
+            ? await releaseUnderReview(ctx, siteId, testReleaseId, {
+                  open: false,
+              })
+            : null;
+        const frozen = release
+            ? await frozenPages(ctx.organizationId, release.id)
+            : null;
 
         const [comments, pages] = await Promise.all([
             prisma.siteComment.findMany({
-                where: { siteId, organizationId: ctx.organizationId },
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    // The draft's notes and a release's are kept apart: a
+                    // note on a release is about bytes the draft may no
+                    // longer hold.
+                    testReleaseId: release?.id ?? null,
+                },
                 orderBy: { createdAt: "desc" },
                 select: {
                     id: true,
@@ -2004,6 +2035,7 @@ export class SitesService {
                 select: {
                     id: true,
                     title: true,
+                    path: true,
                     versions: {
                         where: { status: "DRAFT" },
                         orderBy: { createdAt: "desc" },
@@ -2024,6 +2056,13 @@ export class SitesService {
             ]),
         );
         const titles = new Map(pages.map((p) => [p.id, p.title]));
+        const paths = new Map(pages.map((p) => [p.id, p.path]));
+        const attached = (pageId: string, sectionKey: string): boolean =>
+            frozen
+                ? // A release's page never changes; its path is how the
+                  // frozen snapshot names it.
+                  isOnFrozenPage(frozen, paths.get(pageId), sectionKey)
+                : (live.get(pageId)?.has(sectionKey) ?? false);
 
         return comments.map((c) => ({
             id: c.id,
@@ -2043,9 +2082,7 @@ export class SitesService {
                 name: c.author.name ?? c.author.email,
             },
             // A note whose page is gone is orphaned by definition.
-            orphaned:
-                c.pageId === null ||
-                !(live.get(c.pageId)?.has(c.sectionKey) ?? false),
+            orphaned: c.pageId === null || !attached(c.pageId, c.sectionKey),
         }));
     }
 
@@ -2123,6 +2160,13 @@ export class SitesService {
     ): Promise<{ id: string }> {
         authorize(ctx, "site:comment");
         await assertSiteInOrg(ctx, siteId);
+        // A note on a release is about what it froze (T8), and a release
+        // that is gone or live takes no more notes.
+        const release = dto.testReleaseId
+            ? await releaseUnderReview(ctx, siteId, dto.testReleaseId, {
+                  open: true,
+              })
+            : null;
         await assertPageInSite(ctx, siteId, dto.pageId);
 
         /*
@@ -2131,6 +2175,9 @@ export class SitesService {
          * screen — or a typo — was stored and then read as orphaned for ever:
          * the reviewer saw it saved, the owner saw a note about nothing, and
          * no error was ever raised. A 400 is the honest answer.
+         *
+         * On a release, the same check is made of the release's frozen page
+         * instead, whatever the draft holds now.
          */
         const page = await prisma.page.findFirst({
             where: {
@@ -2140,6 +2187,7 @@ export class SitesService {
             },
             select: {
                 title: true,
+                path: true,
                 versions: {
                     where: { status: "DRAFT" },
                     orderBy: { createdAt: "desc" },
@@ -2148,13 +2196,23 @@ export class SitesService {
                 },
             },
         });
-        const keys = new Set(
-            page?.versions.flatMap((v) => v.sections.map((x) => x.key)) ?? [],
-        );
-        if (!keys.has(dto.sectionKey)) {
-            throw new BadRequestException(
-                "That section is no longer on the page. Reload the draft and try again.",
+        if (release) {
+            const frozen = await frozenPages(ctx.organizationId, release.id);
+            if (!isOnFrozenPage(frozen, page?.path, dto.sectionKey)) {
+                throw new BadRequestException(
+                    "That section isn't on this page of the test release. Reload it and try again.",
+                );
+            }
+        } else {
+            const keys = new Set(
+                page?.versions.flatMap((v) => v.sections.map((x) => x.key)) ??
+                    [],
             );
+            if (!keys.has(dto.sectionKey)) {
+                throw new BadRequestException(
+                    "That section is no longer on the page. Reload the draft and try again.",
+                );
+            }
         }
 
         const comment = await prisma.siteComment.create({
@@ -2167,6 +2225,7 @@ export class SitesService {
                 sectionKey: dto.sectionKey,
                 authorUserId: ctx.userId,
                 body: dto.body,
+                ...(release ? { testReleaseId: release.id } : {}),
             },
             select: { id: true },
         });
@@ -2227,6 +2286,29 @@ export class SitesService {
         authorize(ctx, "site:approve");
         await assertSiteInOrg(ctx, siteId);
 
+        if (dto.testReleaseId) {
+            // A verdict on a release is about its frozen bytes, whatever
+            // the draft does next (KTD-10). Both outcomes carry them: a
+            // change request on release 2 is not about release 3.
+            const release = await releaseUnderReview(
+                ctx,
+                siteId,
+                dto.testReleaseId,
+                { open: true },
+            );
+            return prisma.siteApproval.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    byUserId: ctx.userId,
+                    outcome: dto.outcome,
+                    draftFingerprint: release.fingerprint,
+                    testReleaseId: release.id,
+                },
+                select: { id: true },
+            });
+        }
+
         return prisma.siteApproval.create({
             data: {
                 siteId,
@@ -2253,13 +2335,41 @@ export class SitesService {
     async getReviewState(
         ctx: OrganizationContext,
         siteId: string,
+        /**
+         * A test release's review instead of the draft's (T8): its verdicts,
+         * bound to its fingerprint, and its own notes. The two never mix, so
+         * approving a release leaves the draft's review as it was.
+         */
+        testReleaseId?: string,
     ): Promise<ReviewState> {
         authorize(ctx, "site:read");
         await assertSiteInOrg(ctx, siteId);
+        const release = testReleaseId
+            ? await releaseUnderReview(ctx, siteId, testReleaseId, {
+                  open: false,
+              })
+            : null;
 
         const [latest, standing, openNotes] = await Promise.all([
             prisma.siteApproval.findFirst({
-                where: { siteId, organizationId: ctx.organizationId },
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    ...(release
+                        ? {
+                              // Its verdicts (by fingerprint, as the
+                              // standing reads them), and its go-live's
+                              // own record.
+                              OR: [
+                                  {
+                                      testReleaseId: { not: null },
+                                      draftFingerprint: release.fingerprint,
+                                  },
+                                  { testReleaseId: release.id },
+                              ],
+                          }
+                        : { testReleaseId: null }),
+                },
                 orderBy: { createdAt: "desc" },
                 select: {
                     outcome: true,
@@ -2269,25 +2379,39 @@ export class SitesService {
             }),
             // Asked as "what would happen if THIS caller published now",
             // because that is the question the editor's bar is answering.
-            this.currentDraftFingerprint(ctx, siteId).then((fingerprint) =>
-                this.reviewStandingFor(
-                    prisma,
-                    siteId,
-                    ctx.organizationId,
-                    fingerprint,
-                    ctx.userId,
-                ),
-            ),
+            // A release asks it of its own bytes.
+            release
+                ? readReviewStanding(prisma, {
+                      siteId,
+                      organizationId: ctx.organizationId,
+                      fingerprint: release.fingerprint,
+                      publisherUserId: ctx.userId,
+                      scope: "release",
+                  })
+                : this.currentDraftFingerprint(ctx, siteId).then(
+                      (fingerprint) =>
+                          this.reviewStandingFor(
+                              prisma,
+                              siteId,
+                              ctx.organizationId,
+                              fingerprint,
+                              ctx.userId,
+                          ),
+                  ),
             prisma.siteComment.count({
                 where: {
                     siteId,
                     organizationId: ctx.organizationId,
                     resolvedAt: null,
+                    testReleaseId: release?.id ?? null,
                 },
             }),
         ]);
 
         return {
+            testRelease: release
+                ? { id: release.id, number: release.number, name: release.name }
+                : null,
             openNotes,
             outstanding: standing.outstanding,
             // "In review" is the state a REQUESTED row creates and only a
@@ -2321,9 +2445,33 @@ export class SitesService {
     async requestReview(
         ctx: OrganizationContext,
         siteId: string,
+        /** Put a test release up for review instead of the draft (T8). */
+        testReleaseId?: string,
     ): Promise<{ id: string }> {
         authorize(ctx, "site:update");
         await assertSiteInOrg(ctx, siteId);
+
+        if (testReleaseId) {
+            // Bound to the release's bytes, so an approval of them is what
+            // settles it (KTD-10).
+            const release = await releaseUnderReview(
+                ctx,
+                siteId,
+                testReleaseId,
+                { open: true },
+            );
+            return prisma.siteApproval.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    byUserId: ctx.userId,
+                    outcome: "REQUESTED",
+                    draftFingerprint: release.fingerprint,
+                    testReleaseId: release.id,
+                },
+                select: { id: true },
+            });
+        }
 
         return prisma.siteApproval.create({
             data: {
@@ -2379,10 +2527,10 @@ export class SitesService {
     }
 
     /**
-     * Where the site stands with its reviewers, as `reviewStanding`
+     * Where the draft stands with its reviewers, as `reviewStanding`
      * decides it. The query is `readReviewStanding` in `live-pointer.ts`, the
      * same one `putLive` asks of its own transaction; the rule lives in
-     * `review-route.ts`.
+     * `review-route.ts`. A test release's verdicts are not the draft's (T8).
      */
     private async reviewStandingFor(
         client: Pick<typeof prisma, "siteApproval">,
@@ -2396,6 +2544,7 @@ export class SitesService {
             organizationId,
             fingerprint: currentFingerprint,
             publisherUserId,
+            scope: "draft",
         });
     }
 

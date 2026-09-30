@@ -8,6 +8,7 @@ import {
     Patch,
     Post,
     Put,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 import { listTemplates } from "@saroh/templates";
@@ -24,6 +25,8 @@ import {
     CreatePageDto,
     CreatePreviewLinkDto,
     CreateSiteFromTemplateDto,
+    RequestReviewDto,
+    ReviewTargetQueryDto,
     SetCommentResolvedDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
@@ -101,15 +104,17 @@ export class SitesController {
     }
 
     /**
-     * Every note on this site, with the section each is about resolved against
-     * the current draft. Requires `site:read`.
+     * Every note on the draft, with the section each is about resolved against
+     * the current draft; or, with `?testReleaseId=`, every note on that test
+     * release, against its frozen pages. Requires `site:read`.
      */
     @Get(":siteId/comments")
     listComments(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Query() query: ReviewTargetQueryDto,
     ) {
-        return this.sites.listComments(ctx, siteId);
+        return this.sites.listComments(ctx, siteId, query.testReleaseId);
     }
 
     /** Leave a note pinned to a section. Requires `site:comment`. */
@@ -144,18 +149,23 @@ export class SitesController {
     }
 
     /**
-     * Ask for a review (#278). Requires `site:update` — the person whose work
-     * it is saying they are ready for eyes. It blocks nothing.
+     * Ask for a review (#278) of the draft, or of a test release named in the
+     * body (T8). Requires `site:update` — the person whose work it is saying
+     * they are ready for eyes. It blocks nothing.
      */
     @Post(":siteId/review/request")
     requestReview(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Body() dto: RequestReviewDto,
     ) {
-        return this.sites.requestReview(ctx, siteId);
+        return this.sites.requestReview(ctx, siteId, dto.testReleaseId);
     }
 
-    /** Record a reviewer's verdict. Requires `site:approve`. */
+    /**
+     * Record a reviewer's verdict, on the draft or on a test release (T8).
+     * Requires `site:approve`.
+     */
     @Post(":siteId/approvals")
     createApproval(
         @OrgContext() ctx: OrganizationContext,
@@ -197,13 +207,17 @@ export class SitesController {
         return this.previewLinks.revoke(ctx, siteId, linkId);
     }
 
-    /** The latest verdict plus the open-note count. Requires `site:read`. */
+    /**
+     * The latest verdict plus the open-note count, for the draft or, with
+     * `?testReleaseId=`, for that test release (T8). Requires `site:read`.
+     */
     @Get(":siteId/review")
     getReviewState(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Query() query: ReviewTargetQueryDto,
     ) {
-        return this.sites.getReviewState(ctx, siteId);
+        return this.sites.getReviewState(ctx, siteId, query.testReleaseId);
     }
 
     /**
