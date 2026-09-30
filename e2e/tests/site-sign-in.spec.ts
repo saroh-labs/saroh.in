@@ -141,9 +141,7 @@ test.describe("site sign-in: in the browser", () => {
         const openDays = page.getByRole("radio", { name: /times? free/ });
         await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
         const names = await openDays.evaluateAll((days) =>
-            days.map(
-                (d) => d.getAttribute("aria-label") ?? d.textContent ?? "",
-            ),
+            days.map((d) => d.getAttribute("aria-label") ?? d.textContent),
         );
         const day = names.findIndex(
             (name) => Number(/(\d+)\s+times?\s+free/.exec(name)?.[1] ?? 0) >= 2,
