@@ -1,4 +1,4 @@
-// @covers app:/ app:/settings/organization api:organizations api:invoices api:contacts
+// @covers app:/settings/organization api:organizations api:invoices api:contacts
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -12,15 +12,15 @@ import { urls } from "../playwright.config";
  * takes money (DEC-070, K4).
  *
  * As Asha (`founder`), on "a site for my work" she sets up for the test:
- * nothing on that sells, and no invoice, so Settings asks for none of them
- * and Home has no checklist. Once she drafts a first invoice — invoicing
- * needs no module — both ask for "your address" (her kind's words), and
- * Settings for the type and the logo too.
+ * nothing on that sells, and no invoice, so Settings › Business asks for
+ * none of them. Once she drafts a first invoice — invoicing needs no module
+ * — it asks for "your address" (her kind's words), the type and the logo.
  *
  * A business made at test time can't turn a module on (DEV_LEARNINGS), so
- * the one-step "Publish your site" list of a WORK business with Website on
- * is covered in vitest (`ready.test.ts`). The business is Asha's alone, so
- * this runs beside everything else.
+ * the one-step "Publish your site" list of a WORK business with Website on,
+ * and Home's copy of the list (Home shows no dashboard while nothing is
+ * on), are covered in vitest (`ready.test.ts`). The business is Asha's
+ * alone, so this runs beside everything else.
  */
 
 interface Made {
@@ -97,30 +97,20 @@ test("the address, type and logo wait for a first invoice", async ({
         lines: [{ description: "Logo design", quantity: 1, unitPrice: "1200" }],
     });
 
-    await expect
-        .poll(async () => {
-            await page.reload();
-            return settingsCard(page).count();
-        })
-        .toBe(1);
+    // The settings read counts it at once: no waiting on anything.
+    await page.goto("/settings/organization");
     const card = settingsCard(page);
+    await expect(card).toBeVisible();
     await expect(card).toHaveAccessibleName("Ready to take payments");
     // Her kind's words: "your address", not "your registered address".
     await expect(card).toContainText("Add your address");
     await expect(card).not.toContainText("registered address");
     await expect(card).toContainText("Choose your business type");
     await expect(card).toContainText("Add your logo");
-
-    // Home asks for the address too, under the money heading.
-    await page.goto("/");
-    const home = page
-        .getByRole("region", { name: "Get ready to take money" })
-        .filter({ visible: true });
-    await expect(home).toBeVisible();
-    await expect(
-        home.getByRole("link", { name: /Add your address/ }),
-    ).toHaveAttribute("href", "/settings/organization?section=address");
-    await expect(
-        home.getByRole("link", { name: /Add your address/ }),
-    ).toHaveCSS("cursor", "pointer");
+    const add = card.getByRole("link", { name: "Add address" });
+    await expect(add).toHaveAttribute(
+        "href",
+        "/settings/organization?section=address",
+    );
+    await expect(add).toHaveCSS("cursor", "pointer");
 });
