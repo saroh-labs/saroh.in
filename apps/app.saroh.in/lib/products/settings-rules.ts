@@ -30,7 +30,7 @@ export const RETURN_RULES: { choice: ReturnsChoice; label: string }[] = [
         choice: "OWN:Returnable within 7 days, unused",
         label: "Returnable within 7 days, unused",
     },
-    { choice: "STOREFRONT", label: "The storefront's rule" },
+    { choice: "STOREFRONT", label: "The location's rule" },
     { choice: "OWN:Non-returnable", label: "Non-returnable" },
 ];
 
@@ -38,7 +38,7 @@ export const BUILT_IN_LOW = 10;
 
 export function returnsLabel(choice: ReturnsChoice): string {
     if (choice === "") return "Same as All products";
-    if (choice === "STOREFRONT") return "The storefront's rule";
+    if (choice === "STOREFRONT") return "The location's rule";
     return choice.slice(4);
 }
 

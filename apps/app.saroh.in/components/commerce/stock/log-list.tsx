@@ -87,7 +87,7 @@ export function LogList({
                 {storefronts.length > 1 ? (
                     <div
                         role="group"
-                        aria-label="Storefront"
+                        aria-label="Location"
                         className="flex flex-wrap gap-2"
                     >
                         {[

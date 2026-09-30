@@ -30,7 +30,7 @@ export function PossibleMatch({
     const who =
         matches.length === 1
             ? `${first.name} at ${first.storefront.name} has the same email`
-            : `${matches.length} store customers have the same email`;
+            : `${matches.length} customers at your locations have the same email`;
     return (
         <div
             role="note"

@@ -372,7 +372,7 @@ export function DetailsSheet({
                             options={[
                                 {
                                     value: "STOREFRONT",
-                                    label: "The storefront's rule",
+                                    label: "The location's rule",
                                 },
                                 { value: "OWN", label: "Its own rule" },
                             ]}

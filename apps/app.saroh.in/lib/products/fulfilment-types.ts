@@ -37,7 +37,7 @@ export function fulfilmentLine(
     types: readonly ProductFulfilmentType[] | undefined,
 ): string {
     const picked = inTableOrder(types ?? []);
-    if (picked.length === 0) return "Every way its storefronts offer";
+    if (picked.length === 0) return "Every way its locations offer";
     return FULFILMENT_CHOICES.filter((c) => picked.includes(c.value))
         .map((c) => c.label)
         .join(", ");

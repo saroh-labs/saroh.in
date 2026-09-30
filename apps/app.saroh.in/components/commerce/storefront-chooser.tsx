@@ -49,14 +49,14 @@ export function StorefrontChooser({
             {stores.length === 0 ? (
                 <EmptyState
                     icon={<StoreIcon />}
-                    title="No storefront yet"
-                    description="Everything you sell is sold at a storefront, so the first one comes first."
+                    title="No location yet"
+                    description="Everything you sell is sold at a location, so the first one comes first."
                     action={
                         <Link
                             href={newStorefrontHref}
                             className="font-medium underline-offset-4 hover:underline"
                         >
-                            Make a storefront
+                            Make a location
                         </Link>
                     }
                 />

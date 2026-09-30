@@ -14,7 +14,7 @@ import { movedWords } from "@/lib/stock/levels";
 import type { ProductStock, SizeStock } from "@/lib/stock/product-stock";
 
 /**
- * Move stock between storefronts, from the stock sheet (#523): only what
+ * Move stock between locations, from the stock sheet (#523): only what
  * isn't promised can go, and it goes as a pair of Moved entries in the
  * log. Its own write, made when Move is pressed — so it waits while the
  * sheet has unsaved counts, rather than mixing the two.
@@ -60,7 +60,7 @@ export function MoveStock({
         (!from || !to
             ? "Choose where from and where to."
             : from === to
-              ? "Choose two different storefronts."
+              ? "Choose two different locations."
               : units.trim() === ""
                 ? null
                 : !Number.isInteger(n) || n < 1
@@ -69,7 +69,7 @@ export function MoveStock({
                     ? `Only ${can} can move — the rest is promised to open orders.`
                     : null);
     const nameOf = (id: string) =>
-        stores.find(([sid]) => sid === id)?.[1] ?? "the storefront";
+        stores.find(([sid]) => sid === id)?.[1] ?? "the location";
 
     async function move() {
         if (problem || !size || Number.isNaN(n)) return;
@@ -101,7 +101,7 @@ export function MoveStock({
             className="mt-5 border-t border-border pt-4"
         >
             <h3 id="move-stock-title" className="text-[12.5px] font-semibold">
-                Move stock between storefronts
+                Move stock between locations
             </h3>
             <p className="mt-1 text-[11.5px] text-muted-foreground">
                 Only what isn&apos;t promised can move. It shows in the log as

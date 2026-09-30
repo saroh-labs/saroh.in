@@ -164,7 +164,7 @@ export function stockSubline(
             `${storefronts[0].name} and ${storefronts[1].name} count separately`,
         );
     } else if (storefronts.length > 2) {
-        parts.push(`${storefronts.length} storefronts count separately`);
+        parts.push(`${storefronts.length} locations count separately`);
     }
     parts.push("every change is logged");
     return parts.join(" · ");
@@ -296,7 +296,7 @@ export function moveProblem(input: {
 }): string | null {
     const { from, to, units } = input;
     if (!from || !to) return "Pick where it comes from and where it goes.";
-    if (from.storeId === to.storeId) return "Pick two different storefronts.";
+    if (from.storeId === to.storeId) return "Pick two different locations.";
     if (!from.has || from.onHand <= 0) {
         return `${from.name} has none of it on the shelf, so there's nothing to move.`;
     }

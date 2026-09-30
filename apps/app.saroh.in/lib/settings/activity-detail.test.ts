@@ -356,7 +356,7 @@ describe("activityDetail — what changed", () => {
             {
                 label: "Stock",
                 before: null,
-                after: "38 units set to 0 at 2 storefronts",
+                after: "38 units set to 0 at 2 locations",
             },
         ]);
         expect(
@@ -376,7 +376,7 @@ describe("activityDetail — what changed", () => {
             {
                 label: "Sold out by hand",
                 before: null,
-                after: "Cleared at 1 storefront",
+                after: "Cleared at 1 location",
             },
         ]);
         expect(
@@ -394,7 +394,7 @@ describe("activityDetail — what changed", () => {
             {
                 label: "Stock",
                 before: null,
-                after: "1,400 units set to 0 at 1 storefront",
+                after: "1,400 units set to 0 at 1 location",
             },
         ]);
         expect(
@@ -476,7 +476,7 @@ describe("activityDetail — what changed", () => {
             }),
         ).toEqual([
             { label: "Role", before: null, after: "Member" },
-            { label: "From storefront", before: null, after: "Hill Road" },
+            { label: "From location", before: null, after: "Hill Road" },
         ]);
         expect(
             rows({

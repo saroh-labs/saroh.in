@@ -11,7 +11,30 @@ import { formatStatus } from "@/lib/format/status";
 export const STOREFRONT_TEAM_ROLE = "storefront-team";
 
 /** Before the business has the role row to name it. */
-export const STOREFRONT_TEAM_LABEL = "Storefront team";
+export const STOREFRONT_TEAM_LABEL = "Location team";
+
+/**
+ * The name the API gives the role when it makes it. It is stored on each
+ * business's role row, so an older business still holds it (DEC-069, L10).
+ */
+const STORED_DEFAULT_LABEL = "Storefront team";
+
+/**
+ * A role's name as a merchant reads it (DEC-069: "location", never
+ * "storefront"). The stored default reads "Location team"; a name the
+ * business chose itself is shown as it is. Only the words on screen change —
+ * the stored label stays until the API renames it, and the role editor sends
+ * a label only when someone changes it, so reading this never writes it.
+ */
+export function shownRoleLabel(label: string): string;
+export function shownRoleLabel(
+    label: string | null | undefined,
+): string | null | undefined;
+export function shownRoleLabel(
+    label: string | null | undefined,
+): string | null | undefined {
+    return label === STORED_DEFAULT_LABEL ? STOREFRONT_TEAM_LABEL : label;
+}
 
 /**
  * Whether this role works only its own storefronts' orders (DEC-074): the

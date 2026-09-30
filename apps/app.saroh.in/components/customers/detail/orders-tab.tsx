@@ -68,7 +68,7 @@ export function OrdersTab({
                         <span>Order</span>
                         <span>What</span>
                         <span>Total</span>
-                        <span>Storefront</span>
+                        <span>Location</span>
                         <span>When</span>
                         <span>Status</span>
                     </div>

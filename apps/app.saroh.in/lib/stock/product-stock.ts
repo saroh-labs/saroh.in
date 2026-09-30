@@ -107,7 +107,7 @@ export function productStock(
     const sizes: SizeStock[] = rows.map((row) => {
         const shelves: ShelfLine[] = row.cells.filter(shows).map((c) => ({
             storeId: c.storeId,
-            name: names.get(c.storeId) ?? "A storefront",
+            name: names.get(c.storeId) ?? "A location",
             soldHere: c.soldHere,
             onHand: c.onHand,
             promised: c.promised,
@@ -189,7 +189,7 @@ export function warnsAt(size: SizeStock, split: boolean): string | null {
 /** The table's footnote. */
 export function stockFootnote(split: boolean): string {
     return split
-        ? "Each storefront counts its own stock. Promised is what open orders there have already taken."
+        ? "Each location counts its own stock. Promised is what open orders there have already taken."
         : "Promised is what open orders have already taken.";
 }
 

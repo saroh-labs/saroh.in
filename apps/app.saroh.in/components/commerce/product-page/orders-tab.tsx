@@ -133,7 +133,7 @@ export function ProductOrdersTab({
                                 <th scope="col">Order</th>
                                 <th scope="col">Customer</th>
                                 <th scope="col">What</th>
-                                <th scope="col">Storefront</th>
+                                <th scope="col">Location</th>
                                 <th scope="col">When</th>
                                 <th scope="col">Status</th>
                             </tr>

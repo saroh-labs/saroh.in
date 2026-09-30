@@ -36,9 +36,9 @@ export function logKinds(id: LogKindId): StockEntryKind[] | undefined {
     return kinds ? [...kinds] : undefined;
 }
 
-/** "Both storefronts", or "All storefronts" past two. */
+/** "Both locations", or "All locations" past two. */
 export function allStorefrontsWords(n: number): string {
-    return n === 2 ? "Both storefronts" : "All storefronts";
+    return n === 2 ? "Both locations" : "All locations";
 }
 
 // ---- Entries ----

@@ -78,14 +78,14 @@ const FIELD: Record<string, keyof FormValues | "targets"> = {
 
 const REACH: { value: DiscountReach; label: string }[] = [
     { value: "BUSINESS", label: "Everything" },
-    { value: "STOREFRONT", label: "Storefronts" },
+    { value: "STOREFRONT", label: "Locations" },
     { value: "COLLECTION", label: "Categories" },
     { value: "PRODUCT", label: "Products" },
 ];
 
 const REACH_NOTE: Record<DiscountReach, string> = {
-    BUSINESS: "Every order at every storefront.",
-    STOREFRONT: "Every order at the storefronts you choose.",
+    BUSINESS: "Every order at every location.",
+    STOREFRONT: "Every order at the locations you choose.",
     COLLECTION:
         "Only the lines in the categories you choose — and the categories inside them.",
     PRODUCT: "Only the lines for the products you choose.",
@@ -428,7 +428,7 @@ export function DiscountForm({
                                     }}
                                     placeholder={
                                         mode === "STOREFRONT"
-                                            ? "Choose storefronts"
+                                            ? "Choose locations"
                                             : mode === "COLLECTION"
                                               ? "Choose categories"
                                               : "Choose products"

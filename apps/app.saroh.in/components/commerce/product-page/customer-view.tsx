@@ -282,7 +282,7 @@ export function toShopData(
         returns: shown("returns")
             ? product.returnsMode === "OWN"
                 ? product.returnsText
-                : "The storefront's rule"
+                : "The location's rule"
             : null,
         images: product.images.map((i) => ({
             id: i.id,

@@ -119,7 +119,7 @@ describe("the Levels table", () => {
         );
         expect(
             stockSubline("Rye", [{ name: "A" }, { name: "B" }, { name: "C" }]),
-        ).toBe("Rye · 3 storefronts count separately · every change is logged");
+        ).toBe("Rye · 3 locations count separately · every change is logged");
     });
 
     it("words the footer and the empty table", () => {
@@ -210,7 +210,7 @@ describe("Move stock", () => {
 
     it("refuses the same storefront, a bad number, and promised units", () => {
         expect(moveProblem({ from: hill, to: hill, units: "2" })).toBe(
-            "Pick two different storefronts.",
+            "Pick two different locations.",
         );
         expect(moveProblem({ from: hill, to: online, units: "" })).toBe(
             "How many to move — a whole number.",

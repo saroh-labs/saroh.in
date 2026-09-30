@@ -54,7 +54,7 @@ describe("stopTrackingConfirm", () => {
     it("names the product, the count going to 0 and the verb", () => {
         const c = stopTrackingConfirm("Rye loaf");
         expect(c.title).toBe("Stop tracking Rye loaf?");
-        expect(c.description).toMatch(/goes to 0 at every storefront/);
+        expect(c.description).toMatch(/goes to 0 at every location/);
         expect(c.description).toMatch(/starts from 0/);
         // Untracked is no longer "always available": it can be marked.
         expect(c.description).not.toMatch(/always available/);

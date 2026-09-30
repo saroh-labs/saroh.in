@@ -54,7 +54,7 @@ export function ProductDiscountsTab({
             <TabState
                 icon={Tag}
                 title="No discounts reach it yet"
-                description="A code set on this product, its category, the storefront or everything in the shop shows here."
+                description="A code set on this product, its category, the location or everything in the shop shows here."
             >
                 <StateLink href="/commerce/discounts">Open Discounts</StateLink>
             </TabState>
@@ -65,7 +65,7 @@ export function ProductDiscountsTab({
         <div>
             <p className="mb-3 text-pretty text-[12.5px] text-muted-foreground">
                 Discounts that reach this product — set on it, its category, the
-                storefront or everything. Set up in Discounts.
+                location or everything. Set up in Discounts.
             </p>
             <ul className="flex flex-col gap-2.5">
                 {discounts.data.map((d) => {

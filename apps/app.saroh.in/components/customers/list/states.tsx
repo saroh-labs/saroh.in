@@ -84,7 +84,7 @@ export function ListFirstRun({
                     {hasStorefront ? null : (
                         <Button asChild>
                             <Link href={newStorefrontHref}>
-                                Create a storefront
+                                Create a location
                             </Link>
                         </Button>
                     )}

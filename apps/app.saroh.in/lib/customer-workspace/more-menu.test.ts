@@ -50,7 +50,7 @@ describe("moreMenu", () => {
             }),
         ).toEqual([
             "Merge with a duplicate…",
-            "Link a store customer…",
+            "Link a customer from a location…",
             "This isn't them…",
             "Delete their record…",
         ]);
@@ -75,7 +75,7 @@ describe("moreMenu", () => {
                 canLink: true,
                 canUnlink: false,
             }),
-        ).toEqual(["Link a store customer…", "Delete their record…"]);
+        ).toEqual(["Link a customer from a location…", "Delete their record…"]);
     });
 
     it("gives a role that may merge but not edit Merge alone", () => {
@@ -123,7 +123,7 @@ describe("moreMenu", () => {
         );
         expect(items.map((i) => i.label)).toEqual([
             "Merge with a duplicate…",
-            "Link a store customer…",
+            "Link a customer from a location…",
             "Delete their record…",
             "Remove their details (privacy request)…",
         ]);
