@@ -1208,6 +1208,7 @@ updated". `test/global-setup.ts` re-runs the (idempotent) grants.
 the pattern doc saying why not. A new CI job lands with its prepush step.
 **Category**: tooling · `scripts/prepush.sh`, `scripts/e2e-affected.mjs`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
 ## Integration — a probe role failed DROP ROLE beside another test database (K1)
 
 **Problem**: `prepush --int` failed `public-catalogue.db.spec.ts` in teardown
@@ -1224,6 +1225,7 @@ database being torn down.
 **Rule**: a spec that creates a role must not fail when another database still
 uses it — drop it tolerantly, or give it a per-database name.
 **Category**: tests · integration · parallel databases
+
 ## Copy — the service editor matched an API refusal by its words (DEC-069 L11)
 
 **Problem**: Rewording the API's "Treatments are sold as orders — add a
@@ -1241,6 +1243,7 @@ storefront, so a copy change there is visible in review.
 when an old app still compares words, change both sides together and expect
 an old app to fall back to the toast until it is redeployed.
 **Category**: copy · API contract · DEC-069
+
 ## Sites — every new site opened with broken images (DEC-070 K10)
 
 **Problem**: A site made from the starter template (Turn on Website, or
@@ -1263,6 +1266,7 @@ shown "Starter" twice in the picker, which keys options by id.
 media library served, never a path an app is assumed to have. Render a new
 template in a test, not only parse it (K12–K14 follow the same test).
 **Category**: sites · templates · DEC-070
+
 ## E2E stack — the API's renderer links pointed at production (DEC-069 L6)
 
 **Problem**: a pay page opened on a tenant host in the CI and prepush e2e
@@ -1279,6 +1283,7 @@ stack's renderer.
 **Rule**: an origin the API hands to customers is set in every stack that
 runs the API; a spec that follows a link asserts it stays on the stack.
 **Category**: e2e · environment · `docs/patterns/devops-environments-and-flags.md`
+
 ## Sites — a Shop page can't be shown in the browser suite (DEC-069, L13)
 
 **Problem**: L13's plan asked for a browser spec: turn on Sell with Delivery
@@ -1298,6 +1303,7 @@ business by an override.
 flag is on in the e2e seed; if it isn't, plan the proof as a db spec, or
 seed the flag for Northwind first.
 **Category**: testing · feature flags · DEC-069
+
 ## Tooling — a killed `eslint --fix` left three source files empty (L9)
 
 **Symptom**: after a machine restart, a unit worktree's uncommitted
@@ -1312,6 +1318,7 @@ new files were rewritten.
 (`find apps -path '*/node_modules' -prune -o -type f -empty -print`), and
 commit work in progress before a long `--fix` run.
 **Category**: tooling · worktrees
+
 ## CI — four reds on batch 4 (#765) that the local gate passed
 
 **Problem**: `pnpm prepush --all` passed; CI failed four jobs. (1) Unit:
@@ -1349,6 +1356,7 @@ evidence, never on absence. Run `TEST_RLS=on` for any spec touching a
 cross-business read, and the permission suite for anything on Team, until
 `scripts/prepush.sh` runs both.
 **Category**: CI · tests · RLS · a11y
+
 ## Capabilities — the annotation spec counted a decorator named in a comment
 
 **Problem**: after K6 (DEC-070) moved the Payments gate off `InvoicesController`
@@ -1366,3 +1374,25 @@ whose mocked Prisma lacks it with a TypeError, not a clear failure — add
 `organizationModule: { findFirst: jest.fn().mockResolvedValue(null) }` (no
 row reads as on).
 **Category**: tests · capabilities · mocks
+
+## Invoices — a rule moved, and the sentences that described it stayed
+
+**Problem**: after K6 (DEC-070) made invoices work without Payments, three
+places still said the old rule: turning Payments off promised "their pay
+links still work" (`module-deactivation-impact.ts`), the Modules list said
+Payments is where you "send invoices", and the workspace offered "Copy pay
+link" and "Issue with pay link" from a connected provider alone — a link the
+API now refuses with Payments off.
+**Root cause**: the rule was changed where it is enforced, and the words and
+the workspace's own guesses (`online.providerConnected`) were not searched
+for. `navRowsForModule` also listed Invoices as a Payments row, so turning
+Payments off would have said Invoices go with it.
+**Fix**: K7 reads `send.payOnline` (`paysOnline` in `lib/invoices/send.ts`)
+for every pay-link offer on an invoice, `payLinkPossible` for New and Edit,
+rewords the impact line and the Modules note, and a rail row can stand in
+for a module's page while it is off (`unlessModule`), which
+`navRowsForModule` skips.
+**Rule**: when a gate moves, grep the copy for the old promise ("pay link",
+"with Payments") as well as the code, and let the workspace read the API's
+flag rather than rebuild the rule from a provider list.
+**Category**: copy · invoices · nav

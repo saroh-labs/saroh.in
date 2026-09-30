@@ -307,9 +307,9 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
             say: (c) => {
                 if (c === undefined) return null;
                 if (c === null)
-                    return "We couldn't count your unpaid invoices. They stay open, and their pay links still work.";
+                    return "We couldn't count your unpaid invoices. They stay open, and their links show the invoice with no Pay button until it's back on.";
                 if (c.count === 0) return null;
-                return `${n(c.count, "unpaid invoice stays", "unpaid invoices stay")} open, and ${c.count === 1 ? "its pay link still works" : "their pay links still work"}.`;
+                return `${n(c.count, "unpaid invoice stays", "unpaid invoices stay")} open, and ${c.count === 1 ? "its link shows" : "their links show"} the invoice with no Pay button until it's back on.`;
             },
         },
         {
