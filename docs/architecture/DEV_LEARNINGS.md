@@ -1136,3 +1136,25 @@ renewal PDF against a real database.
 reading it as a number. `docs/patterns/backend-billing-and-classes.md` → GST
 shows only when it applies.
 **Category**: invoices · GST · DEC-072
+
+## E2E — "book into the new gap" failed on phone every Wednesday
+
+**Problem**: `bookings.spec.ts` "open extra hours on a closed stretch, then
+book into the new gap" failed on `phone-serial` on 2026-09-30, twice the
+same way: the gap's New booking dialog showed no Service it could pick.
+**Root cause**: the test, not the product. It booked "two days ahead" on
+desk and "three days ahead" on phone. A one-to-one start is the person's
+hours intersected with the service's own weekly rules (ADR-008), and the
+seeded Northwind services run Mon–Fri 09:00–17:00 — so on a Wednesday the
+phone opened hours on a Saturday, where the service has no time, and the
+dialog greyed it out exactly as designed ("outside the service's own
+hours"). On a Thursday or Friday the desk copy would have failed too.
+**Fix**: the test reads the service's rules (`GET
+/services/:id/rules`) and takes the first two days, two or more ahead, on
+which the service runs — the desk the first, the phone the second — and
+checks the booking over that one day rather than "the next four days".
+**Rule**: a spec never books "N days from today": N days on is a different
+weekday every day of the week. Take a day the service is known to run
+(its rules), or a day the test makes open. `.agents/skills/saroh-browser-tests/SKILL.md`
+→ Times and slots are claimed, not assumed.
+**Category**: tests · e2e · dates

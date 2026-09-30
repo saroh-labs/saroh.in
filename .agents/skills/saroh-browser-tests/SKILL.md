@@ -186,6 +186,10 @@ the `@serial` tests one at a time. Every new spec follows these rules:
   yours (`bookOwn`). A visitor on a merchant's site gets an address per
   worker (`asNewVisitor`), since the site limits bookings and codes by
   address.
+- **Days are chosen, not counted.** "Three days from today" is a Saturday
+  every Wednesday, and Northwind's seeded services run Mon–Fri. Book on a
+  day the service's rules say it runs (`serviceDays` in `bookings.spec.ts`)
+  or one the test opens itself.
 - A click that cannot land fails after 15s (`actionTimeout`), not at the
   test's timeout.
 
