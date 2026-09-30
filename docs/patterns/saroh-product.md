@@ -136,6 +136,9 @@ pattern files refer back here.
   (`ONLINE`: stock kept for online orders). A location has no public address
   of its own. The four addresses are named apart: _web address_,
   _registered address_, _location address_ and the blog's _posts path_.
+  A page's or a post's own part of the link is its _path_ ("Page path",
+  "Post path", "Change its path"), never its address; the web address has
+  one place, Settings › Business › Identity's Web address card.
 - **Current** — **Opening hours are edited once, for every storefront**
   (DEC-034): Business → Hours reads the first storefront's week and Save
   writes it to all of them, saying so first when their weeks differ.
