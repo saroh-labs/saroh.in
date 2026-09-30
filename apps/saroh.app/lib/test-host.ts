@@ -66,6 +66,24 @@ function tokenOf(value: string | null | undefined): string | null {
     return token && TOKEN_SHAPE.test(token) ? token : null;
 }
 
+/** The origin the visitor's browser is on: its scheme, host and port. */
+function visitorOrigin(req: NextRequest): string {
+    const forwarded = req.headers
+        .get("x-forwarded-proto")
+        ?.split(",")[0]
+        ?.trim()
+        .toLowerCase();
+    const scheme =
+        forwarded === "https" || forwarded === "http"
+            ? forwarded
+            : req.nextUrl.protocol.replace(/:$/, "");
+    // The Host the browser sent (an empty one counts as none).
+    const host =
+        [req.headers.get("host")?.trim(), req.nextUrl.host].find(Boolean) ??
+        req.nextUrl.host;
+    return `${scheme}://${host}`;
+}
+
 function withTestHeaders<T extends Response>(res: T): T {
     for (const [key, value] of Object.entries(TEST_HOST_RESPONSE_HEADERS)) {
         res.headers.set(key, value);
@@ -132,9 +150,11 @@ export function testHostResponse(
         const params = new URLSearchParams(url.search);
         params.delete(TEST_RELEASE_PARAM);
         const query = params.toString();
-        // Relative, so the browser keeps the scheme and host it is on; the
-        // server behind a proxy may not know either.
-        const location = `${url.pathname}${query ? `?${query}` : ""}`;
+        // Absolute, because the edge runtime refuses a relative Location
+        // ("Invalid URL"). Built from what the browser asked for: its Host
+        // (port kept) and the scheme the proxy in front says it used, since
+        // the server behind portless or Vercel's edge sees plain http.
+        const location = `${visitorOrigin(req)}${url.pathname}${query ? `?${query}` : ""}`;
         const res = new NextResponse(null, {
             status: 303,
             headers: { location, "cache-control": "no-store" },

@@ -95,7 +95,7 @@ describe("middleware: a test release's host (DEC-071, T5)", () => {
     it("moves ?release= into the host-only cookie and redirects without it", () => {
         const res = middleware(request(`${HOST}/shop?release=${TOKEN}&page=2`));
         expect(res.status).toBe(303);
-        expect(res.headers.get("location")).toBe("/shop?page=2");
+        expect(res.headers.get("location")).toBe(`${HOST}/shop?page=2`);
         const cookie = res.headers.get("set-cookie") ?? "";
         expect(cookie).toContain(`${TEST_RELEASE_COOKIE}=${TOKEN}`);
         expect(cookie).toMatch(/HttpOnly/i);
@@ -110,8 +110,29 @@ describe("middleware: a test release's host (DEC-071, T5)", () => {
     it("sets no cookie for a token that isn't shaped like one", () => {
         const res = middleware(request(`${HOST}/?release=%3Cscript%3E`));
         expect(res.status).toBe(303);
-        expect(res.headers.get("location")).toBe("/");
+        expect(res.headers.get("location")).toBe(`${HOST}/`);
         expect(res.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("redirects to the scheme and port the visitor used, behind a proxy", () => {
+        const res = middleware(
+            request(
+                `http://test--northwind.saroh.app.localhost:4012/?release=${TOKEN}`,
+                {
+                    host: "test--northwind.saroh.app.localhost",
+                    "x-forwarded-proto": "https",
+                },
+            ),
+        );
+        expect(res.headers.get("location")).toBe(
+            "https://test--northwind.saroh.app.localhost/",
+        );
+        const bare = middleware(
+            request(`http://test--northwind.localhost:3005/?release=${TOKEN}`),
+        );
+        expect(bare.headers.get("location")).toBe(
+            "http://test--northwind.localhost:3005/",
+        );
     });
 
     it("passes the cookie's token on to the site, and strips a forged header", () => {

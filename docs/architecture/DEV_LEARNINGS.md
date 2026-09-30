@@ -1487,6 +1487,7 @@ asserts), it passes without checking them.
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
 worth the same change.
 **Category**: e2e · tests
+
 ## E2E — a business a test sets up has no modules and no rollout flags (L4)
 
 **Problem**: L4's browser spec had to change a web address on a business of
@@ -1506,6 +1507,7 @@ forwarded. The forwarding half (the new host serves, the old one answers 307) wa
 **Rule**: before planning a spec on a business the test makes, check which
 flags it will have. Only a flag with a seeded global default reaches it.
 **Category**: e2e · flags · DEC-069
+
 ## Gate — the shared browser worktree ran a spec this tree doesn't have (T4)
 
 **Symptom**: T4's `pnpm prepush --e2e` failed on
@@ -1522,3 +1524,21 @@ files (node_modules, .next) stay, so the build cache is kept.
 **Rule**: a failing browser spec that isn't in `e2e/tests` of your tree is
 the shared worktree's leftover, not your change.
 **Category**: gate · parallel units
+
+## Renderer — a page's metadata inherits the layout's share card (T5)
+
+**Symptom** (found while building, not shipped): stripping the share card
+in the tenant layout alone would leave each page's own `og:*` tags on a
+test host, and stripping it in the pages alone would leave the layout's.
+**Cause**: Next merges metadata down the tree. A key a page leaves out is
+inherited from the layout, and a key a page sets replaces the layout's. So
+the share card has to go at every level that writes one: the tenant layout
+and each page with its own `generateMetadata` (`[slug]`, the post, `/shop`,
+the product, `/book`).
+**Fix**: every one of them returns through `shareable(resolved, meta)`
+(`apps/saroh.app/lib/test-metadata.ts`), which on a test host keeps only the
+title and adds `noindex` and `no-referrer`. `site-test-release.spec.ts`
+asserts no `og:title`.
+**Rule**: a new tenant route that writes `openGraph` or `twitter` returns
+through `shareable`.
+**Category**: renderer · metadata · DEC-071
