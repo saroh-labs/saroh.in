@@ -66,6 +66,17 @@ describe("shownCatalogue (DEC-073)", () => {
         expect(shown?.groups).toEqual(catalogue.groups);
     });
 
+    it("hides only on evidence: a module the list doesn't name still shows", () => {
+        // Sell isn't in the list at all: its permissions show. Automations
+        // stays hidden whether it is listed or not (DEC-068).
+        const shown = shownCatalogue(catalogue, [mod("CLASS_PACKS", false)]);
+        expect(labels(shown)).toEqual([
+            "Change business details",
+            "See orders",
+            "See customers",
+        ]);
+    });
+
     it("keeps a permission several parts share", () => {
         expect(moduleOfAction("contact:read")).toBeNull();
         expect(moduleOfAction("org:update")).toBeNull();
