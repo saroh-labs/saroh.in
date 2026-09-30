@@ -279,8 +279,11 @@ test.describe("a reviewer and a test release", () => {
 
             // The owner, in a context of their own: makes the release and
             // edits the draft through the API, and reads the editor.
+            // At the desk, whichever project runs this: the reviewer is
+            // the one on the phone.
             const ownerContext = await browser.newContext({
                 ignoreHTTPSErrors,
+                viewport: { width: 1440, height: 900 },
             });
             const owner = await ownerContext.newPage();
             await useSession(owner);
@@ -389,15 +392,27 @@ test.describe("a reviewer and a test release", () => {
                 // The release still reads Approved, in the editor's panel.
                 await owner.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
                 await owner.goto(`${urls.APP_URL}/sites/${siteId}`);
-                await owner
-                    .getByRole("button", { name: "More test release actions" })
-                    .click();
-                await owner
-                    .getByRole("menuitem", { name: /^Test releases/ })
-                    .click();
-                const row = owner
-                    .getByRole("dialog", { name: "Test releases" })
-                    .getByRole("listitem", { name });
+                // The editor redraws its top bar while it settles, so the
+                // menu is opened until the panel shows, as T11's spec does.
+                const releasesPanel = owner.getByRole("dialog", {
+                    name: "Test releases",
+                });
+                await expect(async () => {
+                    if (!(await releasesPanel.isVisible())) {
+                        await owner
+                            .getByRole("button", {
+                                name: "More test release actions",
+                            })
+                            .click({ timeout: 2_000 });
+                        await owner
+                            .getByRole("menuitem", { name: /^Test releases/ })
+                            .click({ timeout: 2_000 });
+                    }
+                    await expect(releasesPanel).toBeVisible({
+                        timeout: 2_000,
+                    });
+                }).toPass({ timeout: 30_000 });
+                const row = releasesPanel.getByRole("listitem", { name });
                 await expect(row).toContainText(/Approved by /);
                 await expect(row).toContainText("Your draft has changed since");
 
