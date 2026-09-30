@@ -1,3 +1,6 @@
+// @covers app:/ app:/sites app:/sites/[siteId]/review app:/settings/organization app:/settings/people
+// @covers app:/contacts app:/commerce/orders app:/commerce/products app:/bookings app:/bookings/all
+// @covers app:/billing/invoices app:/billing/subscriptions
 import type { BrowserContext } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

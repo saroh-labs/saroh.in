@@ -178,8 +178,9 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
 4. **Run `pnpm prepush --all` on the batch** before it leaves the machine.
    It runs gitleaks, lint, typecheck, the `check:*` scripts, unit tests and
    vitest, then the API integration tests in shards (a full `test:int` run
-   can crash a worker), and the browser specs for the screens the batch
-   touched on both `desk` and `phone`. The browser step is a copy of CI's
+   can crash a worker), plain and again under RLS, the browser specs for the
+   screens the batch touched on both `desk` and `phone`, and the permission
+   specs they reach on the app's production build. The browser step is a copy of CI's
    seeded-stack job, not of `pnpm dev`: from a detached worktree of HEAD it
    re-creates `E2E_DATABASE_URL` (a throwaway `*test*` database), migrates
    it, seeds the showcase while building the api, accounts, app and
@@ -276,8 +277,37 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
   `PREPUSH_E2E_LOCK_WAIT` seconds (1800), then fails clearly; it checks the
   ports only once it holds the lock. Teardown stops the PIDs its own run
   started and their children, never "whatever listens on 3000".
-- **Not mirrored:** CI also runs the integration suite under RLS
-  (`TEST_RLS=on`); the local gate runs it plain only.
+- **Both integration modes** (2026-09-30). CI runs every integration spec
+  twice, plain and under RLS (`TEST_RLS=on`: the schema from the migrations,
+  a NOBYPASSRLS role, every service call in its org context). `--int` does
+  too: plain first, then the same selection under RLS (less the three
+  owner-DDL backfill specs the RLS config leaves out), on the same
+  `PREPUSH_INT_DBS` databases and the same sharding. Never side by side:
+  every shard's reset takes ~800 locks in one transaction from a lock table
+  every database shares, and twice the resets at once can end in "out of
+  shared memory". Each mode has its own pass (`int:affected`/`int`,
+  `int-rls:affected`/`int-rls`), so a tree that passed plain re-runs only
+  RLS. The RLS role is one per cluster and each shard re-sets its password;
+  Homebrew's Postgres trusts local connections, but one that checks
+  passwords needs `PREPUSH_INT_DBS=1`.
+- **The permission suite** (2026-09-30). CI's "Permission states
+  (production build)" runs `e2e/permissions/` against the app's production
+  build (`turbo run build`, then `next start` on 3004) and a fake api on
+  3334 that answers per role, started by Playwright's `webServer`
+  (`e2e/permissions.config.ts`). It never uses the seeded stack, and its
+  `NEXT_PUBLIC_*` urls point at the fake api, so its build can't be the
+  browser step's. `--e2e` runs it the same way, after the browser specs, in
+  the same worktree of HEAD and under the same lock (one production build
+  of the app at a time), with CI's env and nothing from the shell but
+  `PATH`, `HOME`, `USER`, `TMPDIR` and `LANG`. Specs are chosen by
+  `@covers`, like the browser specs
+  (`node scripts/e2e-affected.mjs --suite permissions`): each names the app
+  routes it opens, so a change to Team, roles, the nav or a screen's
+  permission gate reaches it through the import scan, and its config, fake
+  api, the ui and auth packages, tooling and root configs pick it whole. No
+  api file does: the suite never runs the api. Its pass is
+  `e2e-permissions:affected` (`e2e-permissions` under `--full`), keyed on
+  HEAD's tree.
 
 Measured on the 12-core Mac on 2026-09-29, on a batch 209 files ahead of
 development (the browser step picked 25 spec files):
@@ -292,6 +322,20 @@ development (the browser step picked 25 spec files):
 These are full runs. A batch that changes the schema, seed or CI still gets
 them, as batch 2 did. For a batch that touches a few screens and modules,
 see the targeted timings above.
+
+What the two CI mirrors added on 2026-09-30 (the same Mac, batch 4's tip,
+PREPUSH_KEEP_DEV=1):
+
+| Step                        | Typical tree (one screen + one api file)                 | Full run (`--all` on the batch: whole suite, every spec)                          |
+| --------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `int-rls` after plain `int` | +26s (30 of 388 specs, 10 shards; plain took 16s)        | +98s under `--int` (plain 85s); under `--all` 161s, hidden behind the browser run |
+| `e2e-permissions` after e2e | +83s (1 spec file, 36 tests, the app's build from turbo) | +102s (both files, 44 tests, the app built fresh for the new tree)                |
+| `--all` end to end          | —                                                        | 392s: browser 286s then permissions 102s; int + int-rls (321s) ran beside them    |
+
+The app's production build for the permission suite takes about 20s when
+Next's own cache is warm, and replays from turbo on a tree that has passed
+it. One of four runs took 17.8 min in Playwright for the same 36 tests,
+unexplained; the other three took 77–102s.
 
 A small app change costs about 30s because ESLint over `app.saroh.in` takes
 27s on its own. ESLint's `--cache` would cut that to seconds, but the config
