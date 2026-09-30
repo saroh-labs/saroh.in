@@ -28,7 +28,7 @@ export async function invoicePayOnline(
             select: { id: true },
         }),
     ]);
-    return on && provider !== null;
+    return on && provider != null;
 }
 
 /** What the pay page's payment routes answer when {@link invoicePayOnline} is false. */
