@@ -277,6 +277,21 @@ export async function listInvoices(): Promise<CappedList<Invoice>> {
 }
 
 /**
+ * Whether the business has made any invoice yet: Home's "Invoice a client"
+ * (DEC-070) goes once it has. Null when the API couldn't answer — a refusal
+ * or a failure — so the caller decides what an unknown means; nothing here
+ * throws, since Home must not break over a first-run card.
+ */
+export async function hasAnyInvoice(): Promise<boolean | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const res = await apiFetch(`${base}/invoices`).catch(() => null);
+    if (!res?.ok) return null;
+    const rows = (await res.json().catch(() => null)) as unknown;
+    return Array.isArray(rows) ? rows.length > 0 : null;
+}
+
+/**
  * The invoices paid from `since` on, credit notes never — Home's "Last 24
  * hours" money, filtered by the API (H-7) rather than over the capped
  * newest page, where an invoice made months ago and paid this morning is

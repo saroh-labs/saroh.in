@@ -8,8 +8,13 @@ import { ReviewerHome } from "@/components/home/reviewer-home";
 import { StaffHome } from "@/components/home/staff-home";
 import { PageContainer } from "@/components/shared/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
+import type { InvoiceJobFacts } from "@/lib/home/first-run";
+import { mayWriteInvoices } from "@/lib/home/first-run";
 import { getHome } from "@/lib/home/service";
+import { hasAnyInvoice } from "@/lib/invoices/service";
 import { listModules } from "@/lib/modules/service";
+import type { OrganizationKind } from "@/lib/organizations/kind";
+import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
 import type { Organization } from "@/lib/organizations/service";
 import {
     listOrganizations,
@@ -87,6 +92,11 @@ export default async function Home() {
     }
 
     const setup = home.hasAnyModule ? await loadSetup(business) : null;
+    // What is being set up (DEC-070) orders and words the first-run jobs.
+    const kind = kindOf(business?.kind);
+    const invoicing = home.hasAnyModule
+        ? undefined
+        : await loadInvoicing(business, kind);
 
     return (
         // A dashboard, so the width matches the other data screens rather than
@@ -106,10 +116,27 @@ export default async function Home() {
                     modules={modules}
                     businessName={business?.name ?? "This business"}
                     setup={setup}
+                    kind={kind}
+                    invoicing={invoicing}
                 />
             </div>
         </PageContainer>
     );
+}
+
+/**
+ * "Invoice a client" (DEC-070), for a kind whose first run offers it: to
+ * someone who may write invoices, until the business has one. The invoice
+ * read happens only then, and a read that fails leaves the card offered.
+ */
+async function loadInvoicing(
+    business: Organization | null,
+    kind: OrganizationKind,
+): Promise<InvoiceJobFacts | undefined> {
+    if (!firstRunOrder(kind).includes(INVOICE_JOB)) return undefined;
+    if (!mayWriteInvoices(business))
+        return { mayWrite: false, hasInvoice: null };
+    return { mayWrite: true, hasInvoice: await hasAnyInvoice() };
 }
 
 /**

@@ -163,6 +163,33 @@ describe("Home's first run", () => {
         expect(opened()).toBe("APPOINTMENTS");
         expect(setModuleStatusAction).not.toHaveBeenCalled();
     });
+
+    it("Invoice a client is a link to a new invoice, and opens no sheet (DEC-070)", () => {
+        const jobs = firstRunJobs(ALL_OFF, "SOLO", {
+            mayWrite: true,
+            hasInvoice: false,
+        });
+        act(() => root.render(<FirstRunJobs modules={ALL_OFF} jobs={jobs} />));
+        const link = Array.from(document.querySelectorAll("a")).find((a) =>
+            a.textContent.includes("Invoice a client"),
+        );
+        expect(link?.getAttribute("href")).toBe("/billing/invoices/new");
+        expect(link?.textContent).toContain("Nothing to turn on");
+        expect(link?.textContent).not.toContain("Adds");
+        // The cards read in the kind's order: Bookings, then the invoice.
+        const cards = Array.from(
+            document.querySelectorAll("section .grid > *"),
+        ).map((c) => c.querySelector("span")?.textContent);
+        expect(cards.slice(0, 3)).toEqual([
+            "Take bookings",
+            "Invoice a client",
+            "Keep track of clients",
+        ]);
+        expect(document.body.textContent).toContain(
+            "Most add their own rows to the sidebar",
+        );
+        expect(opened()).toBeNull();
+    });
 });
 
 describe("/onboarding/modules", () => {
