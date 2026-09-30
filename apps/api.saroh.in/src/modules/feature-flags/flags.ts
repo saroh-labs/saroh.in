@@ -80,6 +80,16 @@ export const FlagKey = {
      * Deleted with those readers one release after it is on for everyone.
      */
     SITE_TEST_RELEASES: "SITE_TEST_RELEASES",
+
+    /**
+     * Changing a business's web address (DEC-069, plan L2): off, the owner
+     * can't change it (`PUT organizations/:id/web-address` answers 403) and
+     * Settings shows no Change button. Two readers: that endpoint, and the
+     * read's `canChange` (`organizations/web-address.service.ts`). It goes
+     * on only once the renderer forwards an old address (plan L3) in
+     * production, first for one business, then for everyone.
+     */
+    WEB_ADDRESS_CHANGE: "WEB_ADDRESS_CHANGE",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -177,5 +187,13 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "Test releases are on for every business on every instance, have needed no kill switch for a release, and the flag's five readers (release endpoints, test-host lookup, scheduling, the editor panel and the settings row) have been removed.",
+    },
+    WEB_ADDRESS_CHANGE: {
+        purpose:
+            "Lets a business's owner change its web address in Settings; the old address forwards for 90 days and stays held for the business. Turn it on only once the renderer forwards an old address in production, first for one business; off, the address can't be changed and no Change button shows.",
+        owner: "Release manager",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Changing the address has been on for every business on every instance for a release, and its two readers (the change endpoint and the read's canChange) no longer ask it.",
     },
 };

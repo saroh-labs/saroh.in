@@ -68,6 +68,9 @@ describe("capability catalogue", () => {
         // has exactly one person who can always get back in" untrue.
         const grantable = grantableCapabilities().map((c) => c.action);
         expect(grantable).not.toContain("org:delete");
+        // Changing the web address holds an address and moves every shared
+        // link (DEC-069): the Owner's alone too.
+        expect(grantable).not.toContain("org:address:update");
     });
 
     it("offers everything else", () => {

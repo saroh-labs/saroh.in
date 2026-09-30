@@ -85,6 +85,13 @@ export const CAPABILITIES: readonly Capability[] = [
         ownerOnly: true,
     },
     {
+        action: "org:address:update",
+        group: "business",
+        label: "Change the web address",
+        note: "The old address forwards to the new one for 90 days.",
+        ownerOnly: true,
+    },
+    {
         action: "audit:read",
         group: "business",
         label: "Read the activity log",

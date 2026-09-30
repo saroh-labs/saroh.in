@@ -42,6 +42,15 @@ export async function siteOriginOf(
         : null;
 }
 
+/**
+ * A web address on the renderer's apex, as an origin:
+ * `https://<address>.saroh.app` (`.saroh.app.localhost` in dev). Whether
+ * anything is served there is the caller's question.
+ */
+export function platformOrigin(address: string): string {
+    return `https://${address}.${rendererHost()}`;
+}
+
 /** The renderer's apex host: `saroh.app`, or `saroh.app.localhost` in dev. */
 function rendererHost(): string {
     const base =

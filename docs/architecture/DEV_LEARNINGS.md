@@ -1403,3 +1403,16 @@ landed) are re-gated when they land together: run `pnpm prepush --int`
 per unit. A uniqueness check across businesses reads outside the org
 context (`docs/patterns/backend-data-and-money.md`).
 **Category**: gate · RLS · copy
+## Merges — a new guard and a new string landed in one batch, and the guard failed (L2)
+
+**Symptom**: on `batch-2026-09-30-5`, `src/common/merchant-copy.spec.ts`
+(L11) failed on `orders/order-location.ts`: "Your role moves only your
+storefront's orders."
+**Cause**: DEC-074's location-team refusal and L11's "API prose never says
+storefront" guard were built in parallel; each passed alone, and the merge
+put them together with nothing re-running the unit suite on the result.
+**Fix**: the refusal says "your location's orders" (L2's first commit).
+**Rule**: after merging a unit that adds a guard test (a source scan, a
+catalogue check), run the API unit suite on the batch before starting the
+next wave from it.
+**Category**: merges · testing · DEC-069

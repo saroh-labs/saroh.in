@@ -76,6 +76,10 @@ export const AuditAction = {
     // channel, and on or off as it was and became. Their own choice, about
     // no one else, so it carries the value.
     MemberAlertsUpdate: "member.alerts.update",
+    // The owner changed the business's web address (DEC-069, plan L2),
+    // written in the change's own transaction. Metadata: `from` and `to`,
+    // the addresses — public by nature, never a person's detail.
+    OrganizationAddressChanged: "organization.address_changed",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

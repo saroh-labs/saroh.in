@@ -5,6 +5,8 @@ import { hashClientIp } from "../../common/client-ip";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { PublicVisit } from "./public-visit.service";
 import { PublicVisitService } from "./public-visit.service";
+import type { SiteMoved } from "./site-moved";
+import { siteMovedTo } from "./site-moved";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
 
@@ -53,6 +55,23 @@ export class PublicSitesController {
     @Get("by-subdomain/:subdomain")
     bySubdomain(@Param("subdomain") subdomain: string) {
         return this.sites.getPublicationBySubdomain(subdomain);
+    }
+
+    /**
+     * Where an old web address forwards to (DEC-069, plan L2): `{ to }`, the
+     * site's origin now, while the address's 90 days last; else a 404. The
+     * renderer asks only when a host has no live site. Declared before the
+     * `:siteId/…` reads, so an address such as `posts` is never taken for a
+     * site id. Rate-limited per visitor, like the Visit us read.
+     */
+    @Get("moved/:address")
+    @Header("Cache-Control", "no-store")
+    moved(
+        @Param("address") address: string,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<SiteMoved> {
+        return siteMovedTo(address, visitorKey(ip, relay));
     }
 
     /**
