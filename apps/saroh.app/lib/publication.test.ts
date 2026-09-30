@@ -45,6 +45,11 @@ describe("movedAddressOf", () => {
         expect(movedAddressOf("a.rye.saroh.app")).toBeNull();
         expect(movedAddressOf(null)).toBeNull();
     });
+
+    it("is null for a test host, which names a release, not an old address", () => {
+        expect(movedAddressOf("test--rye.saroh.app")).toBeNull();
+        expect(movedAddressOf("TEST--Rye.saroh.app:3005")).toBeNull();
+    });
 });
 
 describe("getMovedTo", () => {
@@ -85,6 +90,12 @@ describe("getMovedTo", () => {
         // Never a hop to the host the visitor is already on.
         answer(200, { to: "https://rye.saroh.app" });
         await expect(getMovedTo("rye.saroh.app")).resolves.toBeNull();
+    });
+
+    it("never asks for a test host", async () => {
+        const fetch = answer(200, { to: "https://rye-bakery.saroh.app" });
+        await expect(getMovedTo("test--rye.saroh.app")).resolves.toBeNull();
+        expect(fetch).not.toHaveBeenCalled();
     });
 
     it("never asks for a custom hostname", async () => {

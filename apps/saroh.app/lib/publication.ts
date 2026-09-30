@@ -683,11 +683,15 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
  * apex, `www`, a deeper name and every custom hostname: only a platform
  * address is ever changed and held (a custom domain is the merchant's own,
  * and nothing forwards from one).
+ *
+ * Null for a test host too (DEC-071): `test--rye` names a release of the
+ * site at `rye`, never an old address, so it is never asked about.
  */
 export function movedAddressOf(host: string | null | undefined): string | null {
     const hostname = host?.split(":")[0]?.toLowerCase().trim();
     const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
     if (!hostname || !root || !hostname.endsWith(`.${root}`)) return null;
+    if (classifySiteHost(hostname, root).mode === "test") return null;
     const address = hostname.slice(0, -1 * (root.length + 1));
     if (!address || address === "www" || address.includes(".")) return null;
     return address;

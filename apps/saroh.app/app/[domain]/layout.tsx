@@ -159,8 +159,12 @@ export default async function SiteLayout({
     if (!resolved) {
         // Nothing live here. An old address still forwarding sends the
         // visitor to the same page on the new one; anything else 404s.
-        const movedTo = await movedHere(domain);
-        if (movedTo) redirect(movedTo);
+        // Never on a test host: `test--<address>` names a release, not an
+        // old address (DEC-071), so it 404s rather than forwarding.
+        if (test.mode !== "test") {
+            const movedTo = await movedHere(domain);
+            if (movedTo) redirect(movedTo);
+        }
         notFound();
     }
     const { snapshot, siteId } = resolved;
