@@ -6,6 +6,8 @@ import { accountAreaOn } from "@/lib/account-area";
 import { isMessage, refusalMessage } from "@/lib/account-shape";
 import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
+import { testMode } from "@/lib/test-release";
+import { TEST_RELEASE_REFUSAL } from "@saroh/site-blocks";
 
 /**
  * Writing to the business from the customer's account (round-2 A13). Runs
@@ -22,6 +24,7 @@ const MAX_MESSAGE = 2_000;
 
 export async function sendMessage(text: string): Promise<SendResult> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     if (!accountAreaOn()) return { ok: false, message: OFFLINE };
     const body = typeof text === "string" ? text.trim() : "";
     if (!body) return { ok: false, message: "Write your message" };

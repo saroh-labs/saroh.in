@@ -5,6 +5,7 @@ import type {
     ShopProblem,
     ShopResult,
 } from "@saroh/site-blocks";
+import { isTestReleaseRefusal, TEST_RELEASE_MESSAGE } from "@saroh/site-blocks";
 
 /**
  * The site checkout's answers (round-2 G13), narrowed, and every refusal
@@ -138,6 +139,7 @@ const WORDS: Record<ShopProblem, string> = {
         "This shop isn't taking orders online right now. Ask them about ordering instead.",
     invalid: "Check the details and try again.",
     error: SHOP_TROUBLE,
+    "test-release": TEST_RELEASE_MESSAGE,
 };
 
 /** The API's error envelope: `{ error: { message, details } }`. */
@@ -162,6 +164,9 @@ export function problemOf(
         reason: r,
         message: words,
     });
+    // A test host's write refused by the API (DEC-071, T4): said as a test
+    // release, never as a bag that changed.
+    if (isTestReleaseRefusal(status, body)) return fail("test-release");
     if (status === 401) return fail("signed-out");
     if (status === 403) return fail("cant-order");
     if (status === 409 && reason === "bag-changed") return fail("bag-changed");

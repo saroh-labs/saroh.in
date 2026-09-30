@@ -1,4 +1,5 @@
 import { env } from "@/env";
+import { isTestReleaseRefusal, TEST_RELEASE_MESSAGE } from "@saroh/site-blocks";
 
 import type { CheckoutIntent, CheckoutReceipt } from "./checkout-shape";
 import { isIntent, isReceipt } from "./checkout-shape";
@@ -105,6 +106,11 @@ export async function createPaymentIntent(
                       ok: false,
                       error: "We couldn't start the payment — please try again.",
                   };
+        }
+        // A test host's payment refused by the API (DEC-071, T4).
+        const refused: unknown = await res.json().catch(() => null);
+        if (isTestReleaseRefusal(res.status, refused)) {
+            return { ok: false, error: TEST_RELEASE_MESSAGE };
         }
         return {
             ok: false,

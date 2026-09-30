@@ -1,10 +1,11 @@
-// @covers site:/ site:/shop site:/book site:/account site:/test-release-gate api:sites pkg:site-blocks
+// @covers site:/ site:/shop site:/book site:/account site:/[slug] site:/test-release-gate api:sites api:contacts api:enquiry pkg:site-blocks
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { northwind, stamp } from "../fixtures/own-data";
+import { northwind, ORDER_LINE, stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
+import { asNewVisitor } from "./site-codes";
 
 /**
  * A test release on its own host (DEC-071, T5).
@@ -19,6 +20,11 @@ import { ignoreHTTPSErrors, urls } from "../playwright.config";
  * Each test makes its own release, so any two run side by side: making one
  * changes nothing the live site or another test reads. `SITE_TEST_RELEASES`
  * is on for Northwind in the seed.
+ *
+ * T6: on the test host a new visitor walks the contact form, the booking
+ * page and (where the shop is on) the bag to the point where each would
+ * become real, and sees the stop instead. Nothing is sent: no enquiry, no
+ * booking, no order, and no contact with the test's stamp on Northwind.
  */
 
 const renderer = new URL(urls.RENDERER_URL);
@@ -192,5 +198,146 @@ test.describe("a test release on its own host (T5)", () => {
                 }),
             )
             .toBe(true);
+    });
+});
+
+/** A browser write from here on: a server action, or a public API POST. */
+function watchWrites(page: Page): string[] {
+    const writes: string[] = [];
+    page.on("request", (request) => {
+        if (request.method() !== "POST") return;
+        if (
+            request.headers()["next-action"] ||
+            new URL(request.url()).pathname.startsWith("/public/")
+        ) {
+            writes.push(request.url());
+        }
+    });
+    return writes;
+}
+
+const stop = (page: Page) =>
+    page.locator("[data-test-release-stop]").filter({ visible: true });
+
+test.describe("flows stop short on a test release (T6)", () => {
+    test("the contact form and the booking page stop, and nothing reaches the business", async ({
+        page,
+    }, testInfo) => {
+        const mark = stamp(testInfo);
+        const email = `t6-${mark}@example.in`.toLowerCase();
+        const { token } = await makeRelease(page, `E2E release ${mark}`);
+        await asNewVisitor(page);
+        await page.goto(`${TEST}/?release=${token}`);
+        await expect(bar(page)).toContainText(mark);
+
+        // The contact form: filled in and sent, it posts nothing.
+        await page.goto(`${TEST}/contact`);
+        await page.getByLabel("Your name").fill(`Tester ${mark}`);
+        await page.getByLabel("Email").fill(email);
+        await page.getByLabel("What do you need?").fill(`Stamp ${mark}`);
+        const formWrites = watchWrites(page);
+        await page.getByRole("button", { name: "Send enquiry" }).click();
+        await expect(stop(page)).toContainText(
+            "Nothing is sent on a test release.",
+        );
+        await expect(page.getByLabel("What do you need?")).toHaveValue(
+            `Stamp ${mark}`,
+        );
+        expect(formWrites).toEqual([]);
+
+        // The booking page: live times, and the stop where signing in
+        // would be. No booking, no hold.
+        await page.goto(`${TEST}/book`);
+        await expect(
+            page.getByRole("heading", { name: "Book your appointment" }),
+        ).toBeVisible();
+        await page
+            .getByRole("radio", { name: /Warehouse walkthrough/ })
+            .click();
+        const times = page.locator('[role="radiogroup"] button[role="radio"]', {
+            hasText: /^\d{2}:\d{2}$/,
+        });
+        await expect(times.first()).toBeVisible({ timeout: 15_000 });
+        await times.first().click();
+        await page.getByLabel("Name").fill(`Tester ${mark}`);
+        const bookWrites = watchWrites(page);
+        await page
+            .getByRole("button", { name: "Continue to sign in" })
+            .filter({ visible: true })
+            .first()
+            .click();
+        const sheet = page.getByRole("dialog", {
+            name: "This is a test release",
+        });
+        await expect(sheet).toContainText(
+            /the customer signs in here and books Warehouse walkthrough, /,
+        );
+        await expect(sheet).toContainText(
+            "Nothing is booked on a test release.",
+        );
+        // Signing in is where the live site would go next; here it doesn't.
+        await expect(page.getByLabel("Email")).toHaveCount(0);
+        expect(bookWrites).toEqual([]);
+        await sheet.getByRole("button", { name: "Back" }).click();
+        await expect(sheet).toHaveCount(0);
+
+        // Nothing reached Northwind with this test's stamp.
+        const found = await northwind(page.request).get<{ id: string }[]>(
+            `/contacts/search?q=${encodeURIComponent(email)}`,
+        );
+        expect(found).toEqual([]);
+    });
+
+    test("the bag is priced, then stops before signing in: no order", async ({
+        page,
+    }, testInfo) => {
+        const mark = stamp(testInfo);
+        const { token } = await makeRelease(page, `E2E release ${mark}`);
+        await asNewVisitor(page);
+        await page.goto(`${TEST}/?release=${token}`);
+        await expect(bar(page)).toContainText(mark);
+
+        const shop = await page.goto(`${TEST}/shop`);
+        test.skip(
+            shop?.status() === 404,
+            "Northwind's shop is switched off on this stack",
+        );
+        const product = page
+            .getByRole("link", { name: new RegExp(ORDER_LINE) })
+            .first();
+        test.skip(
+            (await product.count()) === 0,
+            `${ORDER_LINE} isn't on sale on Northwind's site here`,
+        );
+        await product.click();
+        const add = page.getByRole("button", { name: "Add to bag" });
+        test.skip(
+            (await add.count()) === 0,
+            "Northwind's site doesn't take online orders on this stack",
+        );
+        await add.click();
+        await page.getByRole("button", { name: /^Your bag, / }).click();
+        const bag = page.getByRole("dialog");
+        await expect(
+            bag.getByRole("heading", { name: "Your bag" }),
+        ).toBeVisible();
+        const pickUp = bag.getByRole("radio", { name: /Pick-up/ });
+        if (await pickUp.isVisible()) await pickUp.click();
+        const cont = bag.getByRole("button", { name: /^Continue · / });
+        await expect(cont).toBeEnabled({ timeout: 15_000 });
+        const total = ((await cont.innerText()).split("·")[1] ?? "").trim();
+
+        const writes = watchWrites(page);
+        await cont.click();
+        const sheet = page.getByRole("dialog", {
+            name: "This is a test release",
+        });
+        await expect(sheet).toContainText(
+            `the customer signs in here and pays ${total} for 1 item.`,
+        );
+        await expect(sheet).toContainText(
+            "Nothing is ordered on a test release.",
+        );
+        expect(writes).toEqual([]);
     });
 });

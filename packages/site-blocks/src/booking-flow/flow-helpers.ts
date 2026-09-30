@@ -2,7 +2,12 @@ import { useSyncExternalStore } from "react";
 
 import type { PublicVisit } from "../blocks/visit-us";
 import { weekSummary } from "../lib/opening-hours";
-import type { BookingDays, BookingService, BookingStart } from "./model";
+import type {
+    BookingDays,
+    BookingService,
+    BookingStart,
+    BookPay,
+} from "./model";
 import { dateIn, dateText, timeIn } from "./model";
 
 // ── The phone breakpoint, read without a render-time window ─────────────
@@ -118,4 +123,39 @@ export function headerFacts(
         place: parts.length > 0 ? parts.join(" · ") : null,
         phone: phone === undefined || phone === "" ? null : phone,
     };
+}
+
+// ── A test release (DEC-071, T6) ─────────────────────────────────────────
+
+/**
+ * What the live site does at the booking page's last step, for a test
+ * release's stop: "the customer signs in here and books Haircut, Sat 4 Oct
+ * at 11:00 with Asha and pays ₹500".
+ */
+export function testReleaseBookingLine({
+    serviceName,
+    whenText,
+    waitlist,
+    pay,
+    payingNow,
+}: {
+    serviceName: string;
+    whenText: string;
+    /** A full class: they would join its waitlist. */
+    waitlist: boolean;
+    pay: BookPay;
+    /** What leaves their account at booking, for NOW and DEPOSIT. */
+    payingNow: string;
+}): string {
+    const what = [serviceName, whenText].filter(Boolean).join(", ");
+    if (waitlist) {
+        return `the customer signs in here and joins the waitlist for ${what}`;
+    }
+    const paid =
+        (pay === "NOW" || pay === "DEPOSIT") && payingNow
+            ? ` and pays ${payingNow}`
+            : pay === "CREDIT"
+              ? " with 1 credit"
+              : "";
+    return `the customer signs in here and books ${what}${paid}`;
 }

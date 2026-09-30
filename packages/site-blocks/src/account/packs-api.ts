@@ -1,6 +1,7 @@
 import type { PaymentHandoff } from "../booking-flow/api";
 import type { PackKind } from "../prices/pack-words";
 import { packCount, packUnit } from "../prices/pack-words";
+import type { TestReleaseRefusal } from "../test-release/words";
 
 /**
  * Buying a class pack from the account (round-2 plan A, A11): what the
@@ -49,7 +50,7 @@ export interface AccountPackAttempt {
 }
 
 export type PackResult<T> =
-    { ok: true; data: T } | { ok: false; message: string };
+    { ok: true; data: T } | { ok: false; message: string } | TestReleaseRefusal;
 
 export interface PacksApi {
     /** Start paying for a pack; the same key replays the same payment. */

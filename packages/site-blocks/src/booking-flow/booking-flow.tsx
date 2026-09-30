@@ -12,6 +12,9 @@ import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
 import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
+import { useTestRelease } from "../test-release/context";
+import { TestReleaseStopSheet } from "../test-release/test-release-stop";
+import { TEST_RELEASE_REASON } from "../test-release/words";
 import type { BookSignedIn, CreditFor, Result } from "./api";
 import {
     CREDIT_GONE,
@@ -29,6 +32,7 @@ import {
     nextChosenText,
     nextFreeStart,
     pageTitle,
+    testReleaseBookingLine,
     usePhone,
     zoneName,
 } from "./flow-helpers";
@@ -206,6 +210,10 @@ export default function BookingFlow({
     );
     const [name, setName] = useState("");
     const [sheetOpen, setSheetOpen] = useState(false);
+    // A test release (DEC-071, T6): the last step stops here instead of
+    // signing in, and nothing is booked or held.
+    const testRelease = useTestRelease() !== null;
+    const [testStop, setTestStop] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
     // Where, for a service offered either way, and the note (E7).
     const [where, setWhere] = useState<BookingWhere>("IN_PERSON");
@@ -607,6 +615,11 @@ export default function BookingFlow({
     const confirm = async () => {
         setTouched(true);
         if (block || !service || !chosenStart || submitting) return;
+        if (testRelease) {
+            setSubmitError(null);
+            setTestStop(true);
+            return;
+        }
         // Not signed in: the sheet, and the booking once the code checks.
         if (!customer) {
             setSubmitError(null);
@@ -628,6 +641,10 @@ export default function BookingFlow({
             .catch((): Result<WaitlistJoined> => OFFLINE_RESULT);
         setSubmitting(false);
         if (!result.ok) {
+            if (result.reason === TEST_RELEASE_REASON) {
+                setTestStop(true);
+                return;
+            }
             if (result.status === 401) {
                 setCustomer(null);
                 setSubmitError(SIGNED_OUT);
@@ -737,6 +754,11 @@ export default function BookingFlow({
             .catch((): Result<BookResult> => OFFLINE_RESULT);
         setSubmitting(false);
         if (!result.ok) {
+            if (result.reason === TEST_RELEASE_REASON) {
+                attemptKey.current = null;
+                setTestStop(true);
+                return;
+            }
             if (result.reason === CREDIT_GONE) {
                 // Spent or changed meanwhile (another tab, the desk): say
                 // so, keep the time, and ask again what they can pay with.
@@ -1190,6 +1212,20 @@ export default function BookingFlow({
                 api={account.signIn}
                 purpose="book"
                 onSignedIn={(who) => void signedIn(who)}
+            />
+
+            <TestReleaseStopSheet
+                open={testStop}
+                live={testReleaseBookingLine({
+                    serviceName: service?.name ?? "",
+                    whenText,
+                    waitlist: waitMode === "join",
+                    pay,
+                    payingNow,
+                })}
+                nothing="booked"
+                back="Back"
+                onClose={() => setTestStop(false)}
             />
         </div>
     );

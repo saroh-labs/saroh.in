@@ -13,6 +13,7 @@ import PacksSection, { packEyebrow, packPerClass } from "../blocks/packs";
 import type { PlansFeed, PublicPlan } from "../blocks/plans";
 import PlansSection from "../blocks/plans";
 import type { OpenCheckout } from "../booking-flow/checkout";
+import { TestReleaseProvider } from "../test-release/context";
 import type {
     JoinApi,
     JoinResult,
@@ -536,5 +537,58 @@ describe("the Class packs block on the editor's canvas", () => {
         // Drawn, not followed.
         expect(screen.queryByRole("button", { name: /^Buy/ })).toBeNull();
         fetchMock.mockRestore();
+    });
+});
+
+describe("Join and Buy on a test release (DEC-071, T6)", () => {
+    it("Join stops where signing in would be, with the plan's price: nobody joins", async () => {
+        const { prices, join } = actions();
+        render(
+            <TestReleaseProvider release={{ name: "Diwali menu" }}>
+                <PlansSection
+                    content={PLANS}
+                    feed={plansFeed()}
+                    prices={prices}
+                    apiUrl="https://api.test"
+                />
+            </TestReleaseProvider>,
+        );
+        await press(
+            screen.getByRole("button", { name: "Join: Monthly unlimited" }),
+        );
+        const stop = await screen.findByRole("dialog", {
+            name: "This is a test release",
+        });
+        expect(stop.textContent).toContain(
+            "On the live site, the customer signs in here and pays ₹2,500 / month to join Monthly unlimited.",
+        );
+        expect(join).not.toHaveBeenCalled();
+        expect(
+            screen.queryByText(
+                "Last step: confirm it's you, then we'll finish. No password.",
+            ),
+        ).toBeNull();
+    });
+
+    it("Buy stops too, with the pack's price: nothing is bought", async () => {
+        const { prices } = actions({ signedIn: true });
+        const buy = vi.fn(prices.packs.buy);
+        prices.packs = { ...prices.packs, buy };
+        render(
+            <TestReleaseProvider release={{ name: "Diwali menu" }}>
+                <PacksSection
+                    content={PACKS}
+                    feed={packsFeed()}
+                    prices={prices}
+                    apiUrl="https://api.test"
+                />
+            </TestReleaseProvider>,
+        );
+        await press(screen.getAllByRole("button", { name: /Buy/ })[0]);
+        const stop = await screen.findByRole("dialog", {
+            name: "This is a test release",
+        });
+        expect(stop.textContent).toContain("pays ₹4,500 for 10 classes.");
+        expect(buy).not.toHaveBeenCalled();
     });
 });

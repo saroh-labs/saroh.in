@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SignedInCustomer } from "../account/api";
 import type { PublicVisit } from "../blocks/visit-us";
+import { TestReleaseProvider } from "../test-release/context";
 import type { SignedInBookRequest } from "./api";
 import { resultOf } from "./api";
 import type { BookingAccount } from "./booking-flow";
@@ -2226,5 +2227,83 @@ describe("a treatment of several visits (E10)", () => {
             screen.getByRole("heading", { name: "When?" }),
         ).toBeInTheDocument();
         expect(screen.queryByText(/visits/)).toBeNull();
+    });
+});
+
+describe("the booking page on a test release (DEC-071, T6)", () => {
+    it("reads the times as usual, then stops where signing in would be: nothing booked or held", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        const requestCode = vi.fn(() =>
+            Promise.resolve({ ok: true as const, resendAfterSeconds: 30 }),
+        );
+        const signedOut = account({
+            customer: null,
+            signIn: { requestCode, verifyCode: vi.fn() },
+        });
+        render(
+            <TestReleaseProvider release={{ name: "Diwali menu" }}>
+                <BookingFlow page={PAGE} apiUrl={API} account={signedOut} />
+            </TestReleaseProvider>,
+        );
+        await chooseOneToOne();
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Asha Rao" },
+        });
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        );
+
+        const stop = await screen.findByRole("dialog", {
+            name: "This is a test release",
+        });
+        expect(stop.textContent).toMatch(
+            /On the live site, the customer signs in here and books Personal training, .+ with Karan Mehta\./,
+        );
+        expect(stop.textContent).toContain(
+            "Nothing is booked on a test release.",
+        );
+        // Only the days were read: no booking, no hold.
+        expect(calls.every((c) => c.url.endsWith("/days"))).toBe(true);
+        expect(requestCode).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "Back" }));
+        expect(
+            screen.queryByRole("dialog", { name: "This is a test release" }),
+        ).toBeNull();
+    });
+
+    it("shows the stop when the site's server refuses the booking", async () => {
+        serve((url) => (url.endsWith("/days") ? json(ONE_DAYS) : json({})));
+        const book = vi.fn(() =>
+            Promise.resolve({
+                ok: false as const,
+                status: 409,
+                message: "This is a test release.",
+                reason: "test-release",
+            }),
+        );
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ book })}
+            />,
+        );
+        await chooseOneToOne();
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getAllByRole("button", {
+                name: "Book — pay at the desk",
+            })[0],
+        );
+        expect(
+            await screen.findByRole("dialog", {
+                name: "This is a test release",
+            }),
+        ).toBeInTheDocument();
+        expect(book).toHaveBeenCalledTimes(1);
     });
 });

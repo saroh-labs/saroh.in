@@ -17,6 +17,8 @@ import {
 import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
 import { codeCallFailed, codeResult, customerFromEmail } from "@/lib/sign-in";
+import { testMode } from "@/lib/test-release";
+import { TEST_RELEASE_REFUSAL } from "@saroh/site-blocks";
 
 /**
  * What a signed-in customer changes in Me (round-2 plan A, A5): their name
@@ -41,6 +43,7 @@ export async function updateAccountDetails(
     input: DetailsInput,
 ): Promise<DetailsResult> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     if (!accountAreaOn()) return { ok: false, message: OFFLINE };
     const name = typeof input.name === "string" ? input.name.trim() : "";
     const phone = typeof input.phone === "string" ? input.phone.trim() : "";
@@ -63,6 +66,7 @@ export async function requestEmailChangeCode(
     challenge?: string,
 ): Promise<CodeRequestResult> {
     if (!(await siteOrigin())) return { ok: false, reason: "error" };
+    if (await testMode()) return { ok: false, reason: "test-release" };
     if (!accountAreaOn()) return { ok: false, reason: "error" };
     const address = typeof email === "string" ? email.trim() : "";
     if (!address || address.length > MAX_EMAIL) {
@@ -85,6 +89,7 @@ export async function confirmEmailChange(
     code: string,
 ): Promise<VerifyResult> {
     if (!(await siteOrigin())) return { ok: false, reason: "error" };
+    if (await testMode()) return { ok: false, reason: "test-release" };
     if (!accountAreaOn()) return { ok: false, reason: "error" };
     const address = typeof email === "string" ? email.trim() : "";
     const digits = typeof code === "string" ? code.replace(/\D/g, "") : "";
@@ -123,6 +128,7 @@ export async function confirmEmailChange(
 
 export async function addHealthNote(text: string): Promise<NoteResult> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     if (!accountAreaOn()) return { ok: false, message: OFFLINE };
     const note = typeof text === "string" ? text.trim() : "";
     if (!note) return { ok: false, message: "Write your note" };
