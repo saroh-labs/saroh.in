@@ -213,6 +213,29 @@ describe("changing the web address (DEC-069, L2)", () => {
         });
     });
 
+    // Under TEST_RLS the expired hold is released on another connection,
+    // after this change's serializable snapshot was taken (DEV_LEARNINGS).
+    it("moves back to its own address whose hold has run out, first time", async () => {
+        const rye = fresh("rye");
+        const b = await business(rye);
+        await service.change(b.owner, `${rye}-bakery`);
+        // More than 90 days on: its hold on rye has run out.
+        await prisma.addressReservation.updateMany({
+            where: { organizationId: b.id, address: rye },
+            data: {
+                redirectUntil: new Date(Date.now() - DAY),
+                reservedUntil: new Date(Date.now() - DAY),
+            },
+        });
+
+        const view = await service.change(b.owner, rye);
+
+        expect(view.address).toBe(rye);
+        expect((await holds(b.id)).map((r) => r.address)).toEqual([
+            `${rye}-bakery`,
+        ]);
+    });
+
     it("answers the same address with no change at all", async () => {
         const rye = fresh("rye");
         const b = await business(rye);

@@ -1952,3 +1952,29 @@ read only when the service is priced.
 (`stores/currency.ts`), never the value. Pinned by `module-setup.db.spec.ts`
 "prices the first service in the business's currency, not INR".
 **Category**: capabilities · money
+
+## Web address — moving back to an own expired address said "is taken" once, under RLS (release review)
+
+**Symptom**: found in the production release review, behind
+`WEB_ADDRESS_CHANGE`. With RLS enforced, a business moving back to an
+address it held more than 90 days ago got "<address>.saroh.app is taken"
+on the first try, and succeeded on the second.
+**Cause**: `releaseExpired` reads and deletes across businesses, so under
+RLS it runs on another connection (`acrossBusinesses`), outside the
+change's serializable transaction. It committed the delete of the expired
+hold after the transaction's snapshot; the transaction's own
+`deleteMany({ organizationId, address })` then touched that row again, and
+Postgres failed it as a concurrent delete (40001), which `isRaceLost`
+turns into "is taken". A plain run shares one connection, so only the RLS
+suite could see it.
+**Fix**: `WebAddressService.change` calls `releaseExpired` before it opens
+the transaction, and the own-row deletes (the change back, and `hold`)
+match only live holds (`reservedUntil > now`), leaving expired ones to
+`releaseExpired`.
+**Rule**: inside a serializable transaction, never write a row another
+connection may have just deleted: clear across businesses before the
+transaction, and scope in-transaction writes away from what that clearing
+owns. Pinned by `web-address.service.db.spec.ts` "moves back to its own
+address whose hold has run out, first time" (fails only under
+`TEST_RLS=on`).
+**Category**: organizations · RLS · transactions
