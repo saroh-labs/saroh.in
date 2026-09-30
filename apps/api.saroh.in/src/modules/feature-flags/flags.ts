@@ -68,6 +68,8 @@ export const FlagKey = {
      * the renderer serves `/pay` on a tenant host (plan L6) in production.
      */
     PAY_LINK_ON_SITE: "PAY_LINK_ON_SITE",
+
+    /**
      * Test releases (DEC-071): making, sharing and going live with a frozen
      * version of a site, and serving it on its test host. Per business, off
      * by default. Its five readers, once the plan's units land: the release
