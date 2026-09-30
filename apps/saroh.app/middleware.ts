@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "@/env";
 import { accountAreaOn, isAccountPath } from "@/lib/account-area-switch";
+import { isPayPath, TENANT_HOST_HEADER } from "@/lib/pay-host";
 import { tenantUrl } from "@/lib/tenant-url";
 
 export const config = {
@@ -69,7 +70,27 @@ export default function middleware(req: NextRequest) {
     // `/home${path}` — a route that does not exist in this app — so every apex
     // request 404'd instead of reaching app/page.tsx.
     if (isApexHost(hostname)) {
+        // Only this middleware names a tenant host (below); one a visitor
+        // sent to the apex is dropped, so the apex pay page never redirects.
+        if (req.headers.has(TENANT_HOST_HEADER)) {
+            const headers = new Headers(req.headers);
+            headers.delete(TENANT_HOST_HEADER);
+            return NextResponse.next({ request: { headers } });
+        }
         return NextResponse.next();
+    }
+
+    // A pay link on the business's own address (DEC-069, L6): the apex's
+    // pay pages, told which host they were opened on (`lib/pay-host.ts`).
+    // Before the account area's switch, and never into `[domain]`, which
+    // 404s a site that has since been unpublished.
+    if (isPayPath(path)) {
+        const headers = new Headers(req.headers);
+        headers.set(TENANT_HOST_HEADER, hostname);
+        // The same path and query, served by `app/pay/**`.
+        return NextResponse.rewrite(new URL(url.toString()), {
+            request: { headers },
+        });
     }
 
     // The account area switched off (`lib/account-area.ts`) is not there: a

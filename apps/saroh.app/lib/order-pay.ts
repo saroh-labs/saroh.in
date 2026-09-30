@@ -2,6 +2,7 @@ import { env } from "@/env";
 
 import { isIntent } from "./checkout-shape";
 import type { StartResult } from "./invoice-pay";
+import { payUrlOf } from "./invoice-pay-shape";
 import type { PayOrder } from "./order-pay-shape";
 import { isPayOrder } from "./order-pay-shape";
 
@@ -37,7 +38,11 @@ export async function getPayOrder(token: string): Promise<OrderPayLookup> {
     if (res.ok) {
         const body: unknown = await res.json().catch(() => null);
         return isPayOrder(body)
-            ? { ok: true, order: body }
+            ? {
+                  ok: true,
+                  // Where the link lives (DEC-069, L6), checked.
+                  order: { ...body, payUrl: payUrlOf(body.payUrl) },
+              }
             : { ok: false, reason: "unavailable" };
     }
     if (res.status === 404) return { ok: false, reason: "missing" };
