@@ -151,7 +151,7 @@ describe("personal@1 (DEC-070, K14)", () => {
                 ...nameOnly,
                 modules: ["APPOINTMENTS"],
                 serviceIds: ["svc_0", ...ids],
-            } as WithModules),
+            }),
         ).toEqual(ids.slice(0, 24));
     });
 
