@@ -8,7 +8,7 @@
  *   switch, not its audit event;
  * - a second enable applies nothing (`alreadyEnabled`);
  * - the previous app's call, without setup, behaves as before;
- * - the defaults the sheet prefills;
+ * - the defaults the sheet prefills, and how they follow the kind (K8);
  * - Automations is refused and hidden, a setting already on kept;
  * - `module:manage`, and the action for what a setup creates, are enforced.
  *
@@ -55,13 +55,16 @@ const availability = new ModuleAvailabilityService(
 );
 const setup = new ModuleSetupService(lifecycle, entitlements, flags);
 
-async function business(name = "Rye Studio"): Promise<OrganizationContext> {
+async function business(
+    name = "Rye Studio",
+    kind?: "BUSINESS" | "SOLO" | "WORK",
+): Promise<OrganizationContext> {
     seq += 1;
     const user = await prisma.user.create({
         data: { email: `m1-${tag}-${seq}@example.com` },
     });
     const org = await prisma.organization.create({
-        data: { name, slug: `m1-${seq}-${tag}` },
+        data: { name, slug: `m1-${seq}-${tag}`, ...(kind ? { kind } : {}) },
     });
     return { organizationId: org.id, userId: user.id, role: "OWNER" };
 }
@@ -884,6 +887,88 @@ describe("setup-defaults", () => {
             setup: { siteName: "Rye site", address: `${org.slug}-3` },
             existing: { siteId: site.id, address: `${org.slug}-3` },
         });
+    });
+});
+
+describe("the Bookings prefill follows the kind (DEC-070, K8)", () => {
+    const weekdays = (from: number, to: number, close: string) =>
+        Array.from({ length: to - from + 1 }, (_, i) => ({
+            weekday: from + i,
+            open: "10:00",
+            close,
+        }));
+
+    it("Just me: Mon–Fri 10:00–18:00 and an hour's Consultation, no price", async () => {
+        const ctx = await business("Asha Rao", "SOLO");
+        expect((await setup.defaults(ctx, "APPOINTMENTS")).setup).toEqual({
+            hours: weekdays(1, 5, "18:00"),
+            service: {
+                name: "Consultation",
+                durationMinutes: 60,
+                price: "",
+            },
+        });
+    });
+
+    it("a business, one from before the kind, and a site for my work keep DEC-068's", async () => {
+        const dec068 = {
+            hours: HOURS,
+            service: { name: "", durationMinutes: 60, price: "" },
+        };
+        for (const kind of ["BUSINESS", undefined, "WORK"] as const) {
+            const ctx = await business("Northwind Salon", kind);
+            expect((await setup.defaults(ctx, "APPOINTMENTS")).setup).toEqual(
+                dec068,
+            );
+        }
+    });
+
+    it("only the prefill: Just me's edited suggestion is saved as sent", async () => {
+        const ctx = await business("Asha Rao", "SOLO");
+        await setup.enable(ctx, "CRM", {});
+        const out = await setup.enable(ctx, "APPOINTMENTS", {
+            hours: [{ weekday: 2, open: "09:00", close: "13:00" }],
+            service: {
+                name: "Portfolio review",
+                durationMinutes: 30,
+                price: "1500",
+            },
+        });
+        const service = await prisma.service.findUniqueOrThrow({
+            where: { id: out.created.serviceId },
+            include: { availabilityRules: { orderBy: { dayOfWeek: "asc" } } },
+        });
+        expect(service).toMatchObject({
+            name: "Portfolio review",
+            durationMinutes: 30,
+            priceCents: 150000,
+        });
+        // Not the prefill's Mon–Fri: the one day sent.
+        expect(service.availabilityRules).toEqual([
+            expect.objectContaining({
+                dayOfWeek: 2,
+                startMinute: 540,
+                endMinute: 780,
+            }),
+        ]);
+        expect(
+            await prisma.service.count({
+                where: {
+                    organizationId: ctx.organizationId,
+                    name: "Consultation",
+                },
+            }),
+        ).toBe(0);
+    });
+
+    it("the other sheets don't change with the kind", async () => {
+        const solo = await business("Asha Rao", "SOLO");
+        const firm = await business("Asha Rao", "BUSINESS");
+        for (const key of ["COMMERCE", "CRM", "PAYMENTS"] as const) {
+            expect((await setup.defaults(solo, key)).setup).toEqual(
+                (await setup.defaults(firm, key)).setup,
+            );
+        }
     });
 });
 
