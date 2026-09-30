@@ -1680,6 +1680,7 @@ app's own client modules.
 **Rule**: a value both a server file and a client component need lives in a
 module with no "use client".
 **Category**: renderer · RSC · DEC-071
+
 ## e2e — a business made in a spec has every module dark
 
 **Problem**: K3's first-run spec set up a business through the API and
@@ -1697,6 +1698,7 @@ reads them without saving.
 business; one it makes itself can only check what needs no module (setup,
 the kind, invoices).
 **Category**: e2e · seed · modules
+
 ## e2e — a business a test sets up can still write contacts and invoices (K4)
 
 **Problem**: K4 needed a "site for my work" with nothing that takes money
@@ -1714,3 +1716,19 @@ through the API, then reads Settings and Home.
 e2e. Plan on turning one on only where the spec needs the module to read as
 on (Home, the rail, the checklist's module steps).
 **Category**: e2e · tests · modules
+
+## vitest — bookings-list.test.tsx throws "window is not defined" under load (K11)
+
+**Problem**: `pnpm prepush --int` failed its vitest step once on
+`@saroh/site-blocks`: "Vitest caught 1 unhandled error", a
+`ReferenceError: window is not defined` from
+`src/account/bookings-list.test.tsx`, with every test passing. The same
+suite then passed three times out of three, and the prepush rerun passed.
+**Root cause**: not found. It looks like something scheduled by the test
+(a timer or a state update) running after the jsdom environment was torn
+down, which only happens when several prepush runs share the machine.
+**Fix**: none yet. It was rerun. K11 did not touch the file.
+**Rule**: a lone unhandled "window is not defined" with all tests green is
+this flake. Rerun before hunting, and fix the test (clear its timers in
+`afterEach`) when it recurs.
+**Category**: vitest · tests · flake
