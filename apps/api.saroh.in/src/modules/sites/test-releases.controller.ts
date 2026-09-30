@@ -93,6 +93,20 @@ export class TestReleasesController {
         return this.releases.discard(ctx, siteId, releaseId);
     }
 
+    /**
+     * Go live now with exactly this release (R8). `site:publish`. 409 when it
+     * is discarded, already live, scheduled, or can't be drawn.
+     */
+    @Post(":releaseId/go-live")
+    @HttpCode(200)
+    goLive(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("releaseId") releaseId: string,
+    ) {
+        return this.releases.goLive(ctx, siteId, releaseId);
+    }
+
     /** A new link to share, lasting 1, 7 or 30 days. `site:update`. */
     @Post(":releaseId/links")
     @HttpCode(201)
