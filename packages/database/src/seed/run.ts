@@ -31,7 +31,6 @@ import {
     SERVICES,
     SIDE_BUSINESSES,
     SITES,
-    STORE_SLUG,
     SUBMISSIONS,
 } from "./data";
 import { seedFounder } from "./founder";
@@ -218,6 +217,27 @@ export async function seed(): Promise<void> {
             },
         });
     }
+
+    /*
+     * Changing the web address (DEC-069, L4) is on for everyone here, unlike
+     * the module flags above. It gates a release order in production (the
+     * renderer's forwarding goes out first), not a surface a business
+     * chooses, and the browser spec that changes an address does it on a
+     * business it sets up itself (`e2e/fixtures/own-business.ts`) — one the
+     * seed can't know to give an override. Production's row is made off in
+     * the admin console; `update: {}` leaves a row someone set alone.
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "WEB_ADDRESS_CHANGE" },
+        update: {},
+        create: {
+            id: "flag_WEB_ADDRESS_CHANGE",
+            key: "WEB_ADDRESS_CHANGE",
+            description:
+                "Lets a business's owner change its web address (DEC-069). On in the seed so a business a test sets up can change its own.",
+            enabledByDefault: true,
+        },
+    });
 
     // A connected-but-disabled provider: a merchant who set Razorpay up and
     // then turned it off. Kept alongside the live Cashfree connection below so
@@ -513,14 +533,14 @@ async function seedCommerce(
     userId: string,
     now: Date,
 ): Promise<string> {
+    // Keyed by its fixed id: a location has no slug (DEC-069, L14).
     const store = await prisma.store.upsert({
-        where: { slug: STORE_SLUG },
+        where: { id: id("store") },
         update: { name: `${ORG_NAME} Store`, organizationId: orgId },
         create: {
             id: id("store"),
             organizationId: orgId,
             name: `${ORG_NAME} Store`,
-            slug: STORE_SLUG,
             description: "Packaging, storage and safety supplies.",
         },
     });
@@ -780,13 +800,12 @@ async function seedOnlineStorefront(
 ) {
     const storeId = id("store", "online");
     await prisma.store.upsert({
-        where: { slug: `${STORE_SLUG}-online` },
+        where: { id: storeId },
         update: { name: "Online", organizationId: a.orgId, deletedAt: null },
         create: {
             id: storeId,
             organizationId: a.orgId,
             name: "Online",
-            slug: `${STORE_SLUG}-online`,
             description: "The website's shop: delivered anywhere in India.",
         },
     });

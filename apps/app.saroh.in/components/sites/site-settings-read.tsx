@@ -1,6 +1,7 @@
 import { EmptyState } from "@saroh/ui/empty-state";
 
 import type { SiteDetail } from "@/lib/sites/service";
+import type { SiteAddress } from "@/lib/sites/share-links";
 
 /**
  * The site's settings, for someone who may read them and not change them
@@ -16,9 +17,14 @@ import type { SiteDetail } from "@/lib/sites/service";
  * holds every field's state and one missed `disabled` is a request the API has
  * to refuse.
  */
-export function SiteSettingsRead({ site }: { site: SiteDetail }) {
-    const address = site.subdomain ? `${site.subdomain}.saroh.app` : null;
-
+export function SiteSettingsRead({
+    site,
+    address,
+}: {
+    site: SiteDetail;
+    /** Where the site is reached (`siteAddressOf`); null without an address. */
+    address: SiteAddress | null;
+}) {
     return (
         <div className="space-y-8">
             <p className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
@@ -29,7 +35,9 @@ export function SiteSettingsRead({ site }: { site: SiteDetail }) {
             </p>
 
             <Section title="Address">
-                <Row label="Saroh address">{address ?? <Missing />}</Row>
+                <Row label="Saroh address">
+                    {address?.platformHost ?? <Missing />}
+                </Row>
             </Section>
 
             <Section title="In search results">

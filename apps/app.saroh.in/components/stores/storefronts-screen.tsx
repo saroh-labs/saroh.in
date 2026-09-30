@@ -469,7 +469,7 @@ function BasicsSection({
             <div className="flex flex-wrap gap-2">
                 <Button asChild variant="outline" size="sm">
                     <Link href={storefrontDetailsHref(store.id)}>
-                        Web address, description and logo
+                        Description and logo
                     </Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">

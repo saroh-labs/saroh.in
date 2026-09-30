@@ -12,6 +12,7 @@ import {
     KanbanSquare,
     LayoutGrid,
     Link2,
+    ReceiptText,
     SlidersHorizontal,
     Store,
     Target,
@@ -298,6 +299,14 @@ export interface NavItem {
      * a merchant never meets an empty heading.
      */
     moduleKey?: string;
+    /**
+     * Offered only while this module is NOT available: a row that stands
+     * in for a page the module otherwise holds. Invoices need no module
+     * (DEC-070), and sit under Payments while it's on; with it off they
+     * get this row of their own. While availability is unknown the module's
+     * own section is shown, so this row isn't.
+     */
+    unlessModule?: string;
 }
 
 export interface NavGroup {
@@ -364,6 +373,7 @@ export function showsGroupLabel(group: NavGroup): boolean {
  */
 const STOREFRONTS_HREF = "/commerce/locations";
 const STOCK_HREF = "/commerce/stock";
+const INVOICES_HREF = "/billing/invoices";
 
 export const NAV_GROUPS: NavGroup[] = [
     {
@@ -532,6 +542,18 @@ export const NAV_GROUPS: NavGroup[] = [
                         action: "invoice:read",
                     },
                 ],
+            },
+            // Invoices without Payments (DEC-070, KTD-11): a business that
+            // doesn't take money online still bills, sends and records paid.
+            // While Payments is on, Invoices sits under it (above); while it
+            // is off, this row takes its place. Same address, so no link
+            // breaks.
+            {
+                href: INVOICES_HREF,
+                label: "Invoices",
+                icon: ReceiptText,
+                action: "invoice:read",
+                unlessModule: "PAYMENTS",
             },
             {
                 href: "/contacts",
@@ -740,6 +762,13 @@ export function navGroupsWithSites(
  */
 export function navRowsForModule(moduleKey: string): string[] {
     const rows: string[] = [];
+    // A page that keeps a row of its own while the module is off (Invoices,
+    // DEC-070) doesn't go with it.
+    const staying = new Set(
+        NAV_GROUPS.flatMap((g) => g.items)
+            .filter((i) => i.unlessModule === moduleKey)
+            .map((i) => i.href),
+    );
     for (const group of NAV_GROUPS) {
         for (const item of group.items) {
             const own = item.moduleKey ?? group.moduleKey;
@@ -748,7 +777,9 @@ export function navRowsForModule(moduleKey: string): string[] {
             // should be told the names they navigate by. A section that spans
             // modules (Bookings) names the ones this module owns.
             const children = (item.children ?? []).filter(
-                (child) => (child.moduleKey ?? own) === moduleKey,
+                (child) =>
+                    (child.moduleKey ?? own) === moduleKey &&
+                    !(child.href && staying.has(child.href)),
             );
             if (own !== moduleKey && children.length === 0) continue;
             if (own === moduleKey) rows.push(item.label);
@@ -769,7 +800,14 @@ export function filterNavGroups(
     groups: readonly NavGroup[],
     availableModuleKeys: readonly string[] | null,
 ): NavGroup[] {
-    if (availableModuleKeys === null) return [...groups];
+    if (availableModuleKeys === null) {
+        // Unknown: every module's own rows are shown, so a row standing in
+        // for one of them while it is off is not.
+        return groups.map((group) => ({
+            ...group,
+            items: group.items.filter((item) => !item.unlessModule),
+        }));
+    }
     const available = new Set(availableModuleKeys);
     const allowed = (key?: string) => !key || available.has(key);
 
@@ -780,6 +818,9 @@ export function filterNavGroups(
                 ...group,
                 items: group.items.flatMap((item) => {
                     if (!allowed(item.moduleKey)) return [];
+                    if (item.unlessModule && available.has(item.unlessModule)) {
+                        return [];
+                    }
                     if (!item.children?.some((c) => c.moduleKey)) {
                         return [item];
                     }

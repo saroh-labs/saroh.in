@@ -36,8 +36,8 @@ export default async function ImportProductsPage({
                     section="Products"
                     sectionHref="/commerce/products"
                     crumb="Import"
-                    title="Which storefront do they go into?"
-                    description="A spreadsheet of products is brought into one storefront's catalogue."
+                    title="Which location do they go into?"
+                    description="A spreadsheet of products is brought into one location's catalogue."
                     stores={stores}
                     hrefFor={importProductsHref}
                 />

@@ -7,10 +7,11 @@ import { useState, useTransition } from "react";
 
 import { startPayment } from "@/app/pay/[token]/actions";
 import { InvoiceAutopay } from "@/components/invoice-autopay";
+import { PrintButton } from "@/components/print-button";
 import { ProviderHandoff } from "@/components/provider-handoff";
 import type { CheckoutIntent } from "@/lib/checkout-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
-import { payDate, payMoney, payTitle } from "@/lib/invoice-pay-shape";
+import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
 
 /**
  * The invoice a pay link shows, and its Pay button (ADR-007, U13).
@@ -24,6 +25,10 @@ import { payDate, payMoney, payTitle } from "@/lib/invoice-pay-shape";
  *
  * A plan's invoice, where the business's provider takes autopay, offers
  * "Pay and turn on autopay" first (D12, `invoice-autopay.tsx`).
+ *
+ * A business that doesn't take payment online (`payOnline` false, DEC-070)
+ * sends the same link to view the invoice: no Pay button, a copy to print
+ * or save as PDF, and "Pay ‹business› the way they've asked you to".
  *
  * Styled in the business's `--site-*` tokens, never Saroh's brand. Status is
  * an opaque fill with its own foreground, for the reason checkout gives: the
@@ -59,9 +64,10 @@ export function InvoicePay({
     // When autopay next takes money (D13B): this invoice's queued charge,
     // or once it's paid, the next renewal's.
     const nextCharge = invoice.autopayNextCharge ?? null;
-    const payable =
-        (invoice.status === "ISSUED" || invoice.status === "OVERDUE") &&
-        !charging;
+    // Pay, or — where the business doesn't take payment online (DEC-070)
+    // — the invoice to keep, and pay them their own way.
+    const offer = payOffer(invoice);
+    const payable = offer === "pay";
     // Autopay for the invoice's plan (D12): offered, or on already.
     const autopay =
         invoice.autopay &&
@@ -216,6 +222,24 @@ export function InvoicePay({
                     >
                         Check again
                     </button>
+                </div>
+            ) : offer === "elsewhere" ? (
+                <div className="mt-6 space-y-4">
+                    <div
+                        role="status"
+                        className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
+                    >
+                        <p className="font-semibold text-site-fg">
+                            Pay {invoice.businessName} the way they&apos;ve
+                            asked you to.
+                        </p>
+                        <p className="mt-1 text-sm text-site-muted">
+                            {invoice.businessName} doesn&apos;t take payment
+                            online. Keep a copy of this invoice for your
+                            records.
+                        </p>
+                    </div>
+                    <PrintButton />
                 </div>
             ) : charging ? (
                 <div className="mt-6 space-y-4">

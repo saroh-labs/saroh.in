@@ -197,7 +197,7 @@ describe("provider rows", () => {
         );
         const [razorpay, cashfree] = view.connected;
         expect(razorpay.note).toBe("Takes online payments at Rye & Co.");
-        expect(cashfree.note).toMatch(/no storefront's checkout uses it yet/);
+        expect(cashfree.note).toMatch(/no location's checkout uses it yet/);
         expect(view.available.some((e) => e.type === "Payments")).toBe(false);
     });
 

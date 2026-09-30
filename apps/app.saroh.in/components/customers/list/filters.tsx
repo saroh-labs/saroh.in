@@ -83,13 +83,13 @@ export function Filters({
                 </div>
                 {storefronts.length > 1 ? (
                     <OptionSelect
-                        aria-label="Storefront"
+                        aria-label="Location"
                         value={query.store ?? ALL_STORES}
                         onValueChange={(v) =>
                             go({ store: v === ALL_STORES ? null : v })
                         }
                         options={[
-                            { value: ALL_STORES, label: "All storefronts" },
+                            { value: ALL_STORES, label: "All locations" },
                             ...storefronts.map((s) => ({
                                 value: s.id,
                                 label: `Bought at ${s.name}`,

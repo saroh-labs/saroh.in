@@ -39,8 +39,6 @@ import {
     writeSiteFromTemplate,
 } from "../../sites/site-create";
 import { businessCurrency } from "../../stores/currency";
-import { slugify as storeSlugify } from "../../stores/slug";
-import { storeSlugInUse } from "../../stores/store-slug";
 import type { ModuleTransaction } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
 import type {
@@ -155,22 +153,6 @@ async function prepareCommerce(
     return (tx) => writeCommerce(tx, ctx, setup);
 }
 
-/**
- * A store slug no storefront has, in any business (Store.slug is unique).
- * Read across businesses: under RLS `tx` sees only this one (storeSlugInUse).
- */
-async function freeStoreSlug(
-    tx: ModuleTransaction,
-    name: string,
-): Promise<string> {
-    const base = storeSlugify(name).slice(0, 60) || "storefront";
-    for (let n = 1; n <= 50; n++) {
-        const slug = n === 1 ? base : `${base}-${n}`;
-        if (!(await storeSlugInUse(tx, slug))) return slug;
-    }
-    return `${base}-${Date.now().toString(36)}`;
-}
-
 async function writeCommerce(
     tx: ModuleTransaction,
     ctx: OrganizationContext,
@@ -210,7 +192,6 @@ async function writeCommerce(
     const store = await tx.store.create({
         data: {
             name: setup.storefrontName,
-            slug: await freeStoreSlug(tx, setup.storefrontName),
             organization: { connect: { id: ctx.organizationId } },
             owners: { create: { userId: ctx.userId, role: "OWNER" } },
             settings: { create: { currency, ...ways } },

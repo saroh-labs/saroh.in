@@ -76,6 +76,15 @@ export class SitesController {
         }));
     }
 
+    /**
+     * What `/sites/new` prefills: `{ siteName, address }` (DEC-069, L5).
+     * Declared before `:siteId` so "new-defaults" is never captured as an id.
+     */
+    @Get("new-defaults")
+    newDefaults(@OrgContext() ctx: OrganizationContext) {
+        return this.sites.newSiteDefaults(ctx);
+    }
+
     /** List the org's non-deleted sites. */
     @Get()
     list(@OrgContext() ctx: OrganizationContext) {

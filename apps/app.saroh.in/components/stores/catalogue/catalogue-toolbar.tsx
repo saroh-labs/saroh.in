@@ -104,7 +104,7 @@ export function CatalogueToolbar({
                     onChange={(storefront) => go({ storefront })}
                     noun={{ one: "product", other: "products" }}
                     label="Show products sold at"
-                    note="A filter, not a scope. The catalogue belongs to the business; a storefront decides what it sells from it."
+                    note="A filter, not a scope. The catalogue belongs to the business; a location decides what it sells from it."
                 />
             ) : null}
             <FilterMenu query={query} go={go} choices={choices} />

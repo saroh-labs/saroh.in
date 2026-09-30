@@ -18,7 +18,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { orderPayLinkUrl } from "../invoices/pay-link-url";
+import { orderPayLinkUrlFor } from "../invoices/pay-link-url";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
     EditOrderDto,
@@ -281,7 +281,10 @@ export class OrganizationOrdersController {
             ctx,
             orderId,
         );
-        return { url: orderPayLinkUrl(token), payLinkCreatedAt };
+        return {
+            url: await orderPayLinkUrlFor(ctx.organizationId, token),
+            payLinkCreatedAt,
+        };
     }
 
     /**

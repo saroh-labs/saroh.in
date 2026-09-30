@@ -82,6 +82,15 @@ const ROUTES: Route[] = [
         expect: [ctx, DTO],
     },
     {
+        handler: "newDefaults",
+        method: RequestMethod.GET,
+        path: "new-defaults",
+        target: "sites",
+        call: "newSiteDefaults",
+        args: [ctx],
+        expect: [ctx],
+    },
+    {
         handler: "list",
         method: RequestMethod.GET,
         path: "/",

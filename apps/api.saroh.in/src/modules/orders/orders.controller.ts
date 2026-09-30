@@ -16,7 +16,7 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { orderPayLinkUrl } from "../invoices/pay-link-url";
+import { orderPayLinkUrlFor } from "../invoices/pay-link-url";
 import { CreateOrderDto, UpdateOrderDto } from "./dto";
 import { OrdersService } from "./orders.service";
 
@@ -52,7 +52,10 @@ export class OrdersController {
             ? {
                   id: made.id,
                   payLink: {
-                      url: orderPayLinkUrl(made.payLink.token),
+                      url: await orderPayLinkUrlFor(
+                          made.organizationId,
+                          made.payLink.token,
+                      ),
                       payLinkCreatedAt: made.payLink.payLinkCreatedAt,
                   },
               }

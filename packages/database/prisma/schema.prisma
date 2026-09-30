@@ -605,7 +605,10 @@ model Store {
 
   // Basic info
   name        String
-  slug        String  @unique
+  // Dead: the storefront "Web address" went nowhere (DEC-069). L14 made it
+  // nullable and stopped reading and writing it; existing rows keep theirs.
+  // L15 drops the column (a later release).
+  slug        String? @unique
   description String?
   logo        String?
 

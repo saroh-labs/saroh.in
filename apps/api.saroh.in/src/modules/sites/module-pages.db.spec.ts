@@ -82,6 +82,8 @@ async function business(
             organizationId: org.id,
             name: "Pulse",
             slug: uniq("g14-site-"),
+            // A site publishes only with an address (L5).
+            subdomain: uniq("g14-sub-"),
         },
     });
     await prisma.page.create({
@@ -344,7 +346,7 @@ describe("module pages (G14, real database)", () => {
         ]);
     });
 
-    it.each(["/book", "/shop/sale", "/checkout"])(
+    it.each(["/book", "/shop/sale", "/checkout", "/pay"])(
         "refuses a free-form page at %s with the reason and another address",
         async (path) => {
             const b = await business();
@@ -410,6 +412,25 @@ describe("module pages (G14, real database)", () => {
         await expect(
             sites.createPage(b.ctx, b.siteId, { kind: "BOOK" }),
         ).resolves.toMatchObject({ path: "/book" });
+    });
+
+    it("flags a free-form page already at /pay: pay links live there (DEC-069, L7)", async () => {
+        const b = await business();
+        const fees = await freePage(b, "/pay", "Pay your fees");
+        // A neighbour of the address is free.
+        await freePage(b, "/payments", "Ways to pay");
+
+        const { flags } = await sites.getSiteFlags(b.ctx, b.siteId);
+        expect(
+            flags
+                .filter((f) => f.type === "reservedAddress")
+                .map((f) => [f.pageId, f.message]),
+        ).toEqual([
+            [
+                fees.id,
+                "This page can't be seen: /pay is where your customers pay a link you sent. Change its address so visitors can reach it.",
+            ],
+        ]);
     });
 
     it("refuses a Shop page with Commerce off, naming the module", async () => {

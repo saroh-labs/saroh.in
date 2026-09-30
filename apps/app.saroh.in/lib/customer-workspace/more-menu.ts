@@ -79,7 +79,10 @@ export function moreMenu(
     }
     if (writes) {
         if (may.canLink) {
-            items.push({ label: "Link a store customer…", go: go.link });
+            items.push({
+                label: "Link a customer from a location…",
+                go: go.link,
+            });
         }
         if (may.canUnlink) {
             items.push({ label: "This isn't them…", go: go.notThem });

@@ -6,13 +6,11 @@
 
 export interface CreateStoreInput {
     name: string;
-    slug?: string;
     description?: string;
 }
 
 export interface UpdateStoreInput {
     name: string;
-    slug: string;
     description?: string | null;
     logo?: string | null;
 }
@@ -20,4 +18,4 @@ export interface UpdateStoreInput {
 /** Discriminated result so callers/UI can show field errors inline. */
 export type StoreResult<T> =
     | { ok: true; data: T }
-    | { ok: false; error: string; field?: "name" | "slug" | "logo" };
+    | { ok: false; error: string; field?: "name" | "logo" };

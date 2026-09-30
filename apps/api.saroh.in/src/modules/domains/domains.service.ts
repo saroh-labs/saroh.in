@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     ForbiddenException,
     Inject,
@@ -13,6 +14,7 @@ import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
 import type { DomainVerifier, VerificationFailure } from "./domain-verifier";
 import { DOMAIN_VERIFIER, verificationRecordName } from "./domain-verifier";
+import { isTestReservedHostname, TEST_RESERVED_HOSTNAME_MSG } from "./dto";
 
 /** Input for {@link DomainsService.claim} — the validated {@link ClaimDomainDto}. */
 export interface ClaimDomainInput {
@@ -67,6 +69,11 @@ export class DomainsService {
         }
 
         const hostname = input.hostname.trim().toLowerCase();
+        // DEC-071: `test.<H>` and `test--*` are test-release hosts. The DTO
+        // refuses them at the edge; this keeps any other caller honest.
+        if (isTestReservedHostname(hostname)) {
+            throw new BadRequestException(TEST_RESERVED_HOSTNAME_MSG);
+        }
 
         // Globally-unique guard: a hostname claimed by ANY org (this one or
         // another) blocks a new claim. Pre-check for a clear 409; the unique

@@ -359,6 +359,16 @@ const OPERATIONS: readonly Operation[] = [
             releases().createLink(ctx, SITE, "release_1", { days: 7 }),
         allowed: ["OWNER", "ADMIN"],
     },
+    // Going live with one changes what the public sees: the same act as
+    // publishing (T7).
+    {
+        what: "go live with a test release",
+        handler: "list",
+        target: releaseRoute("goLive"),
+        method: "POST",
+        run: (ctx) => releases().goLive(ctx, SITE, "release_1"),
+        allowed: ["OWNER", "ADMIN"],
+    },
     {
         what: "discard a test release",
         handler: "list",

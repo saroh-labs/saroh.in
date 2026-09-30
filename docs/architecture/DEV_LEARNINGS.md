@@ -263,7 +263,15 @@ transaction. Version history already marks bypass rows by `publicationId`, and
 the restore confirm now says a change request is outstanding before it
 happens. Any new path that repoints `Site.currentPublicationId` must do the
 same.
-**Category**: sites · tests in `sites-editing.service.spec.ts`
+**Since DEC-071 (T7)** that rule is structural, not remembered: publish,
+restore and a test release's Go live all call `putLive`
+(`apps/api.saroh.in/src/modules/sites/live-pointer.ts`), which asks the
+review standing, appends the LIVE row with its route, repoints the site and
+writes the BYPASSED record in one place. `live-pointer.source.spec.ts` fails
+if `currentPublicationId` is written anywhere else in `modules/sites`, so a
+new path that puts something live has to go through it.
+**Category**: sites · tests in `sites-editing.service.spec.ts`,
+`live-pointer.source.spec.ts`, `test-release-go-live.db.spec.ts`
 
 ## Sites — a changed search title reads "the live site matches your draft" (#282)
 
@@ -1403,6 +1411,7 @@ landed) are re-gated when they land together: run `pnpm prepush --int`
 per unit. A uniqueness check across businesses reads outside the org
 context (`docs/patterns/backend-data-and-money.md`).
 **Category**: gate · RLS · copy
+
 ## Merges — a new guard and a new string landed in one batch, and the guard failed (L2)
 
 **Symptom**: on `batch-2026-09-30-5`, `src/common/merchant-copy.spec.ts`
@@ -1416,6 +1425,7 @@ put them together with nothing re-running the unit suite on the result.
 catalogue check), run the API unit suite on the batch before starting the
 next wave from it.
 **Category**: merges · testing · DEC-069
+
 ## Batch — a DEC-074 refusal said "storefront" once L11's copy scan landed (K2)
 
 **Symptom**: `api-unit` failed on `batch-2026-09-30-5` itself:
@@ -1430,3 +1440,128 @@ change, since it blocked its gate).
 before branching the next wave from it; a scan added by one unit judges every
 other unit's strings.
 **Category**: batches · copy · DEC-069
+
+## Capabilities — Sell's store slug read as free under RLS (batch 2026-09-30-5)
+
+**Problem**: on `batch-2026-09-30-5`, `pnpm prepush --int` failed only in
+`int-rls`. `module-setup.db.spec.ts` (L13) failed with a unique constraint
+error on `tx.store.create`. The base also failed `api-unit`, because
+`merchant-copy.spec.ts` (L9) found "storefront" in `OTHER_LOCATION_REFUSAL`.
+**Root cause**: `freeStoreSlug` checked a globally unique `Store.slug` through
+the request's `tx`. Under RLS that client sees only this business's stores,
+so a slug another business held read as free. The copy line was left behind
+by a merge: two units, one merge.
+**Fix**: under RLS with an org context, the slug is read in
+`outsideOrgContext` (`module-setup.writers.ts`). The refusal now says
+"location". Both fixes landed with T3 (#754).
+**Rule**: every uniqueness check on a column unique across businesses is read
+outside the org context, as `site-address.ts` does. Test releases' host
+lookups (`site-host-mode.ts`, `test-release-lookup.ts`) follow the same rule.
+**Category**: RLS · tests · merge
+
+## Invoices — a rule moved, and the sentences that described it stayed
+
+**Problem**: after K6 (DEC-070) made invoices work without Payments, three
+places still said the old rule: turning Payments off promised "their pay
+links still work" (`module-deactivation-impact.ts`), the Modules list said
+Payments is where you "send invoices", and the workspace offered "Copy pay
+link" and "Issue with pay link" from a connected provider alone — a link the
+API now refuses with Payments off.
+**Root cause**: the rule was changed where it is enforced, and the words and
+the workspace's own guesses (`online.providerConnected`) were not searched
+for. `navRowsForModule` also listed Invoices as a Payments row, so turning
+Payments off would have said Invoices go with it.
+**Fix**: K7 reads `send.payOnline` (`paysOnline` in `lib/invoices/send.ts`)
+for every pay-link offer on an invoice, `payLinkPossible` for New and Edit,
+rewords the impact line and the Modules note, and a rail row can stand in
+for a module's page while it is off (`unlessModule`), which
+`navRowsForModule` skips.
+**Rule**: when a gate moves, grep the copy for the old promise ("pay link",
+"with Payments") as well as the code, and let the workspace read the API's
+flag rather than rebuild the rule from a provider list.
+**Category**: copy · invoices · nav
+
+## e2e — a @serial test on the phone is project "phone-serial", not "phone"
+
+**Problem**: K7's @serial spec took the desk path on the phone and failed
+looking for the desk rail ("Primary") at Pixel width.
+**Root cause**: `e2e/run.mjs` runs @serial tests in their own projects,
+`desk-serial` and `phone-serial`. `testInfo.project.name === "phone"` is
+false there, so a phone branch in a @serial spec never runs — and where the
+phone branch only adds checks (`module-turn-on.spec.ts`'s sheet and 44px
+asserts), it passes without checking them.
+**Fix**: `project.name.startsWith("phone")` in the spec.
+**Rule**: in a spec that can be @serial, test the project with
+`startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
+worth the same change.
+**Category**: e2e · tests
+
+## E2E — a business a test sets up has no modules and no rollout flags (L4)
+
+**Problem**: L4's browser spec had to change a web address on a business of
+its own (Northwind's address is read by every other spec), and to show that
+the new host serves. A business set up through onboarding in the seeded
+stack could neither change its address nor have a website.
+**Root cause**: the seed registers every rollout flag dark
+(`enabledByDefault: false`) and gives overrides only to the businesses it
+makes. A business made at test time gets the production default for each,
+so `MODULE_WEBSITE` and `WEB_ADDRESS_CHANGE` are off for it, and there is
+no staff session in `e2e/` to give it an override.
+**Fix**: the seed registers `WEB_ADDRESS_CHANGE` on by default (a release
+order, not a surface a business chooses). `e2e/fixtures/own-business.ts`
+(`makeBusiness`) sets one up as Asha. The spec covers the change on a
+business with no site, where the old address is kept rather than
+forwarded. The forwarding half (the new host serves, the old one answers 307) waits for a way to give a test-made business a site.
+**Rule**: before planning a spec on a business the test makes, check which
+flags it will have. Only a flag with a seeded global default reaches it.
+**Category**: e2e · flags · DEC-069
+
+## Gate — the shared browser worktree ran a spec this tree doesn't have (T4)
+
+**Symptom**: T4's `pnpm prepush --e2e` failed on
+`tests/web-address-change.spec.ts`, a spec that is not in T4's tree. It
+failed on the address it expected, not on anything T4 touched. The same
+run also had `public-booking` and `site-sign-in` fail on one project each.
+A rerun passed all of them.
+**Cause**: parallel units share one detached browser worktree
+(`$TMPDIR/saroh-prepush-e2e`). `e2e_worktree` moved it to HEAD with
+`checkout -f`, which leaves untracked files in place, so a spec another
+unit's run left there ran against this tree.
+**Fix**: `e2e_worktree` cleans untracked files after the checkout. Ignored
+files (node_modules, .next) stay, so the build cache is kept.
+**Rule**: a failing browser spec that isn't in `e2e/tests` of your tree is
+the shared worktree's leftover, not your change.
+**Category**: gate · parallel units
+
+## e2e — a business a test sets up can't turn a module on
+
+**Problem**: L8's first spec set up a business as `founder` and turned on
+Contacts, Bookings, Sell and Website through `PUT modules/:key`; every call
+came back 400 "CRM isn't available for your business yet".
+**Root cause**: each module sits behind its `MODULE_*` rollout flag
+(DEC-057). The seed creates those flags with `enabledByDefault: false` and
+turns them on only through overrides for the seeded businesses
+(`seed/run.ts`). A business made during a test has no override, and no e2e
+session is staff, so nothing can roll a module out to it.
+**Fix**: `share-links.spec.ts` reads Northwind instead (its Online location
+has no orders, so the Orders first run is reachable), and the booking
+page's first run stays in vitest.
+**Rule**: a spec that needs a module on uses a seeded business. A business
+the test makes (setup, the web-address change) is for what needs no module.
+**Category**: e2e · tests · modules
+
+## e2e — a booking test took "the first open day" and failed late in the day
+
+**Problem**: `site-sign-in.spec.ts` A9 failed on the phone in CI (#767) and in
+T7's local run, both in the afternoon: "element(s) not found" for the second
+free time.
+**Root cause**: the desk takes the first time on the first open day and the
+phone the second. Late in the day, today is still open but has one time
+left, so the phone's slot doesn't exist. The test assumed the day, and the
+clock decided.
+**Fix**: `chooseTime` reads each day's "N times free" and picks the first day
+with two.
+**Rule**: a booking test reads the day it books from the page or the API.
+Never "today", "the first open day" or "N days from now" (see also the
+Saturday failure above).
+**Category**: e2e · tests · dates

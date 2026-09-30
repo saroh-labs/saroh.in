@@ -57,6 +57,25 @@ describe("seats", () => {
         ]);
     });
 
+    it("puts Invoices in More with Payments off, marked while you're on it (DEC-070)", () => {
+        const withoutPayments = EVERYTHING.filter((k) => k !== "PAYMENTS");
+        const home = buildMobileNav({
+            groups: ownerNav(withoutPayments),
+            pathname: "/",
+        });
+        expect(labels(home.tabs)).not.toContain("Invoices");
+        const sheet = home.groups.flatMap((g) => g.rows);
+        expect(sheet.map((r) => r.href)).toContain("/billing/invoices");
+        const on = buildMobileNav({
+            groups: ownerNav(withoutPayments),
+            pathname: "/billing/invoices/inv_1",
+        });
+        const row = on.groups
+            .flatMap((g) => g.rows)
+            .find((r) => r.href === "/billing/invoices");
+        expect(row?.current).toBe(true);
+    });
+
     it("keeps Sell seated when you are in it, without seating it twice", () => {
         expect(seatPreference("Sell")).toEqual([
             "Home",

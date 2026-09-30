@@ -4,7 +4,6 @@ import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
-import { env } from "@/env";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
     orderPowers,
@@ -21,15 +20,12 @@ import {
     ordersHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
-import { storefrontShareUrl } from "@/lib/orders/share";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCataloguePage } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
-import { listSites } from "@/lib/sites/service";
+import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import { listBusinessStores } from "@/lib/stores/service";
-
-/** Where a merchant's subdomain lives, as the Website screen reads it. */
-const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
 
 /**
  * Sell → Orders: every order in the business, a page at a time (plan B, B3).
@@ -116,15 +112,14 @@ export default async function OrdersPage({
     if (query.cursor && page.rows.length === 0) {
         redirect(ordersHref(query, { cursor: null, back: [] }));
     }
-    // No orders yet: "Share your storefront" copies the live site's address
-    // (B7's first run, built in B8). Only then is the site read, and a read
-    // that fails just leaves the button out.
-    const shareUrl =
+    // No orders yet: share the online shop while it is live, else the
+    // website (B7's first run; DEC-069, L8), on the business's own origin.
+    // Only then is the web address read, and a read that fails (or a role
+    // it isn't shown to) just leaves the button out.
+    const share =
         page.rows.length === 0 &&
         ordersEmptyCopy(query, null).kind === "first-run"
-            ? await listSites()
-                  .then((sites) => storefrontShareUrl(sites, ROOT_DOMAIN))
-                  .catch(() => null)
+            ? shareLink(await readWebAddressLinks(), ORDERS_FIRST_RUN)
             : null;
 
     return (
@@ -146,7 +141,7 @@ export default async function OrdersPage({
                 // (DEC-024) and gets the kitchen's view of it.
                 kitchen={!access.money}
                 filterOptions={filterOptions}
-                shareUrl={shareUrl}
+                share={share}
                 newOrder={
                     sells
                         ? {

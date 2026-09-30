@@ -92,6 +92,25 @@ export interface CreatedTestReleaseView {
     link: CreatedTestReleaseLinkView;
 }
 
+/**
+ * What going live did (T7). `replaced` is the version that was live until
+ * now, so the answer can say "replaced the version published 3:10pm by
+ * Asha"; null when the site had never been published.
+ */
+export interface TestReleaseGoLiveView {
+    publicationId: string;
+    publishedAt: Date;
+    /** The review route it took (#278), and whether that was a bypass. */
+    route: ReviewRoute;
+    bypassed: boolean;
+    replaced: {
+        publicationId: string;
+        publishedAt: Date;
+        publishedBy: { name: string | null };
+    } | null;
+    release: TestReleaseView;
+}
+
 export const linkSelect = {
     id: true,
     purpose: true,

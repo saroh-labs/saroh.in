@@ -141,10 +141,10 @@ function UnlinkedSheet({
                         Paying customers to link
                     </SheetTitle>
                     <SheetDescription className="mt-1 text-pretty text-[13px] leading-[1.5] text-muted-foreground">
-                        Each paid at a storefront with an email a contact
-                        already has. Link them if they&apos;re the same person
-                        and their orders join that customer. Saroh never links
-                        anyone on its own.
+                        Each paid at a location with an email a contact already
+                        has. Link them if they&apos;re the same person and their
+                        orders join that customer. Saroh never links anyone on
+                        its own.
                     </SheetDescription>
                 </div>
 

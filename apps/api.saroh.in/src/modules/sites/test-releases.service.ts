@@ -16,6 +16,7 @@ import { checkRenderability } from "./publication-renderability";
 import { draftFingerprint } from "./review-route";
 import { assertSiteInOrg } from "./site-access";
 import { SitesService } from "./sites.service";
+import { goLiveWithRelease } from "./test-release-go-live";
 import type {
     TestReleaseLinkDays,
     TestReleaseLinkPurpose,
@@ -29,6 +30,7 @@ import {
 import type {
     CreatedTestReleaseLinkView,
     CreatedTestReleaseView,
+    TestReleaseGoLiveView,
     TestReleaseLinkView,
     TestReleaseList,
     TestReleaseView,
@@ -48,18 +50,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 /**
- * Test releases (DEC-071, T2): freeze the draft into a named version that is
- * not live, share it by link, and discard it.
+ * Test releases (DEC-071, T2, T7): freeze the draft into a named version that
+ * is not live, share it by link, discard it, or go live with it.
  *
  * The frozen snapshot is an ordinary `Publication` with `kind = 'TEST'`,
  * built by the same strict `buildSnapshot` publish uses, so what a tester
  * sees is byte for byte what going live would write (KTD-1). Making one never
- * touches `Site.currentPublicationId`: nothing here puts anything live.
+ * touches `Site.currentPublicationId`. Only Go live puts anything live, and it
+ * does so through `putLive`, the one path that repoints the site (KTD-3).
  *
  * Who may do what (KTD-11, Q5): making, renaming, discarding and sharing is
  * `site:update`, the people who edit the site; reading the list and opening a
  * release from the workspace is `site:read`, narrowed per site for a
- * reviewer. Everything answers 404 while `SITE_TEST_RELEASES` is off for the
+ * reviewer; going live is `site:publish`. Everything answers 404 while `SITE_TEST_RELEASES` is off for the
  * business (KTD-16).
  */
 
@@ -266,6 +269,60 @@ export class TestReleasesService {
     }
 
     /**
+     * Go live now with a release (R8): exactly its frozen snapshot goes
+     * live, whatever the draft looks like now. Requires `site:publish`, the
+     * same act as publishing.
+     *
+     * Refused (409) for a release that is discarded, already live, or
+     * scheduled (cancel the schedule first), and for one holding a section
+     * this build can no longer draw. It goes through `putLive`, so the review
+     * standing is recorded, a bypass included (#279), and the live form
+     * fields switch with it (#281). The answer says what it replaced.
+     */
+    async goLive(
+        ctx: OrganizationContext,
+        siteId: string,
+        releaseId: string,
+    ): Promise<TestReleaseGoLiveView> {
+        await this.gate(ctx, "site:publish", siteId);
+        const outcome = await prisma.$transaction((tx) =>
+            goLiveWithRelease(tx, {
+                siteId,
+                organizationId: ctx.organizationId,
+                releaseId,
+                actorUserId: ctx.userId,
+            }),
+        );
+        const [release, names] = await Promise.all([
+            this.readOne(ctx, siteId, releaseId),
+            namesFor(
+                outcome.replaced?.publishedByUserId
+                    ? [outcome.replaced.publishedByUserId]
+                    : [],
+            ),
+        ]);
+        const replaced = outcome.replaced;
+        return {
+            publicationId: outcome.publicationId,
+            publishedAt: outcome.publishedAt,
+            route: outcome.route,
+            bypassed: outcome.bypassed,
+            replaced: replaced
+                ? {
+                      publicationId: replaced.publicationId,
+                      publishedAt: replaced.publishedAt,
+                      publishedBy: {
+                          name: replaced.publishedByUserId
+                              ? (names.get(replaced.publishedByUserId) ?? null)
+                              : null,
+                      },
+                  }
+                : null,
+            release,
+        };
+    }
+
+    /**
      * A new link to share a release, lasting 1, 7 or 30 days. Requires
      * `site:update`: deciding who sees unreleased work is the editor's call,
      * as it is for a preview link.
@@ -343,7 +400,7 @@ export class TestReleasesService {
      */
     private async gate(
         ctx: OrganizationContext,
-        action: "site:read" | "site:update",
+        action: "site:read" | "site:update" | "site:publish",
         siteId: string,
     ): Promise<{ id: string; subdomain: string | null }> {
         authorize(ctx, action);

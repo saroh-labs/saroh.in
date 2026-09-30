@@ -10,11 +10,11 @@ import { useState } from "react";
 import { dismissStorefrontTeamNotice } from "@/lib/organizations/member-actions";
 import type { StorefrontTeamNoticePerson } from "@/lib/organizations/members";
 
-/** "3 people from your storefronts are now on your team as Storefront team". */
+/** "3 people from your locations are now on your team as Location team". */
 export function storefrontNoticeTitle(count: number, roleLabel: string) {
     return count === 1
-        ? `1 person from your storefronts is now on your team as ${roleLabel}`
-        : `${count} people from your storefronts are now on your team as ${roleLabel}`;
+        ? `1 person from your locations is now on your team as ${roleLabel}`
+        : `${count} people from your locations are now on your team as ${roleLabel}`;
 }
 
 /**
@@ -73,8 +73,8 @@ export function StorefrontTeamNotice({
                     </p>
                     <p className="mt-0.5 text-[12px] leading-[1.5] text-muted-foreground">
                         They can see the team, and see and move their own
-                        storefront&apos;s orders, but not customers, bookings or
-                        money. What they do in their storefront hasn&apos;t
+                        location&apos;s orders, but not customers, bookings or
+                        money. What they do in their location hasn&apos;t
                         changed. Change a role if someone needs more.
                     </p>
                 </div>

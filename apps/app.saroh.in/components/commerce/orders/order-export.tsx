@@ -66,7 +66,7 @@ export function OrderExport({
         } else {
             showError(
                 `Only the newest ${rows.length} orders were exported.`,
-                "Narrow the list, by date or storefront, to export the rest.",
+                "Narrow the list, by date or location, to export the rest.",
             );
         }
     }

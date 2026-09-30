@@ -19,6 +19,25 @@ export function mayRead(
     return organization.role === "OWNER" || organization.role === "ADMIN";
 }
 
+/**
+ * Where `/billing` lands: Subscriptions, unless it can't be shown — Payments
+ * is off (invoices need no module, DEC-070) or the role reads invoices and
+ * not subscriptions — then Invoices. Subscriptions' own gate explains
+ * anything else.
+ */
+export function billingLanding(
+    organization: Pick<Organization, "role" | "actions"> | null,
+    paymentsOn: boolean,
+): "/billing/subscriptions" | "/billing/invoices" {
+    const SUBSCRIPTIONS = "/billing/subscriptions";
+    const INVOICES = "/billing/invoices";
+    if (!mayRead(organization, "invoice:read")) return SUBSCRIPTIONS;
+    if (!paymentsOn) return INVOICES;
+    return mayRead(organization, "subscription:read")
+        ? SUBSCRIPTIONS
+        : INVOICES;
+}
+
 /** Whose role it is, as the locked card names it. */
 type Viewer = Pick<Organization, "role" | "roleKey" | "roleLabel" | "actions">;
 

@@ -24,6 +24,11 @@ describe("redactHeaders", () => {
         expect(out["x-saroh-relay"]).toBe(REDACTED);
         expect(out["X-Customer-Session"]).toBe(REDACTED);
     });
+
+    it("redacts a test release link's token (DEC-071, KTD-6)", () => {
+        const out = redactHeaders({ "X-Saroh-Test-Token": "secret" });
+        expect(out["X-Saroh-Test-Token"]).toBe(REDACTED);
+    });
 });
 
 describe("redactObject", () => {

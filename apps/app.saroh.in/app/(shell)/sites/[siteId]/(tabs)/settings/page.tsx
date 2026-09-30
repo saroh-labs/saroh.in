@@ -4,6 +4,11 @@ import { SiteSettings } from "@/components/sites/site-settings";
 import { SiteSettingsRead } from "@/components/sites/site-settings-read";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
+import { siteAddressOf } from "@/lib/sites/share-links";
+import {
+    readWebAddressLinks,
+    RENDERER_APEX,
+} from "@/lib/sites/share-links-read";
 
 export const metadata = { title: "Settings · Website" };
 
@@ -27,17 +32,22 @@ export default async function SiteSettingsPage({
     const { siteId } = await params;
     await requireSession();
 
-    const site = await getSite(siteId);
+    const [site, webAddress] = await Promise.all([
+        getSite(siteId),
+        readWebAddressLinks(),
+    ]);
     if (!site) notFound();
+    // Where the site is reached, its verified domain first (DEC-069, L8).
+    const address = siteAddressOf(site, webAddress, RENDERER_APEX);
 
     return (
         <div className="max-w-2xl">
             {site.can.manageSettings ? (
-                <SiteSettings site={site} />
+                <SiteSettings site={site} address={address} />
             ) : (
                 // The values, and none of the controls the API would refuse
                 // (#275).
-                <SiteSettingsRead site={site} />
+                <SiteSettingsRead site={site} address={address} />
             )}
         </div>
     );

@@ -311,7 +311,7 @@ function paymentEntry(
                 ? "Needs its webhook signing secret — payments can't be confirmed until you add it."
                 : stores.length > 0
                   ? sentence(`Takes online payments at ${words(stores)}`)
-                  : "Ready to take online payments — no storefront's checkout uses it yet.",
+                  : "Ready to take online payments — no location's checkout uses it yet.",
         fix: noKey ? "Add key id" : noSecret ? "Add webhook secret" : null,
         update: live
             ? lastUpdateLine(

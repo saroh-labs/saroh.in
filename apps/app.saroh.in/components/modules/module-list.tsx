@@ -96,9 +96,11 @@ const DISPLAY: Partial<Record<string, { label?: string; note: string }>> = {
     CRM: { label: "Contacts", note: "People who are not customers yet." },
     COMMERCE: {
         label: "Sell",
-        note: "Orders, products, customers and storefronts.",
+        note: "Orders, products, customers and locations.",
     },
-    PAYMENTS: { note: "Take subscriptions, send invoices and sell plans." },
+    PAYMENTS: {
+        note: "Take subscriptions, sell plans and take payment online.",
+    },
     WEBSITE: { note: "Pages, posts and a domain." },
     APPOINTMENTS: { note: "A calendar, services and bookings." },
     COURSES: { note: "A run of dated sessions with seats and a price." },

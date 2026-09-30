@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { storefrontNoticeTitle } from "@/components/organizations/storefront-team-notice";
 
-import { storefrontRolesLine } from "./storefront-team";
+import { shownRoleLabel, storefrontRolesLine } from "./storefront-team";
 
 describe("storefront roles under a person's name (F16)", () => {
     it("names each storefront with the role in words", () => {
@@ -21,11 +21,11 @@ describe("storefront roles under a person's name (F16)", () => {
 
 describe("the storefront people notice's title", () => {
     it("counts people, and says one person in the singular", () => {
-        expect(storefrontNoticeTitle(3, "Storefront team")).toBe(
-            "3 people from your storefronts are now on your team as Storefront team",
+        expect(storefrontNoticeTitle(3, "Location team")).toBe(
+            "3 people from your locations are now on your team as Location team",
         );
-        expect(storefrontNoticeTitle(1, "Storefront team")).toBe(
-            "1 person from your storefronts is now on your team as Storefront team",
+        expect(storefrontNoticeTitle(1, "Location team")).toBe(
+            "1 person from your locations is now on your team as Location team",
         );
     });
 
@@ -33,5 +33,18 @@ describe("the storefront people notice's title", () => {
         expect(storefrontNoticeTitle(2, "Shop floor")).toMatch(
             /as Shop floor$/,
         );
+    });
+});
+
+describe("the role's name on screen (DEC-069, L10)", () => {
+    it("shows the stored default as Location team", () => {
+        expect(shownRoleLabel("Storefront team")).toBe("Location team");
+    });
+
+    it("keeps a name the business chose, and nothing stays nothing", () => {
+        expect(shownRoleLabel("Shop floor")).toBe("Shop floor");
+        expect(shownRoleLabel("Admin")).toBe("Admin");
+        expect(shownRoleLabel(null)).toBeNull();
+        expect(shownRoleLabel(undefined)).toBeUndefined();
     });
 });

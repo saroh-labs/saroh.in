@@ -24,7 +24,6 @@ export const KAVI = {
     slug: "kavi-dental",
     /** The one storefront, with nothing listed: E9's treatment orders go here. */
     storeId: kaviId("store"),
-    storeSlug: "kavi-dental",
     siteSlug: "kavi-dental",
     prefix: kaviId(""),
 } as const;

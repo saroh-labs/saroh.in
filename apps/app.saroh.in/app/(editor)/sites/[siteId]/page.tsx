@@ -1,7 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 
 import { SiteEditor } from "@/components/sites/site-editor";
-import { env } from "@/env";
 import { requireSession } from "@/lib/session";
 import { parseSectionContent } from "@saroh/block-contract";
 
@@ -13,6 +12,11 @@ import {
     getSiteFlags,
     listComments,
 } from "@/lib/sites/service";
+import { siteAddressOf } from "@/lib/sites/share-links";
+import {
+    readWebAddressLinks,
+    RENDERER_APEX,
+} from "@/lib/sites/share-links-read";
 
 /**
  * Site editor host (S2-004). Resolves the site (notFound when missing / not
@@ -20,9 +24,6 @@ import {
  * editable draft, and hands the draft sections to the client SiteEditor. The
  * editing + live preview happen client-side; only Save/Publish hit the API.
  */
-/** Matches the sites index; the renderer defaults the same way. */
-const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
-
 export default async function SiteEditorPage({
     params,
     searchParams,
@@ -65,11 +66,13 @@ export default async function SiteEditorPage({
     // Flags are whole-site, so they load alongside the page rather than per
     // page — the pre-publish check groups them by page and cannot be answered
     // from the one page that happens to be open.
-    const [draft, flags, comments, review] = await Promise.all([
+    const [draft, flags, comments, review, webAddress] = await Promise.all([
         getPageDraft(siteId, activePage.id),
         getSiteFlags(siteId),
         listComments(siteId),
         getReviewState(siteId),
+        // Where the site is reached, custom domain first (DEC-069, L8).
+        readWebAddressLinks(),
     ]);
     /*
      * Checked against the block contract, not cast into it (#275).
@@ -140,7 +143,9 @@ export default async function SiteEditorPage({
             canUpdateSite={site.can.manageSettings}
             initialStyle={site.style}
             styleOptions={site.styleOptions}
-            address={site.subdomain ? `${site.subdomain}.${ROOT_DOMAIN}` : null}
+            address={
+                siteAddressOf(site, webAddress, RENDERER_APEX)?.host ?? null
+            }
             // The API sends where the site sells from only while the shop is
             // open for the business; only then is a Product grid offered.
             shopOpen={site.sellsFrom != null}

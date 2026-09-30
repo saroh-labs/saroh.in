@@ -67,7 +67,7 @@ export function ordersToCsv(orders: OrderRow[]): string {
                   },
               ]
             : []),
-        { head: "Storefront", value: (o) => o.store.name },
+        { head: "Location", value: (o) => o.store.name },
         { head: "Fulfilment", value: (o) => o.fulfilmentLabel },
         { head: "Step", value: (o) => rowProgress(o).word },
         { head: "Late", value: (o) => (o.late ? "Yes" : "No") },

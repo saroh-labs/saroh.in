@@ -170,7 +170,7 @@ export function emptyCopy(
     return {
         kind: "first-run",
         title: "No products yet",
-        note: `Add your first product and it appears in ${storeName ?? "your storefront"} straight away.`,
+        note: `Add your first product and it appears in ${storeName ?? "your location"} straight away.`,
         action: "add-product",
     };
 }

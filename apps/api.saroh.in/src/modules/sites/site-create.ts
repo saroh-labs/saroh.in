@@ -14,13 +14,19 @@ import {
 } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
 
+import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
 import { authorize } from "../organizations/organization-policy";
 import { automaticStorefront } from "./sells-from";
 import { buildTemplateContext } from "./site-access";
-import { addressProblem, addressUse, freeAddress } from "./site-address";
+import {
+    addressProblem,
+    addressUse,
+    freeAddress,
+    releaseExpired,
+} from "./site-address";
 
 /**
  * Creating a website from a template (S2-003), in two halves so a caller
@@ -154,11 +160,102 @@ export async function planSiteFromTemplate(
     }
 }
 
+/** A unique-constraint failure on `field` (Prisma's P2002). */
+function isUniqueViolation(error: unknown, field: string): boolean {
+    if (prismaErrorCode(error) !== "P2002") return false;
+    // Where the column is named differs between the engine (`meta.target`)
+    // and the driver adapter (nested under `meta.driverAdapterError`).
+    const meta = (error as { meta?: unknown }).meta;
+    return JSON.stringify(meta ?? {}).includes(field);
+}
+
+/**
+ * The address a new site is served at (`<address>.saroh.app`), on `tx`. A
+ * site is never made without one (DEC-069, L5): this returns an address, or
+ * refuses in a way the form can put on the field.
+ *
+ * - Asked for: it must pass the shape rules (a 400), and be free — of other
+ *   businesses' setup addresses, their sites and the addresses they still
+ *   hold after a change, and of this business's own other sites, deleted
+ *   ones included, since a site's address is unique.
+ * - Not asked for: the address the business chose at setup, under the same
+ *   rules. It is normally free to them — setup reserved it — but an old
+ *   business's may be in use or fail a rule added since. Then the site is
+ *   not made without one: it is refused, with a free address to offer.
+ *
+ * Every 409 carries `{ field, reason, suggestion }` — `reason` is `taken`,
+ * or `unusable` for a setup address today's rules refuse — the suggestion
+ * from {@link freeAddress}. An expired hold on the address is released first
+ * (L1), so a claim is never refused by a reservation that has run out.
+ */
+export async function claimSiteAddress(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    asked: string | undefined,
+    field = "subdomain",
+): Promise<string> {
+    let address = asked;
+    if (address) {
+        const problem = addressProblem(address);
+        if (problem) {
+            throw new BadRequestException({
+                message: problem,
+                details: { field },
+            });
+        }
+    } else {
+        const business = await tx.organization.findUniqueOrThrow({
+            where: { id: organizationId },
+            select: { slug: true },
+        });
+        address = business.slug;
+        if (addressProblem(address)) {
+            // An address from before today's rules (a `--`, say): usable
+            // where it already is, never claimed anew.
+            const suggestion = await freeAddress(tx, address, organizationId);
+            throw new ConflictException({
+                message: `${address}.saroh.app can't be used for a new site. Choose a web address for it.`,
+                details: {
+                    field,
+                    reason: "unusable",
+                    ...(suggestion ? { suggestion } : {}),
+                },
+            });
+        }
+    }
+
+    await releaseExpired(tx, address);
+    // Read across every business (site-address.ts): under RLS `tx` sees
+    // only this one, and another's claim would look free.
+    const use = await addressUse(tx, address);
+    const another = (owner: string | null) =>
+        owner !== null && owner !== organizationId;
+    const heldElsewhere =
+        another(use.reservedBy) || another(use.heldBy) || another(use.siteOf);
+    // A site of this business's own (a deleted one keeps its address).
+    const ownSite = use.siteOf === organizationId;
+    if (heldElsewhere || ownSite) {
+        const suggestion = await freeAddress(tx, address, organizationId);
+        throw new ConflictException({
+            message: heldElsewhere
+                ? `${address}.saroh.app belongs to another business`
+                : `${address}.saroh.app is already in use`,
+            details: {
+                field,
+                reason: "taken",
+                ...(suggestion ? { suggestion } : {}),
+            },
+        });
+    }
+    return address;
+}
+
 /**
  * Write the planned site on `tx`. `subdomain` is the address asked for, if
  * any; `addressField` names it in a refusal (`subdomain` for `/sites/new`,
- * `setup.address` for the Turn on sheet). A refusal over an address in use
- * carries a free one in `details.suggestion` (DEC-069).
+ * `setup.address` for the Turn on sheet). Without one, the site takes its
+ * business's own address, or is refused with a free one to offer
+ * (`details.suggestion`, DEC-069): `subdomain` is always set.
  */
 export async function writeSiteFromTemplate(
     tx: Prisma.TransactionClient,
@@ -184,93 +281,39 @@ export async function writeSiteFromTemplate(
         );
     }
 
-    /*
-     * Where the site is served (`<subdomain>.saroh.app`).
-     *
-     * Asked for: it must be a usable address, free of other sites,
-     * and not the address ANOTHER business reserved at setup or still
-     * holds after a change — that is a promise (see site-address.ts),
-     * and a site taking it would break it.
-     *
-     * Not asked for: the site takes the address its own business
-     * reserved, while no site of theirs uses it yet — so the address
-     * a merchant chose at setup is where their first website appears.
-     */
-    let subdomain = options.subdomain;
-    if (subdomain) {
-        const problem = addressProblem(subdomain);
-        if (problem) {
-            throw new BadRequestException({
-                message: problem,
-                details: { field },
-            });
-        }
-        // Read across every business (site-address.ts): under RLS `tx`
-        // sees only this one, and another's claim would look free.
-        const use = await addressUse(tx, subdomain);
-        const another = (owner: string | null) =>
-            owner !== null && owner !== ctx.organizationId;
-        if (another(use.reservedBy) || another(use.heldBy)) {
-            const suggestion = await freeAddress(
-                tx,
+    const subdomain = await claimSiteAddress(
+        tx,
+        ctx.organizationId,
+        options.subdomain,
+        field,
+    );
+
+    let site: { id: string; slug: string };
+    try {
+        site = await tx.site.create({
+            data: {
+                organizationId: ctx.organizationId,
+                name: plan.name,
+                slug: plan.slug,
                 subdomain,
-                ctx.organizationId,
-            );
-            throw new ConflictException({
-                message: `${subdomain}.saroh.app belongs to another business`,
-                details: {
-                    field,
-                    reason: "taken",
-                    ...(suggestion ? { suggestion } : {}),
-                },
-            });
-        }
-    } else {
-        const business = await tx.organization.findUnique({
-            where: { id: ctx.organizationId },
-            select: { slug: true },
+                // Where it sells from (G11): set only when there is
+                // exactly one candidate, and the settings say so.
+                storefrontId: await automaticStorefront(tx, ctx.organizationId),
+            },
+            select: { id: true, slug: true },
         });
-        if (business?.slug && !addressProblem(business.slug)) {
-            subdomain = business.slug;
-        }
-    }
-
-    // Subdomain is globally unique when set; reject a clash up front
-    // rather than surfacing a raw constraint error. A default that
-    // turns out to be in use is simply not taken, not an error.
-    if (subdomain) {
-        // Any website at it, another business's too (read across them all).
-        const taken = (await addressUse(tx, subdomain)).siteOf !== null;
-        if (taken && options.subdomain) {
-            const suggestion = await freeAddress(
-                tx,
-                subdomain,
-                ctx.organizationId,
-            );
+    } catch (error) {
+        // Another site took the address between the check and this write.
+        // The transaction is spent, so there is no suggestion to look up:
+        // asking again gets one.
+        if (isUniqueViolation(error, "subdomain")) {
             throw new ConflictException({
-                message: `The subdomain "${subdomain}" is already taken`,
-                details: {
-                    field,
-                    reason: "taken",
-                    ...(suggestion ? { suggestion } : {}),
-                },
+                message: `${subdomain}.saroh.app was just taken. Choose another address.`,
+                details: { field, reason: "taken" },
             });
         }
-        if (taken) subdomain = undefined;
+        throw error;
     }
-
-    const site = await tx.site.create({
-        data: {
-            organizationId: ctx.organizationId,
-            name: plan.name,
-            slug: plan.slug,
-            subdomain,
-            // Where it sells from (G11): set only when there is
-            // exactly one candidate, and the settings say so.
-            storefrontId: await automaticStorefront(tx, ctx.organizationId),
-        },
-        select: { id: true, slug: true },
-    });
 
     for (const page of plan.pages) {
         await tx.page.create({

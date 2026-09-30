@@ -22,7 +22,8 @@
  *
  * `GET …/modules/:key/setup-defaults` is what the sheet shows before
  * anything is saved: the payload prefilled, what else turns on with it,
- * and whether the business may see the module at all.
+ * and whether the business may see the module at all. The prefill follows
+ * the business's kind (DEC-070); nothing else here reads it.
  */
 import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
@@ -31,8 +32,10 @@ import type { OrganizationContext } from "../../../common/types/organization-con
 import { EntitlementService } from "../../billing/entitlement.service";
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { storefrontTypesOf } from "../../orders/fulfilment";
+import type { OrganizationKind } from "../../organizations/organization-kind";
+import { organizationKind } from "../../organizations/organization-kind";
 import { authorize } from "../../organizations/organization-policy";
-import { freeAddress } from "../../sites/site-address";
+import { siteDefaults } from "../../sites/site-address";
 import { ModuleLifecycleService } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
 import { MODULE_BY_KEY, moduleRolledOut } from "../module-registry";
@@ -85,19 +88,45 @@ export interface ModuleSetupDefaults {
     alsoWebsite?: boolean;
 }
 
-/** Mon–Sat, 10:00–19:00 (DEC-068's default). */
-const DEFAULT_HOURS = [1, 2, 3, 4, 5, 6].map((weekday) => ({
-    weekday,
-    open: "10:00",
-    close: "19:00",
-}));
+/** Opening hours, one row per weekday (0 = Sunday). */
+function hours(weekdays: number[], open: string, close: string) {
+    return weekdays.map((weekday) => ({ weekday, open, close }));
+}
 
 /**
- * The first service's suggestion. A business's type is its legal form
- * (`business-type.ts`), which says nothing about what it offers, so there
- * is no sensible mapping yet: the name and price are left blank.
+ * The Bookings sheet's prefill per kind (DEC-070, KTD-6). Only the prefill:
+ * whatever the merchant sends back is what is saved, and every kind may
+ * turn Bookings on.
+ *
+ * A business, and a site for someone's work: Mon–Sat, 10:00–19:00
+ * (DEC-068's default), and the first service left blank. A business's type
+ * is its legal form (`business-type.ts`), which says nothing about what it
+ * offers, so there is no sensible name or price to suggest.
+ *
+ * Just me: a freelancer or consultant keeps weekday hours, 10:00–18:00, and
+ * is most often booked for a conversation, so the first service is an
+ * hour's "Consultation" with no price.
  */
-const SERVICE_SUGGESTION = { name: "", durationMinutes: 60, price: "" };
+const BOOKINGS_DEFAULTS: Record<
+    OrganizationKind,
+    {
+        hours: { weekday: number; open: string; close: string }[];
+        service: { name: string; durationMinutes: number; price: string };
+    }
+> = {
+    BUSINESS: {
+        hours: hours([1, 2, 3, 4, 5, 6], "10:00", "19:00"),
+        service: { name: "", durationMinutes: 60, price: "" },
+    },
+    SOLO: {
+        hours: hours([1, 2, 3, 4, 5], "10:00", "18:00"),
+        service: { name: "Consultation", durationMinutes: 60, price: "" },
+    },
+    WORK: {
+        hours: hours([1, 2, 3, 4, 5, 6], "10:00", "19:00"),
+        service: { name: "", durationMinutes: 60, price: "" },
+    },
+};
 
 @Injectable()
 export class ModuleSetupService {
@@ -152,7 +181,7 @@ export class ModuleSetupService {
         const [org, rolledOut] = await Promise.all([
             prisma.organization.findUniqueOrThrow({
                 where: { id: organizationId },
-                select: { name: true, slug: true },
+                select: { name: true },
             }),
             moduleRolledOut(this.flags, moduleKey, organizationId),
         ]);
@@ -186,16 +215,20 @@ export class ModuleSetupService {
                 };
             }
             case "APPOINTMENTS": {
-                const service = await prisma.service.findFirst({
-                    where: { organizationId, deletedAt: null },
-                    orderBy: { createdAt: "asc" },
-                    select: { id: true },
-                });
+                const [service, kind] = await Promise.all([
+                    prisma.service.findFirst({
+                        where: { organizationId, deletedAt: null },
+                        orderBy: { createdAt: "asc" },
+                        select: { id: true },
+                    }),
+                    organizationKind(prisma, organizationId),
+                ]);
+                const suggestion = BOOKINGS_DEFAULTS[kind];
                 return {
                     ...base,
                     setup: {
-                        hours: DEFAULT_HOURS,
-                        service: SERVICE_SUGGESTION,
+                        hours: suggestion.hours.map((h) => ({ ...h })),
+                        service: { ...suggestion.service },
                     },
                     existing: service ? { serviceId: service.id } : null,
                 };
@@ -224,12 +257,11 @@ export class ModuleSetupService {
                         existing: { siteId: site.id, address: site.subdomain },
                     };
                 }
-                // The address chosen at setup, or a free one like it.
-                const address =
-                    (await freeAddress(prisma, org.slug, organizationId)) ?? "";
+                // The address chosen at setup, or a free one like it: the
+                // same start `/sites/new` has (`GET …/sites/new-defaults`).
                 return {
                     ...base,
-                    setup: { siteName: org.name.slice(0, 120), address },
+                    setup: { ...(await siteDefaults(prisma, organizationId)) },
                     existing: null,
                 };
             }

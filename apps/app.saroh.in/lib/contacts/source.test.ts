@@ -5,10 +5,7 @@ import { contactSourceLabel } from "./source";
 describe("contactSourceLabel", () => {
     it.each([
         ["customers:added", "Added on Customers"],
-        [
-            "store-customer:cmumhl2ru00hm3tsgmpvmp1eo",
-            "An order at a storefront",
-        ],
+        ["store-customer:cmumhl2ru00hm3tsgmpvmp1eo", "An order at a location"],
         ["enquiry:form:f_1", "An enquiry"],
         ["site-account", "Signed in on your website"],
         ["manual", "Added by hand"],

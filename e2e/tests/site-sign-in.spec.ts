@@ -128,14 +128,28 @@ test.describe("site sign-in: in the browser", () => {
     }
 
     /**
-     * The booking page, a service and a free time on the first open day:
-     * the first for the desk, the second for the phone, which runs at the
-     * same moment (`public-booking.spec.ts` books the last days).
+     * The booking page, a service and a free time on the first open day that
+     * still has two: the first for the desk, the second for the phone, which
+     * runs at the same moment (`public-booking.spec.ts` books the last days).
+     * Late in the day, today can have a single time left, so the day is read,
+     * never assumed.
      */
     async function chooseTime(page: Page) {
         const nth = test.info().project.name.startsWith("phone") ? 1 : 0;
         await page.goto(`${SITE}/book`);
         await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
+        const openDays = page.getByRole("radio", { name: /times? free/ });
+        await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
+        const names = await openDays.evaluateAll((days) =>
+            days.map((d) => d.getAttribute("aria-label") ?? d.textContent),
+        );
+        const day = names.findIndex(
+            (name) => Number(/(\d+)\s+times?\s+free/.exec(name)?.[1] ?? 0) >= 2,
+        );
+        expect(day, "an open day with two free times").toBeGreaterThanOrEqual(
+            0,
+        );
+        await openDays.nth(day).click();
         const times = page.locator('[role="radiogroup"] button[role="radio"]', {
             hasText: /^\d{2}:\d{2}$/,
         });

@@ -1,5 +1,6 @@
 import type { CrmResult } from "@/lib/api/http";
 import { destroy, getJson, mutate, orgBase } from "@/lib/api/http";
+import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 
 /**
  * The roles a business has and the permissions they can be given.
@@ -49,7 +50,9 @@ export interface RoleInput {
 export async function listRoles(): Promise<Role[]> {
     const base = await orgBase();
     if (!base) return [];
-    return (await getJson<Role[]>(`${base}/roles`)) ?? [];
+    const roles = (await getJson<Role[]>(`${base}/roles`)) ?? [];
+    // The words on screen, not the stored name (DEC-069, L10).
+    return roles.map((r) => ({ ...r, label: shownRoleLabel(r.label) }));
 }
 
 export async function getRoleCatalogue(): Promise<RoleCatalogue | null> {
@@ -66,12 +69,18 @@ export async function updateRole(
     key: string,
     input: Partial<RoleInput>,
 ): Promise<CrmResult<Role>> {
-    return mutate<Role>(
+    const res = await mutate<Role>(
         `/roles/${encodeURIComponent(key)}`,
         "PATCH",
         input,
         "Could not save that role.",
     );
+    return res.ok
+        ? {
+              ...res,
+              data: { ...res.data, label: shownRoleLabel(res.data.label) },
+          }
+        : res;
 }
 
 export async function deleteRole(key: string): Promise<CrmResult<object>> {

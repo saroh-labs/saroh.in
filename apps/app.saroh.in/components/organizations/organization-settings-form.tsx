@@ -358,6 +358,7 @@ export function OrganizationSettingsForm({
     canEdit,
     hours,
     canEditHours,
+    webAddress,
 }: {
     settings: OrganizationSettings;
     canEdit: boolean;
@@ -365,6 +366,11 @@ export function OrganizationSettingsForm({
     hours: StorefrontHoursRead;
     /** May change the storefronts, which is where hours are kept. */
     canEditHours: boolean;
+    /**
+     * The web address card (DEC-069, L4), drawn under Identity. It saves on
+     * its own, so it sits beside this form's `<form>`, never inside it.
+     */
+    webAddress?: React.ReactNode;
 }) {
     const router = useRouter();
     // What the API last said, so the cards read the saved values at once
@@ -1126,49 +1132,52 @@ export function OrganizationSettingsForm({
 
             <div className="flex flex-wrap items-start gap-5">
                 {tab === "hours" ? null : (
-                    <form
-                        id="business-panel"
-                        role="tabpanel"
-                        aria-labelledby={`business-tab-${tab}`}
-                        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-                        className="grid min-w-0 flex-[1_1_460px] gap-4"
-                    >
-                        <BusinessSection
-                            title={SECTIONS[tab].title}
-                            lead={SECTIONS[tab].lead}
-                            rows={rows[tab]}
-                            note={notes[tab]}
-                            editing={editing === tab}
-                            canEdit={canEdit}
-                            onEdit={() => startEditing(tab)}
-                            onCancel={cancel}
-                            saveOff={!isDirty || sectionErrors > 0}
-                            saving={isSubmitting}
-                            saveWhy={saveWhy}
-                            top={
-                                tab === "identity" ? (
-                                    <BusinessLogoRow
-                                        logoUrl={settings.logo?.url ?? null}
-                                        name={settings.name}
-                                        canEdit={canEdit}
-                                        onSaved={(next, said) => {
-                                            undo.offer(
-                                                said,
-                                                logoCardUndo(
-                                                    settings,
-                                                    next,
-                                                    setSettings,
-                                                ),
-                                            );
-                                            setSettings(next);
-                                        }}
-                                    />
-                                ) : undefined
-                            }
+                    <div className="grid min-w-0 flex-[1_1_460px] gap-4">
+                        <form
+                            id="business-panel"
+                            role="tabpanel"
+                            aria-labelledby={`business-tab-${tab}`}
+                            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+                            className="grid min-w-0 gap-4"
                         >
-                            {fieldsOf[tab]}
-                        </BusinessSection>
-                    </form>
+                            <BusinessSection
+                                title={SECTIONS[tab].title}
+                                lead={SECTIONS[tab].lead}
+                                rows={rows[tab]}
+                                note={notes[tab]}
+                                editing={editing === tab}
+                                canEdit={canEdit}
+                                onEdit={() => startEditing(tab)}
+                                onCancel={cancel}
+                                saveOff={!isDirty || sectionErrors > 0}
+                                saving={isSubmitting}
+                                saveWhy={saveWhy}
+                                top={
+                                    tab === "identity" ? (
+                                        <BusinessLogoRow
+                                            logoUrl={settings.logo?.url ?? null}
+                                            name={settings.name}
+                                            canEdit={canEdit}
+                                            onSaved={(next, said) => {
+                                                undo.offer(
+                                                    said,
+                                                    logoCardUndo(
+                                                        settings,
+                                                        next,
+                                                        setSettings,
+                                                    ),
+                                                );
+                                                setSettings(next);
+                                            }}
+                                        />
+                                    ) : undefined
+                                }
+                            >
+                                {fieldsOf[tab]}
+                            </BusinessSection>
+                        </form>
+                        {tab === "identity" ? webAddress : null}
+                    </div>
                 )}
                 {/* Mounted on every tab, so an unsaved week survives a look
                     elsewhere, as the other cards' fields do. */}

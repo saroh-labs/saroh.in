@@ -51,7 +51,7 @@ export function StorefrontFilter({
 }) {
     const current = stores.find((s) => s.id === value);
     const choices = [
-        { id: null, name: "All storefronts", n: total },
+        { id: null, name: "All locations", n: total },
         ...stores.map((s) => ({ id: s.id, name: s.name, n: countFor(s.id) })),
     ];
     return (
@@ -63,10 +63,10 @@ export function StorefrontFilter({
                         "h-[38px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground",
                         current && "border-foreground",
                     )}
-                    aria-label={`Storefront filter: ${current?.name ?? "all storefronts"}. Change it.`}
+                    aria-label={`Location filter: ${current?.name ?? "all locations"}. Change it.`}
                 >
                     <Store className="size-4" />
-                    {current?.name ?? "All storefronts"}
+                    {current?.name ?? "All locations"}
                     <ChevronDown className="size-4" />
                 </Button>
             </DropdownMenuTrigger>

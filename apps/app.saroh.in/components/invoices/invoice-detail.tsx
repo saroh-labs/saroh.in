@@ -23,8 +23,10 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { createPayLink } from "@/lib/invoices/actions";
+import type { DetailActionId } from "@/lib/invoices/detail-actions";
+import { detailActions, owedHere } from "@/lib/invoices/detail-actions";
 import { downloadInvoicePdf, hasPdf } from "@/lib/invoices/pdf";
-import { canSend, wasSent } from "@/lib/invoices/send";
+import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
 
@@ -66,6 +68,10 @@ async function copy(text: string): Promise<boolean> {
  * gets "Send with pay link" (issue and send), an unpaid one "Send with pay
  * link" and then "Send reminder", once a day. Where it names none, Saroh
  * doesn't send it: the pay link is copied for the merchant to send.
+ *
+ * Without online payment (`payOnline` false, DEC-070) the link only shows
+ * the invoice: Send reads "Send invoice", and there is no pay link to copy.
+ * The buttons are `detailActions`'.
  */
 export function InvoiceDetail({
     invoice,
@@ -83,6 +89,7 @@ export function InvoiceDetail({
     paper,
     connected,
     after,
+    paymentsOn = true,
 }: {
     invoice: InvoiceRef & { kind: string };
     pill: { label: string; variant: PillVariant };
@@ -111,6 +118,12 @@ export function InvoiceDetail({
     connected: ReactNode;
     /** Under the Payment panel: money to refund, what happened. */
     after: ReactNode;
+    /**
+     * The Payments module is on (unknown reads as on). Only which hint the
+     * Payment panel gives: with it off, connecting a provider wouldn't
+     * make the link take payment, so it isn't suggested.
+     */
+    paymentsOn?: boolean;
 }) {
     const [open, setOpen] = useState<Dialog | null>(null);
     // A pay link waits for the registered address (DEC-068): asked here.
@@ -123,10 +136,11 @@ export function InvoiceDetail({
     const [downloading, setDownloading] = useState(false);
     const s = invoice.standing;
     const credit = invoice.kind === "CREDIT_NOTE";
-    const owed = (s === "ISSUED" || s === "OVERDUE") && !credit && !orderHref;
+    const owed = owedHere({ standing: s, credit, fromOrder: !!orderHref });
     // While autopay is charging it (D13), no link: the customer would pay twice.
     const charging = owed ? (online?.autopayCharge ?? null) : null;
-    const canLink = owed && (online?.providerConnected ?? false) && !charging;
+    // The API says whether its link takes payment (DEC-070); never guessed.
+    const payOnline = paysOnline(send, online);
     const sendable = canWrite && canSend(send);
     const reminding = wasSent(sent);
     const nextReminderAt = send?.nextReminderAt ?? null;
@@ -170,103 +184,39 @@ export function InvoiceDetail({
         if (!res.ok) showError(res.error);
     }
     // Reading the invoice is enough: the PDF is the paper the page shows.
-    const pdf = hasPdf(invoice)
-        ? [
-              {
-                  label: downloading ? "Making the PDF…" : "Download PDF",
-                  disabled: downloading,
-                  onClick: () => void downloadPdf(),
-              },
-          ]
-        : [];
-    interface Action {
-        label: string;
-        primary?: boolean;
-        danger?: boolean;
-        onClick?: () => void;
-        href?: string;
-        disabled?: boolean;
-    }
-    const actions: Action[] = [];
-    if (canWrite && s === "DRAFT") {
-        if (sendable) {
-            actions.push({
-                label: "Send with pay link",
-                primary: true,
-                onClick: () => setOpen("draftSend"),
-            });
-        }
-        actions.push(
-            {
-                label: "Issue it",
-                primary: !sendable,
-                onClick: () => setOpen("issue"),
-            },
-            { label: "Edit", href: editHref },
-            {
-                label: "Delete draft",
-                danger: true,
-                onClick: () => setOpen("delete"),
-            },
-        );
-    } else if (canWrite && owed) {
-        if (sendable) {
-            actions.push(
-                reminding
-                    ? {
-                          label: "Send reminder",
-                          primary: true,
-                          // One a day: the Payment panel says when.
-                          disabled: nextReminderAt !== null,
-                          onClick: () => setOpen("remind"),
-                      }
-                    : {
-                          label: "Send with pay link",
-                          primary: true,
-                          onClick: () => setOpen("send"),
-                      },
-            );
-        }
-        if (canLink) {
-            actions.push({
-                label: busy ? "Making a link…" : "Copy pay link",
-                primary: !sendable,
-                disabled: busy,
-                onClick: copyLink,
-            });
-        }
-        actions.push(
-            {
-                label: "Mark paid",
-                primary: !canLink && !sendable,
-                onClick: () => setOpen("pay"),
-            },
-            { label: "Print", onClick: print },
-            ...pdf,
-            {
-                label: "Cancel invoice",
-                danger: true,
-                onClick: () => setOpen("cancel"),
-            },
-        );
-    } else {
-        actions.push({ label: "Print", primary: true, onClick: print }, ...pdf);
-        if (canWrite && s === "PAID" && !credit) {
-            actions.push(
-                orderHref
-                    ? {
-                          label: "Refund on the order",
-                          danger: true,
-                          href: orderHref,
-                      }
-                    : {
-                          label: "Refund…",
-                          danger: true,
-                          onClick: () => setOpen("refund"),
-                      },
-            );
-        }
-    }
+    const does: Record<
+        DetailActionId,
+        { onClick?: () => void; href?: string }
+    > = {
+        draftSend: { onClick: () => setOpen("draftSend") },
+        issue: { onClick: () => setOpen("issue") },
+        edit: { href: editHref },
+        delete: { onClick: () => setOpen("delete") },
+        send: { onClick: () => setOpen("send") },
+        // One a day: the Payment panel says when.
+        remind: { onClick: () => setOpen("remind") },
+        copyLink: { onClick: copyLink },
+        pay: { onClick: () => setOpen("pay") },
+        print: { onClick: print },
+        pdf: { onClick: () => void downloadPdf() },
+        cancel: { onClick: () => setOpen("cancel") },
+        refund: { onClick: () => setOpen("refund") },
+        refundOrder: { href: orderHref ?? undefined },
+    };
+    const actions = detailActions({
+        standing: s,
+        credit,
+        fromOrder: !!orderHref,
+        canWrite,
+        sendable,
+        reminding,
+        reminderWaits: nextReminderAt !== null,
+        payOnline,
+        charging: !!charging,
+        hasPdf: hasPdf(invoice),
+        linkBusy: busy,
+        pdfBusy: downloading,
+    }).map((a) => ({ ...a, ...does[a.id] }));
 
     return (
         <div>
@@ -297,7 +247,7 @@ export function InvoiceDetail({
                         const variant = a.primary ? "default" : "outline";
                         return a.href ? (
                             <Button
-                                key={a.label}
+                                key={a.id}
                                 asChild
                                 variant={variant}
                                 className={cls}
@@ -306,7 +256,7 @@ export function InvoiceDetail({
                             </Button>
                         ) : (
                             <Button
-                                key={a.label}
+                                key={a.id}
                                 type="button"
                                 variant={variant}
                                 className={cls}
@@ -372,20 +322,31 @@ export function InvoiceDetail({
                                         <Copy aria-hidden className="size-4" />
                                     </Button>
                                 </div>
-                            ) : !online?.providerConnected ? (
-                                <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                    Connect a payment provider to take payment
-                                    online.{" "}
-                                    {canWrite ? (
-                                        <Link
-                                            href="/settings/providers"
-                                            className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
-                                        >
-                                            Connect one
-                                        </Link>
-                                    ) : null}
-                                </p>
-                            ) : online.payLinkActive ? (
+                            ) : !payOnline ? (
+                                paymentsOn && !online?.providerConnected ? (
+                                    <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                                        Connect a payment provider to take
+                                        payment online.{" "}
+                                        {canWrite ? (
+                                            <Link
+                                                href="/settings/providers"
+                                                className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
+                                            >
+                                                Connect one
+                                            </Link>
+                                        ) : null}
+                                    </p>
+                                ) : (
+                                    // Payments is off, or its provider can't
+                                    // take a payment (DEC-070): the link only
+                                    // shows the invoice.
+                                    <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                                        Its link shows the invoice with no Pay
+                                        button. {invoice.who} pays you the way
+                                        you&apos;ve asked them to.
+                                    </p>
+                                )
+                            ) : online?.payLinkActive ? (
                                 <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
                                     A pay link is out. Its address was shown
                                     once, when it was copied — copying it again
@@ -428,6 +389,7 @@ export function InvoiceDetail({
                 onOpenChange={dialog("issue")}
                 invoice={invoice}
                 canSend={sendable}
+                payOnline={payOnline}
             />
             {send && sendable ? (
                 <SendDialog

@@ -34,7 +34,7 @@ export default async function AcceptInvitationPage({
                 description={`${result.error} If this invitation was sent to a different email, sign in with that account and open the link again.`}
                 action={
                     <Button asChild variant="brand">
-                        <Link href="/">Go to your stores</Link>
+                        <Link href="/">Go to Home</Link>
                     </Button>
                 }
             />

@@ -10,6 +10,7 @@ import {
     isPayInvoice,
     payAutopayOf,
     payChargingOf,
+    payOnlineOf,
     payUrlOf,
 } from "./invoice-pay-shape";
 
@@ -57,6 +58,8 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
                       autopayNextCharge: payChargingOf(body.autopayNextCharge),
                       // Where the link lives (DEC-069, L6).
                       payUrl: payUrlOf(body.payUrl),
+                      // Whether Pay is offered at all (DEC-070).
+                      payOnline: payOnlineOf(body.payOnline),
                   },
               }
             : { ok: false, reason: "unavailable" };

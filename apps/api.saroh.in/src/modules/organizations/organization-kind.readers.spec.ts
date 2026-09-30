@@ -167,6 +167,7 @@ describe("who reads Organization.kind (DEC-070, KTD-3)", () => {
             "modules/organizations/organization-onboarding.service.ts",
             "modules/organizations/organization-settings.service.ts",
             "modules/organizations/organization-context.service.ts",
+            "modules/capabilities/setup/module-setup.service.ts",
         ]) {
             expect(readers).toContain(path);
         }

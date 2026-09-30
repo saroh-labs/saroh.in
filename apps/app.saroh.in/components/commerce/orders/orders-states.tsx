@@ -10,15 +10,16 @@ import {
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Skeleton } from "@saroh/ui/skeleton";
-import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, ListFilter, Receipt, RotateCcw, Search } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ShareLinkButton } from "@/components/sites/share-link-button";
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import { NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import { ORDERS_TABS, ordersEmptyCopy } from "@/lib/orders/list-query";
+import type { ShareLink } from "@/lib/sites/share-links";
 
 import { ORDER_GRID } from "./order-row";
 
@@ -267,7 +268,7 @@ export function OrdersEmpty({
     storeName,
     options = null,
     go,
-    shareUrl = null,
+    share = null,
 }: {
     query: OrdersQuery;
     storeName: string | null;
@@ -275,25 +276,15 @@ export function OrdersEmpty({
     options?: OrderFilterOptions | null;
     go: (patch: Partial<OrdersQuery>) => void;
     /**
-     * The live site's address: a business with no orders yet is offered
-     * "Share your storefront", which copies it. Null: no live site, so no
-     * button — there is nothing to share yet.
+     * What a business with no orders yet is offered to share (DEC-069, L8):
+     * "Share your online shop" while `/shop` is live, else "Share your
+     * website" (`ORDERS_FIRST_RUN`). Null: nothing is live, so no button —
+     * there is nothing to share yet.
      */
-    shareUrl?: string | null;
+    share?: ShareLink | null;
 }) {
     const copy = ordersEmptyCopy(query, storeName, options);
-    const share = copy.kind === "first-run" && shareUrl ? shareUrl : null;
-    const copyLink = async (url: string) => {
-        try {
-            await navigator.clipboard.writeText(url);
-            showSuccess("Storefront link copied", url);
-        } catch {
-            showError(
-                "Couldn't copy the link. Select it and copy it instead.",
-                url,
-            );
-        }
-    };
+    const offer = copy.kind === "first-run" ? share : null;
     const Icon =
         copy.kind === "search"
             ? Search
@@ -332,14 +323,8 @@ export function OrdersEmpty({
                     >
                         {action.label}
                     </Button>
-                ) : share ? (
-                    <Button
-                        variant="outline"
-                        className="mt-1"
-                        onClick={() => void copyLink(share)}
-                    >
-                        Share your storefront
-                    </Button>
+                ) : offer ? (
+                    <ShareLinkButton link={offer} />
                 ) : undefined
             }
         />

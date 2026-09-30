@@ -37,7 +37,7 @@ const MOVED: readonly [key: string, one: string, many?: string][] = [
     ["messages", "message"],
     ["leads", "lead"],
     ["submissions", "form entry", "form entries"],
-    ["links", "store record"],
+    ["links", "location record"],
 ];
 
 /** "3 orders", "1 note" — each kind the merge moved, none for nothing. */

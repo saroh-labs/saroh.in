@@ -545,7 +545,7 @@ describe("deactivationImpact (F13)", () => {
             ["PAYMENTS_UNPAID_INVOICES", null],
         ]);
         expect(items[1]?.message).toBe(
-            "We couldn't count your unpaid invoices. They stay open, and their pay links still work.",
+            "We couldn't count your unpaid invoices. They stay open, and their links show the invoice with no Pay button until it's back on.",
         );
     });
 
@@ -641,7 +641,7 @@ describe("deactivationImpact (F13)", () => {
             [
                 "PAYMENTS_UNPAID_INVOICES",
                 1,
-                "1 unpaid invoice stays open, and its pay link still works.",
+                "1 unpaid invoice stays open, and its link shows the invoice with no Pay button until it's back on.",
             ],
             [
                 "PAYMENTS_SITE_PLANS",

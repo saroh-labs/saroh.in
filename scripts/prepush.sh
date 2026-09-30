@@ -250,6 +250,10 @@ e2e_worktree() {
     local dir=$1
     if [ -d "$dir/.git" ] || [ -f "$dir/.git" ]; then
         git -C "$dir" checkout -q --detach -f "$SHA"
+        # Another unit's run leaves its untracked files here (a spec file
+        # this tree doesn't have ran, and failed, in T4's run). Ignored
+        # files, node_modules and .next, stay.
+        git -C "$dir" clean -fdq
     else
         git worktree add -q --detach -f "$dir" "$SHA"
     fi

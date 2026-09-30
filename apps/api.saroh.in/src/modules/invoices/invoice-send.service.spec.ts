@@ -5,6 +5,14 @@ jest.mock("../../env", () => ({
     env: { NODE_ENV: "test", RENDERER_URL: "https://saroh.app" },
 }));
 
+// PAY_LINK_ON_SITE (DEC-069, L7): off unless a test turns it on.
+const payLinkOnSite = jest.fn().mockResolvedValue(false);
+jest.mock("../feature-flags/feature-flags.service", () => ({
+    FeatureFlagService: jest.fn().mockImplementation(() => ({
+        isEnabled: payLinkOnSite,
+    })),
+}));
+
 jest.mock("../communications/account-thread", () => ({
     ACCOUNT_THREAD_POSTER: Symbol("ACCOUNT_THREAD_POSTER"),
     accountThreadOn: jest.fn().mockResolvedValue(true),
@@ -37,6 +45,9 @@ jest.mock("@saroh/database", () => {
         customerAccount: { count: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         organization: { findUnique: jest.fn() },
+        // Where the pay link lives (DEC-069, L7): the live site, its domain.
+        site: { findFirst: jest.fn() },
+        domain: { findFirst: jest.fn() },
         $queryRaw: jest.fn(),
     };
     return {
@@ -126,6 +137,7 @@ beforeEach(() => {
         contactId: "c_1",
     });
     (accountThreadOn as jest.Mock).mockResolvedValue(true);
+    payLinkOnSite.mockResolvedValue(false);
 });
 
 describe("the send flag", () => {
@@ -312,6 +324,41 @@ describe("sending", () => {
             owner,
             "inv_1",
             { requireProvider: payOnline },
+        );
+    });
+});
+
+describe("the link on the business's own address (DEC-069, L7)", () => {
+    it("puts the emailed link on the business's site, read on the send's transaction", async () => {
+        payLinkOnSite.mockResolvedValue(true);
+        db.site!.findFirst!.mockResolvedValue({
+            id: "site_1",
+            subdomain: "rye",
+        });
+        db.domain!.findFirst!.mockResolvedValue(null);
+        comms.queueTransactional.mockResolvedValue({
+            id: "m_1",
+            status: "QUEUED",
+            toAddress: "asha@example.com",
+        });
+        db.organization!.findUnique!.mockResolvedValue({ name: "Rye & Co." });
+        const createPayLinkInTx = jest
+            .fn()
+            .mockResolvedValue({ token: "tok_1" });
+        await new InvoiceSendService(
+            { createPayLinkInTx } as unknown as InvoicesService,
+            comms as unknown as CommunicationsService,
+        ).send(owner, "inv_1");
+
+        const input = comms.queueTransactional.mock.calls[0][2];
+        await expect(input.secretLink()).resolves.toBe(
+            "https://rye.saroh.app/pay/tok_1",
+        );
+        expect(payLinkOnSite).toHaveBeenCalledWith("PAY_LINK_ON_SITE", "org_1");
+        expect(db.site!.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ organizationId: "org_1" }),
+            }),
         );
     });
 });

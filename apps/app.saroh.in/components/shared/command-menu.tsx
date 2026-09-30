@@ -184,7 +184,7 @@ const ACTIONS: {
         href: "/billing/invoices/new",
         label: "New invoice",
         icon: ReceiptText,
-        moduleKey: "PAYMENTS",
+        // Invoicing needs no module (DEC-070): only the permission.
         action: "invoice:write",
     },
     {

@@ -289,7 +289,7 @@ function FulfilmentChips({
             <FieldHelp className="mt-[9px]">
                 {picked.length
                     ? "An order with it offers only these ways."
-                    : "Pick none and it goes every way its storefronts offer."}
+                    : "Pick none and it goes every way its locations offer."}
             </FieldHelp>
         </>
     );

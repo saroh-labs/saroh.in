@@ -244,7 +244,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 },
             }),
         ).toBe(
-            "Sanjay changed when orders count as late at Counter → Storefronts",
+            "Sanjay changed when orders count as late at Counter → Locations",
         );
         expect(
             said({
@@ -252,7 +252,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 targetType: "storefront",
                 metadata: { fields: ["fulfilmentTypes"], changes: [] },
             }),
-        ).toBe("Sanjay changed how orders leave → Storefronts");
+        ).toBe("Sanjay changed how orders leave → Locations");
     });
 
     it("says a storefront turned linking customers who share an email on or off (C15)", () => {
@@ -270,10 +270,10 @@ describe("activityLine — values a save recorded (#509)", () => {
                 },
             });
         expect(sameEmail(false, true)).toBe(
-            "Sanjay turned on linking customers who share an email at Rye Online → Storefronts",
+            "Sanjay turned on linking customers who share an email at Rye Online → Locations",
         );
         expect(sameEmail(true, false)).toBe(
-            "Sanjay turned off linking customers who share an email at Rye Online → Storefronts",
+            "Sanjay turned off linking customers who share an email at Rye Online → Locations",
         );
         expect(ACTIVITY_ACTIONS).toContain("storefront.same-email.update");
     });
@@ -407,7 +407,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 metadata: { product: "Rye loaf", soldOutCleared: 2 },
             }),
         ).toBe(
-            "Sanjay turned Track stock on for Rye loaf — cleared Sold out at 2 storefronts → Rye loaf",
+            "Sanjay turned Track stock on for Rye loaf — cleared Sold out at 2 locations → Rye loaf",
         );
         // A first count started it.
         expect(
@@ -421,7 +421,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 },
             }),
         ).toBe(
-            "Sanjay turned Track stock on for Rye loaf with its first count — cleared Sold out at 1 storefront → Rye loaf",
+            "Sanjay turned Track stock on for Rye loaf with its first count — cleared Sold out at 1 location → Rye loaf",
         );
         // It opens the product.
         expect(

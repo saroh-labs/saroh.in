@@ -16,6 +16,7 @@ import {
     paperTitle,
     showsGstTotals,
 } from "@/lib/invoices/paper-title";
+import { paysOnline } from "@/lib/invoices/send";
 import type { Invoice } from "@/lib/invoices/service";
 import {
     billedTo,
@@ -106,7 +107,8 @@ export function InvoiceQuickLook({
     const canLink =
         canWrite &&
         owedHere &&
-        (full?.online?.providerConnected ?? false) &&
+        // Only where its link takes payment: the API's `payOnline` (DEC-070).
+        paysOnline(full?.send, full?.online) &&
         // No link while autopay is charging it (D13).
         !full?.online?.autopayCharge;
     const linkOut = full?.online?.payLinkActive ?? false;
@@ -387,6 +389,9 @@ function payLine(i: Invoice, money: (a: string) => string) {
         case "DRAFT":
             return "A draft has no number and can still change.";
         default:
-            return "Not paid. Send the pay link, or mark it paid when the money arrives.";
+            // No online payment (DEC-070): there is no pay link to send.
+            return paysOnline(i.send, i.online)
+                ? "Not paid. Send the pay link, or mark it paid when the money arrives."
+                : "Not paid. Send it, or mark it paid when the money arrives.";
     }
 }

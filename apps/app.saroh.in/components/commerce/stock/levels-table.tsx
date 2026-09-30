@@ -91,7 +91,7 @@ export function LevelsTable({
                                 cell={cell}
                                 counting={counting}
                                 countKey={countKey(row, cell.storeId)}
-                                label={`${row.productName}${row.variantTitle ? ` ${row.variantTitle}` : ""} counted at ${storefronts[i]?.name ?? "this storefront"}`}
+                                label={`${row.productName}${row.variantTitle ? ` ${row.variantTitle}` : ""} counted at ${storefronts[i]?.name ?? "this location"}`}
                                 values={values}
                                 onValue={onValue}
                             />
