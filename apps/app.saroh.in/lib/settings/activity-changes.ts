@@ -7,6 +7,7 @@
  */
 
 import { businessTypeLabel } from "@/lib/organizations/business-types";
+import { KIND_CHOICES } from "@/lib/organizations/kind";
 
 /** The Business settings tab a field is on. */
 export type BusinessTab = "identity" | "contact" | "tax" | "hours" | "address";
@@ -24,6 +25,13 @@ export const FIELD_PHRASES: Partial<
     name: {
         phrase: "the business name",
         label: "Business name",
+        tab: "identity",
+    },
+    // DEC-070: recorded as stored (BUSINESS, SOLO, WORK), said as setup
+    // offered it.
+    kind: {
+        phrase: "what you're setting up",
+        label: "What you're setting up",
         tab: "identity",
     },
     legalName: {
@@ -178,7 +186,8 @@ export const fieldsOf = (meta: Record<string, unknown>): string[] =>
 
 /**
  * A recorded value as a person reads it: a business type by its name
- * ("llp" is "LLP", and the old "company" Private limited, F10); anything
+ * ("llp" is "LLP", and the old "company" Private limited, F10), what is
+ * being set up as setup offered it ("SOLO" is "Just me", DEC-070); anything
  * else as recorded.
  */
 export function recordedValueText(
@@ -187,6 +196,9 @@ export function recordedValueText(
 ): string {
     if (field === "type" && typeof value === "string") {
         return businessTypeLabel(value) ?? value;
+    }
+    if (field === "kind" && typeof value === "string") {
+        return KIND_CHOICES.find((c) => c.kind === value)?.label ?? value;
     }
     return String(value);
 }

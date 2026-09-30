@@ -24,6 +24,11 @@ import {
     BusinessHoursSection,
     HOURS_SECTION,
 } from "@/components/organizations/business-hours-section";
+import {
+    BusinessKindField,
+    KIND_ROW_LABEL,
+    kindChoiceLabel,
+} from "@/components/organizations/business-kind-field";
 import { BusinessLogoRow } from "@/components/organizations/business-logo-row";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
 import type { BusinessRow } from "@/components/organizations/business-section";
@@ -81,6 +86,11 @@ import {
     businessTypeLabel,
     businessTypeOf,
 } from "@/lib/organizations/business-types";
+import {
+    kindOf,
+    kindWords,
+    ORGANIZATION_KINDS,
+} from "@/lib/organizations/kind";
 import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
@@ -95,6 +105,8 @@ const optionalText = (schema: z.ZodString) =>
 const formSchema = z
     .object({
         name: z.string().trim().min(1, { message: "Name is required" }),
+        // What is being set up (DEC-070): words and defaults only.
+        kind: z.enum(ORGANIZATION_KINDS),
         legalName: z.string().optional(),
         type: z.enum(BUSINESS_TYPE_VALUES).optional(),
         country: z.string().optional(),
@@ -178,6 +190,7 @@ const FIELD_OF: Record<string, keyof FormValues> = {
     city: "city",
     postalCode: "postalCode",
     name: "name",
+    kind: "kind",
     timezone: "timezone",
     phone: "phone",
 };
@@ -201,6 +214,7 @@ function numberFormatOf(settings: OrganizationSettings) {
 function valuesOf(settings: OrganizationSettings): FormValues {
     return {
         name: settings.name,
+        kind: kindOf(settings.kind),
         legalName: settings.profile?.legalName ?? "",
         type: businessTypeOf(settings.profile?.type),
         country: settings.profile?.country ?? "",
@@ -232,7 +246,7 @@ const SECTIONS = {
     identity: {
         title: "Identity",
         lead: "How the business is named and registered",
-        fields: ["name", "legalName", "type", "timezone"],
+        fields: ["kind", "name", "legalName", "type", "timezone"],
     },
     contact: {
         title: "Contact",
@@ -531,6 +545,7 @@ export function OrganizationSettingsForm({
 
         const sent = {
             ...(dirtyFields.name ? { name: values.name.trim() } : {}),
+            ...(dirtyFields.kind ? { kind: values.kind } : {}),
             ...(Object.keys(profile).length > 0 ? { profile } : {}),
             ...(Object.keys(tax).length > 0 ? { tax } : {}),
             ...(Object.keys(registeredAddress).length > 0
@@ -548,8 +563,10 @@ export function OrganizationSettingsForm({
         }
 
         const title = SECTIONS[editing].title;
+        // What is being set up prints on nothing: only its words change.
+        const printed = Object.keys(sent).some((key) => key !== "kind");
         undo.offer(
-            editing === "contact"
+            editing === "contact" || !printed
                 ? `${title} saved`
                 : `${title} saved — invoices from now on use it`,
             cardUndo(settings, result.data, sent, applySaved),
@@ -599,9 +616,21 @@ export function OrganizationSettingsForm({
         void form.trigger(NUMBER_FIELDS);
     };
 
+    // The words of what is saved (DEC-070): an Undo puts them back too.
+    const words = kindWords(saved.kind);
+    const nameLabel =
+        saved.kind === "BUSINESS" ? "Business name" : words.nameLabel;
+    const leadOf = (key: SectionKey) =>
+        key === "identity" && saved.kind !== "BUSINESS"
+            ? "How you're named and registered"
+            : key === "contact"
+              ? `How ${words.people} reach you`
+              : SECTIONS[key].lead;
+
     const rows: Record<SectionKey, BusinessRow[]> = {
         identity: [
-            { label: "Business name", value: saved.name },
+            { label: KIND_ROW_LABEL, value: kindChoiceLabel(saved.kind) },
+            { label: nameLabel, value: saved.name },
             {
                 label: "Legal name",
                 value: saved.legalName ?? "",
@@ -760,17 +789,18 @@ export function OrganizationSettingsForm({
     const fieldsOf: Record<SectionKey, React.ReactNode> = {
         identity: (
             <>
+                <BusinessKindField control={form.control} name="kind" at={at} />
                 <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                         <FormItem {...at("100%")}>
-                            <FormLabel>Business name</FormLabel>
+                            <FormLabel>{nameLabel}</FormLabel>
                             <FormControl>
                                 <Input {...field} maxLength={120} />
                             </FormControl>
                             <FormDescription>
-                                Shown to customers on receipts and in the
+                                Shown to {words.people} on receipts and in the
                                 switcher above.
                             </FormDescription>
                             <FormMessage />
@@ -1142,7 +1172,7 @@ export function OrganizationSettingsForm({
                         >
                             <BusinessSection
                                 title={SECTIONS[tab].title}
-                                lead={SECTIONS[tab].lead}
+                                lead={leadOf(tab)}
                                 rows={rows[tab]}
                                 note={notes[tab]}
                                 editing={editing === tab}
@@ -1217,7 +1247,7 @@ export function OrganizationSettingsForm({
             </div>
             <LeaveDialog
                 to={leaveTo}
-                section={editing ? titleOf(editing) : "Business"}
+                section={editing ? titleOf(editing) : words.settingsTab}
                 onKeep={() => {
                     stay();
                     if (editing) setTab(editing);

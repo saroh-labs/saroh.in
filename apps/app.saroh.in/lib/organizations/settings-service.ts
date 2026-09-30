@@ -126,6 +126,11 @@ export interface TaxSettingsInput {
 
 export interface OrganizationSettingsInput {
     name?: string;
+    /**
+     * What is being set up (DEC-070, K5): words and defaults only. Needs
+     * `org:update`, as the name does.
+     */
+    kind?: OrganizationKind;
     profile?: Partial<Record<keyof OrganizationProfile, string>>;
     tax?: TaxSettingsInput;
     /** "" clears a line; the state goes as `tax.state`. */

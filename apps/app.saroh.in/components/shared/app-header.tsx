@@ -93,6 +93,7 @@ export function AppHeader(props: AppHeaderProps) {
                         role: activeOrg?.role ?? null,
                         actions: activeOrg?.actions ?? null,
                         modules: moduleKeys,
+                        kind: activeOrg?.kind,
                     }}
                 />
                 {unread !== null ? <NotificationsLink unread={unread} /> : null}

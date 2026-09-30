@@ -32,7 +32,9 @@ import {
  * api.saroh.in, so this never decides anything itself.
  *
  * Revalidates `/` too: the chrome renders the org name in the switcher, so a
- * rename must not leave a stale name in the header.
+ * rename must not leave a stale name in the header. A change of what is
+ * being set up (DEC-070) changes words on every screen — the settings tab,
+ * Home's first run — so it revalidates the whole layout.
  */
 export async function saveOrganizationSettings(
     input: OrganizationSettingsInput,
@@ -40,7 +42,8 @@ export async function saveOrganizationSettings(
     const result = await updateOrganizationSettings(input);
     if (result.ok) {
         revalidatePath("/settings/organization");
-        revalidatePath("/");
+        if (input.kind !== undefined) revalidatePath("/", "layout");
+        else revalidatePath("/");
     }
     return result;
 }
