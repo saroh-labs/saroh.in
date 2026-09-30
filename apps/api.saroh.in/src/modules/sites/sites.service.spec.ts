@@ -161,7 +161,10 @@ describe("SitesService.createFromTemplate", () => {
                 slug: "ryeandco",
                 businessProfile: null,
             });
-            siteFindUnique.mockResolvedValue({ id: "site_old" });
+            siteFindUnique.mockResolvedValue({
+                id: "site_old",
+                organizationId: "org_1",
+            });
             await service.createFromTemplate(ctx(), { name: "Rye 2" });
             expect(siteCreate.mock.calls[0][0].data.subdomain).toBeUndefined();
         });
@@ -181,6 +184,24 @@ describe("SitesService.createFromTemplate", () => {
                 }),
             ).rejects.toMatchObject({
                 response: { details: { field: "subdomain" } },
+            });
+            expect(siteCreate).not.toHaveBeenCalled();
+        });
+
+        it("refuses an address another business still holds after a change", async () => {
+            (
+                prisma.addressReservation.findUnique as jest.Mock
+            ).mockResolvedValueOnce({
+                organizationId: "org_other",
+                reservedUntil: new Date(Date.now() + 86_400_000),
+            });
+            await expect(
+                service.createFromTemplate(ctx(), {
+                    name: "Rye",
+                    subdomain: "kiln",
+                }),
+            ).rejects.toMatchObject({
+                response: { details: { field: "subdomain", reason: "taken" } },
             });
             expect(siteCreate).not.toHaveBeenCalled();
         });
