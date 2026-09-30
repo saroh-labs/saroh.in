@@ -633,7 +633,12 @@ describe("public catalogue (G11)", () => {
                 await prisma.$executeRawUnsafe(
                     `REVOKE USAGE ON SCHEMA public FROM ${ROLE}`,
                 );
-                await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${ROLE}`);
+                await prisma.$executeRawUnsafe(
+                    // A role is cluster-wide: another test database still granting
+                    // to it (a parallel run, or one cut short) keeps it; that is fine.
+                    `DO $$ BEGIN DROP ROLE IF EXISTS ${ROLE};
+                EXCEPTION WHEN dependent_objects_still_exist THEN NULL; END $$`,
+                );
             });
 
             /** Run `fn` in one transaction as the probe role, in `orgId`'s context. */
