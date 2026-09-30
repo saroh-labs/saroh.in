@@ -72,7 +72,9 @@
 # ~7 min); --all 10.7 min (was ~25), nearly all of it the browser specs.
 # Targeted, on a commit touching one screen and one api module: --e2e 105s
 # for 2 spec files (was 657s for 25), the integration step 9s for 10 specs
-# (was 84s for 381).
+# (was 84s for 381). The CI mirrors added 2026-09-30: RLS after plain +26s
+# targeted, +98s whole suite; the permission suite after the browser specs
+# +83–102s.
 #
 # Integration needs TEST_DATABASE_URL naming a database with "test" in it (and a
 # changed migration needs REPLAY_DATABASE_URL, a throwaway one; the browser step

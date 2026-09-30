@@ -323,6 +323,20 @@ These are full runs. A batch that changes the schema, seed or CI still gets
 them, as batch 2 did. For a batch that touches a few screens and modules,
 see the targeted timings above.
 
+What the two CI mirrors added on 2026-09-30 (the same Mac, batch 4's tip,
+PREPUSH_KEEP_DEV=1):
+
+| Step                        | Typical tree (one screen + one api file)                 | Full run (`--all` on the batch: whole suite, every spec)                          |
+| --------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `int-rls` after plain `int` | +26s (30 of 388 specs, 10 shards; plain took 16s)        | +98s under `--int` (plain 85s); under `--all` 161s, hidden behind the browser run |
+| `e2e-permissions` after e2e | +83s (1 spec file, 36 tests, the app's build from turbo) | +102s (both files, 44 tests, the app built fresh for the new tree)                |
+| `--all` end to end          | —                                                        | 392s: browser 286s then permissions 102s; int + int-rls (321s) ran beside them    |
+
+The app's production build for the permission suite takes about 20s when
+Next's own cache is warm, and replays from turbo on a tree that has passed
+it. One of four runs took 17.8 min in Playwright for the same 36 tests,
+unexplained; the other three took 77–102s.
+
 A small app change costs about 30s because ESLint over `app.saroh.in` takes
 27s on its own. ESLint's `--cache` would cut that to seconds, but the config
 uses type-aware rules, and a cached file can miss an error that a change in

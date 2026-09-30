@@ -1178,3 +1178,33 @@ can't list B's holds, yet sees B's address as taken.
 goes through `outsideOrgContext`, never the request's client; such a read is
 outside the caller's transaction.
 **Category**: RLS · `docs/patterns/backend-data-and-money.md`
+
+## Gate — batch 4 passed `prepush --all` and failed CI on RLS and the permission suite (#765)
+
+**Problem**: PR #765 (batch 2026-09-29-4) passed `pnpm prepush --all` and
+then failed two CI jobs the gate never ran. "Integration (rls, shard 4/4)":
+`module-setup.db.spec.ts` › "an address in use fails the whole transaction"
+fails with `RLS_ENFORCEMENT` on. "Permission states (production build)": F17
+and F19 on Team (`permissions.spec.ts`, desk and phone) no longer found the
+controls they check after DEC-073 changed the permission lists.
+**Root cause**: two CI jobs had no local mirror. The gate ran the
+integration suite plain only (its own doc said so, under "Not mirrored"),
+and never ran `e2e/permissions/` at all: that suite is not the seeded
+stack, it builds the app against a fake api, and the browser step only
+knew `e2e/tests/`.
+**Fix**: `--int` runs the same selection again under `TEST_RLS=on`, after
+plain, on the same databases (`int-rls:affected` / `int-rls` in the pass
+cache). `--e2e` runs the permission suite after the browser specs, in the
+same worktree of HEAD, with CI's env only; its specs carry `@covers` lines
+and `node scripts/e2e-affected.mjs --suite permissions` chooses them. Proved
+on batch 4's tip (7cb03b67) plus the gate: a scratch commit touching
+`team-screen.tsx` and `site-address.ts` made `int-rls:affected` fail on
+exactly CI's spec (plain passed) and `e2e-permissions:affected` fail on
+exactly CI's four tests (F17, F19 × desk, phone).
+**Also**: RLS shards on parallel databases share one cluster role, and two
+globalSetups granting it at once failed one with "tuple concurrently
+updated". `test/global-setup.ts` re-runs the (idempotent) grants.
+**Rule**: every CI job has a mirror in `scripts/prepush.sh`, or a line in
+the pattern doc saying why not. A new CI job lands with its prepush step.
+**Category**: tooling · `scripts/prepush.sh`, `scripts/e2e-affected.mjs`,
+`docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
