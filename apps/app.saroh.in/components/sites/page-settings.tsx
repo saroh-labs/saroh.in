@@ -21,10 +21,10 @@ import type { SitePage, UpdatePageInput } from "@/lib/sites/service";
  * Delete (00-universal §15: every control keeps a place).
  *
  * - A Book or Shop page's address is its route's (G14): shown as fixed
- *   ("/book — your booking page's address"), never as a field.
+ *   ("/book — your booking page's path"), never as a field.
  * - A free-form page at an address one of the site's routes answers is
  *   flagged by the pre-publish check; the reason is said here, over the
- *   address, so "Change address" lands on the field that fixes it.
+ *   address, so "Change path" lands on the field that fixes it.
  * - Every rule about addresses is the API's. A refusal is shown in its
  *   words, and an address it offers instead can be taken in one press.
  *
@@ -92,7 +92,7 @@ export function PageSettings({
             {readOnly ? (
                 <ReadOnlyNote className="mb-0">
                     Your role can change this page&apos;s blocks but not its
-                    title, address or place in the menu.
+                    title, path or place in the menu.
                 </ReadOnlyNote>
             ) : null}
 
@@ -126,10 +126,10 @@ export function PageSettings({
 
                 <div className="grid gap-1.5">
                     {fixed !== null ? (
-                        <span className={FIELD_LABEL}>Address</span>
+                        <span className={FIELD_LABEL}>Page path</span>
                     ) : (
                         <label htmlFor={`${id}-path`} className={FIELD_LABEL}>
-                            Address
+                            Page path
                         </label>
                     )}
                     {fixed !== null ? (

@@ -225,7 +225,7 @@ export function PagesPanel({
                     }
                     hint={
                         active && unseenBecause(active.id, flags)
-                            ? "Change address"
+                            ? "Change path"
                             : undefined
                     }
                 />
@@ -314,7 +314,7 @@ function Disclosure({
     onToggle: () => void;
     disabled?: boolean;
     describedBy?: string;
-    /** A word on the right, such as "Change address". */
+    /** A word on the right, such as "Change path". */
     hint?: string;
 }) {
     return (

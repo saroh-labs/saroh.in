@@ -231,7 +231,7 @@ describe("the page menu's list (G16)", () => {
         const flag: Flag = {
             type: "reservedAddress",
             message:
-                "This page can't be seen: /book is your booking page. Change its address so visitors can reach it.",
+                "This page can't be seen: /book is your booking page. Change its path so visitors can reach it.",
             pageId: "p-walk",
             sectionIndex: null,
             field: "path",
@@ -247,12 +247,16 @@ describe("the page menu's list (G16)", () => {
         render({ pages: [PAGES[0], walk], active: "p-walk", flags: [flag] });
         expect(options()[1].textContent).toContain("Can't be seen");
         const settings = button(/^Settings for Walkthrough/);
-        expect(settings.textContent).toContain("Change address");
+        expect(settings.textContent).toContain("Change path");
         await press(settings);
         expect(host.textContent).toContain(flag.message);
         const address = host.querySelector<HTMLInputElement>("input.font-mono");
         expect(address?.value).toBe("/book/walkthrough");
         expect(address?.getAttribute("aria-invalid")).toBe("true");
+        // A page's own path, named apart from the web address (DEC-069).
+        expect(
+            host.querySelector(`label[for="${address?.id}"]`)?.textContent,
+        ).toBe("Page path");
     });
 });
 
@@ -260,9 +264,9 @@ describe("the open page's settings (G16)", () => {
     it("shows a Book page's address as fixed, never as a field", async () => {
         render({ active: "p-book" });
         await press(button(/^Settings for Book/));
-        expect(host.textContent).toContain(
-            "/book — your booking page's address",
-        );
+        expect(host.textContent).toContain("/book — your booking page's path");
+        expect(host.textContent).toContain("Page path");
+        expect(host.textContent).not.toMatch(/\bAddress\b/);
         expect(host.querySelector("input.font-mono")).toBeNull();
         expect(host.textContent).toContain("Also its name in the menu.");
     });
@@ -292,7 +296,7 @@ describe("the open page's settings (G16)", () => {
     it("offers the address the API suggests when a rename is refused", async () => {
         actions.updatePage.mockResolvedValue({
             ok: false,
-            error: "/shop is your online shop, so a page can't use /shop/sale. Pick another address, such as /sale.",
+            error: "/shop is your online shop, so a page can't use /shop/sale. Pick another path, such as /sale.",
             suggestion: "/sale",
         });
         render({ active: "p-story" });
@@ -311,7 +315,7 @@ describe("the open page's settings (G16)", () => {
             path: "/shop/sale",
         });
         expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-            "Pick another address, such as /sale.",
+            "Pick another path, such as /sale.",
         );
         await press(button("Use /sale"));
         expect(address.value).toBe("/sale");
@@ -328,7 +332,7 @@ describe("the open page's settings (G16)", () => {
         render({ active: "p-story", canUpdate: false, addable: [] });
         await press(button(/^Settings for Our story/));
         expect(host.querySelector('[role="note"]')?.textContent).toContain(
-            "not its title, address or place in the menu",
+            "not its title, path or place in the menu",
         );
         expect(choice("In the menu", "Show").hasAttribute("disabled")).toBe(
             true,
@@ -385,7 +389,7 @@ describe("Add a page (G16)", () => {
         actions.createPage
             .mockResolvedValueOnce({
                 ok: false,
-                error: 'The path /prices is already used by "Rates". Pick another address, such as /pricing.',
+                error: 'The path /prices is already used by "Rates". Pick another path, such as /pricing.',
                 suggestion: "/pricing",
             })
             .mockResolvedValueOnce({
