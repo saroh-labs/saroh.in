@@ -1842,6 +1842,7 @@ it the body the controller returns, envelope and all.
 **Rule**: a lenient decoder's test uses the producer's real body (copy it
 from the controller spec), never a shape written from the consumer's side.
 **Category**: contract · app↔api · tests
+
 ## e2e — a new test release already reads Approved (T12)
 
 **Problem**: `site-review.spec.ts`'s new test passed on desk-serial and
@@ -1856,3 +1857,22 @@ release has bytes no other run has, and puts the draft back.
 **Rule**: a spec that reviews a test release makes the release's content
 its own (a stamped section), never a release of the seed's draft as it is.
 **Category**: e2e · test releases · own data
+
+## Payments — the pending sweep asks the same failing intents every minute
+
+**Problem**: (release review) an intent whose lookup threw — its business's
+credentials no longer decrypted, or a reconcile refused — was counted as an
+ERROR and asked again on the very next run, every 60 seconds. Enough of them
+filled `SWEEP_BATCH`, so the sweep re-ran at once and never reached the
+healthy intents behind them.
+**Root cause**: `lookUpAll` caught the throw but never stamped
+`lastLookupAt`. The sweep orders by `lastLookupAt` nulls first, so an
+unstamped intent is always first in line. The provider's own failure
+(ERROR from `lookUp`) was stamped; only the throw path wasn't.
+**Fix**: the catch stamps `lastLookupAt` best-effort (its own error
+swallowed), so a throwing intent waits for its tier's next turn.
+**Rule**: every outcome of a scheduled per-row attempt, a throw included,
+moves the row's "last tried" marker; a query that orders by it can
+otherwise be monopolised. Test: `payment-lookup.db.spec.ts` ("an intent
+whose ask throws takes its turn").
+**Category**: jobs · payments · starvation
