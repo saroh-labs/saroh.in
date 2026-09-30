@@ -1495,6 +1495,7 @@ asserts), it passes without checking them.
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
 worth the same change.
 **Category**: e2e · tests
+
 ## E2E — a business a test sets up has no modules and no rollout flags (L4)
 
 **Problem**: L4's browser spec had to change a web address on a business of
@@ -1514,6 +1515,7 @@ forwarded. The forwarding half (the new host serves, the old one answers 307) wa
 **Rule**: before planning a spec on a business the test makes, check which
 flags it will have. Only a flag with a seeded global default reaches it.
 **Category**: e2e · flags · DEC-069
+
 ## Gate — the shared browser worktree ran a spec this tree doesn't have (T4)
 
 **Symptom**: T4's `pnpm prepush --e2e` failed on
@@ -1546,4 +1548,22 @@ has no orders, so the Orders first run is reachable), and the booking
 page's first run stays in vitest.
 **Rule**: a spec that needs a module on uses a seeded business. A business
 the test makes (setup, the web-address change) is for what needs no module.
+**Category**: e2e · tests · modules
+
+## e2e — a business a test sets up can still write contacts and invoices (K4)
+
+**Problem**: K4 needed a "site for my work" with nothing that takes money
+and then a first invoice, on a business of its own. The module wall above
+suggested no contact or invoice could be made there.
+**Root cause**: the wall is the rollout check on `PUT modules/:key`, not the
+endpoints. `@RequireModule` is enforced only while `MODULE_ENFORCEMENT` is
+set, and neither the dev nor the e2e stack sets it, so `POST /contacts` and
+`POST /invoices` answer a test-made business like any other. The first run
+did fail, on the contact itself: one needs an email or a phone.
+**Fix**: `checklist-when-money.spec.ts` sets up a WORK business as
+`founder`, makes a contact with a stamped email and drafts an invoice
+through the API, then reads Settings and Home.
+**Rule**: a module that is off isn't a module you can't write through in
+e2e. Plan on turning one on only where the spec needs the module to read as
+on (Home, the rail, the checklist's module steps).
 **Category**: e2e · tests · modules

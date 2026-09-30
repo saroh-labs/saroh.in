@@ -3,6 +3,7 @@ import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { ownAddress } from "../fixtures/own-business";
+import { stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -87,6 +88,8 @@ test("the address, type and logo wait for a first invoice", async ({
     const contact = await post("/contacts", {
         firstName: "Ravi",
         lastName: `Client ${testInfo.project.name}`,
+        // A contact is reached somehow: an email, never a phone (own-data).
+        email: `k4-${stamp(testInfo)}@example.test`,
     });
     await post("/invoices", {
         contactId: contact.id,
