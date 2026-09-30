@@ -2354,9 +2354,10 @@ export class SitesService {
 
     /**
      * A hash of the draft as publishing would write it, for binding an
-     * approval to the work it approved (#278).
+     * approval to the work it approved (#278). Test releases compare theirs
+     * against it to say "Your draft has changed since" (DEC-071).
      */
-    private async currentDraftFingerprint(
+    async currentDraftFingerprint(
         ctx: OrganizationContext,
         siteId: string,
     ): Promise<string> {
