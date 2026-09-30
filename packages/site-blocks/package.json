@@ -30,6 +30,7 @@
     },
     "devDependencies": {
         "@saroh/eslint-config": "workspace:*",
+        "@saroh/templates": "workspace:*",
         "@saroh/tsconfig": "workspace:*",
         "@testing-library/jest-dom": "^6.6.3",
         "@testing-library/react": "^16.1.0",

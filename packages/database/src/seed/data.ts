@@ -962,9 +962,12 @@ export const SIDE_BUSINESSES: readonly {
  * is composed at render time from NEXT_PUBLIC_ROOT_DOMAIN, which is why moving
  * tenants from saroh.in to saroh.app needed no data migration at all.
  *
- * No section here carries an image. The shipped starter template points at
- * `/templates/starter/*.jpg`, and those files do not exist in any app's
- * `public/` — seeding them would put broken images in the editor.
+ * No section here carries an image. `starter@1` pointed at
+ * `/templates/starter/*.jpg`, files no app's `public/` has, so seeding its
+ * sections would have put broken images in the editor. `starter@2` (DEC-070,
+ * what a new site starts from) carries no image at all. These sites are
+ * written from explicit sections, not from a template, so neither version
+ * changes them.
  */
 export const SITES: readonly SeedSite[] = [
     {

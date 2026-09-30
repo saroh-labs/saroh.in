@@ -1296,6 +1296,9 @@ importers:
       '@saroh/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint-config-custom
+      '@saroh/templates':
+        specifier: workspace:*
+        version: link:../templates
       '@saroh/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/tsconfig

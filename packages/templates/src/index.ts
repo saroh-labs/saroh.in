@@ -29,5 +29,10 @@ export type {
     InstantiatedTemplate,
 } from "./instantiate";
 
-// The starter production template
-export { STARTER_TEMPLATE_ID, starterTemplate } from "./templates/starter";
+// The starter production template: `starterTemplate` is the latest (v2),
+// `starterTemplateV1` the version sites built before DEC-070 came from.
+export {
+    STARTER_TEMPLATE_ID,
+    starterTemplate,
+    starterTemplateV1,
+} from "./templates/starter";

@@ -1241,3 +1241,25 @@ storefront, so a copy change there is visible in review.
 when an old app still compares words, change both sides together and expect
 an old app to fall back to the toast until it is redeployed.
 **Category**: copy · API contract · DEC-069
+## Sites — every new site opened with broken images (DEC-070 K10)
+
+**Problem**: A site made from the starter template (Turn on Website, or
+`/sites/new`) drafted a hero and a three-image gallery, and all four images
+were broken in the editor and on the published page. With no contact email,
+its "Get in touch" went to `/contact`, a page it never made, which the
+pre-publish check then flagged.
+**Root cause**: `starter@1` named `/templates/starter/*.jpg`, relative
+paths that no app's `public/` has. The template's tests only parsed the
+content against the block contract, which checks that `src` is a string,
+not that anything serves it. Nothing ever rendered a template.
+**Fix**: `starter@2` carries no image and links only to its email or its
+own About page. `packages/site-blocks/src/starter-template.test.tsx` renders
+every page through `SectionRenderer` and fails on any `<img>` or
+`/templates/` path; `starter@1` is its control. `starter-site.db.spec.ts`
+checks a real Turn on Website draft. `listTemplates()` now lists only the
+latest version of each id: registering v2 beside v1 would otherwise have
+shown "Starter" twice in the picker, which keys options by id.
+**Rule**: a template may name an image only by an absolute address the
+media library served, never a path an app is assumed to have. Render a new
+template in a test, not only parse it (K12–K14 follow the same test).
+**Category**: sites · templates · DEC-070
