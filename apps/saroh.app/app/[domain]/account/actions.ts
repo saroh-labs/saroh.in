@@ -21,6 +21,7 @@ import {
     getSignInOptions,
     sessionAnswer,
 } from "@/lib/sign-in";
+import { testMode } from "@/lib/test-release";
 
 /**
  * Signing in on a merchant's site (ADR-011; round-2 plan A, A3): ask for a
@@ -45,6 +46,7 @@ export async function requestSignInCode(
     challenge?: string,
 ): Promise<CodeRequestResult> {
     if (!(await siteOrigin())) return { ok: false, reason: "error" };
+    if (await testMode()) return { ok: false, reason: "test-release" };
     const address = cleanEmail(email);
     if (!address) return { ok: false, reason: "email" };
     const call = await siteAccountsFetch("codes", {
@@ -63,6 +65,7 @@ export async function verifySignInCode(
     code: string,
 ): Promise<VerifyResult> {
     if (!(await siteOrigin())) return { ok: false, reason: "error" };
+    if (await testMode()) return { ok: false, reason: "test-release" };
     const address = cleanEmail(email);
     const digits = typeof code === "string" ? code.replace(/\D/g, "") : "";
     if (!address || digits.length !== 6) {
@@ -113,6 +116,7 @@ export async function loadSignInOptions(): Promise<SignInOptions | null> {
 
 export async function signOut(): Promise<{ ok: boolean }> {
     if (!(await siteOrigin())) return { ok: false };
+    if (await testMode()) return { ok: false };
     await accountFetch("session", { method: "DELETE" });
     await clearSessionCookie();
     return { ok: true };
@@ -120,6 +124,7 @@ export async function signOut(): Promise<{ ok: boolean }> {
 
 export async function signOutEverywhere(): Promise<{ ok: boolean }> {
     if (!(await siteOrigin())) return { ok: false };
+    if (await testMode()) return { ok: false };
     const call = await accountFetch("sessions", { method: "DELETE" });
     await clearSessionCookie();
     return { ok: call?.ok === true && call.res.ok };

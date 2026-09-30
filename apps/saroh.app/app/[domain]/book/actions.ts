@@ -16,11 +16,14 @@ import {
     isWaitlistPlaces,
     OFFLINE_RESULT,
     resultOf,
+    TEST_RELEASE_MESSAGE,
+    TEST_RELEASE_REASON,
 } from "@saroh/site-blocks";
 
 import { accountBookingBody } from "@/lib/account-booking";
 import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
+import { testMode } from "@/lib/test-release";
 
 /**
  * Booking on a merchant's site, signed in (round-2 plan A, A9; ADR-011).
@@ -36,12 +39,24 @@ import { siteOrigin } from "@/lib/origin";
 
 const TROUBLE = "Something went wrong on our side. Please try again.";
 
+/**
+ * A test release (DEC-071, T6): nothing is booked, held or joined, and
+ * nothing is sent. The page shows its stop for this reason.
+ */
+const TEST_REFUSAL = {
+    ok: false as const,
+    status: 409,
+    message: TEST_RELEASE_MESSAGE,
+    reason: TEST_RELEASE_REASON,
+};
+
 export async function bookSignedIn(
     request: SignedInBookRequest,
 ): Promise<BookingResult<BookResult>> {
     if (!(await siteOrigin())) {
         return { ok: false, status: 403, message: TROUBLE };
     }
+    if (await testMode()) return TEST_REFUSAL;
     const body = accountBookingBody(request);
     if (!body) return { ok: false, status: 400, message: TROUBLE };
     const call = await accountFetch("bookings", { method: "POST", body });
@@ -162,6 +177,7 @@ export async function joinWaitlist(
     if (!(await siteOrigin())) {
         return { ok: false, status: 403, message: TROUBLE };
     }
+    if (await testMode()) return TEST_REFUSAL;
     const body = sessionOf(request);
     if (!body) return { ok: false, status: 400, message: TROUBLE };
     const call = await accountFetch("waitlist", { method: "POST", body });
@@ -188,6 +204,7 @@ export async function leaveWaitlist(
     if (!(await siteOrigin())) {
         return { ok: false, status: 403, message: TROUBLE };
     }
+    if (await testMode()) return TEST_REFUSAL;
     const body = sessionOf(request);
     if (!body) return { ok: false, status: 400, message: TROUBLE };
     const call = await accountFetch("waitlist/leave", { method: "POST", body });

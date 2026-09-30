@@ -8,6 +8,7 @@ import {
     ShopBag,
     SiteChromeFrame,
     SiteTheme,
+    TestReleaseProvider,
 } from "@saroh/site-blocks";
 
 import { TestReleaseBar } from "@/components/test-release-bar";
@@ -249,51 +250,65 @@ export default async function SiteLayout({
         />
     ) : undefined;
 
+    /*
+     * On a test host every flow stops short of a real order, booking,
+     * payment, enquiry or sign-in (DEC-071, T6): the blocks read the
+     * provider and show their stop, and the server actions refuse on their
+     * own (`testMode()`). Keyed on the host, not on the release, so a test
+     * host is never treated as live whatever the lookup returned.
+     */
+    const testRelease =
+        test.mode === "test"
+            ? { name: resolved.release?.name ?? "Test release" }
+            : null;
+
     return (
-        <div
-            className="min-h-screen bg-site-bg text-site-body"
-            data-test-release={resolved.release ? "" : undefined}
-        >
-            {resolved.release ? (
-                <>
-                    <TestReleaseBar
-                        name={resolved.release.name}
-                        liveUrl={release?.ok ? release.liveUrl : null}
-                    />
-                    {/* The site's sticky header sits below the bar, not
-                        under it: the bar keeps this variable at its height. */}
-                    <style>{HEADER_BELOW_BAR}</style>
-                </>
-            ) : null}
-            <SiteTheme variables={snapshot.site.styleVariables} />
-            {/* The account area draws its own compact header and no
-                footer (DEC-073 #10): the frame leaves these out there. */}
-            <SiteChromeFrame
-                account={accountAreaOn()}
-                header={
-                    <SiteHeader
-                        name={snapshot.site.name}
-                        navigation={snapshot.site.navigation ?? []}
-                        // A module page leaves the menu while its module is
-                        // off (G15).
-                        modules={resolved.modules}
-                        action={action}
-                        // A Shop entry in the menu while /shop serves (P4).
-                        shopServes={shopServes}
-                        account={account}
-                        bag={bag}
-                    />
-                }
-                footer={
-                    <SiteFooter
-                        footer={snapshot.site.footer}
-                        name={snapshot.site.name}
-                    />
-                }
+        <TestReleaseProvider release={testRelease}>
+            <div
+                className="min-h-screen bg-site-bg text-site-body"
+                data-test-release={resolved.release ? "" : undefined}
             >
-                {children}
-            </SiteChromeFrame>
-        </div>
+                {resolved.release ? (
+                    <>
+                        <TestReleaseBar
+                            name={resolved.release.name}
+                            liveUrl={release?.ok ? release.liveUrl : null}
+                        />
+                        {/* The site's sticky header sits below the bar, not
+                        under it: the bar keeps this variable at its height. */}
+                        <style>{HEADER_BELOW_BAR}</style>
+                    </>
+                ) : null}
+                <SiteTheme variables={snapshot.site.styleVariables} />
+                {/* The account area draws its own compact header and no
+                footer (DEC-073 #10): the frame leaves these out there. */}
+                <SiteChromeFrame
+                    account={accountAreaOn()}
+                    header={
+                        <SiteHeader
+                            name={snapshot.site.name}
+                            navigation={snapshot.site.navigation ?? []}
+                            // A module page leaves the menu while its module is
+                            // off (G15).
+                            modules={resolved.modules}
+                            action={action}
+                            // A Shop entry in the menu while /shop serves (P4).
+                            shopServes={shopServes}
+                            account={account}
+                            bag={bag}
+                        />
+                    }
+                    footer={
+                        <SiteFooter
+                            footer={snapshot.site.footer}
+                            name={snapshot.site.name}
+                        />
+                    }
+                >
+                    {children}
+                </SiteChromeFrame>
+            </div>
+        </TestReleaseProvider>
     );
 }
 
