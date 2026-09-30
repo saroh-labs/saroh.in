@@ -592,7 +592,10 @@ describe("public catalogue (G11)", () => {
     (isRlsTestMode() ? describe.skip : describe)(
         "with RLS enforcement on, as a role that cannot bypass it",
         () => {
-            const ROLE = "saroh_g11_rls_probe";
+            // Roles are cluster-wide, and parallel runs share one Postgres
+            // with a database each: a fixed name let one run's grants block
+            // another's DROP ROLE. This run's role is its own.
+            const ROLE = `saroh_g11_rls_probe_${process.pid}`;
             const TABLES = ["ProductListing", "Product"];
 
             beforeAll(async () => {
@@ -627,12 +630,8 @@ describe("public catalogue (G11)", () => {
                         `ALTER TABLE "${table}" DISABLE ROW LEVEL SECURITY`,
                     );
                 }
-                await prisma.$executeRawUnsafe(
-                    `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${ROLE}`,
-                );
-                await prisma.$executeRawUnsafe(
-                    `REVOKE USAGE ON SCHEMA public FROM ${ROLE}`,
-                );
+                // Every grant it holds in this database, then the role.
+                await prisma.$executeRawUnsafe(`DROP OWNED BY ${ROLE}`);
                 await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${ROLE}`);
             });
 
