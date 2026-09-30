@@ -202,7 +202,10 @@ organizations/:org/customers`: everyone who has paid (an order through a
 - **Current** — `draft → publish → immutable snapshot` (ADR-002). Drafts are
   private; the public renderer reads only `Publication` snapshots; rollback
   repoints `Site.currentPublicationId`. Rich fields are sanitised at publish, so
-  the renderer only ever reads safe content.
+  the renderer only ever reads safe content. Publish, restore and a test
+  release's Go live all repoint through `putLive` (`sites/live-pointer.ts`,
+  DEC-071), which records the review route and any bypass; nothing else in
+  `modules/sites` writes the pointer (`live-pointer.source.spec.ts`).
 - **Current** — Section content validates against the versioned contract in
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing

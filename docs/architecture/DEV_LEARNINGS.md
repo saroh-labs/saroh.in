@@ -263,7 +263,15 @@ transaction. Version history already marks bypass rows by `publicationId`, and
 the restore confirm now says a change request is outstanding before it
 happens. Any new path that repoints `Site.currentPublicationId` must do the
 same.
-**Category**: sites · tests in `sites-editing.service.spec.ts`
+**Since DEC-071 (T7)** that rule is structural, not remembered: publish,
+restore and a test release's Go live all call `putLive`
+(`apps/api.saroh.in/src/modules/sites/live-pointer.ts`), which asks the
+review standing, appends the LIVE row with its route, repoints the site and
+writes the BYPASSED record in one place. `live-pointer.source.spec.ts` fails
+if `currentPublicationId` is written anywhere else in `modules/sites`, so a
+new path that puts something live has to go through it.
+**Category**: sites · tests in `sites-editing.service.spec.ts`,
+`live-pointer.source.spec.ts`, `test-release-go-live.db.spec.ts`
 
 ## Sites — a changed search title reads "the live site matches your draft" (#282)
 

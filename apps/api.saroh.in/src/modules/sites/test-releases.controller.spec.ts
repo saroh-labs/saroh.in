@@ -84,6 +84,13 @@ const ROUTES: readonly Route[] = [
         args: [ctx, SITE, RELEASE],
     },
     {
+        handler: "goLive",
+        method: RequestMethod.POST,
+        path: ":releaseId/go-live",
+        call: "goLive",
+        args: [ctx, SITE, RELEASE],
+    },
+    {
         handler: "revokeLink",
         method: RequestMethod.POST,
         path: "links/:linkId/revoke",
