@@ -41,6 +41,16 @@ export const REVIEWER_PASSWORD = "demo-password-123";
 export const STOREFRONT_TEAM_EMAIL = "farah.storefront@saroh.dev";
 export const STOREFRONT_TEAM_PASSWORD = "demo-password-123";
 
+/**
+ * Someone who has just signed up and set nothing up (DEC-070, K2). Owns no
+ * business, so setup is the first thing they see. Browser specs about
+ * setting up — "What are you setting up?", a first run for each kind — sign
+ * in as them and make businesses of their own, never touching the demo
+ * owner's.
+ */
+export const FOUNDER_EMAIL = "founder@saroh.dev";
+export const FOUNDER_PASSWORD = "demo-password-123";
+
 export const ORG_SLUG = "demo-org";
 export const ORG_NAME = "Northwind Supply";
 /**
