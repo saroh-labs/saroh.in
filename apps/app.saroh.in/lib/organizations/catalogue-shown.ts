@@ -1,4 +1,4 @@
-import { rolledOutKeys } from "@/lib/modules/rollout";
+import { NOT_OFFERED, rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 
 import type { RoleCatalogue } from "./roles";
@@ -53,12 +53,17 @@ export function shownCatalogue(
     modules: readonly ModuleView[] | null,
 ): RoleCatalogue | null {
     if (!catalogue || !modules || modules.length === 0) return catalogue;
+    // Hidden on evidence only: a module the list names and `rolledOut`
+    // leaves out, or one with no screen yet. A module the list doesn't name
+    // is not hidden, so its permissions show.
     const shown = rolledOutKeys(modules);
+    const hidden = new Set<string>(NOT_OFFERED);
+    for (const m of modules) if (!shown.has(m.key)) hidden.add(m.key);
     return {
         ...catalogue,
         capabilities: catalogue.capabilities.filter((c) => {
             const owner = moduleOfAction(c.action);
-            return owner === null || shown.has(owner);
+            return owner === null || !hidden.has(owner);
         }),
     };
 }
