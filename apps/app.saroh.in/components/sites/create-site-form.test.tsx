@@ -5,6 +5,7 @@ import { addressSuggestionOf } from "@/lib/sites/service";
 
 import { CreateSiteForm, UseSuggestedAddress } from "./create-site-form";
 
+const noop = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
@@ -70,7 +71,7 @@ describe("a refused address (L5)", () => {
             <UseSuggestedAddress
                 suggestion="rye-2"
                 current="rye"
-                onUse={() => {}}
+                onUse={noop}
             />,
         );
         expect(html).toContain("Use rye-2.saroh.app");
@@ -84,7 +85,7 @@ describe("a refused address (L5)", () => {
                 <UseSuggestedAddress
                     suggestion="rye-2"
                     current="rye-2"
-                    onUse={() => {}}
+                    onUse={noop}
                 />,
             ),
         ).toBe("");
@@ -93,7 +94,7 @@ describe("a refused address (L5)", () => {
                 <UseSuggestedAddress
                     suggestion={null}
                     current="rye"
-                    onUse={() => {}}
+                    onUse={noop}
                 />,
             ),
         ).toBe("");

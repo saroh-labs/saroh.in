@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Flag, ReviewState } from "@/lib/sites/service";
 
@@ -8,6 +8,7 @@ import {
     WEB_ADDRESS_SETTINGS_HREF,
 } from "./pre-publish-check";
 
+const noop = vi.fn();
 const review: ReviewState = {
     openNotes: 0,
     latestApproval: null,
@@ -47,15 +48,15 @@ const check = (flags: Flag[]) =>
             pendingSummary={null}
             pendingKnown
             review={review}
-            onPublish={() => {}}
-            onClose={() => {}}
-            onJump={() => {}}
+            onPublish={noop}
+            onClose={noop}
+            onJump={noop}
         />,
     );
 
 /** The publish button's opening tag. */
 const publishButton = (html: string) =>
-    html.match(/<button[^>]*>Publish site<\/button>/)?.[0] ?? "";
+    /<button[^>]*>Publish site<\/button>/.exec(html)?.[0] ?? "";
 
 describe("PrePublishCheck: a site with no web address (L5)", () => {
     it("holds Publish and sends the merchant to choose an address", () => {
