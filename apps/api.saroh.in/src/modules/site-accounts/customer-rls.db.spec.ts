@@ -395,7 +395,12 @@ describe("the customer session on a site", () => {
             await prisma.$executeRawUnsafe(
                 `REVOKE USAGE ON SCHEMA public FROM ${PROBE_ROLE}`,
             );
-            await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${PROBE_ROLE}`);
+            await prisma.$executeRawUnsafe(
+                // A role is cluster-wide: another test database still granting
+                // to it (a parallel run, or one cut short) keeps it; that is fine.
+                `DO $$ BEGIN DROP ROLE IF EXISTS ${PROBE_ROLE};
+                EXCEPTION WHEN dependent_objects_still_exist THEN NULL; END $$`,
+            );
         });
 
         it("runs in the session's business, and sees none of another business's customers", async () => {
