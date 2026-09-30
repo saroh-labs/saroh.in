@@ -1698,6 +1698,7 @@ reads them without saving.
 business; one it makes itself can only check what needs no module (setup,
 the kind, invoices).
 **Category**: e2e · seed · modules
+
 ## e2e — a business a test sets up can still write contacts and invoices (K4)
 
 **Problem**: K4 needed a "site for my work" with nothing that takes money
@@ -1736,3 +1737,21 @@ tables and to `site-review-view.tsx`.
 added to every app table that indexes by it in the same release, or kept
 unreachable behind a flag until it is.
 **Category**: sites · review · DEC-071
+## Templates — a template's enquiry form has no Form until the editor saves (K13)
+
+**Problem**: `writing@1` (and K12's portfolio) give Contact an enquiry
+section, but a template can only lay down its content: the `formId` the
+public submit endpoint needs is missing.
+**Root cause**: `instantiateTemplate` is pure (no Prisma), and
+`site-create.ts` writes the sections as they are. Only two paths make a
+Form: the module pages (`module-page-sections.ts`, `contact`) and the
+editor's `syncEnquiryForms` on save. The enquiry block draws nothing without
+a `formId`, so a site published without an editor save has a blank form.
+**Fix**: not yet. The template leaves `formId` out (the contract allows
+it), and its Home link falls back to the email when there is one. K15,
+which owns `site-create.ts`, should make the Form for any template enquiry
+section as `module-page-sections.ts` does.
+**Rule**: a template section that needs a record behind it (a Form, a
+service, a storefront) is only half-made by the template. Name who makes
+the record before the template ships.
+**Category**: templates · sites · enquiry
