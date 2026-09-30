@@ -3,6 +3,7 @@ import { StorefrontsScreen } from "@/components/stores/storefronts-screen";
 import { mayAddStorefront } from "@/lib/business-limits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { readSiteSelling } from "@/lib/stores/location-selling";
 import {
     getStorefront,
     getStorefrontAllowance,
@@ -10,15 +11,16 @@ import {
 } from "@/lib/stores/storefronts";
 
 /**
- * Sell → Storefronts: the places the business sells from, and each one's own
- * settings.
+ * Sell → Locations: the places the business sells from, and each one's own
+ * settings. A location is a `Store` in code and a storefront in the API
+ * (DEC-069 renamed the words, not the identifiers).
  *
  * The chosen storefront lives in `?storefront=` so a link to one lands on
  * it, and read here rather than in the screen for the reason Orders gives:
  * `useSearchParams` would put the whole screen behind Suspense for a value
  * needed once. An unknown id falls back to the first, not to an error.
  */
-export const metadata = { title: "Storefront" };
+export const metadata = { title: "Locations" };
 
 export default async function StorefrontsPage({
     searchParams,
@@ -26,13 +28,16 @@ export default async function StorefrontsPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [organization, storefronts, allowance, { storefront }] =
+    const [organization, storefronts, allowance, siteSelling, { storefront }] =
         await Promise.all([
             resolveActiveOrganization(),
             listStorefronts(),
             // How many the plan allows; unreadable offers New and lets the
             // API decide.
             getStorefrontAllowance().catch(() => null),
+            // Which location the online shop sells from, for each one's
+            // "Sells in person only / and online" line (DEC-069).
+            readSiteSelling(),
             searchParams,
         ]);
 
@@ -55,6 +60,7 @@ export default async function StorefrontsPage({
                 businessName={organization?.name ?? "This business"}
                 storefronts={storefronts}
                 selected={selected}
+                site={siteSelling.known ? siteSelling.site : undefined}
                 canCreate={
                     may("store:create") &&
                     mayAddStorefront(

@@ -66,7 +66,7 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
             }
             return;
         }
-        showSuccess("Store settings saved");
+        showSuccess("Details saved");
     }
 
     return (

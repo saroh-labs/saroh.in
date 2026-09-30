@@ -158,7 +158,7 @@ test.describe("the phone tab bar", () => {
                 )
                 .toBe(true);
             // Measured again until it holds: a route that redirects
-            // (/commerce → /commerce/storefronts) can be between pages on a
+            // (/commerce → /commerce/locations) can be between pages on a
             // busy runner, with the old bar gone and the new one not drawn
             // yet. A control really under the bar still fails at the timeout.
             await expect

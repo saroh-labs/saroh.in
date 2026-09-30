@@ -21,6 +21,7 @@
  * which is also why `connectedHealth` takes an options object.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join, relative, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -167,11 +168,53 @@ function inAppLinks() {
     return found;
 }
 
-const patterns = appRoutePatterns();
-if (patterns.length === 0) {
+/**
+ * The app's permanent redirects (`next.config.js`), as routes that land: an
+ * old path such as `/commerce/storefronts` (DEC-069 moved it to
+ * `/commerce/locations`) still takes whoever follows it somewhere. Each
+ * redirect's destination must itself be a route, or the check fails, so a
+ * redirect cannot hide a 404 either.
+ */
+async function redirectPatterns(routes) {
+    const require = createRequire(import.meta.url);
+    const config = require(join(APP_ROOT, "next.config.js"));
+    const redirects = config.redirects ? await config.redirects() : [];
+    // `/a/:id` → one segment; a trailing `/:path*` → any depth, or none.
+    const toRegex = (path) => {
+        const rest = /\/:[^/]+\*$/.test(path);
+        const segments = path
+            .replace(/\/:[^/]+\*$/, "")
+            .split("/")
+            .map((s) =>
+                s.startsWith(":")
+                    ? "[^/]+"
+                    : s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            );
+        return new RegExp(`^${segments.join("/")}${rest ? "(?:/.*)?" : ""}$`);
+    };
+    const landing = [];
+    for (const { source, destination } of redirects) {
+        // The destination with its parameters filled by a stand-in segment.
+        const sample = destination
+            .replace(/\/:[^/]+\*$/, "")
+            .replace(/:[^/]+/g, "x");
+        if (!routes.some((p) => p.regex.test(sample))) {
+            console.error(
+                `next.config.js redirects ${source} to ${destination}, which has no route.`,
+            );
+            process.exit(1);
+        }
+        landing.push({ route: source, regex: toRegex(source) });
+    }
+    return landing;
+}
+
+const routes = appRoutePatterns();
+if (routes.length === 0) {
     console.error(`No routes found under ${relative(ROOT, APP_DIR)}.`);
     process.exit(1);
 }
+const patterns = [...routes, ...(await redirectPatterns(routes))];
 
 /** Paths that are real but owned by something other than the app router. */
 const NOT_APP_ROUTES = [

@@ -1298,3 +1298,17 @@ business by an override.
 flag is on in the e2e seed; if it isn't, plan the proof as a db spec, or
 seed the flag for Northwind first.
 **Category**: testing · feature flags · DEC-069
+## Tooling — a killed `eslint --fix` left three source files empty (L9)
+
+**Symptom**: after a machine restart, a unit worktree's uncommitted
+`storefronts-screen.tsx` and two new files were 0 bytes, though `git status`
+listed them only as modified or untracked.
+**Cause**: `eslint --fix` over a directory was still writing when the
+machine went down; a fix rewrites the file in place, so a kill mid-write
+truncates it.
+**Fix**: restored the tracked file from HEAD and re-applied the edits; the
+new files were rewritten.
+**Rule**: after any interruption, look for empty files before committing
+(`find apps -path '*/node_modules' -prune -o -type f -empty -print`), and
+commit work in progress before a long `--fix` run.
+**Category**: tooling · worktrees

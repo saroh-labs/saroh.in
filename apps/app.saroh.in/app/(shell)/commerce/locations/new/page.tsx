@@ -14,13 +14,13 @@ import {
     listStorefronts,
 } from "@/lib/stores/storefronts";
 
-export const metadata = { title: "New storefront" };
+export const metadata = { title: "New location" };
 
 /**
- * Sell → Storefront → New storefront.
+ * Sell → Location → New location.
  *
- * A business may have several storefronts, up to its plan (ADR-010) — a
- * counter and an online shop count their stock apart. At the plan's number
+ * A business may have several locations, up to its plan (ADR-010) — a
+ * counter and a stall count their stock apart. At the plan's number
  * the API refuses another, so this says so before the form, not after Save.
  * An allowance that cannot be read shows the form and leaves it to the API.
  */
@@ -44,33 +44,31 @@ export default async function NewStorefrontPage() {
                 breadcrumb={sellCrumbs(
                     {
                         label:
-                            storefronts.length > 1
-                                ? "Storefronts"
-                                : "Storefront",
-                        href: "/commerce/storefronts",
+                            storefronts.length > 1 ? "Locations" : "Location",
+                        href: "/commerce/locations",
                     },
-                    "New storefront",
+                    "New location",
                 )}
-                title="New storefront"
+                title="New location"
                 description={
                     full !== null
                         ? undefined
                         : first
-                          ? `Another place to sell from, beside ${storefronts.length === 1 ? first.name : `your ${storefronts.length} storefronts`} — it sells from the same catalogue and counts its own stock. Its hours, checkout and payments are set up on the next screen.`
-                          : "Somewhere to sell from — a shop counter, an online store, a market stall. Its hours, checkout and payments are set up on the next screen."
+                          ? `Another place to sell from, beside ${storefronts.length === 1 ? first.name : `your ${storefronts.length} locations`} — it sells from the same catalogue and counts its own stock. Its hours, checkout and payments are set up on the next screen.`
+                          : "A place you sell from — a shop counter, a studio, a market stall. Its hours, checkout and payments are set up on the next screen."
                 }
             />
             {full !== null ? (
                 <EmptyState
                     icon={<Store />}
-                    title={`Your plan includes ${full === 1 ? "one storefront" : `${full} storefronts`}`}
+                    title={`Your plan includes ${full === 1 ? "one location" : `${full} locations`}`}
                     description={`This business has ${storefronts.length === 1 ? "its one" : `all ${storefronts.length}`}. A bigger plan adds more, or close one it no longer sells from.`}
                     action={
                         <Button asChild variant="outline">
-                            <Link href="/commerce/storefronts">
+                            <Link href="/commerce/locations">
                                 {storefronts.length === 1
-                                    ? "Go to your storefront"
-                                    : "Go to storefronts"}
+                                    ? "Go to your location"
+                                    : "Go to locations"}
                             </Link>
                         </Button>
                     }

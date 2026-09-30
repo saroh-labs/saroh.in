@@ -24,7 +24,7 @@ import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
-const STOREFRONTS = "/commerce/storefronts";
+const STOREFRONTS = "/commerce/locations";
 const HOURS = "/settings/organization?section=hours";
 
 /**

@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/commerce/storefronts api:stores
+// @covers accounts:/login app:/open app:/commerce/locations api:stores
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -6,11 +6,12 @@ import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
- * Storefronts, "How orders leave" (plan B, B17): the chips, and "Mark
- * pick-up orders late after [N] [hours ▾]" per way the storefront offers.
+ * Locations, "How orders leave" (plan B, B17): the chips, and "Mark
+ * pick-up orders late after [N] [hours ▾]" per way the location offers.
+ * (Storefronts in the API and in code; DEC-069 renamed only the words.)
  *
  * Walks it on Northwind Supply, the base seed — Rye & Co. and Pulse Fitness
- * are kept camera-ready — and puts its first storefront back as it found
+ * are kept camera-ready — and puts its first location back as it found
  * it: the same ways and the same thresholds.
  */
 
@@ -18,6 +19,86 @@ const ORG = "seed_org";
 // The API refuses a write with no Origin (#50).
 const headers = { "x-organization-id": ORG, origin: urls.APP_URL };
 const base = `${urls.API_URL}/organizations/${ORG}/storefronts`;
+
+/** Northwind's locations, as the API lists them. */
+async function locations(page: Page): Promise<{ id: string; name: string }[]> {
+    const list = await page.request.get(base, { headers });
+    expect(list.ok()).toBe(true);
+    return (await list.json()) as { id: string; name: string }[];
+}
+
+/**
+ * Sell › Locations (DEC-069, L9): the old `/commerce/storefronts` address
+ * still lands, and the rail says Location(s), desk and phone. Read-only.
+ */
+test.describe("Locations (DEC-069)", () => {
+    test("the old storefronts address lands on Locations, on the one asked for", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        const stores = await locations(page);
+        const one = stores.at(-1);
+        expect(one).toBeDefined();
+        if (!one) return;
+
+        await page.goto(`/commerce/storefronts?storefront=${one.id}`);
+        await expect(page).toHaveURL(
+            new RegExp(`/commerce/locations\\?storefront=${one.id}$`),
+        );
+        await expect(
+            page.getByRole("heading", {
+                level: 1,
+                name: stores.length > 1 ? "Locations" : "Location",
+            }),
+        ).toBeVisible();
+        await expect(page.getByLabel("Location name")).toHaveValue(one.name);
+        // The words changed, not only the address.
+        await expect(
+            page.getByText(/storefront/i).filter({ visible: true }),
+        ).toHaveCount(0);
+
+        // A deeper old address lands too.
+        await page.goto(`/commerce/storefronts/${one.id}/details`);
+        await expect(page).toHaveURL(
+            new RegExp(`/commerce/locations/${one.id}/details$`),
+        );
+    });
+
+    test("the rail names the row Location, or Locations once there are several", async ({
+        page,
+    }, testInfo) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        const label =
+            (await locations(page)).length > 1 ? "Locations" : "Location";
+        await page.goto("/commerce/locations");
+
+        if (testInfo.project.name.startsWith("phone")) {
+            // The phone keeps Sell's rows in More.
+            const more = page
+                .getByRole("navigation", { name: "Main" })
+                .getByRole("button", { name: /^More/ });
+            const sheet = page.getByRole("dialog", { name: "Everything else" });
+            // Pressed until it opens: a press before hydration does nothing.
+            await expect(async () => {
+                await more.click();
+                await expect(sheet).toBeVisible({ timeout: 2_000 });
+            }).toPass({ timeout: 20_000 });
+            await expect(
+                sheet.getByRole("link", { name: label, exact: true }),
+            ).toHaveAttribute("href", "/commerce/locations");
+            await expect(sheet.getByText(/storefront/i)).toHaveCount(0);
+            return;
+        }
+
+        const rail = page.getByRole("navigation", { name: "Primary" });
+        await expect(
+            rail.getByRole("link", { name: label, exact: true }),
+        ).toHaveAttribute("href", "/commerce/locations");
+        await expect(rail.getByText(/storefront/i)).toHaveCount(0);
+    });
+});
 
 type Way = "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING";
 interface Storefront {
@@ -77,7 +158,7 @@ test.describe(
                     kind: "SHOP",
                     fulfilmentTypes: ["PICKUP"],
                 });
-                await page.goto(`/commerce/storefronts?storefront=${first.id}`);
+                await page.goto(`/commerce/locations?storefront=${first.id}`);
                 const card = page.getByRole("region", {
                     name: "How orders leave",
                 });
