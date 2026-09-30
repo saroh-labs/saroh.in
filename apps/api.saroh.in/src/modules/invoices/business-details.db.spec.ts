@@ -441,7 +441,7 @@ describe("recorded after money, and flagged (DEC-068)", () => {
         const gap = await businessDetailsGap(prisma, owner.organizationId);
         expect(gap).toMatchObject({
             code: "PAYMENTS_BUSINESS_DETAILS",
-            title: "Add your registered address — invoices go out without it",
+            title: "Add the address your invoices print — they go out without it",
             href: "/settings/organization?tab=address",
             severity: "ATTENTION",
         });

@@ -101,6 +101,12 @@ export interface SetupFacts {
     sites: number;
     /** Of those, the ones with nothing published now (never, or taken down). */
     sitesNotLive: number;
+    /**
+     * Invoices that aren't void: drafts and issued paper alike. Once there is
+     * one, the business invoices, so the address its invoices print is asked
+     * for even with nothing on that takes money (DEC-070, KTD-7).
+     */
+    invoices: number;
 }
 
 /** What the settings read selects from the profile. */
@@ -551,23 +557,27 @@ export class OrganizationSettingsService {
     /** What the take-money checklist ticks, counted now. */
     private async setupFacts(organizationId: string): Promise<SetupFacts> {
         const site = { organizationId, deletedAt: null };
-        const [products, services, sites, sitesNotLive] = await Promise.all([
-            prisma.product.count({
-                where: { organizationId, status: { not: "ARCHIVED" } },
-            }),
-            prisma.service.count({
-                where: {
-                    organizationId,
-                    deletedAt: null,
-                    status: { not: "ARCHIVED" },
-                },
-            }),
-            prisma.site.count({ where: site }),
-            prisma.site.count({
-                where: { ...site, currentPublicationId: null },
-            }),
-        ]);
-        return { products, services, sites, sitesNotLive };
+        const [products, services, sites, sitesNotLive, invoices] =
+            await Promise.all([
+                prisma.product.count({
+                    where: { organizationId, status: { not: "ARCHIVED" } },
+                }),
+                prisma.service.count({
+                    where: {
+                        organizationId,
+                        deletedAt: null,
+                        status: { not: "ARCHIVED" },
+                    },
+                }),
+                prisma.site.count({ where: site }),
+                prisma.site.count({
+                    where: { ...site, currentPublicationId: null },
+                }),
+                prisma.invoice.count({
+                    where: { organizationId, status: { not: "VOID" } },
+                }),
+            ]);
+        return { products, services, sites, sitesNotLive, invoices };
     }
 
     /** The earliest order in the business, across every storefront. */
