@@ -1824,3 +1824,18 @@ machine, disk and CPU contention push that walk past vitest's default 5s.
 Rerun first; if it recurs, give the scan an explicit timeout (as a third
 argument to `it`) rather than the default.
 **Category**: vitest · tests · flake
+
+## e2e — a new test release already reads Approved (T12)
+
+**Problem**: `site-review.spec.ts`'s new test passed on desk-serial and
+failed on phone-serial: the release it had just made already read "Priya
+(reviewer) approved this test release."
+**Root cause**: by design, not a bug. A verdict on a test release is bound
+to its fingerprint, not its id (DEC-071, KTD-10), so two releases with the
+same bytes share their verdicts. The desk run approved a release of the
+seed's draft and put the draft back; the phone run froze the same bytes.
+**Fix**: the spec freezes a draft with a stamped heading of its own, so its
+release has bytes no other run has, and puts the draft back.
+**Rule**: a spec that reviews a test release makes the release's content
+its own (a stamped section), never a release of the seed's draft as it is.
+**Category**: e2e · test releases · own data
