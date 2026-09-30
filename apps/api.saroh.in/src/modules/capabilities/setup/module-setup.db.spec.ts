@@ -147,6 +147,8 @@ describe("Sell (COMMERCE)", () => {
         expect(store).toMatchObject({
             name: "Rye Bakery",
             organizationId: ctx.organizationId,
+            // No storefront "Web address" any more (DEC-069, L14).
+            slug: null,
         });
         expect(store.settings).toMatchObject({
             // Table order, the old toggles in step, the business's currency.

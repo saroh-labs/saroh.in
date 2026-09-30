@@ -1,5 +1,4 @@
 import {
-    BadRequestException,
     ConflictException,
     ForbiddenException,
     Injectable,
@@ -24,8 +23,6 @@ import {
 import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
-import { slugify } from "./slug";
-import { storeSlugInUse } from "./store-slug";
 
 /** Staff roles allowed to mutate a store (VIEWER is read-only). */
 const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
@@ -364,56 +361,34 @@ export class StoresService {
             });
         }
 
-        const slug = slugify(dto.slug ?? dto.name);
-        if (!slug) {
-            throw new BadRequestException({
-                message: "Could not derive a slug from the name",
-                field: "slug",
-            });
-        }
-        if (!(await this.isSlugAvailable(slug))) {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
-        }
-
         // A business sells in one currency (DEC-030): a new storefront takes
         // the business's, rather than reading as the column default (USD)
         // until someone saves its settings.
         const currency = await businessCurrency(prisma, organizationId);
-        try {
-            const store = await prisma.store.create({
-                data: {
-                    name: dto.name,
-                    slug,
-                    description: dto.description ?? null,
-                    organization: { connect: { id: organizationId } },
-                    // Nested create runs in one transaction → no orphan store.
-                    owners: { create: { userId, role: "OWNER" } },
-                    // Its settings say what it offers from the start (B2a), the
-                    // same as a storefront with no settings row reads.
-                    ...(currency
-                        ? {
-                              settings: {
-                                  create: {
-                                      currency,
-                                      fulfilmentTypes: NEW_STOREFRONT_TYPES,
-                                  },
+        // No slug: the storefront "Web address" is gone (DEC-069, L14). A
+        // `slug` an older app still sends is ignored.
+        const store = await prisma.store.create({
+            data: {
+                name: dto.name,
+                description: dto.description ?? null,
+                organization: { connect: { id: organizationId } },
+                // Nested create runs in one transaction → no orphan store.
+                owners: { create: { userId, role: "OWNER" } },
+                // Its settings say what it offers from the start (B2a), the
+                // same as a storefront with no settings row reads.
+                ...(currency
+                    ? {
+                          settings: {
+                              create: {
+                                  currency,
+                                  fulfilmentTypes: NEW_STOREFRONT_TYPES,
                               },
-                          }
-                        : {}),
-                },
-            });
-            return { id: store.id };
-        } catch {
-            // Unique-constraint backstop for a slug race between the check
-            // above and the insert.
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
-        }
+                          },
+                      }
+                    : {}),
+            },
+        });
+        return { id: store.id };
     }
 
     /** Update a store's core fields — owner or a write-capable member. */
@@ -422,44 +397,16 @@ export class StoresService {
             throw new NotFoundException("Location not found");
         }
 
-        const slug = slugify(dto.slug);
-        const current = await prisma.store.findUnique({
+        // `dto.slug` (an older app still sends it) is ignored: the slug
+        // is no longer read or written (DEC-069, L14). A row keeps its own.
+        await prisma.store.update({
             where: { id: storeId },
-            select: { slug: true },
+            data: {
+                name: dto.name,
+                description: dto.description ?? null,
+                logo: dto.logo ?? null,
+            },
         });
-        if (
-            current &&
-            current.slug !== slug &&
-            !(await this.isSlugAvailable(slug))
-        ) {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
-        }
-
-        try {
-            await prisma.store.update({
-                where: { id: storeId },
-                data: {
-                    name: dto.name,
-                    slug,
-                    description: dto.description ?? null,
-                    logo: dto.logo ?? null,
-                },
-            });
-            return { id: storeId };
-        } catch {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
-        }
-    }
-
-    /** Store slugs are globally unique (Store.slug @unique), so this reads
-     *  every business's storefronts, even under RLS (storeSlugInUse). */
-    private async isSlugAvailable(slug: string): Promise<boolean> {
-        return !(await storeSlugInUse(prisma, slug));
+        return { id: storeId };
     }
 }
