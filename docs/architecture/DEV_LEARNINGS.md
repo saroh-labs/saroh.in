@@ -1917,3 +1917,22 @@ claimed" answer schedules the recovery step. `backend-jobs.md` → Autopay
 charges. Test: `subscriptions.charge.db.spec.ts` ("a debit retried after
 a crash mid-claim").
 **Category**: jobs · autopay · crash recovery
+
+## Test releases — the API's write guard was tested everywhere but where it is wired
+
+**Problem**: (release review) `TestHostWriteGuard` had unit specs and a
+route inventory (`test-host.guard.spec.ts`, `test-host-routes.spec.ts`),
+and the browser specs showed the renderer stopping every flow. Nothing
+failed if `main.ts` stopped installing the guard: the renderer's own stops
+never let a browser post from a test host, so the API's refusal was never
+reached in any test.
+**Root cause**: global guards are installed in `bootstrap()`, which only
+the real stack runs; the unit specs construct the guard themselves.
+**Fix**: `e2e/tests/site-test-release.spec.ts` ("the API refuses a test
+host's public write") posts an enquiry straight to the API with
+`Origin: test--northwind.<renderer>` and expects 409 `TEST_RELEASE`, and
+from the live host expects the route's own 404. With the guard removed
+from `main.ts` it fails (404 instead of 409).
+**Rule**: a guard, pipe or filter installed in `main.ts` gets one check
+through the real bootstrap (the e2e stack), besides its unit spec.
+**Category**: e2e · test releases · bootstrap wiring
