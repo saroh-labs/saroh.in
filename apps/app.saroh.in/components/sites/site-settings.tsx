@@ -44,6 +44,7 @@ import type {
     SiteNavigationItem,
     SiteSettingsInput,
 } from "@/lib/sites/service";
+import type { SiteAddress } from "@/lib/sites/share-links";
 
 /**
  * A site's address, search appearance and share card (#188).
@@ -66,7 +67,18 @@ const Missing = () => (
     <span className="text-muted-foreground">Nothing set yet</span>
 );
 
-export function SiteSettings({ site }: { site: SiteDetail }) {
+export function SiteSettings({
+    site,
+    address: reached,
+}: {
+    site: SiteDetail;
+    /**
+     * Where the site is reached (`siteAddressOf`, DEC-069 L8): its verified
+     * domain when the business has one, and its Saroh address beside it.
+     * Null for a site with no address yet.
+     */
+    address: SiteAddress | null;
+}) {
     const [seoTitle, setSeoTitle] = useState(site.seoTitle ?? "");
     const [seoDescription, setSeoDescription] = useState(
         site.seoDescription ?? "",
@@ -129,7 +141,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
     const [editing, setEditing] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const address = site.subdomain ? `${site.subdomain}.saroh.app` : null;
+    const address = reached?.host ?? null;
     const live = Boolean(site.currentPublication);
 
     function save(input: SiteSettingsInput, label: string) {
@@ -232,7 +244,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                         live && address ? (
                             <Button variant="outline" size="sm" asChild>
                                 <a
-                                    href={`https://${address}`}
+                                    href={reached?.url}
                                     target="_blank"
                                     rel="noreferrer"
                                 >
@@ -289,7 +301,9 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                 title="Saroh address"
                 description="Every site gets one of these and keeps it. Your own domain, below, is added alongside it."
             >
-                <Row label="Subdomain">{address ?? <Missing />}</Row>
+                <Row label="Subdomain">
+                    {reached?.platformHost ?? <Missing />}
+                </Row>
             </Section>
 
             <Section
@@ -662,7 +676,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                                 ? { url: socialImageUrl, ...socialImageFacts }
                                 : null
                         }
-                        liveUrl={live && address ? `https://${address}` : null}
+                        liveUrl={live && reached ? reached.url : null}
                     />
                 </Row>
             </Section>
