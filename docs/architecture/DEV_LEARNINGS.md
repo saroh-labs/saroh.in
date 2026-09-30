@@ -1416,3 +1416,17 @@ put them together with nothing re-running the unit suite on the result.
 catalogue check), run the API unit suite on the batch before starting the
 next wave from it.
 **Category**: merges · testing · DEC-069
+## Batch — a DEC-074 refusal said "storefront" once L11's copy scan landed (K2)
+
+**Symptom**: `api-unit` failed on `batch-2026-09-30-5` itself:
+`common/merchant-copy.spec.ts` flagged `orders/order-location.ts`'s
+"Your role moves only your storefront's orders."
+**Cause**: DEC-074's unit wrote the refusal before DEC-069 L11's scan (merchant
+copy says location) existed; each unit passed alone, and the batch merge put
+them together without re-running `api-unit`.
+**Fix**: the refusal says "your location's orders" (K2 made the one-word
+change, since it blocked its gate).
+**Rule**: after landing units into a batch, run `pnpm prepush` on the batch
+before branching the next wave from it; a scan added by one unit judges every
+other unit's strings.
+**Category**: batches · copy · DEC-069

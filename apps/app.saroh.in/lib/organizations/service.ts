@@ -1,6 +1,8 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 
+import type { OrganizationKind } from "./kind";
+
 /**
  * Organization data access for app.saroh.in. Organization is the tenant root
  * (ADR-001): every org-scoped API call carries the active organization id in
@@ -36,6 +38,12 @@ export interface Organization {
      * to the built-in map when it is absent.
      */
     actions?: string[];
+    /**
+     * What is being set up (DEC-070); words and defaults only. Absent from
+     * an API older than it — read it through `kindOf`, which calls that a
+     * business.
+     */
+    kind?: OrganizationKind;
 }
 
 export interface OrganizationProfileInput {
@@ -49,6 +57,8 @@ export interface OrganizationProfileInput {
 
 export interface CreateOrganizationInput {
     name: string;
+    /** "What are you setting up?" (DEC-070). Absent, the API stores BUSINESS. */
+    kind?: OrganizationKind;
     profile?: OrganizationProfileInput;
     /**
      * The `<address>.saroh.app` the business reserves — its first website is
