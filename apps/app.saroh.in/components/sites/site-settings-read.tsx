@@ -28,14 +28,14 @@ export function SiteSettingsRead({
     return (
         <div className="space-y-8">
             <p className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
-                You can see this site&apos;s settings. Changing them — its
-                address, how it appears in search, and its own domain — is the
+                You can see this site&apos;s settings. Changing them — its posts
+                path, how it appears in search, and its own domain — is the
                 owner&apos;s or an admin&apos;s. A connected domain is not shown
                 here: reading it needs the domain permission this role lacks.
             </p>
 
-            <Section title="Address">
-                <Row label="Saroh address">
+            <Section title="Web address">
+                <Row label="On Saroh">
                     {address?.platformHost ?? <Missing />}
                 </Row>
             </Section>

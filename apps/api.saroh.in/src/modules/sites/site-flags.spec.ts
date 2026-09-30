@@ -847,6 +847,19 @@ describe("module pages and reserved addresses (G14)", () => {
         });
         expect(flags.map((f) => f.pageId)).toEqual(["range"]);
     });
+
+    it("says 'your online shop' and 'location', never 'storefront' (DEC-069, L12)", () => {
+        const flags = checkShop({
+            storefrontChosen: false,
+            candidates: 2,
+            isShopPath: (p) => p === "/shop" || p.startsWith("/shop/"),
+            pages: [{ id: "range", path: "/shop/range", hidden: false }],
+        });
+        expect(flags.map((f) => f.message)).toEqual([
+            "Pick which location your online shop sells from. Until you do, the shop and its products don't show on the site.",
+            "/shop/range is where your online shop lives. This page keeps showing there for now. Change its address so the shop can open.",
+        ]);
+    });
 });
 
 describe("checkAddress (DEC-069, L5)", () => {

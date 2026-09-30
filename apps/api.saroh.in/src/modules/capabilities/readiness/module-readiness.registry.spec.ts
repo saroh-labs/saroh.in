@@ -122,7 +122,7 @@ describe("ModuleReadinessRegistry", () => {
                 {
                     code: "WEBSITE_SHOP_NOT_CHOSEN",
                     message:
-                        "Choose which storefront your site sells from — until then your shop page isn't live.",
+                        "Choose which location your online shop sells from — until then your shop page isn't live.",
                     severity: "SETUP",
                     actionHref: "/sites/site_1/settings#sells-from",
                 },

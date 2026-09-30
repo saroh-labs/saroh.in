@@ -136,7 +136,7 @@ function TurnOnBody({
     const shopNote = !draft
         ? null
         : plan.websiteForShop
-          ? `Your online shop goes on your website at ${draft.WEBSITE.address || "your address"}.saroh.app/shop — we'll set up the website for you.`
+          ? `Your online shop goes on your website at ${draft.WEBSITE.address ? `${draft.WEBSITE.address}.saroh.app/shop` : "/shop on your web address"} — we'll set up the website for you.`
           : null;
 
     const submit = async (connect?: boolean) => {

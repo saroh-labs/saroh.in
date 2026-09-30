@@ -23,7 +23,7 @@ import { effectiveStorefront, sellsFromChoices } from "./sells-from";
 
 /** What a merchant is told, in both places. */
 export const SHOP_AWAITS_SELLS_FROM =
-    "Choose which storefront your site sells from — until then your shop page isn't live.";
+    "Choose which location your online shop sells from — until then your shop page isn't live.";
 
 type Db = Pick<
     Prisma.TransactionClient,

@@ -125,7 +125,7 @@ export const RESERVED_PAGE_PATHS: readonly {
     purpose: string;
 }[] = [
     { root: "/book", kind: "BOOK", purpose: "your booking page" },
-    { root: "/shop", kind: "SHOP", purpose: "your shop" },
+    { root: "/shop", kind: "SHOP", purpose: "your online shop" },
     { root: "/checkout", kind: null, purpose: "where your customers pay" },
     {
         root: "/pay",

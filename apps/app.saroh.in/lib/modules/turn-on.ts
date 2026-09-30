@@ -156,7 +156,7 @@ export const GIVES: Readonly<Record<string, string>> = {
     COMMERCE: "Orders, products and customers, sold from your first location.",
     APPOINTMENTS: "A calendar people book into, with your first service.",
     CRM: "Contacts, leads and a pipeline, ready to use.",
-    WEBSITE: "A starter site at your address, ready for you to publish.",
+    WEBSITE: "A starter site at your web address, ready for you to publish.",
     PAYMENTS:
         "Subscriptions, plans, and pay links on your invoices. Online payment stays off until you connect a provider.",
     COMMUNICATIONS:

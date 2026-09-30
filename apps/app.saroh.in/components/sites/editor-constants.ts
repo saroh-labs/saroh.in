@@ -50,7 +50,7 @@ export const SECTION_HINTS: Record<SectionType, string> = {
     contact: "Your address, opening hours, phone, email and WhatsApp.",
     servicesList: "Your services with duration and price, always up to date.",
     visitUs:
-        "Your shop's address, hours and Open now, with directions, always up to date.",
+        "A location's address, hours and Open now, with directions, always up to date.",
     journal: "Your latest posts, newest first. A new post shows up on its own.",
     plans: "Your plans on sale, with price and how often. A new plan shows up on its own.",
     packs: "Your class packs on sale, with the price per class. A new pack shows up on its own.",

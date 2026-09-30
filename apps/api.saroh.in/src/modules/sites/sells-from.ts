@@ -7,14 +7,15 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 
 /**
- * The storefront a site sells from (round-2 G11): `Site.storefrontId`.
+ * The storefront a site sells from (round-2 G11): `Site.storefrontId`. A
+ * merchant reads it as the location "your online shop" sells from (DEC-069).
  *
  * Shown, never silent. It is set on its own only when there is one clear
  * answer ({@link automaticStorefront}: the one open storefront with
  * listings, or the only open storefront when none has any), and when Sell is
  * turned on for a site that has none (DEC-069); the site's settings then say
- * "Your site sells from Online · Change". With several it stays unset until
- * the merchant answers "Which storefront does this site sell from?", and
+ * "Your online shop sells from Online · Change". With several it stays unset until
+ * the merchant answers "Which location does your online shop sell from?", and
  * the pre-publish check names it. It is never "the first storefront" by
  * creation order over products listed elsewhere. Closing the storefront
  * clears it (`storefronts.service.ts`), and a read treats a
@@ -205,7 +206,7 @@ export async function assertSellsFromChoice(
     });
     if (!store) {
         throw new BadRequestException({
-            message: "Pick one of this business's open storefronts.",
+            message: "Pick one of this business's open locations.",
             details: { field: "storefrontId" },
         });
     }

@@ -23,17 +23,6 @@ const APP = join(__dirname, "..");
 const ROOTS = ["app", "components", "lib"];
 
 /**
- * Left to the unit that owns their copy: L12 rewords the site's settings and
- * the Turn on sheet ("Your online shop sells from"). Remove an entry once its
- * unit lands.
- */
-const OWNED_ELSEWHERE = [
-    "components/sites/",
-    "lib/sites/",
-    "components/modules/turn-on/",
-];
-
-/**
  * Text that names a storefront on purpose and never reaches a merchant as
  * it stands.
  */
@@ -113,7 +102,6 @@ describe("merchant copy says location (DEC-069)", () => {
     it("no workspace string a merchant reads says storefront", () => {
         const offenders = ROOTS.flatMap((root) => sourceFiles(join(APP, root)))
             .map((path) => relative(APP, path).split(sep).join("/"))
-            .filter((rel) => !OWNED_ELSEWHERE.some((p) => rel.startsWith(p)))
             .flatMap((rel) =>
                 literals(join(APP, rel))
                     .filter(({ text, jsx }) => saysStorefront(text, jsx))
@@ -121,5 +109,7 @@ describe("merchant copy says location (DEC-069)", () => {
                     .map(({ line, text }) => `${rel}:${line} ${text}`),
             );
         expect(offenders).toEqual([]);
-    });
+        // Parses every source file in the app: seconds on its own, and
+        // more beside the rest of the suite.
+    }, 60_000);
 });

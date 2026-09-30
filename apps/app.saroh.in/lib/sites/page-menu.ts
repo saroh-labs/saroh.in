@@ -100,7 +100,7 @@ export function fixedAddress(
         case "BOOK":
             return { path: page.path, purpose: "your booking page's address" };
         case "SHOP":
-            return { path: page.path, purpose: "your shop's address" };
+            return { path: page.path, purpose: "your online shop's address" };
         default:
             return null;
     }
