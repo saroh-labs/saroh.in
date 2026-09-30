@@ -1559,3 +1559,21 @@ pins both a proxied https host and a bare-port one.
 **Rule**: a middleware redirect's Location is always absolute, and a new
 redirect is proved by a browser spec, not only by `middleware.test.ts`.
 **Category**: renderer · middleware · DEC-071
+
+## Renderer — a constant from a "use client" file is not a value on the server (T5)
+
+**Symptom**: on a test host the site's sticky header slid under the Test
+release bar. The page's CSS read
+`top:var(function(){throw Error("Attempted to call BAR_HEIGHT_VAR() …`.
+**Cause**: the tenant layout (a server component) imported the string
+`BAR_HEIGHT_VAR` from the "use client" bar. On the server every export of a
+client module is a client reference, constants included.
+`lib/server-imports.test.ts` guarded only functions from `@saroh/site-blocks`
+and said constants were fine.
+**Fix**: the shared values live in `apps/saroh.app/lib/test-release-chrome.ts`
+(no directive). A second test in `server-imports.test.ts` fails a server
+file that imports anything but a component (PascalCase) from one of the
+app's own client modules.
+**Rule**: a value both a server file and a client component need lives in a
+module with no "use client".
+**Category**: renderer · RSC · DEC-071
