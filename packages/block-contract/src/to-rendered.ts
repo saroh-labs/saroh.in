@@ -120,6 +120,9 @@ export const TO_RENDERED = {
     productGrid: identity,
     // A title and display options; the packs are read live.
     packs: identity,
+    // The merchant's own projects: text, photos and plain links, checked
+    // when authored. Nothing to resolve.
+    projects: identity,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

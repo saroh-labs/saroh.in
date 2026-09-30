@@ -347,6 +347,28 @@ const renderedPacks = z.object({
 });
 
 /**
+ * `projects`, as published (K11): nothing resolves at publish. Looser than
+ * the authoring schema, as `features` is: a snapshot is immutable and may
+ * outlive today's bounds. The component re-checks each `link` rather than
+ * trusting that the snapshot was written by today's contract.
+ */
+const renderedProjects = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    items: z
+        .array(
+            z.object({
+                image: renderedImageSchema.optional(),
+                title: z.string(),
+                summary: z.string().optional(),
+                link: z.string().optional(),
+            }),
+        )
+        .min(1),
+});
+
+/**
  * The rendered schema for every block type.
  *
  * `Record<SectionType, …>` on purpose: a block type added to `SECTION_TYPES`
@@ -377,6 +399,7 @@ export const RENDERED_SCHEMAS = {
     plans: renderedPlans,
     productGrid: renderedProductGrid,
     packs: renderedPacks,
+    projects: renderedProjects,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -399,6 +422,7 @@ export type RenderedJournal = RenderedContent<"journal">;
 export type RenderedPlans = RenderedContent<"plans">;
 export type RenderedProductGrid = RenderedContent<"productGrid">;
 export type RenderedPacks = RenderedContent<"packs">;
+export type RenderedProjects = RenderedContent<"projects">;
 
 /**
  * Validate rendered content for a block type.

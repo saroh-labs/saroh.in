@@ -11,6 +11,7 @@ import type {
     RenderedPacks,
     RenderedPlans,
     RenderedProductGrid,
+    RenderedProjects,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -39,6 +40,7 @@ import JournalSection from "./blocks/journal";
 import PacksSection from "./blocks/packs";
 import PlansSection from "./blocks/plans";
 import ProductGridSection from "./blocks/product-grid";
+import ProjectsSection from "./blocks/projects";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -291,6 +293,30 @@ describe("block rendering", () => {
         ).container.innerHTML;
         expect(grid).toContain("lg:grid-cols-3");
         expect(list).not.toContain("lg:grid-cols-3");
+    });
+
+    it.each(["cards", "list"])("projects/%s", (look) => {
+        const { container } = render(
+            <ProjectsSection
+                content={blockFixture("projects", look) as RenderedProjects}
+            />,
+        );
+        expect(container.innerHTML).toMatchSnapshot();
+    });
+
+    it("draws the two projects looks differently", () => {
+        const cards = render(
+            <ProjectsSection
+                content={blockFixture("projects", "cards") as RenderedProjects}
+            />,
+        ).container.innerHTML;
+        const list = render(
+            <ProjectsSection
+                content={blockFixture("projects", "list") as RenderedProjects}
+            />,
+        ).container.innerHTML;
+        expect(cards).toContain("auto-fill");
+        expect(list).not.toContain("auto-fill");
     });
 
     it("faq", () => {
