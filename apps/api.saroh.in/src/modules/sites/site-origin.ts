@@ -52,7 +52,7 @@ export function platformOrigin(address: string): string {
 }
 
 /** The renderer's apex host: `saroh.app`, or `saroh.app.localhost` in dev. */
-function rendererHost(): string {
+export function rendererHost(): string {
     const base =
         env.RENDERER_URL ??
         (env.NODE_ENV === "development"

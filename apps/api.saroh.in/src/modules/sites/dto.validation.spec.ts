@@ -6,10 +6,13 @@ import { IsBoolean } from "class-validator";
 import { validationPipeOptions } from "../../common/validation";
 import {
     CreatePageDto,
+    CreateTestReleaseDto,
+    CreateTestReleaseLinkDto,
     SetCommentResolvedDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
     UpdateSiteSettingsDto,
+    UpdateTestReleaseDto,
 } from "./dto";
 
 /**
@@ -215,5 +218,52 @@ describe("the page create body (G14)", () => {
         await expect(
             pipe.transform({ inMenu: "false" }, asBody(UpdatePageDto)),
         ).rejects.toBeInstanceOf(BadRequestException);
+    });
+});
+
+describe("test release bodies (DEC-071, T2)", () => {
+    it("takes a blank name as no name, so the default applies", async () => {
+        const dto = (await pipe.transform(
+            { name: "   ", note: "  For Priya " },
+            asBody(CreateTestReleaseDto),
+        )) as CreateTestReleaseDto;
+        expect(dto.name).toBeUndefined();
+        expect(dto.note).toBe("For Priya");
+    });
+
+    it.each([
+        ["a name over 80 characters", { name: "x".repeat(81) }],
+        ["a note over 500 characters", { note: "x".repeat(501) }],
+        ["a name that isn't text", { name: 5 }],
+        ["a field it does not accept", { live: true }],
+    ])("refuses %s when making one", async (_label, body) => {
+        await expect(
+            pipe.transform(body, asBody(CreateTestReleaseDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("never renames one to nothing, and clears a note with null", async () => {
+        await expect(
+            pipe.transform({ name: "  " }, asBody(UpdateTestReleaseDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            pipe.transform({ name: null }, asBody(UpdateTestReleaseDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            pipe.transform({ note: null }, asBody(UpdateTestReleaseDto)),
+        ).resolves.toMatchObject({ note: null });
+    });
+
+    it("takes a link of 1, 7 or 30 days, as a number only", async () => {
+        for (const days of [1, 7, 30]) {
+            await expect(
+                pipe.transform({ days }, asBody(CreateTestReleaseLinkDto)),
+            ).resolves.toMatchObject({ days });
+        }
+        for (const days of [2, "7", 0]) {
+            await expect(
+                pipe.transform({ days }, asBody(CreateTestReleaseLinkDto)),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        }
     });
 });

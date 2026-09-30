@@ -44,6 +44,8 @@ const CLASS_LEVEL: Record<string, string> = {
     // E3: business closures and the time-off preview.
     "staff/closures.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
+    // DEC-071 T2: a site's test releases and their links.
+    "sites/test-releases.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",

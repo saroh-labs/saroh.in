@@ -417,3 +417,64 @@ export class CreatePreviewLinkDto {
     @IsIn([1, 7, 30], { message: "A preview link lasts 1, 7 or 30 days" })
     expiresInDays!: 1 | 7 | 30;
 }
+
+/** Blank means "not given", so an empty name field takes the default. */
+const trimOrUndefined = ({ value }: { value: unknown }) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+};
+
+const TEST_RELEASE_NAME_MAX = 80;
+const TEST_RELEASE_NOTE_MAX = 500;
+
+/**
+ * Make a test release (DEC-071, T2). Both optional: the name defaults to
+ * "Test release N", and the note is for whoever opens it.
+ */
+export class CreateTestReleaseDto {
+    @IsOptional()
+    @Transform(trimOrUndefined)
+    @IsString({ message: "Give the test release a name" })
+    @MaxLength(TEST_RELEASE_NAME_MAX, {
+        message: `A test release name must be at most ${TEST_RELEASE_NAME_MAX} characters`,
+    })
+    name?: string;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(TEST_RELEASE_NOTE_MAX, {
+        message: `A note must be at most ${TEST_RELEASE_NOTE_MAX} characters`,
+    })
+    note?: string | null;
+}
+
+/** Rename a test release, or change or clear its note. */
+export class UpdateTestReleaseDto {
+    // Checked whenever present: a release always has a name.
+    @ValidateIf((_o, v) => v !== undefined)
+    @Transform(trim)
+    @IsString({ message: "Give the test release a name" })
+    @MinLength(1, { message: "Give the test release a name" })
+    @MaxLength(TEST_RELEASE_NAME_MAX, {
+        message: `A test release name must be at most ${TEST_RELEASE_NAME_MAX} characters`,
+    })
+    name?: string;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(TEST_RELEASE_NOTE_MAX, {
+        message: `A note must be at most ${TEST_RELEASE_NOTE_MAX} characters`,
+    })
+    note?: string | null;
+}
+
+/** A new link to share a test release, lasting 1, 7 or 30 days. */
+export class CreateTestReleaseLinkDto {
+    @IsIn([1, 7, 30], { message: "A test release link lasts 1, 7 or 30 days" })
+    days!: 1 | 7 | 30;
+}
