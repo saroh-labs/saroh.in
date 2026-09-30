@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import { accountAreaOn, isAccountPath } from "@/lib/account-area-switch";
 import { isPayPath, TENANT_HOST_HEADER } from "@/lib/pay-host";
+import { REQUEST_PATH_HEADER, requestPathOf } from "@/lib/request-path";
 import { tenantUrl } from "@/lib/tenant-url";
 
 export const config = {
@@ -70,11 +71,16 @@ export default function middleware(req: NextRequest) {
     // `/home${path}` — a route that does not exist in this app — so every apex
     // request 404'd instead of reaching app/page.tsx.
     if (isApexHost(hostname)) {
-        // Only this middleware names a tenant host (below); one a visitor
-        // sent to the apex is dropped, so the apex pay page never redirects.
-        if (req.headers.has(TENANT_HOST_HEADER)) {
+        // Only this middleware names a tenant host or a request path
+        // (below); one a visitor sent to the apex is dropped, so the apex
+        // pay page never redirects.
+        if (
+            req.headers.has(TENANT_HOST_HEADER) ||
+            req.headers.has(REQUEST_PATH_HEADER)
+        ) {
             const headers = new Headers(req.headers);
             headers.delete(TENANT_HOST_HEADER);
+            headers.delete(REQUEST_PATH_HEADER);
             return NextResponse.next({ request: { headers } });
         }
         return NextResponse.next();
@@ -106,6 +112,14 @@ export default function middleware(req: NextRequest) {
         });
     }
 
-    // Everything else is a tenant hostname: rewrite to the /[domain] route.
-    return NextResponse.rewrite(tenantUrl(hostname, url));
+    // Everything else is a tenant hostname: rewrite to the /[domain] route,
+    // naming the path and query asked for. The layout reads them only when
+    // the host has no live site and is an old address that forwards
+    // (DEC-069, L3): the visitor then lands on the same page at the new one.
+    // Set, never appended, so a value the visitor sent is replaced.
+    const headers = new Headers(req.headers);
+    headers.set(REQUEST_PATH_HEADER, requestPathOf(url));
+    return NextResponse.rewrite(tenantUrl(hostname, url), {
+        request: { headers },
+    });
 }
