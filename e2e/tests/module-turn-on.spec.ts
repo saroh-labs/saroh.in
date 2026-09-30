@@ -46,7 +46,7 @@ async function signIn(page: Page) {
 async function theSheet(page: Page, title: string): Promise<Locator> {
     const sheet = page.getByRole("dialog", { name: title });
     await expect(sheet).toBeVisible();
-    if (test.info().project.name === "phone") {
+    if (test.info().project.name.startsWith("phone")) {
         const box = await sheet.boundingBox();
         const height = page.viewportSize()?.height ?? 0;
         expect(box).not.toBeNull();
@@ -64,7 +64,7 @@ async function turnOnButton(page: Page, sheet: Locator): Promise<Locator> {
     await expect(button).toHaveCount(1);
     await expect(button).toBeEnabled();
     await expect(button).toHaveCSS("cursor", "pointer");
-    if (test.info().project.name === "phone") {
+    if (test.info().project.name.startsWith("phone")) {
         expect(
             await page.evaluate(
                 () => window.matchMedia("(pointer: coarse)").matches,

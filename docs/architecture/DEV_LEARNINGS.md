@@ -1493,7 +1493,8 @@ asserts), it passes without checking them.
 **Fix**: `project.name.startsWith("phone")` in the spec.
 **Rule**: in a spec that can be @serial, test the project with
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
-worth the same change.
+worth the same change. (Now a lint rule: see "the rule written down, not
+enforced", below.)
 **Category**: e2e · tests
 
 ## E2E — a business a test sets up has no modules and no rollout flags (L4)
@@ -1936,3 +1937,21 @@ from `main.ts` it fails (404 instead of 409).
 **Rule**: a guard, pipe or filter installed in `main.ts` gets one check
 through the real bootstrap (the e2e stack), besides its unit spec.
 **Category**: e2e · test releases · bootstrap wiring
+
+## e2e — the "phone-serial" rule was written down, and not enforced
+
+**Problem**: (release review) `module-turn-on.spec.ts`, a @serial spec,
+still tested `project.name === "phone"` at its two phone checks (the sheet
+rising full height, the 44px Turn on button), so on `phone-serial` they
+never ran. The entry above named this very file and rule; the prose did
+not stop it.
+**Root cause**: a rule that lives only in DEV_LEARNINGS is read after the
+fact. Nothing failed on an exact project-name comparison.
+**Fix**: every `=== "phone"`, `!== "phone"` and `=== "desk"` in
+`e2e/tests` is now `startsWith(…)` (only module-turn-on was @serial; the
+rest change nothing today but can't go wrong when a spec turns @serial),
+and `e2e/eslint.config.mjs` has a `no-restricted-syntax` rule that fails an
+equality comparison with the literal `"phone"` or `"desk"`. Lint runs on
+`@saroh/e2e` whenever a spec changes (prepush's lint step, CI's static job).
+**Rule**: compare a Playwright project by prefix; the lint rule says so.
+**Category**: e2e · tests · lint
