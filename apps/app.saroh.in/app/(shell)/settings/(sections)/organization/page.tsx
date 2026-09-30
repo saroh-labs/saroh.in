@@ -1,6 +1,7 @@
 import { EmptyState } from "@saroh/ui/empty-state";
 
 import { OrganizationSettingsForm } from "@/components/organizations/organization-settings-form";
+import { WebAddressSection } from "@/components/organizations/web-address-section";
 import { ReadyChecklist } from "@/components/settings/ready-checklist";
 import {
     SettingsPanel,
@@ -8,6 +9,8 @@ import {
 } from "@/components/settings/settings-panel";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
+import { DEFAULT_TIMEZONE } from "@/lib/organizations/time-zones";
+import { readWebAddress } from "@/lib/organizations/web-address-service";
 import { requireSession } from "@/lib/session";
 import { loadSettingsChecklist } from "@/lib/settings/ready-service";
 import { listStorefrontHours } from "@/lib/stores/storefronts";
@@ -20,6 +23,9 @@ import { listStorefrontHours } from "@/lib/stores/storefronts";
  *
  * OWNER/ADMIN only, enforced by the API (`org:settings:read` / `org:update`). A
  * role denial reaches forbidden.tsx; an unavailable API reaches error.tsx.
+ *
+ * Under Identity, the business's web address (DEC-069, L4): the owner
+ * changes it there, and everyone else who can see it reads it.
  *
  * Above the tabs, for someone who may change things, "Ready to take
  * payments": what is left to set up — Home's steps, then the email, business
@@ -34,10 +40,13 @@ export default async function OrganizationSettingsPage() {
 
     // The Hours tab reads the storefronts, where opening hours are kept; a
     // refusal there is said on that tab, never the whole page.
-    const [settings, organization, hours] = await Promise.all([
+    // The web address (DEC-069, L4) is its own read: one that fails is
+    // said on its card, never the whole page.
+    const [settings, organization, hours, webAddress] = await Promise.all([
         getOrganizationSettings(),
         resolveActiveOrganization(),
         listStorefrontHours(),
+        readWebAddress(),
     ]);
     // From what the API resolved this person may do; the role's name is only
     // the fallback for a response that predates permissions.
@@ -79,6 +88,14 @@ export default async function OrganizationSettingsPage() {
                     canEdit={canEdit}
                     hours={hours}
                     canEditHours={may("store:write")}
+                    webAddress={
+                        <WebAddressSection
+                            read={webAddress}
+                            zone={
+                                settings.profile?.timezone ?? DEFAULT_TIMEZONE
+                            }
+                        />
+                    }
                 />
             ) : (
                 <EmptyState

@@ -1487,3 +1487,22 @@ asserts), it passes without checking them.
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
 worth the same change.
 **Category**: e2e · tests
+## E2E — a business a test sets up has no modules and no rollout flags (L4)
+
+**Problem**: L4's browser spec had to change a web address on a business of
+its own (Northwind's address is read by every other spec), and to show that
+the new host serves. A business set up through onboarding in the seeded
+stack could neither change its address nor have a website.
+**Root cause**: the seed registers every rollout flag dark
+(`enabledByDefault: false`) and gives overrides only to the businesses it
+makes. A business made at test time gets the production default for each,
+so `MODULE_WEBSITE` and `WEB_ADDRESS_CHANGE` are off for it, and there is
+no staff session in `e2e/` to give it an override.
+**Fix**: the seed registers `WEB_ADDRESS_CHANGE` on by default (a release
+order, not a surface a business chooses). `e2e/fixtures/own-business.ts`
+(`makeBusiness`) sets one up as Asha. The spec covers the change on a
+business with no site, where the old address is kept rather than
+forwarded. The forwarding half (the new host serves, the old one answers 307) waits for a way to give a test-made business a site.
+**Rule**: before planning a spec on a business the test makes, check which
+flags it will have. Only a flag with a seeded global default reaches it.
+**Category**: e2e · flags · DEC-069
