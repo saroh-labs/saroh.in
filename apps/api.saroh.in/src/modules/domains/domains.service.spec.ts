@@ -21,16 +21,20 @@ jest.mock("@saroh/database", () => {
 });
 
 import {
+    BadRequestException,
     ConflictException,
     ForbiddenException,
     NotFoundException,
+    ValidationPipe,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { validationPipeOptions } from "../../common/validation";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { FakeDomainVerifier, verificationRecordName } from "./domain-verifier";
 import { DomainsService } from "./domains.service";
+import { ClaimDomainDto, TEST_RESERVED_HOSTNAME_MSG } from "./dto";
 
 /**
  * EntitlementService stub. `can` resolves true by default so the existing claim
@@ -153,6 +157,60 @@ describe("DomainsService.claim", () => {
             service.claim(ctx(), { hostname: "shop.acme.com" }),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(entCan).toHaveBeenCalledWith("org_1", "customDomain");
+        expect(domainCreate).not.toHaveBeenCalled();
+    });
+});
+
+describe("test-release hostnames (DEC-071, KTD-12)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const claimBody = (value: unknown) =>
+        pipe.transform(value, { type: "body", metatype: ClaimDomainDto });
+
+    const RESERVED = [
+        "test.shop.acme.com",
+        "TEST.Shop.Acme.com",
+        "test.acme.com",
+        "test--acme.saroh.app",
+        "test--shop.acme.com",
+    ];
+    const FREE = [
+        "shop.acme.com",
+        "testing.acme.com",
+        "tests.acme.com",
+        "contest.acme.com",
+        "shop.test.com",
+        "test-kitchen.acme.com",
+    ];
+
+    it("the claim DTO refuses a test. or test-- first label with its reason", async () => {
+        for (const hostname of RESERVED) {
+            const refused = await claimBody({ hostname }).then(
+                () => null,
+                (error: unknown) => error,
+            );
+            expect(refused).toBeInstanceOf(BadRequestException);
+            expect(
+                JSON.stringify((refused as BadRequestException).getResponse()),
+            ).toContain(TEST_RESERVED_HOSTNAME_MSG);
+        }
+        for (const hostname of FREE) {
+            await expect(claimBody({ hostname })).resolves.toMatchObject({
+                hostname: hostname.toLowerCase(),
+            });
+        }
+    });
+
+    it("the service refuses the same claims with a 400 and writes nothing", async () => {
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
+        domainFindUnique.mockResolvedValue(null);
+        for (const hostname of RESERVED) {
+            await expect(service.claim(ctx(), { hostname })).rejects.toThrow(
+                new BadRequestException(TEST_RESERVED_HOSTNAME_MSG),
+            );
+        }
+        expect(domainFindUnique).not.toHaveBeenCalled();
         expect(domainCreate).not.toHaveBeenCalled();
     });
 });

@@ -12,6 +12,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { AllowOnTestRelease } from "../../common/decorators/allow-on-test-release.decorator";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 import { CurrentCustomer } from "../site-accounts/customer-context.decorator";
 import { CustomerSessionGuard } from "../site-accounts/customer-session.guard";
@@ -42,6 +43,9 @@ import { PublicCheckoutService } from "./public-checkout.service";
  * - `GET  …/checkout/orders/:orderId` — how a checkout this customer
  *   started stands, while the sheet waits on the payment.
  *
+ * On a test release (DEC-071) only the quote answers; `TestHostWriteGuard`
+ * refuses the checkout itself with 409 `TEST_RELEASE`.
+ *
  * The first two count the visitor by the signed relay's address when
  * saroh.app relays the call (ADR-011), otherwise the caller's own
  * (DEC-027). The service derives the business from the site; nothing in a
@@ -65,7 +69,9 @@ export class PublicCheckoutController {
         return this.checkout.options(siteId, visitorKey(ip, relay));
     }
 
+    // Writes nothing, so a test release prices its bag too (DEC-071, KTD-8).
     @Post(":siteId/checkout/quote")
+    @AllowOnTestRelease()
     @HttpCode(HttpStatus.OK)
     @Header("Cache-Control", "no-store")
     quote(

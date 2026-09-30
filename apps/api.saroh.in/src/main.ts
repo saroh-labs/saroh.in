@@ -19,7 +19,7 @@ import "./env";
 
 import { ValidationPipe } from "@nestjs/common";
 import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
-import { NestFactory } from "@nestjs/core";
+import { NestFactory, Reflector } from "@nestjs/core";
 import { getTrustedOrigins } from "@saroh/auth";
 import helmet from "helmet";
 
@@ -27,6 +27,7 @@ import { AppModule } from "./app.module";
 import { corsOptionsFor } from "./common/cors";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { OriginGuard } from "./common/guards/origin.guard";
+import { TestHostWriteGuard } from "./common/guards/test-host.guard";
 import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
@@ -143,7 +144,15 @@ async function bootstrap() {
     // Referer on unsafe methods for authenticated routes (defense-in-depth on
     // top of the SameSite session cookie + CORS). Public/webhook routes and
     // Better Auth's own routes are exempt inside the guard.
-    app.useGlobalGuards(new OriginGuard());
+    //
+    // Then the test-release write guard (DEC-071, KTD-8): a non-GET
+    // `/public/*` call whose Origin or verified relay names a test host is a
+    // 409 `TEST_RELEASE`, so a test release never takes a real order,
+    // booking, payment or enquiry.
+    app.useGlobalGuards(
+        new OriginGuard(),
+        new TestHostWriteGuard(app.get(Reflector)),
+    );
 
     // OrgRlsInterceptor first (outermost): it opens the per-request RLS org
     // context so the handler's DB work runs inside it. A no-op unless
