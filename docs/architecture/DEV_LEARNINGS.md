@@ -1208,6 +1208,7 @@ updated". `test/global-setup.ts` re-runs the (idempotent) grants.
 the pattern doc saying why not. A new CI job lands with its prepush step.
 **Category**: tooling · `scripts/prepush.sh`, `scripts/e2e-affected.mjs`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
 ## Integration — a probe role failed DROP ROLE beside another test database (K1)
 
 **Problem**: `prepush --int` failed `public-catalogue.db.spec.ts` in teardown
@@ -1224,6 +1225,7 @@ database being torn down.
 **Rule**: a spec that creates a role must not fail when another database still
 uses it — drop it tolerantly, or give it a per-database name.
 **Category**: tests · integration · parallel databases
+
 ## Copy — the service editor matched an API refusal by its words (DEC-069 L11)
 
 **Problem**: Rewording the API's "Treatments are sold as orders — add a
@@ -1241,6 +1243,7 @@ storefront, so a copy change there is visible in review.
 when an old app still compares words, change both sides together and expect
 an old app to fall back to the toast until it is redeployed.
 **Category**: copy · API contract · DEC-069
+
 ## Sites — every new site opened with broken images (DEC-070 K10)
 
 **Problem**: A site made from the starter template (Turn on Website, or
@@ -1263,6 +1266,7 @@ shown "Starter" twice in the picker, which keys options by id.
 media library served, never a path an app is assumed to have. Render a new
 template in a test, not only parse it (K12–K14 follow the same test).
 **Category**: sites · templates · DEC-070
+
 ## E2E stack — the API's renderer links pointed at production (DEC-069 L6)
 
 **Problem**: a pay page opened on a tenant host in the CI and prepush e2e
@@ -1279,6 +1283,7 @@ stack's renderer.
 **Rule**: an origin the API hands to customers is set in every stack that
 runs the API; a spec that follows a link asserts it stays on the stack.
 **Category**: e2e · environment · `docs/patterns/devops-environments-and-flags.md`
+
 ## Sites — a Shop page can't be shown in the browser suite (DEC-069, L13)
 
 **Problem**: L13's plan asked for a browser spec: turn on Sell with Delivery
@@ -1298,6 +1303,7 @@ business by an override.
 flag is on in the e2e seed; if it isn't, plan the proof as a db spec, or
 seed the flag for Northwind first.
 **Category**: testing · feature flags · DEC-069
+
 ## Tooling — a killed `eslint --fix` left three source files empty (L9)
 
 **Symptom**: after a machine restart, a unit worktree's uncommitted
@@ -1312,3 +1318,17 @@ new files were rewritten.
 (`find apps -path '*/node_modules' -prune -o -type f -empty -print`), and
 commit work in progress before a long `--fix` run.
 **Category**: tooling · worktrees
+
+## Merges — a new guard and a new string landed in one batch, and the guard failed (L2)
+
+**Symptom**: on `batch-2026-09-30-5`, `src/common/merchant-copy.spec.ts`
+(L11) failed on `orders/order-location.ts`: "Your role moves only your
+storefront's orders."
+**Cause**: DEC-074's location-team refusal and L11's "API prose never says
+storefront" guard were built in parallel; each passed alone, and the merge
+put them together with nothing re-running the unit suite on the result.
+**Fix**: the refusal says "your location's orders" (L2's first commit).
+**Rule**: after merging a unit that adds a guard test (a source scan, a
+catalogue check), run the API unit suite on the batch before starting the
+next wave from it.
+**Category**: merges · testing · DEC-069
