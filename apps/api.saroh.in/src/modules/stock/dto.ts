@@ -306,8 +306,8 @@ export class SetStockTrackingDto {
  * (#515).
  */
 export class SetSoldOutDto {
-    @IsString({ message: "Pick the storefront." })
-    @MinLength(1, { message: "Pick the storefront." })
+    @IsString({ message: "Pick the location." })
+    @MinLength(1, { message: "Pick the location." })
     @MaxLength(64)
     storefrontId!: string;
 

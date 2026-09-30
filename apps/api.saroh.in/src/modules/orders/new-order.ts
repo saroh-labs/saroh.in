@@ -551,8 +551,8 @@ export function assertStorefrontOffers(
     const words = offered.map((t) => FULFILMENT_RULES[t].label);
     throw new ConflictException({
         message: words.length
-            ? `This storefront doesn't offer ${FULFILMENT_RULES[type].label}. It offers ${words.join(", ")}.`
-            : "This storefront doesn't offer a way for orders to leave yet. Turn one on in its settings.",
+            ? `This location doesn't offer ${FULFILMENT_RULES[type].label}. It offers ${words.join(", ")}.`
+            : "This location doesn't offer a way for orders to leave yet. Turn one on in its settings.",
         details: { field: "fulfilment" },
     });
 }

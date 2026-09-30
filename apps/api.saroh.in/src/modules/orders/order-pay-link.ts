@@ -117,7 +117,7 @@ export function payLinkRefusal(order: PayLinkOrder): string | null {
     }
     // A paused storefront takes no payments (the checkout's own rule).
     if (order.store.settings?.pausedAt) {
-        return "This storefront is paused, so it isn't taking payments.";
+        return "This location is paused, so it isn't taking payments.";
     }
     return null;
 }

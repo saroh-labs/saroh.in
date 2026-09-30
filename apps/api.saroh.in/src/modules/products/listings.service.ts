@@ -191,7 +191,7 @@ export class ListingsService {
             where: { storeId, productId },
         });
         if (listed === 0) {
-            throw new NotFoundException("This storefront doesn't sell it");
+            throw new NotFoundException("This location doesn't sell it");
         }
         return this.list(organizationId, productId, storeId, variantIds);
     }
@@ -258,7 +258,7 @@ export class ListingsService {
                 select: STOCK_LEVEL_SELECT,
             }),
         ]);
-        if (!store) throw new NotFoundException("Store not found");
+        if (!store) throw new NotFoundException("Location not found");
         const sold = new Set(listing?.variants.map((v) => v.variantId) ?? []);
         const whole = rows.find((r) => r.variantId === null);
         return {
@@ -295,7 +295,7 @@ export class ListingsService {
                 select: { id: true },
             }),
         ]);
-        if (!store) throw new NotFoundException("Store not found");
+        if (!store) throw new NotFoundException("Location not found");
         if (!product) throw new NotFoundException("Product not found");
     }
 }

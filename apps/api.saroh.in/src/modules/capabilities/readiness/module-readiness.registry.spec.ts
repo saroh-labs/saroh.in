@@ -682,7 +682,7 @@ describe("deactivationImpact (F13)", () => {
             impactDb({ stores: ["A", "B", "C"] }),
             "COMMERCE",
         );
-        expect(many[0]?.message).toBe("Your 3 storefronts stop taking orders.");
+        expect(many[0]?.message).toBe("Your 3 locations stop taking orders.");
     });
 
     it("Commerce says nothing about a shop while the shop isn't rolled out", async () => {

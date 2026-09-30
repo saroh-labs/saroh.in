@@ -29,7 +29,7 @@ export async function requireOrderRead(
     ]);
     if (stage && !read) {
         throw new ForbiddenException(
-            `Your role doesn't include reading this storefront's ${what}.`,
+            `Your role doesn't include reading this location's ${what}.`,
         );
     }
 }

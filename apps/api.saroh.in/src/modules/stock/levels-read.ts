@@ -219,7 +219,7 @@ export async function readLevels(
         ? everyStorefront.filter((s) => s.id === query.storefront)
         : everyStorefront;
     if (query.storefront && storefronts.length === 0) {
-        throw new NotFoundException("Store not found");
+        throw new NotFoundException("Location not found");
     }
     const shown = new Set(storefronts.map((s) => s.id));
     if (query.product) {

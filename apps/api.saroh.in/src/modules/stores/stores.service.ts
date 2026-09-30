@@ -89,7 +89,7 @@ export class StoresService {
             where: { id: storeId, deletedAt: null },
         });
         if (!store) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
 
         if (!(await this.useOrgPath(store.organizationId))) {
@@ -302,7 +302,7 @@ export class StoresService {
             },
         });
         if (!store) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
         return store;
     }
@@ -342,7 +342,7 @@ export class StoresService {
         });
         if (existing >= MAX_STOREFRONTS_PER_BUSINESS) {
             throw new ConflictException({
-                message: `This business has ${existing} storefronts, as many as Saroh allows. Close one it no longer sells from to add another.`,
+                message: `This business has ${existing} locations, as many as Saroh allows. Close one it no longer sells from to add another.`,
             });
         }
         try {
@@ -359,7 +359,7 @@ export class StoresService {
                 await this.entitlements.getEntitlements(organizationId),
             );
             throw new ForbiddenException({
-                message: `Your plan includes ${limit === 1 ? "one storefront" : `${limit} storefronts`}. A bigger plan adds more.`,
+                message: `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
             });
         }
 
@@ -418,7 +418,7 @@ export class StoresService {
     /** Update a store's core fields — owner or a write-capable member. */
     async updateForUser(userId: string, storeId: string, dto: UpdateStoreDto) {
         if (!(await this.canWrite(storeId, userId))) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
 
         const slug = slugify(dto.slug);

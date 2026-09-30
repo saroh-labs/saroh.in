@@ -139,7 +139,7 @@ export function refusalMessage(code: string, reason: RedeemRefusal): string {
         case "EXHAUSTED":
             return `${code} has been used as many times as it allows.`;
         case "STOREFRONT":
-            return `${code} is not honoured at this storefront.`;
+            return `${code} is not honoured at this location.`;
         case "CURRENCY":
             return `${code} is an amount in another currency.`;
         case "NO_MATCH":

@@ -25,7 +25,7 @@ export type ServiceKind = "one" | "class";
 
 /** The API's refusal of a treatment with no storefront (E10, DEC-050). */
 export const TREATMENT_NEEDS_STOREFRONT =
-    "Treatments are sold as orders — add a storefront first.";
+    "Treatments are sold as orders — add a location first.";
 
 /**
  * Whether a service needs its meeting link: when it happens online, or the

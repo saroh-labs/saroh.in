@@ -1577,7 +1577,7 @@ export class PaymentsService {
         }
         if (order.store.settings?.pausedAt) {
             throw new ConflictException(
-                "This storefront is paused and is not taking payments.",
+                "This location is paused and is not taking payments.",
             );
         }
         await assertOrganizationOpen(customer.organizationId);
@@ -2067,7 +2067,7 @@ export class PaymentsService {
         // accept a payment posted straight at this endpoint.
         if (order.store.settings?.pausedAt) {
             throw new ConflictException(
-                "This storefront is paused and is not taking payments.",
+                "This location is paused and is not taking payments.",
             );
         }
         const {

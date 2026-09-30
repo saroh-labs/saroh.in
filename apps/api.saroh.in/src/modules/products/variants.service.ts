@@ -363,7 +363,7 @@ export class VariantsService {
                     message: variantHasStock(
                         variant.title,
                         row.onHand,
-                        store?.name ?? "this storefront",
+                        store?.name ?? "this location",
                     ),
                     field: "variantId",
                 });

@@ -357,13 +357,13 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
             },
             say: (c) => {
                 if (c === undefined)
-                    return "Your storefronts stop taking orders.";
+                    return "Your locations stop taking orders.";
                 if (c === null)
-                    return "We couldn't read your storefronts. They stop taking orders.";
+                    return "We couldn't read your locations. They stop taking orders.";
                 if (c.count === 0) return null;
                 if (c.names?.length === c.count)
                     return `${names(c.names)} ${c.count === 1 ? "stops" : "stop"} taking orders.`;
-                return `Your ${c.count} storefronts stop taking orders.`;
+                return `Your ${c.count} locations stop taking orders.`;
             },
         },
         {
