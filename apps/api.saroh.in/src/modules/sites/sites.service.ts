@@ -31,6 +31,7 @@ import type {
     UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
+import { putLive, readReviewStanding } from "./live-pointer";
 import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
 import type { PublicModulePageStates } from "./module-pages";
 import {
@@ -51,8 +52,7 @@ import {
 import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
-import type { ApprovalRow, ReviewRoute } from "./review-route";
-import { draftFingerprint, reviewStanding } from "./review-route";
+import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import type { SellsFromView } from "./sells-from";
 import {
@@ -1251,56 +1251,28 @@ export class SitesService {
          */
         const fingerprint = draftFingerprint(source.snapshot);
 
-        return prisma.$transaction(async (tx) => {
-            const standing = await this.reviewStandingFor(
-                tx,
-                siteId,
-                ctx.organizationId,
+        return prisma.$transaction((tx) =>
+            // A restore is a publish, and goes through the one path that
+            // repoints the live site (KTD-3): it says which route it took
+            // (#278) and records a bypass (#279) like any other.
+            putLive(tx, {
+                site: { id: siteId, organizationId: ctx.organizationId },
+                snapshot: source.snapshot,
+                source: "restore",
+                actor: { userId: ctx.userId },
                 fingerprint,
-                ctx.userId,
-            );
-            const bypass = standing.outstanding;
-
-            const restored = await tx.publication.create({
-                data: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    pageId: source.pageId,
-                    path: source.path,
-                    snapshot: source.snapshot as Prisma.InputJsonValue,
-                    templateId: source.templateId,
-                    templateVersion: source.templateVersion,
-                    publishedByUserId: ctx.userId,
-                    // A restore is a publish, and says which route it took
-                    // (#278) like any other.
-                    reviewRoute: standing.route satisfies ReviewRoute,
+                template: {
+                    id: source.templateId,
+                    version: source.templateVersion,
                 },
-                select: { id: true, publishedAt: true },
-            });
-            await tx.site.update({
-                where: { id: siteId },
-                data: { currentPublicationId: restored.id },
-            });
-            if (bypass) {
-                // Linked to the restored publication, so version history marks
-                // this entry the way it marks a bypassed publish.
-                await tx.siteApproval.create({
-                    data: {
-                        siteId,
-                        organizationId: ctx.organizationId,
-                        byUserId: ctx.userId,
-                        outcome: "BYPASSED",
-                        publicationId: restored.id,
-                    },
-                    select: { id: true },
-                });
-            }
-            return {
-                publicationId: restored.id,
-                publishedAt: restored.publishedAt,
-                bypassed: bypass,
-            };
-        });
+                pageId: source.pageId,
+                path: source.path,
+            }).then(({ publicationId, publishedAt, bypassed }) => ({
+                publicationId,
+                publishedAt,
+                bypassed,
+            })),
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1781,9 +1753,6 @@ export class SitesService {
          */
         const fingerprint = draftFingerprint(snapshot);
 
-        // The Site does not track which template produced it; default the
-        // Publication's required (non-null) template stamp to the starter
-        // template's identity/version.
         return prisma.$transaction(async (tx) => {
             /*
              * No web address, no publish (DEC-069, L5): the one pre-publish
@@ -1802,63 +1771,31 @@ export class SitesService {
             }
 
             /*
-             * Asked INSIDE the transaction (#278). It used to be read before
-             * one, so a verdict posted while a publish was in flight was
-             * missed — the narrow window in which the record would have been
-             * wrong is exactly the window a reviewer racing a publisher falls
-             * into.
+             * Through the one path that repoints the live site (KTD-3). It
+             * asks the review standing INSIDE this transaction (#278): a
+             * verdict posted while a publish is in flight is not missed.
+             *
+             * The Site does not track which template produced it; default
+             * the Publication's required (non-null) template stamp to the
+             * starter template's identity/version.
              */
-            const standing = await this.reviewStandingFor(
-                tx,
-                site.id,
-                ctx.organizationId,
+            const live = await putLive(tx, {
+                site: { id: site.id, organizationId: ctx.organizationId },
+                snapshot,
+                source: "publish",
+                actor: { userId: ctx.userId },
                 fingerprint,
-                ctx.userId,
-            );
-            const bypass = standing.outstanding;
-
-            const publication = await tx.publication.create({
-                data: {
-                    siteId: site.id,
-                    organizationId: ctx.organizationId,
-                    // Which of the three routes this took, so version history
-                    // can tell "a reviewer approved it" from "nobody was
-                    // asked" (#193).
-                    reviewRoute: standing.route satisfies ReviewRoute,
-                    // Through `unknown`: SiteStyle is a precise interface, and
-                    // Prisma's InputJsonValue index signature does not accept
-                    // one directly even though the value is plain JSON.
-                    snapshot: snapshot as unknown as Prisma.InputJsonValue,
-                    templateId: starterTemplate.id,
-                    templateVersion: starterTemplate.version,
-                    publishedByUserId: ctx.userId,
-                    publishedAt,
+                template: {
+                    id: starterTemplate.id,
+                    version: starterTemplate.version,
                 },
-                select: { id: true, publishedAt: true },
+                publishedAt,
             });
-            await tx.site.update({
-                where: { id: site.id },
-                data: { currentPublicationId: publication.id },
-            });
-            if (bypass) {
-                // Appended like every other approval event: "changes
-                // requested, then published anyway" reads as history.
-                await tx.siteApproval.create({
-                    data: {
-                        siteId: site.id,
-                        organizationId: ctx.organizationId,
-                        byUserId: ctx.userId,
-                        outcome: "BYPASSED",
-                        publicationId: publication.id,
-                    },
-                    select: { id: true },
-                });
-            }
             return {
-                publicationId: publication.id,
-                publishedAt: publication.publishedAt,
-                currentPublicationId: publication.id,
-                bypassed: bypass,
+                publicationId: live.publicationId,
+                publishedAt: live.publishedAt,
+                currentPublicationId: live.publicationId,
+                bypassed: live.bypassed,
             };
         });
     }
@@ -2442,9 +2379,10 @@ export class SitesService {
     }
 
     /**
-     * Where the site stands with its reviewers, as {@link reviewStanding}
-     * decides it. The query lives here; the rule lives in `review-route.ts`,
-     * where publish can apply it to its own transaction's rows.
+     * Where the site stands with its reviewers, as `reviewStanding`
+     * decides it. The query is `readReviewStanding` in `live-pointer.ts`, the
+     * same one `putLive` asks of its own transaction; the rule lives in
+     * `review-route.ts`.
      */
     private async reviewStandingFor(
         client: Pick<typeof prisma, "siteApproval">,
@@ -2453,24 +2391,12 @@ export class SitesService {
         currentFingerprint: string,
         publisherUserId: string | null,
     ) {
-        const verdicts = (await client.siteApproval.findMany({
-            where: {
-                siteId,
-                organizationId,
-                // BYPASSED is publish's own record, not a verdict: it must not
-                // settle the request it was written about.
-                outcome: { in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"] },
-            },
-            orderBy: { createdAt: "desc" },
-            select: {
-                outcome: true,
-                byUserId: true,
-                draftFingerprint: true,
-                createdAt: true,
-            },
-        })) as ApprovalRow[];
-
-        return reviewStanding(verdicts, currentFingerprint, publisherUserId);
+        return readReviewStanding(client, {
+            siteId,
+            organizationId,
+            fingerprint: currentFingerprint,
+            publisherUserId,
+        });
     }
 
     // -----------------------------------------------------------------------
