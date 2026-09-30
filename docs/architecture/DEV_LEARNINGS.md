@@ -1530,3 +1530,20 @@ files (node_modules, .next) stay, so the build cache is kept.
 **Rule**: a failing browser spec that isn't in `e2e/tests` of your tree is
 the shared worktree's leftover, not your change.
 **Category**: gate · parallel units
+
+## e2e — a business a test sets up can't turn a module on
+
+**Problem**: L8's first spec set up a business as `founder` and turned on
+Contacts, Bookings, Sell and Website through `PUT modules/:key`; every call
+came back 400 "CRM isn't available for your business yet".
+**Root cause**: each module sits behind its `MODULE_*` rollout flag
+(DEC-057). The seed creates those flags with `enabledByDefault: false` and
+turns them on only through overrides for the seeded businesses
+(`seed/run.ts`). A business made during a test has no override, and no e2e
+session is staff, so nothing can roll a module out to it.
+**Fix**: `share-links.spec.ts` reads Northwind instead (its Online location
+has no orders, so the Orders first run is reachable), and the booking
+page's first run stays in vitest.
+**Rule**: a spec that needs a module on uses a seeded business. A business
+the test makes (setup, the web-address change) is for what needs no module.
+**Category**: e2e · tests · modules

@@ -1,9 +1,11 @@
-import { env } from "@/env";
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 import type { SiteSelling } from "@/lib/sites/sells-from";
 import type { SiteDetail, SiteSummary } from "@/lib/sites/service";
-
-const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
+import { siteAddressOf } from "@/lib/sites/share-links";
+import {
+    readWebAddressLinks,
+    RENDERER_APEX,
+} from "@/lib/sites/share-links-read";
 
 /**
  * The website facts each location's "Sells in person only / and online"
@@ -19,9 +21,8 @@ const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
  * a location's own settings must not become a 403 page because the viewer
  * can't read the website.
  *
- * TODO(DEC-069 L8): the origin is the site's subdomain; once the API's
- * web-address read lands, take `links.shop` from it so a verified custom
- * domain is used.
+ * The origin is where customers reach the site (`siteAddressOf`, DEC-069
+ * L8): the business's verified custom domain when it has one.
  */
 export async function readSiteSelling(): Promise<
     { known: true; site: SiteSelling | null } | { known: false }
@@ -37,7 +38,10 @@ export async function readSiteSelling(): Promise<
         const summary = ((await list.json()) as SiteSummary[]).at(0);
         if (!summary) return { known: true, site: null };
 
-        const one = await apiFetch(`${base}/${encodeURIComponent(summary.id)}`);
+        const [one, webAddress] = await Promise.all([
+            apiFetch(`${base}/${encodeURIComponent(summary.id)}`),
+            readWebAddressLinks(),
+        ]);
         if (!one.ok) return { known: false };
         const site = (await one.json()) as SiteDetail;
         const live = Boolean(
@@ -48,10 +52,10 @@ export async function readSiteSelling(): Promise<
             site: {
                 siteId: site.id,
                 sellsFrom: site.sellsFrom ?? null,
-                origin:
-                    live && site.subdomain
-                        ? `https://${site.subdomain}.${ROOT_DOMAIN}`
-                        : null,
+                origin: live
+                    ? (siteAddressOf(site, webAddress, RENDERER_APEX)?.url ??
+                      null)
+                    : null,
             },
         };
     } catch {

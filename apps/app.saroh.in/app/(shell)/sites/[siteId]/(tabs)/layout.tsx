@@ -4,20 +4,17 @@ import type { ReactNode } from "react";
 import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { WebsiteHeader } from "@/components/sites/website-header";
-import { env } from "@/env";
 import { listPosts } from "@/lib/content/service";
 import { listForms } from "@/lib/forms/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { getSite, listSites } from "@/lib/sites/service";
+import { siteAddressOf } from "@/lib/sites/share-links";
+import {
+    readWebAddressLinks,
+    RENDERER_APEX,
+} from "@/lib/sites/share-links-read";
 import { siteState } from "@/lib/sites/site-state";
-
-/**
- * Where a merchant's subdomain lives. Falls back to the production host so a
- * developer without the variable set still sees a plausible address rather than
- * "northwind.undefined" — the renderer defaults the same way.
- */
-const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
 
 /**
  * The Website screen — one header and one row of tabs over Pages, Posts and
@@ -39,13 +36,17 @@ export default async function WebsiteTabsLayout({
     const { siteId } = await params;
     await requireSession();
 
-    const [site, sites, organization, posts] = await Promise.all([
+    const [site, sites, organization, posts, webAddress] = await Promise.all([
         getSite(siteId),
         listSites().catch(() => []),
         resolveActiveOrganization(),
         // A count is decoration on a tab: without it the tab still opens,
         // and the Posts tab says for itself what went wrong.
         listPosts(siteId).catch(() => null),
+        // Where customers reach the business's website — its verified
+        // domain, when it has one (DEC-069, L8). Null falls back to the
+        // site's own subdomain.
+        readWebAddressLinks(),
     ]);
     if (!site) notFound();
 
@@ -90,9 +91,8 @@ export default async function WebsiteTabsLayout({
                     }}
                     sites={summaries}
                     address={
-                        site.subdomain
-                            ? `${site.subdomain}.${ROOT_DOMAIN}`
-                            : `/${site.slug}`
+                        siteAddressOf(site, webAddress, RENDERER_APEX)?.host ??
+                        `/${site.slug}`
                     }
                     canEdit={site.can.edit}
                     mayCreate={navRoleCan(
