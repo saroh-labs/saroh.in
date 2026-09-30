@@ -73,7 +73,20 @@ pattern files refer back here.
   (`lib/stores/pick.ts`), singular copy otherwise. A storefront closes (soft)
   only once no order waits and no stock is on hand or promised there — "Move
   or count out its stock first" — and closing never removes a catalogue
-  product. Storefront and website stay separate — mapping them is future work.
+  product.
+- **Current** (DEC-069) — **Merchants read "location", never "storefront".**
+  A storefront (`Store` in code, `storefronts` in the API — the identifiers
+  stay, KTD-1) is a **location**: a place the business sells from in person.
+  Sell › Locations lives at `/commerce/locations`; `/commerce/storefronts`
+  redirects there. The website is where customers go: **your online shop** is
+  the website's `/shop`, and it sells from one location's stock (the site's
+  Sells from). Each location says where it sells — "Sells in person only",
+  "Sells in person and online · Your online shop", or "Online only" —
+  derived from Sells from, never stored. The two kinds read **Customers
+  visit** (`SHOP`: an address, hours and collection) and **No counter**
+  (`ONLINE`: stock kept for online orders). A location has no public address
+  of its own. The four addresses are named apart: _web address_,
+  _registered address_, _location address_ and the blog's _posts path_.
 - **Current** — **Opening hours are edited once, for every storefront**
   (DEC-034): Business → Hours reads the first storefront's week and Save
   writes it to all of them, saying so first when their weeks differ.
