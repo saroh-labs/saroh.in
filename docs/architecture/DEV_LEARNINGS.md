@@ -1487,6 +1487,7 @@ asserts), it passes without checking them.
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
 worth the same change.
 **Category**: e2e · tests
+
 ## E2E — a business a test sets up has no modules and no rollout flags (L4)
 
 **Problem**: L4's browser spec had to change a web address on a business of
@@ -1506,3 +1507,45 @@ forwarded. The forwarding half (the new host serves, the old one answers 307) wa
 **Rule**: before planning a spec on a business the test makes, check which
 flags it will have. Only a flag with a seeded global default reaches it.
 **Category**: e2e · flags · DEC-069
+
+## Sites — a customer is signed out after the business changes its web address (L3)
+
+**Problem**: after an owner changes the web address, the old one forwards
+for 90 days (a 307 from the `[domain]` layout to the same path on the new
+address). A customer who was signed in on the old address arrives signed
+out, and an order in their bag on the old host is not carried over.
+**Root cause**: the customer session is a `__Host-` cookie
+(`apps/saroh.app/lib/customer-session.ts`), which is host-only by
+definition: it can't carry a `Domain` attribute, so nothing set on
+`rye.saroh.app` is ever sent to `rye-bakery.saroh.app`.
+**Fix**: none needed, by design. The change dialog says "Customers signed
+in on your site will need to sign in again" (L4), and the account area
+already treats a visitor with no session as signed out. Don't try to hand
+the session across hosts in the redirect: a token in a URL is a credential
+in logs and referrers.
+**Rule**: anything that moves a customer from one host to another (an
+address change, a custom domain going live, a test host) signs them out.
+Say so where the merchant makes the move.
+**Category**: sites · sessions · DEC-069
+
+## E2E — the forwarding half of an address change reads a seeded row (L3)
+
+**Problem**: L3's browser check (the old host answers 307 to the same page
+on the new one, which serves) needs a business with a live site whose
+address changes. A business a test sets up can't have a site (its
+`MODULE_WEBSITE` rollout flag is the production default, off; see L4's
+entry above), and Northwind's address is read by every other spec.
+**Root cause**: the seed deliberately registers module rollout flags dark
+and overrides them only for its own businesses; flipping one globally
+would seed away the kill switch.
+**Fix**: the seed holds an old address for Northwind, as a change would
+leave it (`packages/database/src/seed/previous-address.ts`,
+`northwind-before`, forwarding for 90 days from the seed). The spec reads
+it without writing anything, so it runs beside every other spec. The change
+that writes such a row is covered against a real database
+(`web-address.service.db.spec.ts`), and the renderer's decision in vitest
+(`middleware.test.ts`, `lib/publication.test.ts`, `lib/request-path.test.ts`).
+**Rule**: when a browser check needs a state only a business-wide write
+can make, and a test-made business can't reach it, seed the resulting row
+on Northwind and read it. Don't change Northwind's shared settings.
+**Category**: e2e · seed · DEC-069
