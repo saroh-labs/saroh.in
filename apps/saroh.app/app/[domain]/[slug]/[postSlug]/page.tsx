@@ -8,6 +8,7 @@ import {
     postsPrefix,
     shareImages,
 } from "@/lib/publication";
+import { shareable } from "@/lib/test-metadata";
 
 /**
  * One published post (#232), at `/<prefix>/<slug>` — the prefix being whatever
@@ -41,7 +42,7 @@ export async function generateMetadata({
         ? [post.image]
         : shareImages(resolved.snapshot.site);
 
-    return {
+    return shareable(resolved, {
         title: post.title,
         description,
         openGraph: {
@@ -60,7 +61,7 @@ export async function generateMetadata({
             images,
         },
         metadataBase: new URL(`https://${domain}`),
-    };
+    });
 }
 
 export default async function PostPage({

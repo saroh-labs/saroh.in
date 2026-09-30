@@ -55,6 +55,14 @@ A **merchant's own site** hangs off the renderer's apex, so the seeded
 why `portless service install` takes `--wildcard`. A **draft preview** lives at
 `https://saroh.app.localhost/preview/<token>`.
 
+A **test release** (DEC-071) is served on its own host,
+`https://test--northwind.saroh.app.localhost/?release=<token>` — the link the
+API returns when one is made (`SITE_TEST_RELEASES` is on for Northwind in the
+seed). The first visit moves the token into a `__Host-saroh-test` cookie for
+that host and drops it from the address; without the cookie every page of the
+host shows "Open this test release from its link". On a bare-port stack (CI,
+`pnpm prepush --e2e`) the same host is `http://test--northwind.localhost:3005`.
+
 ## Seeded data
 
 ```bash

@@ -9,6 +9,8 @@ import {
     SiteTheme,
 } from "@saroh/site-blocks";
 
+import { BAR_HEIGHT_VAR, TestReleaseBar } from "@/components/test-release-bar";
+import { TestReleaseGate } from "@/components/test-release-gate";
 import { accountAreaOn } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage } from "@/lib/booking-page";
@@ -23,6 +25,9 @@ import {
 } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
+import { classifySiteHost } from "@/lib/site-host-mode";
+import { shareable } from "@/lib/test-metadata";
+import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import {
@@ -49,9 +54,14 @@ export async function generateMetadata({
     params: Promise<{ domain: string }>;
 }): Promise<Metadata | null> {
     const { domain } = await params;
+    const mode = classifySiteHost(domain, rootDomain()).mode;
     const snapshot = await getPublicationForHost(domain);
     if (!snapshot) {
-        return null;
+        // A test host whose link opens nothing still says what it is, and
+        // is never indexed (DEC-071, R3).
+        return mode === "test"
+            ? shareable({ mode }, { title: "Test release" })
+            : null;
     }
 
     /*
@@ -71,29 +81,33 @@ export async function generateMetadata({
     const description = seoDescription?.trim() ? seoDescription : undefined;
     const images = shareImages(snapshot.site);
 
-    return {
-        title,
-        description,
-        openGraph: {
+    // A test release's host has no share card and is never indexed (R3).
+    return shareable(
+        { mode },
+        {
             title,
             description,
-            images,
-            // og:url and og:site_name (#220): the canonical address the
-            // platforms key their cache on, and the name Slack puts above the
-            // card. Resolved against `metadataBase`.
-            url: "/",
-            siteName: name,
+            openGraph: {
+                title,
+                description,
+                images,
+                // og:url and og:site_name (#220): the canonical address the
+                // platforms key their cache on, and the name Slack puts above the
+                // card. Resolved against `metadataBase`.
+                url: "/",
+                siteName: name,
+            },
+            twitter: {
+                // Without an image this degrades to a plain summary card, so the
+                // card type follows the picture rather than always claiming one.
+                card: images ? "summary_large_image" : "summary",
+                title,
+                description,
+                images,
+            },
+            metadataBase: new URL(`https://${domain}`),
         },
-        twitter: {
-            // Without an image this degrades to a plain summary card, so the
-            // card type follows the picture rather than always claiming one.
-            card: images ? "summary_large_image" : "summary",
-            title,
-            description,
-            images,
-        },
-        metadataBase: new URL(`https://${domain}`),
-    };
+    );
 }
 
 /*
@@ -117,6 +131,24 @@ export default async function SiteLayout({
     children: React.ReactNode;
 }) {
     const { domain } = await params;
+
+    /*
+     * A test release's host (DEC-071, T5) shows its release behind the bar,
+     * or says why it can't: never a 404 that reads like a broken site, and
+     * never the live site in its place (R12).
+     */
+    const test = classifySiteHost(domain, rootDomain());
+    const release =
+        test.mode === "test" ? await getTestRelease(test.host) : null;
+    if (release && !release.ok) {
+        return (
+            <TestReleaseGate
+                reason={release.reason}
+                liveUrl={release.liveUrl}
+            />
+        );
+    }
+
     const resolved = await getSiteForHost(domain);
 
     if (!resolved) {
@@ -205,7 +237,21 @@ export default async function SiteLayout({
     ) : undefined;
 
     return (
-        <div className="min-h-screen bg-site-bg text-site-body">
+        <div
+            className="min-h-screen bg-site-bg text-site-body"
+            data-test-release={resolved.release ? "" : undefined}
+        >
+            {resolved.release ? (
+                <>
+                    <TestReleaseBar
+                        name={resolved.release.name}
+                        liveUrl={release?.ok ? release.liveUrl : null}
+                    />
+                    {/* The site's sticky header sits below the bar, not
+                        under it: the bar keeps this variable at its height. */}
+                    <style>{`[data-test-release] header.sticky{top:var(${BAR_HEIGHT_VAR},2.25rem)}`}</style>
+                </>
+            ) : null}
             <SiteTheme variables={snapshot.site.styleVariables} />
             {/* The account area draws its own compact header and no
                 footer (DEC-073 #10): the frame leaves these out there. */}

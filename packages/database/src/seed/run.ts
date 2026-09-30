@@ -239,6 +239,40 @@ export async function seed(): Promise<void> {
         },
     });
 
+    /*
+     * Test releases (DEC-071, KTD-16): off by default, as in production, and
+     * on for Northwind, the write sandbox, where the plan's rollout turns it
+     * on first and the browser specs make their releases. The flag row is
+     * registry (`update: {}` leaves one someone set alone); the override is
+     * Northwind's.
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "SITE_TEST_RELEASES" },
+        update: {},
+        create: {
+            id: "flag_SITE_TEST_RELEASES",
+            key: "SITE_TEST_RELEASES",
+            description:
+                "Test releases of a website: a frozen version on a test address, shared by link (DEC-071). Off by default; on for Northwind in the seed.",
+            enabledByDefault: false,
+        },
+    });
+    await prisma.featureFlagOverride.upsert({
+        where: {
+            flagKey_organizationId: {
+                flagKey: "SITE_TEST_RELEASES",
+                organizationId: org.id,
+            },
+        },
+        update: { enabled: true },
+        create: {
+            id: id("flagoverride", "site-test-releases"),
+            flagKey: "SITE_TEST_RELEASES",
+            organizationId: org.id,
+            enabled: true,
+        },
+    });
+
     // A connected-but-disabled provider: a merchant who set Razorpay up and
     // then turned it off. Kept alongside the live Cashfree connection below so
     // `/settings/providers` has a provider set that is genuinely mixed rather

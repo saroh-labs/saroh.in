@@ -13,6 +13,7 @@ import {
     postsPrefix,
     shareImages,
 } from "@/lib/publication";
+import { shareable } from "@/lib/test-metadata";
 
 /**
  * Tenant sub-page (S2-006).
@@ -39,7 +40,7 @@ export async function generateMetadata({
     // (#232), and it is not a page, so it needs its own title.
     if (slug === postsPrefix(snapshot)) {
         const name = snapshot.site.name;
-        return {
+        return shareable(resolved, {
             title: `Writing · ${name}`,
             openGraph: {
                 title: `Writing · ${name}`,
@@ -47,7 +48,7 @@ export async function generateMetadata({
                 url: `/${slug}`,
             },
             metadataBase: new URL(`https://${domain}`),
-        };
+        });
     }
 
     const page = findPageByPath(snapshot, `/${slug}`);
@@ -63,7 +64,7 @@ export async function generateMetadata({
     const title = page.title ?? name;
     const description = seoDescription?.trim() ? seoDescription : undefined;
     const images = shareImages(snapshot.site);
-    return {
+    return shareable(resolved, {
         title,
         description,
         openGraph: {
@@ -80,7 +81,7 @@ export async function generateMetadata({
             images,
         },
         metadataBase: new URL(`https://${domain}`),
-    };
+    });
 }
 
 export default async function SitePostPage({
