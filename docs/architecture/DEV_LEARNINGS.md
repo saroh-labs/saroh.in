@@ -1208,6 +1208,7 @@ updated". `test/global-setup.ts` re-runs the (idempotent) grants.
 the pattern doc saying why not. A new CI job lands with its prepush step.
 **Category**: tooling · `scripts/prepush.sh`, `scripts/e2e-affected.mjs`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
 ## Integration — a probe role failed DROP ROLE beside another test database (K1)
 
 **Problem**: `prepush --int` failed `public-catalogue.db.spec.ts` in teardown
@@ -1224,6 +1225,7 @@ database being torn down.
 **Rule**: a spec that creates a role must not fail when another database still
 uses it — drop it tolerantly, or give it a per-database name.
 **Category**: tests · integration · parallel databases
+
 ## Copy — the service editor matched an API refusal by its words (DEC-069 L11)
 
 **Problem**: Rewording the API's "Treatments are sold as orders — add a
@@ -1241,6 +1243,7 @@ storefront, so a copy change there is visible in review.
 when an old app still compares words, change both sides together and expect
 an old app to fall back to the toast until it is redeployed.
 **Category**: copy · API contract · DEC-069
+
 ## Sites — every new site opened with broken images (DEC-070 K10)
 
 **Problem**: A site made from the starter template (Turn on Website, or
@@ -1263,6 +1266,7 @@ shown "Starter" twice in the picker, which keys options by id.
 media library served, never a path an app is assumed to have. Render a new
 template in a test, not only parse it (K12–K14 follow the same test).
 **Category**: sites · templates · DEC-070
+
 ## E2E stack — the API's renderer links pointed at production (DEC-069 L6)
 
 **Problem**: a pay page opened on a tenant host in the CI and prepush e2e
@@ -1279,6 +1283,7 @@ stack's renderer.
 **Rule**: an origin the API hands to customers is set in every stack that
 runs the API; a spec that follows a link asserts it stays on the stack.
 **Category**: e2e · environment · `docs/patterns/devops-environments-and-flags.md`
+
 ## Sites — a Shop page can't be shown in the browser suite (DEC-069, L13)
 
 **Problem**: L13's plan asked for a browser spec: turn on Sell with Delivery
@@ -1298,6 +1303,7 @@ business by an override.
 flag is on in the e2e seed; if it isn't, plan the proof as a db spec, or
 seed the flag for Northwind first.
 **Category**: testing · feature flags · DEC-069
+
 ## Tooling — a killed `eslint --fix` left three source files empty (L9)
 
 **Symptom**: after a machine restart, a unit worktree's uncommitted
@@ -1312,6 +1318,7 @@ new files were rewritten.
 (`find apps -path '*/node_modules' -prune -o -type f -empty -print`), and
 commit work in progress before a long `--fix` run.
 **Category**: tooling · worktrees
+
 ## CI — four reds on batch 4 (#765) that the local gate passed
 
 **Problem**: `pnpm prepush --all` passed; CI failed four jobs. (1) Unit:
@@ -1349,6 +1356,7 @@ evidence, never on absence. Run `TEST_RLS=on` for any spec touching a
 cross-business read, and the permission suite for anything on Team, until
 `scripts/prepush.sh` runs both.
 **Category**: CI · tests · RLS · a11y
+
 ## Capabilities — the annotation spec counted a decorator named in a comment
 
 **Problem**: after K6 (DEC-070) moved the Payments gate off `InvoicesController`
@@ -1366,3 +1374,21 @@ whose mocked Prisma lacks it with a TypeError, not a clear failure — add
 `organizationModule: { findFirst: jest.fn().mockResolvedValue(null) }` (no
 row reads as on).
 **Category**: tests · capabilities · mocks
+
+## Capabilities — Sell's store slug read as free under RLS (batch 2026-09-30-5)
+
+**Problem**: on `batch-2026-09-30-5`, `pnpm prepush --int` failed only in
+`int-rls`. `module-setup.db.spec.ts` (L13) failed with a unique constraint
+error on `tx.store.create`. The base also failed `api-unit`, because
+`merchant-copy.spec.ts` (L9) found "storefront" in `OTHER_LOCATION_REFUSAL`.
+**Root cause**: `freeStoreSlug` checked a globally unique `Store.slug` through
+the request's `tx`. Under RLS that client sees only this business's stores,
+so a slug another business held read as free. The copy line was left behind
+by a merge: two units, one merge.
+**Fix**: under RLS with an org context, the slug is read in
+`outsideOrgContext` (`module-setup.writers.ts`). The refusal now says
+"location". Both fixes landed with T3 (#754).
+**Rule**: every uniqueness check on a column unique across businesses is read
+outside the org context, as `site-address.ts` does. Test releases' host
+lookups (`site-host-mode.ts`, `test-release-lookup.ts`) follow the same rule.
+**Category**: RLS · tests · merge
