@@ -1953,5 +1953,10 @@ rest change nothing today but can't go wrong when a spec turns @serial),
 and `e2e/eslint.config.mjs` has a `no-restricted-syntax` rule that fails an
 equality comparison with the literal `"phone"` or `"desk"`. Lint runs on
 `@saroh/e2e` whenever a spec changes (prepush's lint step, CI's static job).
-**Rule**: compare a Playwright project by prefix; the lint rule says so.
+Once they ran, the phone checks failed at once: the sheet's box was read
+the moment it was visible, mid-way through its slide up (bottom at 1565 on
+an 839px screen). They had never passed, only never run. The spec now
+polls until the sheet's bottom meets the screen's.
+**Rule**: compare a Playwright project by prefix; the lint rule says so. A
+geometry check on an animated sheet polls until it settles.
 **Category**: e2e · tests · lint
