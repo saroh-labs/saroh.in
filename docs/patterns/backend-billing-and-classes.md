@@ -25,6 +25,20 @@
 - **Who sees what:** invoice ids and numbers go only to a role with
   `invoice:read`; a subscription or pack view without it still says what is
   owed, not which invoices.
+- **Invoicing needs no module; taking money online needs Payments**
+  (DEC-070, amending DEC-019). `InvoicesController` has no class-level
+  gate: create, issue, send, remind, void, credit, record paid and the PDF
+  ask only for `invoice:*`. The pay-link route alone keeps
+  `@RequireModule("PAYMENTS")` + `@IgnoreModuleReadiness()`, and
+  `createPayLink` also refuses with Payments off (`assertPaymentsOn`) or no
+  provider (`businessPayLinkProvider`). `invoicePayOnline`
+  (`invoices/pay-online.ts`) is the one "can this be paid online" rule: it
+  is `payOnline` on the send view and on the pay page's read. Send with it
+  false mints the same token as a **view link** (`createPayLinkInTx(…, {
+requireProvider: false })`), the email says "view it and download a copy",
+  and the pay page's payment-intent and autopay answer 409 "This business
+  doesn't take payment online." Automatic invoicing (renewals, packs,
+  courses, subscribe) still stops with Payments off (`payments-on.ts`).
 
 ## Business details before money — **Current** (DEC-068, M3)
 

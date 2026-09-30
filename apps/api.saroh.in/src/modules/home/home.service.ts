@@ -377,8 +377,8 @@ export class HomeService {
                       noRefunds,
                   )
                 : skip(noRefunds),
-            // Renewals that haven't been paid, and invoices past due (F1).
-            // Like refunds owed, they show wherever Payments is available:
+            // Renewals that haven't been paid (F1). Like refunds owed, they
+            // show wherever Payments is available:
             // the money is owed whether or not a provider is connected
             // today. Each asks for its own read, so a role holding one sees
             // only that one.
@@ -412,7 +412,9 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
-            available.has("PAYMENTS") && canReadInvoices
+            // Invoices past due need no module (DEC-070): a business
+            // invoices by hand with Payments off, and is still owed.
+            canReadInvoices
                 ? guard(
                       { moduleKey: "PAYMENTS", label: "Overdue invoices" },
                       () => overdueInvoices(this.db, input.organizationId, now),
