@@ -15,6 +15,7 @@ import { businessTimezone } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { authorize } from "../organizations/organization-policy";
+import { readVerdicts } from "./live-pointer";
 import { checkRenderability } from "./publication-renderability";
 import { draftFingerprint } from "./review-route";
 import { assertSiteInOrg } from "./site-access";
@@ -193,20 +194,31 @@ export class TestReleasesService {
         siteId: string,
     ): Promise<TestReleaseList> {
         const site = await this.gate(ctx, "site:read", siteId);
-        const [rows, currentFingerprint] = await Promise.all([
+        const [rows, currentFingerprint, verdicts] = await Promise.all([
             prisma.siteTestRelease.findMany({
                 where: { siteId, organizationId: ctx.organizationId },
                 orderBy: { number: "desc" },
                 select: releaseSelect,
             }),
             this.sites.currentDraftFingerprint(ctx, siteId),
+            readVerdicts(prisma, {
+                siteId,
+                organizationId: ctx.organizationId,
+            }),
         ]);
-        const names = await namesFor(peopleIn(rows));
+        const names = await namesFor(peopleIn(rows, verdicts));
         const now = new Date();
         return {
             testHosts: testHosts(site.subdomain),
             releases: rows.map((row) =>
-                toReleaseView(row, ctx, currentFingerprint, names, now),
+                toReleaseView(
+                    row,
+                    ctx,
+                    currentFingerprint,
+                    verdicts,
+                    names,
+                    now,
+                ),
             ),
         };
     }
@@ -571,7 +583,7 @@ export class TestReleasesService {
         releaseId: string,
         knownFingerprint?: string,
     ): Promise<TestReleaseView> {
-        const [row, currentFingerprint] = await Promise.all([
+        const [row, currentFingerprint, verdicts] = await Promise.all([
             prisma.siteTestRelease.findFirst({
                 where: {
                     id: releaseId,
@@ -581,14 +593,25 @@ export class TestReleasesService {
                 select: releaseSelect,
             }),
             knownFingerprint ?? this.sites.currentDraftFingerprint(ctx, siteId),
+            readVerdicts(prisma, {
+                siteId,
+                organizationId: ctx.organizationId,
+            }),
         ]);
         if (!row) {
             throw new NotFoundException(
                 `Test release "${releaseId}" not found`,
             );
         }
-        const names = await namesFor(peopleIn([row]));
-        return toReleaseView(row, ctx, currentFingerprint, names, new Date());
+        const names = await namesFor(peopleIn([row], verdicts));
+        return toReleaseView(
+            row,
+            ctx,
+            currentFingerprint,
+            verdicts,
+            names,
+            new Date(),
+        );
     }
 
     /**
