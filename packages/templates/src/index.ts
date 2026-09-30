@@ -36,3 +36,10 @@ export {
     starterTemplate,
     starterTemplateV1,
 } from "./templates/starter";
+
+// The Portfolio template (DEC-070, K12). Exported, not yet registered: K15
+// registers it.
+export {
+    PORTFOLIO_TEMPLATE_ID,
+    portfolioTemplate,
+} from "./templates/portfolio";
