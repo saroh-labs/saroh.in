@@ -40,11 +40,11 @@ const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 /** Rupees and paise as a decimal string: "500", "499.50". Empty: no price. */
 const PRICE = /^(\d{1,7}(\.\d{1,2})?)?$/;
 
-/** Sell: the storefront's name and how orders leave. */
+/** Sell: the location's name and how orders leave. */
 export class CommerceSetupDto {
     @Transform(trim)
-    @IsString({ message: "Give your storefront a name." })
-    @MinLength(1, { message: "Give your storefront a name." })
+    @IsString({ message: "Give your location a name." })
+    @MinLength(1, { message: "Give your location a name." })
     @MaxLength(80, { message: "Keep the name to 80 characters or fewer." })
     storefrontName!: string;
 

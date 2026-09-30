@@ -108,7 +108,7 @@ describe("COMMERCE", () => {
             expect.arrayContaining([
                 {
                     field: "setup.storefrontName",
-                    message: "Give your storefront a name.",
+                    message: "Give your location a name.",
                 },
                 {
                     field: "setup.slug",

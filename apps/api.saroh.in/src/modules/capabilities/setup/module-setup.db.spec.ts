@@ -18,14 +18,18 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { EntitlementService } from "../../billing/entitlement.service";
+import { FixedWindowRateLimiter } from "../../bookings/rate-limiter";
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { FLAG_KEYS } from "../../feature-flags/flags";
 import type { OrgAction } from "../../organizations/organization-actions";
+import { PublicCatalogueService } from "../../products/public-catalogue.service";
+import { automaticStorefront } from "../../sites/sells-from";
 import { ModuleAvailabilityService } from "../module-availability.service";
 import { ModuleLifecycleService } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
@@ -460,6 +464,276 @@ describe("Website", () => {
                 where: { organizationId: ctx.organizationId },
             }),
         ).toBe(1);
+    });
+});
+
+describe("selling online leaves the shop ready to publish (DEC-069, L13)", () => {
+    /** The shop open for the business (`SITE_SHOP`), as it is rolled out. */
+    async function shopOpen(ctx: OrganizationContext) {
+        await prisma.featureFlag.upsert({
+            where: { key: "SITE_SHOP" },
+            create: { key: "SITE_SHOP", enabledByDefault: false },
+            update: {},
+        });
+        await prisma.featureFlagOverride.create({
+            data: {
+                flagKey: "SITE_SHOP",
+                organizationId: ctx.organizationId,
+                enabled: true,
+            },
+        });
+    }
+
+    function siteOf(ctx: OrganizationContext) {
+        return prisma.site.findFirstOrThrow({
+            where: { organizationId: ctx.organizationId },
+            include: {
+                pages: {
+                    include: { versions: { select: { status: true } } },
+                },
+            },
+        });
+    }
+
+    const shopPages = (site: Awaited<ReturnType<typeof siteOf>>) =>
+        site.pages.filter((p) => p.kind === "SHOP");
+
+    /** Sell, then Website: the order the Turn on sheet sends them in. */
+    async function sellThenWebsite(
+        ctx: OrganizationContext,
+        fulfilment: string[],
+        address = `l13-${seq}-${tag}`,
+    ) {
+        const sell = await setup.enable(ctx, "COMMERCE", {
+            storefrontName: "Rye Counter",
+            fulfilment,
+        });
+        const website = await setup.enable(ctx, "WEBSITE", {
+            siteName: "Rye",
+            address,
+        });
+        return { sell, website };
+    }
+
+    it("a fresh business with Delivery: the site sells from the new location and has a draft Shop page", async () => {
+        const ctx = await business("Rye Bakery");
+        await shopOpen(ctx);
+        const { sell } = await sellThenWebsite(ctx, ["LOCAL_DELIVERY"]);
+
+        const site = await siteOf(ctx);
+        expect(site.storefrontId).toBe(sell.created.storefrontId);
+        const shop = shopPages(site);
+        expect(shop).toHaveLength(1);
+        expect(shop[0]).toMatchObject({
+            path: "/shop",
+            title: "Shop",
+            inMenu: true,
+        });
+        expect(shop[0]?.versions.map((v) => v.status)).toEqual(["DRAFT"]);
+
+        // Ready to publish, not published: `/shop` is still a 404 — no
+        // publication, and nothing listed yet.
+        expect(
+            await prisma.publication.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(0);
+        await expect(
+            new PublicCatalogueService(new FixedWindowRateLimiter(100)).list(
+                site.id,
+                "visitor",
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("pick-up only: no Shop page, and no website is made", async () => {
+        const ctx = await business();
+        await shopOpen(ctx);
+        await setup.enable(ctx, "COMMERCE", {
+            storefrontName: "Counter",
+            fulfilment: ["PICKUP"],
+        });
+        expect(
+            await prisma.site.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.page.count({
+                where: { organizationId: ctx.organizationId, kind: "SHOP" },
+            }),
+        ).toBe(0);
+    });
+
+    it("pick-up only with a website of its own: no Shop page, the site still sells from the location", async () => {
+        const ctx = await business();
+        await shopOpen(ctx);
+        const { sell } = await sellThenWebsite(ctx, ["PICKUP"]);
+        const site = await siteOf(ctx);
+        expect(shopPages(site)).toHaveLength(0);
+        expect(site.storefrontId).toBe(sell.created.storefrontId);
+    });
+
+    it("two open locations and none listed: nothing is chosen on its own, and the sheet's location is the one the site sells from", async () => {
+        const ctx = await business();
+        await shopOpen(ctx);
+        const first = await prisma.store.create({
+            data: {
+                name: "Old name",
+                slug: `l13-a-${seq}-${tag}`,
+                organizationId: ctx.organizationId,
+            },
+        });
+        await prisma.store.create({
+            data: {
+                name: "Hill Road",
+                slug: `l13-b-${seq}-${tag}`,
+                organizationId: ctx.organizationId,
+            },
+        });
+        await expect(
+            automaticStorefront(prisma, ctx.organizationId),
+        ).resolves.toBeNull();
+
+        const { sell } = await sellThenWebsite(ctx, ["SHIPPING", "PICKUP"]);
+        expect(sell.created.storefrontId).toBe(first.id);
+        const site = await siteOf(ctx);
+        expect(site.storefrontId).toBe(first.id);
+        expect(shopPages(site)).toHaveLength(1);
+    });
+
+    it("Website first, then Sell with Shipping: Sell completes the link", async () => {
+        const ctx = await business();
+        await shopOpen(ctx);
+        await setup.enable(ctx, "WEBSITE", {
+            siteName: "Rye",
+            address: `l13-w-${seq}-${tag}`,
+        });
+        expect(shopPages(await siteOf(ctx))).toHaveLength(0);
+
+        const sell = await setup.enable(ctx, "COMMERCE", {
+            storefrontName: "Rye Counter",
+            fulfilment: ["SHIPPING"],
+        });
+        const site = await siteOf(ctx);
+        expect(site.storefrontId).toBe(sell.created.storefrontId);
+        expect(shopPages(site)).toHaveLength(1);
+    });
+
+    it("turned off and on again: nothing is duplicated, and a site's own Sells from and pages are kept", async () => {
+        const ctx = await business();
+        await shopOpen(ctx);
+        await sellThenWebsite(ctx, ["LOCAL_DELIVERY"]);
+        const before = await siteOf(ctx);
+
+        // The merchant points the site elsewhere and renames the page.
+        const other = await prisma.store.create({
+            data: {
+                name: "Hill Road",
+                slug: `l13-c-${seq}-${tag}`,
+                organizationId: ctx.organizationId,
+            },
+        });
+        await prisma.site.update({
+            where: { id: before.id },
+            data: { storefrontId: other.id },
+        });
+        await prisma.page.updateMany({
+            where: { siteId: before.id, kind: "SHOP" },
+            data: { title: "Bakes" },
+        });
+
+        await lifecycle.disable(ctx, "WEBSITE");
+        await lifecycle.disable(ctx, "COMMERCE");
+        await sellThenWebsite(ctx, ["LOCAL_DELIVERY", "SHIPPING"]);
+
+        const after = await siteOf(ctx);
+        expect(
+            await prisma.site.count({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBe(1);
+        expect(after.storefrontId).toBe(other.id);
+        expect(after.pages).toHaveLength(before.pages.length);
+        expect(shopPages(after).map((p) => p.title)).toEqual(["Bakes"]);
+    });
+
+    it("a page of the merchant's own at /shop keeps it, and the turn-on still succeeds", async () => {
+        const ctx = await business();
+        await shopOpen(ctx);
+        await setup.enable(ctx, "WEBSITE", {
+            siteName: "Rye",
+            address: `l13-h-${seq}-${tag}`,
+        });
+        const site = await siteOf(ctx);
+        await prisma.page.create({
+            data: {
+                siteId: site.id,
+                organizationId: ctx.organizationId,
+                path: "/shop",
+                title: "Our shop",
+            },
+        });
+        const out = await setup.enable(ctx, "COMMERCE", {
+            storefrontName: "Counter",
+            fulfilment: ["SHIPPING"],
+        });
+        expect(out.alreadyEnabled).toBe(false);
+        const after = await siteOf(ctx);
+        expect(shopPages(after)).toHaveLength(0);
+        expect(after.pages.filter((p) => p.path === "/shop")).toHaveLength(1);
+    });
+
+    it("the shop not open for the business: no Shop page is made (DEC-057)", async () => {
+        const ctx = await business();
+        await sellThenWebsite(ctx, ["LOCAL_DELIVERY"]);
+        const site = await siteOf(ctx);
+        expect(shopPages(site)).toHaveLength(0);
+        // The link is still made: it is the business's answer, shop or not.
+        expect(site.storefrontId).not.toBeNull();
+    });
+
+    it("a business already listing at several locations is asked, not given the first", async () => {
+        const ctx = await business();
+        await shopOpen(ctx);
+        const product = await prisma.product.create({
+            data: {
+                organizationId: ctx.organizationId,
+                name: "Loaf",
+                slug: "loaf",
+                price: "300.00",
+                currency: "INR",
+                status: "PUBLISHED",
+            },
+        });
+        for (const name of ["Old name", "Hill Road"]) {
+            const store = await prisma.store.create({
+                data: {
+                    name,
+                    slug: `l13-${name.replace(" ", "")}-${seq}-${tag}`,
+                    organizationId: ctx.organizationId,
+                },
+            });
+            await prisma.productListing.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    productId: product.id,
+                    storeId: store.id,
+                },
+            });
+        }
+        // Sell first, with no site: nothing to link yet.
+        await setup.enable(ctx, "COMMERCE", {
+            storefrontName: "Old name",
+            fulfilment: ["SHIPPING"],
+        });
+        await setup.enable(ctx, "WEBSITE", {
+            siteName: "Rye",
+            address: `l13-l-${seq}-${tag}`,
+        });
+        const site = await siteOf(ctx);
+        expect(site.storefrontId).toBeNull();
+        expect(shopPages(site)).toHaveLength(1);
     });
 });
 

@@ -1279,3 +1279,22 @@ stack's renderer.
 **Rule**: an origin the API hands to customers is set in every stack that
 runs the API; a spec that follows a link asserts it stays on the stack.
 **Category**: e2e · environment · `docs/patterns/devops-environments-and-flags.md`
+## Sites — a Shop page can't be shown in the browser suite (DEC-069, L13)
+
+**Problem**: L13's plan asked for a browser spec: turn on Sell with Delivery
+on a business the test makes, then see Website › Pages show Shop (draft).
+It can't pass on the seeded e2e stack.
+**Root cause**: the Shop page and the Sells from row sit behind `SITE_SHOP`,
+which is off by default and on for no seeded business (`site-shop.spec.ts`
+runs only with `E2E_SITE_SHOP=1`, which neither CI nor `prepush --e2e`
+sets). A business a test makes also has no `MODULE_*` overrides, so Sell
+isn't even offered to it (DEC-057). The brief's "write to Northwind only"
+rules out the other route: Northwind already has its site and pages.
+**Fix**: the scenarios run against a real Postgres instead
+(`module-setup.db.spec.ts` "selling online leaves the shop ready to
+publish", `module-page-create.db.spec.ts`), with the flag turned on per
+business by an override.
+**Rule**: before planning a browser spec for a flag-gated surface, check the
+flag is on in the e2e seed; if it isn't, plan the proof as a db spec, or
+seed the flag for Northwind first.
+**Category**: testing · feature flags · DEC-069
