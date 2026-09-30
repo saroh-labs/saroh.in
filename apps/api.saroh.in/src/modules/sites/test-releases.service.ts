@@ -193,7 +193,7 @@ export class TestReleasesService {
         siteId: string,
     ): Promise<TestReleaseList> {
         const site = await this.gate(ctx, "site:read", siteId);
-        const [rows, currentFingerprint, verdicts] = await Promise.all([
+        const [rows, currentFingerprint, verdicts, zone] = await Promise.all([
             prisma.siteTestRelease.findMany({
                 where: { siteId, organizationId: ctx.organizationId },
                 orderBy: { number: "desc" },
@@ -204,11 +204,13 @@ export class TestReleasesService {
                 siteId,
                 organizationId: ctx.organizationId,
             }),
+            businessTimezone(prisma, ctx.organizationId),
         ]);
         const names = await namesFor(peopleIn(rows, verdicts));
         const now = new Date();
         return {
             testHosts: testHosts(site.subdomain),
+            zone,
             releases: rows.map((row) =>
                 toReleaseView(
                     row,

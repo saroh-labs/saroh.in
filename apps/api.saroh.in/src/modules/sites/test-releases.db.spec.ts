@@ -253,6 +253,9 @@ describe("making a test release (DEC-071, T2)", () => {
 
         const list = await releases.list(b.ctx, b.site.id);
         expect(list.releases.map((r) => r.number)).toEqual([2, 1]);
+        // The zone a scheduled go-live is read in (T11): the business's,
+        // India's while it has none of its own.
+        expect(list.zone).toBe("Asia/Kolkata");
     });
 
     it("gives two made at once different numbers", async () => {
