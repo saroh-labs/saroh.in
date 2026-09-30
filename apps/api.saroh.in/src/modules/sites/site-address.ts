@@ -1,8 +1,8 @@
+import type { Prisma } from "@saroh/database";
 import {
     currentOrgContext,
     isRlsEnforcementEnabled,
     outsideOrgContext,
-    type Prisma,
     prisma,
 } from "@saroh/database";
 
