@@ -19,6 +19,7 @@ import { RequireModule } from "../capabilities/require-module.decorator";
 import {
     CreateTestReleaseDto,
     CreateTestReleaseLinkDto,
+    GoLiveOptionsDto,
     ScheduleGoLiveDto,
     UpdateTestReleaseDto,
 } from "./dto";
@@ -97,7 +98,9 @@ export class TestReleasesController {
 
     /**
      * Go live now with exactly this release (R8). `site:publish`. 409 when it
-     * is discarded, already live, scheduled, or can't be drawn.
+     * is discarded, already live, scheduled, or can't be drawn, and with
+     * "Publishing needs approval" on, when it isn't approved and no owner
+     * sent `override` (T9).
      */
     @Post(":releaseId/go-live")
     @HttpCode(200)
@@ -105,8 +108,11 @@ export class TestReleasesController {
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
         @Param("releaseId") releaseId: string,
+        @Body() dto: GoLiveOptionsDto,
     ) {
-        return this.releases.goLive(ctx, siteId, releaseId);
+        return this.releases.goLive(ctx, siteId, releaseId, {
+            override: dto.override,
+        });
     }
 
     /**

@@ -1680,6 +1680,7 @@ app's own client modules.
 **Rule**: a value both a server file and a client component need lives in a
 module with no "use client".
 **Category**: renderer · RSC · DEC-071
+
 ## e2e — a business made in a spec has every module dark
 
 **Problem**: K3's first-run spec set up a business through the API and
@@ -1714,3 +1715,24 @@ through the API, then reads Settings and Home.
 e2e. Plan on turning one on only where the spec needs the module to read as
 on (Home, the rail, the checklist's module steps).
 **Category**: e2e · tests · modules
+
+## Sites — a new approval outcome reaches maps that index by outcome (T9)
+
+**Problem**: T9 adds OVERRIDDEN, the record of an owner going live past
+"Publishing needs approval". `getReviewState` returns the newest approval
+row of any kind as `latestApproval`, so after an override the draft's (or
+the release's) review reads `outcome: "OVERRIDDEN"`.
+**Root cause**: the app reads that outcome through lookup tables keyed by
+the four outcomes it knew (`APPROVAL_BADGE` in
+`components/sites/editor/status-readout.ts`, `APPROVAL_LINE` in
+`pre-publish-check.tsx`) and calls `.text(…)` on the entry, so an unknown
+outcome is a TypeError, not a missing label. The API's union and the app's
+(`lib/sites/service.ts`) are typed separately, so no type check joins them.
+**Fix**: none needed yet. The setting can't be turned on while
+`SITE_TEST_RELEASES` is off (the API answers 409), and the flag goes on only
+after the app units (T11, T12, T13) ship, which add OVERRIDDEN to those
+tables and to `site-review-view.tsx`.
+**Rule**: a new `SiteApproval.outcome` or `Publication.reviewRoute` value is
+added to every app table that indexes by it in the same release, or kept
+unreachable behind a flag until it is.
+**Category**: sites · review · DEC-071

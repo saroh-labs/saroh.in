@@ -7,6 +7,7 @@ import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { readVerdicts } from "./live-pointer";
+import { approvalRequired } from "./publish-approval";
 import { ADDRESS_MISSING_MESSAGE } from "./site-flags";
 import {
     RELEASE_DISCARDED_MESSAGE,
@@ -42,10 +43,11 @@ export const SCHEDULE_MIN_AHEAD_MS = 5 * 60 * 1000;
 /** The furthest ahead: a release is a test, not a plan for next quarter. */
 export const SCHEDULE_MAX_AHEAD_DAYS = 60;
 
-export const APPROVAL_REQUIRED_MESSAGE =
-    "This site goes live only from an approved test release.";
-export const OVERRIDE_OWNER_ONLY_MESSAGE =
-    "Only an owner can go live without approval.";
+// Said the same way wherever going live is refused for want of approval.
+export {
+    APPROVAL_REQUIRED_MESSAGE,
+    OVERRIDE_OWNER_ONLY_MESSAGE,
+} from "./publish-approval";
 
 /**
  * The instant a local date and time name in `zone`, or a 400 saying why not.
@@ -192,13 +194,7 @@ export async function scheduleGoLive(
             input.actorUserId,
         );
         if (!approved && !input.override) {
-            throw new ConflictException({
-                message: APPROVAL_REQUIRED_MESSAGE,
-                details: {
-                    code: "APPROVAL_REQUIRED",
-                    reason: "approvalRequired",
-                },
-            });
+            throw approvalRequired();
         }
         override = input.override;
     }

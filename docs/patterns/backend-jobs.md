@@ -158,7 +158,9 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   KTD-14), when the person who scheduled it left or can no longer publish,
   or when "Publishing needs approval" is on and the release isn't approved
   and no owner override was recorded. Otherwise it goes live through
-  `goLiveWithRelease` (so `putLive`) as the person who scheduled it.
+  `goLiveWithRelease` (so `putLive`) as the person who scheduled it, passing
+  the stored override (while they are still an owner), so it is recorded
+  as OVERRIDDEN exactly as going live by hand with one is (T9).
 - **A clear no-go never retries.** It records `NOT_LIVE` with the reason and
   clears the schedule, so the merchant can go live now or schedule again. A
   transient failure throws and the worker retries; the last attempt records
