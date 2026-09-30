@@ -1,35 +1,31 @@
 // @covers accounts:/login app:/ app:/open app:/onboarding/modules app:/billing/invoices/new api:organizations api:capabilities api:home
-import type { Page, TestInfo } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
-import { urls } from "../playwright.config";
 
 /**
  * Home's first run and `/onboarding/modules` follow what is being set up
- * (DEC-070, K3). As Asha (`founder`), each test sets up a business of its
- * own through the API — nothing turned on — so it runs beside every other
- * test and touches nothing of the demo owner's.
+ * (DEC-070, K3). As Asha (`founder`), on the three businesses the seed gives
+ * her, one per kind, with every module rolled out and none on
+ * (`packages/database/src/seed/founder.ts`). A business made in a spec
+ * can't be used: the seed rolls modules out business by business, so a new
+ * one has every module dark and its first run offers nothing.
+ *
+ * Every test only reads: the Turn on sheet is opened, never saved, and the
+ * invoice link is followed to an empty form. So they run beside each other.
  */
+const FIRST_RUN = {
+    BUSINESS: "seed_org_first-run_business",
+    SOLO: "seed_org_first-run_solo",
+    WORK: "seed_org_first-run_work",
+} as const;
 
-/** A new business of Asha's, of this kind, opened in the workspace. */
-async function openNew(
-    page: Page,
-    testInfo: TestInfo,
-    kind: "BUSINESS" | "SOLO" | "WORK",
-    name: string,
-): Promise<string> {
+/** Asha's business of this kind, open on Home. */
+async function openFirstRun(page: Page, kind: keyof typeof FIRST_RUN) {
     await useSession(page, "founder");
-    const res = await page.request.post(`${urls.API_URL}/organizations`, {
-        data: { name: `${name} ${stamp(testInfo)}`, kind },
-        headers: { origin: urls.APP_URL },
-    });
-    expect(res.ok(), await res.text()).toBe(true);
-    const { id } = (await res.json()) as { id: string };
-    await page.goto(`/open/${id}`);
+    await page.goto(`/open/${FIRST_RUN[kind]}`);
     await page.goto("/");
-    return id;
 }
 
 /** The first-run question, and its cards in the order drawn. */
@@ -47,8 +43,8 @@ async function cardTitles(page: Page): Promise<string[]> {
 test.describe("first run follows the kind (DEC-070)", () => {
     test("a site for my work starts with the website, and its card opens the Turn on sheet", async ({
         page,
-    }, testInfo) => {
-        await openNew(page, testInfo, "WORK", "Asha Rao Studio");
+    }) => {
+        await openFirstRun(page, "WORK");
         await expect(firstRun(page)).toBeVisible();
         await expect
             .poll(() => cardTitles(page))
@@ -82,8 +78,8 @@ test.describe("first run follows the kind (DEC-070)", () => {
 
     test("a site for my work has the website suggested and ticked in the full list", async ({
         page,
-    }, testInfo) => {
-        await openNew(page, testInfo, "WORK", "Asha Rao Studio");
+    }) => {
+        await openFirstRun(page, "WORK");
         await page.goto("/onboarding/modules");
         await expect(
             page.getByRole("heading", { name: "What do you need to do?" }),
@@ -99,8 +95,8 @@ test.describe("first run follows the kind (DEC-070)", () => {
 
     test("just me starts with bookings, then an invoice, which opens a new one", async ({
         page,
-    }, testInfo) => {
-        await openNew(page, testInfo, "SOLO", "Asha Rao");
+    }) => {
+        await openFirstRun(page, "SOLO");
         await expect
             .poll(() => cardTitles(page))
             .toEqual([
@@ -131,8 +127,8 @@ test.describe("first run follows the kind (DEC-070)", () => {
 
     test("a business still starts with Sell, suggested and ticked", async ({
         page,
-    }, testInfo) => {
-        await openNew(page, testInfo, "BUSINESS", "Asha's Bakery");
+    }) => {
+        await openFirstRun(page, "BUSINESS");
         await expect
             .poll(() => cardTitles(page))
             .toEqual([

@@ -1487,3 +1487,21 @@ asserts), it passes without checking them.
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
 worth the same change.
 **Category**: e2e · tests
+
+## e2e — a business made in a spec has every module dark
+
+**Problem**: K3's first-run spec set up a business through the API and
+found no first-run cards on Home: "Put up a website" never appeared, and
+Just me showed only "Invoice a client".
+**Root cause**: the seed writes every `MODULE_*` rollout flag with
+`enabledByDefault: false` and rolls modules out one business at a time
+(an override each, for Northwind, the showcase and the side businesses).
+A business made by `POST /organizations` has no override, so every module
+reads `ROLLOUT_DISABLED` and DEC-057 hides it everywhere.
+**Fix**: the seed gives `founder` one business per kind with every module
+rolled out and none on (`seed/founder.ts`, `FIRST_RUNS`), and the spec
+reads them without saving.
+**Rule**: a browser spec that needs modules on offer uses a seeded
+business; one it makes itself can only check what needs no module (setup,
+the kind, invoices).
+**Category**: e2e · seed · modules
