@@ -64,7 +64,6 @@ export const NORTHWIND_ADDRESS = {
     postalCode: "560058",
     gstState: "29",
 } as const;
-export const STORE_SLUG = "demo-store";
 export const CURRENCY = "INR";
 
 /**
