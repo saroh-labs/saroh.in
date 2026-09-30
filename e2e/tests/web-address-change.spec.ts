@@ -173,14 +173,14 @@ test("an old address forwards to the same page on the new one (L3)", async ({
         maxRedirects: 0,
     });
     expect(old.status()).toBe(307);
-    expect(old.headers()["location"]).toBe(`${to}/shop?x=1`);
+    expect(old.headers().location).toBe(`${to}/shop?x=1`);
 
     // A post, and the root, go the same way.
     const post = await request.get(`${hostOf(NORTHWIND_BEFORE)}/posts/a-b`, {
         maxRedirects: 0,
     });
     expect(post.status()).toBe(307);
-    expect(post.headers()["location"]).toBe(`${to}/posts/a-b`);
+    expect(post.headers().location).toBe(`${to}/posts/a-b`);
 
     // The new address serves.
     const live = await request.get(`${hostOf("northwind")}/`);
