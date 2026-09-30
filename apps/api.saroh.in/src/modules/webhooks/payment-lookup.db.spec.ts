@@ -476,6 +476,9 @@ describe("the pending sweep (P1)", () => {
                 currency: "INR",
                 status: "REQUIRES_PAYMENT",
                 createdAt: fiveMinutesAgo,
+                // On no order or invoice: the one kind of intent the
+                // `PaymentIntent_one_target` check lets stand alone.
+                purpose: "AUTHORISATION",
             })),
         });
         // A healthy intent, asked four minutes ago: due again, but behind
