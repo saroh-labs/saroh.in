@@ -1876,3 +1876,22 @@ moves the row's "last tried" marker; a query that orders by it can
 otherwise be monopolised. Test: `payment-lookup.db.spec.ts` ("an intent
 whose ask throws takes its turn").
 **Category**: jobs · payments · starvation
+
+## Payments — a provider that never answers holds the sweep forever
+
+**Problem**: (release review) the pending-payment sweep, a hold's release
+and the autopay steps call Razorpay and Cashfree with a bare `fetch`. A
+provider that accepted the connection and never answered would have held
+the job for as long as the socket lived: the sweep's next run never came,
+and a hold waited on an ask that never finished.
+**Root cause**: Node's `fetch` has no timeout by default, and none of the
+lookup or mandate calls passed a signal.
+**Fix**: `findOrderPayments` (Razorpay and Cashfree) and the Razorpay
+mandate `call()` pass `signal: providerCallSignal()` (15 s,
+`payments/providers/provider-call.ts`). The abort rejects like a dropped
+connection, so the existing network-error path handles it: a lookup's ERROR,
+a mandate call's UNKNOWN. There is no Cashfree mandate adapter yet.
+**Rule**: `backend-integrations.md` — "A provider call has a deadline".
+Tests: `order-payments.spec.ts` and `razorpay-mandates.spec.ts`, with a
+fetch that settles only when its signal aborts.
+**Category**: integrations · payments · timeouts
