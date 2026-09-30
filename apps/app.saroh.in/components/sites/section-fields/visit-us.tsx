@@ -24,17 +24,19 @@ import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
-const STOREFRONTS = "/commerce/locations";
+const LOCATIONS = "/commerce/locations";
 const HOURS = "/settings/organization?section=hours";
 
 /**
  * The `visitUs` section's editor fields (G8).
  *
- * Only the title is typed here. Which shop it shows is a choice among the
- * business's open SHOP storefronts — never the site's "sells from" one, which
- * may be online-only — and the shop's address, hours and phone are read live
- * by the site. With one shop it is chosen for the merchant and named; with
- * several the panel asks which (ADR-010); with none it says where to add one.
+ * Only the title is typed here. Which location it shows is a choice among
+ * the business's open locations customers visit (the `SHOP` kind) — never
+ * the site's "sells from" one, which may have no counter — and the
+ * location's address, hours and phone are read live by the site. With one it
+ * is chosen for the merchant and named; with several the panel asks which
+ * (ADR-010); with none it says where to add one. Words per DEC-069: a
+ * location, its location address.
  */
 export function VisitUsFields({
     section,
@@ -85,23 +87,24 @@ export function VisitUsFields({
                 />
             </Field>
 
-            <Field label="Shop shown">
+            <Field label="Location shown">
                 {choice.kind === "loading" ? (
                     <Skeleton
                         className="h-9 w-full"
-                        aria-label="Loading your shops"
+                        aria-label="Loading your locations"
                     />
                 ) : choice.kind === "failed" ? (
                     choice.forbidden ? (
                         <p className="text-sm text-muted-foreground">
                             Your role can&apos;t see this business&apos;s
-                            storefronts, so the shop can&apos;t be chosen here.
+                            locations, so the one shown can&apos;t be chosen
+                            here.
                         </p>
                     ) : (
                         <div className="grid gap-2">
                             <p className="text-sm text-muted-foreground">
-                                We couldn&apos;t load your shops. Nothing you
-                                chose has changed.
+                                We couldn&apos;t load your locations. Nothing
+                                you chose has changed.
                             </p>
                             <Button
                                 type="button"
@@ -119,17 +122,19 @@ export function VisitUsFields({
                     )
                 ) : choice.kind === "none" ? (
                     <p className="text-sm text-muted-foreground">
-                        Add a shop with an address in{" "}
+                        Add a location customers visit, with its location
+                        address, in{" "}
                         <Link
-                            href={STOREFRONTS}
+                            href={LOCATIONS}
                             target="_blank"
                             rel="noopener"
                             className="underline hover:text-foreground"
                         >
-                            Sell › Storefronts
+                            Sell › Locations
                         </Link>
-                        . An online storefront has no address or hours, so until
-                        there is a shop this block shows nothing on your site.
+                        . A location with no counter has no address or hours, so
+                        until there is one customers visit this block shows
+                        nothing on your site.
                     </p>
                 ) : choice.kind === "only" ? (
                     <p className="text-sm">Showing {choice.place.name}</p>
@@ -137,14 +142,14 @@ export function VisitUsFields({
                     <div className="grid gap-2">
                         {choice.kind === "missing" ? (
                             <p className="text-sm text-muted-foreground">
-                                The shop this showed has closed or no longer has
-                                an address, so the block shows nothing on your
-                                site. Choose another.
+                                The location this showed has closed or no longer
+                                has a location address, so the block shows
+                                nothing on your site. Choose another.
                             </p>
                         ) : choice.chosen === null ? (
                             <p className="text-sm text-muted-foreground">
-                                Which shop does this show? Until you choose, the
-                                block shows nothing on your site.
+                                Which location does this show? Until you choose,
+                                the block shows nothing on your site.
                             </p>
                         ) : null}
                         <Select
@@ -155,8 +160,8 @@ export function VisitUsFields({
                             }
                             onValueChange={(storeId) => patch({ storeId })}
                         >
-                            <SelectTrigger aria-label="Shop shown">
-                                <SelectValue placeholder="Choose a shop" />
+                            <SelectTrigger aria-label="Location shown">
+                                <SelectValue placeholder="Choose a location" />
                             </SelectTrigger>
                             <SelectContent>
                                 {choice.places.map((place) => (
@@ -192,14 +197,14 @@ export function VisitUsFields({
             </div>
 
             <p className="text-sm text-muted-foreground">
-                The address lives on the storefront (
+                The location address is set on the location (
                 <Link
-                    href={STOREFRONTS}
+                    href={LOCATIONS}
                     target="_blank"
                     rel="noopener"
                     className="underline hover:text-foreground"
                 >
-                    Sell › Storefronts
+                    Sell › Locations
                 </Link>
                 ); the hours in{" "}
                 <Link

@@ -49,7 +49,7 @@ describe("a page's address", () => {
         });
         expect(
             fixedAddress(page({ kind: "SHOP", path: "/shop" }))?.purpose,
-        ).toBe("your shop's address");
+        ).toBe("your online shop's address");
     });
 
     it("can move for free-form, Prices, Journal and Contact pages", () => {

@@ -28,7 +28,7 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
     features: null,
     faq: null,
     testimonials: null,
-    // Typed by the merchant here, not read from a storefront.
+    // Typed by the merchant here, not read from a location.
     contact: null,
     servicesList: {
         reads: "Reads your services live, so names, durations and prices are never out of date here.",
@@ -37,10 +37,10 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         linkLabel: "Open Services",
     },
     visitUs: {
-        reads: "Reads your shop's address and opening hours live, so they're never out of date here.",
-        notice: "The address lives on the storefront, and the hours in Settings › Hours — change them there, and this block follows.",
+        reads: "Reads your location address and opening hours live, so they're never out of date here.",
+        notice: "The location address is set in Sell › Locations, and the hours in Settings › Hours — change them there, and this block follows.",
         href: "/commerce/locations",
-        linkLabel: "Open Storefronts",
+        linkLabel: "Open Locations",
     },
     journal: {
         reads: "Reads your latest published posts live, so a new post shows here without publishing the site again.",
@@ -62,7 +62,7 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
     },
     productGrid: {
         reads: "Reads the catalogue. Stays current on its own.",
-        notice: "Products live in Sell › Products. Which products appear follows the catalogue — add or hide them there, and this block follows. Only published products sold where the site sells from show.",
+        notice: "Products live in Sell › Products. Which products appear follows the catalogue — add or hide them there, and this block follows. Only published products at the location your online shop sells from show.",
         href: "/commerce/products",
         linkLabel: "Open Products",
     },

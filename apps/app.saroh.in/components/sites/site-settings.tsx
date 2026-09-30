@@ -74,7 +74,8 @@ export function SiteSettings({
     site: SiteDetail;
     /**
      * Where the site is reached (`siteAddressOf`, DEC-069 L8): its verified
-     * domain when the business has one, and its Saroh address beside it.
+     * domain when the business has one, and its web address on Saroh
+     * beside it.
      * Null for a site with no address yet.
      */
     address: SiteAddress | null;
@@ -239,7 +240,7 @@ export function SiteSettings({
                 }
             >
                 <Row
-                    label="Address"
+                    label="Web address"
                     action={
                         live && address ? (
                             <Button variant="outline" size="sm" asChild>
@@ -298,10 +299,10 @@ export function SiteSettings({
             </Section>
 
             <Section
-                title="Saroh address"
-                description="Every site gets one of these and keeps it. Your own domain, below, is added alongside it."
+                title="Web address"
+                description="Your business's web address on Saroh. Your own domain, below, is added alongside it, and this one keeps working."
             >
-                <Row label="Subdomain">
+                <Row label="On Saroh">
                     {reached?.platformHost ?? <Missing />}
                 </Row>
             </Section>
@@ -328,7 +329,7 @@ export function SiteSettings({
                 description="Where this site's posts live. Yours to name — a practice has updates, a studio has a journal."
             >
                 <Row
-                    label="Address"
+                    label="Posts path"
                     action={
                         editing === "postsPrefix" ? (
                             <div className="flex gap-2">
@@ -342,7 +343,7 @@ export function SiteSettings({
                                                 postsPrefix:
                                                     postsPrefix || null,
                                             },
-                                            "Writing address",
+                                            "Posts path",
                                         )
                                     }
                                 >
@@ -378,7 +379,7 @@ export function SiteSettings({
                                 autoFocus
                                 placeholder="blog"
                                 onChange={(e) => setPostsPrefix(e.target.value)}
-                                aria-label="Writing address"
+                                aria-label="Posts path"
                             />
                             <p className="text-xs text-muted-foreground">
                                 {address

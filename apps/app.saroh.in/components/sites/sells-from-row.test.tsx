@@ -37,7 +37,16 @@ describe("SellsFromRow (P4)", () => {
         expect(html).toContain("Not live");
         expect(html).toContain(SHOP_AWAITS_SELLS_FROM.replace("'", "&#x27;"));
         // The question is still there to answer.
-        expect(html).toContain("Which storefront does this site sell from?");
+        expect(html).toContain(
+            "Which location does your online shop sell from?",
+        );
+    });
+
+    it("reads 'Your online shop sells from' once answered (DEC-069, L12)", () => {
+        const html = row({ storefront: online, choices: [online, hill] });
+        expect(html).toContain("Your online shop sells from Online");
+        expect(html).toContain("Your online shop");
+        expect(html).not.toMatch(/storefront/i);
     });
 
     it("says nothing more once it is answered, or when the API doesn't say", () => {
