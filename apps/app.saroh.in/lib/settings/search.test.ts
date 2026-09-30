@@ -51,6 +51,32 @@ describe("searchSettings", () => {
         );
     });
 
+    it("finds the web address and the registered address by name, and by the words they went by (DEC-069)", () => {
+        const webAddress = {
+            label: "Web address",
+            where: "Business",
+            href: "/settings/organization?section=identity",
+        };
+        for (const query of [
+            "web address",
+            "workspace address",
+            "subdomain",
+            "saroh.app",
+        ]) {
+            expect(searchSettings(query, owner)).toEqual([webAddress]);
+        }
+        expect(searchSettings("address", owner).map((h) => h.label)).toEqual([
+            "Web address",
+            "Registered address",
+        ]);
+        expect(searchSettings("address on invoices", owner)[0]?.label).toBe(
+            "Registered address",
+        );
+        expect(
+            SETTINGS_INDEX.some((e) => e.label === "Workspace address"),
+        ).toBe(false);
+    });
+
     it("finds the type of business by each type's name (F10)", () => {
         const typeOfBusiness = {
             label: "Type of business",

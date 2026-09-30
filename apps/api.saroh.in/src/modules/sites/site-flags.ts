@@ -666,7 +666,7 @@ export function checkSite(site: FlagSiteInput): Flag[] {
         }
         flags.push({
             type: "reservedAddress",
-            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its address so visitors can reach it.`,
+            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its path so visitors can reach it.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",
@@ -759,7 +759,7 @@ export function checkShop(input: ShopFlagInput): Flag[] {
         if (page.kind === "SHOP" && page.path === SHOP_ROOT) continue;
         flags.push({
             type: "reservedAddress",
-            message: `${page.path} is where your online shop lives. This page keeps showing there for now. Change its address so the shop can open.`,
+            message: `${page.path} is where your online shop lives. This page keeps showing there for now. Change its path so the shop can open.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",

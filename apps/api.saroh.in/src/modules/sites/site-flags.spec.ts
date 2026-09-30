@@ -837,7 +837,7 @@ describe("module pages and reserved addresses (G14)", () => {
             {
                 type: "reservedAddress",
                 message:
-                    "This page can't be seen: /book is your booking page. Change its address so visitors can reach it.",
+                    "This page can't be seen: /book is your booking page. Change its path so visitors can reach it.",
                 pageId: "walk",
                 sectionIndex: null,
                 field: "path",
@@ -883,7 +883,7 @@ describe("module pages and reserved addresses (G14)", () => {
         expect(reserved(flags).map((f) => [f.pageId, f.message])).toEqual([
             [
                 "acct",
-                "This page can't be seen: /account is where your customers see their account. Change its address so visitors can reach it.",
+                "This page can't be seen: /account is where your customers see their account. Change its path so visitors can reach it.",
             ],
         ]);
     });
@@ -942,7 +942,7 @@ describe("module pages and reserved addresses (G14)", () => {
         });
         expect(flags.map((f) => f.message)).toEqual([
             "Pick which location your online shop sells from. Until you do, the shop and its products don't show on the site.",
-            "/shop/range is where your online shop lives. This page keeps showing there for now. Change its address so the shop can open.",
+            "/shop/range is where your online shop lives. This page keeps showing there for now. Change its path so the shop can open.",
         ]);
     });
 });

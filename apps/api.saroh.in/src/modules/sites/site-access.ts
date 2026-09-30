@@ -107,7 +107,7 @@ export async function assertPathIsFree(
             `${reserved.root}-info`,
         ]);
         throw new BadRequestException({
-            message: `${reserved.root} is ${reserved.purpose}, so a page can't use ${path}. Pick another address, such as ${suggestion}.`,
+            message: `${reserved.root} is ${reserved.purpose}, so a page can't use ${path}. Pick another path, such as ${suggestion}.`,
             details: { field: "path", reason: "reserved", suggestion },
         });
     }
@@ -122,7 +122,7 @@ export async function assertPathIsFree(
             path,
         ]);
         throw new BadRequestException({
-            message: `The path ${path} is already used by "${clash.title}". Pick another address, such as ${suggestion}.`,
+            message: `The path ${path} is already used by "${clash.title}". Pick another path, such as ${suggestion}.`,
             details: { field: "path", reason: "taken", suggestion },
         });
     }

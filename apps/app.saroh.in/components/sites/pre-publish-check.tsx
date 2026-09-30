@@ -44,7 +44,7 @@ const TYPE_LABEL: Record<FlagType, string> = {
     brokenLink: "Link goes nowhere",
     phoneWidth: "Breaks at phone width",
     storefrontUnchosen: "No location for your online shop",
-    reservedAddress: "Change address",
+    reservedAddress: "Change path",
     shopCantTakeOrders: "Can't take orders online",
     productsNotOnSale: "Products not on sale",
     addressMissing: "No web address",

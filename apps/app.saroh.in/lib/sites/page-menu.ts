@@ -98,9 +98,9 @@ export function fixedAddress(
         return { path: page.path, purpose: "your site's own address" };
     switch (pageKind(page)) {
         case "BOOK":
-            return { path: page.path, purpose: "your booking page's address" };
+            return { path: page.path, purpose: "your booking page's path" };
         case "SHOP":
-            return { path: page.path, purpose: "your online shop's address" };
+            return { path: page.path, purpose: "your online shop's path" };
         default:
             return null;
     }
@@ -130,7 +130,7 @@ export interface PageMenuMarks {
     hidden: boolean;
     /** "Show in menu" is off: "Not in menu". Never said of Home. */
     notInMenu: boolean;
-    /** At an address a route answers: "Can't be seen", with Change address. */
+    /** At an address a route answers: "Can't be seen", with Change path. */
     unseen: boolean;
 }
 
@@ -151,7 +151,7 @@ export function pageOptionName(page: SitePage, marks: PageMenuMarks): string {
         page.title,
         marks.hidden ? "hidden from the site" : null,
         marks.notInMenu ? "not in menu" : null,
-        marks.unseen ? "can't be seen at its address" : null,
+        marks.unseen ? "can't be seen at its path" : null,
     ]
         .filter(Boolean)
         .join(", ");

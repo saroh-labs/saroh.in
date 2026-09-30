@@ -62,7 +62,7 @@ describe("checkShop", () => {
             ["reservedAddress", "p_shop"],
             ["reservedAddress", "p_under"],
         ]);
-        expect(flags[0]?.message).toMatch(/Change its address/);
+        expect(flags[0]?.message).toMatch(/Change its path/);
     });
 
     it("says nothing about a hidden page, which isn't on the site", () => {
