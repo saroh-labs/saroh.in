@@ -218,6 +218,27 @@ export async function seed(): Promise<void> {
         });
     }
 
+    /*
+     * Changing the web address (DEC-069, L4) is on for everyone here, unlike
+     * the module flags above. It gates a release order in production (the
+     * renderer's forwarding goes out first), not a surface a business
+     * chooses, and the browser spec that changes an address does it on a
+     * business it sets up itself (`e2e/fixtures/own-business.ts`) — one the
+     * seed can't know to give an override. Production's row is made off in
+     * the admin console; `update: {}` leaves a row someone set alone.
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "WEB_ADDRESS_CHANGE" },
+        update: {},
+        create: {
+            id: "flag_WEB_ADDRESS_CHANGE",
+            key: "WEB_ADDRESS_CHANGE",
+            description:
+                "Lets a business's owner change its web address (DEC-069). On in the seed so a business a test sets up can change its own.",
+            enabledByDefault: true,
+        },
+    });
+
     // A connected-but-disabled provider: a merchant who set Razorpay up and
     // then turned it off. Kept alongside the live Cashfree connection below so
     // `/settings/providers` has a provider set that is genuinely mixed rather
