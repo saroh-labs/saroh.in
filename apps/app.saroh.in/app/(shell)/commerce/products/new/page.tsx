@@ -47,7 +47,7 @@ export default async function NewProductPage({
                 sectionHref="/commerce/products"
                 crumb="New product"
                 title="Where is it sold?"
-                description="A product is made at one storefront, and priced in that storefront's currency."
+                description="A product is made at one location, and priced in that location's currency."
                 stores={stores}
                 hrefFor={newProductHref}
             />

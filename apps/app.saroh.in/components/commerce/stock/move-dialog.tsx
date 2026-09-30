@@ -153,7 +153,7 @@ export function MoveDialog({
                     Move stock
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                    Move units that aren&apos;t promised from one storefront to
+                    Move units that aren&apos;t promised from one location to
                     another.
                 </DialogDescription>
                 <div className="grid gap-[5px]">

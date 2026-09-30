@@ -18,15 +18,15 @@ export function NoStorefront({ canWrite }: { canWrite: boolean }) {
                 className="size-8 stroke-[1.7] text-muted-foreground"
             />
             <p className="font-display text-[19px] font-semibold tracking-[-0.025em]">
-                No storefront yet
+                No location yet
             </p>
             <p className="max-w-[44ch] text-[13.5px] leading-[1.55] text-muted-foreground">
-                A product is sold somewhere. Make a storefront first, and the
+                A product is sold somewhere. Make a location first, and the
                 catalogue starts here.
             </p>
             {canWrite ? (
                 <Button asChild className="mt-1">
-                    <Link href={newStorefrontHref}>Create a storefront</Link>
+                    <Link href={newStorefrontHref}>Create a location</Link>
                 </Button>
             ) : null}
         </div>

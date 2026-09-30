@@ -48,7 +48,7 @@ export function LeavesStep({
             ) : ways.length === 0 && !loading ? (
                 <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
                     These items have no way to leave together here. Take one
-                    out, or turn a way on in the storefront&apos;s settings.
+                    out, or turn a way on in the location&apos;s settings.
                 </p>
             ) : (
                 <div

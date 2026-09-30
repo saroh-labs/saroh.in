@@ -66,7 +66,7 @@ export function LateRuleNoticeCard({
                 </Button>
             ) : (
                 <span className="text-[12px] text-muted-foreground">
-                    An owner or admin can change it in Storefronts.
+                    An owner or admin can change it in Locations.
                 </span>
             )}
             <Button

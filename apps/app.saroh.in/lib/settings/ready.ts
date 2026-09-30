@@ -330,9 +330,9 @@ function shop(modules: readonly ModuleView[]): Check | null {
     if (!blocker) return null;
     return {
         key: "shop",
-        label: "Choose which storefront your site sells from",
+        label: "Choose which location your online shop sells from",
         why: "Until then your shop page isn't live.",
-        cta: "Choose storefront",
+        cta: "Choose location",
         href: blocker.actionHref ?? "/sites",
         broken: false,
         left: true,

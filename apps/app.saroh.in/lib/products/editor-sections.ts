@@ -256,7 +256,7 @@ export const madeBySchema = z
         {
             path: ["returnsText"],
             message:
-                "Write this product's returns rule, or use the storefront's.",
+                "Write this product's returns rule, or use the location's.",
         },
     );
 export type MadeByValues = z.infer<typeof madeBySchema>;

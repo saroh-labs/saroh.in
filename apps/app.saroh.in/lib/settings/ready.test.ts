@@ -405,7 +405,7 @@ describe("readyChecklist", () => {
         expect(r.left).toEqual([
             expect.objectContaining({
                 key: "shop",
-                label: "Choose which storefront your site sells from",
+                label: "Choose which location your online shop sells from",
                 why: "Until then your shop page isn't live.",
                 href: "/sites/site_1/settings#sells-from",
             }),

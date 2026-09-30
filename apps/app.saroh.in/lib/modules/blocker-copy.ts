@@ -25,7 +25,7 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     WEBSITE_NO_SITE: "Create a site to get started.",
     WEBSITE_NO_PUBLICATION: "Publish your site to go live.",
     WEBSITE_SHOP_NOT_CHOSEN:
-        "Choose which storefront your site sells from. Until then your shop page isn't live.",
+        "Choose which location your online shop sells from. Until then your shop page isn't live.",
     CRM_NO_PIPELINE: "Create a pipeline to start tracking leads.",
     APPOINTMENTS_NO_SERVICE: "Add a bookable service.",
     APPOINTMENTS_NO_AVAILABILITY:
@@ -64,7 +64,7 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     PAYMENTS_AUTOPAY: "Autopay stops charging.",
     PAYMENTS_UNPAID_INVOICES: "Unpaid invoices stay as they are.",
     PAYMENTS_SITE_PLANS: "Your site stops selling plans.",
-    COMMERCE_STOREFRONTS: "Your storefronts stop taking orders.",
+    COMMERCE_STOREFRONTS: "Your locations stop taking orders.",
     COMMERCE_PUBLISHED_PRODUCTS:
         "Products leave your site; they are kept here.",
     COMMERCE_SITE_SHOP: "Your site's shop closes.",

@@ -372,7 +372,7 @@ test.describe("product editor", () => {
             expect(made.ok()).toBe(true);
             const { id } = (await made.json()) as { id: string };
 
-            // 1. None picked: every way its storefronts offer.
+            // 1. None picked: every way its locations offer.
             await page.goto(
                 `/commerce/products/${id}/edit?storefront=${STORE}`,
             );
@@ -393,7 +393,7 @@ test.describe("product editor", () => {
                 ).toHaveAttribute("aria-pressed", "false");
             }
             await expect(
-                details.getByText(/every way its storefronts offer/),
+                details.getByText(/every way its locations offer/),
             ).toBeVisible();
 
             // 2. Shipping and Pick-up, picked out of order, save in table order.

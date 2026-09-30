@@ -190,7 +190,7 @@ export function useMoreActions({
                 open={removing}
                 onOpenChange={setRemoving}
                 title={`Delete ${name}?`}
-                description={`Their notes, leads, subscriptions and class packs go with them, and future classes paid with those packs are cancelled. Orders, bookings and invoices stay on record under the name they gave, and a store customer with the same email is kept. This cannot be undone.`}
+                description={`Their notes, leads, subscriptions and class packs go with them, and future classes paid with those packs are cancelled. Orders, bookings and invoices stay on record under the name they gave, and a location's record of a customer with the same email is kept. This cannot be undone.`}
                 confirmLabel="Delete record"
                 cancelLabel="Keep them"
                 onConfirm={() => void remove()}

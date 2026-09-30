@@ -224,7 +224,7 @@ function NewOrderBody({
                         </div>
                         <div
                             role="radiogroup"
-                            aria-label="Storefront"
+                            aria-label="Location"
                             className="flex flex-wrap gap-1.5"
                         >
                             {stores.map((s) => (

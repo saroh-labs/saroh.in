@@ -276,7 +276,7 @@ export function OrdersEmpty({
     go: (patch: Partial<OrdersQuery>) => void;
     /**
      * The live site's address: a business with no orders yet is offered
-     * "Share your storefront", which copies it. Null: no live site, so no
+     * "Share your website", which copies it. Null: no live site, so no
      * button — there is nothing to share yet.
      */
     shareUrl?: string | null;
@@ -286,7 +286,7 @@ export function OrdersEmpty({
     const copyLink = async (url: string) => {
         try {
             await navigator.clipboard.writeText(url);
-            showSuccess("Storefront link copied", url);
+            showSuccess("Website link copied", url);
         } catch {
             showError(
                 "Couldn't copy the link. Select it and copy it instead.",
@@ -338,7 +338,7 @@ export function OrdersEmpty({
                         className="mt-1"
                         onClick={() => void copyLink(share)}
                     >
-                        Share your storefront
+                        Share your website
                     </Button>
                 ) : undefined
             }

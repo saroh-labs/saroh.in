@@ -89,7 +89,7 @@ export function StockTable({
                 <div
                     className="min-w-[540px]"
                     role="table"
-                    aria-label={`${product.name}: stock by size and storefront`}
+                    aria-label={`${product.name}: stock by size and location`}
                 >
                     <div
                         role="row"

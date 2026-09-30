@@ -265,7 +265,7 @@ export function MadeBySection({
             >
                 {(
                     [
-                        ["STOREFRONT", "Use the storefront's rule"],
+                        ["STOREFRONT", "Use the location's rule"],
                         ["OWN", "Its own rule"],
                     ] as const
                 ).map(([mode, label]) => {
@@ -320,7 +320,7 @@ export function MadeBySection({
                     {ownMissing || errors.returnsText ? (
                         <FieldHelp className="mt-1.5" tone="bad">
                             {errors.returnsText?.message ??
-                                "Write this product's returns rule, or use the storefront's."}
+                                "Write this product's returns rule, or use the location's."}
                         </FieldHelp>
                     ) : null}
                 </>

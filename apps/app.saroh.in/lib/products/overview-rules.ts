@@ -239,7 +239,7 @@ export function discountAmount(
 
 export const DISCOUNT_REACH_LABEL: Record<string, string> = {
     BUSINESS: "everything in the shop",
-    STOREFRONT: "this storefront",
+    STOREFRONT: "this location",
     COLLECTION: "its category",
     PRODUCT: "this product",
 };

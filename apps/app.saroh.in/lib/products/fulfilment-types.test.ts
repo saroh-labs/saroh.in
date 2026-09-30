@@ -28,9 +28,7 @@ describe("a product's fulfilment types (B12)", () => {
         expect(fulfilmentLine(["SHIPPING", "PICKUP"])).toBe(
             "Pick-up, Shipping",
         );
-        expect(fulfilmentLine([])).toBe("Every way its storefronts offer");
-        expect(fulfilmentLine(undefined)).toBe(
-            "Every way its storefronts offer",
-        );
+        expect(fulfilmentLine([])).toBe("Every way its locations offer");
+        expect(fulfilmentLine(undefined)).toBe("Every way its locations offer");
     });
 });

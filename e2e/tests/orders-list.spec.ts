@@ -235,7 +235,7 @@ test.describe("orders list", () => {
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");
-        const filter = page.getByRole("button", { name: /Storefront filter/ });
+        const filter = page.getByRole("button", { name: /Location filter/ });
         const row = orders(page).getByRole("listitem").first();
         // Counting the filter before the list is drawn counts nothing.
         await expect(row).toBeVisible();

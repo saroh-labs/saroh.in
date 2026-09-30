@@ -108,10 +108,10 @@ export function SheetSizeRow({
                             inputMode="numeric"
                             title={
                                 split
-                                    ? "The sum of the storefronts below"
+                                    ? "The sum of the locations below"
                                     : undefined
                             }
-                            aria-label={`${s.title || "Size"} on hand${split ? ", the sum of the storefronts below" : ""}`}
+                            aria-label={`${s.title || "Size"} on hand${split ? ", the sum of the locations below" : ""}`}
                             className={cn(split && LOCKED)}
                         />
                         <Input

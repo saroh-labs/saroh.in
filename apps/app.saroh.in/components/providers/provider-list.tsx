@@ -93,7 +93,7 @@ export function ProviderList({
             ) : null}
 
             <p className="text-pretty text-[11.5px] leading-normal text-muted-foreground">
-                These belong to the whole business. Each storefront can pick its
+                These belong to the whole business. Each location can pick its
                 own payment provider under Sell.
             </p>
         </div>

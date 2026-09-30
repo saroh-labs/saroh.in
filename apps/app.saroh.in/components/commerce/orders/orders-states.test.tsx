@@ -113,7 +113,7 @@ describe("OrdersEmpty", () => {
         expect(html).not.toContain('role="alert"');
     });
 
-    it("offers Share your storefront on the first run only when a site is live (B8)", () => {
+    it("offers Share your website on the first run only when a site is live (B8)", () => {
         const share = (params: Record<string, string>, url: string | null) =>
             renderToStaticMarkup(
                 <OrdersEmpty
@@ -124,13 +124,13 @@ describe("OrdersEmpty", () => {
                 />,
             );
         expect(share({}, "https://rye.saroh.app")).toContain(
-            "Share your storefront",
+            "Share your website",
         );
         // No live site: nothing to share, so no button.
-        expect(share({}, null)).not.toContain("Share your storefront");
+        expect(share({}, null)).not.toContain("Share your website");
         // Another empty view keeps its own way back.
         const open = share({ tab: "open" }, "https://rye.saroh.app");
-        expect(open).not.toContain("Share your storefront");
+        expect(open).not.toContain("Share your website");
         expect(open).toContain("View all orders");
     });
 
