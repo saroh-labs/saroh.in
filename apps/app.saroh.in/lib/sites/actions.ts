@@ -5,6 +5,7 @@ import { listVisitPlaces } from "@/lib/stores/storefronts";
 
 import type { GridCatalogueRead } from "./grid-catalogue";
 import { readGridCatalogue } from "./grid-catalogue";
+import { savePublishNeedsApproval } from "./publish-approval-read";
 import type {
     CreatePageInput,
     CreateSiteInput,
@@ -183,4 +184,12 @@ export async function listVisitPlacesForPicker(): Promise<VisitPlacesRead> {
  */
 export async function listGridCatalogue(): Promise<GridCatalogueRead> {
     return readGridCatalogue();
+}
+
+/**
+ * Turn "Publishing needs approval" on or off (DEC-071, T13). The owner's
+ * alone, and it takes effect at once.
+ */
+export async function setPublishNeedsApproval(siteId: string, on: boolean) {
+    return savePublishNeedsApproval(siteId, on);
 }

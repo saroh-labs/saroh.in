@@ -12,6 +12,7 @@ import { useRef, useState, useTransition } from "react";
 
 import { CustomDomain } from "@/components/sites/custom-domain";
 import { MediaPicker } from "@/components/sites/media-picker";
+import { PublishApprovalSection } from "@/components/sites/publish-approval-row";
 import { SellsFromRow } from "@/components/sites/sells-from-row";
 import { Row, Section } from "@/components/sites/settings-rows";
 import { ShareCards, webImageUrl } from "@/components/sites/share-cards";
@@ -38,6 +39,7 @@ import {
 } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
 import { describePendingChanges } from "@/lib/sites/pending";
+import type { PublishApproval } from "@/lib/sites/publish-approval";
 import type {
     SiteDetail,
     SiteFooter,
@@ -70,6 +72,7 @@ const Missing = () => (
 export function SiteSettings({
     site,
     address: reached,
+    approval = null,
 }: {
     site: SiteDetail;
     /**
@@ -79,6 +82,11 @@ export function SiteSettings({
      * Null for a site with no address yet.
      */
     address: SiteAddress | null;
+    /**
+     * "Publishing needs approval" (DEC-071, T13); null leaves it out
+     * (`readPublishApproval`).
+     */
+    approval?: PublishApproval | null;
 }) {
     const [seoTitle, setSeoTitle] = useState(site.seoTitle ?? "");
     const [seoDescription, setSeoDescription] = useState(
@@ -297,6 +305,10 @@ export function SiteSettings({
                     </Row>
                 ) : null}
             </Section>
+
+            {approval ? (
+                <PublishApprovalSection siteId={site.id} approval={approval} />
+            ) : null}
 
             <Section
                 title="Web address"

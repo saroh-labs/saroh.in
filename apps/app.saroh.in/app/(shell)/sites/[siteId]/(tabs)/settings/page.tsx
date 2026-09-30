@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { SiteSettings } from "@/components/sites/site-settings";
 import { SiteSettingsRead } from "@/components/sites/site-settings-read";
 import { requireSession } from "@/lib/session";
+import { readPublishApproval } from "@/lib/sites/publish-approval-read";
 import { getSite } from "@/lib/sites/service";
 import { siteAddressOf } from "@/lib/sites/share-links";
 import {
@@ -39,15 +40,25 @@ export default async function SiteSettingsPage({
     if (!site) notFound();
     // Where the site is reached, its verified domain first (DEC-069, L8).
     const address = siteAddressOf(site, webAddress, RENDERER_APEX);
+    // "Publishing needs approval" (DEC-071, T13), or null to leave it out.
+    const approval = await readPublishApproval(site);
 
     return (
         <div className="max-w-2xl">
             {site.can.manageSettings ? (
-                <SiteSettings site={site} address={address} />
+                <SiteSettings
+                    site={site}
+                    address={address}
+                    approval={approval}
+                />
             ) : (
                 // The values, and none of the controls the API would refuse
                 // (#275).
-                <SiteSettingsRead site={site} address={address} />
+                <SiteSettingsRead
+                    site={site}
+                    address={address}
+                    approval={approval}
+                />
             )}
         </div>
     );
