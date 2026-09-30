@@ -21,6 +21,7 @@ import {
     previousPageHref,
 } from "@/lib/orders/list-query";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
+import type { ShareLink } from "@/lib/sites/share-links";
 
 import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";
@@ -67,7 +68,7 @@ export function OrdersScreen({
     businessName,
     kitchen = false,
     filterOptions = null,
-    shareUrl = null,
+    share = null,
     can = NO_ABILITIES,
     newOrder = null,
 }: {
@@ -94,10 +95,10 @@ export function OrdersScreen({
      */
     kitchen?: boolean;
     /**
-     * The live site's address, for the first-run "Share your storefront"
-     * (B7, built in B8); null when there is none to share.
+     * The first run's share button (DEC-069, L8): the online shop while it
+     * is live, else the website; null when nothing is live to share.
      */
-    shareUrl?: string | null;
+    share?: ShareLink | null;
     /**
      * What the caller may do from a row (B5): its menu and quick view draw
      * only what they can use. The API decides again on every write.
@@ -254,7 +255,7 @@ export function OrdersScreen({
                         storeName={store?.name ?? firstStore?.name ?? null}
                         options={filterOptions}
                         go={go}
-                        shareUrl={shareUrl}
+                        share={share}
                     />
                 ) : (
                     <>

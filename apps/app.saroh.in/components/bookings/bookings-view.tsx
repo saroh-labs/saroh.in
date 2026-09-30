@@ -2,6 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { cn } from "@saroh/ui/lib/utils";
+import { CalendarDays } from "lucide-react";
 import Link from "next/link";
 
 import { CancelBookingControl } from "@/components/bookings/cancel-booking-control";
@@ -10,6 +11,7 @@ import type {
     DataColumn,
     DataFilter,
 } from "@/components/shared/data-view/types";
+import { ShareLinkButton } from "@/components/sites/share-link-button";
 import { formatDayHeading, formatTimeRange } from "@/lib/format/datetime";
 // From ./booking-state, NOT ./service: this is a client component, and the
 // service module reaches next/headers through the CRM HTTP plumbing.
@@ -20,6 +22,7 @@ import {
     needsOutcome,
 } from "@/lib/services/booking-state";
 import type { BookingWithService } from "@/lib/services/service";
+import type { ShareLink } from "@/lib/sites/share-links";
 
 /**
  * The schedule as a register.
@@ -34,6 +37,9 @@ import type { BookingWithService } from "@/lib/services/service";
  * the booker saw — not the viewer's. That is why `formatTimeRange` takes a zone
  * explicitly and why the zone travels on every row.
  */
+
+const EMPTY_NOTE =
+    "Bookings appear here as visitors reserve slots on your services.";
 
 const FILTERS: DataFilter<BookingWithService>[] = [
     // Upcoming leads, because the schedule is mostly read forwards. "Needs an
@@ -94,9 +100,16 @@ function bookerLabel(booking: BookingWithService): string {
 export function BookingsView({
     bookings,
     initialView,
+    share = null,
 }: {
     bookings: BookingWithService[];
     initialView?: string;
+    /**
+     * A business with no bookings yet is offered "Share your booking page"
+     * while the page is live (DEC-069, L8); null leaves the plain empty
+     * line, with nothing to share.
+     */
+    share?: ShareLink | null;
 }) {
     const now = new Date();
 
@@ -220,7 +233,17 @@ export function BookingsView({
             filters={FILTERS}
             initialFilterId={initialView ?? "upcoming"}
             searchableColumnIds={["service", "booker"]}
-            empty="Bookings appear here as visitors reserve slots on your services."
+            empty={EMPTY_NOTE}
+            emptyState={
+                share
+                    ? {
+                          icon: <CalendarDays />,
+                          title: "No bookings yet",
+                          note: EMPTY_NOTE,
+                          action: <ShareLinkButton link={share} />,
+                      }
+                    : undefined
+            }
             rowActions={(b) =>
                 // Not for an appointment that already happened: cancelling one
                 // is meaningless, and the detail screen offers an outcome
