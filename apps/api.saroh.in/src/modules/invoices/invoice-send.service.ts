@@ -28,7 +28,7 @@ import {
 import { assertBusinessDetails } from "./business-details";
 import { isPastDue } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
-import { payLinkUrl } from "./pay-link-url";
+import { payLinkUrlFor } from "./pay-link-url";
 import { invoicePayOnline } from "./pay-online";
 import type {
     InvoiceSendView,
@@ -293,9 +293,12 @@ export class InvoiceSendService {
                         recipient: { kind: "INVOICE_BILL_TO", invoiceId: id },
                         // A fresh link, as "New link" makes; the old one
                         // stops. With no way to pay online it is a view
-                        // link: the same page, without a Pay button.
+                        // link: the same page, without a Pay button. On the
+                        // business's own address (DEC-069, L7), read on
+                        // this transaction as the message is composed.
                         secretLink: async () =>
-                            payLinkUrl(
+                            payLinkUrlFor(
+                                organizationId,
                                 (
                                     await this.invoices.createPayLinkInTx(
                                         tx,
@@ -304,6 +307,7 @@ export class InvoiceSendService {
                                         { requireProvider: view.payOnline },
                                     )
                                 ).token,
+                                tx,
                             ),
                         invoiceId: id,
                         createdByUserId: ctx.userId,

@@ -14,7 +14,7 @@ import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
-import { payLinkUrl, payLinkUrlFor } from "../invoices/pay-link-url";
+import { payLinkUrlFor } from "../invoices/pay-link-url";
 import { invoicePayOnline, NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
@@ -442,7 +442,10 @@ export class PublicInvoicesService {
                 invoice.subscriptionId,
                 invoice.status === "PAID",
             );
-            return { ...outcome, payUrl: payLinkUrl(token) };
+            return {
+                ...outcome,
+                payUrl: await payLinkUrlFor(found.organizationId, token),
+            };
         });
     }
 
