@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { businessPublicPhoneOf } from "../organizations/business-phone";
+import { siteHostMode } from "../sites/site-host-mode";
 import { normaliseHost } from "./site-relay";
 
 /**
@@ -39,6 +40,9 @@ function notFound(): never {
 
 export async function resolveSiteHost(rawHost: string): Promise<SiteHost> {
     const host = normaliseHost(rawHost);
+    // A test release's host is never a live site's (DEC-071, KTD-7): nothing
+    // relayed from it signs anyone in or reaches an account.
+    if ((await siteHostMode(host)).mode === "test") notFound();
     const domain = await prisma.domain.findUnique({
         where: { hostname: host },
         select: { status: true, siteId: true },

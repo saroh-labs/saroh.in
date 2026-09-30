@@ -82,6 +82,11 @@ import type { Flag, FlagType } from "./site-flags";
 import { checkShop, checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
 import { parseSiteFooter } from "./site-footer";
+import {
+    isTestShapedHost,
+    siteHostMode,
+    siteRootDomain,
+} from "./site-host-mode";
 import type { SiteNavigation } from "./site-navigation";
 import { parseSiteNavigation, resolveSiteNavigation } from "./site-navigation";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
@@ -1837,6 +1842,14 @@ export class SitesService {
     async getPublicationBySubdomain(
         subdomain: string,
     ): Promise<PublicSiteView> {
+        // A test host's label is never a live address (DEC-071, KTD-7), even
+        // if a site somehow held one: refused before anything is read.
+        const root = siteRootDomain();
+        if (isTestShapedHost(`${subdomain}.${root}`, root)) {
+            throw new NotFoundException(
+                `No published site found for subdomain "${subdomain}"`,
+            );
+        }
         return this.resolveCurrentPublication(
             { subdomain, deletedAt: null },
             `subdomain "${subdomain}"`,
@@ -1851,6 +1864,12 @@ export class SitesService {
      * {@link getPublicationBySubdomain}.
      */
     async getPublicationByHostname(hostname: string): Promise<PublicSiteView> {
+        // A test host is never served the live site (DEC-071, KTD-7).
+        if ((await siteHostMode(hostname)).mode === "test") {
+            throw new NotFoundException(
+                `No published site found for hostname "${hostname}"`,
+            );
+        }
         const domain = await prisma.domain.findUnique({
             where: { hostname: hostname.trim().toLowerCase() },
             select: { status: true, siteId: true },
