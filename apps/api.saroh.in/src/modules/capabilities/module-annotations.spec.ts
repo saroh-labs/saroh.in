@@ -116,6 +116,9 @@ const NEVER: Record<string, string> = {
     "notifications/notification-preferences.controller.ts": "cross-cutting",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
+    // DEC-069 (L2): the web address is the business's whichever modules
+    // are on, and share buttons across modules read its links.
+    "organizations/web-address.controller.ts": "tenancy, not a capability",
     "organizations/organization-roles.controller.ts":
         "roles decide who may switch modules; a module switch must never lock the owner out of roles",
     "projects/projects.controller.ts": "tenancy",
