@@ -27,6 +27,15 @@
   `RLS_ENFORCEMENT` they are lazy and run in one GUC'd transaction; a promise
   from anywhere else is refused. `TEST_RLS=on` runs the integration suite the
   way enforcement will (#53).
+- **Current** — **A uniqueness check across businesses reads outside the org
+  context.** "Is this slug or address free" must see every business's rows,
+  but under `RLS_ENFORCEMENT` the request's `tx`/`prisma` sees only the
+  caller's, so another business's row looks free and the insert ends in the
+  unique index's raw error. Web addresses go through `addressUse()`
+  (`sites/site-address.ts`), store slugs through `storeSlugInUse()`
+  (`stores/store-slug.ts`); both use `outsideOrgContext` only when
+  enforcement is on and a context is active. Never a `tx.<model>.findUnique`
+  on a globally unique column. Prove it under `TEST_RLS=on`.
 - **Current** — **Read a lost serializable race with `isSerializationFailure()`**
   (or `prismaErrorCode()`, `apps/api.saroh.in/src/common/prisma-errors.ts`),
   never `code === "P2034"`. Through the pg driver adapter it can arrive with no

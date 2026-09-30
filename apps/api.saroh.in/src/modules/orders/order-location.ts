@@ -23,9 +23,9 @@ import { STOREFRONT_TEAM_ROLE_KEY } from "../organizations/storefront-team-role"
  * Nobody on no storefront at all sees no orders, never every one.
  */
 
-/** What a location-scoped move says to an order at another storefront. */
+/** What a location-scoped move says to an order at another location. */
 export const OTHER_LOCATION_REFUSAL =
-    "Your role moves only your storefront's orders.";
+    "Your role moves only your location's orders.";
 
 /** Whether this role's orders are narrowed to its storefronts. */
 export function isLocationScoped(roleKey: string | null | undefined): boolean {

@@ -1208,6 +1208,7 @@ updated". `test/global-setup.ts` re-runs the (idempotent) grants.
 the pattern doc saying why not. A new CI job lands with its prepush step.
 **Category**: tooling · `scripts/prepush.sh`, `scripts/e2e-affected.mjs`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
 ## Integration — a probe role failed DROP ROLE beside another test database (K1)
 
 **Problem**: `prepush --int` failed `public-catalogue.db.spec.ts` in teardown
@@ -1224,6 +1225,7 @@ database being torn down.
 **Rule**: a spec that creates a role must not fail when another database still
 uses it — drop it tolerantly, or give it a per-database name.
 **Category**: tests · integration · parallel databases
+
 ## Copy — the service editor matched an API refusal by its words (DEC-069 L11)
 
 **Problem**: Rewording the API's "Treatments are sold as orders — add a
@@ -1241,6 +1243,7 @@ storefront, so a copy change there is visible in review.
 when an old app still compares words, change both sides together and expect
 an old app to fall back to the toast until it is redeployed.
 **Category**: copy · API contract · DEC-069
+
 ## Sites — every new site opened with broken images (DEC-070 K10)
 
 **Problem**: A site made from the starter template (Turn on Website, or
@@ -1263,6 +1266,7 @@ shown "Starter" twice in the picker, which keys options by id.
 media library served, never a path an app is assumed to have. Render a new
 template in a test, not only parse it (K12–K14 follow the same test).
 **Category**: sites · templates · DEC-070
+
 ## E2E stack — the API's renderer links pointed at production (DEC-069 L6)
 
 **Problem**: a pay page opened on a tenant host in the CI and prepush e2e
@@ -1279,6 +1283,7 @@ stack's renderer.
 **Rule**: an origin the API hands to customers is set in every stack that
 runs the API; a spec that follows a link asserts it stays on the stack.
 **Category**: e2e · environment · `docs/patterns/devops-environments-and-flags.md`
+
 ## Sites — a Shop page can't be shown in the browser suite (DEC-069, L13)
 
 **Problem**: L13's plan asked for a browser spec: turn on Sell with Delivery
@@ -1298,6 +1303,7 @@ business by an override.
 flag is on in the e2e seed; if it isn't, plan the proof as a db spec, or
 seed the flag for Northwind first.
 **Category**: testing · feature flags · DEC-069
+
 ## Tooling — a killed `eslint --fix` left three source files empty (L9)
 
 **Symptom**: after a machine restart, a unit worktree's uncommitted
@@ -1312,6 +1318,7 @@ new files were rewritten.
 (`find apps -path '*/node_modules' -prune -o -type f -empty -print`), and
 commit work in progress before a long `--fix` run.
 **Category**: tooling · worktrees
+
 ## CI — four reds on batch 4 (#765) that the local gate passed
 
 **Problem**: `pnpm prepush --all` passed; CI failed four jobs. (1) Unit:
@@ -1349,6 +1356,7 @@ evidence, never on absence. Run `TEST_RLS=on` for any spec touching a
 cross-business read, and the permission suite for anything on Team, until
 `scripts/prepush.sh` runs both.
 **Category**: CI · tests · RLS · a11y
+
 ## Capabilities — the annotation spec counted a decorator named in a comment
 
 **Problem**: after K6 (DEC-070) moved the Payments gate off `InvoicesController`
@@ -1366,3 +1374,32 @@ whose mocked Prisma lacks it with a TypeError, not a clear failure — add
 `organizationModule: { findFirst: jest.fn().mockResolvedValue(null) }` (no
 row reads as on).
 **Category**: tests · capabilities · mocks
+
+## Gate — batch 5's units passed alone and failed together: a copy guard and RLS (DEC-069/070/071)
+
+**Problem**: batch 2026-09-30-5 (batch 4, wave 1 of DEC-069/070/071, K6)
+failed two gates once merged, though each unit had passed its own.
+(1) api-unit: L11's `merchant-copy.spec.ts` flagged DEC-074's refusal in
+`orders/order-location.ts`, "Your role moves only your storefront's
+orders." (2) int-rls: in `module-setup.db.spec.ts`, L13's "selling online
+leaves the shop ready to publish" cases died at `tx.store.create()` with
+"Unique constraint failed".
+**Root cause**: (1) DEC-074 and L11 were built side by side; the guard
+didn't exist when DEC-074 wrote its copy. (2) `freeStoreSlug` (Sell's
+turn-on) asked `tx.store.findUnique({ where: { slug } })`. `Store.slug` is
+unique across every business, but under RLS `tx` sees only the caller's,
+so the other business's "rye-counter" looked free. L13 added the spec
+cases that make two businesses with the same shop name; the units that
+built them ran before the gate ran `TEST_RLS=on` (FAST-PREPUSH).
+`StoresService.isSlugAvailable` had the same read (backstopped by a 409).
+**Fix**: (1) "Your role moves only your location's orders." (2)
+`storeSlugInUse()` (`stores/store-slug.ts`) reads every business's
+storefronts through `outsideOrgContext`, as `addressUse()` does for web
+addresses; both slug checks use it. The spec failed 5 cases under
+`TEST_RLS=on` before and passes in both modes after.
+**Rule**: units built before the gate ran RLS (or before a guard spec
+landed) are re-gated when they land together: run `pnpm prepush --int`
+(plain and RLS) and the full api unit suite on the batch branch, not only
+per unit. A uniqueness check across businesses reads outside the org
+context (`docs/patterns/backend-data-and-money.md`).
+**Category**: gate · RLS · copy

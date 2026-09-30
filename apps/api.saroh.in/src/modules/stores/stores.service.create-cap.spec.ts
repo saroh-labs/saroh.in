@@ -5,6 +5,10 @@
  * slug is even looked at.
  */
 jest.mock("@saroh/database", () => ({
+    // Plain mode: the slug check reads through `prisma` (store-slug.ts).
+    isRlsEnforcementEnabled: () => false,
+    currentOrgContext: () => undefined,
+    outsideOrgContext: <T>(fn: () => T) => fn(),
     prisma: {
         store: {
             count: jest.fn(),
