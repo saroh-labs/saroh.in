@@ -73,6 +73,25 @@ describe("activityLine — settings saves", () => {
         );
     });
 
+    it("says what is being set up as setup offered it (DEC-070, K5)", () => {
+        const kindChange = (before: string, after: string) =>
+            said({
+                metadata: {
+                    fields: ["kind"],
+                    changes: [{ field: "kind", before, after }],
+                },
+            });
+        expect(kindChange("BUSINESS", "SOLO")).toBe(
+            "Sanjay changed what you're setting up to Just me → Identity",
+        );
+        expect(kindChange("SOLO", "WORK")).toBe(
+            "Sanjay changed what you're setting up to A site for my work → Identity",
+        );
+        expect(kindChange("WORK", "BUSINESS")).toBe(
+            "Sanjay changed what you're setting up to A business → Identity",
+        );
+    });
+
     it("says the address once, however many of its lines changed", () => {
         expect(
             said({

@@ -49,6 +49,9 @@ const COMMENT = "comment_1";
 const LINK = "link_1";
 const PUBLICATION = "pub_1";
 const DTO = { marker: "dto" } as never;
+// Which review a route is about: the draft's, or a test release's (T8).
+const RELEASE = "rel_1";
+const TARGET = { testReleaseId: RELEASE } as never;
 
 type Target = "sites" | "previewLinks";
 
@@ -114,8 +117,8 @@ const ROUTES: Route[] = [
         path: ":siteId/comments",
         target: "sites",
         call: "listComments",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        args: [ctx, SITE, TARGET],
+        expect: [ctx, SITE, RELEASE],
     },
     {
         handler: "createComment",
@@ -142,8 +145,8 @@ const ROUTES: Route[] = [
         path: ":siteId/review/request",
         target: "sites",
         call: "requestReview",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        args: [ctx, SITE, TARGET],
+        expect: [ctx, SITE, RELEASE],
     },
     {
         handler: "createApproval",
@@ -187,8 +190,8 @@ const ROUTES: Route[] = [
         path: ":siteId/review",
         target: "sites",
         call: "getReviewState",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        args: [ctx, SITE, TARGET],
+        expect: [ctx, SITE, RELEASE],
     },
     {
         handler: "getFlags",

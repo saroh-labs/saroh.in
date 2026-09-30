@@ -27,12 +27,25 @@ export const TEAM_ALERT_TYPE = "team.alert";
  * - `booking`: a booking the customer made, moved or cancelled themselves.
  *   `booking.notify` has already put it in the inbox (A14), so this names
  *   that notice, and only the email is left to do.
+ * - `site`: a test release's scheduled go-live ran (DEC-071, T10): it went
+ *   live, or it didn't, and `reason` says why in the merchant's words (the
+ *   run's own finding, not data read back). Keyed to the release and the
+ *   instant it was scheduled for, so each schedule is told of once. The
+ *   person who scheduled it is always emailed, whatever they chose.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
     | { event: "failed"; invoiceId: string; paymentIntentId: string }
     | { event: "team"; userId: string; invitationId: string }
-    | { event: "booking"; notificationId: string };
+    | { event: "booking"; notificationId: string }
+    | {
+          event: "site";
+          testReleaseId: string;
+          goLiveAt: string;
+          outcome: "LIVE" | "NOT_LIVE";
+          reason?: string;
+          schedulerUserId: string;
+      };
 
 type Tx = Pick<Prisma.TransactionClient, "job">;
 

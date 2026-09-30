@@ -18,14 +18,22 @@ const holds =
         actions.includes(a);
 
 describe("alerts", () => {
-    it("offers the design's four rows, and no Monday summary (default 127)", () => {
-        expect(ALERT_EVENTS).toEqual(["order", "booking", "failed", "team"]);
+    it("offers the design's four rows and the Website row (DEC-071), and no Monday summary (default 127)", () => {
+        expect(ALERT_EVENTS).toEqual([
+            "order",
+            "booking",
+            "failed",
+            "team",
+            "site",
+        ]);
     });
 
-    it("starts with the bell on for everything, email for a failed payment, and WhatsApp off (default 126)", () => {
+    it("starts with the bell on for everything, email for a failed payment and a scheduled go-live, and WhatsApp off (default 126)", () => {
         for (const event of ALERT_EVENTS) {
             expect(defaultOn(event, "bell")).toBe(true);
-            expect(defaultOn(event, "email")).toBe(event === "failed");
+            expect(defaultOn(event, "email")).toBe(
+                event === "failed" || event === "site",
+            );
             expect(defaultOn(event, "whatsapp")).toBe(false);
         }
     });
@@ -54,6 +62,13 @@ describe("alerts", () => {
         // A failed payment is money, read as payments or as invoices.
         expect(mayHearAbout("failed", holds("invoice:read"))).toBe(true);
         expect(mayHearAbout("failed", holds("payment:read"))).toBe(true);
+        // A go-live is heard of by whoever could have put the site live.
+        expect(mayHearAbout("site", holds("site:publish"))).toBe(true);
+        expect(mayHearAbout("site", holds("site:read", "site:approve"))).toBe(
+            false,
+        );
+        expect(alertEventOfType("site.live")).toBe("site");
+        expect(alertEventOfType("site.not_live")).toBe("site");
     });
 
     describe("channels", () => {

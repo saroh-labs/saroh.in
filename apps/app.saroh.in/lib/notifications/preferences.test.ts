@@ -60,6 +60,26 @@ describe("alertGrid", () => {
         expect(grid.notes.map((n) => n.id)).toEqual(["not-available"]);
     });
 
+    it("names the Website row when the API offers it (DEC-071, T10)", () => {
+        const grid = alertGrid({
+            status: "ok",
+            prefs: prefs({
+                alerts: [
+                    {
+                        key: "site",
+                        channels: { bell: true, email: true, whatsapp: false },
+                    },
+                ],
+            }),
+        });
+        expect(grid.rows.map((r) => [r.label, r.note])).toEqual([
+            ["Website goes live", "When a scheduled go-live runs, or couldn't"],
+        ]);
+        expect(grid.rows[0]?.cells[0]?.label).toBe(
+            "Website goes live by Bell, on",
+        );
+    });
+
     it("never offers the Monday summary: nothing sends it (default 127)", () => {
         const grid = alertGrid({ status: "ok", prefs: prefs() });
         expect(grid.rows.map((r) => r.label)).not.toContain("Monday summary");

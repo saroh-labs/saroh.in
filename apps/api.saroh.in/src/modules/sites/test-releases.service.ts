@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
@@ -8,10 +9,13 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { starterTemplate } from "@saroh/templates";
 
+import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { businessTimezone } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { authorize } from "../organizations/organization-policy";
+import { readVerdicts } from "./live-pointer";
 import { checkRenderability } from "./publication-renderability";
 import { draftFingerprint } from "./review-route";
 import { assertSiteInOrg } from "./site-access";
@@ -27,6 +31,13 @@ import {
     mintTestReleaseToken,
     OPEN_LINK_HOURS,
 } from "./test-release-links";
+import {
+    assertScheduleWindow,
+    cancelGoLive,
+    OVERRIDE_OWNER_ONLY_MESSAGE,
+    scheduleGoLive,
+    scheduleInstant,
+} from "./test-release-schedule";
 import type {
     CreatedTestReleaseLinkView,
     CreatedTestReleaseView,
@@ -62,7 +73,8 @@ const HOUR_MS = 60 * 60 * 1000;
  * Who may do what (KTD-11, Q5): making, renaming, discarding and sharing is
  * `site:update`, the people who edit the site; reading the list and opening a
  * release from the workspace is `site:read`, narrowed per site for a
- * reviewer; going live is `site:publish`. Everything answers 404 while `SITE_TEST_RELEASES` is off for the
+ * reviewer; going live, now or at a set time, and cancelling that, is
+ * `site:publish`. Everything answers 404 while `SITE_TEST_RELEASES` is off for the
  * business (KTD-16).
  */
 
@@ -182,20 +194,31 @@ export class TestReleasesService {
         siteId: string,
     ): Promise<TestReleaseList> {
         const site = await this.gate(ctx, "site:read", siteId);
-        const [rows, currentFingerprint] = await Promise.all([
+        const [rows, currentFingerprint, verdicts] = await Promise.all([
             prisma.siteTestRelease.findMany({
                 where: { siteId, organizationId: ctx.organizationId },
                 orderBy: { number: "desc" },
                 select: releaseSelect,
             }),
             this.sites.currentDraftFingerprint(ctx, siteId),
+            readVerdicts(prisma, {
+                siteId,
+                organizationId: ctx.organizationId,
+            }),
         ]);
-        const names = await namesFor(peopleIn(rows));
+        const names = await namesFor(peopleIn(rows, verdicts));
         const now = new Date();
         return {
             testHosts: testHosts(site.subdomain),
             releases: rows.map((row) =>
-                toReleaseView(row, ctx, currentFingerprint, names, now),
+                toReleaseView(
+                    row,
+                    ctx,
+                    currentFingerprint,
+                    verdicts,
+                    names,
+                    now,
+                ),
             ),
         };
     }
@@ -320,6 +343,80 @@ export class TestReleasesService {
                 : null,
             release,
         };
+    }
+
+    /**
+     * Go live with a release at a date and time in the business's time zone
+     * (R9, T10). Requires `site:publish`, as going live now does. A release
+     * already scheduled is moved to the new time.
+     *
+     * The time must be at least 5 minutes and at most 60 days ahead (400).
+     * Refused (409) as `scheduleGoLive` says. `override`, an owner's "go
+     * live without approval", is 403 from anyone else (KTD-11).
+     */
+    async schedule(
+        ctx: OrganizationContext,
+        siteId: string,
+        releaseId: string,
+        input: { date: string; time: string; override?: boolean },
+    ): Promise<TestReleaseView> {
+        await this.gate(ctx, "site:publish", siteId);
+        const override = input.override === true;
+        if (override && (ctx.roleKey ?? ctx.role) !== "OWNER") {
+            throw new ForbiddenException(OVERRIDE_OWNER_ONLY_MESSAGE);
+        }
+        const zone = await businessTimezone(prisma, ctx.organizationId);
+        const goLiveAt = scheduleInstant(input.date, input.time, zone);
+        const now = new Date();
+        assertScheduleWindow(goLiveAt, now);
+
+        try {
+            await prisma.$transaction((tx) =>
+                scheduleGoLive(tx, {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    releaseId,
+                    actorUserId: ctx.userId,
+                    override,
+                    goLiveAt,
+                    zone,
+                    now,
+                }),
+            );
+        } catch (err) {
+            // Another release was scheduled at the same moment: the index
+            // allows one schedule per site, and it won.
+            if (prismaErrorCode(err) === "P2002") {
+                throw new ConflictException({
+                    message:
+                        "Another test release of this site was just scheduled to go live. Cancel it first.",
+                    details: { reason: "otherScheduled" },
+                });
+            }
+            throw err;
+        }
+        return this.readOne(ctx, siteId, releaseId);
+    }
+
+    /**
+     * Cancel a release's scheduled go-live: the release is ready again.
+     * Requires `site:publish`. 409 once it is going live. Cancelling a
+     * release with no schedule is not an error.
+     */
+    async cancelSchedule(
+        ctx: OrganizationContext,
+        siteId: string,
+        releaseId: string,
+    ): Promise<TestReleaseView> {
+        await this.gate(ctx, "site:publish", siteId);
+        await prisma.$transaction((tx) =>
+            cancelGoLive(tx, {
+                siteId,
+                organizationId: ctx.organizationId,
+                releaseId,
+            }),
+        );
+        return this.readOne(ctx, siteId, releaseId);
     }
 
     /**
@@ -486,7 +583,7 @@ export class TestReleasesService {
         releaseId: string,
         knownFingerprint?: string,
     ): Promise<TestReleaseView> {
-        const [row, currentFingerprint] = await Promise.all([
+        const [row, currentFingerprint, verdicts] = await Promise.all([
             prisma.siteTestRelease.findFirst({
                 where: {
                     id: releaseId,
@@ -496,14 +593,25 @@ export class TestReleasesService {
                 select: releaseSelect,
             }),
             knownFingerprint ?? this.sites.currentDraftFingerprint(ctx, siteId),
+            readVerdicts(prisma, {
+                siteId,
+                organizationId: ctx.organizationId,
+            }),
         ]);
         if (!row) {
             throw new NotFoundException(
                 `Test release "${releaseId}" not found`,
             );
         }
-        const names = await namesFor(peopleIn([row]));
-        return toReleaseView(row, ctx, currentFingerprint, names, new Date());
+        const names = await namesFor(peopleIn([row], verdicts));
+        return toReleaseView(
+            row,
+            ctx,
+            currentFingerprint,
+            verdicts,
+            names,
+            new Date(),
+        );
     }
 
     /**

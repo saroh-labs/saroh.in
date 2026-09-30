@@ -138,3 +138,35 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 - **Once per event**, claimed as a `CustomerNotice` (`TEAM_TOLD`,
   `team:<event>:<id>`), and re-read first: an unpaid checkout, a payment
   that went through after all, or someone who left again is not announced.
+
+## Scheduled go-live — **Current** (DEC-071, T10)
+
+- **`site.go_live`** puts a test release live at the time the merchant
+  chose, in the business's zone (`businessTimezone`; a time the clocks
+  skip is refused, not moved). Scheduling writes the release's schedule
+  columns and the job, `runAt` = the instant, in one transaction
+  (`sites/test-release-schedule.ts`). The payload is
+  `{ testReleaseId, goLiveAt }`.
+- **The release row is the lock.** Scheduling, cancelling and the run each
+  take it `FOR UPDATE`. Cancel (and moving a schedule) deletes the job
+  fenced on `status = 'PENDING'`; a PROCESSING job answers 409 "going
+  live now". A partial unique index allows one live schedule per site.
+- **Re-read, then decide** (`sites/go-live.handler.ts`). A run whose
+  release was cancelled, moved (`goLiveAt` differs), went live or was
+  discarded does nothing. Then it doesn't go live, and says why, when the
+  site was published after it was scheduled (`scheduledOverPublicationId`,
+  KTD-14), when the person who scheduled it left or can no longer publish,
+  or when "Publishing needs approval" is on and the release isn't approved
+  and no owner override was recorded. Otherwise it goes live through
+  `goLiveWithRelease` (so `putLive`) as the person who scheduled it.
+- **A clear no-go never retries.** It records `NOT_LIVE` with the reason and
+  clears the schedule, so the merchant can go live now or schedule again. A
+  transient failure throws and the worker retries; the last attempt records
+  `NOT_LIVE` before giving up, so a schedule never hangs as "scheduled".
+- **Told either way** through `team.alert`, event `site`, claimed once per
+  release and instant (`team:site:<releaseId>:<goLiveAt>`). The Website row
+  is offered to whoever holds `site:publish`, bell and email on by default,
+  and only while `SITE_TEST_RELEASES` is on. Whoever scheduled it is emailed
+  whatever they chose.
+- A queued job still runs with `SITE_TEST_RELEASES` off (KTD-16): it is a
+  go-live the merchant was told would happen.

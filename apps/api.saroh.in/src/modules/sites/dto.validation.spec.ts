@@ -5,9 +5,13 @@ import { IsBoolean } from "class-validator";
 
 import { validationPipeOptions } from "../../common/validation";
 import {
+    CreateApprovalDto,
+    CreateCommentDto,
     CreatePageDto,
     CreateTestReleaseDto,
     CreateTestReleaseLinkDto,
+    RequestReviewDto,
+    ReviewTargetQueryDto,
     SetCommentResolvedDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
@@ -265,5 +269,46 @@ describe("test release bodies (DEC-071, T2)", () => {
                 pipe.transform({ days }, asBody(CreateTestReleaseLinkDto)),
             ).rejects.toBeInstanceOf(BadRequestException);
         }
+    });
+});
+
+describe("review of a test release (DEC-071, T8)", () => {
+    it("names a release on a verdict, a request, a note and a read, or none", async () => {
+        await expect(
+            pipe.transform(
+                { outcome: "APPROVED", testReleaseId: "rel_1" },
+                asBody(CreateApprovalDto),
+            ),
+        ).resolves.toMatchObject({ testReleaseId: "rel_1" });
+        await expect(
+            pipe.transform({}, asBody(RequestReviewDto)),
+        ).resolves.toEqual({});
+        await expect(
+            pipe.transform(
+                {
+                    body: "Hi",
+                    pageId: "p",
+                    sectionKey: "0",
+                    testReleaseId: "r",
+                },
+                asBody(CreateCommentDto),
+            ),
+        ).resolves.toMatchObject({ testReleaseId: "r" });
+        await expect(
+            pipe.transform(
+                { testReleaseId: "rel_1" },
+                { type: "query", metatype: ReviewTargetQueryDto },
+            ),
+        ).resolves.toMatchObject({ testReleaseId: "rel_1" });
+    });
+
+    it.each([
+        ["an empty id", { testReleaseId: "" }],
+        ["an id that isn't text", { testReleaseId: 5 }],
+        ["a field it does not accept", { fingerprint: "mine" }],
+    ])("refuses %s when asking for a review", async (_label, body) => {
+        await expect(
+            pipe.transform(body, asBody(RequestReviewDto)),
+        ).rejects.toBeInstanceOf(BadRequestException);
     });
 });

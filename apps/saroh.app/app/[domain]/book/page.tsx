@@ -23,6 +23,7 @@ import {
 } from "@/lib/module-pages";
 import { getSiteForHost } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
+import { shareable } from "@/lib/test-metadata";
 
 import {
     requestSignInCode,
@@ -88,7 +89,7 @@ export async function generateMetadata({
     const name = resolved.snapshot.site.name;
     // The Book page's own title (G15), which is also its menu name.
     const label = moduleLabel(resolved.snapshot.pages, "BOOK", "Book");
-    return {
+    return shareable(resolved, {
         title: `${label} · ${name}`,
         openGraph: {
             title: `${label} · ${name}`,
@@ -96,7 +97,7 @@ export async function generateMetadata({
             url: "/book",
         },
         metadataBase: new URL(`https://${domain}`),
-    };
+    });
 }
 
 export default async function BookPage({

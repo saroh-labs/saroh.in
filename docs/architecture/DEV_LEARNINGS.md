@@ -1565,3 +1565,152 @@ with two.
 Never "today", "the first open day" or "N days from now" (see also the
 Saturday failure above).
 **Category**: e2e · tests · dates
+
+## Sites — the scheduled go-live was refused by the go-live it runs (T10)
+
+**Symptom**: the first draft of `site.go_live` called T7's
+`goLiveWithRelease` and got "Cancel the scheduled go-live first" for every
+release it ran: the release it was putting live was, by definition,
+scheduled. In a db spec, `jest.spyOn(prisma, "$transaction")` to fake a
+failed last attempt threw "mockRejectedValueOnce is not a function".
+**Cause**: T7 refuses any release with a `goLiveAt`, which is right for a
+person going live by hand and wrong for the job that owns that schedule.
+`prisma` from `@saroh/database` is the RLS proxy (`createRlsProxy`), so a
+spy on it doesn't replace what callers reach.
+**Fix**: `goLiveWithRelease` takes `scheduledFor`; a release scheduled for
+exactly that instant is let through, and any other schedule still refuses.
+The last-attempt write is `recordGaveUp`, exported and asserted directly;
+the order (retry, then record on the last try) is pinned with a mocked
+`@saroh/database` in `go-live.handler.spec.ts`.
+**Rule**: a guard that refuses "something is scheduled" needs a way for the
+schedule itself through. Fake `prisma` with `jest.mock`, not `spyOn`.
+**Category**: sites · jobs · tests
+
+## Sites — a customer is signed out after the business changes its web address (L3)
+
+**Problem**: after an owner changes the web address, the old one forwards
+for 90 days (a 307 from the `[domain]` layout to the same path on the new
+address). A customer who was signed in on the old address arrives signed
+out, and an order in their bag on the old host is not carried over.
+**Root cause**: the customer session is a `__Host-` cookie
+(`apps/saroh.app/lib/customer-session.ts`), which is host-only by
+definition: it can't carry a `Domain` attribute, so nothing set on
+`rye.saroh.app` is ever sent to `rye-bakery.saroh.app`.
+**Fix**: none needed, by design. The change dialog says "Customers signed
+in on your site will need to sign in again" (L4), and the account area
+already treats a visitor with no session as signed out. Don't try to hand
+the session across hosts in the redirect: a token in a URL is a credential
+in logs and referrers.
+**Rule**: anything that moves a customer from one host to another (an
+address change, a custom domain going live, a test host) signs them out.
+Say so where the merchant makes the move.
+**Category**: sites · sessions · DEC-069
+
+## E2E — the forwarding half of an address change reads a seeded row (L3)
+
+**Problem**: L3's browser check (the old host answers 307 to the same page
+on the new one, which serves) needs a business with a live site whose
+address changes. A business a test sets up can't have a site (its
+`MODULE_WEBSITE` rollout flag is the production default, off; see L4's
+entry above), and Northwind's address is read by every other spec.
+**Root cause**: the seed deliberately registers module rollout flags dark
+and overrides them only for its own businesses; flipping one globally
+would seed away the kill switch.
+**Fix**: the seed holds an old address for Northwind, as a change would
+leave it (`packages/database/src/seed/previous-address.ts`,
+`northwind-before`, forwarding for 90 days from the seed). The spec reads
+it without writing anything, so it runs beside every other spec. The change
+that writes such a row is covered against a real database
+(`web-address.service.db.spec.ts`), and the renderer's decision in vitest
+(`middleware.test.ts`, `lib/publication.test.ts`, `lib/request-path.test.ts`).
+**Rule**: when a browser check needs a state only a business-wide write
+can make, and a test-made business can't reach it, seed the resulting row
+on Northwind and read it. Don't change Northwind's shared settings.
+**Category**: e2e · seed · DEC-069
+
+## Renderer — a page's metadata inherits the layout's share card (T5)
+
+**Symptom** (found while building, not shipped): stripping the share card
+in the tenant layout alone would leave each page's own `og:*` tags on a
+test host, and stripping it in the pages alone would leave the layout's.
+**Cause**: Next merges metadata down the tree. A key a page leaves out is
+inherited from the layout, and a key a page sets replaces the layout's. So
+the share card has to go at every level that writes one: the tenant layout
+and each page with its own `generateMetadata` (`[slug]`, the post, `/shop`,
+the product, `/book`).
+**Fix**: every one of them returns through `shareable(resolved, meta)`
+(`apps/saroh.app/lib/test-metadata.ts`), which on a test host keeps only the
+title and adds `noindex` and `no-referrer`. `site-test-release.spec.ts`
+asserts no `og:title`.
+**Rule**: a new tenant route that writes `openGraph` or `twitter` returns
+through `shareable`.
+**Category**: renderer · metadata · DEC-071
+
+## Renderer — a relative Location from the middleware throws (T5)
+
+**Symptom**: every test release link failed in the browser specs; the
+renderer's log said `TypeError: Invalid URL, input: '/'`. The middleware's
+unit tests had passed.
+**Cause**: the redirect that drops `?release=` was a `NextResponse` with a
+relative `location` header. The unit test reads the header back as set; the
+edge runtime turns a response's Location into a URL and throws on a
+relative one.
+**Fix**: the Location is absolute, built from the visitor's Host and
+`x-forwarded-proto` (`visitorOrigin` in `apps/saroh.app/lib/test-host.ts`),
+since the server behind portless or Vercel sees plain http. A unit test
+pins both a proxied https host and a bare-port one.
+**Rule**: a middleware redirect's Location is always absolute, and a new
+redirect is proved by a browser spec, not only by `middleware.test.ts`.
+**Category**: renderer · middleware · DEC-071
+
+## Renderer — a constant from a "use client" file is not a value on the server (T5)
+
+**Symptom**: on a test host the site's sticky header slid under the Test
+release bar. The page's CSS read
+`top:var(function(){throw Error("Attempted to call BAR_HEIGHT_VAR() …`.
+**Cause**: the tenant layout (a server component) imported the string
+`BAR_HEIGHT_VAR` from the "use client" bar. On the server every export of a
+client module is a client reference, constants included.
+`lib/server-imports.test.ts` guarded only functions from `@saroh/site-blocks`
+and said constants were fine.
+**Fix**: the shared values live in `apps/saroh.app/lib/test-release-chrome.ts`
+(no directive). A second test in `server-imports.test.ts` fails a server
+file that imports anything but a component (PascalCase) from one of the
+app's own client modules.
+**Rule**: a value both a server file and a client component need lives in a
+module with no "use client".
+**Category**: renderer · RSC · DEC-071
+## e2e — a business made in a spec has every module dark
+
+**Problem**: K3's first-run spec set up a business through the API and
+found no first-run cards on Home: "Put up a website" never appeared, and
+Just me showed only "Invoice a client".
+**Root cause**: the seed writes every `MODULE_*` rollout flag with
+`enabledByDefault: false` and rolls modules out one business at a time
+(an override each, for Northwind, the showcase and the side businesses).
+A business made by `POST /organizations` has no override, so every module
+reads `ROLLOUT_DISABLED` and DEC-057 hides it everywhere.
+**Fix**: the seed gives `founder` one business per kind with every module
+rolled out and none on (`seed/founder.ts`, `FIRST_RUNS`), and the spec
+reads them without saving.
+**Rule**: a browser spec that needs modules on offer uses a seeded
+business; one it makes itself can only check what needs no module (setup,
+the kind, invoices).
+**Category**: e2e · seed · modules
+## e2e — a business a test sets up can still write contacts and invoices (K4)
+
+**Problem**: K4 needed a "site for my work" with nothing that takes money
+and then a first invoice, on a business of its own. The module wall above
+suggested no contact or invoice could be made there.
+**Root cause**: the wall is the rollout check on `PUT modules/:key`, not the
+endpoints. `@RequireModule` is enforced only while `MODULE_ENFORCEMENT` is
+set, and neither the dev nor the e2e stack sets it, so `POST /contacts` and
+`POST /invoices` answer a test-made business like any other. The first run
+did fail, on the contact itself: one needs an email or a phone.
+**Fix**: `checklist-when-money.spec.ts` sets up a WORK business as
+`founder`, makes a contact with a stamped email and drafts an invoice
+through the API, then reads Settings and Home.
+**Rule**: a module that is off isn't a module you can't write through in
+e2e. Plan on turning one on only where the spec needs the module to read as
+on (Home, the rail, the checklist's module steps).
+**Category**: e2e · tests · modules

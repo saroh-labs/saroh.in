@@ -13,6 +13,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { AuditService } from "../audit/audit.service";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CommunicationsService } from "../communications/communications.service";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { NotificationPreferencesService } from "./notification-preferences.service";
 import { NotificationsService } from "./notifications.service";
 import { tellTeam } from "./team-alert.handler";
@@ -33,6 +34,7 @@ const availability = {
 const preferences = new NotificationPreferencesService(
     availability,
     new AuditService(),
+    new FeatureFlagService(),
 );
 const inbox = new NotificationsService();
 const comms = new CommunicationsService();

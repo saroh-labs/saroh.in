@@ -49,6 +49,7 @@ import {
     syncStorefrontFulfilmentTypes,
     writeSite,
 } from "./helpers";
+import { seedPreviousAddress } from "./previous-address";
 import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
@@ -239,6 +240,40 @@ export async function seed(): Promise<void> {
         },
     });
 
+    /*
+     * Test releases (DEC-071, KTD-16): off by default, as in production, and
+     * on for Northwind, the write sandbox, where the plan's rollout turns it
+     * on first and the browser specs make their releases. The flag row is
+     * registry (`update: {}` leaves one someone set alone); the override is
+     * Northwind's.
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "SITE_TEST_RELEASES" },
+        update: {},
+        create: {
+            id: "flag_SITE_TEST_RELEASES",
+            key: "SITE_TEST_RELEASES",
+            description:
+                "Test releases of a website: a frozen version on a test address, shared by link (DEC-071). Off by default; on for Northwind in the seed.",
+            enabledByDefault: false,
+        },
+    });
+    await prisma.featureFlagOverride.upsert({
+        where: {
+            flagKey_organizationId: {
+                flagKey: "SITE_TEST_RELEASES",
+                organizationId: org.id,
+            },
+        },
+        update: { enabled: true },
+        create: {
+            id: id("flagoverride", "site-test-releases"),
+            flagKey: "SITE_TEST_RELEASES",
+            organizationId: org.id,
+            enabled: true,
+        },
+    });
+
     // A connected-but-disabled provider: a merchant who set Razorpay up and
     // then turned it off. Kept alongside the live Cashfree connection below so
     // `/settings/providers` has a provider set that is genuinely mixed rather
@@ -274,6 +309,8 @@ export async function seed(): Promise<void> {
     const sideOrgIds = await seedSideBusinesses(prisma, user.id, now);
     const siteIds = await seedWebsite(prisma, org.id, sideOrgIds, user.id, now);
     await seedReviewer(prisma, org.id, user.id, siteIds[0]);
+    // An old address of Northwind's that still forwards to its site (L3).
+    await seedPreviousAddress(prisma, org.id, siteIds[0], now);
     await seedStorefrontTeammate(prisma, org.id, storeId);
     await seedFounder(prisma);
     // Content after the website: a post belongs to the site it is published on
@@ -1544,6 +1581,9 @@ export async function deleteSeeded(
         // Cascades from either side, but removed explicitly so the count the
         // reset reports is the number of rows the seed actually wrote.
         () => prisma.siteReviewer.deleteMany({ where }),
+        // An old address held for Northwind (DEC-069, L3): it goes with
+        // its business and loses its site, but is removed and counted here.
+        () => prisma.addressReservation.deleteMany({ where }),
         () => prisma.site.deleteMany({ where }),
         () => prisma.subscription.deleteMany({ where }),
         () => prisma.plan.deleteMany({ where }),

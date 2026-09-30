@@ -115,4 +115,46 @@ describe("the site's server calls nothing from a client module", () => {
         }
         expect(offenders).toEqual([]);
     });
+
+    /*
+     * The same trap inside this app (T5): the tenant layout read
+     * `BAR_HEIGHT_VAR` from the "use client" bar, and on the server that
+     * constant was a client reference, so the page's CSS read
+     * `var(function(){throw Error("Attempted to call BAR_HEIGHT_VAR() …`.
+     * From one of this app's own client modules a server file may import
+     * only its components (PascalCase) and types.
+     */
+    it("imports nothing but components from this app's own client modules", () => {
+        const offenders: string[] = [];
+        const localSource = (spec: string, from: string): string | null => {
+            const base = spec.startsWith("@/")
+                ? path.join(APP, spec.slice(2))
+                : path.resolve(path.dirname(from), spec);
+            for (const ext of [".ts", ".tsx", "/index.ts", "/index.tsx"]) {
+                if (existsSync(base + ext)) {
+                    return readFileSync(base + ext, "utf8");
+                }
+            }
+            return null;
+        };
+        for (const dir of ["app", "lib", "components"]) {
+            for (const file of serverFiles(path.join(APP, dir))) {
+                const text = readFileSync(file, "utf8");
+                for (const [, list = "", spec = ""] of groupsOf(
+                    /import\s+\{([^}]*)\}\s+from\s+"((?:@\/|\.)[^"]+)"/,
+                    text,
+                )) {
+                    const source = localSource(spec, file);
+                    if (source === null || !isClient(source)) continue;
+                    for (const name of namesIn(list)) {
+                        if (/^[A-Z][a-z]/.test(name)) continue;
+                        offenders.push(
+                            `${path.relative(APP, file)}: ${name} (from ${spec})`,
+                        );
+                    }
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
 });

@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/settings/organization api:organizations api:audit
+// @covers accounts:/login app:/open app:/settings/organization app:/settings/activity api:organizations api:audit
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -225,6 +225,108 @@ test.describe("business settings", { tag: "@serial" }, () => {
         }
     });
 });
+
+// @serial: what Northwind is set up as changes the words every screen of
+// it reads, Home's first run and the settings tab among them.
+test.describe(
+    "what you're setting up (DEC-070, K5)",
+    { tag: "@serial" },
+    () => {
+        test("change to Just me: the tab reads Your details, Activity records it, and back", async ({
+            page,
+        }) => {
+            test.setTimeout(120_000);
+            await signIn(page);
+            await page.goto(`/open/${ORG}`);
+            expect(await readKind(page.request)).toBe("BUSINESS");
+            const since = new Date().toISOString();
+            // The settings tabs are a column on the desk and a row on a phone.
+            const tab = (name: string) =>
+                page
+                    .getByRole("navigation", { name: "Settings" })
+                    .getByRole("link", { name: new RegExp(`^${name}`) })
+                    .filter({ visible: true });
+
+            try {
+                await page.goto("/settings/organization");
+                await expect(tab("Business")).toBeVisible();
+                await saveKindInUi(page, "Just me");
+
+                // The tab, the page's heading and the card speak as "you".
+                await expect(tab("Your details")).toBeVisible({
+                    timeout: 30_000,
+                });
+                await expect(tab("Business")).toHaveCount(0);
+                await expect(
+                    page.getByRole("heading", { name: "Your details" }),
+                ).toBeVisible();
+                const card = page.getByRole("region", { name: "Identity" });
+                await expect(card).toContainText("Just me");
+                await expect(card).toContainText("Your name or brand");
+                await expect.poll(() => readKind(page.request)).toBe("SOLO");
+
+                // Activity: an audited change, with before and after.
+                await expect
+                    .poll(
+                        async () =>
+                            (await readAudit(page.request)).some(
+                                (e) =>
+                                    e.createdAt >= since &&
+                                    JSON.stringify(e.metadata).includes(
+                                        '"SOLO"',
+                                    ),
+                            ),
+                        { timeout: 15_000 },
+                    )
+                    .toBe(true);
+                await page.goto("/settings/activity");
+                await expect(
+                    page
+                        .getByText(/changed what you're setting up to Just me/)
+                        .filter({ visible: true })
+                        .first(),
+                ).toBeVisible({ timeout: 30_000 });
+
+                // And back to A business, the way it was changed.
+                await page.goto("/settings/organization");
+                await saveKindInUi(page, "A business");
+                await expect(tab("Business")).toBeVisible({ timeout: 30_000 });
+                await expect
+                    .poll(() => readKind(page.request))
+                    .toBe("BUSINESS");
+            } finally {
+                await setKind(page.request, "BUSINESS");
+            }
+        });
+    },
+);
+
+async function readKind(request: APIRequestContext): Promise<string> {
+    const res = await request.get(settingsUrl, { headers });
+    expect(res.ok()).toBe(true);
+    return ((await res.json()) as { kind?: string }).kind ?? "BUSINESS";
+}
+
+async function setKind(request: APIRequestContext, kind: string) {
+    const res = await request.patch(`${urls.API_URL}/organizations/${ORG}`, {
+        headers,
+        data: { kind },
+    });
+    expect(res.ok()).toBe(true);
+}
+
+/** Identity → Edit → one of the three answers → Save, and wait for the toast. */
+async function saveKindInUi(page: Page, answer: string) {
+    await page.getByRole("button", { name: "Edit identity" }).click();
+    const card = page.getByRole("region", { name: "Identity" });
+    const choice = card.getByRole("radio", { name: new RegExp(`^${answer}`) });
+    await choice.click();
+    await expect(choice).toHaveAttribute("aria-checked", "true");
+    await card.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText(/^Identity saved/)).toBeVisible({
+        timeout: 30_000,
+    });
+}
 
 async function readPrefix(request: APIRequestContext): Promise<string> {
     const res = await request.get(settingsUrl, { headers });

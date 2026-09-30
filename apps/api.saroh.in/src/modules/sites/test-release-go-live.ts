@@ -32,6 +32,12 @@ export interface GoLiveInput {
     actorUserId: string;
     /** When it goes live. Defaults to now. */
     at?: Date;
+    /**
+     * The scheduled go-live running (T10): the schedule it was queued for.
+     * A release scheduled for exactly this instant is let through, since
+     * this is that schedule; any other schedule still refuses.
+     */
+    scheduledFor?: Date;
 }
 
 /** The version going live replaced, so the answer can say so. */
@@ -99,7 +105,7 @@ export async function goLiveWithRelease(
             details: { reason: "discarded" },
         });
     }
-    if (release.goLiveAt) {
+    if (release.goLiveAt && !isThisSchedule(release.goLiveAt, input)) {
         await refuseScheduled(tx, release.goLiveJobId);
     }
 
@@ -158,6 +164,7 @@ export async function goLiveWithRelease(
         },
         publishedAt: at,
         sourcePublicationId: release.publicationId,
+        testReleaseId: releaseId,
     });
 
     await tx.siteTestRelease.update({
@@ -177,6 +184,11 @@ export async function goLiveWithRelease(
               }
             : null,
     };
+}
+
+/** The run is the schedule the release holds, to the millisecond. */
+function isThisSchedule(goLiveAt: Date, input: GoLiveInput): boolean {
+    return input.scheduledFor?.getTime() === goLiveAt.getTime();
 }
 
 /**

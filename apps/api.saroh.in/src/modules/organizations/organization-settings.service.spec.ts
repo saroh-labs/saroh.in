@@ -23,6 +23,7 @@ jest.mock("@saroh/database", () => {
         product: { count: jest.fn().mockResolvedValue(0) },
         service: { count: jest.fn().mockResolvedValue(0) },
         site: { count: jest.fn().mockResolvedValue(0) },
+        invoice: { count: jest.fn().mockResolvedValue(0) },
     };
     return {
         prisma: {
@@ -125,17 +126,23 @@ describe("OrganizationSettingsService", () => {
             );
         });
 
-        it("sends the checklist's facts: products, services, sites and those not live (H-5, H-6)", async () => {
+        it("sends the checklist's facts: products, services, sites, those not live and invoices (H-5, H-6, DEC-070)", async () => {
             (prisma.product.count as jest.Mock).mockResolvedValueOnce(0);
             (prisma.service.count as jest.Mock).mockResolvedValueOnce(2);
             (prisma.site.count as jest.Mock)
                 .mockResolvedValueOnce(2)
                 .mockResolvedValueOnce(1);
+            (prisma.invoice.count as jest.Mock).mockResolvedValueOnce(3);
             expect((await service.get(ctx())).setup).toEqual({
                 products: 0,
                 services: 2,
                 sites: 2,
                 sitesNotLive: 1,
+                invoices: 3,
+            });
+            // A void invoice never counts: drafts and issued paper do.
+            expect(prisma.invoice.count).toHaveBeenLastCalledWith({
+                where: { organizationId: "org_1", status: { not: "VOID" } },
             });
             // Archived never counts; a site is live only while something
             // is published on it now.

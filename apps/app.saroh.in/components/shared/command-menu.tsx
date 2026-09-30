@@ -31,7 +31,7 @@ import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
-import { searchSettings } from "@/lib/settings/search";
+import { searchSettings, settingsPageLabel } from "@/lib/settings/search";
 
 import type { NavAction, NavRole } from "./nav-items";
 import {
@@ -228,8 +228,14 @@ export function CommandMenu({
     storefronts = null,
     stockTracked = null,
     roleKey = null,
+    kind,
 }: {
     moduleKeys?: string[] | null;
+    /**
+     * What is being set up (DEC-070): the Business settings page is "Your
+     * details" for Just me and A site for my work.
+     */
+    kind?: string;
     /** The role as stored; see `navFor`. */
     roleKey?: string | null;
     /** The actor's role here; `null` = unknown, and the palette fails open. */
@@ -510,10 +516,17 @@ export function CommandMenu({
                         role,
                         actions: permissions,
                         modules: moduleKeys,
+                        kind,
                     };
-                    const pages = settingsPagesFor(actor).filter(
-                        (page) => matches("Settings") || matches(page.label),
-                    );
+                    const pages = settingsPagesFor(actor)
+                        .map((page) => ({
+                            ...page,
+                            label: settingsPageLabel(page, kind),
+                        }))
+                        .filter(
+                            (page) =>
+                                matches("Settings") || matches(page.label),
+                        );
                     const settings = needle
                         ? searchSettings(needle, actor, {
                               limit: 5,

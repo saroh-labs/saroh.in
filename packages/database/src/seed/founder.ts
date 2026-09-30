@@ -1,14 +1,14 @@
-import { FOUNDER_EMAIL, FOUNDER_PASSWORD } from "./data";
+import { FOUNDER_EMAIL, FOUNDER_PASSWORD, MODULE_STATES } from "./data";
 import type { Db } from "./helpers";
 import { hashPassword, id } from "./helpers";
 
 /**
- * Asha, who has just signed up (DEC-070, K2): a verified account with no
- * business, so the workspace sends her to setup. Browser specs about setting
- * up sign in as her and make businesses of their own.
+ * Asha, who is just starting (DEC-070, K2): a verified account. Browser
+ * specs about setting up sign in as her and make businesses of their own;
+ * the three seeded below (`FIRST_RUNS`, K3) are for reading a first run.
  *
- * Only the person is seeded. A business she made in an earlier run is
- * hers, not the seed's, and is left as it is.
+ * A business she made in an earlier run is hers, not the seed's, and is
+ * left as it is.
  */
 export async function seedFounder(prisma: Db): Promise<void> {
     const founder = await prisma.user.upsert({
@@ -33,4 +33,67 @@ export async function seedFounder(prisma: Db): Promise<void> {
             password: await hashPassword(FOUNDER_PASSWORD),
         },
     });
+    await seedFirstRuns(prisma, founder.id);
+}
+
+/**
+ * One business of Asha's per kind (DEC-070, K3), with nothing turned on, so
+ * Home's first run and `/onboarding/modules` can be read for each kind.
+ *
+ * A business made through setup can't show them here: the seed keeps every
+ * module's rollout flag off by default and rolls modules out to the
+ * businesses it makes, one override each, so a business made in a browser
+ * spec has every module dark (DEC-057) and its first run offers nothing.
+ * These carry the overrides and no module rows. Specs only read them —
+ * opening the Turn on sheet without saving — so they run beside each other.
+ */
+export const FIRST_RUNS = [
+    { key: "business", kind: "BUSINESS", name: "Asha's Bakery" },
+    { key: "solo", kind: "SOLO", name: "Asha Rao" },
+    { key: "work", kind: "WORK", name: "Asha Rao Studio" },
+] as const;
+
+async function seedFirstRuns(prisma: Db, userId: string): Promise<void> {
+    for (const run of FIRST_RUNS) {
+        const orgId = id("org", "first-run", run.key);
+        await prisma.organization.upsert({
+            where: { id: orgId },
+            update: { name: run.name, kind: run.kind },
+            create: {
+                id: orgId,
+                name: run.name,
+                slug: `first-run-${run.key}`,
+                kind: run.kind,
+            },
+        });
+        await prisma.membership.upsert({
+            where: {
+                organizationId_userId: { organizationId: orgId, userId },
+            },
+            update: { role: "OWNER" },
+            create: {
+                id: id("membership", "first-run", run.key),
+                organizationId: orgId,
+                userId,
+                role: "OWNER",
+            },
+        });
+        // Rolled out, not switched on. The flag rows themselves are written
+        // with Northwind's modules.
+        for (const m of MODULE_STATES) {
+            const flagKey = `MODULE_${m.key}`;
+            await prisma.featureFlagOverride.upsert({
+                where: {
+                    flagKey_organizationId: { flagKey, organizationId: orgId },
+                },
+                update: { enabled: true },
+                create: {
+                    id: id("flagoverride", "first-run", run.key, m.key),
+                    flagKey,
+                    organizationId: orgId,
+                    enabled: true,
+                },
+            });
+        }
+    }
 }

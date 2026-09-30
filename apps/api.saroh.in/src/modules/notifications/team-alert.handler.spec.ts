@@ -387,6 +387,84 @@ describe("a booking the customer made", () => {
     });
 });
 
+describe("a scheduled go-live (DEC-071, T10)", () => {
+    function siteTx(wentLiveAt: Date | null) {
+        const tx = makeTx();
+        return Object.assign(tx, {
+            siteTestRelease: {
+                findFirst: jest.fn().mockResolvedValue({
+                    siteId: "site_1",
+                    name: "Diwali menu",
+                    wentLiveAt,
+                    site: { name: "Rye & Co" },
+                }),
+            },
+        });
+    }
+    const AT = "2026-10-03T12:30:00.000Z";
+
+    it("says it is live, and emails who can publish by default", async () => {
+        const tx = siteTx(new Date(AT));
+        const out = await tellTeam(asTx(tx), comms, ORG, {
+            event: "site",
+            testReleaseId: "rel_1",
+            goLiveAt: AT,
+            outcome: "LIVE",
+            schedulerUserId: "u_owner",
+        });
+        expect(out.told).toBe(true);
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0].eventKey,
+        ).toBe(`team:site:rel_1:${AT}`);
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "site.live",
+            title: "Diwali menu is live on Rye & Co",
+        });
+        // Email on by default for a go-live, to who holds site:publish.
+        expect(recipients().sort()).toEqual(["u_admin", "u_owner"]);
+    });
+
+    it("says it didn't go live, with the run's reason, and always emails who scheduled it", async () => {
+        const tx = siteTx(null);
+        tx.notificationPreference.findMany.mockResolvedValue([
+            {
+                userId: "u_admin",
+                event: "site",
+                channel: "email",
+                enabled: false,
+            },
+        ]);
+        await tellTeam(asTx(tx), comms, ORG, {
+            event: "site",
+            testReleaseId: "rel_1",
+            goLiveAt: AT,
+            outcome: "NOT_LIVE",
+            reason: "The site was published at 3:10pm, after this was scheduled. Go live now, or schedule it again.",
+            // Lost site:publish since, and still hears how it went.
+            schedulerUserId: "u_kitchen",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "site.not_live",
+            title: "Diwali menu didn't go live on Rye & Co",
+            body: "The site was published at 3:10pm, after this was scheduled. Go live now, or schedule it again.",
+        });
+        expect(recipients().sort()).toEqual(["u_kitchen", "u_owner"]);
+    });
+
+    it("never announces a go-live the release doesn't show", async () => {
+        const tx = siteTx(null);
+        const out = await tellTeam(asTx(tx), comms, ORG, {
+            event: "site",
+            testReleaseId: "rel_1",
+            goLiveAt: AT,
+            outcome: "LIVE",
+            schedulerUserId: "u_owner",
+        });
+        expect(out.told).toBe(false);
+        expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
+    });
+});
+
 describe("the email", () => {
     it("escapes what people typed, links into the workspace and says why they got it", () => {
         const mail = renderAlertEmail(

@@ -369,6 +369,27 @@ const OPERATIONS: readonly Operation[] = [
         run: (ctx) => releases().goLive(ctx, SITE, "release_1"),
         allowed: ["OWNER", "ADMIN"],
     },
+    // A go-live at a set time is still going live (T10).
+    {
+        what: "schedule a test release's go-live",
+        handler: "list",
+        target: releaseRoute("schedule"),
+        method: "POST",
+        run: (ctx) =>
+            releases().schedule(ctx, SITE, "release_1", {
+                date: "2099-01-01",
+                time: "18:00",
+            }),
+        allowed: ["OWNER", "ADMIN"],
+    },
+    {
+        what: "cancel a test release's scheduled go-live",
+        handler: "list",
+        target: releaseRoute("cancelSchedule"),
+        method: "DELETE",
+        run: (ctx) => releases().cancelSchedule(ctx, SITE, "release_1"),
+        allowed: ["OWNER", "ADMIN"],
+    },
     {
         what: "discard a test release",
         handler: "list",

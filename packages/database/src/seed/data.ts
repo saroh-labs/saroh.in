@@ -42,11 +42,10 @@ export const STOREFRONT_TEAM_EMAIL = "farah.storefront@saroh.dev";
 export const STOREFRONT_TEAM_PASSWORD = "demo-password-123";
 
 /**
- * Someone who has just signed up and set nothing up (DEC-070, K2). Owns no
- * business, so setup is the first thing they see. Browser specs about
- * setting up — "What are you setting up?", a first run for each kind — sign
- * in as them and make businesses of their own, never touching the demo
- * owner's.
+ * Someone just starting out (DEC-070, K2). Browser specs about setting up
+ * ("What are you setting up?") sign in as them and make businesses of their
+ * own, never touching the demo owner's. They also own one business per kind
+ * with nothing turned on, for reading a first run (K3, `seed/founder.ts`).
  */
 export const FOUNDER_EMAIL = "founder@saroh.dev";
 export const FOUNDER_PASSWORD = "demo-password-123";

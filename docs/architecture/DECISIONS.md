@@ -202,6 +202,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: Billing (`/billing/…`), Courses (`/courses`) and Class packs appear in the workspace; contact deletion takes a person's holdings with it and cancels their future course and pack bookings; the booking capacity count includes seats an open course still holds.
 - Migration: `20260922120000_subscriptions_invoices_classes` (tables, partial indexes, RLS) and `20260922190000_one_live_subscription_per_person`; rollout flag `MODULE_COURSES` must be added in each environment.
 - Amended 2026-09-26 by [DEC-038](#dec-038-autopay-card-on-file-and-per-session-charges-run-on-the-businesss-own-payment-provider): **autopay and card-on-file come from the business's own payment provider** (mandates and provider subscriptions). Each period is still invoiced, and a pay link stays the fallback.
+- Amended 2026-09-29 by [DEC-070](#dec-070-saroh-is-for-businesses-people-working-for-themselves-and-people-showing-their-work): **invoices are no longer under Payments.** Creating, issuing, sending, voiding, crediting and recording an invoice paid need only `invoice:*`; an online pay link still needs Payments and a connected provider (`payOnline`), and without one Send sends a link to view the invoice. "With Payments off nothing new is invoiced" now reads **nothing is invoiced automatically**: renewals wait, subscribing is refused, and a pack or course is recorded without an invoice.
 
 ## DEC-020 A Member sees the diary and the people on it
 

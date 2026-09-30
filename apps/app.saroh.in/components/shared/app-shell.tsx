@@ -165,6 +165,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 role={role}
                 roleKey={roleKey}
                 actions={actions}
+                kind={activeOrg?.kind}
                 sites={navSites}
                 stockTracked={stockTracked}
                 storefronts={storefronts}

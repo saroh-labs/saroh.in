@@ -7,6 +7,7 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
+import { kindWords } from "@/lib/organizations/kind";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { DEFAULT_TIMEZONE } from "@/lib/organizations/time-zones";
@@ -32,8 +33,15 @@ import { listStorefrontHours } from "@/lib/stores/storefronts";
  * type, logo and pipeline nudges (`loadSettingsChecklist`, DEC-056). Its
  * extra reads are best-effort — one that fails drops its steps, never the
  * page.
+ *
+ * Named in the words of what is being set up (DEC-070, K5): "Business" for
+ * a business, "Your details" for Just me and A site for my work. Identity
+ * is where that is changed.
  */
-export const metadata = { title: "Business" };
+export async function generateMetadata() {
+    const organization = await resolveActiveOrganization();
+    return { title: kindWords(organization?.kind).settingsTab };
+}
 
 export default async function OrganizationSettingsPage() {
     await requireSession();
@@ -67,7 +75,12 @@ export default async function OrganizationSettingsPage() {
             header={
                 <>
                     <SettingsPanelHeader
-                        title="Business"
+                        // The settings read has the kind as saved; the
+                        // organization list is the fallback.
+                        title={
+                            kindWords(settings?.kind ?? organization?.kind)
+                                .settingsTab
+                        }
                         readOnlyNote={
                             canEdit
                                 ? undefined

@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Param,
@@ -18,6 +19,7 @@ import { RequireModule } from "../capabilities/require-module.decorator";
 import {
     CreateTestReleaseDto,
     CreateTestReleaseLinkDto,
+    ScheduleGoLiveDto,
     UpdateTestReleaseDto,
 } from "./dto";
 import { TestReleasesService } from "./test-releases.service";
@@ -105,6 +107,32 @@ export class TestReleasesController {
         @Param("releaseId") releaseId: string,
     ) {
         return this.releases.goLive(ctx, siteId, releaseId);
+    }
+
+    /**
+     * Go live at a date and time in the business's zone (T10), or move the
+     * time. `site:publish`; `override` is the owner's alone.
+     */
+    @Post(":releaseId/schedule")
+    @HttpCode(200)
+    schedule(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("releaseId") releaseId: string,
+        @Body() dto: ScheduleGoLiveDto,
+    ) {
+        return this.releases.schedule(ctx, siteId, releaseId, dto);
+    }
+
+    /** Cancel the scheduled go-live. `site:publish`. 409 once it is running. */
+    @Delete(":releaseId/schedule")
+    @HttpCode(200)
+    cancelSchedule(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("releaseId") releaseId: string,
+    ) {
+        return this.releases.cancelSchedule(ctx, siteId, releaseId);
     }
 
     /** A new link to share, lasting 1, 7 or 30 days. `site:update`. */

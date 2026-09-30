@@ -53,6 +53,7 @@ export default async function SettingsLayout({
                 {pages.length > 0 ? (
                     <SettingsTabs
                         hrefs={pages.map((page) => page.href)}
+                        kind={org?.kind}
                         notes={
                             providersNote
                                 ? { "/settings/providers": providersNote }

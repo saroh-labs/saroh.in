@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { SETTINGS_PAGES } from "@/components/shared/nav-items";
+import { settingsPageLabel } from "@/lib/settings/search";
 
 /**
  * The settings screen's tabs ("Saroh Settings" design): Business, Team,
@@ -29,9 +30,15 @@ import { SETTINGS_PAGES } from "@/components/shared/nav-items";
 export function SettingsTabs({
     hrefs,
     notes,
+    kind,
 }: {
     hrefs: readonly string[];
     notes?: Partial<Record<string, string>>;
+    /**
+     * What is being set up (DEC-070): Business reads "Your details" for
+     * Just me and A site for my work (`settingsPageLabel`).
+     */
+    kind?: string;
 }) {
     const pathname = usePathname();
     const pages = SETTINGS_PAGES.filter((page) => hrefs.includes(page.href));
@@ -79,7 +86,7 @@ export function SettingsTabs({
                         />
                         <span className="min-w-0 flex-1">
                             <span className="block text-[13.5px]">
-                                {page.label}
+                                {settingsPageLabel(page, kind)}
                             </span>
                             {note ? (
                                 <span className="mt-0.5 block text-pretty text-[11.5px] font-normal leading-[1.4] text-muted-foreground">

@@ -10,6 +10,7 @@ import { useId, useSyncExternalStore } from "react";
 import type { ReadyChecklist, ReadyStep } from "@/lib/settings/ready";
 import {
     SETUP_HIDDEN_KEY,
+    checklistHeading,
     readSetupHidden,
     takeMoneyPlace,
     writeSetupHidden,
@@ -25,6 +26,9 @@ import {
  * there: first while fewer than half the steps are done, at the foot once
  * more are. Hidden, the foot keeps a "Show setup" link. Once every step is
  * done neither draws anything.
+ *
+ * The heading follows the steps (DEC-070): "Get your site live" when
+ * publishing the site is all there is — nothing invoices or takes money.
  *
  * Hide is per person, per business, in this browser (default 123). Both
  * slots read one store so hiding in one moves the other at once; a browser
@@ -117,7 +121,7 @@ export function TakeMoneyChecklist({
         >
             <div className="flex flex-wrap items-baseline gap-2.5">
                 <h2 id={headingId} className="text-[15px] font-semibold">
-                    Get ready to take money
+                    {checklistHeading(list, "home")}
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
                     {count}

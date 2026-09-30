@@ -279,10 +279,46 @@ export class CreateCommentDto {
     @MinLength(1, { message: "pageId is required" })
     pageId!: string;
 
+    /**
+     * On the draft: the section's key. On a test release: its position on
+     * the frozen page, `"0"` for the first (a snapshot keeps no keys, and a
+     * frozen page's sections never move).
+     */
     @IsString()
     @MinLength(1, { message: "sectionKey is required" })
     @MaxLength(64)
     sectionKey!: string;
+
+    /** The test release the note is about (DEC-071, T8). Absent: the draft. */
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
+}
+
+/**
+ * Which review to read: the draft's (absent), or a test release's (DEC-071,
+ * T8). A query, for the review state and the notes.
+ */
+export class ReviewTargetQueryDto {
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
+}
+
+/**
+ * Ask for a review (#278): of the draft (no body, or no `testReleaseId`),
+ * or of a test release (DEC-071, T8).
+ */
+export class RequestReviewDto {
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
 }
 
 /**
@@ -315,6 +351,16 @@ export class CreateApprovalDto {
         message: "outcome must be APPROVED or CHANGES_REQUESTED",
     })
     outcome!: "APPROVED" | "CHANGES_REQUESTED";
+
+    /**
+     * The test release the verdict is on (DEC-071, T8). The verdict is then
+     * bound to that release's frozen bytes, not the moving draft (KTD-10).
+     */
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
 }
 
 /**
@@ -477,4 +523,27 @@ export class UpdateTestReleaseDto {
 export class CreateTestReleaseLinkDto {
     @IsIn([1, 7, 30], { message: "A test release link lasts 1, 7 or 30 days" })
     days!: 1 | 7 | 30;
+}
+
+/**
+ * Go live with a test release at a date and time (DEC-071, T10), both in
+ * the business's time zone: "2026-10-03" and "18:00". `override` is an
+ * owner's "go live without approval" while Publishing needs approval is on.
+ */
+export class ScheduleGoLiveDto {
+    @IsString({ message: "Pick a date to go live" })
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+        message: "Pick a date to go live, as YYYY-MM-DD",
+    })
+    date!: string;
+
+    @IsString({ message: "Pick a time to go live" })
+    @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+        message: "Pick a time to go live, as HH:MM",
+    })
+    time!: string;
+
+    @IsOptional()
+    @IsBoolean({ message: "override must be true or false" })
+    override?: boolean;
 }

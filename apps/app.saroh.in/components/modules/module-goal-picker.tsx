@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
+import { kindWords, preselect } from "@/lib/organizations/kind";
 
 /**
  * Need-based module onboarding (#119). Asks what the business needs to *do* —
@@ -37,65 +38,88 @@ interface Goal {
 }
 
 /**
- * Commerce leads (product decision 2026-08-02: commerce-led, not commerce-only),
- * so selling is offered first and pre-selected. Everything else is a peer, not a
- * lesser option — the ordering states a default, it does not rank the business
- * models we serve.
+ * What is suggested follows what is being set up (DEC-070, `preselect` in
+ * `lib/organizations/kind.ts`): for a business, commerce leads (product
+ * decision 2026-08-02: commerce-led, not commerce-only), so selling is
+ * offered first and pre-selected; a site for someone's work starts from the
+ * website; "Just me" is suggested nothing, since its first job is often an
+ * invoice, which needs no module. The suggestion moves to the top and
+ * nothing else moves — the ordering states a default, it does not rank the
+ * business models we serve, and every goal stays on offer for every kind.
+ *
+ * The words for the people it deals with ("customers", "clients",
+ * "readers") are the kind's too.
  */
-const RECOMMENDED_KEY = "COMMERCE";
+function goalsFor(kind: unknown): Goal[] {
+    const { people } = kindWords(kind);
+    const goals: Goal[] = [
+        {
+            moduleKey: "COMMERCE",
+            title: "Sell products",
+            description: "Run a catalog, take orders, and manage inventory.",
+        },
+        {
+            moduleKey: "APPOINTMENTS",
+            title: "Take appointments",
+            description: `Offer services and let ${people} book time with you.`,
+        },
+        {
+            moduleKey: "COURSES",
+            title: "Run courses",
+            description:
+                "Sell a set of dated sessions with limited seats, like a six-week class.",
+        },
+        {
+            moduleKey: "WEBSITE",
+            title: "Show up online",
+            description:
+                "Publish a website with pages, forms, and your own domain.",
+        },
+        {
+            moduleKey: "CRM",
+            title: `Manage ${people} & leads`,
+            description: "Capture enquiries and track them through a pipeline.",
+        },
+        {
+            moduleKey: "PAYMENTS",
+            title: "Take payments",
+            description:
+                "Connect a provider to get paid for bookings and orders.",
+        },
+        {
+            moduleKey: "COMMUNICATIONS",
+            title: `Message ${people}`,
+            description: "Send messages and follow-ups with consent tracking.",
+        },
+        {
+            moduleKey: "AUTOMATIONS",
+            title: "Automate follow-ups",
+            description: "Trigger actions automatically as work comes in.",
+        },
+        {
+            moduleKey: "INSIGHTS",
+            title: "See performance",
+            description: "Track views, enquiries, and sales over time.",
+        },
+    ];
+    const suggested = preselect(kind);
+    return [
+        ...goals.filter((g) => g.moduleKey === suggested),
+        ...goals.filter((g) => g.moduleKey !== suggested),
+    ];
+}
 
-const GOALS: Goal[] = [
-    {
-        moduleKey: "COMMERCE",
-        title: "Sell products",
-        description: "Run a catalog, take orders, and manage inventory.",
-    },
-    {
-        moduleKey: "APPOINTMENTS",
-        title: "Take appointments",
-        description: "Offer services and let customers book time with you.",
-    },
-    {
-        moduleKey: "COURSES",
-        title: "Run courses",
-        description:
-            "Sell a set of dated sessions with limited seats, like a six-week class.",
-    },
-    {
-        moduleKey: "WEBSITE",
-        title: "Show up online",
-        description:
-            "Publish a website with pages, forms, and your own domain.",
-    },
-    {
-        moduleKey: "CRM",
-        title: "Manage customers & leads",
-        description: "Capture enquiries and track them through a pipeline.",
-    },
-    {
-        moduleKey: "PAYMENTS",
-        title: "Take payments",
-        description: "Connect a provider to get paid for bookings and orders.",
-    },
-    {
-        moduleKey: "COMMUNICATIONS",
-        title: "Message customers",
-        description: "Send messages and follow-ups with consent tracking.",
-    },
-    {
-        moduleKey: "AUTOMATIONS",
-        title: "Automate follow-ups",
-        description: "Trigger actions automatically as work comes in.",
-    },
-    {
-        moduleKey: "INSIGHTS",
-        title: "See performance",
-        description: "Track views, enquiries, and sales over time.",
-    },
-];
-
-export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
+export function ModuleGoalPicker({
+    modules,
+    kind,
+}: {
+    modules: ModuleView[];
+    /** What is being set up (DEC-070); absent, a business. */
+    kind?: string;
+}) {
     const router = useRouter();
+    const goals = useMemo(() => goalsFor(kind), [kind]);
+    const suggested = preselect(kind);
     // The picks, handed to the "Turn on" sheet (DEC-068); null when closed.
     const [turningOn, setTurningOn] = useState<string[] | null>(null);
     const pending = turningOn !== null;
@@ -124,8 +148,8 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
      */
     const shown = useMemo(() => rolledOutKeys(modules), [modules]);
     const available = useMemo(
-        () => GOALS.filter((g) => shown.has(g.moduleKey)),
-        [shown],
+        () => goals.filter((g) => shown.has(g.moduleKey)),
+        [goals, shown],
     );
     /**
      * Only offer what this member is actually allowed to turn on. Rendering a
@@ -138,16 +162,17 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
     );
 
     const [selected, setSelected] = useState<Set<string>>(() => {
-        // Pre-select the recommended goal so the screen answers its own
+        // Pre-select the kind's suggestion so the screen answers its own
         // question. Nothing is committed, so this is a suggestion the merchant
         // can undo in one click — not a default they are stuck with.
         const initial = new Set<string>();
         if (
-            shown.has(RECOMMENDED_KEY) &&
-            !alreadyOn.has(RECOMMENDED_KEY) &&
-            byKey.get(RECOMMENDED_KEY)?.canManage
+            suggested &&
+            shown.has(suggested) &&
+            !alreadyOn.has(suggested) &&
+            byKey.get(suggested)?.canManage
         ) {
-            initial.add(RECOMMENDED_KEY);
+            initial.add(suggested);
         }
         return initial;
     });
@@ -177,7 +202,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
             .filter((k) => k !== moduleKey && !alreadyOn.has(k))
             .map(
                 (k) =>
-                    GOALS.find((g) => g.moduleKey === k)?.title ??
+                    goals.find((g) => g.moduleKey === k)?.title ??
                     byKey.get(k)?.label ??
                     k,
             );
@@ -211,7 +236,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
         // module that asks for something, and one "Turn on". It lands on
         // the first pick's screen when it is done.
         setTurningOn(
-            GOALS.map((g) => g.moduleKey).filter((k) => selected.has(k)),
+            goals.map((g) => g.moduleKey).filter((k) => selected.has(k)),
         );
     };
 
@@ -277,7 +302,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                                         >
                                             {goal.title}
                                         </span>
-                                        {goal.moduleKey === RECOMMENDED_KEY ? (
+                                        {goal.moduleKey === suggested ? (
                                             <span className="rounded-full bg-highlight-subtle px-2 py-0.5 text-[11px] font-medium text-highlight-subtle-foreground">
                                                 Suggested
                                             </span>

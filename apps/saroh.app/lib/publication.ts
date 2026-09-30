@@ -3,6 +3,11 @@ import type { JournalFeed, ModulePageStates } from "@saroh/site-blocks";
 import { env } from "@/env";
 import { journalFeed } from "@/lib/journal-feed";
 import { modulePageStatesOf } from "@/lib/module-pages";
+import type { SiteHostKind } from "@/lib/site-host-mode";
+import { classifySiteHost } from "@/lib/site-host-mode";
+import { SITE_RELAY_HEADER } from "@/lib/site-relay";
+import type { TestReleaseInfo } from "@/lib/test-release";
+import { getTestRelease, rootDomain } from "@/lib/test-release";
 
 /**
  * Public publication client for the multi-tenant renderer (S2-006).
@@ -154,6 +159,13 @@ export interface ResolvedSite {
     snapshot: PublicationSnapshot;
     siteId: string | null;
     modules: ModulePageStates | null;
+    /**
+     * `test` on a test release's host (DEC-071, T5): the snapshot is the
+     * release's frozen one, and nothing here takes a real order.
+     */
+    mode: SiteHostKind;
+    /** The release a test host shows; null on a live host. */
+    release: TestReleaseInfo | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,20 +248,9 @@ export async function getPublicationBySubdomain(
 export async function getPublicationForHost(
     host: string | null | undefined,
 ): Promise<PublicationSnapshot | null> {
-    const hostname = host?.split(":")[0]?.toLowerCase().trim();
-    if (!hostname) return null;
-    // A host that is not under the platform root is a merchant's own domain
-    // (#200): ask for it by hostname, which resolves only once its claim is
-    // VERIFIED. The subdomain heuristic below stays as the fallback so nothing
-    // that resolved before this stops resolving.
-    const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
-    if (root && hostname !== root && !hostname.endsWith(`.${root}`)) {
-        const byHostname = await getPublicationByHostname(hostname);
-        if (byHostname) return byHostname;
-    }
-    const subdomain = subdomainFromHost(host);
-    if (!subdomain) return null;
-    return getPublicationBySubdomain(subdomain);
+    // Through the one resolution every page uses, so a test host shows its
+    // release here too, and never the live site (DEC-071, R12).
+    return (await getSiteForHost(host))?.snapshot ?? null;
 }
 
 /** A VERIFIED custom hostname's current publication, or null. */
@@ -618,6 +619,25 @@ export async function getSiteForHost(
     const hostname = host?.split(":")[0]?.toLowerCase().trim();
     if (!hostname) return null;
 
+    /*
+     * A test release's host (DEC-071, T5) shows that release, read with the
+     * token its link left, and nothing else: never the live site, whatever
+     * the lookup answers (R12). The live reads below are never asked about
+     * a test host.
+     */
+    const shaped = classifySiteHost(hostname, rootDomain());
+    if (shaped.mode === "test") {
+        const found = await getTestRelease(shaped.host);
+        if (!found.ok) return null;
+        return {
+            snapshot: found.snapshot as PublicationSnapshot,
+            siteId: found.siteId,
+            modules: found.modules,
+            mode: "test",
+            release: found.release,
+        };
+    }
+
     const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
     if (root && hostname !== root && !hostname.endsWith(`.${root}`)) {
         const view = await fetchSiteView(
@@ -648,5 +668,77 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
         snapshot: body.snapshot,
         siteId: body.siteId ?? null,
         modules: modulePageStatesOf(body.modules),
+        mode: "live",
+        release: null,
     };
+}
+
+// ---------------------------------------------------------------------------
+// An old address that forwards (DEC-069, plan L3)
+// ---------------------------------------------------------------------------
+
+/**
+ * The platform address a host names, when it can be an old one: the single
+ * label before `.<ROOT_DOMAIN>` (`rye` in `rye.saroh.app`). Null for the
+ * apex, `www`, a deeper name and every custom hostname: only a platform
+ * address is ever changed and held (a custom domain is the merchant's own,
+ * and nothing forwards from one).
+ *
+ * Null for a test host too (DEC-071): `test--rye` names a release of the
+ * site at `rye`, never an old address, so it is never asked about.
+ */
+export function movedAddressOf(host: string | null | undefined): string | null {
+    const hostname = host?.split(":")[0]?.toLowerCase().trim();
+    const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
+    if (!hostname || !root || !hostname.endsWith(`.${root}`)) return null;
+    if (classifySiteHost(hostname, root).mode === "test") return null;
+    const address = hostname.slice(0, -1 * (root.length + 1));
+    if (!address || address === "www" || address.includes(".")) return null;
+    return address;
+}
+
+/**
+ * Where an old web address forwards now, as an origin
+ * (`https://rye-bakery.saroh.app`), or null.
+ *
+ *   GET /public/sites/moved/:address   → { to }
+ *
+ * Asked only when a host has no live site (KTD-5), so a live site never pays
+ * for it. The API answers while the address's 90 days of forwarding last and
+ * 404s otherwise. Null on that 404, on any other failure, and for an answer
+ * that isn't an http(s) origin on another host: the page then 404s as it
+ * always did, and never throws at a visitor.
+ *
+ * `relay` is the signed visitor relay (ADR-011, `lib/site-relay.ts`), so the
+ * API's per-visitor limit counts the visitor rather than this server;
+ * without one the read goes unsigned.
+ */
+export async function getMovedTo(
+    host: string | null | undefined,
+    relay?: string | null,
+): Promise<string | null> {
+    const address = movedAddressOf(host);
+    if (!address) return null;
+    const sent: Record<string, string> = { accept: "application/json" };
+    if (relay) sent[SITE_RELAY_HEADER] = relay;
+    try {
+        const res = await fetch(
+            `${API_URL}/public/sites/moved/${encodeURIComponent(address)}`,
+            { cache: "no-store", headers: sent },
+        );
+        if (!res.ok) return null;
+        const body = (await res.json().catch(() => null)) as {
+            to?: unknown;
+        } | null;
+        if (typeof body?.to !== "string") return null;
+        const to = new URL(body.to);
+        if (to.protocol !== "https:" && to.protocol !== "http:") return null;
+        // Never forward a host to itself.
+        if (to.hostname === host?.split(":")[0]?.toLowerCase().trim()) {
+            return null;
+        }
+        return to.origin;
+    } catch {
+        return null;
+    }
 }

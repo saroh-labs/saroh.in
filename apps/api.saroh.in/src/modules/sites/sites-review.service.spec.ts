@@ -21,9 +21,18 @@ jest.mock("@saroh/database", () => {
                 // #278 reads every verdict, not just the latest one.
                 findMany: jest.fn(),
             },
+            siteTestRelease: { findFirst: jest.fn() },
         },
     };
 });
+
+// Test releases on or off for the business (KTD-16).
+const mockFlagOn = jest.fn();
+jest.mock("../feature-flags/feature-flags.service", () => ({
+    FeatureFlagService: jest.fn().mockImplementation(() => ({
+        isEnabled: (...args: unknown[]) => mockFlagOn(...args),
+    })),
+}));
 
 import { prisma } from "@saroh/database";
 
@@ -72,10 +81,13 @@ const service = new SitesService({
     getEntitlements: jest.fn(),
 } as unknown as import("../billing/entitlement.service").EntitlementService);
 
+const releaseFindFirst = prisma.siteTestRelease.findFirst as jest.Mock;
+
 beforeEach(() => {
     jest.clearAllMocks();
     siteFindFirst.mockResolvedValue({ id: "site_1" });
     pageFindFirst.mockResolvedValue({ id: "page_1" });
+    mockFlagOn.mockResolvedValue(true);
 });
 
 describe("the REVIEWER role", () => {
@@ -336,5 +348,374 @@ describe("SitesService.createApproval", () => {
                 outcome: "APPROVED",
             }),
         ).rejects.toThrow(/MEMBER.*site:approve/);
+    });
+});
+
+/*
+ * Review on a test release (DEC-071, T8). A request, a verdict and a note
+ * can name a release: they are then bound to its frozen bytes, and the
+ * draft's own review never reads them.
+ */
+describe("review on a test release (T8)", () => {
+    const RELEASE = {
+        id: "rel_2",
+        number: 2,
+        name: "Diwali menu",
+        fingerprint: "fp-release",
+        discardedAt: null as Date | null,
+        wentLiveAt: null as Date | null,
+    };
+    /** The frozen snapshot: Home with two sections, About with one. */
+    const SNAPSHOT = {
+        pages: [
+            { path: "/", sections: [{ type: "hero" }, { type: "richText" }] },
+            { path: "/about", sections: [{ type: "richText" }] },
+        ],
+    };
+
+    function withRelease(over: Partial<typeof RELEASE> | null = {}) {
+        releaseFindFirst.mockImplementation(
+            (args: { select: Record<string, unknown> }) =>
+                Promise.resolve(
+                    over === null
+                        ? null
+                        : args.select.publication
+                          ? { publication: { snapshot: SNAPSHOT } }
+                          : { ...RELEASE, ...over },
+                ),
+        );
+    }
+
+    function releaseRow(
+        outcome: string,
+        byUserId: string,
+        fingerprint = RELEASE.fingerprint,
+        seconds = 0,
+    ) {
+        return {
+            outcome,
+            byUserId,
+            draftFingerprint: fingerprint,
+            testReleaseId: RELEASE.id,
+            createdAt: new Date(Date.UTC(2026, 9, 1, 12, 0, seconds)),
+        };
+    }
+
+    describe("a verdict", () => {
+        it("is bound to the release's fingerprint, not the draft's", async () => {
+            withRelease();
+            approvalCreate.mockResolvedValue({ id: "a1" });
+            const draft = jest.spyOn(service, "currentDraftFingerprint");
+
+            await service.createApproval(ctx({ role: "REVIEWER" }), "site_1", {
+                outcome: "APPROVED",
+                testReleaseId: "rel_2",
+            });
+
+            expect(approvalCreate.mock.calls[0][0].data).toMatchObject({
+                outcome: "APPROVED",
+                draftFingerprint: "fp-release",
+                testReleaseId: "rel_2",
+            });
+            // The moving draft is never consulted.
+            expect(draft).not.toHaveBeenCalled();
+            draft.mockRestore();
+        });
+
+        it("binds a change request too, so it is about that release", async () => {
+            withRelease();
+            approvalCreate.mockResolvedValue({ id: "a1" });
+            await service.createApproval(ctx({ role: "REVIEWER" }), "site_1", {
+                outcome: "CHANGES_REQUESTED",
+                testReleaseId: "rel_2",
+            });
+            expect(approvalCreate.mock.calls[0][0].data).toMatchObject({
+                outcome: "CHANGES_REQUESTED",
+                draftFingerprint: "fp-release",
+                testReleaseId: "rel_2",
+            });
+        });
+
+        it("is refused on a discarded release (409)", async () => {
+            withRelease({ discardedAt: new Date() });
+            const verdict = service.createApproval(
+                ctx({ role: "REVIEWER" }),
+                "site_1",
+                { outcome: "APPROVED", testReleaseId: "rel_2" },
+            );
+            await expect(verdict).rejects.toMatchObject({ status: 409 });
+            await expect(verdict).rejects.toThrow(
+                "This test release was discarded.",
+            );
+            expect(approvalCreate).not.toHaveBeenCalled();
+        });
+
+        it("is refused on a release that is live now (409)", async () => {
+            withRelease({ wentLiveAt: new Date() });
+            await expect(
+                service.createApproval(ctx({ role: "REVIEWER" }), "site_1", {
+                    outcome: "APPROVED",
+                    testReleaseId: "rel_2",
+                }),
+            ).rejects.toMatchObject({ status: 409 });
+            expect(approvalCreate).not.toHaveBeenCalled();
+        });
+
+        it("is 404 for a release of another site, or with test releases off", async () => {
+            withRelease(null);
+            await expect(
+                service.createApproval(ctx(), "site_1", {
+                    outcome: "APPROVED",
+                    testReleaseId: "rel_other",
+                }),
+            ).rejects.toMatchObject({ status: 404 });
+
+            withRelease();
+            mockFlagOn.mockResolvedValue(false);
+            await expect(
+                service.createApproval(ctx(), "site_1", {
+                    outcome: "APPROVED",
+                    testReleaseId: "rel_2",
+                }),
+            ).rejects.toMatchObject({ status: 404 });
+            expect(approvalCreate).not.toHaveBeenCalled();
+        });
+
+        it("still needs site:approve", async () => {
+            withRelease();
+            await expect(
+                service.createApproval(ctx({ role: "MEMBER" }), "site_1", {
+                    outcome: "APPROVED",
+                    testReleaseId: "rel_2",
+                }),
+            ).rejects.toThrow(/MEMBER.*site:approve/);
+        });
+    });
+
+    describe("asking for a review", () => {
+        it("puts the release's bytes up for review", async () => {
+            withRelease();
+            approvalCreate.mockResolvedValue({ id: "r1" });
+            await service.requestReview(ctx(), "site_1", "rel_2");
+            expect(approvalCreate.mock.calls[0][0].data).toMatchObject({
+                outcome: "REQUESTED",
+                byUserId: "user_1",
+                draftFingerprint: "fp-release",
+                testReleaseId: "rel_2",
+            });
+        });
+
+        it("is refused on a discarded release (409)", async () => {
+            withRelease({ discardedAt: new Date() });
+            await expect(
+                service.requestReview(ctx(), "site_1", "rel_2"),
+            ).rejects.toMatchObject({ status: 409 });
+        });
+    });
+
+    describe("the review state", () => {
+        it("reads the release's verdicts, bound to its fingerprint", async () => {
+            withRelease();
+            approvalFindFirst.mockResolvedValue({
+                outcome: "APPROVED",
+                createdAt: new Date("2026-10-01T12:00:05Z"),
+                by: { name: "Meera", email: "m@example.test" },
+            });
+            approvalFindMany.mockResolvedValue([
+                releaseRow("APPROVED", "reviewer", RELEASE.fingerprint, 5),
+                // The draft's own request doesn't hold the release up.
+                {
+                    ...releaseRow("REQUESTED", "user_1", "fp-draft", 4),
+                    testReleaseId: null,
+                },
+                releaseRow("REQUESTED", "user_1", RELEASE.fingerprint, 3),
+            ]);
+            commentCount.mockResolvedValue(1);
+
+            const state = await service.getReviewState(
+                ctx(),
+                "site_1",
+                "rel_2",
+            );
+
+            expect(state.testRelease).toEqual({
+                id: "rel_2",
+                number: 2,
+                name: "Diwali menu",
+            });
+            expect(state.outstanding).toBe(false);
+            expect(state.pending).toBe(false);
+            expect(state.latestApproval?.by).toBe("Meera");
+            // Its own notes, not the draft's.
+            expect(commentCount.mock.calls[0][0].where).toMatchObject({
+                testReleaseId: "rel_2",
+                resolvedAt: null,
+            });
+        });
+
+        it("is in review while a request on the release is unanswered", async () => {
+            withRelease();
+            approvalFindFirst.mockResolvedValue(null);
+            approvalFindMany.mockResolvedValue([
+                releaseRow("REQUESTED", "user_1"),
+            ]);
+            commentCount.mockResolvedValue(0);
+            const state = await service.getReviewState(
+                ctx(),
+                "site_1",
+                "rel_2",
+            );
+            expect(state.outstanding).toBe(true);
+            expect(state.pending).toBe(true);
+        });
+
+        it("leaves the draft's review as it was when a release is reviewed", async () => {
+            // A release was put up for review and approved; the draft's own
+            // review has nothing asked of it.
+            approvalFindFirst.mockResolvedValue(null);
+            approvalFindMany.mockResolvedValue([
+                releaseRow("APPROVED", "reviewer", RELEASE.fingerprint, 2),
+                releaseRow("REQUESTED", "user_1", RELEASE.fingerprint, 1),
+            ]);
+            commentCount.mockResolvedValue(0);
+            const draft = jest
+                .spyOn(service, "currentDraftFingerprint")
+                .mockResolvedValue("fp-draft");
+
+            const state = await service.getReviewState(ctx(), "site_1");
+
+            expect(state.testRelease).toBeNull();
+            expect(state.outstanding).toBe(false);
+            expect(state.approvalIsStale).toBe(false);
+            expect(approvalFindFirst.mock.calls[0][0].where).toMatchObject({
+                testReleaseId: null,
+            });
+            expect(commentCount.mock.calls[0][0].where).toMatchObject({
+                testReleaseId: null,
+            });
+            expect(releaseFindFirst).not.toHaveBeenCalled();
+            draft.mockRestore();
+        });
+    });
+
+    describe("a note", () => {
+        /** assertPageInSite's lookup, then the page the note is on. */
+        function onHome() {
+            pageFindFirst
+                .mockResolvedValueOnce({ id: "page_1" })
+                .mockResolvedValueOnce({
+                    title: "Home",
+                    path: "/",
+                    // The draft has moved on: one section, keyed.
+                    versions: [{ sections: [{ key: "sec-new" }] }],
+                });
+        }
+
+        beforeEach(() => commentCreate.mockResolvedValue({ id: "c1" }));
+
+        it("is pinned to a section of the frozen page, by position", async () => {
+            withRelease();
+            onHome();
+            await service.createComment(ctx({ role: "REVIEWER" }), "site_1", {
+                body: "The second block reads oddly.",
+                pageId: "page_1",
+                sectionKey: "1",
+                testReleaseId: "rel_2",
+            });
+            expect(commentCreate.mock.calls[0][0].data).toMatchObject({
+                pageId: "page_1",
+                sectionKey: "1",
+                testReleaseId: "rel_2",
+            });
+        });
+
+        it("is checked against the release, not the draft", async () => {
+            withRelease();
+            // The draft's key is no section of the frozen page, and the
+            // frozen page has only two sections.
+            for (const sectionKey of ["sec-new", "2"]) {
+                onHome();
+                await expect(
+                    service.createComment(ctx({ role: "REVIEWER" }), "site_1", {
+                        body: "x",
+                        pageId: "page_1",
+                        sectionKey,
+                        testReleaseId: "rel_2",
+                    }),
+                ).rejects.toThrow("That section isn't on this page");
+            }
+            expect(commentCreate).not.toHaveBeenCalled();
+        });
+
+        it("is refused on a discarded release (409)", async () => {
+            withRelease({ discardedAt: new Date() });
+            onHome();
+            await expect(
+                service.createComment(ctx({ role: "REVIEWER" }), "site_1", {
+                    body: "x",
+                    pageId: "page_1",
+                    sectionKey: "0",
+                    testReleaseId: "rel_2",
+                }),
+            ).rejects.toMatchObject({ status: 409 });
+            expect(commentCreate).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("the notes", () => {
+        function note(id: string, pageId: string, sectionKey: string) {
+            return {
+                id,
+                pageId,
+                sectionKey,
+                body: "note",
+                resolvedAt: null,
+                createdAt: new Date("2026-10-01"),
+                author: { id: "u1", name: "Meera", email: "m@x.test" },
+            };
+        }
+
+        it("lists the release's own, against its frozen pages", async () => {
+            withRelease();
+            commentFindMany.mockResolvedValue([
+                note("c1", "page_home", "1"),
+                // About froze with one section.
+                note("c2", "page_about", "1"),
+            ]);
+            pageFindMany.mockResolvedValue([
+                {
+                    id: "page_home",
+                    title: "Home",
+                    path: "/",
+                    // The draft dropped a section since: the note stays on.
+                    versions: [{ sections: [{ key: "sec-a" }] }],
+                },
+                {
+                    id: "page_about",
+                    title: "About",
+                    path: "/about",
+                    versions: [{ sections: [{ key: "sec-b" }] }],
+                },
+            ]);
+
+            const notes = await service.listComments(ctx(), "site_1", "rel_2");
+
+            expect(commentFindMany.mock.calls[0][0].where).toMatchObject({
+                testReleaseId: "rel_2",
+            });
+            expect(notes.map((n) => [n.id, n.orphaned])).toEqual([
+                ["c1", false],
+                ["c2", true],
+            ]);
+        });
+
+        it("lists only the draft's without a release", async () => {
+            commentFindMany.mockResolvedValue([]);
+            pageFindMany.mockResolvedValue([]);
+            await service.listComments(ctx(), "site_1");
+            expect(commentFindMany.mock.calls[0][0].where).toMatchObject({
+                testReleaseId: null,
+            });
+        });
     });
 });

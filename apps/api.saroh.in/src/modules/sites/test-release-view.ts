@@ -2,8 +2,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import type { ReviewRoute } from "./review-route";
-import { reviewStanding } from "./review-route";
+import { ReviewRoute } from "./review-route";
 import type {
     TestReleaseLinkPurpose,
     TestReleaseLinkState,
@@ -13,6 +12,8 @@ import {
     testReleaseLinkState,
     testReleaseUrl,
 } from "./test-release-links";
+import type { VerdictRow } from "./test-release-review";
+import { releaseStanding, releaseVerdicts } from "./test-release-review";
 
 /**
  * What the API says about a test release (DEC-071, T2): the shapes every
@@ -46,11 +47,20 @@ export interface CreatedTestReleaseLinkView extends TestReleaseLinkView {
     urls: string[];
 }
 
-/** Where a release stands with its reviewers, bound to its fingerprint. */
+/**
+ * Where a release stands with its reviewers, bound to its fingerprint
+ * (KTD-10, `test-release-review.ts`): the verdicts given on a release with
+ * these bytes, never the draft's.
+ */
 export interface TestReleaseStanding {
     outstanding: boolean;
     /** The route going live by the caller would take now. */
     route: ReviewRoute;
+    /**
+     * An approved test release, for the caller going live: approved by
+     * someone else, and nothing asked since (`releaseApproved`).
+     */
+    approved: boolean;
     latest: { outcome: string; at: Date; by: string | null } | null;
 }
 
@@ -138,19 +148,6 @@ export const releaseSelect = {
     lastGoLiveOutcome: true,
     lastGoLiveReason: true,
     links: { orderBy: { createdAt: "desc" }, select: linkSelect },
-    approvals: {
-        // BYPASSED and OVERRIDDEN are going live's own records, not verdicts.
-        where: {
-            outcome: { in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"] },
-        },
-        orderBy: { createdAt: "desc" },
-        select: {
-            outcome: true,
-            byUserId: true,
-            draftFingerprint: true,
-            createdAt: true,
-        },
-    },
 } as const satisfies Prisma.SiteTestReleaseSelect;
 
 export type ReleaseRow = Prisma.SiteTestReleaseGetPayload<{
@@ -197,13 +194,17 @@ export function toReleaseView(
     row: ReleaseRow,
     ctx: OrganizationContext,
     currentFingerprint: string,
+    /** Every verdict on the site, newest first (`readVerdicts`). */
+    verdicts: VerdictRow[],
     names: Names,
     now: Date,
 ): TestReleaseView {
     // The release's own fingerprint, not the draft's (KTD-10): a verdict on
-    // this release is about these bytes, whatever the draft does next.
-    const standing = reviewStanding(row.approvals, row.fingerprint, ctx.userId);
-    const latest = row.approvals.length > 0 ? row.approvals[0] : null;
+    // this release is about these bytes, whatever the draft does next. The
+    // same rule going live and the schedule ask.
+    const standing = releaseStanding(verdicts, row, ctx.userId);
+    const mine = releaseVerdicts(verdicts, row);
+    const latest = mine.length > 0 ? mine[0] : null;
     return {
         id: row.id,
         number: row.number,
@@ -216,6 +217,7 @@ export function toReleaseView(
         standing: {
             outstanding: standing.outstanding,
             route: standing.route,
+            approved: standing.route === ReviewRoute.Approved,
             latest: latest
                 ? {
                       outcome: latest.outcome,
@@ -243,13 +245,15 @@ export function toReleaseView(
 }
 
 /** Every user a set of rows names. */
-export function peopleIn(rows: ReleaseRow[]): string[] {
+export function peopleIn(rows: ReleaseRow[], verdicts: VerdictRow[]): string[] {
     const ids = new Set<string>();
     for (const row of rows) {
         ids.add(row.createdByUserId);
         if (row.scheduledByUserId) ids.add(row.scheduledByUserId);
         for (const link of row.links) ids.add(link.createdByUserId);
-        for (const verdict of row.approvals) ids.add(verdict.byUserId);
+        // Only the newest verdict on a release is named.
+        const mine = releaseVerdicts(verdicts, row);
+        if (mine.length > 0) ids.add(mine[0].byUserId);
     }
     return [...ids];
 }
