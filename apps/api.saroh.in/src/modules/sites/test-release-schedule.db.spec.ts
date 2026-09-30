@@ -12,7 +12,7 @@ import {
     ForbiddenException,
 } from "@nestjs/common";
 import type { Job } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -27,6 +27,7 @@ import {
     recordGaveUp,
     SITE_GO_LIVE_TYPE,
 } from "./go-live.handler";
+import { putLive } from "./live-pointer";
 import { draftFingerprint } from "./review-route";
 import { SitesService } from "./sites.service";
 import { TestReleasesService } from "./test-releases.service";
@@ -607,6 +608,81 @@ describe("the site.go_live job (T10)", () => {
                 ...localIn("Asia/Kolkata", 1),
             }),
         ).resolves.toMatchObject({ status: "scheduled", lastGoLive: null });
+    });
+
+    it("doesn't go live over a publish that commits while it runs (KTD-14)", async () => {
+        const b = await business();
+        const { made } = await scheduled(b);
+        const job = await claimedJob(made.release.id);
+        const { currentPublication: now } = await prisma.site.findUniqueOrThrow(
+            {
+                where: { id: b.site.id },
+                select: {
+                    currentPublication: {
+                        select: {
+                            snapshot: true,
+                            templateId: true,
+                            templateVersion: true,
+                        },
+                    },
+                },
+            },
+        );
+        if (!now) throw new Error("not published");
+
+        // A publish is mid-flight: it has put its fix live and not yet
+        // committed when the job's time comes.
+        let commit = () => {};
+        const held = new Promise<void>((resolve) => {
+            commit = resolve;
+        });
+        let written = (_id: string) => {};
+        const wrote = new Promise<string>((resolve) => {
+            written = resolve;
+        });
+        const publish = runInOrgContext(b.org.id, () =>
+            prisma.$transaction(
+                async (tx) => {
+                    const live = await putLive(tx, {
+                        site: { id: b.site.id, organizationId: b.org.id },
+                        snapshot: now.snapshot,
+                        source: "publish",
+                        actor: { userId: b.owner.id, owner: true },
+                        fingerprint: draftFingerprint(now.snapshot),
+                        template: {
+                            id: now.templateId,
+                            version: now.templateVersion,
+                        },
+                    });
+                    written(live.publicationId);
+                    await held;
+                    return live.publicationId;
+                },
+                { timeout: 20_000 },
+            ),
+        );
+        await wrote;
+
+        const run = handler.handle(job);
+        // Long enough for the job to read the site and reach its write.
+        await new Promise((resolve) => setTimeout(resolve, 750));
+        commit();
+        const fix = await publish;
+        await run;
+
+        const row = await releaseRow(made.release.id);
+        expect(row.wentLiveAt).toBeNull();
+        expect(row.lastGoLiveOutcome).toBe("NOT_LIVE");
+        expect(row.lastGoLiveReason).toMatch(
+            /^The site was published at .+, after this was scheduled\. Go live now, or schedule it again\.$/,
+        );
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: b.site.id },
+            select: { currentPublicationId: true },
+        });
+        // The fix stays live.
+        expect(site.currentPublicationId).toBe(fix);
+        expect(await liveCount(b.site.id)).toBe(2);
     });
 
     it("doesn't go live once whoever scheduled it has left the team, and the owner hears", async () => {

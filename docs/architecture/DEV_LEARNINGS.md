@@ -1842,6 +1842,7 @@ it the body the controller returns, envelope and all.
 **Rule**: a lenient decoder's test uses the producer's real body (copy it
 from the controller spec), never a shape written from the consumer's side.
 **Category**: contract · app↔api · tests
+
 ## e2e — a new test release already reads Approved (T12)
 
 **Problem**: `site-review.spec.ts`'s new test passed on desk-serial and
@@ -1856,3 +1857,26 @@ release has bytes no other run has, and puts the draft back.
 **Rule**: a spec that reviews a test release makes the release's content
 its own (a stamped section), never a release of the seed's draft as it is.
 **Category**: e2e · test releases · own data
+
+## Sites — a scheduled go-live could replace a fix published while it ran (release review)
+
+**Symptom**: found in the production release review, not in use (behind
+`SITE_TEST_RELEASES`). A merchant publishes a price fix at the moment a
+scheduled older test release goes live; the job's "published since?"
+check passed, and the release then repointed the site over the fix.
+**Cause**: check-then-act without a shared lock. The job locked only its
+`SiteTestRelease` row and read `Site.currentPublicationId` unlocked; publish
+and restore never touch that row, and `putLive` didn't lock the site. A
+publish that committed between the job's read and its `putLive` was
+overwritten, which KTD-14 says must never happen.
+**Fix**: `lockSite` (`sites/live-pointer.ts`) takes the Site row FOR NO KEY
+UPDATE; `putLive` takes it first, so every way of going live is serialised
+per site, and the job takes it before it reads the pointer, so a publish in
+flight is either committed and seen ("The site was published at …") or
+waits. FOR NO KEY UPDATE rather than FOR UPDATE, so inserts naming the site
+(its FK's KEY SHARE) don't wait on a publish.
+**Rule**: a job that decides from a row whether to write must take the lock
+the competing writers take, before it reads. Pinned by
+`test-release-schedule.db.spec.ts` "doesn't go live over a publish that
+commits while it runs".
+**Category**: sites · jobs · concurrency
