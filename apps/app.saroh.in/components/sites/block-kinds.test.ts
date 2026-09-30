@@ -31,6 +31,13 @@ describe("the Add block groups", () => {
     });
 });
 
+describe("the Projects block (K11)", () => {
+    it("is offered as a structure block: the merchant types it, nothing is read", () => {
+        expect(BOUND_BLOCKS.projects).toBeNull();
+        expect(addBlockGroups(SECTION_ORDER).structure).toContain("projects");
+    });
+});
+
 describe("where a bound block's values are changed", () => {
     function bound(type: "journal" | "visitUs"): BoundSource {
         const source = BOUND_BLOCKS[type];

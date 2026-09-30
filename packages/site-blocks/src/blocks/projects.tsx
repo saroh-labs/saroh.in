@@ -44,7 +44,7 @@ type Project = RenderedProjects["items"][number];
 /** Text a merchant actually wrote, or null for blank. */
 function said(value: string | undefined): string | null {
     const trimmed = value?.trim();
-    return trimmed ? trimmed : null;
+    return trimmed === undefined || trimmed === "" ? null : trimmed;
 }
 
 /** A link that is safe to draw, or null. */

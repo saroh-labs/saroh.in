@@ -142,6 +142,21 @@ export interface TestimonialsContent {
     items: TestimonialItem[];
 }
 
+/** One piece of work in a projects section (mirror of the section contract). */
+export interface ProjectItem {
+    image?: ImageValue;
+    title: string;
+    summary?: string;
+    /** A web address, an email or phone link, or a path on this site. */
+    link?: string;
+}
+
+/** `projects` — the merchant's own work, typed in (K11). Up to 24. */
+export interface ProjectsContent {
+    title?: string;
+    items: ProjectItem[];
+}
+
 /** `contact` — where to find the business and how to reach it. */
 export interface ContactContent {
     heading?: string;
@@ -312,6 +327,7 @@ export interface SectionContentByType {
     plans: PlansContent;
     packs: PacksContent;
     productGrid: ProductGridContent;
+    projects: ProjectsContent;
 }
 
 /**

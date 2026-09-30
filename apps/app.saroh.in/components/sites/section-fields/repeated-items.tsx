@@ -3,9 +3,10 @@
 import { Button } from "@saroh/ui/button";
 
 /**
- * The repeated-item editor that `features`, `faq` and `testimonials` share: a
- * numbered card per item, Remove, and "Add" up to the contract's cap (review
- * of #255, where the three had grown three copies of this).
+ * The repeated-item editor that `features`, `faq`, `testimonials` and
+ * `projects` share: a numbered card per item, Remove, ↑ ↓ where the block
+ * asks for them, and "Add" up to the contract's cap (review of #255, where
+ * the three had grown three copies of this).
  *
  * The rules are the contracts' and live here once:
  * - at least one item, so the last one cannot be removed; a block with none
@@ -24,6 +25,7 @@ export function RepeatedItems<T>({
     addLabel,
     fullMessage,
     newItem,
+    reorderable = false,
     children,
 }: {
     items: T[];
@@ -38,6 +40,11 @@ export function RepeatedItems<T>({
     fullMessage: string;
     /** A blank item. `NoInfer`: the item type comes from `items`, not this. */
     newItem: () => NoInfer<T>;
+    /**
+     * Offer ↑ and ↓ on each item (K11's projects, whose order is the order
+     * a visitor reads them in). Off for the blocks that never had it.
+     */
+    reorderable?: boolean;
     children: (
         item: T,
         set: (next: Partial<T>) => void,
@@ -48,6 +55,13 @@ export function RepeatedItems<T>({
         onChange(
             items.map((item, i) => (i === index ? { ...item, ...next } : item)),
         );
+    const move = (index: number, delta: -1 | 1) => {
+        const to = index + delta;
+        if (to < 0 || to >= items.length) return;
+        const next = [...items];
+        [next[index], next[to]] = [next[to], next[index]];
+        onChange(next);
+    };
 
     return (
         <>
@@ -60,21 +74,49 @@ export function RepeatedItems<T>({
                         <span className="text-sm font-medium">
                             {itemNoun} {index + 1}
                         </span>
-                        {items.length > 1 ? (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                aria-label={`Remove ${itemNoun.toLowerCase()} ${index + 1}`}
-                                onClick={() =>
-                                    onChange(
-                                        items.filter((_, i) => i !== index),
-                                    )
-                                }
-                            >
-                                Remove
-                            </Button>
-                        ) : null}
+                        <div className="flex items-center gap-1">
+                            {reorderable && items.length > 1 ? (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        disabled={index === 0}
+                                        aria-label={`Move ${itemNoun.toLowerCase()} ${index + 1} up`}
+                                        onClick={() => move(index, -1)}
+                                    >
+                                        ↑
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        disabled={index === items.length - 1}
+                                        aria-label={`Move ${itemNoun.toLowerCase()} ${index + 1} down`}
+                                        onClick={() => move(index, 1)}
+                                    >
+                                        ↓
+                                    </Button>
+                                </>
+                            ) : null}
+                            {items.length > 1 ? (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label={`Remove ${itemNoun.toLowerCase()} ${index + 1}`}
+                                    onClick={() =>
+                                        onChange(
+                                            items.filter((_, i) => i !== index),
+                                        )
+                                    }
+                                >
+                                    Remove
+                                </Button>
+                            ) : null}
+                        </div>
                     </div>
                     {children(item, (next) => setAt(index, next), index)}
                 </div>
