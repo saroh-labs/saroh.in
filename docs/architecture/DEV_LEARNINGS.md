@@ -1936,3 +1936,19 @@ sides, and on the side that moves money, in the claim's WHERE. Pinned by
 customer's pay-link checkout is open" and `mandate-charges.db.spec.ts`
 "a pay-link checkout …".
 **Category**: payments · autopay · subscriptions
+
+## Turn on — Bookings priced the first service in INR for every business (release review)
+
+**Symptom**: found in the production release review. A business that sells
+in pounds turns Bookings on with a price in the sheet; its first service is
+stored in INR, and its booking page shows (and would charge) rupees.
+**Cause**: `writeAppointments` (`capabilities/setup/module-setup.writers.ts`)
+wrote the file's `DEFAULT_CURRENCY` constant. `writeCommerce`, a screen
+above it in the same file, already read `businessCurrency` first; the
+second writer copied the fallback, not the rule.
+**Fix**: `(await businessCurrency(tx, organizationId)) ?? DEFAULT_CURRENCY`,
+read only when the service is priced.
+**Rule**: a default currency is the last fallback after the business's own
+(`stores/currency.ts`), never the value. Pinned by `module-setup.db.spec.ts`
+"prices the first service in the business's currency, not INR".
+**Category**: capabilities · money
