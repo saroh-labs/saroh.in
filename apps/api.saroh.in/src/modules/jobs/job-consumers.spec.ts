@@ -131,6 +131,11 @@ describe("job producers and consumers agree", () => {
         expect(consumed.has("orders.stage-batch.commit")).toBe(true);
     });
 
+    it("runs a test release's scheduled go-live (DEC-071, T10): site.go_live has its handler", () => {
+        expect(produced.has("site.go_live")).toBe(true);
+        expect(consumed.has("site.go_live")).toBe(true);
+    });
+
     it("names every job type with a string literal or an exported constant", () => {
         expect(unresolved).toEqual([]);
     });

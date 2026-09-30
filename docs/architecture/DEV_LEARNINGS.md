@@ -1565,3 +1565,22 @@ with two.
 Never "today", "the first open day" or "N days from now" (see also the
 Saturday failure above).
 **Category**: e2e · tests · dates
+## Sites — the scheduled go-live was refused by the go-live it runs (T10)
+
+**Symptom**: the first draft of `site.go_live` called T7's
+`goLiveWithRelease` and got "Cancel the scheduled go-live first" for every
+release it ran: the release it was putting live was, by definition,
+scheduled. In a db spec, `jest.spyOn(prisma, "$transaction")` to fake a
+failed last attempt threw "mockRejectedValueOnce is not a function".
+**Cause**: T7 refuses any release with a `goLiveAt`, which is right for a
+person going live by hand and wrong for the job that owns that schedule.
+`prisma` from `@saroh/database` is the RLS proxy (`createRlsProxy`), so a
+spy on it doesn't replace what callers reach.
+**Fix**: `goLiveWithRelease` takes `scheduledFor`; a release scheduled for
+exactly that instant is let through, and any other schedule still refuses.
+The last-attempt write is `recordGaveUp`, exported and asserted directly;
+the order (retry, then record on the last try) is pinned with a mocked
+`@saroh/database` in `go-live.handler.spec.ts`.
+**Rule**: a guard that refuses "something is scheduled" needs a way for the
+schedule itself through. Fake `prisma` with `jest.mock`, not `spyOn`.
+**Category**: sites · jobs · tests
