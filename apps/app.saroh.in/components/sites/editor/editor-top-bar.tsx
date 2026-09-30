@@ -14,7 +14,10 @@ import {
     STATUS_BADGE,
     statusReadout,
 } from "@/components/sites/editor/status-readout";
-import type { TopBarActionProps } from "@/components/sites/editor/top-bar-actions";
+import type {
+    TestReleaseActions,
+    TopBarActionProps,
+} from "@/components/sites/editor/top-bar-actions";
 import { TopBarActions } from "@/components/sites/editor/top-bar-actions";
 import type { EditorLayout } from "@/components/sites/editor/use-editor-layout";
 import type { DraftReadiness } from "@/components/sites/editor/use-publish";
@@ -78,6 +81,10 @@ export function EditorTopBar({
     openFeedback,
     canUpdateSite,
     addablePageKinds,
+    needsApproval = false,
+    canOverride = false,
+    scheduled = null,
+    testRelease,
 }: {
     siteId: string;
     siteName: string;
@@ -117,6 +124,14 @@ export function EditorTopBar({
     canUpdateSite: boolean;
     /** The module pages the site can have now (G14), for Add a page. */
     addablePageKinds?: ModulePageKind[];
+    /** "Publishing needs approval" is on (DEC-071, R10). */
+    needsApproval?: boolean;
+    /** An owner who can publish past it, on the record (KTD-11). */
+    canOverride?: boolean;
+    /** "Going live Fri 6:00pm · Diwali menu" (T11), when one is scheduled. */
+    scheduled?: string | null;
+    /** The Test release split; absent while test releases are off. */
+    testRelease?: TestReleaseActions;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const [pagesOpen, setPagesOpen] = useState(false);
@@ -141,6 +156,7 @@ export function EditorTopBar({
         pendingKnown,
         lastSavedAt,
         openNotes,
+        scheduled,
     });
     const publishHint = publishTitle({
         publishing,
@@ -151,11 +167,14 @@ export function EditorTopBar({
         neverPublished,
         pendingShort,
         pendingKnown,
+        needsApproval,
+        canOverride,
     });
     const phone = layout === "phone";
     const actions: TopBarActionProps = {
         ...{ device, setDevice, zoom, setZoom, previewing, setPreviewing },
         ...{ asking, publishing, publishHint, openNotes },
+        ...{ needsApproval, canOverride, testRelease },
         inReview: review.pending,
         askForReview: () => void askForReview(),
         publishDisabled: publishing || dirty || saving || styleDirty,
@@ -371,6 +390,25 @@ function PhoneMenu({
                         setOpen(false);
                         actions.onPublish();
                     }}
+                    // A test release's sheets open over the editor, so
+                    // the menu goes away first.
+                    testRelease={
+                        actions.testRelease
+                            ? {
+                                  ...actions.testRelease,
+                                  onMake: actions.testRelease.onMake
+                                      ? () => {
+                                            setOpen(false);
+                                            actions.testRelease?.onMake?.();
+                                        }
+                                      : undefined,
+                                  onOpenList: () => {
+                                      setOpen(false);
+                                      actions.testRelease?.onOpenList();
+                                  },
+                              }
+                            : undefined
+                    }
                 />
             </PopoverContent>
         </Popover>

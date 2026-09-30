@@ -94,6 +94,11 @@ export interface TestReleaseView {
 export interface TestReleaseList {
     /** The hosts this site's test releases are served on. */
     testHosts: string[];
+    /**
+     * The business's time zone (IANA), the one a scheduled go-live's date
+     * and time are read in, so the editor can say so before it is asked.
+     */
+    zone: string;
     releases: TestReleaseView[];
 }
 

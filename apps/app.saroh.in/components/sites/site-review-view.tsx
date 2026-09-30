@@ -90,7 +90,9 @@ export function SiteReviewView({
                           ? `${review.latestApproval.by} approved this site.`
                           : review.latestApproval.outcome === "BYPASSED"
                             ? `${review.latestApproval.by} published without waiting for approval.`
-                            : `${review.latestApproval.by} asked for changes.`}
+                            : review.latestApproval.outcome === "OVERRIDDEN"
+                              ? `${review.latestApproval.by} went live without approval.`
+                              : `${review.latestApproval.by} asked for changes.`}
                     {open > 0
                         ? ` ${open === 1 ? "1 note is" : `${open} notes are`} open.`
                         : ""}

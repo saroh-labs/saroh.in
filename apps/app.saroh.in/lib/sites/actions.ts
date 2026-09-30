@@ -80,8 +80,9 @@ export async function requestReview(siteId: string) {
     return requestReviewApi(siteId);
 }
 
-export async function publishSite(siteId: string) {
-    return publishSiteApi(siteId);
+/** `override`: an owner past "Publishing needs approval" (DEC-071). */
+export async function publishSite(siteId: string, override = false) {
+    return publishSiteApi(siteId, override);
 }
 
 export async function updateSiteSettings(

@@ -4,14 +4,18 @@ import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { useEffect } from "react";
 
-import { shortDate } from "@/lib/sites/format-date";
+import {
+    APPROVAL_LINE,
+    goesLive,
+    TYPE_LABEL,
+} from "@/components/sites/pre-publish-words";
 import type {
-    ApprovalOutcome,
     Flag,
     FlagType,
     ReviewState,
     SitePage,
 } from "@/lib/sites/service";
+import { OVERRIDE_RECORD } from "@/lib/sites/test-releases";
 
 /**
  * The pre-publish check (spec §2, "Publish").
@@ -32,71 +36,9 @@ import type {
 /** Where the business's web address is chosen (Settings › Business, L4). */
 export const WEB_ADDRESS_SETTINGS_HREF = "/settings/organization";
 
-/** The spec's voice: warm, a little human. Group headings, not error codes. */
-const TYPE_LABEL: Record<FlagType, string> = {
-    emptyRequiredField: "Nothing filled in yet",
-    placeholderText: "Placeholder text still in place",
-    missingImage: "No image yet",
-    hiddenButLinked: "Hidden but linked from navigation",
-    pageNotInNavigation: "Not in the navigation",
-    unpublishedChanges: "Changes visitors cannot see yet",
-    missingSeoDescription: "No search description",
-    brokenLink: "Link goes nowhere",
-    phoneWidth: "Breaks at phone width",
-    storefrontUnchosen: "No location for your online shop",
-    reservedAddress: "Change path",
-    shopCantTakeOrders: "Can't take orders online",
-    productsNotOnSale: "Products not on sale",
-    addressMissing: "No web address",
-};
-
-/**
- * The approval line, worded per outcome. Keyed by the union so a new outcome
- * is a type error here rather than a line that falls through to "asked for
- * changes". Only an approval takes the accent: it is the one good-news verdict.
- */
-const APPROVAL_LINE: Record<
-    ApprovalOutcome,
-    {
-        approved: boolean;
-        text: (approval: NonNullable<ReviewState["latestApproval"]>) => string;
-    }
-> = {
-    // Asked for and not yet answered (#278). Publishing is still allowed from
-    // this panel — it says so, and the publish records as a bypass.
-    REQUESTED: {
-        approved: false,
-        text: ({ by }) => `${by} asked for a review, and nobody has replied`,
-    },
-    APPROVED: { approved: true, text: ({ by }) => `${by} approved this site` },
-    CHANGES_REQUESTED: {
-        approved: false,
-        text: ({ by }) => `${by} asked for changes`,
-    },
-    BYPASSED: {
-        approved: false,
-        text: ({ by, at }) =>
-            `${by} published without approval on ${shortDate(at)}`,
-    },
-};
-
-/**
- * What publishing puts live, in one sentence (G2). A site that has never
- * published goes live whole; a missing count is said, not guessed; and
- * publishing with nothing changed still makes a new version.
- */
-export function goesLive(
-    neverPublished: boolean,
-    pendingKnown: boolean,
-    pendingSummary: string | null,
-): string {
-    if (neverPublished) return "Publishing puts the whole site live.";
-    if (!pendingKnown) {
-        return "We couldn't check what's changed. Publishing puts the site live as it is now.";
-    }
-    if (pendingSummary) return `Publishing puts live: ${pendingSummary}.`;
-    return "Nothing has changed since the last publish. Publishing again makes a new version that matches the live one.";
-}
+// The words live in pre-publish-words.ts; goesLive is re-exported for
+// the callers that imported it from here.
+export { goesLive };
 
 export function PrePublishCheck({
     siteName,
@@ -109,6 +51,9 @@ export function PrePublishCheck({
     pendingSummary,
     pendingKnown,
     review,
+    needsApproval = false,
+    canOverride = false,
+    scheduledWarning = null,
     onPublish,
     onClose,
     onJump,
@@ -135,6 +80,17 @@ export function PrePublishCheck({
     pendingKnown: boolean;
     /** "Approval also shows as a line in the pre-publish check" (spec §2). */
     review: ReviewState;
+    /**
+     * "Publishing needs approval" is on (DEC-071, R10). Only an owner gets
+     * here then, and their publish is the recorded override (KTD-11).
+     */
+    needsApproval?: boolean;
+    canOverride?: boolean;
+    /**
+     * A test release is scheduled to go live, and publishing now means it
+     * won't (KTD-14): said before, not discovered after.
+     */
+    scheduledWarning?: string | null;
     onPublish: () => void;
     onClose: () => void;
     /** Jump to a flag's section. Null pageId means a whole-site flag. */
@@ -197,7 +153,15 @@ export function PrePublishCheck({
                     <Button
                         type="button"
                         size="sm"
-                        disabled={publishing || unsaved || blocked}
+                        // An owner's override is the destructive kind of
+                        // publish: it goes past a rule the business set.
+                        variant={needsApproval ? "destructive" : "default"}
+                        disabled={
+                            publishing ||
+                            unsaved ||
+                            blocked ||
+                            (needsApproval && !canOverride)
+                        }
                         title={
                             blocked
                                 ? "Choose a web address first"
@@ -210,7 +174,7 @@ export function PrePublishCheck({
                     >
                         {publishing
                             ? "Publishing…"
-                            : review.outstanding
+                            : needsApproval || review.outstanding
                               ? "Publish without approval"
                               : neverPublished
                                 ? "Publish site"
@@ -228,6 +192,28 @@ export function PrePublishCheck({
                     <p className="mb-6 text-sm">
                         {goesLive(neverPublished, pendingKnown, pendingSummary)}
                     </p>
+                    {/*
+                     * "Publishing needs approval" (DEC-071): what pressing
+                     * Publish here leaves behind, named before it happens.
+                     */}
+                    {needsApproval ? (
+                        <p
+                            role="note"
+                            className="mb-6 rounded-md bg-destructive-subtle px-3 py-2 text-sm text-destructive-subtle-foreground"
+                        >
+                            {canOverride
+                                ? `This site goes live only from an approved test release. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
+                                : "This site goes live only from an approved test release. Make a test release and ask for a review."}
+                        </p>
+                    ) : null}
+                    {scheduledWarning ? (
+                        <p
+                            role="note"
+                            className="mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
+                        >
+                            {scheduledWarning}
+                        </p>
+                    ) : null}
                     {/*
                      * The approval, where the spec puts it: this is the last
                      * look before going live, and whether someone has signed
