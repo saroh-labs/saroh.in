@@ -64,16 +64,24 @@ describe("contactPanels", () => {
         expect(legacy.canAct.packs).toBe(true);
     });
 
-    it("drops the money panels with Payments off, keeping packs and courses without invoice mentions", () => {
+    it("drops subscriptions with Payments off and keeps invoices, with no invoice mentions on packs and courses (DEC-070)", () => {
         const plan = contactPanels(
             { role: "OWNER" },
             on("APPOINTMENTS", "CLASS_PACKS", "COURSES", "CRM"),
         );
-        expect(plan.panels).toEqual(["packs", "courses"]);
+        expect(plan.panels).toEqual(["packs", "courses", "invoices"]);
         expect(plan.canAct.subscriptions).toBe(false);
-        expect(plan.canAct.invoices).toBe(false);
+        expect(plan.canAct.invoices).toBe(true);
+        // A pack or course sold with Payments off issues no invoice.
         expect(plan.mentionInvoices).toBe(false);
         expect(plan.paymentsOn).toBe(false);
+    });
+
+    it("gives a business with no modules on its invoices, to a role that reads them", () => {
+        expect(contactPanels({ role: "OWNER" }, on()).panels).toEqual([
+            "invoices",
+        ]);
+        expect(contactPanels({ role: "MEMBER" }, on()).panels).toEqual([]);
     });
 
     it("drops packs with Class packs off and courses with Courses off", () => {

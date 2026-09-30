@@ -30,7 +30,8 @@ const NEEDS: Record<
         read: string;
         /** Any one of them offers the panel's action. */
         write: string | readonly string[];
-        moduleKey: string;
+        /** None: the panel needs only its read (invoices, DEC-070). */
+        moduleKey?: string;
     }
 > = {
     subscriptions: {
@@ -51,10 +52,11 @@ const NEEDS: Record<
         write: "course:write",
         moduleKey: "COURSES",
     },
+    // Invoicing needs no module (DEC-070): a business bills and records
+    // paid with Payments off.
     invoices: {
         read: "invoice:read",
         write: "invoice:write",
-        moduleKey: "PAYMENTS",
     },
 };
 
@@ -129,7 +131,7 @@ export function contactPanels(
 ): PanelPlan {
     const shown = (p: ContactPanel) =>
         viewerCan(viewer, NEEDS[p].read) &&
-        moduleOn(modules, NEEDS[p].moduleKey);
+        (!NEEDS[p].moduleKey || moduleOn(modules, NEEDS[p].moduleKey));
     const panels = PANEL_ORDER.filter(shown);
     const canAct = Object.fromEntries(
         PANEL_ORDER.map((p) => [
@@ -140,10 +142,13 @@ export function contactPanels(
                     .some((action) => viewerCan(viewer, action)),
         ]),
     ) as Record<ContactPanel, boolean>;
+    const paymentsOn = moduleOn(modules, "PAYMENTS");
     return {
         panels,
         canAct,
-        mentionInvoices: panels.includes("invoices"),
-        paymentsOn: moduleOn(modules, "PAYMENTS"),
+        // Packs and courses invoice only with Payments on (DEC-019), even
+        // now the invoices panel shows without it (DEC-070).
+        mentionInvoices: panels.includes("invoices") && paymentsOn,
+        paymentsOn,
     };
 }
