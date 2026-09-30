@@ -96,6 +96,19 @@ describe("ModuleReadinessRegistry", () => {
         ).toBe("ACTIVE");
     });
 
+    it("Website: only a LIVE publication makes it published, never a test release's (DEC-071)", async () => {
+        const db = dbWith({ publication: 1 }) as unknown as {
+            publication: { count: jest.Mock };
+        };
+        await new ModuleReadinessRegistry(db as never).evaluate(
+            "WEBSITE",
+            input,
+        );
+        expect(db.publication.count).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", kind: "LIVE" },
+        });
+    });
+
     it("Website: live, but its shop waits on Sells from → the step to choose it (P4)", async () => {
         const waiting = siteAwaitingSellsFrom as jest.Mock;
         waiting.mockResolvedValueOnce("site_1");

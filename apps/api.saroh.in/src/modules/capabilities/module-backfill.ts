@@ -78,7 +78,8 @@ export async function deriveModuleEvidence(
             client.page.count({ where }),
             client.form.count({ where }),
             client.domain.count({ where }),
-            client.publication.count({ where }),
+            // Published: a test release's snapshot (DEC-071) is not.
+            client.publication.count({ where: { ...where, kind: "LIVE" } }),
         )
     ) {
         evidence.add("WEBSITE");

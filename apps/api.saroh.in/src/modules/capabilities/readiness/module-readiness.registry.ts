@@ -140,7 +140,12 @@ export class ModuleReadinessRegistry {
             key: "WEBSITE",
             evaluate: async ({ organizationId }) => {
                 const where = { organizationId };
-                if ((await this.db.publication.count({ where })) > 0) {
+                // A test release's snapshot (kind TEST, DEC-071) has never
+                // been live, so it doesn't make the website published.
+                const published = await this.db.publication.count({
+                    where: { organizationId, kind: "LIVE" },
+                });
+                if (published > 0) {
                     // Live, but its shop waits on "Sells from" (P4): said
                     // only while the shop could serve (DEC-057).
                     const waiting = await siteAwaitingSellsFrom(

@@ -63,7 +63,8 @@ export class AdminMetricsService {
                 where: { status: { in: ["PENDING", "PROCESSING"] } },
             }),
             prisma.site.count(),
-            prisma.publication.count(),
+            // Publishes, not test releases' snapshots (DEC-071).
+            prisma.publication.count({ where: { kind: "LIVE" } }),
             prisma.analyticsEvent.groupBy({
                 by: ["type"],
                 where: { createdAt: { gte: since } },
