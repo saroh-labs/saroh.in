@@ -80,6 +80,12 @@ export interface InvoiceMailVars {
     dueOn: string | null;
     /** Past its due date. */
     overdue: boolean;
+    /**
+     * The link is a pay link (DEC-070). False: it opens the invoice to view
+     * and download, and the email doesn't offer to take the payment.
+     * Absent, as before DEC-070: a pay link.
+     */
+    payOnline?: boolean;
 }
 
 export interface RenderedMessage {
@@ -126,7 +132,9 @@ export function renderTransactional(
     const body = [
         `<p>${greeting}</p>`,
         `<p>${lead}</p>`,
-        `<p>You can pay it by UPI or card here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
+        vars.payOnline === false
+            ? `<p>You can view it and download a copy here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
+            : `<p>You can pay it by UPI or card here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
         reminder
             ? `<p>If you&#39;ve already paid, thank you, and please ignore this.</p>`
             : "",

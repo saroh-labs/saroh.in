@@ -29,7 +29,9 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         customerThreadMessage: { findFirst: jest.fn(), count: jest.fn() },
-        merchantPaymentProvider: { count: jest.fn() },
+        merchantPaymentProvider: { findFirst: jest.fn() },
+        // DEC-070: Payments on or off decides a pay link or a view link.
+        organizationModule: { findFirst: jest.fn() },
         // D13: an autopay charge under way holds the send.
         paymentIntent: { findMany: jest.fn() },
         customerAccount: { count: jest.fn() },
@@ -113,7 +115,8 @@ beforeEach(() => {
     db.message!.count!.mockResolvedValue(0);
     db.customerThreadMessage!.findFirst!.mockResolvedValue(null);
     db.customerThreadMessage!.count!.mockResolvedValue(0);
-    db.merchantPaymentProvider!.count!.mockResolvedValue(1);
+    db.merchantPaymentProvider!.findFirst!.mockResolvedValue({ id: "mpp_1" });
+    db.organizationModule!.findFirst!.mockResolvedValue(null);
     db.paymentIntent!.findMany!.mockResolvedValue([]);
     db.customerAccount!.count!.mockResolvedValue(0);
     db.businessProfile!.findUnique!.mockResolvedValue(null);
@@ -126,14 +129,32 @@ beforeEach(() => {
 });
 
 describe("the send flag", () => {
-    it("needs a payment provider: no pay link, nothing to send", async () => {
-        db.merchantPaymentProvider!.count!.mockResolvedValue(0);
+    it("with a provider and Payments on: a pay link (payOnline)", async () => {
         const { send } = await service().readFor("org_1", "inv_1");
         expect(send).toEqual({
-            channels: [],
-            reason: "NO_PAYMENT_PROVIDER",
+            channels: ["email"],
+            emailTo: "asha@example.com",
+            payOnline: true,
             nextReminderAt: null,
         });
+    });
+
+    it("needs no payment provider: it sends a view link (DEC-070)", async () => {
+        db.merchantPaymentProvider!.findFirst!.mockResolvedValue(null);
+        const { send } = await service().readFor("org_1", "inv_1");
+        expect(send).toEqual({
+            channels: ["email"],
+            emailTo: "asha@example.com",
+            payOnline: false,
+            nextReminderAt: null,
+        });
+    });
+
+    it("with Payments off, a connected provider still sends a view link", async () => {
+        db.organizationModule!.findFirst!.mockResolvedValue({ id: "om_1" });
+        const { send } = await service().readFor("org_1", "inv_1");
+        expect(send.channels).toEqual(["email"]);
+        expect(send.payOnline).toBe(false);
     });
 
     it("an autopay charge under way holds it: AUTOPAY_PENDING, and a send is a 409 (D13)", async () => {
@@ -257,8 +278,41 @@ describe("sending", () => {
                 total: "₹2,400.00",
                 dueOn: null,
                 overdue: false,
+                payOnline: true,
             },
         });
+    });
+
+    it.each([
+        ["a pay link with a provider", { id: "mpp_1" }, true],
+        ["a view link without one (DEC-070)", null, false],
+    ])("mints %s", async (_label, provider, payOnline) => {
+        db.merchantPaymentProvider!.findFirst!.mockResolvedValue(provider);
+        comms.queueTransactional.mockResolvedValue({
+            id: "m_1",
+            status: "QUEUED",
+            toAddress: "asha@example.com",
+        });
+        db.organization!.findUnique!.mockResolvedValue({ name: "Rye & Co." });
+        const createPayLinkInTx = jest
+            .fn()
+            .mockResolvedValue({ token: "tok_1" });
+        await new InvoiceSendService(
+            { createPayLinkInTx } as unknown as InvoicesService,
+            comms as unknown as CommunicationsService,
+        ).send(owner, "inv_1");
+
+        const input = comms.queueTransactional.mock.calls[0][2];
+        expect(input.vars.payOnline).toBe(payOnline);
+        await expect(input.secretLink()).resolves.toBe(
+            "https://saroh.app/pay/tok_1",
+        );
+        expect(createPayLinkInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            owner,
+            "inv_1",
+            { requireProvider: payOnline },
+        );
     });
 });
 

@@ -30,6 +30,8 @@ jest.mock("@saroh/database", () => {
         // PAY_LINK_ON_SITE never configured: the pay link stays on the apex.
         featureFlagOverride: { findUnique: jest.fn().mockResolvedValue(null) },
         featureFlag: { findUnique: jest.fn().mockResolvedValue(null) },
+        // DEC-070: Payments on (no row) unless a test turns it off.
+        organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     return {
         ...actual,
@@ -176,6 +178,8 @@ describe("PublicInvoicesService.read", () => {
                 "lines",
                 "number",
                 "payUrl",
+                // DEC-070: whether the page offers Pay.
+                "payOnline",
                 "status",
                 "tax",
                 "theme",
@@ -204,6 +208,8 @@ describe("PublicInvoicesService.read", () => {
             theme: null,
             // The flag off (never configured): the apex, as before DEC-069.
             payUrl: `https://saroh.app/pay/${TOKEN}`,
+            // No provider can open the checkout window here.
+            payOnline: false,
         });
         // Asked only for what it shows: no email, contact, ids or notes.
         const select = invoiceFindFirst.mock.calls[0][0].select;
@@ -418,16 +424,28 @@ describe("PublicInvoicesService.createIntent", () => {
         expect(result.provider).toBe("CASHFREE");
     });
 
-    it("says what the Razorpay connection needs when none can open the window", async () => {
+    it("refuses when no connection can open the window: the business doesn't take payment online (DEC-070)", async () => {
         const { service } = makeService();
         invoiceFindFirst.mockResolvedValue(PAYABLE);
-        providerFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
-            ...connectedRow("RAZORPAY"),
-            publicKey: null,
-        });
+        // A Razorpay connection missing its public key id counts as none.
+        providerFindFirst.mockResolvedValue(null);
 
         await expect(service.createIntent(TOKEN, {})).rejects.toThrow(
-            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Providers.",
+            "This business doesn't take payment online.",
+        );
+        expect(intentCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses with Payments switched off, even with a provider (DEC-070)", async () => {
+        const { service } = makeService();
+        invoiceFindFirst.mockResolvedValue(PAYABLE);
+        providerFindFirst.mockResolvedValue(connectedRow("RAZORPAY"));
+        (
+            prisma.organizationModule.findFirst as jest.Mock
+        ).mockResolvedValueOnce({ id: "om_1" });
+
+        await expect(service.createIntent(TOKEN, {})).rejects.toThrow(
+            "This business doesn't take payment online.",
         );
         expect(intentCreate).not.toHaveBeenCalled();
     });

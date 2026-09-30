@@ -1349,3 +1349,20 @@ evidence, never on absence. Run `TEST_RLS=on` for any spec touching a
 cross-business read, and the permission suite for anything on Team, until
 `scripts/prepush.sh` runs both.
 **Category**: CI · tests · RLS · a11y
+## Capabilities — the annotation spec counted a decorator named in a comment
+
+**Problem**: after K6 (DEC-070) moved the Payments gate off `InvoicesController`
+onto its pay-link handler, `module-annotations.spec.ts` said the file had two
+`@RequireModule(` but only one `@IgnoreModuleReadiness()`.
+**Root cause**: the spec is a source scan. The class doc comment spelled out
+`@RequireModule("PAYMENTS")` to explain the handler gate, and the regex
+counted it as a second gate.
+**Fix**: the comment says "its own Payments gate on the handler". A new case
+pins that the invoices controller has exactly one gate, on the pay link.
+**Rule**: in a controller, never write a decorator's literal text in a
+comment; the annotation spec reads comments as code. Also: a service that
+starts reading `organizationModule` (`paymentsOn`) breaks every unit spec
+whose mocked Prisma lacks it with a TypeError, not a clear failure — add
+`organizationModule: { findFirst: jest.fn().mockResolvedValue(null) }` (no
+row reads as on).
+**Category**: tests · capabilities · mocks

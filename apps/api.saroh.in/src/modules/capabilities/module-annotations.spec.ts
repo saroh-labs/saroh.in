@@ -71,7 +71,6 @@ const CLASS_LEVEL: Record<string, string> = {
     // #514: stock levels, the log, counts, moves and checks.
     "stock/stock.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
-    "invoices/invoices.controller.ts": "PAYMENTS",
     "subscriptions/subscriptions.controller.ts": "PAYMENTS",
     // Both of its controllers: the packs, and using one on a booking (E12).
     "class-packs/class-packs.controller.ts": "CLASS_PACKS",
@@ -84,6 +83,8 @@ const CLASS_LEVEL: Record<string, string> = {
  */
 const METHOD_LEVEL: Record<string, string> = {
     "payments/payments.controller.ts": "PAYMENTS",
+    // DEC-070: invoicing needs no module; only the pay link is Payments'.
+    "invoices/invoices.controller.ts": "PAYMENTS",
     "communications/communications.controller.ts": "COMMUNICATIONS",
 };
 
@@ -288,9 +289,11 @@ describe("module enforcement rollout (#117)", () => {
     // The half that matters most: these are the routes that must keep working
     // when a merchant switches a capability off.
     /*
-     * Invoices sit under Payments but need no provider: an invoice paid in
-     * cash is recorded by hand (ADR-007). Without the opt-out, switching
-     * enforcement on would refuse every business that never connected one.
+     * Invoice pay links and subscriptions sit under Payments but need no
+     * provider to reach: an invoice paid in cash is recorded by hand
+     * (ADR-007), and the pay link's service says what it needs. Without the
+     * opt-out, switching enforcement on would refuse every business that
+     * never connected one.
      */
     it.each([
         "invoices/invoices.controller.ts",
@@ -330,6 +333,22 @@ describe("module enforcement rollout (#117)", () => {
             ),
         );
         expect(orgPart).toContain('@RequireModule("INSIGHTS")');
+    });
+
+    /*
+     * DEC-070: a business invoices with Payments off — create, issue, send,
+     * void, credit, record paid, download. Only the pay link, a way to take
+     * money online, stays under Payments, and it alone carries the gate.
+     */
+    it("gates only the invoice pay link on Payments (DEC-070)", () => {
+        const text = source("invoices/invoices.controller.ts");
+        expect(text.match(/@RequireModule\(/g)).toHaveLength(1);
+        const payLink = text.slice(
+            text.indexOf('@Post(":invoiceId/pay-link")'),
+        );
+        const handler = payLink.slice(0, payLink.indexOf("async payLink("));
+        expect(handler).toContain('@RequireModule("PAYMENTS")');
+        expect(handler).toContain("@IgnoreModuleReadiness()");
     });
 
     it("refunds and payment status stay reachable with Payments off", () => {

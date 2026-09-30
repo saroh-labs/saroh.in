@@ -758,8 +758,40 @@ describe("HomeService with the F1 sources", () => {
         const model = await service.build(OWNER);
 
         expect(model.actions).toEqual([]);
-        expect(db.invoice.findMany).not.toHaveBeenCalled();
+        // Overdue invoices need no module (DEC-070), so only their read
+        // runs: never the renewals' (the one read that selects the plan).
+        for (const [args] of db.invoice.findMany.mock.calls) {
+            expect(args.select.subscription).toBeUndefined();
+        }
         expect(db.site.count).not.toHaveBeenCalled();
         expect(stockChecks.openShort).not.toHaveBeenCalled();
+    });
+
+    it("lists an overdue invoice for a business with Payments off (DEC-070)", async () => {
+        const { service } = home([{ key: "PAYMENTS", readiness: "DISABLED" }], {
+            unpaid: [liveOverdue()],
+            overdue: [handOverdue()],
+        });
+        const model = await service.build(OWNER);
+
+        expect(model.actions.map((a) => a.code)).toEqual([
+            "PAYMENTS_OVERDUE_INVOICES",
+        ]);
+        expect(model.actions[0].evidence?.map((e) => e.id)).toEqual(["inv_1"]);
+    });
+
+    it("gives a Member no overdue invoices with Payments off either", async () => {
+        const { service, db } = home(
+            [{ key: "PAYMENTS", readiness: "DISABLED" }],
+            {
+                overdue: [handOverdue()],
+            },
+        );
+        const model = await service.build({
+            organizationId: "org_1",
+            organizationRole: "MEMBER",
+        });
+        expect(model.actions).toEqual([]);
+        expect(db.invoice.findMany).not.toHaveBeenCalled();
     });
 });

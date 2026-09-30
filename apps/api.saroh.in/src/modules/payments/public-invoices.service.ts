@@ -15,6 +15,7 @@ import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
 import { payLinkUrl, payLinkUrlFor } from "../invoices/pay-link-url";
+import { invoicePayOnline, NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
@@ -67,6 +68,14 @@ export interface PublicInvoiceView {
     billOfSupply: boolean;
     /** The business's site theme as `--site-*` variables; null for defaults. */
     theme: Record<string, string> | null;
+    /**
+     * The business takes payment online (DEC-070): Payments is on and a
+     * provider can open the checkout window. False: the page shows the
+     * invoice and its PDF with no Pay button, and a payment start is a 409.
+     * Set on the pay link's read only; absent (an older API, or the account
+     * area's receipt), the page behaves as before.
+     */
+    payOnline?: boolean;
     /**
      * Autopay for the plan this invoice is for (D12): the pay page's
      * allow-list gains only this. Absent or null: not a plan's invoice, the
@@ -206,6 +215,19 @@ function notFound(): never {
 }
 
 /**
+ * A 409 when the business doesn't take payment online (DEC-070): Payments
+ * is off, or no provider can open the checkout window. The invoice is still
+ * owed; the customer pays the business some other way.
+ */
+async function assertPaysOnline(organizationId: string): Promise<void> {
+    if (await invoicePayOnline(prisma, organizationId)) return;
+    throw new ConflictException({
+        message: NOT_PAID_ONLINE,
+        details: { reason: "not-paid-online" },
+    });
+}
+
+/**
  * The customer's side of an invoice pay link — no session, so everything
  * hangs on the token (ADR-007, U13).
  *
@@ -247,15 +269,21 @@ export class PublicInvoicesService {
         }
         const found = await this.find(tokenHash);
         return runInOrgContext(found.organizationId, async () => {
-            const paper = await invoicePaper(found.organizationId, found.id);
-            // Autopay only on a plan's invoice that offers it (D12).
+            const [paper, payOnline] = await Promise.all([
+                invoicePaper(found.organizationId, found.id),
+                // A link sent before Payments went off opens as a view
+                // link: it never errors (DEC-070).
+                invoicePayOnline(prisma, found.organizationId),
+            ]);
+            // Autopay only on a plan's invoice that offers it (D12), and
+            // only while the business takes payment online.
             const [autopay, charging] = await Promise.all([
-                this.payAutopay(found),
+                payOnline ? this.payAutopay(found) : null,
                 chargeUnderWayOn(prisma, found.organizationId, found.id),
             ]);
             const view: PublicInvoiceView = autopay
-                ? { ...paper, autopay }
-                : paper;
+                ? { ...paper, payOnline, autopay }
+                : { ...paper, payOnline };
             // "Next autopay charge" (D13B): this invoice's planned debit, or
             // once it's paid with autopay on, the next renewal's.
             const next =
@@ -370,6 +398,7 @@ export class PublicInvoicesService {
             });
         }
         return runInOrgContext(found.organizationId, async () => {
+            await assertPaysOnline(found.organizationId);
             const origin = await siteOriginOf(found.organizationId);
             return autopay.startForInvoice({
                 organizationId: found.organizationId,
@@ -479,6 +508,10 @@ export class PublicInvoicesService {
                         : "This invoice is no longer payable.",
                 );
             }
+            // A view link (DEC-070): the page offers no Pay, and the API
+            // agrees. A booking's pay-now hold above was started online
+            // and keeps the provider's own refusal.
+            await assertPaysOnline(found.organizationId);
             // One charge at a time (D13): autopay is charging it.
             if (
                 await chargeUnderWayOn(prisma, found.organizationId, invoice.id)

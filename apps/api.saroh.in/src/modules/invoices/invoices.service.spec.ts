@@ -55,6 +55,10 @@ jest.mock("@saroh/database", () => {
             },
             contact: { findFirst: jest.fn() },
             businessProfile: { findUnique: jest.fn() },
+            // DEC-070: Payments on (no row) for a pay link.
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },

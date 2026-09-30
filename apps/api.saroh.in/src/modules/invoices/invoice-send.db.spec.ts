@@ -139,6 +139,7 @@ describe("sending an invoice (real database)", () => {
         expect(before.send).toEqual({
             channels: ["email"],
             emailTo: "asha@example.com",
+            payOnline: true,
             nextReminderAt: null,
         });
 
@@ -286,6 +287,7 @@ describe("sending an invoice (real database)", () => {
         expect(read.send).toEqual({
             channels: [],
             reason: "NOT_OWED",
+            payOnline: true,
             nextReminderAt: null,
         });
     });
@@ -312,6 +314,7 @@ describe("sending an invoice (real database)", () => {
             expect(read.send).toEqual({
                 channels: [],
                 reason: "NO_EMAIL_PROVIDER",
+                payOnline: true,
                 nextReminderAt: null,
             });
             expect(await status(sending.send(owner, id))).toBe(409);
