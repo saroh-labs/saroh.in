@@ -1824,3 +1824,21 @@ machine, disk and CPU contention push that walk past vitest's default 5s.
 Rerun first; if it recurs, give the scan an explicit timeout (as a third
 argument to `it`) rather than the default.
 **Category**: vitest · tests · flake
+
+## Turn on sheet — the API's prefill never reached the sheet (K15)
+
+**Problem**: `GET …/modules/:key/setup-defaults` answers
+`{ data: { setup, dependencies, hidden, existing } }`, but the app's
+decoder (`lib/modules/turn-on-schema.ts`) read the prefill from a
+`defaults` key the API never sends. Every sheet opened on the app's own
+fallback: Website's name and address blank, and K8's "Consultation" for
+Just me never shown. Nothing failed: the decode is lenient by design, and
+the unit tests fed it the same wrong key.
+**Root cause**: M1 wrote the app's contract and its tests against a shape
+agreed in the plan, and the API named the field differently. No test
+crossed the boundary with the API's real body.
+**Fix**: the decoder reads `setup` (then `defaults`), and a vitest feeds
+it the body the controller returns, envelope and all.
+**Rule**: a lenient decoder's test uses the producer's real body (copy it
+from the controller spec), never a shape written from the consumer's side.
+**Category**: contract · app↔api · tests

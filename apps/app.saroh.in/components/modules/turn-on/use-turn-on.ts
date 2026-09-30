@@ -199,10 +199,15 @@ export function useTurnOn({
         else router.refresh();
     };
 
+    // The template a new website starts from (DEC-070, K15), when said.
+    const websiteTemplate =
+        (loaded ?? []).find((d) => d.key === "WEBSITE")?.template ?? null;
+
     return {
         ready: draft !== null,
         draft,
         plan,
+        websiteTemplate,
         apiDeps,
         hidden,
         errors,

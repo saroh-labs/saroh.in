@@ -144,19 +144,24 @@ export function SellFields({
 /**
  * Website's minimum: the site's name and its address, with the
  * `.saroh.app` it lives on shown beside what is typed. An address that is
- * taken or reserved comes back from the API on the field.
+ * taken or reserved comes back from the API on the field. Below them, the
+ * template the new site starts from, which follows what is being set up
+ * (DEC-070, K15): said, not asked.
  */
 export function WebsiteFields({
     draft,
     update,
     errors,
     suggestion = null,
+    template = null,
 }: {
     draft: TurnOnDraft;
     update: Update;
     errors: FieldErrors;
     /** A free address the API offered for a taken one (DEC-069). */
     suggestion?: string | null;
+    /** The template a new site starts from; null says nothing. */
+    template?: { id: string; name: string } | null;
 }) {
     const id = useId();
     const w = draft.WEBSITE;
@@ -242,6 +247,12 @@ export function WebsiteFields({
                 >
                     Use {suggestion}.saroh.app
                 </button>
+            ) : null}
+            {template ? (
+                <p className="text-[12.5px] leading-normal text-muted-foreground">
+                    Starts from the {template.name} template. Change its pages
+                    any time.
+                </p>
             ) : null}
         </>
     );

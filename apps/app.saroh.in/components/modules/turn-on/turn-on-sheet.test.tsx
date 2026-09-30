@@ -120,6 +120,8 @@ const DEFAULTS: Record<string, SetupDefaults["defaults"]> = {
 };
 
 let hiddenKeys: string[] = [];
+/** The template the API says a new site starts from (K15); null says none. */
+let websiteTemplate: { id: string; name: string } | null = null;
 
 /** jsdom has no layout, so nothing to observe. */
 class NoResize {
@@ -142,6 +144,7 @@ beforeEach(() => {
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     hiddenKeys = [];
+    websiteTemplate = null;
     // Radix's checkbox measures itself; jsdom has no ResizeObserver.
     vi.stubGlobal("ResizeObserver", NoResize);
     readSetupDefaultsAction.mockReset();
@@ -153,6 +156,7 @@ beforeEach(() => {
                 dependencies: NEEDS[key] ?? [],
                 hidden: hiddenKeys.includes(key),
                 read: true,
+                template: key === "WEBSITE" ? websiteTemplate : null,
             })),
         ),
     );
@@ -412,6 +416,25 @@ describe("Website", () => {
         expect(showError).not.toHaveBeenCalled();
         expect(push).not.toHaveBeenCalled();
         expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    });
+
+    it("says which template the new site starts from, when the API names one (K15)", async () => {
+        await open(["WEBSITE"]);
+        expect(text()).not.toContain("Starts from");
+
+        act(() => root.unmount());
+        root = createRoot(host);
+        websiteTemplate = { id: "portfolio", name: "Portfolio" };
+        await open(["WEBSITE"]);
+        expect(text()).toContain(
+            "Starts from the Portfolio template. Change its pages any time.",
+        );
+        // Said, not asked: nothing about it is sent.
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction).toHaveBeenLastCalledWith("WEBSITE", {
+            siteName: "Northwind",
+            address: "northwind",
+        });
     });
 
     it("says a refusal it can't place at the top of the sheet", async () => {

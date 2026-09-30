@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { addressSuggestionOf } from "@/lib/sites/service";
 
-import { CreateSiteForm, UseSuggestedAddress } from "./create-site-form";
+import {
+    CreateSiteForm,
+    initialTemplateId,
+    UseSuggestedAddress,
+} from "./create-site-form";
 
 const noop = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -98,5 +102,43 @@ describe("a refused address (L5)", () => {
                 />,
             ),
         ).toBe("");
+    });
+});
+
+/**
+ * A new site starts from the template for what is being set up (DEC-070,
+ * K15), picked in the form to start with; any other can be chosen.
+ */
+describe("the template picker (K15)", () => {
+    const templates = [
+        { id: "starter", version: 2, name: "Starter", description: "" },
+        { id: "personal", version: 1, name: "Personal", description: "" },
+        { id: "portfolio", version: 1, name: "Portfolio", description: "" },
+        { id: "writing", version: 1, name: "Writing", description: "" },
+    ];
+
+    it("starts on the kind's template when it is listed", () => {
+        expect(initialTemplateId(templates, "portfolio")).toBe("portfolio");
+        expect(initialTemplateId(templates, "personal")).toBe("personal");
+    });
+
+    it("starts on the first listed when the kind's isn't, and on none with none listed", () => {
+        expect(initialTemplateId(templates, "gone")).toBe("starter");
+        expect(initialTemplateId(templates, null)).toBe("starter");
+        expect(initialTemplateId([], "portfolio")).toBe("none");
+    });
+
+    it("offers no blank site: a site always starts from a template", () => {
+        const html = renderToStaticMarkup(
+            <CreateSiteForm
+                templates={templates}
+                defaults={{ siteName: "Asha Rao Studio", address: "asha" }}
+                defaultTemplateId="portfolio"
+            />,
+        );
+        expect(html).toContain("Template");
+        expect(html).not.toContain("Blank site");
+        expect(html).not.toContain("(optional)");
+        // Radix draws the picked name only once hydrated; e2e reads it.
     });
 });
