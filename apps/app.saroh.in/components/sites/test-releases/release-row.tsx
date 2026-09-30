@@ -9,12 +9,15 @@ import {
     CircleCheck,
     CircleDot,
     ExternalLink,
+    MessageSquareText,
     Rocket,
     Trash2,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { openReleaseInNewTab } from "@/components/sites/test-releases/open-release";
 import { ReleaseLinks } from "@/components/sites/test-releases/release-links";
 import type {
     GoLiveGate,
@@ -29,7 +32,6 @@ import {
 import {
     cancelScheduledGoLive,
     discardTestRelease,
-    openTestRelease,
 } from "@/lib/sites/test-releases-actions";
 
 const BADGE = {
@@ -46,6 +48,10 @@ const BADGE = {
  * with its reviewers, its links, and what can be done with it — Open, Go
  * live…, Schedule…, Cancel schedule and Discard. A control this person
  * can't use says why beside it, never only on the press.
+ *
+ * Review (T12) opens the release in the workspace, its frozen pages beside
+ * its own review, where reviewers approve that release rather than the
+ * draft.
  */
 export function ReleaseRow({
     siteId,
@@ -72,25 +78,9 @@ export function ReleaseRow({
         release.status === "ready" || release.status === "scheduled";
 
     async function open() {
-        // Opened before the request, so the browser treats it as the
-        // press's own window rather than a pop-up.
-        const tab = window.open("about:blank", "_blank");
-        // The site it opens never gets a handle back on the editor.
-        if (tab) tab.opener = null;
         setBusy("open");
-        const res = await openTestRelease(siteId, release.id);
+        await openReleaseInNewTab(siteId, release.id);
         setBusy(null);
-        if (!res.ok || !res.data.url) {
-            tab?.close();
-            showError(
-                res.ok
-                    ? "This site has no test address, so the release can't be opened there."
-                    : res.error,
-            );
-            return;
-        }
-        if (tab) tab.location.href = res.data.url;
-        else window.location.assign(res.data.url);
     }
 
     async function cancelSchedule() {
@@ -195,6 +185,17 @@ export function ReleaseRow({
                         >
                             <ExternalLink aria-hidden className="size-4" />
                             {busy === "open" ? "Opening…" : "Open"}
+                        </Button>
+                        <Button size="sm" variant="outline" asChild>
+                            <Link
+                                href={`/sites/${siteId}/releases/${release.id}`}
+                            >
+                                <MessageSquareText
+                                    aria-hidden
+                                    className="size-4"
+                                />
+                                Review
+                            </Link>
                         </Button>
                         {release.status === "scheduled" ? (
                             can.canPublish ? (

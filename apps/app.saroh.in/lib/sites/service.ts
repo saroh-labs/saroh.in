@@ -989,10 +989,27 @@ export interface SitePublication {
     /** Set when this publish went past an outstanding change request (#199). */
     bypass: { at: string; by: string } | null;
     /**
-     * Which route this publish took: APPROVED, BYPASSED or NONE (#278). Null on
-     * versions published before it was recorded.
+     * Set when an owner went live past "Publishing needs approval" (DEC-071,
+     * T9). Optional: an older API image doesn't send it.
+     */
+    override?: { at: string; by: string } | null;
+    /**
+     * Which route this publish took: APPROVED, BYPASSED, OVERRIDDEN or NONE
+     * (#278, T9). Null on versions published before it was recorded.
      */
     reviewRoute: string | null;
+    /**
+     * The test release this version went live from (DEC-071, T12); null for
+     * a direct publish or a restore. Optional for an older API image.
+     */
+    testRelease?: PublicationRelease | null;
+}
+
+/** A test release, as the version it went live as names it (T12). */
+export interface PublicationRelease {
+    id: string;
+    number: number;
+    name: string;
 }
 
 /** Every publish of a site, newest first. Empty if it has never been published. */
@@ -1035,6 +1052,8 @@ export interface SitePublicationDetail {
     templateVersion: number;
     snapshot: PublishedSnapshot;
     renderability: { renderable: boolean; unrenderable: UnrenderableSection[] };
+    /** The test release this version went live from (T12). */
+    testRelease?: PublicationRelease | null;
 }
 
 /**
@@ -1121,6 +1140,12 @@ export type ApprovalOutcome =
     "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED" | "OVERRIDDEN";
 
 export interface ReviewState {
+    /**
+     * What is being reviewed (DEC-071, T12): a test release, or null for the
+     * draft. The two never mix: a verdict on a release is about its frozen
+     * bytes and leaves the draft's review as it was (KTD-10).
+     */
+    testRelease?: PublicationRelease | null;
     openNotes: number;
     latestApproval: {
         outcome: ApprovalOutcome;
@@ -1147,7 +1172,11 @@ export interface ReviewState {
  * showing nothing is a worse outcome than the editor refusing to open, and
  * notes are not what the merchant came here to do.
  */
-export async function listComments(siteId: string): Promise<SiteCommentView[]> {
+export async function listComments(
+    siteId: string,
+    /** A test release's own notes instead of the draft's (T8, T12). */
+    testReleaseId?: string,
+): Promise<SiteCommentView[]> {
     const base = await sitesBase();
     if (!base) return [];
     /*
@@ -1158,11 +1187,25 @@ export async function listComments(siteId: string): Promise<SiteCommentView[]> {
      * resource (404 → empty) from a failure, and the segment boundary explains
      * the failure.
      */
-    return getList<SiteCommentView>(`${base}/${siteId}/comments`);
+    return getList<SiteCommentView>(
+        `${base}/${siteId}/comments${releaseQuery(testReleaseId)}`,
+    );
 }
 
-export async function getReviewState(siteId: string): Promise<ReviewState> {
+/** `?testReleaseId=…`, or nothing for the draft. */
+function releaseQuery(testReleaseId: string | undefined): string {
+    return testReleaseId
+        ? `?testReleaseId=${encodeURIComponent(testReleaseId)}`
+        : "";
+}
+
+export async function getReviewState(
+    siteId: string,
+    /** A test release's review instead of the draft's (T8, T12). */
+    testReleaseId?: string,
+): Promise<ReviewState> {
     const empty: ReviewState = {
+        testRelease: null,
         openNotes: 0,
         pending: false,
         approvalIsStale: false,
@@ -1180,10 +1223,11 @@ export async function getReviewState(siteId: string): Promise<ReviewState> {
      * `pending` yet is a missing field, not a failure.
      */
     const data = await getJson<Partial<ReviewState>>(
-        `${base}/${siteId}/review`,
+        `${base}/${siteId}/review${releaseQuery(testReleaseId)}`,
     );
     if (!data) return empty;
     return {
+        testRelease: data.testRelease ?? null,
         openNotes: typeof data.openNotes === "number" ? data.openNotes : 0,
         latestApproval: data.latestApproval ?? null,
         outstanding: data.outstanding === true,
@@ -1202,7 +1246,13 @@ export async function getReviewState(siteId: string): Promise<ReviewState> {
  */
 export async function createComment(
     siteId: string,
-    input: { pageId: string; sectionKey: string; body: string },
+    input: {
+        pageId: string;
+        /** On a test release, the section's position on its frozen page (T8). */
+        sectionKey: string;
+        body: string;
+        testReleaseId?: string;
+    },
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
@@ -1237,12 +1287,16 @@ export type ReviewerVerdict = Exclude<
 export async function createApproval(
     siteId: string,
     outcome: ReviewerVerdict,
+    /** A verdict on a test release's frozen bytes, not the draft (T8, T12). */
+    testReleaseId?: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/approvals`, {
         method: "POST",
-        body: JSON.stringify({ outcome }),
+        body: JSON.stringify(
+            testReleaseId ? { outcome, testReleaseId } : { outcome },
+        ),
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
@@ -1289,11 +1343,14 @@ export async function getPageForReview(
  */
 export async function requestReview(
     siteId: string,
+    /** Put a test release up for review instead of the draft (T8, T12). */
+    testReleaseId?: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/review/request`, {
         method: "POST",
+        ...(testReleaseId ? { body: JSON.stringify({ testReleaseId }) } : {}),
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };

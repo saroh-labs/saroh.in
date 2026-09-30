@@ -46,6 +46,11 @@ const SECTION_NAME: Record<string, string | undefined> = {
  *
  * Commenting is a MODE, not furniture. Turn it on and each section becomes
  * something to point at; turn it off and the page is a page again.
+ *
+ * It reads a test release the same way (DEC-071, T12): the release's frozen
+ * sections over the look it froze (`variables`), with each note sent with
+ * the release's id and pinned to the section's position on the frozen page
+ * (T8), since a snapshot keeps no section keys.
  */
 export function SectionReview({
     siteId,
@@ -55,6 +60,8 @@ export function SectionReview({
     style,
     styleOptions,
     canComment,
+    variables,
+    testReleaseId,
 }: {
     siteId: string;
     pageId: string;
@@ -63,14 +70,20 @@ export function SectionReview({
     style: SiteStyle | null;
     styleOptions: SiteStyleOptions | null;
     canComment: boolean;
+    /** Resolved tokens to draw with instead of `style`: a release's own. */
+    variables?: Record<string, string> | null;
+    /** The test release these sections are from; notes go to it. */
+    testReleaseId?: string;
 }) {
     const [commenting, setCommenting] = useState(false);
     const [openFor, setOpenFor] = useState<string | null>(null);
 
     const vars =
-        style && styleOptions
-            ? resolveStyleVariables(style, styleOptions)
-            : undefined;
+        variables !== undefined
+            ? (variables ?? undefined)
+            : style && styleOptions
+              ? resolveStyleVariables(style, styleOptions)
+              : undefined;
 
     if (sections.length === 0) {
         return (
@@ -115,6 +128,7 @@ export function SectionReview({
                             key={section.key}
                             siteId={siteId}
                             pageId={pageId}
+                            testReleaseId={testReleaseId}
                             section={section}
                             notes={comments.filter(
                                 (c) =>
@@ -140,6 +154,7 @@ export function SectionReview({
 function SectionSlot({
     siteId,
     pageId,
+    testReleaseId,
     section,
     notes,
     commenting,
@@ -149,6 +164,7 @@ function SectionSlot({
 }: {
     siteId: string;
     pageId: string;
+    testReleaseId?: string;
     section: ReviewableSection;
     notes: SiteCommentView[];
     commenting: boolean;
@@ -171,6 +187,7 @@ function SectionSlot({
             pageId,
             sectionKey: section.key,
             body: text,
+            ...(testReleaseId ? { testReleaseId } : {}),
         });
         setSaving(false);
         if (!res.ok) {

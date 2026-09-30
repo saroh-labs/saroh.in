@@ -1,7 +1,8 @@
 import { toFailure } from "@/lib/api/failure";
-import { apiFetch, getActiveOrgId } from "@/lib/api/http";
+import { apiFetch, getActiveOrgId, getJson } from "@/lib/api/http";
 
 import type { SitesResult } from "./service";
+import type { TestReleaseDetail } from "./test-release-types";
 import type {
     CreatedTestReleaseLink,
     GoLiveResult,
@@ -47,6 +48,22 @@ export async function readTestReleases(
     } catch {
         return { state: "failed" };
     }
+}
+
+/**
+ * One release with its frozen snapshot, for the in-app release view (T12).
+ * A page read: null for a 404 (not this site's, or test releases are off),
+ * `forbidden()` for a 403, and a failure throws to the segment boundary.
+ */
+export async function readTestRelease(
+    siteId: string,
+    releaseId: string,
+): Promise<TestReleaseDetail | null> {
+    const path = await base(siteId);
+    if (!path) return null;
+    return getJson<TestReleaseDetail>(
+        `${path}/${encodeURIComponent(releaseId)}`,
+    );
 }
 
 async function send<T>(

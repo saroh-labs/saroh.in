@@ -1,7 +1,9 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { CircleCheck, CircleDot } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -9,6 +11,11 @@ import { useState } from "react";
 import { SectionReview } from "@/components/sites/section-review";
 import { createApproval } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
+import {
+    releaseTitle,
+    releaseVerdictLine,
+    reviewSubject,
+} from "@/lib/sites/release-review";
 import type {
     ReviewablePage,
     ReviewerVerdict,
@@ -16,6 +23,15 @@ import type {
     SiteCommentView,
     SiteDetail,
 } from "@/lib/sites/service";
+import type { TestRelease } from "@/lib/sites/test-releases";
+
+/**
+ * The test releases waiting on a reviewer (DEC-071, T12): the ones that can
+ * still be approved or sent back. `failed` is said; null while test
+ * releases are off for the business, and then nothing is shown.
+ */
+export type ReleasesForReview =
+    { state: "on"; releases: TestRelease[] } | { state: "failed" } | null;
 
 /**
  * What someone who may read a site — but not author it — gets instead of the
@@ -28,6 +44,11 @@ import type {
  *
  * What replaced: a list of page titles and paths, which told a reviewer a site
  * had four pages and nothing about what was on them.
+ *
+ * It says what is being reviewed (DEC-071, T12): the draft, here, while
+ * each test release is reviewed on its own page, which this lists. A
+ * verdict here is on the draft and never on a release, and the other way
+ * round (KTD-10).
  */
 export function SiteReviewView({
     site,
@@ -35,12 +56,14 @@ export function SiteReviewView({
     activePageId,
     comments,
     review,
+    releases = null,
 }: {
     site: SiteDetail;
     page: ReviewablePage;
     activePageId: string;
     comments: SiteCommentView[];
     review: ReviewState;
+    releases?: ReleasesForReview;
 }) {
     const router = useRouter();
     const [recording, setRecording] = useState(false);
@@ -77,6 +100,17 @@ export function SiteReviewView({
                         : "You can read this site. Editing and publishing are limited to owners and admins."}
                 </p>
             </div>
+
+            <ReleasesToReview siteId={site.id} releases={releases} />
+
+            <p className="flex items-baseline gap-2 border-b pb-2">
+                <span className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                    Reviewing
+                </span>
+                <span data-review-subject className="text-sm font-medium">
+                    {reviewSubject(null)}
+                </span>
+            </p>
 
             {review.latestApproval ? (
                 <p
@@ -159,5 +193,86 @@ export function SiteReviewView({
                 </div>
             ) : null}
         </div>
+    );
+}
+
+/**
+ * The open test releases, each linked to its own review (T12). Shown only
+ * while test releases are on and there is one to review; a list that
+ * couldn't be read says so rather than reading as none.
+ */
+function ReleasesToReview({
+    siteId,
+    releases,
+}: {
+    siteId: string;
+    releases: ReleasesForReview;
+}) {
+    if (releases === null) return null;
+    if (releases.state === "failed") {
+        return (
+            <p className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
+                Couldn&apos;t check for test releases to review. Reload to try
+                again.
+            </p>
+        );
+    }
+    const open = releases.releases.filter(
+        (r) => r.status === "ready" || r.status === "scheduled",
+    );
+    if (open.length === 0) return null;
+    return (
+        <section aria-label="Test releases" className="space-y-2">
+            <h3 className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                Test releases
+            </h3>
+            <ul className="grid gap-2">
+                {open.map((release) => {
+                    const approved =
+                        release.standing.latest?.outcome === "APPROVED";
+                    return (
+                        <li
+                            key={release.id}
+                            aria-label={release.name}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3.5"
+                        >
+                            <div className="min-w-0">
+                                <p className="text-sm font-semibold [overflow-wrap:anywhere]">
+                                    {releaseTitle(release)}
+                                </p>
+                                <p className="mt-0.5 flex items-start gap-1.5 text-[12.5px] leading-normal text-muted-foreground">
+                                    {approved ? (
+                                        <CircleCheck
+                                            aria-hidden
+                                            className="mt-0.5 size-3.5 shrink-0 text-success"
+                                        />
+                                    ) : (
+                                        <CircleDot
+                                            aria-hidden
+                                            className="mt-0.5 size-3.5 shrink-0"
+                                        />
+                                    )}
+                                    {releaseVerdictLine(
+                                        release.standing.latest,
+                                    )}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {release.status === "scheduled" ? (
+                                    <Badge variant="info">Scheduled</Badge>
+                                ) : null}
+                                <Button size="sm" variant="outline" asChild>
+                                    <Link
+                                        href={`/sites/${siteId}/releases/${release.id}`}
+                                    >
+                                        Review
+                                    </Link>
+                                </Button>
+                            </div>
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
     );
 }

@@ -66,19 +66,31 @@ export async function saveDraftSections(
 /** Leave a note on a section (#277). */
 export async function createComment(
     siteId: string,
-    input: { pageId: string; sectionKey: string; body: string },
+    input: {
+        pageId: string;
+        sectionKey: string;
+        body: string;
+        testReleaseId?: string;
+    },
 ) {
     return createCommentApi(siteId, input);
 }
 
-/** Record a verdict on the site (#277). */
-export async function createApproval(siteId: string, outcome: ReviewerVerdict) {
-    return createApprovalApi(siteId, outcome);
+/**
+ * Record a verdict (#277): on the draft, or on a test release's frozen
+ * bytes when `testReleaseId` is given (T12).
+ */
+export async function createApproval(
+    siteId: string,
+    outcome: ReviewerVerdict,
+    testReleaseId?: string,
+) {
+    return createApprovalApi(siteId, outcome, testReleaseId);
 }
 
-/** Ask for a review (#278). */
-export async function requestReview(siteId: string) {
-    return requestReviewApi(siteId);
+/** Ask for a review (#278), of the draft or of a test release (T12). */
+export async function requestReview(siteId: string, testReleaseId?: string) {
+    return requestReviewApi(siteId, testReleaseId);
 }
 
 /** `override`: an owner past "Publishing needs approval" (DEC-071). */
@@ -93,11 +105,16 @@ export async function updateSiteSettings(
     return updateSiteSettingsApi(siteId, input);
 }
 
+/**
+ * `override`: an owner's restore past "Publishing needs approval"
+ * (DEC-071, Q3), recorded as one.
+ */
 export async function restorePublication(
     siteId: string,
     publicationId: string,
+    override = false,
 ) {
-    return restorePublicationApi(siteId, publicationId);
+    return restorePublicationApi(siteId, publicationId, override);
 }
 
 export async function updateSiteStyle(siteId: string, style: SiteStyle) {
@@ -139,12 +156,12 @@ export async function getSiteFlags(siteId: string) {
     return getSiteFlagsApi(siteId);
 }
 
-export async function listComments(siteId: string) {
-    return listCommentsApi(siteId);
+export async function listComments(siteId: string, testReleaseId?: string) {
+    return listCommentsApi(siteId, testReleaseId);
 }
 
-export async function getReviewState(siteId: string) {
-    return getReviewStateApi(siteId);
+export async function getReviewState(siteId: string, testReleaseId?: string) {
+    return getReviewStateApi(siteId, testReleaseId);
 }
 
 export async function setCommentResolved(
