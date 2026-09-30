@@ -201,6 +201,13 @@ async function withoutPointer(page: Page) {
  * with focus gone, off the same elements. A stop whose look did not change
  * shows a keyboard user nothing.
  *
+ * Every read waits for the transitions the focus change started. Under the
+ * reduced-motion clamp every element transitions `all` for 0.01ms
+ * (globals.css), so a box-shadow ring read in the same frame as its focus
+ * or blur still has its old value: the last stop, blurred just before the
+ * resting read, looked exactly as it did focused and was reported with a
+ * ring on screen (#765).
+ *
  * `from` is where the walk starts: the top of the document, as a keyboard
  * user arriving would, or the start of the page's own content, past the
  * shell's rail — otherwise every screen would walk the same navigation.
@@ -221,7 +228,17 @@ async function focusWithoutIndicator(page: Page, from: "top" | "main") {
                 )
                 .join(" / ");
         };
-        (window as unknown as { __a11yLook: typeof look }).__a11yLook = look;
+        // Every transition and finite animation run out, as `audit` waits.
+        const settle = () =>
+            Promise.all(
+                document
+                    .getAnimations()
+                    .filter(
+                        (a) => a.effect?.getTiming().iterations !== Infinity,
+                    )
+                    .map((a) => a.finished.catch(() => undefined)),
+            );
+        Object.assign(window, { __a11yLook: look, __a11ySettle: settle });
         (document.activeElement as HTMLElement | null)?.blur();
         window.scrollTo(0, 0);
         const main = document.querySelector<HTMLElement>("main");
@@ -238,7 +255,12 @@ async function focusWithoutIndicator(page: Page, from: "top" | "main") {
     for (let i = 0; i < FOCUS_STOPS; i++) {
         await page.keyboard.press("Tab");
         focused.push(
-            await page.evaluate((i) => {
+            await page.evaluate(async (i) => {
+                const w = window as unknown as {
+                    __a11yLook: (el: HTMLElement) => string;
+                    __a11ySettle: () => Promise<unknown>;
+                };
+                await w.__a11ySettle();
                 const el = document.activeElement as HTMLElement | null;
                 // Next's dev overlay takes a stop in development only.
                 if (
@@ -251,18 +273,17 @@ async function focusWithoutIndicator(page: Page, from: "top" | "main") {
                     "data-a11y-stop",
                     `${el.getAttribute("data-a11y-stop") ?? ""} ${i}`.trim(),
                 );
-                const w = window as unknown as {
-                    __a11yLook: (el: HTMLElement) => string;
-                };
                 return w.__a11yLook(el);
             }, i),
         );
     }
-    return page.evaluate((focused) => {
+    return page.evaluate(async (focused) => {
         (document.activeElement as HTMLElement | null)?.blur();
         const w = window as unknown as {
             __a11yLook: (el: HTMLElement) => string;
+            __a11ySettle: () => Promise<unknown>;
         };
+        await w.__a11ySettle();
         const out = new Set<string>();
         focused.forEach((styles, i) => {
             if (!styles) return;
