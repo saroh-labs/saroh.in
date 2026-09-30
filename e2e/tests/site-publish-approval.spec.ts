@@ -1,4 +1,4 @@
-// @covers app:/sites/[siteId]/settings api:sites
+// @covers app:/sites/[siteId]/settings app:/sites api:sites
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -87,6 +87,33 @@ test(
                 "aria-checked",
                 "true",
             );
+
+            // The editor's Publish says so before it is pressed (T11): it
+            // reads "Needs approval". On a phone it sits in the "Status,
+            // view and publish" menu.
+            await page.goto(`${urls.APP_URL}/sites/${siteId}`);
+            const publish = page
+                .getByRole("button", { name: /^Needs approval/ })
+                .filter({ visible: true });
+            await expect(async () => {
+                if (
+                    (page.viewportSize()?.width ?? 1440) < 760 &&
+                    !(await publish.first().isVisible())
+                ) {
+                    await page
+                        .getByRole("button", {
+                            name: "Status, view and publish",
+                        })
+                        .click();
+                }
+                await expect(publish).toHaveCount(1, { timeout: 2_000 });
+            }).toPass({ timeout: 30_000 });
+            await expect(
+                page.getByRole("button", { name: /^Publish( \d+)?$/ }).filter({
+                    visible: true,
+                }),
+            ).toHaveCount(0);
+            await page.goto(`${urls.APP_URL}/sites/${siteId}/settings`);
 
             // A direct publish is now refused, and nothing is written.
             const refused = await page.request.post(
