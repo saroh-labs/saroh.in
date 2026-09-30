@@ -630,6 +630,36 @@ describe("an unsure answer", () => {
         expect(calls("charge")).toHaveLength(2);
         expect((await intentsOf(invoice.id))[0].status).toBe("PROCESSING");
     });
+
+    it("a debit retried after a crash mid-claim schedules its look-up (release review)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        await runDue(invoice.id);
+        const [intent] = await intentsOf(invoice.id);
+        fake.settlePreDebit(intent.providerIntentId ?? "", "DELIVERED");
+        clock = new Date(clock.getTime() + 27 * HOUR);
+        // The first delivery claimed the debit (PROCESSING) and the worker
+        // died before asking the provider or writing its LOOK; the job is
+        // delivered again.
+        await prisma.paymentIntent.update({
+            where: { id: intent.id },
+            data: { status: "PROCESSING" },
+        });
+        const before = calls("charge").length;
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(before);
+        const waiting = (await chargeJobs(invoice.id)).map(
+            (j) => (j.payload as { step: string }).step,
+        );
+        expect(waiting).toEqual(["LOOK"]);
+
+        // The look-up finds no debit, so it is asked for, once.
+        clock = new Date(clock.getTime() + 2 * HOUR);
+        expect(await runDue(invoice.id)).toEqual(["LOOK"]);
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(before + 1);
+        expect((await intentsOf(invoice.id))[0].status).toBe("PROCESSING");
+    });
 });
 
 describe("the limit", () => {

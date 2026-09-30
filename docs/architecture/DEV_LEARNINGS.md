@@ -1895,3 +1895,25 @@ a mandate call's UNKNOWN. There is no Cashfree mandate adapter yet.
 Tests: `order-payments.spec.ts` and `razorpay-mandates.spec.ts`, with a
 fetch that settles only when its signal aborts.
 **Category**: integrations · payments · timeouts
+
+## Autopay — a debit retried after a crash is never looked up
+
+**Problem**: (release review) a renewal's autopay charge could sit in
+PROCESSING for good. The DEBIT step claims the intent (REQUIRES_PAYMENT →
+PROCESSING) before asking the provider; a worker that died after the claim
+and before writing the LOOK step left the job to be delivered again, and
+that delivery did nothing.
+**Root cause**: on the retry `charge()` finds the intent already claimed
+and answers ALREADY (`intentStatus: PROCESSING`); the handler's ALREADY
+case returned without a next step. No LOOK, so nothing ever asked the
+provider, and the pay link stayed shut behind "Autopay charge in progress".
+**Fix**: `subscription-charge.handler.ts` — ALREADY with PROCESSING
+enqueues the LOOK step, as UNKNOWN does (`enqueueChargeStepInTx` keeps a
+LOOK already waiting). The look-up finds no debit, puts the intent back to
+REQUIRES_PAYMENT and asks for it once.
+**Rule**: a step that claims a row before a side effect must leave a way
+back from every state its crash can leave behind; the redelivery's "already
+claimed" answer schedules the recovery step. `backend-jobs.md` → Autopay
+charges. Test: `subscriptions.charge.db.spec.ts` ("a debit retried after
+a crash mid-claim").
+**Category**: jobs · autopay · crash recovery

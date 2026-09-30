@@ -119,7 +119,9 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   transaction; each step writes the next with `enqueueChargeStepInTx`,
   which skips a step already waiting for that charge, so a redelivered run
   never forks the chain. The debit is claimed on the intent before it is
-  asked, so a run delivered twice debits once.
+  asked, so a run delivered twice debits once. A redelivery that finds the
+  debit already claimed (`ALREADY`, PROCESSING) writes the `LOOK` step: the
+  run before it may have died between the claim and its next step.
 
 ## Team alerts — **Current** (F14)
 
