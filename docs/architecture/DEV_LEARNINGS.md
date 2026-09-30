@@ -1802,3 +1802,19 @@ down, which only happens when several prepush runs share the machine.
 this flake. Rerun before hunting, and fix the test (clear its timers in
 `afterEach`) when it recurs.
 **Category**: vitest · tests · flake
+
+## vitest — merchant-copy.test.ts times out at 5s under load (K12)
+
+**Problem**: `pnpm prepush --int` failed its vitest step on
+`apps/app.saroh.in/lib/merchant-copy.test.ts` ("no workspace string a
+merchant reads says storefront"): "Test timed out in 5000ms". Alone it
+passes in about a second, and the prepush rerun passed. K12 did not touch
+the app.
+**Root cause**: the test walks and reads every source file under the app's
+roots synchronously. With several unit worktrees running prepush on one
+machine, disk and CPU contention push that walk past vitest's default 5s.
+**Fix**: none yet. It was rerun.
+**Rule**: a lone timeout in a source-scanning test is load, not a finding.
+Rerun first; if it recurs, give the scan an explicit timeout (as a third
+argument to `it`) rather than the default.
+**Category**: vitest · tests · flake

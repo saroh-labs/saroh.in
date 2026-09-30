@@ -46,3 +46,10 @@ export {
     personalServiceIds,
     personalTemplate,
 } from "./templates/personal";
+
+// The Portfolio template (DEC-070, K12). Exported, not yet registered: K15
+// registers it.
+export {
+    PORTFOLIO_TEMPLATE_ID,
+    portfolioTemplate,
+} from "./templates/portfolio";
