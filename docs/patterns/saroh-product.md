@@ -55,10 +55,19 @@ pattern files refer back here.
   They use the kind's words ("Add your address", "Add your details"), and the
   checklist's heading follows its steps ("Get your site live" when only
   publishing is left).
-- **Not yet true** (DEC-070, K11–K15) — The Portfolio, Blog/writing and
-  Personal/consultant templates and the Projects block aren't built, so a
-  new site starts from the starter template for every kind. Its second
-  version (`starter@2`) no longer assumes a business and has no images.
+- **Current** (DEC-070, K10–K15) — A new site starts from the kind's
+  template: the starter (`starter@2`) for a business, Personal for Just me,
+  Portfolio (with the Projects block) for A site for my work. The Turn on
+  sheet's Website step says which ("Starts from the Portfolio template"),
+  and `/sites/new` starts its picker there; any registered template can be
+  chosen instead, Writing among them, and an explicit choice always wins.
+  There is no blank site. The kind only picks the default
+  (`sites/site-template.ts`, `KIND_TEMPLATE`), never which templates a
+  business may use. No template assumes a business, speaks as "we", or
+  names an image; every enquiry form a template lays down gets its Form
+  when the site is made, so it takes enquiries from the first publish.
+  Personal lists the real Services only with Bookings on and a service to
+  show; otherwise placeholder offers the owner writes over.
 - **Current** — A business is often a small team of 2–5 people with mixed
   roles, sharing one workspace; someone working for themselves is a team of
   one. Nobody is a full-time software operator (`PRODUCT.md`). Avoid

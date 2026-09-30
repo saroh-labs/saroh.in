@@ -65,8 +65,8 @@ describe("portfolio@1 (DEC-070, K12)", () => {
         expect(portfolioTemplate.version).toBe(1);
     });
 
-    it("is not registered yet: K15 registers it", () => {
-        expect(getTemplate(PORTFOLIO_TEMPLATE_ID)).toBeUndefined();
+    it("is registered as the latest portfolio (K15)", () => {
+        expect(getTemplate(PORTFOLIO_TEMPLATE_ID)).toBe(portfolioTemplate);
     });
 
     it.each(profiles)(

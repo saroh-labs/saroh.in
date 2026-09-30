@@ -5,7 +5,8 @@ import { hashPassword, id } from "./helpers";
 /**
  * Asha, who is just starting (DEC-070, K2): a verified account. Browser
  * specs about setting up sign in as her and make businesses of their own;
- * the three seeded below (`FIRST_RUNS`, K3) are for reading a first run.
+ * the three seeded below (`FIRST_RUNS`, K3) are for reading a first run,
+ * and the two after them (`SITE_STARTS`, K15) for making a first site.
  *
  * A business she made in an earlier run is hers, not the seed's, and is
  * left as it is.
@@ -33,7 +34,8 @@ export async function seedFounder(prisma: Db): Promise<void> {
             password: await hashPassword(FOUNDER_PASSWORD),
         },
     });
-    await seedFirstRuns(prisma, founder.id);
+    await seedFirstRuns(prisma, founder.id, "first-run", FIRST_RUNS);
+    await seedFirstRuns(prisma, founder.id, "site-start", SITE_STARTS);
 }
 
 /**
@@ -53,16 +55,32 @@ export const FIRST_RUNS = [
     { key: "work", kind: "WORK", name: "Asha Rao Studio" },
 ] as const;
 
-async function seedFirstRuns(prisma: Db, userId: string): Promise<void> {
-    for (const run of FIRST_RUNS) {
-        const orgId = id("org", "first-run", run.key);
+/**
+ * Two more of Asha's, "A site for my work", each with nothing on (DEC-070,
+ * K15): `site-templates.spec.ts` turns Website on in one per browser — desk
+ * and phone each make their own site, since a business has one — and reads
+ * the portfolio it starts from. Nothing else reads them.
+ */
+export const SITE_STARTS = [
+    { key: "work-desk", kind: "WORK", name: "Asha Rao Studio" },
+    { key: "work-phone", kind: "WORK", name: "Asha Rao Studio" },
+] as const;
+
+async function seedFirstRuns(
+    prisma: Db,
+    userId: string,
+    set: string,
+    runs: readonly { key: string; kind: string; name: string }[],
+): Promise<void> {
+    for (const run of runs) {
+        const orgId = id("org", set, run.key);
         await prisma.organization.upsert({
             where: { id: orgId },
             update: { name: run.name, kind: run.kind },
             create: {
                 id: orgId,
                 name: run.name,
-                slug: `first-run-${run.key}`,
+                slug: `${set}-${run.key}`,
                 kind: run.kind,
             },
         });
@@ -72,7 +90,7 @@ async function seedFirstRuns(prisma: Db, userId: string): Promise<void> {
             },
             update: { role: "OWNER" },
             create: {
-                id: id("membership", "first-run", run.key),
+                id: id("membership", set, run.key),
                 organizationId: orgId,
                 userId,
                 role: "OWNER",
@@ -88,7 +106,7 @@ async function seedFirstRuns(prisma: Db, userId: string): Promise<void> {
                 },
                 update: { enabled: true },
                 create: {
-                    id: id("flagoverride", "first-run", run.key, m.key),
+                    id: id("flagoverride", set, run.key, m.key),
                     flagKey,
                     organizationId: orgId,
                     enabled: true,

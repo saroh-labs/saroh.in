@@ -5,7 +5,9 @@ import { moduleViewSchema } from "./schema";
 /**
  * The "Turn on" sheet's contract with the API (DEC-068, unit M1):
  *
- * - `GET  …/modules/:key/setup-defaults` → `{ defaults, dependencies, hidden }`
+ * - `GET  …/modules/:key/setup-defaults` → `{ setup, dependencies, hidden,
+ *   template? }` (`setup` is the prefill; `defaults` is read too, as this
+ *   file first expected it)
  * - `PUT  …/modules/:key` with `{ status: "ENABLED", setup? }`
  *
  * Only three modules ask for anything at turn-on; every other one sends
@@ -104,12 +106,24 @@ export interface SetupDefaults {
     hidden: boolean;
     /** False when the API couldn't be asked: the fallback is in use. */
     read: boolean;
+    /**
+     * Website only, with no site yet: the template a new site starts from,
+     * which follows what is being set up (DEC-070, K15). Null: not said.
+     */
+    template: { id: string; name: string } | null;
 }
 
 const defaultsEnvelopeSchema = z.object({
+    /** The prefill, as the API names it. */
+    setup: z.unknown().optional(),
+    /** The name this file first read it under; kept as a fallback. */
     defaults: z.unknown().optional(),
     dependencies: z.array(z.string()).optional(),
     hidden: z.boolean().optional(),
+    template: z
+        .object({ id: z.string().min(1), name: z.string().min(1) })
+        .nullish()
+        .catch(null),
 });
 
 /**
@@ -128,11 +142,14 @@ export function decodeSetupDefaults(key: string, raw: unknown): SetupDefaults {
             dependencies: [],
             hidden: false,
             read: false,
+            template: null,
         };
     }
     let defaults: SetupDefaults["defaults"] = fallback;
     if (hasSetup(key)) {
-        const own = SETUP_SCHEMAS[key].safeParse(parsed.data.defaults);
+        const own = SETUP_SCHEMAS[key].safeParse(
+            parsed.data.setup ?? parsed.data.defaults,
+        );
         if (own.success) defaults = own.data;
     }
     return {
@@ -141,6 +158,7 @@ export function decodeSetupDefaults(key: string, raw: unknown): SetupDefaults {
         dependencies: parsed.data.dependencies ?? [],
         hidden: parsed.data.hidden ?? false,
         read: true,
+        template: parsed.data.template ?? null,
     };
 }
 

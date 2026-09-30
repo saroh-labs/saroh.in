@@ -1,4 +1,5 @@
 import type { TemplateContext, TemplateManifest } from "../manifest";
+import { escapeHtml } from "./html";
 
 /**
  * `portfolio` — a site for someone showing their work (DEC-070, K12). Three
@@ -21,11 +22,11 @@ import type { TemplateContext, TemplateManifest } from "../manifest";
  * reads it the same. Every link goes somewhere: an email, or a page this
  * template makes itself.
  *
- * The enquiry has no `formId`: its Form is made the first time the site is
- * saved in the editor, as for any enquiry section added there.
+ * The enquiry has no `formId` here: a template lays down content only, and
+ * the API makes its Form with the site (`site-create.ts`), so it takes
+ * enquiries from the first publish.
  *
- * Registered with the others by K15; until then `getTemplate("portfolio")`
- * doesn't find it.
+ * The default for "A site for my work" (DEC-070, K15).
  */
 
 export const PORTFOLIO_TEMPLATE_ID = "portfolio";
@@ -67,21 +68,6 @@ const ENQUIRY_FIELDS = [
         required: true,
     },
 ] as const;
-
-/**
- * Escape text for the rich-text HTML it is woven into: a name like
- * "Ink & Co." is text, not markup. (`starter.ts`, `writing.ts` and
- * `personal.ts` keep their own copy; K15, which touches every template, is
- * the place to share one.)
- */
-function escapeHtml(text: string): string {
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-}
 
 /** What the owner has said about the work, if anything. */
 function ownWords(ctx: TemplateContext): string | undefined {

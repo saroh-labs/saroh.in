@@ -61,6 +61,19 @@ describe("registry", () => {
         const ids = listTemplates().map((t) => t.id);
         expect(new Set(ids).size).toBe(ids.length);
     });
+
+    it("registers the DEC-070 templates beside the starter (K15)", () => {
+        expect(listTemplates().map((t) => `${t.id}@${t.version}`)).toEqual([
+            "starter@2",
+            "personal@1",
+            "portfolio@1",
+            "writing@1",
+        ]);
+        for (const id of ["personal", "portfolio", "writing"]) {
+            expect(getTemplate(id)?.id).toBe(id);
+            expect(getTemplate(id, 1)?.version).toBe(1);
+        }
+    });
 });
 
 describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", () => {

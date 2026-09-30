@@ -36,6 +36,7 @@ import type { OrganizationKind } from "../../organizations/organization-kind";
 import { organizationKind } from "../../organizations/organization-kind";
 import { authorize } from "../../organizations/organization-policy";
 import { siteDefaults } from "../../sites/site-address";
+import { kindTemplate } from "../../sites/site-template";
 import { ModuleLifecycleService } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
 import { MODULE_BY_KEY, moduleRolledOut } from "../module-registry";
@@ -86,6 +87,12 @@ export interface ModuleSetupDefaults {
      * with its own setup when an online way is chosen).
      */
     alsoWebsite?: boolean;
+    /**
+     * Website only, with no site yet: the template the new site starts
+     * from, which follows the kind (DEC-070, K15) — "Starts from
+     * Portfolio". Said, not asked: `/sites/new` is where another is picked.
+     */
+    template?: { id: string; name: string };
 }
 
 /** Opening hours, one row per weekday (0 = Sunday). */
@@ -259,10 +266,15 @@ export class ModuleSetupService {
                 }
                 // The address chosen at setup, or a free one like it: the
                 // same start `/sites/new` has (`GET …/sites/new-defaults`).
+                const [address, kind] = await Promise.all([
+                    siteDefaults(prisma, organizationId),
+                    organizationKind(prisma, organizationId),
+                ]);
                 return {
                     ...base,
-                    setup: { ...(await siteDefaults(prisma, organizationId)) },
+                    setup: { ...address },
                     existing: null,
+                    template: kindTemplate(kind),
                 };
             }
             default:
