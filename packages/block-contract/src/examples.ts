@@ -16,6 +16,8 @@ import type { SectionType } from "./section-contract";
  *   the moment they went live;
  * - contact — an invented phone number or address is worse than none;
  * - gallery — needs the merchant's own photos;
+ * - projects — invented work would be a claim about the merchant that is
+ *   not true (K11);
  * - enquiry, booking, servicesList — already seeded with working defaults,
  *   or read the business's live data.
  * Those start as they always have.

@@ -1787,3 +1787,18 @@ reviewers acting at the same moment.
 `cuid()` grows within a process, so the id settles the tie.
 **Rule**: "the newest row" is never ordered by a timestamp alone; add the id.
 **Category**: data · ordering · tests
+## vitest — bookings-list.test.tsx throws "window is not defined" under load (K11)
+
+**Problem**: `pnpm prepush --int` failed its vitest step once on
+`@saroh/site-blocks`: "Vitest caught 1 unhandled error", a
+`ReferenceError: window is not defined` from
+`src/account/bookings-list.test.tsx`, with every test passing. The same
+suite then passed three times out of three, and the prepush rerun passed.
+**Root cause**: not found. It looks like something scheduled by the test
+(a timer or a state update) running after the jsdom environment was torn
+down, which only happens when several prepush runs share the machine.
+**Fix**: none yet. It was rerun. K11 did not touch the file.
+**Rule**: a lone unhandled "window is not defined" with all tests green is
+this flake. Rerun before hunting, and fix the test (clear its timers in
+`afterEach`) when it recurs.
+**Category**: vitest · tests · flake

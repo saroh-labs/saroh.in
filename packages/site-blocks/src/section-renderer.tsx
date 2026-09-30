@@ -11,6 +11,7 @@ import type {
     RenderedPacks,
     RenderedPlans,
     RenderedProductGrid,
+    RenderedProjects,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -34,6 +35,7 @@ import type { PlansFeed } from "./blocks/plans";
 import PlansSection from "./blocks/plans";
 import type { ProductGridFeed } from "./blocks/product-grid";
 import ProductGridSection from "./blocks/product-grid";
+import ProjectsSection from "./blocks/projects";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
@@ -240,6 +242,12 @@ export default function SectionRenderer({
                     feed={productGrid}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                />
+            );
+        case "projects":
+            return (
+                <ProjectsSection
+                    content={section.content as RenderedProjects}
                 />
             );
         case "booking":

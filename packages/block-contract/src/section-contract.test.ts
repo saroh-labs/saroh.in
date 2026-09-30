@@ -394,6 +394,7 @@ describe("per-section padding override (#189)", () => {
         plans: {},
         productGrid: {},
         packs: {},
+        projects: { items: [{ title: "Menus for a bakery" }] },
     };
 
     it("is accepted on every section type", () => {

@@ -209,6 +209,91 @@ describe("the text block's photo (G7)", () => {
     });
 });
 
+describe("a project's photo and link (K11)", () => {
+    const projects = (items: unknown[], hidden = false) =>
+        page([{ type: "projects", content: { items }, hidden }]);
+
+    it("flags a photo with no description, naming the project", () => {
+        const flags = checkPage(
+            projects([
+                {
+                    title: "Menus for a bakery",
+                    image: { src: "https://cdn.example.com/a.jpg", alt: " " },
+                },
+            ]),
+            ["/"],
+        );
+        expect(flags).toHaveLength(1);
+        expect(flags[0]).toMatchObject({
+            type: "emptyRequiredField",
+            field: "items",
+            sectionIndex: 0,
+        });
+        expect(flags[0].message).toMatch(
+            /"Menus for a bakery".*no description/,
+        );
+    });
+
+    it("flags each undescribed photo, and none that are described", () => {
+        const flags = checkPage(
+            projects([
+                { title: "A", image: { src: "https://x/a.jpg" } },
+                { title: "B", image: { src: "https://x/b.jpg", alt: "B" } },
+                { title: "C" },
+                { title: "D", image: { src: "https://x/d.jpg" } },
+            ]),
+            ["/"],
+        );
+        expect(flags.map((f) => f.message)).toEqual([
+            expect.stringMatching(/"A"/),
+            expect.stringMatching(/"D"/),
+        ]);
+    });
+
+    it("flags a link to a page that is not on the site", () => {
+        const flags = checkPage(
+            projects([
+                { title: "A", link: "/work/menus" },
+                { title: "B", link: "/about" },
+                { title: "C", link: "https://example.com/c" },
+            ]),
+            ["/", "/about"],
+        );
+        expect(flags.map((f) => [f.type, f.field])).toEqual([
+            ["brokenLink", "items"],
+        ]);
+        expect(flags[0].message).toMatch(/\/work\/menus/);
+    });
+
+    it("says nothing about a hidden block", () => {
+        expect(
+            checkPage(
+                projects(
+                    [{ title: "A", image: { src: "https://x/a.jpg" } }],
+                    true,
+                ),
+                ["/"],
+            ),
+        ).toEqual([]);
+    });
+
+    it("reaches the pre-publish check, not only the rail", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    projects([
+                        { title: "A", image: { src: "https://x/a.jpg" } },
+                    ]),
+                ],
+            }),
+        );
+        expect(flags.map((f) => [f.type, f.field])).toContainEqual([
+            "emptyRequiredField",
+            "items",
+        ]);
+    });
+});
+
 describe("missing images", () => {
     it("flags a hero with no image and a gallery with none", () => {
         const flags = checkPage(

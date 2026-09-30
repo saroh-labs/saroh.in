@@ -27,6 +27,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
     plans: "Plans",
     packs: "Class packs",
     productGrid: "Product grid",
+    projects: "Projects",
 };
 
 /**
@@ -55,6 +56,7 @@ export const SECTION_HINTS: Record<SectionType, string> = {
     plans: "Your plans on sale, with price and how often. A new plan shows up on its own.",
     packs: "Your class packs on sale, with the price per class. A new pack shows up on its own.",
     productGrid: "Reads the catalogue. Stays current on its own.",
+    projects: "Your own work, each with a photo, a line about it and a link.",
 };
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
@@ -112,6 +114,7 @@ export const SECTION_ORDER: SectionType[] = [
     "richText",
     "cta",
     "gallery",
+    "projects",
     "enquiry",
     "booking",
     "features",
