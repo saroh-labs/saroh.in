@@ -1,7 +1,9 @@
 import type { Prisma } from "@saroh/database";
 
-import type { ApprovalRow, ReviewRoute } from "./review-route";
+import type { ReviewRoute, ReviewStanding } from "./review-route";
 import { reviewStanding } from "./review-route";
+import type { VerdictRow } from "./test-release-review";
+import { draftVerdicts, releaseStanding } from "./test-release-review";
 
 /**
  * The one way a site's live version changes (DEC-071, KTD-3).
@@ -57,6 +59,12 @@ export interface PutLiveInput {
     path?: string | null;
     /** The TEST publication a go-live copied (KTD-2). */
     sourcePublicationId?: string | null;
+    /**
+     * The test release going live (T8). Its review is read from the verdicts
+     * given on a release (KTD-10), not the draft's, and a bypass record names
+     * it, so the draft's own review never reads a release's go-live.
+     */
+    testReleaseId?: string | null;
 }
 
 export interface PutLiveResult {
@@ -83,6 +91,9 @@ export async function putLive(
         organizationId: site.organizationId,
         fingerprint: input.fingerprint,
         publisherUserId: actor.userId,
+        // Going live with a release asks the release's reviewers; publish
+        // and restore ask the draft's (KTD-10).
+        scope: input.source === "go-live" ? "release" : "draft",
     });
     const bypassed = standing.outstanding;
 
@@ -131,6 +142,9 @@ export async function putLive(
                 byUserId: actor.userId,
                 outcome: "BYPASSED",
                 publicationId: publication.id,
+                ...(input.testReleaseId
+                    ? { testReleaseId: input.testReleaseId }
+                    : {}),
             },
             select: { id: true },
         });
@@ -145,21 +159,23 @@ export async function putLive(
 }
 
 /**
- * Where the site stands with its reviewers for `fingerprint`, asked of
- * `client` so a transaction gets its own answer (#278). Verdicts only:
- * BYPASSED and OVERRIDDEN are going live's own records, and must not settle
- * the request they were written about.
+ * Whose review is asked about: the draft's (publish, restore), or a test
+ * release's (go live), which reads only the verdicts given on a release
+ * with its fingerprint (KTD-10, `test-release-review.ts`).
  */
-export async function readReviewStanding(
+export type ReviewScope = "draft" | "release";
+
+/**
+ * Every verdict on the site, newest first, asked of `client` so a
+ * transaction gets its own answer (#278). Verdicts only: BYPASSED and
+ * OVERRIDDEN are going live's own records, and must not settle the request
+ * they were written about.
+ */
+export async function readVerdicts(
     client: Pick<Prisma.TransactionClient, "siteApproval">,
-    input: {
-        siteId: string;
-        organizationId: string;
-        fingerprint: string;
-        publisherUserId: string | null;
-    },
-) {
-    const verdicts = (await client.siteApproval.findMany({
+    input: { siteId: string; organizationId: string },
+): Promise<VerdictRow[]> {
+    return client.siteApproval.findMany({
         where: {
             siteId: input.siteId,
             organizationId: input.organizationId,
@@ -171,8 +187,35 @@ export async function readReviewStanding(
             byUserId: true,
             draftFingerprint: true,
             createdAt: true,
+            testReleaseId: true,
         },
-    })) as ApprovalRow[];
+    });
+}
 
-    return reviewStanding(verdicts, input.fingerprint, input.publisherUserId);
+/**
+ * Where the site stands with its reviewers for `fingerprint`: the draft's
+ * review, or a release's (`scope`).
+ */
+export async function readReviewStanding(
+    client: Pick<Prisma.TransactionClient, "siteApproval">,
+    input: {
+        siteId: string;
+        organizationId: string;
+        fingerprint: string;
+        publisherUserId: string | null;
+        scope: ReviewScope;
+    },
+): Promise<ReviewStanding> {
+    const verdicts = await readVerdicts(client, input);
+    return input.scope === "release"
+        ? releaseStanding(
+              verdicts,
+              { fingerprint: input.fingerprint },
+              input.publisherUserId,
+          )
+        : reviewStanding(
+              draftVerdicts(verdicts),
+              input.fingerprint,
+              input.publisherUserId,
+          );
 }

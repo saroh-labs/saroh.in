@@ -279,10 +279,46 @@ export class CreateCommentDto {
     @MinLength(1, { message: "pageId is required" })
     pageId!: string;
 
+    /**
+     * On the draft: the section's key. On a test release: its position on
+     * the frozen page, `"0"` for the first (a snapshot keeps no keys, and a
+     * frozen page's sections never move).
+     */
     @IsString()
     @MinLength(1, { message: "sectionKey is required" })
     @MaxLength(64)
     sectionKey!: string;
+
+    /** The test release the note is about (DEC-071, T8). Absent: the draft. */
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
+}
+
+/**
+ * Which review to read: the draft's (absent), or a test release's (DEC-071,
+ * T8). A query, for the review state and the notes.
+ */
+export class ReviewTargetQueryDto {
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
+}
+
+/**
+ * Ask for a review (#278): of the draft (no body, or no `testReleaseId`),
+ * or of a test release (DEC-071, T8).
+ */
+export class RequestReviewDto {
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
 }
 
 /**
@@ -315,6 +351,16 @@ export class CreateApprovalDto {
         message: "outcome must be APPROVED or CHANGES_REQUESTED",
     })
     outcome!: "APPROVED" | "CHANGES_REQUESTED";
+
+    /**
+     * The test release the verdict is on (DEC-071, T8). The verdict is then
+     * bound to that release's frozen bytes, not the moving draft (KTD-10).
+     */
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
 }
 
 /**

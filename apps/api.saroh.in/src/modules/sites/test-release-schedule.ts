@@ -6,14 +6,14 @@ import {
 import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { readReviewStanding } from "./live-pointer";
-import { ReviewRoute } from "./review-route";
+import { readVerdicts } from "./live-pointer";
 import { ADDRESS_MISSING_MESSAGE } from "./site-flags";
 import {
     RELEASE_DISCARDED_MESSAGE,
     RELEASE_GOING_LIVE_MESSAGE,
     RELEASE_LIVE_MESSAGE,
 } from "./test-release-go-live";
+import { releaseApproved } from "./test-release-review";
 
 /**
  * A scheduled go-live (DEC-071, T10): "Go live at Fri 6:00pm", chosen in the
@@ -185,12 +185,12 @@ export async function scheduleGoLive(
 
     let override = false;
     if (site.publishNeedsApproval) {
-        const approved = await releaseApprovedFor(tx, {
-            siteId: input.siteId,
-            organizationId: input.organizationId,
-            fingerprint: release.fingerprint,
-            userId: input.actorUserId,
-        });
+        // Asked of `tx`, as `putLive` asks it, so both give the same answer.
+        const approved = releaseApproved(
+            await readVerdicts(tx, input),
+            release,
+            input.actorUserId,
+        );
         if (!approved && !input.override) {
             throw new ConflictException({
                 message: APPROVAL_REQUIRED_MESSAGE,
@@ -265,29 +265,6 @@ export const CLEARED_SCHEDULE = {
     scheduleOverride: false,
     goLiveJobId: null,
 } as const satisfies Prisma.SiteTestReleaseUpdateInput;
-
-/**
- * Whether the release is approved for `userId` to put live: an approval of
- * its fingerprint by someone else settles its review (KTD-10). Asked of
- * `tx`, as `putLive` asks it, so both give the same answer.
- */
-export async function releaseApprovedFor(
-    tx: Pick<Prisma.TransactionClient, "siteApproval">,
-    input: {
-        siteId: string;
-        organizationId: string;
-        fingerprint: string;
-        userId: string;
-    },
-): Promise<boolean> {
-    const standing = await readReviewStanding(tx, {
-        siteId: input.siteId,
-        organizationId: input.organizationId,
-        fingerprint: input.fingerprint,
-        publisherUserId: input.userId,
-    });
-    return standing.route === ReviewRoute.Approved;
-}
 
 async function lockRelease(
     tx: ScheduleTx,

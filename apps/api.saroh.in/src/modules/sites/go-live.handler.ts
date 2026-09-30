@@ -5,12 +5,13 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { businessTimezone } from "../bookings/staff-availability";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import { readVerdicts } from "./live-pointer";
 import { goLiveWithRelease } from "./test-release-go-live";
+import { releaseApproved } from "./test-release-review";
 import type { SiteGoLivePayload } from "./test-release-schedule";
 import {
     CLEARED_SCHEDULE,
     localTime,
-    releaseApprovedFor,
     SITE_GO_LIVE_TYPE,
 } from "./test-release-schedule";
 
@@ -227,12 +228,11 @@ async function whyNotLive(
     }
 
     if (site.publishNeedsApproval) {
-        const approved = await releaseApprovedFor(tx, {
-            siteId: release.siteId,
-            organizationId,
-            fingerprint: release.fingerprint,
-            userId: release.scheduledByUserId ?? "",
-        });
+        const approved = releaseApproved(
+            await readVerdicts(tx, { siteId: release.siteId, organizationId }),
+            release,
+            release.scheduledByUserId ?? "",
+        );
         // An owner's override holds only while they are still an owner.
         const overridden = release.scheduleOverride && scheduler.owner;
         if (!approved && !overridden) {

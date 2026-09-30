@@ -164,6 +164,7 @@ export async function goLiveWithRelease(
         },
         publishedAt: at,
         sourcePublicationId: release.publicationId,
+        testReleaseId: releaseId,
     });
 
     await tx.siteTestRelease.update({
