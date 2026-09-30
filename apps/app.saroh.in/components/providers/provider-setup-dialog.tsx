@@ -18,6 +18,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
@@ -212,6 +213,10 @@ function PaymentsForm({
     const secretRequired = hook?.secretRequired ?? razorpay;
     const [webhookSecret, setWebhookSecret] = useState("");
     const [saving, setSaving] = useState(false);
+    const details = useBusinessDetailsStep({
+        then: `connect ${labelOfPayment(provider)}`,
+        continueLabel: "Save and connect",
+    });
     const [confirming, setConfirming] = useState<PaymentProviderName | null>(
         null,
     );
@@ -234,18 +239,23 @@ function PaymentsForm({
         e.preventDefault();
         if (incomplete) return;
         setSaving(true);
-        const res = await connectPaymentProvider({
-            provider,
-            keyId: keyId.trim(),
-            keySecret: keySecret.trim(),
-            ...(!razorpay && publicKey.trim()
-                ? { publicKey: publicKey.trim() }
-                : {}),
-            ...(secretRequired && webhookSecret.trim()
-                ? { webhookSecret: webhookSecret.trim() }
-                : {}),
-        });
+        // Online payments are invoiced: the registered address first
+        // (DEC-068), asked here, then the keys are saved.
+        const res = await details.run(() =>
+            connectPaymentProvider({
+                provider,
+                keyId: keyId.trim(),
+                keySecret: keySecret.trim(),
+                ...(!razorpay && publicKey.trim()
+                    ? { publicKey: publicKey.trim() }
+                    : {}),
+                ...(secretRequired && webhookSecret.trim()
+                    ? { webhookSecret: webhookSecret.trim() }
+                    : {}),
+            }),
+        );
         setSaving(false);
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(`${labelOfPayment(provider)} connected`);
         onDone();
@@ -415,6 +425,7 @@ function PaymentsForm({
                     onConfirm={() => void disconnect(confirming)}
                 />
             ) : null}
+            {details.step}
         </form>
     );
 }

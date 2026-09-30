@@ -2,7 +2,6 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
-    InternalServerErrorException,
     NotFoundException,
 } from "@nestjs/common";
 import type { PageKind } from "@saroh/database";
@@ -12,16 +11,8 @@ import {
     Prisma,
     prisma,
 } from "@saroh/database";
-import {
-    getTemplate,
-    instantiateTemplate,
-    STARTER_TEMPLATE_ID,
-    starterTemplate,
-    TemplateInstantiationError,
-} from "@saroh/templates";
-import { randomUUID } from "node:crypto";
+import { starterTemplate } from "@saroh/templates";
 import { isDeepStrictEqual } from "node:util";
-import { addressProblem } from "./site-address";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
@@ -30,7 +21,6 @@ import {
     checkoutReadiness,
     readinessMessage,
 } from "../orders/checkout-readiness";
-import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
 import { allows, authorize } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
@@ -67,7 +57,6 @@ import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import type { SellsFromView } from "./sells-from";
 import {
     assertSellsFromChoice,
-    automaticStorefront,
     commerceOpen,
     effectiveStorefront,
     isShopPath,
@@ -80,10 +69,15 @@ import {
     assertPageInSite,
     assertPathIsFree,
     assertSiteInOrg,
-    buildTemplateContext,
     getOrCreateDraftVersion,
     reviewerScope,
 } from "./site-access";
+import type { CreatedSite } from "./site-create";
+import {
+    newSectionKey,
+    planSiteFromTemplate,
+    writeSiteFromTemplate,
+} from "./site-create";
 import type { Flag, FlagType } from "./site-flags";
 import { checkShop, checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
@@ -96,16 +90,6 @@ import {
     siteStyleOptions,
     siteStyleVariables,
 } from "./site-style";
-
-/** What creating a site returns to the caller: the new site's identity. */
-/**
- * Mint a section key. Opaque and random rather than derived from position or
- * content: a key that encoded either would stop being stable the moment a
- * section moved or was edited, which is exactly what it exists to survive.
- */
-function newSectionKey(): string {
-    return randomUUID();
-}
 
 /**
  * Take the key a section claims, unless something earlier in the list already
@@ -120,10 +104,7 @@ function claimKey(seen: Set<string>, claimed: string | undefined): string {
     return key;
 }
 
-export interface CreatedSite {
-    siteId: string;
-    slug: string;
-}
+export type { CreatedSite };
 
 /** A reviewer's note as the Review tab shows it. */
 export interface CommentView {
@@ -267,28 +248,6 @@ export interface PublicSiteView {
      * before.
      */
     modules?: PublicModulePageStates;
-}
-
-/**
- * Turn an arbitrary name/slug input into a URL-safe site slug. Pure (no DB).
- * A small local copy of the organization slugify so the sites module has no
- * cross-module import; the CMS slug rules are identical for now.
- */
-function slugify(input: string): string {
-    const collapsed = input
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9\s_-]/g, "")
-        .replace(/[\s_-]+/g, "-");
-    // Trim leading/trailing "-" by index rather than /^-+|-+$/. The collapse
-    // above already leaves at most one dash in a row, so the regex could not
-    // actually backtrack — but CodeQL cannot see that (js/polynomial-redos),
-    // and an index scan is unconditionally linear.
-    let start = 0;
-    let end = collapsed.length;
-    while (start < end && collapsed[start] === "-") start++;
-    while (end > start && collapsed[end - 1] === "-") end--;
-    return collapsed.slice(start, end);
 }
 
 /**
@@ -620,184 +579,10 @@ export class SitesService {
         ctx: OrganizationContext,
         dto: CreateSiteFromTemplateDto,
     ): Promise<CreatedSite> {
-        authorize(ctx, "site:create");
-
-        // Two caps on the org's live sites (soft-deleted excluded). The
-        // product's comes first (ADR-006): one website per business for now,
-        // whatever the plan says, and upgrading would not help — so it is a
-        // 409 in plain words, not "upgrade to add more". Then the
-        // subscription's `sites` entitlement (S7-005), a 403 at the plan
-        // limit. The lower of the two wins.
-        const siteCount = await prisma.site.count({
-            where: { organizationId: ctx.organizationId, deletedAt: null },
-        });
-        if (siteCount >= MAX_WEBSITES_PER_BUSINESS) {
-            throw new ConflictException({
-                message:
-                    "This business already has its website. Change its pages, look and address from Website.",
-            });
-        }
-        await this.entitlements.check(ctx.organizationId, "sites", siteCount);
-
-        const templateId = dto.templateId ?? STARTER_TEMPLATE_ID;
-        const template = getTemplate(templateId, dto.templateVersion);
-        if (!template) {
-            throw new NotFoundException(
-                dto.templateVersion === undefined
-                    ? `Unknown template "${templateId}"`
-                    : `Unknown template "${templateId}" v${dto.templateVersion}`,
-            );
-        }
-
-        const slug = slugify(dto.slug ?? dto.name);
-        if (!slug) {
-            throw new BadRequestException(
-                "Site name must contain at least one alphanumeric character",
-            );
-        }
-
-        const context = await buildTemplateContext(ctx.organizationId);
-
-        let pages;
-        try {
-            pages = instantiateTemplate(template, context).pages;
-        } catch (error) {
-            if (error instanceof TemplateInstantiationError) {
-                // A shipped template should never emit an invalid section; if it
-                // does, that's a server bug, not bad client input.
-                throw new InternalServerErrorException(
-                    `Template "${template.id}" v${template.version} produced an invalid site`,
-                );
-            }
-            throw error;
-        }
-
-        return prisma.$transaction(async (tx) => {
-            // Fail fast on a taken slug with a clear 409 (the unique is
-            // [organizationId, slug]); the check + create share the txn.
-            const existing = await tx.site.findFirst({
-                where: {
-                    organizationId: ctx.organizationId,
-                    slug,
-                    deletedAt: null,
-                },
-                select: { id: true },
-            });
-            if (existing) {
-                throw new ConflictException(
-                    `A site with the slug "${slug}" already exists in this organization`,
-                );
-            }
-
-            /*
-             * Where the site is served (`<subdomain>.saroh.app`).
-             *
-             * Asked for: it must be a usable address, free of other sites,
-             * and not the address ANOTHER business reserved at setup — that
-             * reservation is a promise (see site-address.ts), and a site
-             * taking it would break it.
-             *
-             * Not asked for: the site takes the address its own business
-             * reserved, while no site of theirs uses it yet — so the address
-             * a merchant chose at setup is where their first website appears.
-             */
-            let subdomain = dto.subdomain;
-            if (subdomain) {
-                const problem = addressProblem(subdomain);
-                if (problem) {
-                    throw new BadRequestException({
-                        message: problem,
-                        details: { field: "subdomain" },
-                    });
-                }
-                const reserved = await tx.organization.findUnique({
-                    where: { slug: subdomain },
-                    select: { id: true },
-                });
-                if (reserved && reserved.id !== ctx.organizationId) {
-                    throw new ConflictException({
-                        message: `${subdomain}.saroh.app belongs to another business`,
-                        details: { field: "subdomain" },
-                    });
-                }
-            } else {
-                const business = await tx.organization.findUnique({
-                    where: { id: ctx.organizationId },
-                    select: { slug: true },
-                });
-                if (business?.slug && !addressProblem(business.slug)) {
-                    subdomain = business.slug;
-                }
-            }
-
-            // Subdomain is globally unique when set; reject a clash up front
-            // rather than surfacing a raw constraint error. A default that
-            // turns out to be in use is simply not taken, not an error.
-            if (subdomain) {
-                const taken = await tx.site.findUnique({
-                    where: { subdomain },
-                    select: { id: true },
-                });
-                if (taken && dto.subdomain) {
-                    throw new ConflictException({
-                        message: `The subdomain "${subdomain}" is already taken`,
-                        details: { field: "subdomain" },
-                    });
-                }
-                if (taken) subdomain = undefined;
-            }
-
-            const site = await tx.site.create({
-                data: {
-                    organizationId: ctx.organizationId,
-                    name: dto.name,
-                    slug,
-                    subdomain,
-                    // Where it sells from (G11): set only when there is
-                    // exactly one candidate, and the settings say so.
-                    storefrontId: await automaticStorefront(
-                        tx,
-                        ctx.organizationId,
-                    ),
-                },
-                select: { id: true, slug: true },
-            });
-
-            for (const page of pages) {
-                await tx.page.create({
-                    data: {
-                        siteId: site.id,
-                        organizationId: ctx.organizationId,
-                        path: page.path,
-                        title: page.title,
-                        isHome: page.isHome,
-                        versions: {
-                            create: {
-                                organizationId: ctx.organizationId,
-                                status: "DRAFT",
-                                createdByUserId: ctx.userId,
-                                sections: {
-                                    create: page.sections.map((section) => ({
-                                        organizationId: ctx.organizationId,
-                                        // Minted here so a section has a stable
-                                        // identity from the moment it exists.
-                                        key: newSectionKey(),
-                                        type: section.type,
-                                        contractVersion:
-                                            section.contractVersion,
-                                        order: section.order,
-                                        content:
-                                            section.content as Prisma.InputJsonValue,
-                                    })),
-                                },
-                            },
-                        },
-                    },
-                });
-            }
-
-            return { siteId: site.id, slug: site.slug };
-        });
+        const plan = await planSiteFromTemplate(ctx, dto, this.entitlements);
+        return prisma.$transaction((tx) =>
+            writeSiteFromTemplate(tx, ctx, plan, { subdomain: dto.subdomain }),
+        );
     }
 
     /**

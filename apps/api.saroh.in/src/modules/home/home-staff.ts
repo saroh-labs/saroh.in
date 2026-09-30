@@ -1,6 +1,7 @@
 import type { prisma } from "@saroh/database";
 import { Prisma } from "@saroh/database";
 
+import { isLocationScoped } from "../orders/order-location";
 import type { HomeInput, HomeStaff } from "./home-model";
 
 /**
@@ -106,8 +107,16 @@ export async function readStaffNarrow(
               }
             : null;
 
+    // A Storefront team holder's orders are their storefronts' only
+    // (DEC-074, as the Orders API narrows them): on none, Home shows none,
+    // never every storefront's.
+    const storeIds = stores
+        ? stores.map((s) => s.id)
+        : roles.length === 0 && isLocationScoped(input.organizationRoleKey)
+          ? []
+          : null;
     return {
-        narrow: { storeIds: stores ? stores.map((s) => s.id) : null, staff },
+        narrow: { storeIds, staff },
         staff: { stores, ownDiary: staff !== null },
     };
 }

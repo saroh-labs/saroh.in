@@ -34,11 +34,16 @@ export type Standing = "ACTIVE" | "OVERDUE" | "PAUSED" | "CANCELLED";
 const DAY = 86_400_000;
 
 function day(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        day: "numeric",
-        month: "short",
-    }).format(new Date(iso));
+    return (
+        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+            timeZone,
+            day: "numeric",
+            month: "short",
+        })
+            .format(new Date(iso))
+            // ICU writes "Sept"; the designs write three letters every month.
+            .replace("Sept", "Sep")
+    );
 }
 
 export function intervalWords(interval: Interval): {
@@ -188,7 +193,9 @@ const short = (v: Ymd) =>
         timeZone: "UTC",
         day: "numeric",
         month: "short",
-    }).format(new Date(toUtc(v)));
+    })
+        .format(new Date(toUtc(v)))
+        .replace("Sept", "Sep");
 
 function ordinal(n: number): string {
     const tail =

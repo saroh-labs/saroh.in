@@ -167,11 +167,10 @@ describe("Home", () => {
         plan: { ok: true, value: PLAN },
     };
 
-    it("greets the customer and shows the next appointment and the plan", () => {
+    it("shows the next appointment and the plan, under the header's greeting", () => {
         render(<AccountHome account={ACCOUNT} home={home} />);
-        expect(
-            screen.getByRole("heading", { level: 1, name: "Hi, Farah" }),
-        ).toBeInTheDocument();
+        // "Hi, Farah" is the account header's title now (DEC-073 #10).
+        expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
         expect(
             screen.getByRole("heading", { name: "Next appointment" }),
         ).toBeInTheDocument();

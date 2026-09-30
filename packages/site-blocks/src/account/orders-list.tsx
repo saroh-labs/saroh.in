@@ -57,9 +57,6 @@ export function AccountOrders({
 
     return (
         <div className="grid gap-3.5">
-            <h1 className="font-site-heading text-site-fg m-0 text-[26px] font-semibold tracking-[-0.02em]">
-                Orders
-            </h1>
             {orders.ok ? (
                 <AccountCard
                     labelledBy="account-orders-list"

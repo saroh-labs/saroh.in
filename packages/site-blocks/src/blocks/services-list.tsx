@@ -6,6 +6,7 @@ import type { RenderedServicesList } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
 import { CtaButton, ctaClasses } from "./cta";
 
@@ -85,15 +86,9 @@ export function formatPrice(
     locale?: string,
 ): string | null {
     if (priceCents === null || !currency) return null;
-    try {
-        return new Intl.NumberFormat(locale, {
-            style: "currency",
-            currency,
-        }).format(priceCents / 100);
-    } catch {
-        // An unknown currency code: better no price than a wrong one.
-        return null;
-    }
+    // Whole amounts without decimals (DEC-073 #11); an unknown currency
+    // code is no price rather than a wrong one.
+    return siteMoney(priceCents / 100, currency, locale);
 }
 
 export default function ServicesListSection({
@@ -169,7 +164,16 @@ export default function ServicesListSection({
     const label = said(content.buttonLabel);
 
     return (
-        <section className="mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+        <section
+            className={
+                // Cards sit on the page's width, level with the Plans and
+                // Product grid beside them (the design's Book and Prices
+                // pages); a list keeps its reading column.
+                content.layout === "cards"
+                    ? "mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+                    : "mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+            }
+        >
             {content.heading ? (
                 <h2 className="text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight">
                     {content.heading}

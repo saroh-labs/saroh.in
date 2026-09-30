@@ -56,6 +56,12 @@ export interface OrderRowDto extends FulfilmentView, LateView {
         email?: string;
         /** Only with `contact:read`. */
         phone?: string | null;
+        /**
+         * They have ordered here before (two orders or more at this
+         * storefront): the design's Saffron ring on the row's avatar.
+         * Absent where the count isn't loaded.
+         */
+        returning?: boolean;
     } | null;
     /**
      * A walk-in (B13): no customer record, only the name they gave, and
@@ -127,6 +133,8 @@ export interface RawOrderRow {
         firstName: string | null;
         lastName: string | null;
         phone: string | null;
+        /** How many orders they have at the storefront, where loaded. */
+        _count?: { orders: number };
     } | null;
     items: {
         product: { name: string } | null;
@@ -222,6 +230,9 @@ export function serializeOrderRow(
                                     : { email: shownEmail }),
                                 phone: order.customer.phone,
                             }
+                          : {}),
+                      ...(order.customer._count && !removed
+                          ? { returning: order.customer._count.orders >= 2 }
                           : {}),
                   }
                 : null,

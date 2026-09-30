@@ -166,6 +166,23 @@ export function replyWords(first: string | null, signsIn: boolean): Words {
     };
 }
 
+/**
+ * Reply to a low-star review (REVIEW_REPLY, F2): the reply is posted under
+ * the review on the business's site, where anyone can read it. Nothing is
+ * emailed: a review's reply has no sender, so the design's "and Dev is
+ * emailed" isn't said.
+ */
+export function reviewReplyWords(first: string | null): Words {
+    const whose = first ? `${first}'s` : "their";
+    return {
+        label: "Reply",
+        confirm: `Your reply shows under ${whose} review on your site, where anyone can read it. Nothing is emailed.`,
+        yes: "Post reply",
+        done: "Reply posted",
+        sends: true,
+    };
+}
+
 function capital(text: string): string {
     return text.charAt(0).toUpperCase() + text.slice(1);
 }

@@ -11,7 +11,7 @@ import {
 } from "@/lib/invoices/links";
 import { sentLine } from "@/lib/invoices/send";
 import type { Invoice } from "@/lib/invoices/service";
-import { billedTo, isOwed, paidBy, sourceLine } from "@/lib/invoices/status";
+import { billedTo, isOwed, paidHow, sourceLine } from "@/lib/invoices/status";
 
 /** A white panel in the right-hand column, with its eyebrow. */
 export function SidePanel({
@@ -178,7 +178,7 @@ export function HistoryPanel({ invoice: i }: { invoice: Invoice }) {
         events.push({
             key: "paid",
             what: i.payment
-                ? `Paid by ${paidBy(i.payment.method).toLowerCase()}${i.payment.reference ? ` · ${i.payment.reference}` : ""}`
+                ? `Paid ${paidHow(i.payment.method)}${i.payment.reference ? ` · ${i.payment.reference}` : ""}`
                 : "Paid",
             when: i.paidAt,
         });
@@ -187,9 +187,11 @@ export function HistoryPanel({ invoice: i }: { invoice: Invoice }) {
         events.push({ key: s.id, what: sentLine(s), when: s.at });
     }
     if (i.issuedAt) {
+        // Only a subscription's paper is issued by the renewal; a booking,
+        // a pack or a course bought online is issued automatically too.
         const by = i.order
             ? ` for order #${i.order.number}`
-            : i.issuedAutomatically
+            : i.issuedAutomatically && i.source === "SUBSCRIPTION"
               ? " by the subscription renewal"
               : "";
         events.push({

@@ -31,6 +31,10 @@ import { BusinessSection } from "@/components/organizations/business-section";
 import { GstinGuide } from "@/components/organizations/gstin-guide";
 import { InvoiceNumberFields } from "@/components/organizations/invoice-number-fields";
 import {
+    fieldWidth,
+    RegisteredAddressFields,
+} from "@/components/organizations/registered-address-fields";
+import {
     ADDRESS_API_KEY,
     ADDRESS_KEYS,
     registeredAddressShape,
@@ -45,7 +49,7 @@ import {
     logoCardUndo,
     useSettingsUndo,
 } from "@/components/organizations/use-settings-undo";
-import { countryName, CountrySelect } from "@/components/shared/country-select";
+import { countryName } from "@/components/shared/country-select";
 import { OptionSelect } from "@/components/shared/option-select";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import {
@@ -71,6 +75,7 @@ import {
     phoneProblem,
 } from "@/lib/organizations/business-phone";
 import {
+    BUSINESS_TYPE_ANCHOR,
     BUSINESS_TYPE_OPTIONS,
     BUSINESS_TYPE_VALUES,
     businessTypeLabel,
@@ -250,7 +255,7 @@ const SECTIONS = {
         ],
     },
     address: {
-        title: "Address",
+        title: "Registered address",
         lead: "Printed under your legal name",
         fields: [
             "addressLine1",
@@ -731,126 +736,19 @@ export function OrganizationSettingsForm({
     };
 
     /** One field's wrapper, at the width the design gives it. */
-    const at = (basis: string, grow = true) => ({
-        className: cn(
-            "min-w-0",
-            grow ? "flex-[1_1_var(--b)]" : "flex-[0_1_var(--b)]",
-        ),
-        style: { "--b": basis } as React.CSSProperties,
-    });
+    const at = fieldWidth;
 
     // States are India's (GST's list); another country's address has none.
     const inIndia = registered || ["", "IN"].includes(v.country ?? "");
     const addressFields = (
-        <>
-            {(
-                [
-                    [
-                        "addressLine1",
-                        "Address line 1",
-                        "100%",
-                        true,
-                        "address-line1",
-                    ],
-                    [
-                        "addressLine2",
-                        "Address line 2 (optional)",
-                        "100%",
-                        true,
-                        "address-line2",
-                    ],
-                    ["city", "City", "240px", true, "address-level2"],
-                    ["postalCode", "PIN code", "140px", false, "postal-code"],
-                ] as const
-            ).map(([name, label, basis, grow, auto]) => (
-                <FormField
-                    key={name}
-                    control={form.control}
-                    name={name}
-                    render={({ field }) => (
-                        <FormItem {...at(basis, grow)}>
-                            <FormLabel>{label}</FormLabel>
-                            <FormControl>
-                                <Input
-                                    {...field}
-                                    maxLength={name === "postalCode" ? 12 : 120}
-                                    inputMode={
-                                        name === "postalCode"
-                                            ? "numeric"
-                                            : undefined
-                                    }
-                                    autoComplete={auto}
-                                    className={cn(
-                                        name === "postalCode" && "font-mono",
-                                    )}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            ))}
-            {inIndia ? (
-                <FormField
-                    control={form.control}
-                    name="gstState"
-                    render={({ field }) => (
-                        <FormItem {...at("240px")}>
-                            <FormLabel>State</FormLabel>
-                            <FormControl>
-                                <OptionSelect
-                                    // A registered business's state is its
-                                    // GSTIN's: the API takes no other.
-                                    value={
-                                        registered
-                                            ? (v.taxId ?? "")
-                                                  .trim()
-                                                  .slice(0, 2)
-                                                  .toUpperCase()
-                                            : field.value
-                                    }
-                                    onValueChange={field.onChange}
-                                    options={[
-                                        { value: "", label: "Choose a state" },
-                                        ...GST_STATES,
-                                    ]}
-                                    disabled={registered}
-                                    className="w-full"
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                {registered
-                                    ? "Set by your GSTIN."
-                                    : "Printed with the address."}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            ) : null}
-            <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                    <FormItem {...at("220px")}>
-                        <FormLabel>Country</FormLabel>
-                        <FormControl>
-                            <CountrySelect
-                                value={registered ? "IN" : (field.value ?? "")}
-                                onValueChange={field.onChange}
-                                disabled={registered}
-                            />
-                        </FormControl>
-                        <FormDescription>
-                            {registered
-                                ? "GST registration is Indian."
-                                : "Where the business is registered."}
-                        </FormDescription>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-        </>
+        <RegisteredAddressFields
+            control={form.control}
+            registered={registered}
+            gstinState={(v.taxId ?? "").trim().slice(0, 2).toUpperCase()}
+            inIndia={inIndia}
+            withCountry
+            at={at}
+        />
     );
 
     const fieldsOf: Record<SectionKey, React.ReactNode> = {
@@ -897,7 +795,19 @@ export function OrganizationSettingsForm({
                     control={form.control}
                     name="type"
                     render={({ field }) => (
-                        <FormItem {...at("220px")}>
+                        // The go-live checklist's "Choose your business
+                        // type" lands here (`#business-type`).
+                        // Half the card, as the design draws it: the time
+                        // zone below takes its own row, so a growing Type
+                        // would stretch a seven-word choice across it.
+                        <FormItem
+                            {...at("220px", false)}
+                            id={BUSINESS_TYPE_ANCHOR}
+                            className={cn(
+                                at("220px", false).className,
+                                "scroll-mt-24",
+                            )}
+                        >
                             <FormLabel>Type</FormLabel>
                             <FormControl>
                                 <OptionSelect
@@ -1199,7 +1109,7 @@ export function OrganizationSettingsForm({
                                 "flex shrink-0 items-center gap-[7px] whitespace-nowrap px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
                                 on
                                     ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
+                                    : "font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
                             )}
                         >
                             {titleOf(key)}

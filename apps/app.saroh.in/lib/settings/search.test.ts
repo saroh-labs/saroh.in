@@ -45,7 +45,7 @@ describe("searchSettings", () => {
                 },
             ]);
         }
-        // The tab is "Address" now; the setting keeps its full name.
+        // The tab is "Registered address" (DEC-069 names the addresses apart).
         expect(searchSettings("registered address", owner)[0]?.href).toBe(
             "/settings/organization?section=address",
         );
@@ -158,6 +158,28 @@ describe("searchSettings", () => {
         expect(labels({ role: null })).toEqual([
             "People — invite or change a role",
         ]);
+    });
+
+    it("never offers a setting for a module this business doesn't have (DEC-057)", () => {
+        const labels = (modules: string[] | null) =>
+            searchSettings("", { ...owner, modules }, { limit: 100 }).map(
+                (h) => h.label,
+            );
+        // Contacts and Payments not rolled out, or off: not offered.
+        expect(labels(["COMMERCE"])).not.toContain("Contacts pipeline");
+        expect(labels(["COMMERCE"])).not.toContain("Payment provider");
+        expect(labels(["CRM", "PAYMENTS"])).toEqual(
+            expect.arrayContaining(["Contacts pipeline", "Payment provider"]),
+        );
+        // Unknown (the list couldn't be read): offered, as the rail fails open.
+        expect(labels(null)).toContain("Contacts pipeline");
+        // The Modules entry names no module at all.
+        const modulesEntry = SETTINGS_INDEX.find(
+            (e) => e.page === "/settings/modules" && !e.module,
+        );
+        expect(modulesEntry?.label).not.toMatch(
+            /\b(Sell|Payments|Website|Contacts|Appointments|Courses|Class packs)\b/,
+        );
     });
 
     it("points every entry at a settings page", () => {

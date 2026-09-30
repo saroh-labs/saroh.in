@@ -188,7 +188,7 @@ export function OrderFilters({
                 <button
                     type="button"
                     onClick={() => go({ ...NO_FILTERS })}
-                    className="rounded-sm px-1 text-[12.5px] font-semibold text-brand underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                    className="rounded-sm px-1 text-[12.5px] font-semibold text-brand underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
                 >
                     Clear filters
                 </button>

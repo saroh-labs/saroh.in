@@ -64,7 +64,7 @@ export function ThemeToggle() {
                 `Switch to ${isDark ? "light" : "dark"}.`
             }
             title={`Switch to ${isDark ? "light" : "dark"}`}
-            className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11 dark:text-foreground"
+            className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active coarse:size-11 dark:text-foreground"
         >
             <Icon className="size-4" />
         </button>

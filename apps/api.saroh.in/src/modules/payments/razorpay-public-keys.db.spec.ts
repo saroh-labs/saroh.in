@@ -17,6 +17,7 @@ jest.mock("../../env", () => ({
 
 import { backfillRazorpayPublicKeys, prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { decryptSecret, encryptSecret } from "./crypto";
@@ -34,6 +35,7 @@ async function business(name: string): Promise<OrganizationContext> {
     const org = await prisma.organization.create({
         data: { name, slug: `d22-${name.toLowerCase()}-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     return { organizationId: org.id, userId: "user_1", role: "OWNER" };
 }
 

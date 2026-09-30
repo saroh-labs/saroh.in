@@ -47,7 +47,10 @@ export default function AccountPage() {
                 <p className="text-muted-foreground text-sm">
                     Sign in to manage your account.
                 </p>
-                <Link href="/login" className="text-sm underline">
+                <Link
+                    href="/login"
+                    className="active:text-muted-foreground text-sm underline hover:decoration-2"
+                >
                     Go to login
                 </Link>
             </main>

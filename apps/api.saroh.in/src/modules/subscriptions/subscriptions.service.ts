@@ -12,6 +12,7 @@ import { DateTime, IANAZone } from "luxon";
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { isPastDue } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { assertPaymentsOn, paymentsOn } from "../invoices/payments-on";
@@ -700,6 +701,9 @@ export class SubscriptionsService {
         const id = await prisma
             .$transaction(async (tx) => {
                 await assertPaymentsOn(tx, organizationId, "subscribe people");
+                // A subscription is its invoices: the business details
+                // before the first (DEC-068).
+                await assertBusinessDetails(tx, organizationId);
                 // Merged since the page loaded (C9)? Subscribe the survivor.
                 const person = await resolveContact(
                     tx,
@@ -856,6 +860,10 @@ export class SubscriptionsService {
             await this.resumeLocked(tx, sub, this.log(tx, ctx, id), {
                 now: new Date(),
                 createdByUserId: ctx.userId,
+                // Staff restarting it: a new period's invoice waits for the
+                // business details (DEC-068). The job and a member's own
+                // resume are never refused for them.
+                needsBusinessDetails: true,
             });
         });
         return this.read(ctx, id);
@@ -927,6 +935,8 @@ export class SubscriptionsService {
             now: Date;
             createdByUserId: string | null;
             ended?: PauseEnded;
+            /** Refuse a restart's invoice without the business details. */
+            needsBusinessDetails?: boolean;
         },
     ): Promise<void> {
         const { id } = sub;
@@ -997,6 +1007,9 @@ export class SubscriptionsService {
             sub.organizationId,
             "restart a subscription past its paid period",
         );
+        if (opts.needsBusinessDetails) {
+            await assertBusinessDetails(tx, sub.organizationId);
+        }
         // A new period starts today: that is the next renewal, so a plan
         // change booked for it takes effect here.
         const terms = await this.nextTerms(tx, sub);

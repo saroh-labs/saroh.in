@@ -1009,7 +1009,7 @@ waits, and its teardown stops only its own servers.
 **Gotcha**: A test that was skipped "because the seed has none" is not
 coverage — make the record. And a long email pushed the phone's Link button
 off-screen in "Link a commerce customer" (the test keeps emails short; the
-dialog does not wrap).
+dialog did not wrap — fixed in P2, next entry).
 **Category**: e2e · tooling · `.agents/skills/saroh-browser-tests/SKILL.md`,
 `docs/patterns/devops-tooling-and-deploy.md`, `scripts/prepush.sh`
 
@@ -1028,3 +1028,220 @@ in that gap.
 or redirect, never read the page once and assert — assert through a
 web-first expectation or a poll, so a slow runner waits instead of failing.
 **Category**: e2e · `e2e/tests/four-scenes.spec.ts` · `.agents/skills/saroh-browser-tests/SKILL.md`
+
+## Modules — production showed `ROLLOUT_DISABLED` in Settings › Modules
+
+**Problem**: On a fresh production database every module's rollout flag was
+unset, and Settings › Modules listed each module with a raw
+`ROLLOUT_DISABLED` line under it. Other surfaces had the same hole in
+other shapes: onboarding and Home's first run offered modules Saroh hadn't
+rolled out, a hidden module's page said "turned off" with a button to a
+switch Settings no longer showed, and API refusals named `CLASS_PACKS`.
+**Root cause**: `GET /modules` lists every module, a dark one with a gate
+blocker that has no sentence; each screen filtered (or didn't) on its own,
+and a step with no message fell back to its code.
+**Fix**: DEC-057 is one function, `rolledOut` (`lib/modules/rollout.ts`),
+which every list goes through; a hidden module's route is a 404. Words for a
+blocker come only from `blockerSentence` (`lib/modules/blocker-copy.ts`):
+the API's sentence, else ours, else a plain line.
+**Guard**: `lib/modules/blocker-copy.test.ts` reads the API's capabilities
+module and fails when a code it can send has no merchant words, and scans
+the app for a blocker's `.code` rendered directly.
+**Category**: modules · copy · DEC-057
+
+## E2E — a phone test said a dialog fit at 320px while its buttons were off the screen
+
+**Problem**: On a phone, "Link a commerce customer" put a long email on one
+line and pushed Link off the screen; the invoice send confirm, the
+duplicate notice on Customer Detail, its email in the header, the invoice
+paper and Order Detail's header actions did the same with long values. The
+first draft of the guard (`scrollWidth <= innerWidth`) passed on most of
+them.
+**Root cause**: Two. In the app, a dialog is a CSS grid, and a grid item's
+`min-width: auto` let one unbreakable value (an email has no break point)
+set the dialog's width; a text line's `truncate` or a `flex-none` button row
+did the same outside dialogs. In the test, the Pixel 7 project is a mobile
+viewport: content wider than the screen makes Chrome zoom the page out and
+widen its layout viewport, so `innerWidth` grows with the overflow (320 → 426) and the check compares the bug with itself. A fixed dialog's `w-full`
+then follows the widened viewport too. And a paragraph whose text spills
+keeps its own box, so a "what sticks out" search by `getBoundingClientRect`
+finds nothing but the tab bar.
+**Fix**: `DialogContent` and `AlertDialogContent` have one
+`minmax(0,1fr)` column, `break-words`, and a height capped at the screen's
+with the rest scrolling inside; rows that hold an address wrap it
+(`[overflow-wrap:anywhere]`) and keep their buttons `shrink-0`.
+`e2e/tests/phone-reflow.spec.ts` opens the dialogs and sheets of Customer
+Detail, Order Detail, New order, the invoice send confirm, Change plan and
+Settings › Team with a 60-character email (no hyphen) and long names, at
+320px and 390px, and measures against the width it SET
+(`page.viewportSize()`), failing when `innerWidth` has grown; on failure it
+names the innermost boxes past the edge or spilling their text.
+**Category**: e2e · design system · `.agents/skills/saroh-browser-tests/SKILL.md`
+(Traps), `docs/patterns/frontend-design-system.md` (reflow)
+
+## Invoices — a new precondition on connecting a provider failed 46 integration specs (DEC-068)
+
+**Problem**: Refusing an invoice, a pay link or a provider connection until
+the business has its registered address (M3) turned 46 `*.db.spec.ts` files
+red, most of them about bookings, subscriptions and webhooks, not invoices.
+**Root cause**: Nearly every money spec connects a provider in its setup
+through `PaymentsService.connectProvider`, and its test business was made
+with no `BusinessProfile` address. The browser suite had the same shape:
+Northwind, Pulse, Prana, CarePoint, Lumen and Leela & Loom were seeded with
+no address, and every Northwind invoice spec would have been refused.
+**Fix**: `test/business-details.ts` (`giveBusinessDetails`) gives a test
+business an address without touching its GST standing; the specs call it
+after they make the business (and after any `businessProfile.create` of
+their own). Unit specs that mock Prisma stub `assertBusinessDetails`; the
+refusal and the flag after money have their own specs. Every seeded business
+has an address; the GST-registration browser spec clears Northwind's first
+and puts the seeded one back.
+**Rule**: a new check on a path every setup walks (connecting a provider,
+making a storefront) ships with its fixture, and the seed says what the
+check needs. `docs/patterns/backend-billing-and-classes.md` → Business
+details before money.
+**Category**: tests · seed · DEC-068
+
+## Orders — a row's status ran over its Placed column at the desk
+
+**Problem**: On the Orders list at 1440, a treatment's "Next 2 Oct, 10:45"
+and a local delivery's "Handed to courier" pill were drawn on top of the
+Placed date (Kavi Dental, Rye & Co.; found in the round-2 verify).
+**Root cause**: Each row is its own grid, so the columns are fixed widths
+(`ORDER_GRID`); the Status column kept the design's 122px, and its bar and
+age sat on one `nowrap` line. The design's own words fit; the longer step
+and visit words added later did not, and a grid track doesn't clip.
+**Fix**: Status is `minmax(86px,140px)` (the longest pill fits) and the bar
+and its age wrap onto a second line rather than overflow.
+`orders-list.spec.ts` ("a row's status never runs into its Placed column")
+measures every desk row's status text against the Placed cell on Kavi and
+Rye.
+**Category**: layout · `docs/patterns/frontend-design-system.md` (reflow)
+
+## Invoices — a renewal line with no GST rate printed "Nil-rated" (DEC-072)
+
+**Problem**: Rye's plan renewal invoices, issued with `gstRate` null on a
+GST-registered business, read "Nil-rated" on every line in Invoice Detail's
+paper and in the PDF.
+**Root cause**: both papers tested the rate for truthiness
+(`l.gst?.rate ? … : "Nil-rated"`), so null and "not set" fell into the 0%
+branch. The title logic (D15, `isExemptRate`) already told null from 0; the
+line label did not.
+**Fix**: one rule, `lineGstNote`, in `invoices/invoice-paper-view.ts` (PDF)
+and the app's `lib/invoices/paper-title.ts` (paper): nothing when the paper
+charges no GST, nothing for a null rate, "Nil-rated" only for a rate of
+exactly 0. Tests pin null, 0 and above 0, registered and not, and a Rye
+renewal PDF against a real database.
+**Rule**: null is "not set", never 0 — test a rate with `== null` before
+reading it as a number. `docs/patterns/backend-billing-and-classes.md` → GST
+shows only when it applies.
+**Category**: invoices · GST · DEC-072
+
+## E2E — "book into the new gap" failed on phone every Wednesday
+
+**Problem**: `bookings.spec.ts` "open extra hours on a closed stretch, then
+book into the new gap" failed on `phone-serial` on 2026-09-30, twice the
+same way: the gap's New booking dialog showed no Service it could pick.
+**Root cause**: the test, not the product. It booked "two days ahead" on
+desk and "three days ahead" on phone. A one-to-one start is the person's
+hours intersected with the service's own weekly rules (ADR-008), and the
+seeded Northwind services run Mon–Fri 09:00–17:00 — so on a Wednesday the
+phone opened hours on a Saturday, where the service has no time, and the
+dialog greyed it out exactly as designed ("outside the service's own
+hours"). On a Thursday or Friday the desk copy would have failed too.
+**Fix**: the test reads the service's rules (`GET
+/services/:id/rules`) and takes the first two days, two or more ahead, on
+which the service runs — the desk the first, the phone the second — and
+checks the booking over that one day rather than "the next four days".
+**Rule**: a spec never books "N days from today": N days on is a different
+weekday every day of the week. Take a day the service is known to run
+(its rules), or a day the test makes open. `.agents/skills/saroh-browser-tests/SKILL.md`
+→ Times and slots are claimed, not assumed.
+**Category**: tests · e2e · dates
+
+## RLS — "is this address free" would miss another business under enforcement (L1)
+
+**Problem**: `addressTaken` and `freeAddress` (`sites/site-address.ts`) are
+asked during one business's request too: site creation, the Turn on sheet
+and, from L2, a change of address. With `RLS_ENFORCEMENT` on, `Site` and the
+new `AddressReservation` are scoped to that business there, so another
+business's site or held address read as free. A held address has no unique
+index to catch the claim afterwards.
+**Root cause**: the check is cross-business by nature, but it read through
+the caller's (GUC'd) client.
+**Fix**: `outsideOrgContext(fn)` (`@saroh/database`, rls-proxy) leaves the
+ambient org context and its transaction. `site-address.ts` uses it for its
+reads (and `releaseExpired`) only when enforcement is on and a context is
+active. `site-address.db.spec.ts` checks it under `TEST_RLS=on`: business A
+can't list B's holds, yet sees B's address as taken.
+**Rule**: a read that must see every business (uniqueness across tenants)
+goes through `outsideOrgContext`, never the request's client; such a read is
+outside the caller's transaction.
+**Category**: RLS · `docs/patterns/backend-data-and-money.md`
+
+## Gate — batch 4 passed `prepush --all` and failed CI on RLS and the permission suite (#765)
+
+**Problem**: PR #765 (batch 2026-09-29-4) passed `pnpm prepush --all` and
+then failed two CI jobs the gate never ran. "Integration (rls, shard 4/4)":
+`module-setup.db.spec.ts` › "an address in use fails the whole transaction"
+fails with `RLS_ENFORCEMENT` on. "Permission states (production build)": F17
+and F19 on Team (`permissions.spec.ts`, desk and phone) no longer found the
+controls they check after DEC-073 changed the permission lists.
+**Root cause**: two CI jobs had no local mirror. The gate ran the
+integration suite plain only (its own doc said so, under "Not mirrored"),
+and never ran `e2e/permissions/` at all: that suite is not the seeded
+stack, it builds the app against a fake api, and the browser step only
+knew `e2e/tests/`.
+**Fix**: `--int` runs the same selection again under `TEST_RLS=on`, after
+plain, on the same databases (`int-rls:affected` / `int-rls` in the pass
+cache). `--e2e` runs the permission suite after the browser specs, in the
+same worktree of HEAD, with CI's env only; its specs carry `@covers` lines
+and `node scripts/e2e-affected.mjs --suite permissions` chooses them. Proved
+on batch 4's tip (7cb03b67) plus the gate: a scratch commit touching
+`team-screen.tsx` and `site-address.ts` made `int-rls:affected` fail on
+exactly CI's spec (plain passed) and `e2e-permissions:affected` fail on
+exactly CI's four tests (F17, F19 × desk, phone).
+**Also**: RLS shards on parallel databases share one cluster role, and two
+globalSetups granting it at once failed one with "tuple concurrently
+updated". `test/global-setup.ts` re-runs the (idempotent) grants.
+**Rule**: every CI job has a mirror in `scripts/prepush.sh`, or a line in
+the pattern doc saying why not. A new CI job lands with its prepush step.
+**Category**: tooling · `scripts/prepush.sh`, `scripts/e2e-affected.mjs`,
+`docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+## CI — four reds on batch 4 (#765) that the local gate passed
+
+**Problem**: `pnpm prepush --all` passed; CI failed four jobs. (1) Unit:
+`interaction-states.test.tsx` › Checkbox timed out at 5s (33s on the
+runner). (2) Integration, `rls` shard: the Turn on sheet's Website setup
+with a taken address threw Prisma's unique error, not a 409. (3) Browser,
+phone: a11y reported Orders' row name as a focus stop with no ring.
+(4) Permission states: F17/F19 found no "See orders" or "Manage payments".
+**Root cause**: (1) nwsapi answers `:modal` and `:popover-open` by calling
+`Element.matches`, which is nwsapi again, down to a stack overflow, and
+floating-ui asks both of every open menu after its test returns; the next
+test paid for it: 3s on a Mac, 33s on a runner. (2) `writeSiteFromTemplate`
+checked the address with its own `tx.site`/`tx.organization` reads, which
+RLS scopes to the caller; L1 had moved only `site-address.ts` outside the
+org context. (3) Not the page: the reduced-motion clamp makes every element
+transition `all` for 0.01ms, so a box-shadow read in the frame of a blur
+still has its old value. The walk's last stop was blurred just before the
+resting read, and a batch change put a ring-on-`::after` row name there.
+(4) `shownCatalogue` (DEC-073) kept a module's permissions only when the
+modules list named it; the suite's fake API names only what its scenarios
+need. The local gate runs integration without RLS and has no permission
+suite, and the unit and browser failures needed a slower runner or a
+different 20th stop.
+**Fix**: (1) `packages/ui/vitest.setup.ts` answers the two top-layer
+selectors false (jsdom has no top layer); the file went from 6s to 0.1s.
+(2) `addressUse` in `site-address.ts`, read across businesses, is what
+site creation checks; a held address is refused there too. (3) The a11y
+walk waits for running transitions before each read. (4) A permission hides
+only when the list names its module hidden (DEC-057) or it's Automations
+(DEC-068).
+**Rule**: a check on something other businesses own goes through
+`site-address.ts`, never the request's `tx`. A computed-style read right
+after a focus change waits a frame's transitions. A hide rule hides on
+evidence, never on absence. Run `TEST_RLS=on` for any spec touching a
+cross-business read, and the permission suite for anything on Team, until
+`scripts/prepush.sh` runs both.
+**Category**: CI · tests · RLS · a11y

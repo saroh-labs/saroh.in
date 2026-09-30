@@ -27,6 +27,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
@@ -77,11 +78,17 @@ export function IssueDialog({
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
+    // No registered address yet (DEC-068): asked here, then it issues.
+    const details = useBusinessDetailsStep({
+        then: "issue it",
+        continueLabel: "Save and issue",
+    });
 
     async function issue() {
         setBusy(true);
-        const res = await issueInvoice(invoice.id);
+        const res = await details.run(() => issueInvoice(invoice.id));
         setBusy(false);
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(`${res.data.number ?? "Invoice"} issued`);
         onOpenChange(false);
@@ -115,6 +122,7 @@ export function IssueDialog({
                         {busy ? "Issuing…" : "Issue it"}
                     </AlertDialogAction>
                 </AlertDialogFooter>
+                {details.step}
             </AlertDialogContent>
         </AlertDialog>
     );

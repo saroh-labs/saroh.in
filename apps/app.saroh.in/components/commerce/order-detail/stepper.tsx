@@ -86,7 +86,7 @@ export function KitchenStepper({
                                     aria-label={`${STEP_LABEL[s]} — next step`}
                                     className={cn(
                                         FOCUS,
-                                        "inline-flex items-center gap-[7px] rounded-md coarse:min-h-11",
+                                        "-mx-1 inline-flex items-center gap-[7px] rounded-md px-1 transition-colors duration-fast hover:bg-accent active:bg-accent-active coarse:min-h-11",
                                     )}
                                 >
                                     {body}

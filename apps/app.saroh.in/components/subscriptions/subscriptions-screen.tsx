@@ -190,7 +190,7 @@ export function SubscriptionsScreen({
                                         TAB_CLASS,
                                         on
                                             ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                            : "font-medium text-muted-foreground hover:text-foreground",
+                                            : "font-medium text-muted-foreground hover:text-foreground active:text-muted-foreground",
                                     )}
                                 >
                                     {TAB_LABEL[t]}
@@ -209,7 +209,7 @@ export function SubscriptionsScreen({
                                 TAB_CLASS,
                                 onPlans
                                     ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
+                                    : "font-medium text-muted-foreground hover:text-foreground active:text-muted-foreground",
                             )}
                         >
                             Plans

@@ -116,7 +116,13 @@ export function AccountTabBar({
                                     strokeLinejoin="round"
                                 />
                             </svg>
-                            <span>{tab.label}</span>
+                            {/* Held to its own column: with six tabs on a
+                                phone, "Appointments" ran into Home and
+                                Orders. It ends in "…" instead, and the
+                                whole word is still what is read out. */}
+                            <span className="block w-full truncate text-center">
+                                {tab.label}
+                            </span>
                             {dot ? (
                                 <>
                                     <span

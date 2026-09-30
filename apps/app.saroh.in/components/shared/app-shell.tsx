@@ -136,6 +136,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
      */
     const role = activeOrg?.role ?? null;
     const actions = activeOrg?.actions ?? null;
+    // A location's team is offered Sell with Orders alone (DEC-074).
+    const roleKey = activeOrg?.roleKey ?? null;
 
     return (
         <div className="flex min-h-screen flex-col">
@@ -161,6 +163,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <CommandMenu
                 moduleKeys={moduleKeys}
                 role={role}
+                roleKey={roleKey}
                 actions={actions}
                 sites={navSites}
                 stockTracked={stockTracked}
@@ -172,6 +175,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 user={session.user}
                 organizations={organizations}
                 activeOrg={activeOrg}
+                moduleKeys={moduleKeys}
                 unread={
                     navCan({ role, actions }, NOTIFICATIONS_NAV.action)
                         ? unread
@@ -187,6 +191,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     unread={unread}
                     moduleKeys={moduleKeys}
                     role={role}
+                    roleKey={roleKey}
                     actions={actions}
                     counts={counts}
                     stockTracked={stockTracked}
@@ -223,6 +228,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 unread={unread}
                 moduleKeys={moduleKeys}
                 role={role}
+                roleKey={roleKey}
                 actions={actions}
                 counts={counts}
                 stockTracked={stockTracked}

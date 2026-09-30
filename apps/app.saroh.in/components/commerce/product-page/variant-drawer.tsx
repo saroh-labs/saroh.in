@@ -197,7 +197,7 @@ export function VariantDrawer({
                                                                 storeId,
                                                                 o.id,
                                                             )}
-                                                            className="font-mono text-[12px] text-brand hover:text-foreground"
+                                                            className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                                         >
                                                             {o.orderNumber}
                                                         </Link>

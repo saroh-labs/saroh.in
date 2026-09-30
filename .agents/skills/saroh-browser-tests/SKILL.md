@@ -107,6 +107,14 @@ must skip ancestor/descendant pairs or it reports every row as a bug.
 **Resizing the window cannot reach 320px.** Chrome has a ~500px minimum window
 width, so a resize to 320 silently gives 500. Use viewport emulation.
 
+**On the phone project, `innerWidth` lies about overflow.** The Pixel 7 is a
+mobile viewport: content wider than the screen makes Chrome zoom the page
+out and widen `innerWidth` to match, so `scrollWidth <= innerWidth` passes
+on the very bug. Measure against the width you set (`page.viewportSize()`)
+and fail when `innerWidth` has grown, as `phone-reflow.spec.ts` does. Test
+with the values merchants have: a 60-character email with no hyphen (a
+hyphen is a line break the layout didn't earn), and long names.
+
 **A flaky harness gets ignored, which is worse than none.** Poll for readiness
 rather than sleeping a fixed number of seconds; a cold Next server on a runner
 is not reliably up in any particular time.
@@ -178,6 +186,10 @@ the `@serial` tests one at a time. Every new spec follows these rules:
   yours (`bookOwn`). A visitor on a merchant's site gets an address per
   worker (`asNewVisitor`), since the site limits bookings and codes by
   address.
+- **Days are chosen, not counted.** "Three days from today" is a Saturday
+  every Wednesday, and Northwind's seeded services run Mon–Fri. Book on a
+  day the service's rules say it runs (`serviceDays` in `bookings.spec.ts`)
+  or one the test opens itself.
 - A click that cannot land fails after 15s (`actionTimeout`), not at the
   test's timeout.
 

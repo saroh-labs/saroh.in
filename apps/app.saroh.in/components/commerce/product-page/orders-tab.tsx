@@ -101,7 +101,7 @@ export function ProductOrdersTab({
                 </p>
                 <Link
                     href="/commerce/orders"
-                    className="text-[12.5px] text-brand hover:text-foreground"
+                    className="text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                 >
                     All orders for it in Orders →
                 </Link>
@@ -150,7 +150,7 @@ export function ProductOrdersTab({
                                     <td>
                                         <Link
                                             href={orderHref(storeId, o.id)}
-                                            className="font-mono text-[12px] text-brand hover:text-foreground"
+                                            className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                         >
                                             {o.orderNumber}
                                         </Link>
@@ -162,7 +162,7 @@ export function ProductOrdersTab({
                                                     storeId,
                                                     o.customerId,
                                                 )}
-                                                className="text-brand hover:text-foreground"
+                                                className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                             >
                                                 {o.customer}
                                             </Link>

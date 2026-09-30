@@ -59,15 +59,12 @@ type Open =
 
 export function AccountBookingsTab({
     bookings,
-    title,
     businessName,
     phone,
     api,
     initial = null,
 }: {
     bookings: Block<AccountBookings>;
-    /** "Appointments" or "Bookings", as the tab is named. */
-    title: string;
     businessName: string;
     /** The business's public phone, for "Call"; null when it shows none. */
     phone: string | null;
@@ -120,9 +117,6 @@ export function AccountBookingsTab({
 
     return (
         <div className="grid gap-3.5">
-            <h1 className="font-site-heading text-site-fg m-0 text-[26px] font-semibold tracking-[-0.02em]">
-                {title}
-            </h1>
             {said ? (
                 <p role="status" className="text-site-body text-sm">
                     {said}

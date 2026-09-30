@@ -48,7 +48,7 @@ describe("nextLine", () => {
                 nextRenewalAt: null,
                 pausedAt: "2026-09-05T08:00:00.000Z",
             }),
-        ).toBe("Paused since 5 Sept");
+        ).toBe("Paused since 5 Sep");
         // D8: a pause with an end date says when it resumes.
         expect(
             nextLine(
@@ -69,7 +69,7 @@ describe("nextLine", () => {
                 nextRenewalAt: null,
                 cancelledAt: "2026-09-10T08:00:00.000Z",
             }),
-        ).toBe("Ended 10 Sept");
+        ).toBe("Ended 10 Sep");
     });
 
     it("never says paused until a day that has passed", () => {
@@ -81,13 +81,13 @@ describe("nextLine", () => {
             pausedUntil: "2026-09-20T00:00:00.000Z",
         };
         // The end date has come; the renewal job hasn't resumed it yet.
-        expect(nextLine(paused, NOW)).toBe("Pause ended 20 Sept");
+        expect(nextLine(paused, NOW)).toBe("Pause ended 20 Sep");
         // On the day itself, from its first moment.
         expect(nextLine(paused, new Date("2026-09-20T00:00:00.000Z"))).toBe(
-            "Pause ended 20 Sept",
+            "Pause ended 20 Sep",
         );
         expect(nextLine(paused, new Date("2026-09-19T23:59:59.000Z"))).toBe(
-            "Paused until 20 Sept",
+            "Paused until 20 Sep",
         );
     });
 
@@ -182,7 +182,7 @@ describe("latestInvoiceNote", () => {
                 },
                 NOW,
             ),
-        ).toBe("Paid 2 Sept");
+        ).toBe("Paid 2 Sep");
         expect(
             latestInvoiceNote(
                 {
@@ -197,20 +197,20 @@ describe("latestInvoiceNote", () => {
                 },
                 NOW,
             ),
-        ).toBe("Due 30 Sept");
+        ).toBe("Due 30 Sep");
     });
 });
 
 describe("explainStart", () => {
     it("explains a start from today", () => {
         expect(explainStart("2026-09-24", "MONTH", "2026-09-24")).toBe(
-            "The first invoice is issued now, for 24 Sept to 23 Oct. It renews on the 24th after that.",
+            "The first invoice is issued now, for 24 Sep to 23 Oct. It renews on the 24th after that.",
         );
     });
 
     it("explains a backdated start: only the period holding today is billed", () => {
         expect(explainStart("2026-03-15", "MONTH", "2026-09-24")).toBe(
-            "It keeps the 15th as its renewal day. Only the period holding today, 15 Sept to 14 Oct, is invoiced now — the months before are not billed.",
+            "It keeps the 15th as its renewal day. Only the period holding today, 15 Sep to 14 Oct, is invoiced now — the months before are not billed.",
         );
     });
 
@@ -223,7 +223,7 @@ describe("explainStart", () => {
 
     it("explains weekly plans by weekday", () => {
         expect(explainStart("2026-09-24", "WEEK", "2026-09-24")).toBe(
-            "The first invoice is issued now, for 24 Sept to 30 Sept. It renews every Thursday after that.",
+            "The first invoice is issued now, for 24 Sep to 30 Sep. It renews every Thursday after that.",
         );
     });
 
@@ -402,6 +402,6 @@ describe("rowInvoice", () => {
                 { ...base, oldestUnpaid: oldest, latestInvoice: latest },
                 NOW,
             ),
-        ).toEqual({ id: "i_latest", number: "INV-0050", note: "Due 30 Sept" });
+        ).toEqual({ id: "i_latest", number: "INV-0050", note: "Due 30 Sep" });
     });
 });

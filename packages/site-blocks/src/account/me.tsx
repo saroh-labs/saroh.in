@@ -97,9 +97,6 @@ export function Me({
 
     return (
         <div className="grid gap-3.5">
-            <h1 className="font-site-heading text-site-fg m-0 text-[26px] font-semibold tracking-[-0.02em]">
-                Me
-            </h1>
             {said ? (
                 <p role="status" className="text-site-body text-sm">
                     {said}

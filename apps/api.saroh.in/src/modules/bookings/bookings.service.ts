@@ -13,6 +13,7 @@ import { IANAZone } from "luxon";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { isGstRate } from "../invoices/gst";
 import { allows } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
@@ -1225,6 +1226,9 @@ export class BookingsService {
                 "Connect a payment provider to take payment online.",
             );
         }
+        // The link issues the booking's invoice: the business details
+        // first (DEC-068).
+        await assertBusinessDetails(prisma, ctx.organizationId);
         const { token } = await prisma.$transaction((tx) =>
             bookingPayLinkInTx(tx, {
                 organizationId: ctx.organizationId,

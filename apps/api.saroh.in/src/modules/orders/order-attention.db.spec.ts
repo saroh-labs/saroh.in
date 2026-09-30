@@ -311,9 +311,12 @@ describe("the Orders list's attention (B15)", () => {
 
     it("the customer's own phone and email only with contact:read", async () => {
         const kitchen = await rowOf(asPacker(), "Asha");
+        // Who, and whether they've ordered before (the row's "returning"),
+        // but never how to reach them.
         expect(kitchen.customer).toEqual({
             id: customers.Asha,
             name: "Asha",
+            returning: false,
         });
         const counter = await rowOf(asMember(), "Asha");
         expect(counter.customer).toMatchObject({

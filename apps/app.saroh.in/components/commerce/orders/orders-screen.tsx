@@ -154,8 +154,10 @@ export function OrdersScreen({
     // null rather than an empty list, and the page says so.
     const attentionUnread = rows.some((r) => r.attention === null);
 
+    // One block on the page: the design spaces the tabs, search, filter bar
+    // and rows 14px apart, which the page's own 24px rhythm would widen.
     return (
-        <>
+        <div className="min-w-0">
             <OrdersHeading
                 actions={
                     stores.length > 0 && !kitchen ? (
@@ -347,7 +349,7 @@ export function OrdersScreen({
                     <PageLink href={next} label="Next" />
                 </nav>
             ) : null}
-        </>
+        </div>
     );
 }
 

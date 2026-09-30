@@ -144,7 +144,7 @@ export function RecentChanges({
                                             {" · "}
                                             <Link
                                                 href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
-                                                className="text-brand hover:text-foreground"
+                                                className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                             >
                                                 Order {orderRef(e.order.number)}
                                             </Link>

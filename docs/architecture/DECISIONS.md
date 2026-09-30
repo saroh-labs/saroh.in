@@ -710,3 +710,202 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     4. `ACCOUNT_THREAD` once A13 and A14 are live.
 - **Brand v2** (H2–H11) starts after the launch-readiness work, with the plan's default pairings and palettes.
 - Consequences: B5, B6, B11, B14, B15, E20, E23 and F13 need code; the rest are recorded behaviour. DEC-052 is amended by the E6 line above.
+
+## DEC-068 Turning a module on asks for its minimum first
+
+**Status: Accepted — 2026-09-29** · user · launch readiness
+
+- Context: today a module switches on at once and works out its readiness afterwards, so a merchant meets what is missing only when it fails in use ("No connected payment provider…"). Four entry points (Settings › Modules, Home's first run, `/onboarding/modules`, "Also sell") each behave differently, and some can enable a module Saroh hasn't rolled out.
+- Decision:
+    - **One "Turn on" sheet, used from every entry point.** It names what comes with the module, including the modules it needs, and asks only the minimum that makes it work.
+    - **The module switches on when that minimum is saved.** Everything else is "Finish setup", and the merchant lands on the module's first screen with the next step shown.
+    - **Sensible defaults are created and shown in the sheet, editable before saving:**
+
+        | Module         | Asked at turn-on (default)                                                 | Later ("Finish setup")          |
+        | -------------- | -------------------------------------------------------------------------- | ------------------------------- |
+        | Sell           | storefront name (the business name), how orders leave (Pick-up / Delivery) | first product, payment provider |
+        | Bookings       | opening hours (Mon–Sat 10–7), first service (name, duration, price)        | staff, deposits                 |
+        | Class packs    | (Bookings first)                                                           | first pack                      |
+        | Payments       | connect Razorpay now, or later (online payment stays off until connected)  | —                               |
+        | Contacts       | nothing: a default pipeline is created                                     | —                               |
+        | Website        | site name and address (`<name>.saroh.app`); a starter site is made         | publish                         |
+        | Communications | connect email now, or later                                                | —                               |
+        | Insights       | nothing                                                                    | —                               |
+
+    - **The registered address and GST details are asked before the first invoice or the first online payment**, where they matter, and on the take-money checklist. Turning a module on doesn't ask for them.
+    - **Automations is hidden until it has a screen**, the same way DEC-057 treats rollout.
+    - The API refuses to enable a module whose rollout is off, in merchant copy (DEC-057).
+- Consequences:
+    - Enable gains a setup payload per module, validated by the API. The minimum and the switch are saved in one transaction.
+    - Readiness still comes from the data. A module saved with its minimum is ACTIVE, or it shows its remaining "Finish setup" items.
+    - Existing businesses keep their modules as they are.
+
+## DEC-069 One address: the website is where customers go, storefronts become locations
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · amends DEC-018 / DEC-030 wording
+
+- Context:
+    - The address chosen at setup (`Organization.slug`) becomes the website's `Site.subdomain`, and the website is the only public front (`/`, `/shop`, `/book`, `/account`).
+    - A storefront has no public address; the site sells from one through "Sells from".
+    - Merchants meet five overlapping words (storefront, online store, the Shop kind, the Shop page, `/shop`) and an editable storefront "Web address" that goes nowhere (`Store.slug`, `Store.CustomDomain`, both unused).
+    - "Address" means four different things.
+    - The address can never change, not even for a typo.
+    - Pay links sit on another domain (`saroh.app/pay/…`).
+    - "Share your storefront" shares the site's home page.
+- Decision:
+    - **The business address is the website**, `<address>.saroh.app`, or the verified custom domain once there is one.
+        - Everything customers touch lives on it: the shop, the booking page, the account, and **pay links** (`<address>/pay/…`).
+        - `saroh.app/pay/…` stays only for a business with no site, and old links keep working.
+    - **Words:**
+        - Storefronts become **Locations**: the places the business sells from in person.
+        - **Your online shop** is the website's `/shop`, selling from one location's stock. "Sells from" is renamed to match.
+        - Each location says whether it sells in person only or online too, with a link to the shop.
+        - The four "address" meanings are named apart: _web address_, _registered address_, _location address_, and the blog's _posts path_.
+    - **The address can be changed** by the owner in Settings.
+        - The old address redirects for 90 days and stays reserved to the business, so nobody else can take it. Links already shared keep working.
+        - The reserved-word list (`RESERVED_ADDRESSES`) applies.
+    - **Selling online creates the website:** turning on selling online makes the starter site on the business's address (DEC-068's defaults), with the shop page ready to publish.
+    - **Share buttons share the link that fits** (the shop, the booking page or the site), on the custom domain when verified.
+    - **The dead storefront "Web address" and the unused `CustomDomain` table are removed** (expand/contract).
+- Consequences:
+    - The merchant-facing copy changes across Sell and Sites.
+    - Pay-link URLs move to the tenant host, and the old apex links still resolve.
+    - An address change needs a redirect table and a reserved-until date.
+    - A site created with no address because the slug was taken can no longer happen silently: creation asks for a free address instead.
+- Migration: to be planned. The address history and redirects are an additive table. `Store.slug` and `CustomDomain` are dropped in a later contract release.
+
+## DEC-070 Saroh is for businesses, people working for themselves, and people showing their work
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · ships before launch
+
+- Context:
+    - Onboarding says "Name your business", suggests Sell first and pre-selects it.
+    - Checklists nudge everyone toward a registered address, a business type and a logo "for receipts", even someone with only a website.
+    - The one site template is written for a business.
+    - Nothing at setup actually requires business details, and the Organization model is neutral. The internal strategy note says the target audience must not be built into the architecture.
+- Decision:
+    - **Setup starts with "What are you setting up?"** It has three answers and is stored as a _kind_ on the Organization, which the owner can change later in Settings:
+        - **A business** (shop, studio, practice): today's flow.
+        - **Just me** (freelancer, consultant, creator): clients, bookings, invoices.
+        - **A site for my work** (portfolio, blog, projects): website first.
+    - **The kind drives wording and defaults only, not features.** Every module stays available to every kind.
+        - It sets the words ("your business" / "you", "customers" / "clients" / "readers"), the name field ("Your name or brand"), the order of the first-run jobs, and the starter template.
+        - Sell is pre-selected only for a business.
+    - **Checklists appear only when they apply.** The registered address, business type and logo nudges appear once something that invoices or takes money is on, not for everyone.
+    - **New site templates:** Portfolio, Blog/writing, and Personal/consultant, plus a **Projects block** (image, title, summary, link) for portfolios. The starter template's copy stops assuming a business.
+    - **Invoices work on their own.** Issuing, sending and marking an invoice or receipt paid doesn't need the Payments module; an online pay link still needs a connected provider. This changes DEC-019's "invoices under Payments" for invoicing itself.
+- Consequences:
+    - PRODUCT.md and saroh-product.md widen "who it's for".
+    - An additive `Organization.kind` (default BUSINESS for everyone existing).
+    - The copy layer reads the kind.
+    - The invoices module gate moves off PAYMENTS for issue, send and record-paid.
+    - Before launch: the question, copy, first-run order, conditional checklists and invoices-without-Payments. The templates and Projects block follow right after if they aren't ready.
+
+## DEC-071 Test releases: a frozen version on a test address, then "Go live"
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · amends DEC-047 (approval stays advisory unless the business turns it on)
+
+- Context:
+    - Publishing is one step: the whole draft becomes the live snapshot (ADR-002).
+    - Preview links show the draft as it is at that moment, so a reviewer's view changes as the merchant keeps editing, and Publish ships whatever the draft is now, not what was approved.
+    - Preview links live on `saroh.app/preview/<token>` and have no shop, booking, checkout or account pages.
+    - There's no scheduling, and approval never blocks publishing.
+- Decision:
+    - **"Make a test release"** freezes the current draft into a named Publication that isn't live, with an optional note. It's built by the same `buildSnapshot` and stored without repointing `currentPublicationId`.
+    - **Each test release has its own address:** `test--<address>.saroh.app`, and `test.<custom domain>` when the business has a verified one.
+        - It shows the whole site, including the shop, booking and account pages, with a "Test release" bar.
+        - Live products, prices and times are shown, but it **never takes a real order, booking or payment**.
+        - Only people with the link can open it (a token), and it's `noindex`.
+        - An address containing `--` can never be claimed by a business.
+    - **Review and approval attach to the test release** (its fingerprint), not to the moving draft.
+    - **"Go live" publishes exactly the tested version**, now or **at a scheduled time** in the business's time zone, even if the draft has moved on since.
+        - A scheduled go-live can be cancelled until it runs, and the merchant is told when it happens.
+        - Going live is a pointer flip like restore. It records the review standing (#279) and switches the live form fields (#281).
+    - **Direct publishing stays**, unless the business turns on **"Publishing needs approval"** (off by default). With it on, only an approved test release can go live. An owner can still override, and the override is recorded.
+- Consequences:
+    - A test-host lookup mode in the renderer and API.
+    - A scheduled job for go-live.
+    - A setting on the site.
+    - Shop, booking and checkout routes in test mode, with writes refused.
+    - Things that don't go through a publish stay live and outside test releases: products, prices, stock, plans and packs (they have their own publish), hours, "Sells from", posts and modules. The test release says so.
+
+## DEC-072 GST shows only when it applies
+
+**Status: Accepted — 2026-09-29** · user · extends [DEC-023](#dec-023-an-invoice-for-every-order-issued-invoices-never-change-and-gst) and D15 · [backend-billing-and-classes.md](../patterns/backend-billing-and-classes.md) GST
+
+- Context: Rye's plan renewal lines are issued with `gstRate` null. D15 already reads null as "not set", not exempt, yet Invoice Detail's paper and the PDF labelled those lines "Nil-rated".
+- Decision:
+    - **A business that isn't GST-registered charges no GST, so no GST appears anywhere** on its invoice, receipt or PDF: no rate, no tax columns, no "Nil-rated".
+    - **A registered business's line with no rate set** (`gstRate` null) shows no GST rate: no "Nil-rated", no "0%".
+    - **Only a line whose rate really is 0%** (a nil-rated or exempt supply, recorded as 0) may be labelled "Nil-rated".
+    - **A registered business's paper with no line rated** (every `gstRate` null, like Rye's renewals) shows no GST totals — no Taxable value, CGST, SGST or IGST rows and no "Prices include GST" — just the total, on the paper, the PDF and the quick look (`showsGstTotals`); one rated line, 0% included, keeps them. Its title stays D15's "Tax invoice".
+- Consequences: presentation only. Stored data and totals are unchanged (a null rate is already taxed at nothing and never counts toward a bill of supply). The rule is `lineGstNote`, once in the API for the PDF and once in the app for the paper. The draft editor's hint no longer says a line with no rate is nil-rated.
+- Migration: none.
+
+## DEC-073 Round-2 design deviations, settled
+
+**Status: Accepted — 2026-09-29** · user ("go with your recommendations for the deviations") · the round-2 check against the designs
+
+- Context: the check compared every round-2 screen with its `.dc.html` design. Most mismatches were fixed on the spot. These are the ones where the build differs on purpose, or where a fix needed a call.
+- **Kept as built:**
+    - **Payments:**
+        - the Plan Editor says "Invoiced each month with a pay link", not "by UPI Autopay or card", following D14's rule that copy is honest;
+        - Publish sits in a bottom bar on a phone (D6);
+        - "Subscribe someone" is in the header;
+        - the failed-renewals banner says only what the product does ("isn't paid and needs you");
+        - Invoice Detail offers "Copy pay link" and has no pay-link box;
+        - PDF dates carry the year;
+        - the phone gutter is 16px, from the shared PageContainer.
+    - **Orders:**
+        - the phone header's actions wrap under the title (the shared PageHeader, the same on every screen);
+        - New order's customer step is the shared picker with recent customers and Walk-in (B13/E4);
+        - the row menu follows B5;
+        - Storefront Settings has no design, and DEC-069 reworks it into Locations.
+    - **Customers:**
+        - the phone list stacks rows and scrolls its chips;
+        - Import and Add customer sit in the header (DEC-056/C14);
+        - Overview's Needs attention card and the "Average order" tile stay;
+        - the Spent note says what's true ("₹x still owed" / "Including delivery");
+        - the offers wording stays honest ("Nothing recorded yet"), since customers aren't always asked at checkout;
+        - the merge dialog keeps its Stays row, close X and counts;
+        - removal asks for the name, as the design does;
+        - C15's copy is accepted.
+    - **GST:** see DEC-072. A rate shows only when one applies.
+    - **Bookings:**
+        - Kavi's calendar shows Orders, Bookings and Invoices: treatment orders (E9) replace the Payments layer, which appears only without Commerce.
+        - Pack Detail's receipts show "name · date", because the purchase read carries no invoice number.
+        - "On the booking page" is plain text until DEC-069's share links give the app the page's address.
+        - The rail says "Class packs" (the module's name) and the pack kind says "One-to-one".
+        - The Packs summary and Extend copy say what the API does.
+        - The editor's first-pack hint names the pack's kind.
+        - E17's "Each sale" card is accepted.
+    - **Home and settings:**
+        - This week has no "Website · Live" row until DEC-069 settles which address to show.
+        - Checklist rows are two lines (title and reason), shared with Home.
+        - The phone tab bar stays Home, Sell, Calendar, Insights; the two designs disagree with each other.
+        - Mark sent is offered only on orders ready to hand over (the API's stage rule).
+    - **Site and accounts:**
+        - A past appointment with no attendance recorded still reads "Booked"; it never claims "Attended".
+        - The editor's Tablet and zoom controls stay as they are (G2/G3).
+        - A shop card adds the first option that can be sold now.
+- **Fixed to match the design, or to correct a small error:**
+    1. Order Detail's customer card reads "Needs attention: Sesame", since the card covers every kind of entry, not just allergies.
+    2. A treatment order shows Needs attention in the customer card as well as the Visits card.
+    3. The Orders quick view's close is a plain X, and the customer's name is a Saffron link.
+    4. "They asked to stop" shows only when they did ask.
+    5. A customer added by hand shows their saved address on Overview before they have an order.
+    6. C12's booking-note card uses the customer's full name, and names the roles that can see a sensitive note.
+    7. Settings › Business's "Address" tab is "Registered address" (DEC-069 names the four addresses apart).
+    8. Permission lists hide the permissions of modules hidden from the business ("Manage automations" while DEC-068 hides Automations).
+    9. Module pages (Book, Prices, Shop) draw the design's page title and lead line, and a rich-text intro lines up with the cards.
+    10. The account area has the design's compact header (logo, tab title, language) and no site footer.
+    11. Whole-rupee prices show without decimals ("₹500"), wherever the site shows a price.
+    12. A product card sums up its options ("2 sizes") instead of listing them.
+
+## DEC-074 A location's team sees and moves that location's orders
+
+**Status: Accepted — 2026-09-29** · user · amends F16
+
+- Context: F16 lets storefront staff join the team with a storefront role, but that role opens nothing in the workspace. Sell needs `order:read` or `order:stage`, so their rail is empty.
+- Decision: a storefront (location) role sees and moves the orders of **its own location only**: read and stage, with no money, refunds, pay links or cancelling. It's like the kitchen and Member view, scoped to one location. Sell appears in their rail with those orders, and other locations' orders are refused by the API.
+- Consequences: the order permissions gain a location scope for this role. The B16 permission tests extend to it.

@@ -8,7 +8,6 @@ import type {
     SignInOptions,
 } from "../account/api";
 import { SignInSheet } from "../account/sign-in-sheet";
-import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
 import { phoneText } from "../lib/phone";
@@ -62,6 +61,8 @@ import {
 import { DetailsStep } from "./steps/details-step";
 import { DoneCard } from "./steps/done-card";
 import { ExpiredCard } from "./steps/expired-card";
+import type { FlowMessage } from "./steps/flow-message";
+import { FlowMessageLine } from "./steps/flow-message";
 import { PayStep } from "./steps/pay-step";
 import { PayingCard } from "./steps/paying-card";
 import { ServiceStep } from "./steps/service-step";
@@ -213,7 +214,19 @@ export default function BookingFlow({
     const [payChoice, setPayChoice] = useState<BookPay | null>(null);
     const [sessionsShown, setSessionsShown] = useState(SESSIONS_SHOWN);
     const [submitting, setSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState<string | null>(null);
+    // What the page says under the steps: an error, or news that isn't one
+    // (A10's credit found, a place held) — never the red alert for the latter.
+    const [message, setMessage] = useState<FlowMessage | null>(null);
+    const setSubmitError = useCallback(
+        (text: string | null) =>
+            setMessage(text === null ? null : { text, tone: "error" }),
+        [],
+    );
+    const setNotice = useCallback(
+        (text: string) => setMessage({ text, tone: "notice" }),
+        [],
+    );
+    const submitError = message?.text ?? null;
     const [phase, setPhase] = useState<Phase>({ kind: "choose" });
     const [now, setNow] = useState<number | null>(null);
 
@@ -288,7 +301,7 @@ export default function BookingFlow({
         );
         if (found) setStart(found);
         else setSubmitError(INITIAL_TIME_GONE);
-    }, [daysState, firstId, firstIsClass]);
+    }, [daysState, firstId, firstIsClass, setSubmitError]);
 
     const pickService = (id: string) => {
         if (id === serviceId) return;
@@ -584,8 +597,8 @@ export default function BookingFlow({
         if (!next) return;
         setDate(dateIn(next.startAt, daysState.days.timezone));
         setStart(next);
-        setSubmitError(nextChosenText(next, daysState.days.timezone));
-    }, [daysState, serviceId, isClass]);
+        setNotice(nextChosenText(next, daysState.days.timezone));
+    }, [daysState, serviceId, isClass, setNotice]);
 
     /** The name to send: only for an account that has none yet. */
     const nameFor = (who: SignedInCustomer) =>
@@ -628,7 +641,7 @@ export default function BookingFlow({
         const joined = result.value;
         putPlace(joined);
         if (joined.status === "OFFERED") {
-            setSubmitError(heldForYouText(joined.offeredUntil, zone));
+            setNotice(heldForYouText(joined.offeredUntil, zone));
             return;
         }
         setPhase({
@@ -658,7 +671,7 @@ export default function BookingFlow({
         }
         dropPlace(startAt);
         setStart(null);
-        setSubmitError(LEFT_WAITLIST);
+        setNotice(LEFT_WAITLIST);
     };
 
     /** Signed in from the sheet: book straight away, on what was chosen. */
@@ -680,7 +693,7 @@ export default function BookingFlow({
             if (offered) {
                 attemptKey.current = null;
                 setPayChoice("CREDIT");
-                setSubmitError(CREDIT_FOUND);
+                setNotice(CREDIT_FOUND);
                 return;
             }
         }
@@ -1130,13 +1143,8 @@ export default function BookingFlow({
                                 />
                             ) : null}
 
-                            {submitError && phone ? (
-                                <p
-                                    role="alert"
-                                    className={destructiveAlertClasses}
-                                >
-                                    {submitError}
-                                </p>
+                            {message && phone ? (
+                                <FlowMessageLine message={message} />
                             ) : null}
                         </>
                     )}

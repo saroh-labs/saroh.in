@@ -1,7 +1,7 @@
 import { EmptyState } from "@saroh/ui/empty-state";
 
+import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
-import { rolledOut } from "@/lib/modules/switch-plan";
 
 import { ModuleList } from "./module-list";
 

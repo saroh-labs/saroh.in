@@ -533,6 +533,45 @@ describe("HomeInlineService.decorate", () => {
         expect(off[0].evidence?.[0].inline).toBeUndefined();
     });
 
+    it("offers Reply on a low-star review to product-review:write, saying nothing is emailed", async () => {
+        const make = () => [
+            action("COMMERCE_LOW_STAR_REVIEWS", [
+                ev("review_1", { subtitle: "Dev S." }),
+            ]),
+        ];
+
+        const owner = make();
+        await setup({}).service.decorate(owner, OWNER, NOW);
+        expect(owner[0].evidence?.[0].inline).toMatchObject({
+            kind: "REVIEW_REPLY",
+            label: "Reply",
+            target: "review_1",
+            person: "Dev",
+            sends: true,
+            yes: "Post reply",
+        });
+        expect(owner[0].evidence?.[0].inline?.confirm).toBe(
+            "Your reply shows under Dev's review on your site, where anyone can read it. Nothing is emailed.",
+        );
+
+        // Reading reviews isn't answering them.
+        const reader = make();
+        await setup({}).service.decorate(
+            reader,
+            holding("product-review:read"),
+            NOW,
+        );
+        expect(reader[0].evidence?.[0].inline).toBeUndefined();
+
+        const writer = make();
+        await setup({}).service.decorate(
+            writer,
+            holding("product-review:write"),
+            NOW,
+        );
+        expect(writer[0].evidence?.[0].inline?.kind).toBe("REVIEW_REPLY");
+    });
+
     it("gives a Member none of them by default", async () => {
         env.SITE_ACCOUNT_AREA = "on";
         const past = new Date(NOW.getTime() - DAY).toISOString();

@@ -122,6 +122,7 @@ interface ShopScope {
 
 /** What a card needs of a listing and its product. */
 const CARD_SELECT = {
+    id: true,
     soldOutAt: true,
     variants: { select: { variantId: true } },
     product: {
@@ -134,6 +135,7 @@ const CARD_SELECT = {
             mrp: true,
             currency: true,
             stockTracked: true,
+            option: { select: { name: true } },
             images: {
                 orderBy: { position: "asc" },
                 take: 1,
@@ -346,8 +348,15 @@ export class PublicCatalogueService {
                         : { url: cover.url, alt: cover.alt }
                     : null,
                 variantTitles: offered.map((v) => v.title),
+                optionName: p.option?.name ?? null,
                 blurb: blurbOf(p.description),
                 soldOut: words.every((w) => w === "SOLD_OUT"),
+                listingId: listing.id,
+                // What the card's Add to bag puts in the bag (the design's
+                // shop card): the first option on offer that can be sold
+                // now, or null for a product without options.
+                bagVariantId:
+                    offered.find((_, i) => words[i] !== "SOLD_OUT")?.id ?? null,
             };
         });
     }

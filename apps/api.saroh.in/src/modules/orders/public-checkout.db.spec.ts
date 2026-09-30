@@ -33,6 +33,7 @@ import { createHmac } from "node:crypto";
 
 import { isRlsTestMode } from "../../../test/rls-mode";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
 import { validationPipeOptions } from "../../common/validation";
@@ -163,6 +164,7 @@ async function shop(
     const org = await prisma.organization.create({
         data: { name: "Rye & Co.", slug: `g13-${next()}` },
     });
+    await giveBusinessDetails(org.id);
     await prisma.featureFlagOverride.create({
         data: { flagKey: "SITE_SHOP", organizationId: org.id, enabled: true },
     });
@@ -987,7 +989,12 @@ describe("a payment that can't hold (G13)", () => {
             await prisma.$executeRawUnsafe(
                 `REVOKE USAGE ON SCHEMA public FROM ${ROLE}`,
             );
-            await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${ROLE}`);
+            await prisma.$executeRawUnsafe(
+                // A role is cluster-wide: another test database still granting
+                // to it (a parallel run, or one cut short) keeps it; that is fine.
+                `DO $$ BEGIN DROP ROLE IF EXISTS ${ROLE};
+                EXCEPTION WHEN dependent_objects_still_exist THEN NULL; END $$`,
+            );
         });
 
         /** Run `fn` in one transaction as the probe role, in `orgId`'s context. */

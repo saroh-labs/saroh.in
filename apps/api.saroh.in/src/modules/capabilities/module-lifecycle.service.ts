@@ -31,7 +31,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { ModuleImpactView } from "./dto";
 import type { ModuleKey } from "./module-registry";
-import { MODULE_BY_KEY, MODULES } from "./module-registry";
+import { MODULE_BY_KEY, moduleRolledOut, MODULES } from "./module-registry";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
 /** A transaction client, for work that must commit with a lifecycle change. */
@@ -132,50 +132,30 @@ export class ModuleLifecycleService {
         ctx: OrganizationContext,
         moduleKey: ModuleKey,
     ): Promise<boolean> {
-        const flag = MODULE_BY_KEY.get(moduleKey)?.rolloutFlag;
-        if (!this.flags || !flag) return true;
-        return this.flags.isEnabled(flag, ctx.organizationId);
+        // Hidden (DEC-068) reads as not rolled out, whatever the flag.
+        return moduleRolledOut(this.flags, moduleKey, ctx.organizationId);
     }
 
-    /** Enable a module for the Organization. Requires its dependencies enabled. */
+    /**
+     * Enable a module for the Organization. Requires its dependencies enabled.
+     * True when this call switched it on; false when it was already on and
+     * nothing ran — `alsoInTransaction` included (the setup payload, DEC-068,
+     * relies on that to apply nothing twice).
+     */
     async enable(
         ctx: OrganizationContext,
         moduleKey: ModuleKey,
         alsoInTransaction?: AlsoInTransaction,
-    ): Promise<void> {
+    ): Promise<boolean> {
         authorize(ctx, "module:manage");
         const descriptor = this.descriptor(moduleKey);
 
         // Idempotent: enabling an already-enabled module is a no-op (no second
         // audit event).
-        if ((await this.currentStatus(ctx, moduleKey)) === "ENABLED") return;
+        if ((await this.currentStatus(ctx, moduleKey)) === "ENABLED")
+            return false;
 
-        // Hard dependencies must already be ENABLED.
-        if (descriptor.dependencies.length > 0) {
-            const deps = await this.db.organizationModule.findMany({
-                where: {
-                    organizationId: ctx.organizationId,
-                    moduleKey: { in: [...descriptor.dependencies] },
-                    status: "ENABLED",
-                },
-                select: { moduleKey: true },
-            });
-            const enabled = new Set(deps.map((d) => d.moduleKey));
-            const missing = descriptor.dependencies.filter(
-                (d) => !enabled.has(d),
-            );
-            if (missing.length > 0) {
-                // A sentence a merchant can act on, in the modules' own names
-                // ("Class packs needs Appointments. Turn on Appointments
-                // first."), not the registry's keys.
-                const needs = missing
-                    .map((d) => MODULE_BY_KEY.get(d)?.label ?? d)
-                    .join(" and ");
-                throw new BadRequestException(
-                    `${descriptor.label} needs ${needs}. Turn on ${needs} first.`,
-                );
-            }
-        }
+        await this.assertMayTurnOn(ctx, moduleKey);
 
         await this.db.$transaction(async (tx) => {
             await tx.organizationModule.upsert({
@@ -215,6 +195,57 @@ export class ModuleLifecycleService {
         // `moduleEnabled` swallows its own errors — the same tradeoff the audit
         // write makes, for the same reason.
         await this.activation?.moduleEnabled(ctx.organizationId, moduleKey);
+        return true;
+    }
+
+    /**
+     * The refusals turning a module on meets before anything is written:
+     * not rolled out (or hidden), or a module it needs is off. Public so
+     * the setup payload (DEC-068) refuses in the same words, and before it
+     * validates or plans anything.
+     */
+    async assertMayTurnOn(
+        ctx: OrganizationContext,
+        moduleKey: ModuleKey,
+    ): Promise<void> {
+        const descriptor = this.descriptor(moduleKey);
+
+        // Saroh hasn't rolled it out to this business (DEC-057): it is never
+        // shown, so it is never turned on — by the business or an operator,
+        // who meets the rules the owner does. The module's name, never the
+        // flag or a code.
+        if (!(await this.rolledOut(ctx, moduleKey))) {
+            throw new BadRequestException(
+                `${descriptor.label} isn't available for your business yet.`,
+            );
+        }
+
+        // Hard dependencies must already be ENABLED.
+        if (descriptor.dependencies.length > 0) {
+            const deps = await this.db.organizationModule.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    moduleKey: { in: [...descriptor.dependencies] },
+                    status: "ENABLED",
+                },
+                select: { moduleKey: true },
+            });
+            const enabled = new Set(deps.map((d) => d.moduleKey));
+            const missing = descriptor.dependencies.filter(
+                (d) => !enabled.has(d),
+            );
+            if (missing.length > 0) {
+                // A sentence a merchant can act on, in the modules' own names
+                // ("Class packs needs Appointments. Turn on Appointments
+                // first."), not the registry's keys.
+                const needs = missing
+                    .map((d) => MODULE_BY_KEY.get(d)?.label ?? d)
+                    .join(" and ");
+                throw new BadRequestException(
+                    `${descriptor.label} needs ${needs}. Turn on ${needs} first.`,
+                );
+            }
+        }
     }
 
     /**
@@ -282,7 +313,10 @@ export class ModuleLifecycleService {
         if (blockers.length > 0) {
             throw new ConflictException({
                 error: "MODULE_DEACTIVATION_BLOCKED",
-                message: `Cannot disable ${moduleKey} yet.`,
+                // The module's name, never its key: this can reach a
+                // merchant when a refusal comes without its own sentence
+                // (DEC-057).
+                message: `${descriptor.label} can't be turned off yet.`,
                 blockers,
             });
         }
@@ -326,7 +360,7 @@ export class ModuleLifecycleService {
         moduleKey: ModuleKey,
     ): Promise<void> {
         authorize(ctx, "module:manage");
-        this.descriptor(moduleKey);
+        const { label } = this.descriptor(moduleKey);
 
         const installation = await this.db.organizationModule.findUnique({
             where: {
@@ -339,7 +373,7 @@ export class ModuleLifecycleService {
         });
         if (installation?.status === "ENABLED") {
             throw new ConflictException(
-                `Disable ${moduleKey} before archiving it.`,
+                `Turn ${label} off before archiving it.`,
             );
         }
 
@@ -377,7 +411,7 @@ export class ModuleLifecycleService {
         const descriptor = this.descriptor(moduleKey);
         if (!descriptor.projectSelectable) {
             throw new BadRequestException(
-                `${moduleKey} cannot be selected per Project.`,
+                `${descriptor.label} can't be chosen per project.`,
             );
         }
 
@@ -402,7 +436,7 @@ export class ModuleLifecycleService {
         });
         if (installation?.status !== "ENABLED") {
             throw new BadRequestException(
-                `Enable ${moduleKey} for the Organization before selecting it for a Project.`,
+                `Turn on ${descriptor.label} for the business before adding it to a project.`,
             );
         }
 

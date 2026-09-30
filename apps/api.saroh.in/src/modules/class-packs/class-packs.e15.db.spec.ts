@@ -6,6 +6,7 @@
  */
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "../invoices/invoices.service";
 import { resolveCapabilities } from "../organizations/organization-policy";
@@ -50,6 +51,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Pulse E15", slug: `e15-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     const neha = await prisma.user.create({
         data: { email: `e15-neha-${process.pid}@example.com`, name: "Neha" },
     });

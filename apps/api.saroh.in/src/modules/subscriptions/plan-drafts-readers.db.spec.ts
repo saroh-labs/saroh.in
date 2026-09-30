@@ -9,6 +9,7 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "../invoices/invoices.service";
 import { PLAN_NOT_PUBLISHED, PLANS_ON_SALE } from "./plan-on-sale";
@@ -61,6 +62,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Drafts", slug: `d21-drafts-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     shop = { organizationId: org.id, userId: "user_1", role: "OWNER" };
     activeId = await plan("Monthly");
     archivedId = await plan("Old monthly", "900");

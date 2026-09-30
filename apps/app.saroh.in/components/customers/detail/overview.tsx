@@ -58,6 +58,10 @@ export function Overview({
 }) {
     const rows = d.orders?.rows ?? [];
     const orders = d.orders !== undefined;
+    // A treatment order has no product lines, so there may be nothing to
+    // list: the card is left out rather than drawn empty.
+    const usual = favourites(rows);
+    const saved = addressLine(d.contact);
     return (
         <div className="flex flex-col gap-4">
             {attention}
@@ -69,6 +73,14 @@ export function Overview({
                     Totals, favourites and how they get their orders fill in
                     from their first order.
                 </Empty>
+            ) : null}
+            {orders && rows.length === 0 && saved ? (
+                // Their saved address shows before their first order too —
+                // someone added by hand often has one (DEC-073).
+                <section className={CARD} aria-label="Delivery address">
+                    <div className={cn(LABEL, "mb-1.5")}>Delivery address</div>
+                    <div className="text-[13.5px] leading-[1.5]">{saved}</div>
+                </section>
             ) : null}
             {d.bookings !== undefined ? (
                 <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))]">
@@ -90,27 +102,29 @@ export function Overview({
                         ))}
                     </div>
                     <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))]">
-                        <section className={CARD} aria-label="Usually buys">
-                            <div className={cn(LABEL, "mb-2")}>
-                                Usually buys
-                            </div>
-                            {favourites(rows).map((f) => (
-                                <div
-                                    key={f.productId}
-                                    className="flex gap-2.5 border-b border-foreground/10 py-[7px] text-[13.5px]"
-                                >
-                                    <Link
-                                        href={`/commerce/products/${f.productId}`}
-                                        className="min-w-0 flex-1 text-brand hover:text-foreground"
-                                    >
-                                        {f.name}
-                                    </Link>
-                                    <span className="text-muted-foreground">
-                                        {f.note}
-                                    </span>
+                        {usual.length > 0 ? (
+                            <section className={CARD} aria-label="Usually buys">
+                                <div className={cn(LABEL, "mb-2")}>
+                                    Usually buys
                                 </div>
-                            ))}
-                        </section>
+                                {usual.map((f) => (
+                                    <div
+                                        key={f.productId}
+                                        className="flex gap-2.5 border-b border-foreground/10 py-[7px] text-[13.5px]"
+                                    >
+                                        <Link
+                                            href={`/commerce/products/${f.productId}`}
+                                            className="min-w-0 flex-1 text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                        >
+                                            {f.name}
+                                        </Link>
+                                        <span className="text-muted-foreground">
+                                            {f.note}
+                                        </span>
+                                    </div>
+                                ))}
+                            </section>
+                        ) : null}
                         <section
                             className={CARD}
                             aria-label="How they get orders"
@@ -125,7 +139,7 @@ export function Overview({
                                 Delivery address
                             </div>
                             <div className="text-[13.5px] leading-[1.5]">
-                                {deliveryAddress(rows, addressLine(d.contact))}
+                                {deliveryAddress(rows, saved)}
                             </div>
                         </section>
                     </div>
@@ -192,7 +206,7 @@ function OrderTile({
             onClick={() => onOpen(opens)}
             className={cn(
                 box,
-                "transition-colors duration-fast hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "transition-colors duration-fast hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
             )}
         >
             {body}

@@ -6,6 +6,7 @@ import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
+import { businessDetailsGap } from "./home-business-details";
 import { overdueFollowUps } from "./home-crm-sources";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
@@ -181,8 +182,12 @@ export class HomeService {
         const stores = narrow.storeIds;
         const actions: HomeAction[] = [];
 
-        // Setup / attention actions straight from module readiness.
-        for (const view of views) {
+        // Setup / attention actions straight from module readiness. A staff
+        // member (F11) sees them only if they may set modules up: "Create a
+        // pipeline" or "Connect a provider" on a Member's Home is a row they
+        // can't act on, and the design's staff Home draws none.
+        const offersSetup = !staffView || holds(input, "module:manage");
+        for (const view of offersSetup ? views : []) {
             if (view.readiness === "ATTENTION_REQUIRED") {
                 // SETUP/ATTENTION readiness always carries at least one blocker.
                 const blocker = view.blockers[0];
@@ -285,6 +290,7 @@ export class HomeService {
             notes,
             messages,
             refundsFailed,
+            detailsGap,
         ] = await Promise.all([
             active.has("CRM") && canReadLeads
                 ? guard(
@@ -507,6 +513,15 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // Invoices going out without the registered address or GSTIN
+            // (DEC-068), to whoever can add them.
+            holds(input, "org:update")
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Business details" },
+                      () => businessDetailsGap(this.db, input.organizationId),
+                      null,
+                  )
+                : skip(null),
         ]);
         const unavailable = slots.flat();
 
@@ -567,6 +582,7 @@ export class HomeService {
             });
         }
         if (refundsFailed) actions.push(refundsFailed);
+        if (detailsGap) actions.push(detailsGap);
         if (renewals) actions.push(renewals);
         if (waiting) actions.push(waiting);
         if (overdueInvoiceAction) actions.push(overdueInvoiceAction);

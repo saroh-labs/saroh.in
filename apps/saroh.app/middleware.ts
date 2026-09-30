@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "@/env";
 import { accountAreaOn, isAccountPath } from "@/lib/account-area-switch";
+import { tenantUrl } from "@/lib/tenant-url";
 
 export const config = {
     matcher: [
@@ -85,5 +86,5 @@ export default function middleware(req: NextRequest) {
     }
 
     // Everything else is a tenant hostname: rewrite to the /[domain] route.
-    return NextResponse.rewrite(new URL(`/${hostname}${path}`, req.url));
+    return NextResponse.rewrite(tenantUrl(hostname, url));
 }

@@ -11,11 +11,16 @@
 #   pnpm prepush --int           … plus the full unit suites and the API
 #                                integration specs the branch's changes reach
 #                                (jest --findRelatedTests, plus an always-run
-#                                set), in groups, on parallel test databases
+#                                set), in groups, on parallel test databases,
+#                                then the same specs again under RLS
+#                                (TEST_RLS=on), as CI's two matrix modes
 #   pnpm prepush --e2e           … plus the browser specs that cover what the
 #                                branch changed (scripts/e2e-affected.mjs), on
 #                                desk AND phone, against CI's seeded stack
-#                                built from HEAD (E2E_DATABASE_URL)
+#                                built from HEAD (E2E_DATABASE_URL), then the
+#                                permission-state specs they reach on the
+#                                app's production build (CI's "Permission
+#                                states (production build)")
 #   pnpm prepush --all           --int and --e2e; the browser step runs
 #                                alongside the integration groups
 #   … --full                     the WHOLE integration suite and every browser
@@ -67,7 +72,9 @@
 # ~7 min); --all 10.7 min (was ~25), nearly all of it the browser specs.
 # Targeted, on a commit touching one screen and one api module: --e2e 105s
 # for 2 spec files (was 657s for 25), the integration step 9s for 10 specs
-# (was 84s for 381).
+# (was 84s for 381). The CI mirrors added 2026-09-30: RLS after plain +26s
+# targeted, +98s whole suite; the permission suite after the browser specs
+# +83–102s.
 #
 # Integration needs TEST_DATABASE_URL naming a database with "test" in it (and a
 # changed migration needs REPLAY_DATABASE_URL, a throwaway one; the browser step
@@ -238,11 +245,9 @@ test_deps() {
 # It is dropped and re-created each run. Server logs stay in $E2E_LOGS.
 # A route folder or a component folder that changed picks every spec that
 # names it. Both projects: the phone has its own bars, sheets and toasts.
-e2e_stack() {
-    set -e
-    local url=$1 name=$2 dir=$3 specs=$4
-    local maint
-    maint=$(echo "$url" | sed -E 's#/[^/?]+(\?.*)?$#/postgres#')
+# The detached worktree both browser suites run from, at HEAD and installed.
+e2e_worktree() {
+    local dir=$1
     if [ -d "$dir/.git" ] || [ -f "$dir/.git" ]; then
         git -C "$dir" checkout -q --detach -f "$SHA"
     else
@@ -251,6 +256,13 @@ e2e_stack() {
     cd "$dir"
     echo "--- worktree $dir at $(git rev-parse --short HEAD)"
     pnpm install --frozen-lockfile --prefer-offline
+}
+e2e_stack() {
+    set -e
+    local url=$1 name=$2 dir=$3 specs=$4
+    local maint
+    maint=$(echo "$url" | sed -E 's#/[^/?]+(\?.*)?$#/postgres#')
+    e2e_worktree "$dir"
     pnpm --filter @saroh/database generate
 
     # CI's job env, verbatim: placeholders that no live service accepts.
@@ -476,38 +488,91 @@ EOF
     echo "    start it again with \`pnpm dev\` (or \`pnpm dev:app\`) in its checkout; it was:$restart"
 }
 
-E2E_PID=""; E2E_STATUS=""
+# 4b. The permission states on a production build: a mirror of CI's
+# "Permission states (production build)" job (`permissions-e2e`), which runs
+# `pnpm --filter @saroh/e2e test:permissions` with PERMISSIONS_APP_URL and
+# PERMISSIONS_API_URL set and nothing else. It is not the seeded stack:
+# e2e/permissions.config.ts starts its own two servers through Playwright's
+# webServer, a fake api (e2e/fixtures/permissions-api.mjs, per-role answers)
+# on 3334 and app.saroh.in built for it — `turbo run build` then `next start`
+# on 3004, so errors are redacted as in production. The app's NEXT_PUBLIC_*
+# urls point at the fake api and are baked into that build, so it can't share
+# the browser step's build of the app; turbo keys each on its env, and both
+# replay from its cache the next time. So it runs after the browser specs, in
+# the same worktree and under the same lock, and never beside them: one
+# production build of the app at a time.
+#
+# The same env as the runner: only PATH, HOME, USER, TMPDIR and LANG pass
+# through from this shell, plus CI=1 and the two urls, so no DATABASE_URL,
+# NEXT_PUBLIC_* or other local setting reaches the build.
+e2e_perms() {
+    set -e
+    local dir=$1 specs=$2
+    e2e_worktree "$dir"
+    echo "--- permission suite:${specs:- every spec}"
+    # shellcheck disable=SC2086
+    env -i PATH="$PATH" HOME="$HOME" USER="${USER:-}" TMPDIR="${TMPDIR:-/tmp}" \
+        LANG="${LANG:-en_US.UTF-8}" CI=1 \
+        PERMISSIONS_APP_URL=http://localhost:3004 PERMISSIONS_API_URL=http://localhost:3334 \
+        pnpm --filter @saroh/e2e test:permissions $specs
+}
+
+E2E_PID=""; E2E_STATUS=""; PERM_STATUS=""
 # The specs are chosen by scripts/e2e-affected.mjs: every spec names what it
 # exercises (`// @covers app:/commerce/orders api:orders …`), and the branch's
 # changed files are mapped onto those keys through an import scan of the apps
 # and the api. A global change (schema, seed, ui, auth, tooling, CI, root
 # config) picks all of them; so does --full. CI always runs every spec.
+# The permission suite is chosen the same way (`--suite permissions`, its
+# specs' @covers name the app routes they open); an api change never picks
+# it, since it answers with a fake api.
 e2e_start() {
-    local total
+    local total ports p
     # Keyed on HEAD's tree even when files are modified: HEAD is what it tests.
     E2E_TREE=$(git rev-parse 'HEAD^{tree}')
-    if [ "$FULL" = 1 ]; then E2E_STEP=e2e-desk-phone; else E2E_STEP=e2e-desk-phone:affected; fi
+    if [ "$FULL" = 1 ]; then
+        E2E_STEP=e2e-desk-phone; PERM_STEP=e2e-permissions
+    else
+        E2E_STEP=e2e-desk-phone:affected; PERM_STEP=e2e-permissions:affected
+    fi
     if [ "$USE_CACHE" = 1 ] && { [ -f "$PASSES/$E2E_TREE-$E2E_STEP" ] ||
         [ -f "$PASSES/$E2E_TREE-e2e-desk-phone" ]; }; then
-        E2E_STATUS=cached; return 0
-    fi
-    total=$(ls e2e/tests/*.spec.ts | wc -l | tr -d ' ')
-    if [ "$FULL" = 1 ]; then
-        specs=$(cd e2e && ls tests/*.spec.ts)
-        echo "=== e2e selection   all $total specs (--full)"
+        E2E_STATUS=cached
     else
-        specs=$(echo "$CHANGED" | node scripts/e2e-affected.mjs --stdin 2>"$W/e2e-why.log")
-        echo "=== e2e selection   $(head -1 "$W/e2e-why.log" | sed 's/^e2e: //')"
-        sed -n '2,60p' "$W/e2e-why.log"
-        [ "$(wc -l <"$W/e2e-why.log")" -gt 60 ] && echo "      … (full list: $W/e2e-why.log)"
+        total=$(ls e2e/tests/*.spec.ts | wc -l | tr -d ' ')
+        if [ "$FULL" = 1 ]; then
+            specs=$(cd e2e && ls tests/*.spec.ts)
+            echo "=== e2e selection   all $total specs (--full)"
+        else
+            specs=$(echo "$CHANGED" | node scripts/e2e-affected.mjs --stdin 2>"$W/e2e-why.log")
+            echo "=== e2e selection   $(head -1 "$W/e2e-why.log" | sed 's/^e2e: //')"
+            sed -n '2,60p' "$W/e2e-why.log"
+            [ "$(wc -l <"$W/e2e-why.log")" -gt 60 ] && echo "      … (full list: $W/e2e-why.log)"
+        fi
+        specs=$(echo $specs)
+        e2e_db=$(echo "${E2E_DATABASE_URL:-}" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
+        if [ -z "$specs" ]; then E2E_STATUS=none
+        elif [ -z "${E2E_DATABASE_URL:-}" ] || ! echo "$e2e_db" | grep -q test; then E2E_STATUS=nodb
+        else E2E_STATUS=run
+        fi
     fi
-    specs=$(echo $specs)
-    e2e_db=$(echo "${E2E_DATABASE_URL:-}" | sed -E 's#^.*/([^/?]+)(\?.*)?$#\1#')
-    if [ -z "$specs" ]; then
-        E2E_STATUS=none; return 0
-    elif [ -z "${E2E_DATABASE_URL:-}" ] || ! echo "$e2e_db" | grep -q test; then
-        E2E_STATUS=nodb; return 0
+    if [ "$USE_CACHE" = 1 ] && { [ -f "$PASSES/$E2E_TREE-$PERM_STEP" ] ||
+        [ -f "$PASSES/$E2E_TREE-e2e-permissions" ]; }; then
+        PERM_STATUS=cached
+    else
+        if [ "$FULL" = 1 ]; then
+            perm_specs=""; PERM_STATUS=run
+            echo "=== permissions     every spec (--full)"
+        else
+            perm_specs=$(echo "$CHANGED" | node scripts/e2e-affected.mjs --suite permissions --stdin 2>"$W/perm-why.log")
+            echo "=== permissions     $(head -1 "$W/perm-why.log" | sed 's/^e2e: //')"
+            sed -n '2,20p' "$W/perm-why.log"
+            perm_specs=$(echo $perm_specs)
+            if [ -z "$perm_specs" ]; then PERM_STATUS=none; else PERM_STATUS=run; fi
+        fi
     fi
+    [ "$E2E_STATUS" = run ] || [ "$PERM_STATUS" = run ] || return 0
+
     # Only a run that has specs to run takes the CPU back from `pnpm dev`.
     if [ "${PREPUSH_KEEP_DEV:-}" = 1 ]; then
         echo "    (PREPUSH_KEEP_DEV=1: the dev stack is left running)"
@@ -518,12 +583,19 @@ e2e_start() {
         echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
     SHA=$(git rev-parse HEAD)
     E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
-    echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
-    E2E_T0=$(date +%s)
+    [ "$E2E_STATUS" = run ] &&
+        echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
+    [ "$PERM_STATUS" = run ] &&
+        echo "=== permissions (in the background, after the browser specs) desk + phone, production build"
+    ports=""
+    [ "$E2E_STATUS" = run ] && ports="3333 3000 3003 3005"
+    [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
     trap stop_stack EXIT
     # In the background: the lock first (waiting on another run, if one is
     # going), then CI's ports — free, or taken by something that isn't a
-    # browser run — and only then the worktree, the database and the stack.
+    # browser run — and only then the worktree, the database and the stack;
+    # then the permission suite. Each part leaves "<rc> <seconds>" in
+    # $E2E_LOGS/<part>.rc.
     (
         me=$(sh -c 'echo $PPID')
         e2e_lock "$me" || exit 3
@@ -532,37 +604,66 @@ e2e_start() {
         trap 'stop_stack; e2e_unlock "$me"' EXIT
         trap 'exit 130' INT TERM
         busy=""
-        for p in 3333 3000 3003 3005; do
+        for p in $ports; do
             lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && busy="$busy $p"
         done
         if [ -n "$busy" ]; then
             echo "e2e ports taken:$busy — stop whatever listens there (a bare-port dev server?)"
             exit 4
         fi
-        e2e_stack "$E2E_DATABASE_URL" "$e2e_db" "$E2E_DIR" "$specs"
-    ) >"$E2E_LOGS/run.log" 2>&1 &
+        if [ "$E2E_STATUS" = run ]; then
+            s=$(date +%s)
+            ( e2e_stack "$E2E_DATABASE_URL" "$e2e_db" "$E2E_DIR" "$specs" ) >"$E2E_LOGS/run.log" 2>&1
+            echo "$? $(( $(date +%s) - s ))" >"$E2E_LOGS/browser.rc"
+            stop_stack
+        fi
+        if [ "$PERM_STATUS" = run ]; then
+            s=$(date +%s)
+            ( e2e_perms "$E2E_DIR" "$perm_specs" ) >"$E2E_LOGS/permissions.log" 2>&1
+            echo "$? $(( $(date +%s) - s ))" >"$E2E_LOGS/permissions.rc"
+        fi
+    ) >"$E2E_LOGS/job.log" 2>&1 &
     E2E_PID=$!
+}
+# e2e_part <step> <part> <log> <grep pattern>: one part's result.
+e2e_part() {
+    local step=$1 part=$2 log=$3 pattern=$4 rc secs
+    if [ ! -f "$E2E_LOGS/$part.rc" ]; then
+        say "$step" "FAIL (never ran)"
+        tail -5 "$E2E_LOGS/job.log"
+        echo "    logs: $E2E_LOGS"
+        FAILED="$FAILED $step"; return 0
+    fi
+    read -r rc secs <"$E2E_LOGS/$part.rc"
+    if [ "$rc" = 0 ]; then
+        say "$step" "PASS (${secs}s)"
+        # It tested HEAD's tree, whatever the working tree holds.
+        date +%s >"$PASSES/$E2E_TREE-$step"
+    else
+        say "$step" "FAIL (${secs}s)"
+        grep -E "$pattern" "$E2E_LOGS/$log" | tail -40
+        echo "    run log and server logs: $E2E_LOGS"
+        FAILED="$FAILED $step"
+    fi
 }
 e2e_finish() {
     case "$E2E_STATUS" in
-        cached) say "$E2E_STEP" "PASS (cached)"; return 0 ;;
-        none) say e2e "no spec covers what changed (scripts/e2e-affected.mjs); CI runs them all"; return 0 ;;
+        cached) say "$E2E_STEP" "PASS (cached)" ;;
+        none) say e2e "no spec covers what changed (scripts/e2e-affected.mjs); CI runs them all" ;;
         nodb) say e2e "FAIL — set E2E_DATABASE_URL to a throwaway *test* database (it is dropped and re-created)"
-            FAILED="$FAILED e2e(db)"; return 0 ;;
+            FAILED="$FAILED e2e(db)" ;;
+    esac
+    case "$PERM_STATUS" in
+        cached) say "$PERM_STEP" "PASS (cached)" ;;
+        none) say permissions "no permission spec covers what changed (--suite permissions); CI runs them all" ;;
     esac
     [ -n "$E2E_PID" ] || return 0
     [ "$INT" = 1 ] && echo "    (waiting for the browser run)"
-    if wait "$E2E_PID"; then
-        say "$E2E_STEP" "PASS ($(( $(date +%s) - E2E_T0 ))s)"
-        # It tested HEAD's tree, whatever the working tree holds.
-        date +%s >"$PASSES/$E2E_TREE-$E2E_STEP"
-    else
-        say "$E2E_STEP" "FAIL ($(( $(date +%s) - E2E_T0 ))s)"
-        grep -E "✘|^\s+[0-9]+ (failed|passed|skipped|flaky)|never came up|Error:|ports taken|e2e lock:|=== e2e:" \
-            "$E2E_LOGS/run.log" | tail -40
-        echo "    run log and server logs: $E2E_LOGS"
-        FAILED="$FAILED $E2E_STEP"
-    fi
+    wait "$E2E_PID"
+    [ "$E2E_STATUS" = run ] && e2e_part "$E2E_STEP" browser run.log \
+        "✘|^\s+[0-9]+ (failed|passed|skipped|flaky)|never came up|Error:|=== e2e:"
+    [ "$PERM_STATUS" = run ] && e2e_part "$PERM_STEP" permissions permissions.log \
+        "✘|^\s+[0-9]+ (failed|passed|skipped|flaky)|Error:|ELIFECYCLE|Timed out|already used"
     stop_stack
     trap - EXIT
 }
@@ -689,37 +790,51 @@ fi
 # with a TRUNCATE between files. Two runs on one database reset each other's
 # rows and fail at random, so no two workers ever share one. Each worker also
 # has its own TMPDIR: the fake site-code outbox is a file per email there.
+#
+# Two modes, as CI's matrix: plain (INT_TAG=int), then RLS (INT_TAG=int-rls,
+# TEST_RLS=on), where each shard's globalSetup replays the migrations (where
+# the policies live; ~3s) and the specs connect as a NOBYPASSRLS role
+# (apps/api.saroh.in/test/rls-mode.ts). RLS runs after plain, on the same
+# PREPUSH_INT_DBS databases, never beside it: every reset drops and re-creates
+# the whole schema in one transaction, and Postgres' lock table is shared by
+# every database (max_locks_per_transaction × max_connections, 6,400 slots
+# on a default install). A reset holds one lock per table, index and sequence,
+# ~800 of them, so twice the resets at once, beside another checkout's run,
+# can end in "out of shared memory". The RLS
+# role is one per cluster and every RLS shard's globalSetup gives it a new
+# password, which a Postgres that trusts local connections (Homebrew's
+# default) never checks; one that checks passwords needs PREPUSH_INT_DBS=1.
 int_worker() {
     local i=$1 url=$2 k tries rc s
-    local tmp=$W/tmp-$i
+    local tmp=$W/$INT_TAG-tmp-$i
     mkdir -p "$tmp"
     k=1
     while [ "$k" -le "$INT_GROUPS" ]; do
-        if mkdir "$W/claim-$k" 2>/dev/null; then
+        if mkdir "$W/$INT_TAG-claim-$k" 2>/dev/null; then
             tries=0
             while :; do
                 tries=$((tries + 1))
                 s=$(date +%s)
                 # shellcheck disable=SC2086
-                ( cd apps/api.saroh.in && TEST_DATABASE_URL=$url TMPDIR=$tmp \
+                ( cd apps/api.saroh.in && TEST_DATABASE_URL=$url TEST_RLS=$INT_RLS TMPDIR=$tmp \
                     SKIP_ENV_VALIDATION=1 pnpm -s exec jest -c jest.integration.config.js \
                     --shard="$k/$INT_GROUPS" --cacheDirectory="$JEST_CACHE" --ci --no-watchman \
-                    ${INT_PATHS:+--runTestsByPath $INT_PATHS} ) \
-                    >"$W/int-$k.log" 2>&1
+                    ${INT_RUN_PATHS:+--runTestsByPath $INT_RUN_PATHS} ) \
+                    >"$W/$INT_TAG-$k.log" 2>&1
                 rc=$?
-                if [ $rc != 0 ] && [ $tries = 1 ] && ! grep -qE '^Tests:' "$W/int-$k.log"; then
-                    cp "$W/int-$k.log" "$W/int-$k.crash.log"
-                    printf '    int %s/%s crashed without a jest summary on db %s — retrying once\n' "$k" "$INT_GROUPS" "$i"
+                if [ $rc != 0 ] && [ $tries = 1 ] && ! grep -qE '^Tests:' "$W/$INT_TAG-$k.log"; then
+                    cp "$W/$INT_TAG-$k.log" "$W/$INT_TAG-$k.crash.log"
+                    printf '    %s %s/%s crashed without a jest summary on db %s — retrying once\n' "$INT_TAG" "$k" "$INT_GROUPS" "$i"
                     continue
                 fi
                 break
             done
-            printf '%s %s %s %s\n' "$rc" "$(( $(date +%s) - s ))" "$i" "$tries" >"$W/int-$k.rc"
+            printf '%s %s %s %s\n' "$rc" "$(( $(date +%s) - s ))" "$i" "$tries" >"$W/$INT_TAG-$k.rc"
             if [ $rc = 0 ]; then
-                printf '    int %2s/%s  pass  %4ss  db %s%s\n' "$k" "$INT_GROUPS" "$(( $(date +%s) - s ))" "$i" \
+                printf '    %-7s %2s/%s  pass  %4ss  db %s%s\n' "$INT_TAG" "$k" "$INT_GROUPS" "$(( $(date +%s) - s ))" "$i" \
                     "$([ $tries = 2 ] && echo ' (after a retry)')"
             else
-                printf '    int %2s/%s  FAIL  %4ss  db %s\n' "$k" "$INT_GROUPS" "$(( $(date +%s) - s ))" "$i"
+                printf '    %-7s %2s/%s  FAIL  %4ss  db %s\n' "$INT_TAG" "$k" "$INT_GROUPS" "$(( $(date +%s) - s ))" "$i"
             fi
         fi
         k=$((k + 1))
@@ -729,9 +844,9 @@ int_run() {
     local n i name url maint exists k rc bad="" pids=""
     n=${PREPUSH_INT_DBS:-3}
     INT_GROUPS=${PREPUSH_INT_GROUPS:-16}
-    if [ -n "$INT_PATHS" ]; then
+    if [ -n "$INT_RUN_PATHS" ]; then
         # A few specs a shard: each shard pays for its own schema reset.
-        k=$(echo "$INT_PATHS" | wc -w | tr -d ' ')
+        k=$(echo "$INT_RUN_PATHS" | wc -w | tr -d ' ')
         k=$(( (k + 2) / 3 ))
         [ "$k" -lt "$INT_GROUPS" ] && INT_GROUPS=$k
         [ "$INT_GROUPS" -lt "$n" ] && n=$INT_GROUPS
@@ -750,7 +865,7 @@ int_run() {
         fi
         i=$((i + 1))
     done
-    say int "$INT_GROUPS shards on $n test databases, $name-1 to $name-$n"
+    say "$INT_TAG" "$INT_GROUPS shards on $n test databases, $name-1 to $name-$n"
     i=1
     while [ $i -le "$n" ]; do
         url=$(echo "$TEST_DATABASE_URL" | sed -E "s#/([^/?]+)(\\?.*)?\$#/\\1-$i\\2#")
@@ -761,17 +876,17 @@ int_run() {
     for i in $pids; do wait "$i"; done
     k=1
     while [ $k -le "$INT_GROUPS" ]; do
-        if [ ! -f "$W/int-$k.rc" ]; then bad="$bad $k"
+        if [ ! -f "$W/$INT_TAG-$k.rc" ]; then bad="$bad $k"
         else
-            read -r rc _ <"$W/int-$k.rc"
+            read -r rc _ <"$W/$INT_TAG-$k.rc"
             [ "$rc" = 0 ] || bad="$bad $k"
         fi
         k=$((k + 1))
     done
     for k in $bad; do
-        echo "--- int shard $k/$INT_GROUPS (log $W/int-$k.log)"
-        grep -E "^(FAIL|Tests:|Test Suites:)|●" "$W/int-$k.log" | head -30
-        grep -qE '^Tests:' "$W/int-$k.log" || tail -30 "$W/int-$k.log"
+        echo "--- $INT_TAG shard $k/$INT_GROUPS (log $W/$INT_TAG-$k.log)"
+        grep -E "^(FAIL|Tests:|Test Suites:)|● [^C]" "$W/$INT_TAG-$k.log" | head -30
+        grep -qE '^Tests:' "$W/$INT_TAG-$k.log" || tail -30 "$W/$INT_TAG-$k.log"
     done
     [ -z "$bad" ]
 }
@@ -779,7 +894,9 @@ int_run() {
 # --findRelatedTests over the api files that changed (and the api files that
 # import a changed workspace package), plus the specs that guard every module
 # at once. A change to what every spec stands on runs the whole suite, as
-# --full does. CI always runs the whole suite (and again under RLS).
+# --full does. CI always runs the whole suite, plain and under RLS; so does
+# this: the RLS run takes the same selection (less the specs the RLS config
+# leaves out) and has its own pass, int-rls or int-rls:affected.
 INT_FULL_RE='^(packages/(database|auth)/|apps/api\.saroh\.in/(src/common/|src/[^/]+\.ts$|test/|jest[^/]*$|package\.json$|tsconfig[^/]*$)|pnpm-lock\.yaml$)'
 INT_ALWAYS_RE='/(capabilities/module-annotations\.spec|rls/[^/]+|[^/]+-rls\.db\.spec|[^/]*permissions?[^/.]*(\.db)?\.spec)\.ts$'
 INT_PATHS=""; INT_WHY=""
@@ -790,6 +907,7 @@ else
     else INT_STEP=int:affected
     fi
 fi
+INT_RLS_STEP=int-rls${INT_STEP#int}
 int_select() {
     local srcs="" f p all related always
     for f in $(echo "$CHANGED" | grep -E '^apps/api\.saroh\.in/src/.*\.ts$'); do
@@ -813,16 +931,53 @@ int_select() {
     INT_PATHS=$(printf '%s\n%s\n' "$related" "$always" | grep . | sort -u | tr '\n' ' ')
     INT_WHY="$(echo "$related" | grep -c .) related to $(echo "$srcs" | wc -w | tr -d ' ') changed api files + $(echo "$always" | grep -c .) always-run (permissions, RLS, module annotations) = $(echo "$INT_PATHS" | wc -w | tr -d ' ') of $(echo "$all" | grep -c .) specs"
 }
+# The RLS run's specs: the plain selection, less what jest.integration.config
+# leaves out under TEST_RLS (the backfill specs that need the owner's DDL).
+# The whole suite needs no list: the config leaves them out itself.
+int_rls_select() {
+    local all p
+    INT_RLS_PATHS=""
+    [ -n "$INT_PATHS" ] || return 0
+    all=$(cd apps/api.saroh.in && TEST_RLS=on SKIP_ENV_VALIDATION=1 pnpm -s exec jest \
+        -c jest.integration.config.js --listTests --no-watchman 2>/dev/null) || return 1
+    for p in $INT_PATHS; do
+        echo "$all" | grep -qxF "$p" && INT_RLS_PATHS="$INT_RLS_PATHS $p"
+    done
+    return 0
+}
+# int_mode plain|rls: one integration run, recorded as its own step.
+int_mode() {
+    local name s
+    if [ "$1" = rls ]; then
+        INT_TAG=int-rls; INT_RLS=on; name=$INT_RLS_STEP
+        if ! int_rls_select; then
+            say "$name" "FAIL — could not list the RLS specs"; FAILED="$FAILED $name"; return 0
+        fi
+        INT_RUN_PATHS=$INT_RLS_PATHS
+        if [ -n "$INT_PATHS" ]; then
+            say int-rls "the same selection under TEST_RLS=on: $(echo "$INT_RUN_PATHS" | wc -w | tr -d ' ') specs"
+        else
+            say int-rls "the whole suite under TEST_RLS=on"
+        fi
+    else
+        INT_TAG=int; INT_RLS=""; name=$INT_STEP; INT_RUN_PATHS=$INT_PATHS
+    fi
+    s=$(date +%s)
+    if int_run; then say "$name" "PASS ($(( $(date +%s) - s ))s)"; record "$name"
+    else say "$name" "FAIL ($(( $(date +%s) - s ))s)"; FAILED="$FAILED $name"
+    fi
+}
 if [ "$INT" = 1 ]; then
-    if cached "$INT_STEP" int; then say "$INT_STEP" "PASS (cached)"; else
+    INT_NEED=""
+    if cached "$INT_STEP" int; then say "$INT_STEP" "PASS (cached)"; else INT_NEED=plain; fi
+    if cached "$INT_RLS_STEP" int-rls; then say "$INT_RLS_STEP" "PASS (cached)"; else INT_NEED="$INT_NEED rls"; fi
+    if [ -n "$INT_NEED" ]; then
         # The api's workspace packages are consumed built, as in CI.
         step int-build $TURBO build --filter='@saroh/api^...'
-        s=$(date +%s)
         if [ "$INT_STEP" = int ] || int_select; then
             say int "$INT_WHY"
-            if int_run; then say "$INT_STEP" "PASS ($(( $(date +%s) - s ))s)"; record "$INT_STEP"
-            else say "$INT_STEP" "FAIL ($(( $(date +%s) - s ))s)"; FAILED="$FAILED $INT_STEP"
-            fi
+            # One mode after the other, never side by side (int_worker).
+            for m in $INT_NEED; do int_mode "$m"; done
         else say "$INT_STEP" "FAIL — could not list the integration specs"; FAILED="$FAILED $INT_STEP"
         fi
     fi

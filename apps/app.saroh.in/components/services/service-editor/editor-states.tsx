@@ -45,7 +45,7 @@ export function ServiceEditorState({
                         </h1>
                         <Link
                             href="/services"
-                            className="text-[13px] font-semibold text-brand hover:text-foreground"
+                            className="text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                         >
                             Back to services
                         </Link>

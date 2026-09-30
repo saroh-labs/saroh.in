@@ -13,6 +13,7 @@ import {
     LEADS,
     LIVE_PAYMENT_PROVIDER,
     MODULE_STATES,
+    NORTHWIND_ADDRESS,
     ONLINE_STOCK,
     ORDERS,
     ORG_NAME,
@@ -48,6 +49,7 @@ import {
     syncStorefrontFulfilmentTypes,
     writeSite,
 } from "./helpers";
+import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
  * Build a believable Northwind Supply, or remove it.
@@ -107,14 +109,17 @@ export async function seed(): Promise<void> {
     });
 
     // The zone the business keeps time in (ADR-007): renewal dates and
-    // "today" are counted in it.
+    // "today" are counted in it. And its registered address, which every
+    // invoice prints: issuing one, or connecting a provider, asks for it
+    // first (DEC-068).
     await prisma.businessProfile.upsert({
         where: { organizationId: org.id },
-        update: { timezone: "Asia/Kolkata" },
+        update: { timezone: "Asia/Kolkata", ...NORTHWIND_ADDRESS },
         create: {
             id: id("profile"),
             organizationId: org.id,
             timezone: "Asia/Kolkata",
+            ...NORTHWIND_ADDRESS,
         },
     });
 
@@ -240,7 +245,7 @@ export async function seed(): Promise<void> {
 
     await seedCrm(prisma, org.id, user.id, now);
     await seedAppointments(prisma, org.id, now);
-    await seedCommerce(prisma, org.id, user.id, now);
+    const storeId = await seedCommerce(prisma, org.id, user.id, now);
 
     // Billing first: the sites and the domain claim below are both entitlement-
     // gated, and an org on the FREE default may hold neither.
@@ -248,6 +253,7 @@ export async function seed(): Promise<void> {
     const sideOrgIds = await seedSideBusinesses(prisma, user.id, now);
     const siteIds = await seedWebsite(prisma, org.id, sideOrgIds, user.id, now);
     await seedReviewer(prisma, org.id, user.id, siteIds[0]);
+    await seedStorefrontTeammate(prisma, org.id, storeId);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);
@@ -1525,6 +1531,8 @@ export async function deleteSeeded(
         () => prisma.featureFlagOverride.deleteMany({ where }),
         () => prisma.organizationModule.deleteMany({ where }),
         () => prisma.membership.deleteMany({ where }),
+        // Farah's storefront role (DEC-074); it cascades from the store too.
+        () => prisma.storeMembers.deleteMany({ where }),
         () => prisma.businessProfile.deleteMany({ where }),
         // Keyed by its organization, so matched on that.
         () =>

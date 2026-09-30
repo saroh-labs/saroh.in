@@ -4,6 +4,7 @@ import {
     Logger,
     Optional,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
@@ -17,6 +18,7 @@ import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { isPastDue } from "../invoices/invoice-state";
 import { realOrderWhere } from "../orders/open-orders";
+import { orderLocationWhere } from "../orders/order-location";
 import { allows, authorize } from "../organizations/organization-policy";
 import { dateKey } from "../subscriptions/collections";
 import type { CalendarStaff, DayOff } from "./days-off";
@@ -375,6 +377,8 @@ export class CalendarService {
                     orderAmounts,
                     money,
                     now,
+                    // A location's team sees its storefronts' (DEC-074).
+                    orderLocationWhere(ctx),
                 ),
             ),
             attempt("collections", sees.collections, () =>
@@ -644,6 +648,8 @@ export class CalendarService {
         amounts: boolean,
         money: boolean,
         now: Date,
+        /** The viewer's storefronts, when they are narrowed (DEC-074). */
+        location: Prisma.OrderWhereInput = {},
     ): Promise<{
         items: DatedItem[];
         takings: TakingEntry[];
@@ -657,6 +663,7 @@ export class CalendarService {
                     createdAt: { gte: window.start, lt: window.end },
                     // Never an abandoned site checkout, as Orders (B1).
                     ...realOrderWhere(),
+                    ...location,
                 },
                 orderBy: { createdAt: "asc" },
                 select: {

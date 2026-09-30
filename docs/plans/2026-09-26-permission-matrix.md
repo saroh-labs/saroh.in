@@ -173,6 +173,13 @@ from their storefront role. It is an ordinary custom role the owner can
 widen, and the owner is told who was added (Activity, and a one-time Team
 notice with Change role).
 
+**A location's team moves its orders (DEC-074, amends F16).** Storefront team
+also holds `order:stage`, narrowed to the storefronts its holder works on
+(`StoreMembers`): list, read (no money, no customer email or phone) and move
+their orders; another storefront's order is a 404 to read and a 403 to move;
+no `order:read`, create, edit, refund, pay link or export
+(`orders/order-location.ts`, `order-permissions.db.spec.ts`).
+
 ## 3. Why each split exists, and the splits dropped
 
 **Kept, because a business would plausibly grant one without the other:**

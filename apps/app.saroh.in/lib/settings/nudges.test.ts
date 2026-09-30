@@ -111,7 +111,8 @@ describe("settingsNudges (DEC-056)", () => {
         expect(type).toMatchObject({
             key: "businessType",
             left: true,
-            href: "/settings/organization?section=identity",
+            // Straight to the Type field on Business › Identity.
+            href: "/settings/organization?section=identity#business-type",
         });
         // A type this app doesn't know reads as Not set; `company` is Pvt Ltd.
         expect(
@@ -121,6 +122,29 @@ describe("settingsNudges (DEC-056)", () => {
                 messaging: null,
             })[0]?.left,
         ).toBe(false);
+    });
+
+    it("is done once any of F10's six types is saved, and only then", () => {
+        const left = (type: string | null) =>
+            settingsNudges({
+                settings: { profile: { ...profile, type } },
+                modules: null,
+                messaging: null,
+            }).find((n) => n.key === "businessType")?.left;
+        for (const type of [
+            "individual",
+            "partnership",
+            "llp",
+            "pvt",
+            "public",
+            "trust",
+        ]) {
+            expect(left(type), type).toBe(false);
+        }
+        // Onboarding's "Registered" saves nothing; an unknown word is Not set.
+        expect(left(null)).toBe(true);
+        expect(left("")).toBe(true);
+        expect(left("registered")).toBe(true);
     });
 
     it("never names a module Saroh has not rolled out (DEC-057)", () => {

@@ -2,6 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { CapabilityOffState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { AccessDenied } from "@/components/shared/access-denied";
@@ -89,6 +90,12 @@ export async function ModuleGate({
     children: ReactNode;
 }) {
     const access = await moduleAccess(moduleKey);
+    /*
+     * Saroh hasn't rolled it out here (DEC-057): the business is never shown
+     * it, so a bookmark or an old link finds no page — not "turned off" with
+     * a button to a switch Settings doesn't have.
+     */
+    if (access.state === "hidden") notFound();
     if (access.state === "unavailable") {
         /*
          * Readiness is DISABLED for ANY closed gate, and authorization is one

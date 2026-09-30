@@ -4,6 +4,8 @@
  * Pure — no React, no fetch — so every rule here is tested on its own.
  */
 
+import { siteMoney } from "../lib/money";
+
 /** Where a service happens (E7): the customer chooses for EITHER. */
 export type ServiceWhere = "IN_PERSON" | "ONLINE" | "EITHER";
 
@@ -470,17 +472,7 @@ export function formatMoney(
     locale = "en-IN",
 ): string | null {
     if (cents === null || !currency) return null;
-    const whole = cents % 100 === 0;
-    try {
-        return new Intl.NumberFormat(locale, {
-            style: "currency",
-            currency,
-            minimumFractionDigits: whole ? 0 : 2,
-            maximumFractionDigits: whole ? 0 : 2,
-        }).format(cents / 100);
-    } catch {
-        return null;
-    }
+    return siteMoney(cents / 100, currency, locale);
 }
 
 /** "Karan", "Karan or Vikram", "Asha, Karan or Vikram". */

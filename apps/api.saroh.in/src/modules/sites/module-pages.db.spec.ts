@@ -208,6 +208,9 @@ describe("module pages (G14, real database)", () => {
         expect(sections[1]?.content).toMatchObject({
             serviceIds: [first.id, second.id],
             showPrices: true,
+            // The design's Book page: cards, each "Choose a time".
+            layout: "cards",
+            buttonLabel: "Choose a time",
         });
         expect(sections.every((s) => s.key.length > 0)).toBe(true);
 
@@ -261,6 +264,8 @@ describe("module pages (G14, real database)", () => {
             heading: "Try it once",
             serviceIds: [trial.id, expect.any(String)],
             showPrices: true,
+            layout: "cards",
+            buttonLabel: "Choose a time",
         });
         expect(
             (sections[1]?.content as { serviceIds: string[] }).serviceIds,

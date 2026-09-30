@@ -72,7 +72,7 @@ export function CollectionsCard({
                             onClick={() => onToggle(u)}
                             disabled={busyDate === u.date}
                             aria-label={`${u.skipped ? "Undo skip" : "Skip"} ${u.label}`}
-                            className="h-8 min-w-[76px] rounded-[8px] border border-border bg-card px-3 text-[12px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-disabled disabled:text-disabled-foreground coarse:h-11"
+                            className="h-8 min-w-[76px] rounded-[8px] border border-border bg-card px-3 text-[12px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active disabled:bg-disabled disabled:text-disabled-foreground coarse:h-11"
                         >
                             {u.skipped ? "Undo skip" : "Skip"}
                         </button>
@@ -141,7 +141,7 @@ export function ChargesCard({
                         {c.number ? (
                             <Link
                                 href={`/billing/invoices/${c.id}`}
-                                className="font-mono text-[11.5px] text-brand hover:text-foreground"
+                                className="font-mono text-[11.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 {c.number}
                             </Link>
@@ -154,7 +154,7 @@ export function ChargesCard({
                     <button
                         type="button"
                         onClick={() => setEverything(true)}
-                        className="text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                        className="text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11"
                     >
                         Show all {all.length} charges
                     </button>

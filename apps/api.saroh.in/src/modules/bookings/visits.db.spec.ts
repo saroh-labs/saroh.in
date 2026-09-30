@@ -30,6 +30,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrderKitchenService } from "../orders/order-kitchen.service";
@@ -144,6 +145,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "UTC" },
     });
+    await giveBusinessDetails(org.id);
     await prisma.bookingRules.create({
         data: { organizationId: org.id, freeCancelHours: 24 },
     });
@@ -664,6 +666,7 @@ describe("a treatment sold as one order (E9, real database)", () => {
         const org = await prisma.organization.create({
             data: { name: "Elsewhere", slug: `visits-other-${tag}` },
         });
+        await giveBusinessDetails(org.id);
         const stranger: OrganizationContext = {
             organizationId: org.id,
             userId: owner.userId,
@@ -715,6 +718,7 @@ describe("a treatment refused before anything is held (E9)", () => {
         const org = await prisma.organization.create({
             data: { name: "No Shop Dental", slug: `visits-noshop-${tag}` },
         });
+        await giveBusinessDetails(org.id);
         const serviceId = await service(org.id, {
             name: "Root canal treatment",
             visits: 3,
@@ -741,6 +745,7 @@ describe("a treatment refused before anything is held (E9)", () => {
         const org = await prisma.organization.create({
             data: { name: "Shop Off Dental", slug: `visits-shopoff-${tag}` },
         });
+        await giveBusinessDetails(org.id);
         await prisma.store.create({
             data: {
                 name: "Clinic",

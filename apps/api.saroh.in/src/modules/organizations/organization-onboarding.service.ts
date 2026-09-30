@@ -13,10 +13,25 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { addressProblem, addressTaken } from "../sites/site-address";
+import {
+    addressProblem,
+    addressTaken,
+    MAX_ADDRESS_LENGTH,
+} from "../sites/site-address";
 import { businessTypeWrite } from "./business-type";
 import type { OnboardOrganizationDto } from "./dto";
 import { slugify } from "./slug";
+
+/**
+ * The address a name becomes when the merchant didn't choose one: its slug,
+ * cut to the longest address a business can claim (DEC-071), without a
+ * hyphen left dangling at the cut.
+ */
+function addressFromName(name: string): string {
+    let address = slugify(name).slice(0, MAX_ADDRESS_LENGTH);
+    while (address.endsWith("-")) address = address.slice(0, -1);
+    return address;
+}
 
 /** What onboarding returns to the caller: the new org's identity. */
 export interface OnboardedOrganization {
@@ -61,7 +76,7 @@ export class OrganizationOnboardingService {
             dto.address === undefined || dto.address === ""
                 ? null
                 : dto.address;
-        const slug = chosen ?? slugify(dto.name).slice(0, 63);
+        const slug = chosen ?? addressFromName(dto.name);
         if (!slug) {
             throw new BadRequestException(
                 "Organization name must contain at least one alphanumeric character",

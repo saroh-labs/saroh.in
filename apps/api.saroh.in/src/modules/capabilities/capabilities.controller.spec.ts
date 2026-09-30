@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 
 // Stub the guard modules so importing the controller doesn't pull in
 // better-auth's ESM (which ts-jest can't transform) — keeps this a pure unit
@@ -14,6 +14,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { CapabilitiesController } from "./capabilities.controller";
 import type { ModuleAvailabilityService } from "./module-availability.service";
 import type { ModuleLifecycleService } from "./module-lifecycle.service";
+import type { ModuleSetupService } from "./setup/module-setup.service";
 
 const CTX: OrganizationContext = {
     organizationId: "org_1",
@@ -42,10 +43,26 @@ function build() {
             }),
         ),
     } as unknown as ModuleLifecycleService;
+    const setup = {
+        enable: jest.fn().mockResolvedValue({
+            alreadyEnabled: false,
+            created: { pipelineId: "pipe_1" },
+        }),
+        defaults: jest.fn((_ctx: unknown, moduleKey: string) =>
+            Promise.resolve({
+                moduleKey,
+                hidden: false,
+                dependencies: [],
+                setup: {},
+                existing: null,
+            }),
+        ),
+    } as unknown as ModuleSetupService;
     return {
-        controller: new CapabilitiesController(availability, lifecycle),
+        controller: new CapabilitiesController(availability, lifecycle, setup),
         availability,
         lifecycle,
+        setup,
     };
 }
 
@@ -73,6 +90,55 @@ describe("CapabilitiesController", () => {
         expect(lifecycle.disable).toHaveBeenCalledWith(CTX, "CRM");
         await controller.setStatus(CTX, "COMMERCE", { status: "ARCHIVED" });
         expect(lifecycle.archive).toHaveBeenCalledWith(CTX, "COMMERCE");
+    });
+
+    it("an enable without setup is the previous app's call: lifecycle alone, the view alone (DEC-068)", async () => {
+        const { controller, lifecycle, setup } = build();
+        const res = await controller.setStatus(CTX, "CRM", {
+            status: "ENABLED",
+        });
+        expect(lifecycle.enable).toHaveBeenCalledWith(CTX, "CRM");
+        expect(setup.enable).not.toHaveBeenCalled();
+        expect(res).toEqual({ data: { key: "CRM", lifecycle: "ENABLED" } });
+    });
+
+    it("an enable with setup goes to the setup, and says what it did", async () => {
+        const { controller, lifecycle, setup } = build();
+        const res = await controller.setStatus(CTX, "CRM", {
+            status: "ENABLED",
+            setup: {},
+        });
+        expect(setup.enable).toHaveBeenCalledWith(CTX, "CRM", {});
+        expect(lifecycle.enable).not.toHaveBeenCalled();
+        expect(res).toEqual({
+            data: { key: "CRM", lifecycle: "ENABLED" },
+            alreadyEnabled: false,
+            created: { pipelineId: "pipe_1" },
+        });
+    });
+
+    it("refuses a setup with any status but ENABLED", async () => {
+        const { controller, lifecycle, setup } = build();
+        for (const status of ["DISABLED", "ARCHIVED"] as const) {
+            await expect(
+                controller.setStatus(CTX, "CRM", { status, setup: {} }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        }
+        expect(setup.enable).not.toHaveBeenCalled();
+        expect(lifecycle.disable).not.toHaveBeenCalled();
+        expect(lifecycle.archive).not.toHaveBeenCalled();
+    });
+
+    it("GET setup-defaults answers what the Turn on sheet prefills", async () => {
+        const { controller, setup } = build();
+        const res = await controller.setupDefaults(CTX, "WEBSITE");
+        expect(setup.defaults).toHaveBeenCalledWith(CTX, "WEBSITE");
+        expect(res.data).toEqual(
+            expect.objectContaining({ moduleKey: "WEBSITE", hidden: false }),
+        );
+        await expect(
+            controller.setupDefaults(CTX, "NOPE"),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("rejects an unknown module key with 404", async () => {

@@ -4,6 +4,8 @@ import { forbidden } from "next/navigation";
 import { cache } from "react";
 
 import { ApiError } from "@/lib/api/errors";
+import { toFailure } from "@/lib/api/failure";
+import type { BusinessDetail } from "@/lib/organizations/business-details";
 
 import { env } from "@/env";
 
@@ -34,7 +36,14 @@ const API_URL =
 export const ACTIVE_ORG_COOKIE = "active_org";
 
 /** Discriminated result so a client component can surface a message inline. */
-export type CrmResult<T> = { ok: true; data: T } | { ok: false; error: string };
+export type CrmResult<T> =
+    | { ok: true; data: T }
+    | {
+          ok: false;
+          error: string;
+          /** What the business must add first (DEC-068); see `failure.ts`. */
+          missing?: BusinessDetail[];
+      };
 
 /**
  * Member organization ids for the session, newest-first as the API returns
@@ -190,7 +199,12 @@ export async function mutate<T>(
     if (res.ok) {
         return { ok: true, data: (data ?? {}) as T };
     }
-    return { ok: false, error: readError(data, fallback) };
+    const { missing } = toFailure(data, fallback);
+    return {
+        ok: false,
+        error: readError(data, fallback),
+        ...(missing ? { missing } : {}),
+    };
 }
 
 /**

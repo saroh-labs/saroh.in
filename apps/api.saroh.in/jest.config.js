@@ -70,6 +70,8 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/readiness/module-readiness.registry.spec.ts",
         // #115 module API controller (mocked services).
         "<rootDir>/src/modules/capabilities/capabilities.controller.spec.ts",
+        // DEC-068 Turn on: the setup payload's shapes (pure, no DB).
+        "<rootDir>/src/modules/capabilities/setup/module-setup.parse.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
         // #274 the same guard with the REAL availability service, per role:
@@ -246,7 +248,12 @@ module.exports = {
         // D16: the invoice's paper and its PDF, read back as text — pure
         // (invoice-pdf.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        // DEC-072: a line's GST note on the paper and the PDF — pure.
+        "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
+        // DEC-068: which business details are missing — pure (the refusals
+        // and the flag after money are in business-details.db.spec.ts).
+        "<rootDir>/src/modules/invoices/business-details.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.

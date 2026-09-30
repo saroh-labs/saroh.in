@@ -8,6 +8,7 @@
  */
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { InvoicesService } from "./invoices.service";
 
@@ -27,6 +28,7 @@ beforeAll(async () => {
             slug: `invoices-org-${process.pid}`,
         },
     });
+    await giveBusinessDetails(created.id);
     org = { organizationId: created.id, userId: "user_1", role: "OWNER" };
     const contact = await prisma.contact.create({
         data: {

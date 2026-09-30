@@ -18,6 +18,7 @@ import {
 import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { SendDialog } from "@/components/invoices/send-dialog";
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -112,6 +113,11 @@ export function InvoiceDetail({
     after: ReactNode;
 }) {
     const [open, setOpen] = useState<Dialog | null>(null);
+    // A pay link waits for the registered address (DEC-068): asked here.
+    const details = useBusinessDetailsStep({
+        then: "make its pay link",
+        continueLabel: "Save and make link",
+    });
     const [url, setUrl] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [downloading, setDownloading] = useState(false);
@@ -128,8 +134,9 @@ export function InvoiceDetail({
 
     async function makeLink() {
         setBusy(true);
-        const res = await createPayLink(invoice.id);
+        const res = await details.run(() => createPayLink(invoice.id));
         setBusy(false);
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         setUrl(res.data.url);
         showSuccess(
@@ -263,6 +270,7 @@ export function InvoiceDetail({
 
     return (
         <div>
+            {details.step}
             <InvoiceCrumbs current={invoice.number ?? "Draft"} />
             <div className="mb-4 flex flex-wrap items-start gap-3.5 print:hidden">
                 <div className="min-w-0 flex-[1_1_300px]">
@@ -371,7 +379,7 @@ export function InvoiceDetail({
                                     {canWrite ? (
                                         <Link
                                             href="/settings/providers"
-                                            className="font-medium text-foreground underline underline-offset-4"
+                                            className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
                                         >
                                             Connect one
                                         </Link>
@@ -404,7 +412,7 @@ export function InvoiceDetail({
                                 provider.{" "}
                                 <Link
                                     href="/settings/providers"
-                                    className="font-medium text-foreground underline underline-offset-4"
+                                    className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
                                 >
                                     Providers
                                 </Link>

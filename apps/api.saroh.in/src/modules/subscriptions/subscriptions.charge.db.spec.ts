@@ -26,6 +26,7 @@ import { ConflictException } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { failedRenewals } from "../home/home-money-sources";
@@ -88,6 +89,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Pulse", slug: `d13-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: user.id, role: "OWNER" };
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",

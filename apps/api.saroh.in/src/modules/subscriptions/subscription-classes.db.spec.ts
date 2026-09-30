@@ -15,6 +15,7 @@ import {
     unsetClassesPerPeriod,
 } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import { structuredLogger } from "../../common/logging/structured-logger";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { useMembershipInTx } from "../bookings/use-membership";
@@ -128,6 +129,7 @@ beforeAll(async () => {
     const created = await prisma.organization.create({
         data: { name: "Pulse", slug: `d10-${tag}` },
     });
+    await giveBusinessDetails(created.id);
     org = { organizationId: created.id, userId: "user_1", role: "OWNER" };
     serviceId = (
         await prisma.service.create({

@@ -28,6 +28,7 @@ import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { DateTime } from "luxon";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -128,6 +129,7 @@ async function business(opts: { gst?: boolean } = {}) {
             },
         });
     }
+    await giveBusinessDetails(org.id);
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
         publicKey: "rzp_test_Public1",
@@ -731,6 +733,7 @@ describe("the settings", () => {
         const org = await prisma.organization.create({
             data: { name: "Plain", slug: `d13b-none-${next()}` },
         });
+        await giveBusinessDetails(org.id);
         const ctx: OrganizationContext = {
             organizationId: org.id,
             userId: user.id,

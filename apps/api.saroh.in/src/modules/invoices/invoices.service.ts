@@ -15,6 +15,7 @@ import {
     chargeUnderWayOn,
 } from "../payments/charge-under-way";
 import { businessPayLinkProvider } from "../payments/pay-link-provider";
+import { assertBusinessDetails } from "./business-details";
 import type {
     CreditInvoiceDto,
     InvoiceInputDto,
@@ -209,6 +210,9 @@ export class InvoicesService {
         id: string,
     ): Promise<{ token: string }> {
         authorize(ctx, "invoice:write");
+        // A pay link is a way to take money online: the business details
+        // first (DEC-068). A member's own "Pay now" is never refused for it.
+        await assertBusinessDetails(db, ctx.organizationId);
         return this.mintPayLink(db, ctx.organizationId, id);
     }
 
@@ -450,6 +454,9 @@ export class InvoicesService {
         authorize(ctx, "invoice:write");
         const current = await this.read(ctx.organizationId, id);
         this.assertDraft(current.status, "issued again");
+        // Before its number: the paper prints the business's address, and
+        // a registered business's GSTIN (DEC-068).
+        await assertBusinessDetails(prisma, ctx.organizationId);
 
         await prisma.$transaction(async (tx) => {
             // Read the draft again under its lock: an edit that landed since

@@ -1,3 +1,4 @@
+import { rateToBps } from "./gst";
 import { stateName } from "./gst-states";
 import type { InvoiceTitle } from "./invoice-title";
 import type { InvoiceViewModel } from "./serialize";
@@ -129,6 +130,46 @@ function isExemptPaper(i: InvoiceViewModel): boolean {
     return Boolean(i.gst && i.exempt);
 }
 
+/**
+ * What a line says about its GST (DEC-072): only where GST applies.
+ *
+ * - No tax charged on the paper (an unregistered business's receipt, a
+ *   bill of supply): nothing, whatever the line holds.
+ * - A rate never set (`gstRate` null, like a plan renewal's line): nothing
+ *   — not "Nil-rated", not "0%". Not set is not a 0% supply.
+ * - A rate recorded as exactly 0: "Nil-rated".
+ * - Above 0: "GST 18% · taxable ₹2,400".
+ */
+export function lineGstNote(
+    taxed: boolean,
+    gst: { rate: string | null; taxableValue: string | null } | null,
+    money: (amount: string) => string,
+): string | null {
+    if (!taxed || gst?.rate == null || gst.rate.trim() === "") {
+        return null;
+    }
+    const bps = rateToBps(gst.rate);
+    if (bps === null || !Number.isFinite(bps)) return null;
+    if (bps === 0) return "Nil-rated";
+    return `GST ${Number(gst.rate)}% · taxable ${money(gst.taxableValue ?? "0")}`;
+}
+
+/**
+ * Whether a registered business's paper shows its GST totals (DEC-072) —
+ * the taxable value, CGST and SGST or IGST, and "Prices include GST": only
+ * when at least one line has a rate set, 0% included. A paper whose every
+ * line has no rate set (a plan renewal's) shows just its total. The app's
+ * `showsGstTotals` (`lib/invoices/paper-title.ts`) says the same on the
+ * paper.
+ */
+export function showsGstTotals(i: Pick<InvoiceViewModel, "lines">): boolean {
+    if (!i.lines) return true;
+    return i.lines.some((l) => {
+        const rate = l.gst?.rate;
+        return rate != null && rate.trim() !== "";
+    });
+}
+
 /** The line at the foot: the law it is issued under, and how it stands. */
 export function paperFooter(i: InvoiceViewModel, businessName: string): string {
     if (i.gst) {
@@ -197,14 +238,16 @@ export function paperView(
         : "";
 
     const typedTax = !gst && Number(i.tax) > 0;
-    const sums: [string, string][] = taxed
+    // No line with a rate set: no GST rows, just the total (DEC-072).
+    const gstRows = taxed && showsGstTotals(i) ? taxed : null;
+    const sums: [string, string][] = gstRows
         ? [
               ["Taxable value", money(i.subtotal)],
-              ...(taxed.taxType === "INTER"
-                  ? ([["IGST", money(taxed.igst)]] as [string, string][])
+              ...(gstRows.taxType === "INTER"
+                  ? ([["IGST", money(gstRows.igst)]] as [string, string][])
                   : ([
-                        ["CGST", money(taxed.cgst)],
-                        ["SGST", money(taxed.sgst)],
+                        ["CGST", money(gstRows.cgst)],
+                        ["SGST", money(gstRows.sgst)],
                     ] as [string, string][])),
           ]
         : typedTax
@@ -245,14 +288,9 @@ export function paperView(
             : null,
         hsnColumn: Boolean(gst),
         lines: (i.lines ?? []).map((l) => {
-            const rate = l.gst?.rate ? Number(l.gst.rate) : null;
             const discount = Number(l.discount);
             const sub = [
-                taxed
-                    ? rate
-                        ? `GST ${rate}% · taxable ${money(l.gst?.taxableValue ?? "0")}`
-                        : "Nil-rated"
-                    : null,
+                lineGstNote(Boolean(taxed), l.gst, money),
                 l.quantity > 1 ? `${money(l.unitPrice)} each` : null,
                 discount > 0
                     ? `less ${money(String(discount))} discount`
@@ -269,7 +307,7 @@ export function paperView(
         sums,
         totalLabel: credit ? "Credited" : "Total",
         total: money(i.total),
-        inclusive: taxed ? "Prices include GST." : null,
+        inclusive: gstRows ? "Prices include GST." : null,
         footer: paperFooter(i, business.name),
     };
 }

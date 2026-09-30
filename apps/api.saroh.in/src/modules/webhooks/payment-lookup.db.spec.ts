@@ -25,6 +25,7 @@ import { BadRequestException, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
@@ -90,6 +91,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "UTC" },
     });
+    await giveBusinessDetails(org.id);
     massage = (
         await prisma.service.create({
             data: {

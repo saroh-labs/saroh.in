@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
 import { InvoiceRow } from "@/components/invoices/invoice-row";
 import { ScopeNotice, SourceChips } from "@/components/invoices/source-filter";
@@ -159,8 +160,8 @@ export function InvoicesScreen({
         // One block: the page container spaces its children apart, and the
         // design sets the title, note and tabs close together.
         <div>
+            <InvoiceCrumbs />
             <PageHeader
-                breadcrumb={["Payments", "Invoices"]}
                 title="Invoices"
                 className="mb-1.5"
                 actions={
@@ -212,7 +213,7 @@ export function InvoicesScreen({
                                 "inline-flex items-center px-3.5 py-2.5 text-[13px] transition-colors duration-fast coarse:min-h-11",
                                 on
                                     ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
+                                    : "font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
                             )}
                         >
                             {t.label}

@@ -126,5 +126,11 @@ export default async function ShopProductPage({
                 businessName={business}
             />
         );
-    return <ProductPage product={product} preview={false} action={action} />;
+    // The page's own width, as the header's and every block's: at a desk
+    // the product sits under the menu rather than across the whole screen.
+    return (
+        <div className="mx-auto w-full max-w-screen-xl">
+            <ProductPage product={product} preview={false} action={action} />
+        </div>
+    );
 }

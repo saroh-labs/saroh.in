@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import {
     issueInvoice,
     remindInvoice,
@@ -48,22 +49,29 @@ export function SendDialog({
     const first = invoice.who.split(" ")[0] || invoice.who;
     const reminder = mode === "reminder";
     const label = invoice.number ?? "this invoice";
+    // No registered address yet (DEC-068): asked here, then it goes.
+    const details = useBusinessDetailsStep({
+        then: reminder ? "send the reminder" : "send it",
+        continueLabel: reminder ? "Save and remind" : "Save and send",
+    });
 
     async function go() {
         setBusy(true);
         let number = invoice.number;
         if (mode === "draft") {
-            const issued = await issueInvoice(invoice.id);
+            const issued = await details.run(() => issueInvoice(invoice.id));
+            if (!issued) return setBusy(false);
             if (!issued.ok) {
                 setBusy(false);
                 return showError(issued.error);
             }
             number = issued.data.number ?? number;
         }
-        const res = reminder
-            ? await remindInvoice(invoice.id)
-            : await sendInvoice(invoice.id);
+        const res = await details.run(() =>
+            reminder ? remindInvoice(invoice.id) : sendInvoice(invoice.id),
+        );
         setBusy(false);
+        if (!res) return;
         onOpenChange(false);
         router.refresh();
         if (!res.ok) {
@@ -109,6 +117,7 @@ export function SendDialog({
                         {busy ? "Sending…" : action}
                     </AlertDialogAction>
                 </AlertDialogFooter>
+                {details.step}
             </AlertDialogContent>
         </AlertDialog>
     );

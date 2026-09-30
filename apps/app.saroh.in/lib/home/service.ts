@@ -23,7 +23,7 @@ export type HomeTone = "bad" | "due" | "info";
  * target's own endpoint; see `lib/home/inline-actions.ts` for how it runs.
  */
 export interface HomeInline {
-    kind: "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+    kind: "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY" | "REVIEW_REPLY";
     /** The row's button. */
     label: string;
     /** What will happen, and who is told. */
@@ -36,7 +36,7 @@ export interface HomeInline {
     sends: boolean;
     /** Whether Undo is offered (never once a message has left). */
     undoable: boolean;
-    /** The order, subscription, invoice or contact it acts on. */
+    /** The order, subscription, invoice, contact or review it acts on. */
     target: string;
     /** The customer's first name, for the words after; null without one. */
     person: string | null;

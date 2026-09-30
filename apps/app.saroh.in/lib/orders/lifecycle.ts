@@ -1,3 +1,5 @@
+import type { StepTone } from "@/lib/orders/list-row";
+import { rowProgress } from "@/lib/orders/list-row";
 import type {
     AllergenRef,
     AllergyNote,
@@ -335,4 +337,49 @@ export function putBackOf(
         const quantity = Math.min(refundableQuantity(l), l.returnable ?? 0);
         return quantity > 0 ? [{ itemId: l.id, quantity }] : [];
     });
+}
+
+/**
+ * The pill beside the order's number, as the "Saroh Order Detail" design
+ * draws it: the step the order is at in its type's words ("New", "Ready",
+ * "Collected"), or Refunded / Cancelled, toned as the Orders list tones the
+ * same step (`rowProgress`), so the list and the page never disagree.
+ */
+export function headerStep(
+    order: Pick<
+        OrderRead,
+        | "status"
+        | "paymentStatus"
+        | "refundStanding"
+        | "stage"
+        | "steps"
+        | "fulfilmentLabel"
+    >,
+): { label: string; tone: StepTone } {
+    const index = order.steps.findIndex((s) => s.stage === order.stage);
+    const p = rowProgress({
+        standing: kitchenStanding(order),
+        steps: order.steps,
+        stepIndex: index === -1 ? 0 : index,
+        fulfilmentLabel: order.fulfilmentLabel,
+    });
+    return { label: p.word, tone: p.tone };
+}
+
+/**
+ * How the order leaves, in the header's words (the design): "Pick-up at
+ * Hill Road" for a pick-up, else the type's own word ("Local delivery",
+ * "Shipping"), with the town a delivery goes to when the address says.
+ */
+export function howWords(
+    order: Pick<
+        OrderRead,
+        "fulfilmentType" | "fulfilmentLabel" | "store" | "deliveryAddress"
+    >,
+): string {
+    if (order.fulfilmentType === "PICKUP") {
+        return `${order.fulfilmentLabel} at ${order.store.name}`;
+    }
+    const city = goesToAddress(order) ? order.deliveryAddress?.city : null;
+    return `${order.fulfilmentLabel}${city ? ` to ${city}` : ""}`;
 }

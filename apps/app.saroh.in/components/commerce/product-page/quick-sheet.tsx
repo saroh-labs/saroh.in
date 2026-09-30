@@ -136,7 +136,7 @@ export function QuickSheet({
                         {fullEditorHref || moreLink ? (
                             <Link
                                 href={fullEditorHref ?? moreLink?.href ?? ""}
-                                className="flex-[1_1_150px] text-[12.5px] text-brand hover:text-foreground"
+                                className="flex-[1_1_150px] text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 {fullEditorHref
                                     ? "More in the full editor"

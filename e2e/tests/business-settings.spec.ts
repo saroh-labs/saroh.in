@@ -15,8 +15,9 @@ import { urls } from "../playwright.config";
  * GSTIN and the address in full (Save back on), and saves.
  *
  * It runs on Northwind Supply, the base seed — Rye & Co. and Pulse Fitness
- * are kept camera-ready — and puts Northwind back as it found it: not
- * registered, no tax ID, no address, no state.
+ * are kept camera-ready. It clears Northwind's address first, so the
+ * address is missing when GST goes on, and puts Northwind back as the seed
+ * leaves it: not registered, no tax ID, its address in Karnataka.
  */
 
 const ORG = "seed_org";
@@ -44,22 +45,36 @@ async function readTax(request: APIRequestContext): Promise<TaxRead> {
     return (await res.json()) as TaxRead;
 }
 
-/** Northwind as the seed leaves it: not registered, nothing on file. */
-async function putBack(request: APIRequestContext) {
+/**
+ * Northwind's registered address as the seed writes it
+ * (`NORTHWIND_ADDRESS`, packages/database/src/seed/data.ts), state 29.
+ */
+const SEEDED_ADDRESS = {
+    line1: "Plot 12, Peenya Industrial Area",
+    city: "Bengaluru",
+    postalCode: "560058",
+};
+
+/** Northwind unregistered, with its address as given ("" clears it). */
+async function setNorthwind(
+    request: APIRequestContext,
+    address: { line1: string; city: string; postalCode: string },
+    state: string,
+) {
     const res = await request.patch(`${urls.API_URL}/organizations/${ORG}`, {
         headers,
         data: {
-            tax: { registered: false, state: "" },
+            tax: { registered: false, state },
             profile: { taxId: "", country: "" },
-            registeredAddress: {
-                line1: "",
-                line2: "",
-                city: "",
-                postalCode: "",
-            },
+            registeredAddress: { ...address, line2: "" },
         },
     });
     expect(res.ok()).toBe(true);
+}
+
+/** Northwind as the seed leaves it: not registered, its address on file. */
+async function putBack(request: APIRequestContext) {
+    await setNorthwind(request, SEEDED_ADDRESS, "29");
 }
 
 // @serial: GST registration and the invoice prefix are Northwind's own,
@@ -76,6 +91,12 @@ test.describe("business settings", { tag: "@serial" }, () => {
         expect(before.tax?.registered).toBe(false);
 
         try {
+            // No address on file, so GST brings its fields into the card.
+            await setNorthwind(
+                page.request,
+                { line1: "", city: "", postalCode: "" },
+                "",
+            );
             await page.goto("/settings/organization");
             await page.getByRole("tab", { name: "Tax and invoices" }).click();
             await page
@@ -139,11 +160,9 @@ test.describe("business settings", { tag: "@serial" }, () => {
         // Put back: a cleared tax ID reads "" where the seed had none.
         const restored = await readTax(page.request);
         expect(restored.tax?.registered).toBe(false);
-        expect(restored.tax?.state ?? null).toBeNull();
+        expect(restored.tax?.state).toBe("29");
         expect(restored.profile?.taxId ?? "").toBe("");
-        expect(restored.registeredAddress?.line1 ?? null).toBeNull();
-        expect(restored.registeredAddress?.city ?? null).toBeNull();
-        expect(restored.registeredAddress?.postalCode ?? null).toBeNull();
+        expect(restored.registeredAddress).toMatchObject(SEEDED_ADDRESS);
     });
 
     /*
@@ -248,3 +267,21 @@ async function savePrefixInUi(page: Page, prefix: string) {
         timeout: 30_000,
     });
 }
+
+// Read only: nothing here is saved.
+test.describe("business settings tabs", () => {
+    test('the address tab is "Registered address" (DEC-069, DEC-073)', async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        await page.goto("/settings/organization");
+        await expect(
+            page.getByRole("tab", { name: "Address", exact: true }),
+        ).toHaveCount(0);
+        await page.getByRole("tab", { name: "Registered address" }).click();
+        await expect(
+            page.getByRole("region", { name: "Registered address" }),
+        ).toContainText("Printed under your legal name");
+    });
+});

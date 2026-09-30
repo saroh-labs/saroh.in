@@ -164,16 +164,3 @@ const REFUSAL_ACTION: Record<string, string> = {
 export function refusalActionLabel(code: string): string | null {
     return REFUSAL_ACTION[code] ?? null;
 }
-
-/**
- * The modules Saroh has rolled out (DEC-057). One whose rollout is off is
- * never shown to the business, in Settings or anywhere else; the business's
- * own setting and its data are kept.
- */
-export function rolledOut<T extends Pick<ModuleView, "blockers">>(
-    modules: readonly T[],
-): T[] {
-    return modules.filter(
-        (m) => !m.blockers.some((b) => b.code === "ROLLOUT_DISABLED"),
-    );
-}

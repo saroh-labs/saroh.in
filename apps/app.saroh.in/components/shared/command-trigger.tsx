@@ -10,7 +10,7 @@ import { isSettingsScreen } from "@/lib/settings/search";
 import { openCommandMenu } from "./command-menu";
 
 const BUTTON =
-    "inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11 dark:text-foreground";
+    "inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted active:bg-accent-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11 dark:text-foreground";
 
 /**
  * Discoverable top-bar entry point for the ⌘K command palette.

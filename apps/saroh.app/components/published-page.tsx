@@ -5,7 +5,7 @@ import type {
     PricesActions,
     SignInOptions,
 } from "@saroh/site-blocks";
-import { PageSections } from "@saroh/site-blocks";
+import { modulePageTopOf, PageSections } from "@saroh/site-blocks";
 
 import {
     requestSignInCode,
@@ -61,6 +61,8 @@ export async function PublishedPage({
     return (
         <PageSections
             sections={page.sections}
+            // A module page opens with its title (DEC-073 #9).
+            top={modulePageTopOf(page)}
             apiUrl={publicApiUrl()}
             bookHref="/book"
             siteId={siteId}

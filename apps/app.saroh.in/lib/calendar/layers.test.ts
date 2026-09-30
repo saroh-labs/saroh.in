@@ -103,7 +103,7 @@ describe("layersFor", () => {
         ]);
     });
 
-    it("a clinic reads its bookings, then its payments in green (E20)", () => {
+    it("a clinic reads its appointments, then its payments in green (E20, the design)", () => {
         const layers = layersFor(
             month({
                 layers: ["bookings", "classes", "payments"],
@@ -111,7 +111,7 @@ describe("layersFor", () => {
             }),
         );
         expect(layers.map((l) => [l.key, l.label, l.one, l.tone])).toEqual([
-            ["bookings", "Bookings", "booking", 1],
+            ["bookings", "Appointments", "appointment", 1],
             ["payments", "Payments", "payment", 2],
         ]);
     });

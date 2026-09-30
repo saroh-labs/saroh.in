@@ -4,8 +4,10 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import {
     isExemptPaper,
+    lineGstNote,
     paperFooter,
     paperTitle,
+    showsGstTotals,
 } from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
 import { billedTo, spacedCode } from "@/lib/invoices/status";
@@ -17,7 +19,8 @@ import type { InvoiceBusiness } from "@/lib/invoices/tax";
  * not frozen on issue: it is not a GST particular), legal name,
  * registered address (frozen on issue, like the GSTIN), GSTIN and state,
  * who it is billed to (with their GSTIN when they are registered), the place
- * of supply, HSN/SAC and rate on every line, taxable value and CGST + SGST
+ * of supply, HSN/SAC on every line and its rate where one is set (a rate
+ * never set says nothing, DEC-072), taxable value and CGST + SGST
  * or IGST — or a receipt for a business that is not registered. A
  * registered business's paper whose every line is exempt is a bill of
  * supply (D15): its GSTIN and SAC, and no place of supply or tax columns.
@@ -70,14 +73,16 @@ export function InvoicePaper({
     const buyerGstin = i.billTo?.gstin ?? i.billToGst?.gstin ?? null;
     const typedTax = !gst && Number(i.tax) > 0;
 
-    const sums: [string, string][] = taxed
+    // No line with a rate set: no GST rows, just the total (DEC-072).
+    const gstRows = taxed && showsGstTotals(i) ? taxed : null;
+    const sums: [string, string][] = gstRows
         ? [
               ["Taxable value", money(i.subtotal)],
-              ...(taxed.taxType === "INTER"
-                  ? ([["IGST", money(taxed.igst)]] as [string, string][])
+              ...(gstRows.taxType === "INTER"
+                  ? ([["IGST", money(gstRows.igst)]] as [string, string][])
                   : ([
-                        ["CGST", money(taxed.cgst)],
-                        ["SGST", money(taxed.sgst)],
+                        ["CGST", money(gstRows.cgst)],
+                        ["SGST", money(gstRows.sgst)],
                     ] as [string, string][])),
           ]
         : typedTax
@@ -90,7 +95,7 @@ export function InvoicePaper({
     return (
         <article
             aria-label={`The ${title.toLowerCase()} as it prints`}
-            className="invoice-paper invoice-print rounded-[6px] border border-border px-5 py-[22px] shadow-[0_6px_18px_hsl(60_4%_11%/0.08)] sm:px-7 sm:py-[26px] print:rounded-none print:border-0 print:p-0 print:shadow-none"
+            className="invoice-paper invoice-print rounded-[6px] border border-border px-5 py-[22px] shadow-[0_6px_18px_hsl(60_4%_11%/0.08)] [overflow-wrap:anywhere] sm:px-7 sm:py-[26px] print:rounded-none print:border-0 print:p-0 print:shadow-none"
         >
             <header className="flex flex-wrap items-start gap-4 border-b-2 border-foreground pb-4">
                 <div className="min-w-0 flex-[1_1_200px]">
@@ -199,14 +204,9 @@ export function InvoicePaper({
                         <span className="text-right">Amount</span>
                     </div>
                     {(i.lines ?? []).map((l) => {
-                        const rate = l.gst?.rate ? Number(l.gst.rate) : null;
                         const discount = Number(l.discount ?? 0);
                         const sub = [
-                            taxed
-                                ? rate
-                                    ? `GST ${rate}% · taxable ${money(l.gst?.taxableValue ?? "0")}`
-                                    : "Nil-rated"
-                                : null,
+                            lineGstNote(Boolean(taxed), l.gst ?? null, money),
                             l.quantity > 1
                                 ? `${money(l.unitPrice)} each`
                                 : null,
@@ -261,7 +261,7 @@ export function InvoicePaper({
                         </span>
                         <span className="tabular-nums">{money(i.total)}</span>
                     </div>
-                    {taxed ? (
+                    {gstRows ? (
                         <p className="mt-1 text-[11.5px] text-muted-foreground">
                             Prices include GST.
                         </p>

@@ -53,7 +53,7 @@ export default async function InvitePage({
                 <p className="sa-rise text-muted-foreground text-[12.5px]">
                     <Link
                         href="/login"
-                        className="text-foreground underline-offset-4 transition-colors hover:underline"
+                        className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                     >
                         Log in
                     </Link>{" "}
@@ -116,7 +116,7 @@ export default async function InvitePage({
                 Already have one?{" "}
                 <Link
                     href={`/login${carry}`}
-                    className="text-foreground underline-offset-4 transition-colors hover:underline"
+                    className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
                     Log in
                 </Link>

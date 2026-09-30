@@ -313,6 +313,7 @@ export function EditorCanvas({
                         siteAddress={address}
                         sections={sections}
                         pages={pages}
+                        page={pages.find((p) => p.id === pageId) ?? null}
                         style={style}
                         styleOptions={styleOptions}
                         chrome={canvasChrome}

@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { ModuleView } from "@/lib/modules/schema";
 
-import { firstRunJobs, sidebarName, turnOnOrder } from "./first-run";
+import {
+    firstRunJobs,
+    onButNotOpen,
+    sidebarName,
+    turnOnOrder,
+} from "./first-run";
 
 function mod(key: string, over: Partial<ModuleView> = {}): ModuleView {
     return {
@@ -53,6 +58,17 @@ describe("firstRunJobs", () => {
         expect(bookings?.pulls).toEqual([]);
     });
 
+    it("never offers a module Saroh hasn't rolled out, nor one that needs it (DEC-057)", () => {
+        const dark = [{ code: "ROLLOUT_DISABLED" }];
+        const modules = ALL.map((m) =>
+            m.key === "WEBSITE" || m.key === "CRM"
+                ? { ...m, blockers: dark }
+                : m,
+        );
+        // Website is dark; Contacts is dark, and Bookings needs it while off.
+        expect(firstRunJobs(modules).map((j) => j.key)).toEqual(["COMMERCE"]);
+    });
+
     it("leaves out a job this business cannot have", () => {
         const modules = ALL.filter((m) => m.key !== "WEBSITE");
         expect(firstRunJobs(modules).map((j) => j.key)).not.toContain(
@@ -100,5 +116,44 @@ describe("sidebarName", () => {
 
     it("falls back to the module's own label", () => {
         expect(sidebarName(ALL, "PAYMENTS")).toBe("PAYMENTS");
+    });
+});
+
+describe("onButNotOpen", () => {
+    const off = { code: "UNAUTHORIZED" } as const;
+
+    it("is true when the business runs a module this role doesn't reach", () => {
+        // A Storefront team member (F16): Sell is on, but not for them.
+        expect(
+            onButNotOpen([
+                mod("COMMERCE", {
+                    lifecycle: "ENABLED",
+                    canManage: false,
+                    blockers: [off],
+                }),
+            ]),
+        ).toBe(true);
+    });
+
+    it("is false when nothing is on for the business", () => {
+        expect(
+            onButNotOpen([
+                mod("COMMERCE", {
+                    canManage: false,
+                    blockers: [off, { code: "ORG_MODULE_DISABLED" }],
+                }),
+            ]),
+        ).toBe(false);
+    });
+
+    it("ignores a module Saroh hasn't rolled out", () => {
+        expect(
+            onButNotOpen([
+                mod("COMMERCE", {
+                    lifecycle: "ENABLED",
+                    blockers: [off, { code: "ROLLOUT_DISABLED" }],
+                }),
+            ]),
+        ).toBe(false);
     });
 });

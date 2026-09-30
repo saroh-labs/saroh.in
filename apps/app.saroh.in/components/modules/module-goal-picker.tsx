@@ -2,13 +2,13 @@
 
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
-import { showError } from "@saroh/ui/toast";
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
-import { setModuleStatusAction } from "@/lib/modules/actions";
+import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 
 /**
@@ -22,6 +22,8 @@ import type { ModuleView } from "@/lib/modules/schema";
  * once per card — state communicated through a control role. Deferring the
  * commit makes reversibility a property of the design rather than a feature to
  * build, and lets the whole choice be described before anything happens.
+ * Confirming opens one "Turn on" sheet for every pick (DEC-068), which asks
+ * each module's minimum in one form and turns them on in order.
  *
  * Dependencies come from the server-owned read model (`view.dependencies`), so
  * the client never hardcodes the capability graph. They are also SHOWN: picking
@@ -94,7 +96,9 @@ const GOALS: Goal[] = [
 
 export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
     const router = useRouter();
-    const [pending, startTransition] = useTransition();
+    // The picks, handed to the "Turn on" sheet (DEC-068); null when closed.
+    const [turningOn, setTurningOn] = useState<string[] | null>(null);
+    const pending = turningOn !== null;
 
     const byKey = useMemo(
         () => new Map(modules.map((m) => [m.key, m])),
@@ -112,9 +116,16 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
         [modules],
     );
 
+    /**
+     * Only what Saroh has rolled out to this business (DEC-057): the API
+     * lists every module, a dark one with ROLLOUT_DISABLED. The dependency
+     * walk below still reads every module, so a hidden one already on
+     * counts as on and is never named.
+     */
+    const shown = useMemo(() => rolledOutKeys(modules), [modules]);
     const available = useMemo(
-        () => GOALS.filter((g) => byKey.has(g.moduleKey)),
-        [byKey],
+        () => GOALS.filter((g) => shown.has(g.moduleKey)),
+        [shown],
     );
     /**
      * Only offer what this member is actually allowed to turn on. Rendering a
@@ -131,7 +142,11 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
         // question. Nothing is committed, so this is a suggestion the merchant
         // can undo in one click — not a default they are stuck with.
         const initial = new Set<string>();
-        if (byKey.has(RECOMMENDED_KEY) && !alreadyOn.has(RECOMMENDED_KEY)) {
+        if (
+            shown.has(RECOMMENDED_KEY) &&
+            !alreadyOn.has(RECOMMENDED_KEY) &&
+            byKey.get(RECOMMENDED_KEY)?.canManage
+        ) {
             initial.add(RECOMMENDED_KEY);
         }
         return initial;
@@ -192,32 +207,23 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
             router.push("/");
             return;
         }
-        startTransition(async () => {
-            // Commit prerequisites before dependants, in the server's order.
-            const ordered: string[] = [];
-            for (const key of Array.from(selected)) {
-                for (const dep of withDeps(key)) {
-                    if (!alreadyOn.has(dep) && !ordered.includes(dep)) {
-                        ordered.push(dep);
-                    }
-                }
-            }
-            for (const key of ordered) {
-                const result = await setModuleStatusAction(key, "ENABLED");
-                if (!result.ok) {
-                    // Stop at the first failure rather than pressing on — a
-                    // partially-enabled set is worse than a clear error, and the
-                    // merchant's remaining selection is still on screen to retry.
-                    showError(result.error);
-                    return;
-                }
-            }
-            router.push("/");
-        });
+        // One sheet for every pick: one form with a section for each
+        // module that asks for something, and one "Turn on". It lands on
+        // the first pick's screen when it is done.
+        setTurningOn(
+            GOALS.map((g) => g.moduleKey).filter((k) => selected.has(k)),
+        );
     };
 
     return (
         <div className="space-y-8">
+            <TurnOnSheet
+                picked={turningOn}
+                modules={modules}
+                onOpenChange={(open) => {
+                    if (!open) setTurningOn(null);
+                }}
+            />
             {choosable.length > 0 ? (
                 <fieldset className="space-y-3" disabled={pending}>
                     <legend className="sr-only">
@@ -297,7 +303,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                 </fieldset>
             ) : null}
 
-            {alreadyOn.size > 0 ? (
+            {available.some((g) => alreadyOn.has(g.moduleKey)) ? (
                 <div className="space-y-2">
                     <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Already on
@@ -357,11 +363,9 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                         onClick={confirm}
                         disabled={pending}
                     >
-                        {pending
-                            ? "Setting up…"
-                            : resolved.size === 0
-                              ? "Continue"
-                              : "Set up my workspace"}
+                        {resolved.size === 0
+                            ? "Continue"
+                            : "Set up my workspace"}
                     </Button>
                 </div>
             </div>

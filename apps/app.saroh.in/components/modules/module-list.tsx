@@ -2,15 +2,17 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
+import { showError, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { navRowsForModule } from "@/components/shared/nav-items";
 import {
     readModuleImpactAction,
     setModuleStatusAction,
 } from "@/lib/modules/actions";
+import { blockerSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleBlocker, ModuleView } from "@/lib/modules/schema";
 import {
     listWords,
@@ -24,6 +26,10 @@ import {
 /**
  * Settings → Modules ("Saroh Settings" design): one bordered list, a switch
  * a row, and under each name what it is for.
+ *
+ * Turning one on opens the "Turn on" sheet (DEC-068): it asks for the
+ * module's minimum and brings what it needs, so the switch and "Turn on X
+ * and Y" open the same sheet.
  *
  * Turning a module off is entirely reversible — nothing is deleted — so it
  * takes UNDO, and never a modal. Where it changes something a person would
@@ -45,8 +51,17 @@ export function ModuleList({
     all?: ModuleView[];
 }) {
     const canManage = modules.some((m) => m.canManage);
+    // Turning one on asks for its minimum first, in the one sheet (DEC-068).
+    const [turningOn, setTurningOn] = useState<string[] | null>(null);
     return (
         <div className="max-w-[760px]">
+            <TurnOnSheet
+                picked={turningOn}
+                modules={all}
+                onOpenChange={(open) => {
+                    if (!open) setTurningOn(null);
+                }}
+            />
             <div className="overflow-hidden rounded-xl border border-border bg-card">
                 {[...modules].sort(byAttentionFirst).map((module, i) => (
                     <ModuleRow
@@ -55,6 +70,7 @@ export function ModuleList({
                         modules={modules}
                         all={all}
                         first={i === 0}
+                        onTurnOn={(key) => setTurningOn([key])}
                     />
                 ))}
             </div>
@@ -112,8 +128,11 @@ function noteOf(modules: ModuleView[], module: ModuleView): string {
             ? `${listWords(rows)} in the rail.`
             : "Works in the background — no new menu item.");
     // "Needs Appointments." from the API's dependencies, not the copy, so
-    // it is said of every module that has one.
-    const needs = module.dependencies.map((d) => labelOf(modules, d));
+    // it is said of every module that has one — only the ones shown: a
+    // module Saroh hasn't rolled out is never named (DEC-057).
+    const needs = module.dependencies
+        .filter((d) => modules.some((m) => m.key === d))
+        .map((d) => labelOf(modules, d));
     return needs.length > 0 ? `${note} Needs ${listWords(needs)}.` : note;
 }
 
@@ -135,11 +154,14 @@ function ModuleRow({
     modules,
     all,
     first,
+    onTurnOn,
 }: {
     module: ModuleView;
     modules: ModuleView[];
     all: ModuleView[];
     first: boolean;
+    /** Open the "Turn on" sheet, which brings what it needs (DEC-068). */
+    onTurnOn: (key: string) => void;
 }) {
     const [pending, startTransition] = useTransition();
     const [asking, setAsking] = useState(false);
@@ -160,7 +182,9 @@ function ModuleRow({
     const label = labelOf(modules, module.key);
 
     // Off, and something it needs is off too: the switch waits for that.
-    const missing = on ? [] : missingDependencies(modules, module.key);
+    // Worked out over every module, so a hidden one that is on counts as on
+    // (a row that needs a hidden one that is off isn't shown, `rolledOut`).
+    const missing = on ? [] : missingDependencies(all, module.key);
     const blocked = missing.length > 0;
     const missingLabels = missing.map((k) => labelOf(modules, k));
     // On, and other modules need it: they go off with it, and every one is
@@ -175,8 +199,14 @@ function ModuleRow({
         navRowsForModule(k),
     );
     // The step the API says is left, for a module that is on.
+    // Setup still to do, or something that stopped: a gate that is shut
+    // (a role, a plan) is said by the tag and the switch, not as a step.
     const step =
-        on && module.readiness !== "ACTIVE" ? module.blockers[0] : undefined;
+        on &&
+        (module.readiness === "SETUP_REQUIRED" ||
+            module.readiness === "ATTENTION_REQUIRED")
+            ? module.blockers[0]
+            : undefined;
     const stepAction = step?.actionHref ? setupActionLabel(step.code) : null;
 
     /**
@@ -194,24 +224,15 @@ function ModuleRow({
                     // A refusal is the safe-guard talking (open orders, say).
                     // Say what it said — the switch springing back with no
                     // reason is the worst version of this.
-                    showError(result.blockers?.[0]?.message ?? result.error);
+                    const refused = result.blockers?.[0];
+                    showError(
+                        refused ? blockerSentence(refused) : result.error,
+                    );
                     return;
                 }
             }
             onDone();
         });
-    };
-
-    const turnOn = (keys: string[]) => {
-        const names = keys.map((k) => labelOf(modules, k));
-        const rows = keys.flatMap((k) => navRowsForModule(k));
-        run(
-            keys.map((k) => [k, "ENABLED"]),
-            () =>
-                showSuccess(
-                    `${listWords(names)} ${keys.length > 1 ? "are" : "is"} on${rows.length > 0 ? ` — ${listWords(rows)} ${rows.length === 1 ? "is" : "are"} in the rail now` : ""}.`,
-                ),
-        );
     };
 
     const turnOff = () => {
@@ -257,7 +278,7 @@ function ModuleRow({
 
     const flip = () => {
         if (!module.canManage || blocked || pending) return;
-        if (!on) return turnOn([module.key]);
+        if (!on) return onTurnOn(module.key);
         if (!asking) return askFirst();
         // A second press while asking is the answer "yes" — unless
         // something refuses it, which no press overrides.
@@ -312,7 +333,7 @@ function ModuleRow({
                         <p className="text-pretty text-[12.5px] leading-[1.45] text-foreground">
                             <strong>Turn off {label}?</strong>{" "}
                             {refusal
-                                ? refusals.map((r) => r.message).join(" ")
+                                ? refusals.map(blockerSentence).join(" ")
                                 : impact}
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -355,16 +376,16 @@ function ModuleRow({
                         size="sm"
                         className="mt-2"
                         disabled={pending}
-                        onClick={() => turnOn([...missing, module.key])}
+                        onClick={() => onTurnOn(module.key)}
                     >
                         Turn on {listWords([...missingLabels, label])}
                     </Button>
                 ) : null}
-                {step?.message ? (
+                {step ? (
                     <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
                         {/* The API's sentence, never its code (DEC-057). */}
                         <span className="text-[12.5px] text-foreground/80">
-                            {step.message}
+                            {blockerSentence(step)}
                         </span>
                         {stepAction && step.actionHref && module.canManage ? (
                             <Button asChild variant="outline" size="sm">
@@ -427,7 +448,7 @@ function ModuleSwitch({
             aria-describedby={describedBy}
             onClick={onFlip}
             className={cn(
-                "shrink-0 rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "shrink-0 rounded-full p-1 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
                 locked ? "cursor-not-allowed" : "cursor-pointer",
                 locked && !on && "opacity-50",
                 busy && "cursor-progress",

@@ -117,7 +117,12 @@ module.exports = {
         "<rootDir>/src/modules/invoices/list-filter.spec.ts",
         // D16: pure; invoice-pdf.db.spec.ts runs here.
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        // DEC-072: a line's GST note on the paper and the PDF — pure.
+        "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
+        // DEC-068: which business details are missing — pure (the refusals
+        // and the flag after money are in business-details.db.spec.ts).
+        "<rootDir>/src/modules/invoices/business-details.spec.ts",
         "<rootDir>/src/modules/payments/public-invoices.service.spec.ts",
         // D20: mocked Prisma; the real rows are in mandates.db.spec.ts.
         "<rootDir>/src/modules/payments/mandates.service.spec.ts",

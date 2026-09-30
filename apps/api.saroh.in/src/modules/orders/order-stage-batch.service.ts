@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import { assertOrdersAtOwnLocation, isLocationScoped } from "./order-location";
 import type { LineRow } from "./order-stage-batch-lines";
 import {
     isUniqueViolation,
@@ -60,7 +61,15 @@ export class OrderStageBatchService {
         dto: CreateStageBatchDto,
     ): Promise<StageBatchView> {
         authorize(ctx, "order:stage");
+        // A location's team moves its own storefronts' orders (DEC-074).
+        await assertOrdersAtOwnLocation(
+            ctx,
+            dto.lines.map((line) => line.orderId),
+        );
         let batch = await this.find(ctx.organizationId, dto.batchId);
+        if (batch && isLocationScoped(ctx.roleKey)) {
+            batch = await this.mustFindFor(ctx, dto.batchId);
+        }
         if (!batch) {
             try {
                 await this.hold(ctx, dto);
@@ -84,20 +93,20 @@ export class OrderStageBatchService {
 
     async get(ctx: OrganizationContext, batchId: string) {
         authorize(ctx, "order:stage");
-        return viewOf(await this.mustFind(ctx.organizationId, batchId));
+        return viewOf(await this.mustFindFor(ctx, batchId));
     }
 
     /** "Send now": commit the held batch at once. */
     async commit(ctx: OrganizationContext, batchId: string) {
         authorize(ctx, "order:stage");
-        await this.mustFind(ctx.organizationId, batchId);
+        await this.mustFindFor(ctx, batchId);
         return this.commitBatch(ctx.organizationId, batchId);
     }
 
     /** Cancel a batch still held; nothing was moved. */
     async cancel(ctx: OrganizationContext, batchId: string) {
         authorize(ctx, "order:stage");
-        await this.mustFind(ctx.organizationId, batchId);
+        await this.mustFindFor(ctx, batchId);
         await this.cancelHeld(ctx.organizationId, batchId);
         const batch = await this.mustFind(ctx.organizationId, batchId);
         if (batch.status === "COMMITTED") {
@@ -115,7 +124,7 @@ export class OrderStageBatchService {
      */
     async undo(ctx: OrganizationContext, batchId: string) {
         authorize(ctx, "order:stage");
-        await this.mustFind(ctx.organizationId, batchId);
+        await this.mustFindFor(ctx, batchId);
         await this.cancelHeld(ctx.organizationId, batchId);
         let batch = await this.mustFind(ctx.organizationId, batchId);
         if (batch.status !== "COMMITTED") return viewOf(batch);
@@ -315,6 +324,19 @@ export class OrderStageBatchService {
     private async mustFind(organizationId: string, batchId: string) {
         const batch = await this.find(organizationId, batchId);
         if (!batch) throw new NotFoundException("That batch isn't here.");
+        return batch;
+    }
+
+    /**
+     * The batch, for this caller. A location's team (DEC-074) reaches only
+     * the batches they made, whose orders were checked as theirs when held;
+     * anyone else's is not there.
+     */
+    private async mustFindFor(ctx: OrganizationContext, batchId: string) {
+        const batch = await this.mustFind(ctx.organizationId, batchId);
+        if (isLocationScoped(ctx.roleKey) && batch.actorUserId !== ctx.userId) {
+            throw new NotFoundException("That batch isn't here.");
+        }
         return batch;
     }
 }

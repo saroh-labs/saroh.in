@@ -20,7 +20,7 @@ export function ChangePaymentMethod() {
                     "Until it is, nothing about how you pay changes.",
                 )
             }
-            className="rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
         >
             Change
         </button>

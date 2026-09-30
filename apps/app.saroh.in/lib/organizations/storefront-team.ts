@@ -14,6 +14,17 @@ export const STOREFRONT_TEAM_ROLE = "storefront-team";
 export const STOREFRONT_TEAM_LABEL = "Storefront team";
 
 /**
+ * Whether this role works only its own storefronts' orders (DEC-074): the
+ * API narrows the orders it reads and moves, and the rail offers Sell with
+ * Orders alone.
+ */
+export function isLocationScopedRole(
+    roleKey: string | null | undefined,
+): boolean {
+    return roleKey === STOREFRONT_TEAM_ROLE;
+}
+
+/**
  * A person's storefront roles, as the line under their name on Team:
  * "Hill Road · Editor, Market · Viewer".
  */

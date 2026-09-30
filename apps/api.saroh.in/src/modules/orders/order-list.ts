@@ -21,6 +21,7 @@ import {
     tabCondition,
     ts,
 } from "./order-list-filters";
+import { orderLocationSql, orderLocationWhere } from "./order-location";
 import type { OrderRowDto } from "./order-row";
 import { serializeOrderRow } from "./order-row";
 import type { NextVisitDto } from "./order-visits";
@@ -100,7 +101,11 @@ export async function listOrderRows(
         // Read from the order itself, whether or not the filters still keep
         // it (paid since, moved on a step), and only inside this business.
         const at = await prisma.order.findFirst({
-            where: { id: query.cursor, organizationId },
+            where: {
+                id: query.cursor,
+                organizationId,
+                ...(caller.viewer ? orderLocationWhere(caller.viewer) : {}),
+            },
             select: { id: true, createdAt: true },
         });
         if (!at) throw new NotFoundException("Order not found");
@@ -125,7 +130,10 @@ export async function listOrderRows(
             FROM "PaymentIntent" pi
             WHERE pi."orderId" = o.id AND pi.status = 'SUCCEEDED'
         ) money ON TRUE
-        WHERE ${orderConditions(organizationId, query, view, range)}
+        WHERE ${orderConditions(organizationId, query, view, range)}${
+            // A location's team lists its own storefronts' (DEC-074).
+            orderLocationSql(caller.viewer, "o")
+        }
     )`;
     const kept = computedConditions(query);
 
@@ -174,6 +182,8 @@ export async function listOrderRows(
                           firstName: true,
                           lastName: true,
                           phone: true,
+                          // A returning customer's ring on the row.
+                          _count: { select: { orders: true } },
                       },
                   },
                   items: {

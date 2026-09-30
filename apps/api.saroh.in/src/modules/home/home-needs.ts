@@ -18,7 +18,8 @@ import type {
  * 1. Late, and someone is waiting: late orders, a note for a visit in the
  *    next two days, a message waiting on a reply, overdue invoices, money
  *    to refund, a refund the provider failed (B9), overdue follow-ups.
- * 2. Blocked: stock short for orders, a renewal not paid, a site not live, a
+ * 2. Blocked: stock short for orders, a renewal not paid, invoices going
+ *    out without the business details (DEC-068), a site not live, a
  *    module that needs fixing.
  * 3. Due: orders not late yet, notes for a later visit, low-rated reviews
  *    to answer.
@@ -58,6 +59,7 @@ const SOURCE_ORDER = [
     "CRM_OVERDUE_FOLLOWUPS",
     "COMMERCE_STOCK_SHORT",
     "PAYMENTS_FAILED_RENEWALS",
+    "PAYMENTS_BUSINESS_DETAILS",
     "WEBSITE_NOT_LIVE",
     "COMMERCE_LOW_STAR_REVIEWS",
 ] as const;
@@ -283,6 +285,12 @@ const SINGLE: Partial<Record<string, { rank: Rank; sub: string }>> = {
     WEBSITE_NOT_LIVE: {
         rank: 2,
         sub: "Nobody can find you until you publish it.",
+    },
+    // DEC-068: paper written after a payment is never refused, so it
+    // went out without the business details.
+    PAYMENTS_BUSINESS_DETAILS: {
+        rank: 2,
+        sub: "Payments are still recorded, but every invoice should print it. Add it once and the next ones will.",
     },
     // D8: pauses that ended while Payments is off.
     PAYMENTS_PAUSES_WAITING: {

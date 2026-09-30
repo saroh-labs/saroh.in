@@ -34,6 +34,14 @@ export const people = {
     member: { email: "nisha.kulkarni@saroh.dev", password: demoUser.password },
     /** Divya on Kavi Dental's desk — a Member. */
     desk: { email: "divya.kamath@saroh.dev", password: demoUser.password },
+    /**
+     * Farah, on Northwind Store's counter: Storefront team, a Viewer on
+     * Northwind Store and not on Online (DEC-074).
+     */
+    storefront: {
+        email: "farah.storefront@saroh.dev",
+        password: demoUser.password,
+    },
 } as const;
 
 export type Role = keyof typeof people;

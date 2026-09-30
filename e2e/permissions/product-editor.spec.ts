@@ -1,3 +1,4 @@
+// @covers app:/commerce/products app:/commerce/products/[productId]/edit
 import type { BrowserContext } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

@@ -27,6 +27,7 @@ import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { CalendarService } from "../calendar/calendar.service";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -69,6 +70,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Rye & Co.", slug: `kitchen-org-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: "user_owner", role: "OWNER" };
     member = { organizationId: org.id, userId: "user_member", role: "MEMBER" };
     storeId = (

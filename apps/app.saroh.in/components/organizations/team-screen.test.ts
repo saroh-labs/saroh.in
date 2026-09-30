@@ -8,9 +8,10 @@ import type { RoleCatalogue } from "@/lib/organizations/roles";
 import { TeamScreen } from "./team-screen";
 
 // Hoisted above the imports by vitest, so the screen sees these.
+const nav = vi.hoisted(() => ({ search: new URLSearchParams() }));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
-    useSearchParams: () => new URLSearchParams(),
+    useSearchParams: () => nav.search,
 }));
 vi.mock("@/lib/organizations/member-actions", () => ({
     inviteMember: vi.fn(),
@@ -117,5 +118,45 @@ describe("TeamScreen People: extra permissions (F17)", () => {
     it("names the Edit button for the role and the permissions", () => {
         const html = renderPeople(people([]), catalogue);
         expect(html).toContain("role and permissions");
+    });
+});
+
+describe("TeamScreen: who may change what", () => {
+    const people = [
+        member({ userId: "u1", name: "Asha", role: "OWNER" }),
+        member({ userId: "u2", name: "Suresh", isSelf: true }),
+    ];
+    const render = (view: string) => {
+        nav.search = new URLSearchParams(view ? { view } : {});
+        try {
+            return renderToString(
+                createElement(TeamScreen, {
+                    organizationName: "Rye Bakery",
+                    members: people,
+                    invitations: [],
+                    sites: [],
+                    // A custom role holding member:role:update only.
+                    canManage: false,
+                    canEditRoles: true,
+                    roles: [],
+                    catalogue: null,
+                    myActions: null,
+                }),
+            );
+        } finally {
+            nav.search = new URLSearchParams();
+        }
+    };
+
+    it("doesn't call Roles read-only for someone who may edit roles", () => {
+        expect(render("roles")).not.toContain(
+            "Only owners and admins can change this",
+        );
+    });
+
+    it("still says People is theirs to ask about", () => {
+        expect(render("")).toContain(
+            "Only owners and admins can change this. Ask Asha",
+        );
     });
 });

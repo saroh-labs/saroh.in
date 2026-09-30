@@ -45,7 +45,7 @@ export function AgendaList({
                             "flex w-full items-center gap-3 rounded-[11px] border bg-card px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                             selected === b.key
                                 ? "border-foreground"
-                                : "border-border hover:border-border-strong",
+                                : "border-border hover:border-border-strong active:bg-accent-active",
                             b.state === "cancelled" && "text-muted-foreground",
                         )}
                     >
@@ -180,7 +180,7 @@ export function AgendaMonth({
                                     type="button"
                                     onClick={f.book}
                                     aria-label={`Book ${f.who} at ${clock(f.from)}`}
-                                    className="flex w-full gap-2 rounded-[7px] px-2 py-[7px] text-left text-[12.5px] hover:bg-success-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="flex w-full gap-2 rounded-[7px] px-2 py-[7px] text-left text-[12.5px] hover:bg-success-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:brightness-95"
                                 >
                                     <span className="flex-1">{f.who}</span>
                                     <span className="font-semibold tabular-nums text-success-subtle-foreground">

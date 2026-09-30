@@ -48,6 +48,19 @@ const SERVICES_LIST_MAX = 24;
 /** "Try it once" lists this many services, cheapest first (the design's). */
 export const TRY_IT_ONCE_MAX = 2;
 
+/**
+ * How the Book and Prices pages start their services (the Customer Site
+ * design): cards side by side, each with its price and "Choose a time",
+ * which opens the booking page at that service. Display options (G16), so
+ * the merchant can switch back to a list.
+ */
+const SERVICE_CARDS = {
+    showPrices: true,
+    layout: "cards",
+    showDescriptions: false,
+    buttonLabel: "Choose a time",
+} as const;
+
 /** What a Prices page can offer, as its default sections are chosen. */
 export interface PricesOffer {
     /** Appointments is open: single visits can be booked. */
@@ -156,7 +169,7 @@ export async function defaultModuleSections(
                     content: {
                         heading: "Services",
                         serviceIds: services.map((s) => s.id),
-                        showPrices: true,
+                        ...SERVICE_CARDS,
                     },
                 }),
             ];
@@ -270,7 +283,7 @@ async function pricesSections(
                 content: {
                     heading: "Try it once",
                     serviceIds: once.map((s) => s.id),
-                    showPrices: true,
+                    ...SERVICE_CARDS,
                 },
             }),
         );

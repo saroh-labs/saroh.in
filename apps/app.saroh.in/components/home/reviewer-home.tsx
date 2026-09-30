@@ -31,7 +31,7 @@ export function ReviewerHome({ home }: { home: HomeModel }) {
     const live = liveSites(sites, ROOT_DOMAIN);
 
     return (
-        <div className="grid min-w-0 max-w-[720px] gap-5">
+        <div className="grid min-w-0 gap-5">
             {failed ? (
                 <PartialNotice>
                     {formatList(home.unavailable.map((part) => part.label))}{" "}
@@ -67,7 +67,7 @@ export function ReviewerHome({ home }: { home: HomeModel }) {
                         href={site.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="justify-self-start rounded text-[13px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11 coarse:content-center"
+                        className="justify-self-start rounded text-[13px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground coarse:min-h-11 coarse:content-center"
                     >
                         {live.length > 1
                             ? `See ${site.name} live`
@@ -93,7 +93,7 @@ function ReviewItem({ row, first }: { row: ReviewRow; first: boolean }) {
             {row.href ? (
                 <Link
                     href={row.href}
-                    className="flex items-center gap-3 bg-card px-4 py-3.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    className="flex items-center gap-3 bg-card px-4 py-3.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active"
                 >
                     {words}
                     <span className="shrink-0 text-[12.5px] font-semibold text-brand-subtle-foreground">

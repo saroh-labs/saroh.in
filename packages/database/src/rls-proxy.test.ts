@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
     createRlsProxy,
+    currentOrgContext,
     isRlsEnforcementEnabled,
+    outsideOrgContext,
     runInOrgContext,
 } from "./rls-proxy";
 
@@ -168,6 +170,36 @@ describe("createRlsProxy", () => {
             "tx.lead.findMany",
         ]);
         expect(guc()).toBe("org_9");
+    });
+
+    it("reads on the base client outside the context, even inside a context tx (L1)", async () => {
+        process.env.RLS_ENFORCEMENT = "1";
+        const { proxy, calls } = makeFake();
+        const p = proxy as unknown as {
+            $transaction: (
+                fn: (tx: unknown) => Promise<unknown>,
+            ) => Promise<unknown>;
+            lead: { findMany: (a: unknown) => Promise<unknown> };
+        };
+
+        await runInOrgContext("org_3", () =>
+            p.$transaction(async () => {
+                await outsideOrgContext(async () => {
+                    expect(currentOrgContext()).toBeUndefined();
+                    await p.lead.findMany({});
+                });
+                // Back inside: the context and its tx are untouched.
+                expect(currentOrgContext()).toBe("org_3");
+                await p.lead.findMany({});
+            }),
+        );
+
+        expect(calls).toEqual([
+            "base.$transaction",
+            "tx.$executeRaw",
+            "base.lead.findMany",
+            "tx.lead.findMany",
+        ]);
     });
 
     it("runs the array form's ops in order in ONE transaction that sets the GUC first (#53)", async () => {

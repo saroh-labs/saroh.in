@@ -104,7 +104,7 @@ export function RefundPanel({
                             }
                             className={cn(
                                 FOCUS,
-                                "flex w-full items-center gap-2.5 rounded-[7px] px-1.5 py-2 text-left text-[13px] hover:bg-muted coarse:min-h-11",
+                                "flex w-full items-center gap-2.5 rounded-[7px] px-1.5 py-2 text-left text-[13px] hover:bg-muted active:bg-accent-active coarse:min-h-11",
                             )}
                         >
                             <span

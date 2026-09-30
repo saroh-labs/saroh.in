@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { offeredCredit } from "../bookings/booking-credit";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -126,6 +127,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Pulse E13", slug: `e13-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     const neha = await prisma.user.create({
         data: { email: `e13-neha-${process.pid}@example.com`, name: "Neha" },
     });
@@ -147,6 +149,7 @@ beforeAll(async () => {
     const other = await prisma.organization.create({
         data: { name: "Other E13", slug: `e13-other-${process.pid}` },
     });
+    await giveBusinessDetails(other.id);
     elsewhere = { organizationId: other.id, userId: neha.id, role: "OWNER" };
     hiit = await service("HIIT", 20);
     pt = await service("Personal training", 1);

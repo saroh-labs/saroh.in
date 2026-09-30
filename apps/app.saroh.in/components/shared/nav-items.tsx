@@ -12,7 +12,6 @@ import {
     KanbanSquare,
     LayoutGrid,
     Link2,
-    ReceiptText,
     SlidersHorizontal,
     Store,
     Target,
@@ -21,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { mayAddWebsite } from "@/lib/business-limits";
+import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
@@ -516,7 +516,7 @@ export const NAV_GROUPS: NavGroup[] = [
                 // them. `/billing` itself redirects to Subscriptions.
                 href: "/billing",
                 label: "Payments",
-                icon: ReceiptText,
+                icon: CreditCard,
                 moduleKey: "PAYMENTS",
                 children: [
                     {
@@ -864,6 +864,7 @@ function landOnFirstChild(item: NavItem, children: NavChild[]): NavItem {
  */
 export function navFor({
     role,
+    roleKey,
     actions,
     moduleKeys,
     sites,
@@ -872,6 +873,11 @@ export function navFor({
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
+    /**
+     * The role as stored. A Storefront team holder (DEC-074) is offered
+     * Sell with Orders alone: their storefront's orders are their work.
+     */
+    roleKey?: string | null;
     /**
      * What the actor may do, as the API resolved it. Preferred over `role`,
      * which cannot describe a role the business invented.
@@ -903,8 +909,36 @@ export function navFor({
         role,
         actions,
     );
-    const groups = stockTracked === false ? withoutStockRows(tracked) : tracked;
+    const stocked =
+        stockTracked === false ? withoutStockRows(tracked) : tracked;
+    const groups = isLocationScopedRole(roleKey)
+        ? sellOrdersOnly(stocked)
+        : stocked;
     return (storefronts ?? 0) > 1 ? pluralStorefronts(groups) : groups;
+}
+
+const ORDERS_HREF = "/commerce/orders";
+
+/**
+ * Sell for a location's team (DEC-074): its Orders alone, and the row lands
+ * there. The storefronts, products and stock their role can read stay
+ * reachable by address; the rail offers the work.
+ */
+function sellOrdersOnly(groups: NavGroup[]): NavGroup[] {
+    return groups
+        .map((group) => ({
+            ...group,
+            items: group.items.flatMap((item) => {
+                if (item.href !== "/commerce" || !item.children) return [item];
+                const children = item.children.filter(
+                    (c) => c.href === ORDERS_HREF,
+                );
+                return children.length > 0
+                    ? [{ ...item, href: ORDERS_HREF, children }]
+                    : [];
+            }),
+        }))
+        .filter((group) => group.items.length > 0);
 }
 
 /** The rows that need the business to track stock, taken out. */

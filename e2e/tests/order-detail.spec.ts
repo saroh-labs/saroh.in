@@ -197,6 +197,9 @@ test.describe("order detail", () => {
         const orderId = await priyaOrderToday(page);
         await page.goto(`/commerce/orders/${orderId}`);
         const card = page.getByRole("region", { name: "Customer" });
+        // "Needs attention: Sesame", as the design reads (DEC-073); a
+        // screen reader hears the kind too.
+        await expect(card.getByText("Needs attention:")).toBeVisible();
         await expect(
             card.getByRole("list", { name: "Needs attention" }),
         ).toContainText("Allergy: Sesame");
@@ -659,6 +662,7 @@ const KAVI = "seed_sc_kavi_org";
 interface TreatmentRead {
     id: string;
     orderId: string;
+    attention?: { entries: { label: string }[] } | null;
     visits?: {
         total: number;
         attended: number;
@@ -718,6 +722,31 @@ test.describe("visits on a treatment's order (B14)", () => {
             sw: document.documentElement.scrollWidth,
         }));
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
+    });
+
+    test("a treatment's customer card says their Needs attention too (DEC-073)", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${KAVI}`);
+        const noted = (await kaviTreatments(page)).find(
+            (t) => (t.attention?.entries.length ?? 0) > 0,
+        );
+        expect(
+            noted,
+            "Kavi Dental seeds a patient with Needs attention",
+        ).toBeDefined();
+        const label = noted?.attention?.entries[0]?.label;
+        if (!noted || !label) return;
+        await page.goto(`/commerce/orders/${noted.id}`);
+        const card = page.getByRole("region", { name: "Customer" });
+        await expect(card.getByText("Needs attention:")).toBeVisible();
+        await expect(
+            card.getByRole("list", { name: "Needs attention" }),
+        ).toContainText(label);
+        await expect(
+            page.getByRole("region", { name: "Visits" }),
+        ).toContainText(label);
     });
 
     test("Book visit N opens New booking for the treatment (nothing is saved)", async ({

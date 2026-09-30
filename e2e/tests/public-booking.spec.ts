@@ -180,6 +180,48 @@ test.describe("the booking page", () => {
     // Each test is a different customer, from an address of their own.
     test.beforeEach(({ page }) => asNewVisitor(page));
 
+    test("a link to one service opens the page on it (?service=, read on the server)", async ({
+        page,
+    }) => {
+        // The service's id, as the page itself reads its days.
+        await page.goto(`${SITE}/book`);
+        const daysRead = page.waitForRequest((r) =>
+            /\/public\/services\/[^/]+\/days$/.test(new URL(r.url()).pathname),
+        );
+        await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
+        const serviceId =
+            new URL((await daysRead).url()).pathname.split("/")[3] ?? "";
+
+        // A services list's Book (or "Choose a time") links here. The
+        // middleware once dropped the query on its way to the page, and
+        // the flow opened on no service at all.
+        await page.goto(
+            `${SITE}/book?service=${encodeURIComponent(serviceId)}`,
+        );
+        await expect(
+            page.getByRole("radio", { name: new RegExp(SERVICE) }),
+        ).toHaveAttribute("aria-checked", "true");
+    });
+
+    test("the header names the clinic's place and phone, read on the server (E6)", async ({
+        page,
+    }) => {
+        // Read only: Kavi Dental is a film set. The page reads the public
+        // visit on the server; the check it ran came from a "use client"
+        // module, so every header fell back to the business's name alone.
+        const renderer = new URL(urls.RENDERER_URL);
+        await page.goto(
+            `${renderer.protocol}//kavi-dental.${renderer.host}/book`,
+        );
+        const header = page.locator("section").first();
+        await expect(
+            header.getByText(/12th Main, Indiranagar, Bengaluru/),
+        ).toBeVisible();
+        await expect(
+            header.getByRole("link", { name: "+91 80409 92210" }),
+        ).toHaveAttribute("href", "tel:+918040992210");
+    });
+
     test("pay at the desk: signed in at the last step, booked, and in the team's calendar as paid at the desk", async ({
         page,
     }, testInfo) => {

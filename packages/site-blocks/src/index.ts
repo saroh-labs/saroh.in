@@ -52,8 +52,8 @@ export {
     default as PacksSection,
     packEyebrow,
     packPerClass,
-    packsOf,
 } from "./blocks/packs";
+// Called by saroh.app's server: from a module with no "use client".
 export type { PacksFeed, PublicPack } from "./blocks/packs";
 export {
     PLANS_BUTTON,
@@ -62,28 +62,27 @@ export {
     joinHref,
     planEvery,
     planPrice,
-    plansAutopayMethods,
-    plansOf,
-    plansPayOnline,
 } from "./blocks/plans";
+export { packsOf } from "./prices/pack-words";
+// Called by saroh.app's server: from a module with no "use client".
 export type { PlansFeed, PublicPlan } from "./blocks/plans";
 export {
     PRODUCT_GRID_TITLE,
     default as ProductGridSection,
-    productCardsOf,
-    productGridQuery,
 } from "./blocks/product-grid";
+export { plansAutopayMethods, plansOf, plansPayOnline } from "./lib/plans-read";
+// Called by saroh.app's server: from a module with no "use client".
 export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
-export {
-    default as VisitUsSection,
-    directionsHref,
-    isPublicVisit,
-} from "./blocks/visit-us";
-export type { PublicVisit } from "./blocks/visit-us";
+export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
+export { productCardsOf, productGridQuery } from "./lib/product-grid-read";
+// Server-safe (not in the "use client" block): saroh.app reads it for the
+// booking page's header on the server (E6).
+export { isPublicVisit } from "./lib/public-visit";
+export type { PublicVisit } from "./lib/public-visit";
 
 // The one rule for "Open now" (G8): Visit us, the hero's On today (G18) and
 // the booking page's header (E6) all say it through this.
@@ -294,6 +293,15 @@ export type {
 } from "./account/packs-api";
 // G20: joining a plan and buying a pack from the site's Prices page.
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
+// The account's compact header, and the site's chrome stepping aside for it
+// (DEC-073 #10).
+export {
+    AccountHeader,
+    SiteChromeFrame,
+    accountTitle,
+    businessInitial,
+    isAccountPath,
+} from "./account/account-header";
 export type { TrackLookup } from "./account/track-sheet";
 export { PRICES_OFFLINE, joinedMessage } from "./prices/api";
 export type {
@@ -360,5 +368,8 @@ export {
 export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
+// A module page's title and lead (DEC-073 #9).
+export { ModulePageTop, modulePageTopOf } from "./module-page-top";
+export type { ModulePageTopContent } from "./module-page-top";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";

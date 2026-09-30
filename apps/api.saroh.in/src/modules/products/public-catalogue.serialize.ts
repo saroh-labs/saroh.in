@@ -57,10 +57,23 @@ export interface PublicCatalogueCard {
     image: { url: string; alt: string } | null;
     /** "Small · Large", when it is chosen by variant. */
     variantTitles: string[];
+    /**
+     * What the options are ("Size"), for the card's "2 sizes" (DEC-073
+     * #12). Null for a product without options.
+     */
+    optionName: string | null;
     /** Two sentences at most of the description, as plain text. */
     blurb: string | null;
     /** Nothing offered here can be sold now. */
     soldOut: boolean;
+    /** The listing at the site's storefront: what the bag holds (G13). */
+    listingId: string;
+    /**
+     * The option the card's Add to bag adds: the first one offered here
+     * that can be sold now. Null for a product without options (or when
+     * every option is sold out).
+     */
+    bagVariantId: string | null;
 }
 
 export interface PublicCatalogue {

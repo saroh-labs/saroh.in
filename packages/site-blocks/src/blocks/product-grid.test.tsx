@@ -38,6 +38,7 @@ const BREADS: ShopListingCard[] = [
         price: "250.00",
         priceFrom: true,
         variantTitles: ["Small", "Large"],
+        optionName: "Size",
     }),
     card({ slug: "brioche", name: "Brioche", soldOut: true }),
     card({ slug: "rye-loaf", name: "Rye loaf" }),
@@ -103,7 +104,9 @@ describe("the Product grid on a served page (G12)", () => {
             within(focaccia).getByText("Olive oil and rosemary."),
         ).toBeTruthy();
         expect(within(focaccia).getByText("₹120")).toBeTruthy();
-        expect(within(sourdough).getByText("Small · Large")).toBeTruthy();
+        expect(within(sourdough).getByText("2 sizes")).toBeTruthy();
+        // The card sums its options up (DEC-073 #12), never lists them.
+        expect(within(sourdough).queryByText(/Small/)).toBeNull();
         expect(within(sourdough).getByText("From ₹250")).toBeTruthy();
         expect(within(brioche).getByText("Sold out")).toBeTruthy();
     });

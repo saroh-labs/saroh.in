@@ -23,6 +23,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
 import { isReservedContactEmail } from "../contacts/contact-email";
@@ -129,6 +130,7 @@ beforeAll(async () => {
             data: { name: "Rye Counter", slug: `b13-org-${tag}` },
         })
     ).id;
+    await giveBusinessDetails(orgId);
     await prisma.membership.createMany({
         data: [
             { organizationId: orgId, userId: ownerId, role: "OWNER" },

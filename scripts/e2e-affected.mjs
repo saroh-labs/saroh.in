@@ -2,8 +2,10 @@
 /**
  * Which browser specs cover what a branch changed.
  *
- * Every spec in `e2e/tests/*.spec.ts` names what it exercises in a header
- * comment, one or more lines of:
+ * Every spec in `e2e/tests/*.spec.ts` (the seeded-stack suite, `--suite
+ * browser`, the default) and `e2e/permissions/*.spec.ts` (the permission
+ * states on a production build, `--suite permissions`) names what it
+ * exercises in a header comment, one or more lines of:
  *
  *     // @covers app:/commerce/orders api:orders site:/shop pkg:site-blocks
  *
@@ -28,15 +30,18 @@
  *     followed: stock → orders → bookings → … would reach every module.
  *   - packages/X/** → pkg:X, the packages that depend on X, and every app
  *     or api file that imports one of them (then as above).
- *   - e2e/tests/X.spec.ts → X itself; a helper or fixture → the specs that
- *     import it.
- *   - Anything global → every spec: the schema, migrations and seed
- *     (packages/database), packages/ui and packages/auth, tooling, root
- *     configs, the lockfile, .github, the playwright config, its runner
- *     (run.mjs) and sign-in setup (auth.setup.ts, fixtures/sessions.ts),
- *     the api's
- *     bootstrap and common/, this script and scripts/prepush.sh. An app's
- *     own config, middleware or root layout → every spec on that app.
+ *   - a spec of the suite → itself; a helper or fixture → the specs that
+ *     import it. A file of the other suite → none.
+ *   - Anything global → every spec of the suite: the schema, migrations and
+ *     seed (packages/database), packages/ui and packages/auth, tooling, root
+ *     configs, the lockfile, .github, this script and scripts/prepush.sh,
+ *     and the suite's harness — for `browser` the playwright config, its
+ *     runner (run.mjs) and sign-in setup (auth.setup.ts,
+ *     fixtures/sessions.ts) and the api's bootstrap and common/; for
+ *     `permissions` its config and fake api (fixtures/permissions-api.mjs).
+ *     An app's own config, middleware or root layout → every spec on that
+ *     app. The permissions suite never runs the api, so no api file reaches
+ *     it.
  *   - docs, Markdown, unit tests and apps with no browser specs → none.
  *
  * Usage:
@@ -45,7 +50,9 @@
  *                                                     (origin/development...HEAD)
  *   node scripts/e2e-affected.mjs --files a b c       these paths instead
  *   … | node scripts/e2e-affected.mjs --stdin         paths on stdin (prepush)
- *   node scripts/e2e-affected.mjs --check             every spec names valid keys
+ *   node scripts/e2e-affected.mjs --check             every spec of both suites
+ *                                                     names valid keys
+ *   --suite permissions (before --files)               the permission suite
  *
  * Prints the selected spec paths on stdout (relative to e2e/, one per line)
  * and the reasons on stderr. `--check` exits 1 when a spec has no @covers
@@ -56,7 +63,32 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const E2E_TESTS = join(ROOT, "e2e/tests");
+
+/**
+ * The two browser suites. `browser` is the seeded-stack suite (e2e/tests,
+ * CI's "Browser E2E"). `permissions` is the permission-state suite
+ * (e2e/permissions, CI's "Permission states (production build)"): the app's
+ * production build against a fake api (e2e/fixtures/permissions-api.mjs), so
+ * no api change reaches it, only the app and the packages it renders with.
+ * Each suite has its own harness, and a file of one suite never picks a spec
+ * of the other.
+ */
+const SUITES = {
+    browser: {
+        dir: "e2e/tests",
+        harness:
+            /^e2e\/(playwright\.config\.ts|run\.mjs|package\.json|tsconfig\.json|tests\/auth\.setup\.ts|fixtures\/sessions\.ts)$/,
+        other: /^e2e\/(permissions\/|permissions\.config\.ts$|fixtures\/permissions-api\.mjs$)/,
+        api: true,
+    },
+    permissions: {
+        dir: "e2e/permissions",
+        harness:
+            /^e2e\/(permissions\.config\.ts|package\.json|tsconfig\.json|fixtures\/permissions-api\.mjs)$/,
+        other: /^e2e\/(tests\/|playwright\.config\.ts$|run\.mjs$)/,
+        api: false,
+    },
+};
 
 /** The three Next apps the browser specs drive, with their key prefix. */
 const SURFACES = [
@@ -67,7 +99,11 @@ const SURFACES = [
 const API_DIR = "apps/api.saroh.in";
 const API_MODULES = `${API_DIR}/src/modules`;
 
-/** Changes that can break any spec: every spec runs. */
+/**
+ * Changes that can break any spec: every spec of the suite runs. Each suite
+ * adds its own harness, and API_GLOBAL reaches only a suite that runs the api
+ * (globalsFor).
+ */
 const GLOBAL = [
     [
         /^packages\/database\//,
@@ -79,15 +115,13 @@ const GLOBAL = [
     ],
     [/^tooling\//, "shared tooling"],
     [/^\.github\//, "CI"],
-    [
-        /^e2e\/(playwright\.config\.ts|run\.mjs|package\.json|tsconfig\.json|tests\/auth\.setup\.ts|fixtures\/sessions\.ts)$/,
-        "the browser harness",
-    ],
     [/^scripts\/(prepush\.sh|e2e-affected\.mjs)$/, "the gate itself"],
     [
         /^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json|tsconfig[^/]*\.json|\.npmrc|\.nvmrc)$/,
         "a root config or the lockfile",
     ],
+];
+const API_GLOBAL = [
     [
         /^apps\/api\.saroh\.in\/src\/(common\/|[^/]+\.ts$)/,
         "the api's bootstrap or common code",
@@ -97,6 +131,13 @@ const GLOBAL = [
         "the api's config",
     ],
 ];
+function globalsFor(suite) {
+    return [
+        ...GLOBAL,
+        ...(suite.api ? API_GLOBAL : []),
+        [suite.harness, "the suite's harness"],
+    ];
+}
 /** Changes no browser spec can see. */
 const NONE = [
     /^docs\//,
@@ -106,7 +147,7 @@ const NONE = [
     /^apps\/api\.saroh\.in\/(test|scripts)\//,
     /^apps\/api\.saroh\.in\/src\/cli\//,
     /^apps\/api\.saroh\.in\/jest[^/]*$/,
-    /^e2e\/(permissions|permissions\.config\.ts|eslint\.config\.mjs)/,
+    /^e2e\/eslint\.config\.mjs$/,
     /^\.(husky|agents|claude|vscode)\//,
     /^(AGENTS|CLAUDE|README|PRODUCT|AUDIT-PLAYBOOK)/,
 ];
@@ -268,20 +309,22 @@ function routeMatches(key, hit) {
 // ---------------------------------------------------------------------------
 // Specs
 
-function loadSpecs() {
-    return readdirSync(E2E_TESTS)
+function loadSpecs(suite) {
+    const dir = join(ROOT, suite.dir);
+    const prefix = suite.dir.replace(/^e2e\//, "");
+    return readdirSync(dir)
         .filter((f) => f.endsWith(".spec.ts"))
         .sort()
         .map((f) => {
-            const text = readFileSync(join(E2E_TESTS, f), "utf8");
+            const text = readFileSync(join(dir, f), "utf8");
             const keys = [];
             for (const m of text.matchAll(/^\/\/\s*@covers\s+(.+)$/gm))
                 keys.push(...m[1].trim().split(/\s+/));
-            const imports = importsOf(join(E2E_TESTS, f))
+            const imports = importsOf(join(dir, f))
                 .filter((s) => s.startsWith("."))
-                .map((s) => resolveFile(resolve(E2E_TESTS, s)))
+                .map((s) => resolveFile(resolve(dir, s)))
                 .filter(Boolean);
-            return { file: `tests/${f}`, keys, imports };
+            return { file: `${prefix}/${f}`, keys, imports };
         });
 }
 
@@ -297,7 +340,7 @@ function validKeys() {
 function check() {
     const valid = validKeys();
     const bad = [];
-    const specs = loadSpecs();
+    const specs = Object.values(SUITES).flatMap(loadSpecs);
     for (const s of specs) {
         if (s.keys.length === 0)
             bad.push(`${s.file}: no \`// @covers …\` line`);
@@ -352,8 +395,9 @@ function packageDependents() {
     };
 }
 
-function select(changed) {
-    const specs = loadSpecs();
+function select(changed, suite) {
+    const specs = loadSpecs(suite);
+    const globals = globalsFor(suite);
     /** spec file -> Set of reasons */
     const chosen = new Map();
     const pick = (spec, why) => {
@@ -462,14 +506,27 @@ function select(changed) {
 
     for (const path of changed) {
         const abs = join(ROOT, path);
-        const g = GLOBAL.find(([re]) => re.test(path));
+        const g = globals.find(([re]) => re.test(path));
         if (g) {
             all ??= `${path} (${g[1]})`;
             continue;
         }
         let m;
-        if ((m = path.match(/^e2e\/tests\/([^/]+\.spec\.ts)$/))) {
-            const s = specs.find((x) => x.file === `tests/${m[1]}`);
+        if (suite.other.test(path)) {
+            notes.push(`${path}: the other browser suite's`);
+            continue;
+        }
+        if (!suite.api && path.startsWith(API_DIR + "/")) {
+            notes.push(`${path}: this suite answers with a fake api`);
+            continue;
+        }
+        if (
+            path.startsWith(suite.dir + "/") &&
+            path.endsWith(".spec.ts") &&
+            !path.slice(suite.dir.length + 1).includes("/")
+        ) {
+            const file = path.replace(/^e2e\//, "");
+            const s = specs.find((x) => x.file === file);
             if (s) pick(s, `${path} (the spec itself)`);
             else notes.push(`${path}: deleted`);
             continue;
@@ -523,7 +580,7 @@ function select(changed) {
         if ((m = path.match(/^packages\/([^/]+)\//))) {
             const pkgs = dependents(m[1]);
             const globalDep = pkgs.find((p) =>
-                GLOBAL.some(([re]) => re.test(`packages/${p.dir}/x`)),
+                globals.some(([re]) => re.test(`packages/${p.dir}/x`)),
             );
             if (globalDep) {
                 all ??= `${path} (${globalDep.name} depends on it)`;
@@ -606,7 +663,16 @@ else {
         .filter(Boolean);
 }
 const quiet = args.includes("--quiet");
-const r = select(changed);
+const suiteName = args.includes("--suite")
+    ? args[args.indexOf("--suite") + 1]
+    : "browser";
+if (!SUITES[suiteName]) {
+    console.error(
+        `unknown suite ${suiteName} (${Object.keys(SUITES).join(", ")})`,
+    );
+    process.exit(2);
+}
+const r = select(changed, SUITES[suiteName]);
 const err = (s) => quiet || process.stderr.write(s + "\n");
 if (r.all) {
     err(`e2e: all ${r.total} specs — ${r.all}`);

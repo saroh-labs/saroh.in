@@ -161,7 +161,7 @@ function PauseBody({
                                 "h-[34px] rounded-full border px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11",
                                 on
                                     ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:border-border-strong",
+                                    : "border-border bg-card font-medium text-foreground/75 hover:border-border-strong active:bg-accent-active",
                             )}
                         >
                             {o.label}
@@ -229,7 +229,7 @@ function SwitchBody({
                                     "flex w-full rounded-[9px] px-3 py-2.5 text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
                                     on
                                         ? "border-[1.5px] border-foreground bg-muted/50 font-semibold"
-                                        : "border border-border bg-card font-medium hover:border-border-strong",
+                                        : "border border-border bg-card font-medium hover:border-border-strong active:bg-accent-active",
                                 )}
                             >
                                 {p.name} · {money(p.price, p.currency)}/
@@ -323,7 +323,7 @@ function CancelBody({
                                     "flex w-full rounded-[9px] px-3 py-2.5 text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
                                     on
                                         ? "border-[1.5px] border-foreground bg-muted/50 font-semibold"
-                                        : "border border-border bg-card font-medium hover:border-border-strong",
+                                        : "border border-border bg-card font-medium hover:border-border-strong active:bg-accent-active",
                                 )}
                             >
                                 {o.label}

@@ -77,8 +77,10 @@ export function Notes({
     return (
         <>
             <p className="mb-2.5 text-[12.5px] text-muted-foreground">
-                Team only — never shown to the customer. Everyone on the team
-                can read them{canWrite ? "" : ". Your role can't add them"}.
+                Team only — never shown to the customer.{" "}
+                {canWrite
+                    ? "Everyone on the team can read and add notes."
+                    : "Everyone on the team can read them. Your role can't add them."}
             </p>
             {canWrite ? (
                 <div className="mb-3 rounded-xl border border-border bg-card px-3.5 py-3">
@@ -149,7 +151,7 @@ export function Notes({
                                 <button
                                     type="button"
                                     onClick={() => void remove(n)}
-                                    className="text-[12px] text-muted-foreground hover:text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                                    className="text-[12px] text-muted-foreground hover:text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-destructive-subtle coarse:min-h-11"
                                 >
                                     Delete
                                 </button>

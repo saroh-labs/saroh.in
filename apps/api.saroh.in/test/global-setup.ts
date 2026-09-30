@@ -85,9 +85,7 @@ function buildFromMigrationsWithRole(
 
     const password = randomBytes(18).toString("hex");
     const database = new URL(testDatabaseUrl).pathname.replace(/^\//, "");
-    prisma(
-        ["db", "execute", "--stdin"],
-        `DO $$
+    const grantRole = `DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${RLS_TEST_ROLE}') THEN
         CREATE ROLE ${RLS_TEST_ROLE} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
@@ -98,8 +96,25 @@ GRANT CONNECT ON DATABASE "${database}" TO ${RLS_TEST_ROLE};
 GRANT USAGE ON SCHEMA public TO ${RLS_TEST_ROLE};
 -- TRUNCATE only for the suite's between-file wipe (test/truncate.ts).
 GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public TO ${RLS_TEST_ROLE};
-GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${RLS_TEST_ROLE};`,
-    );
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${RLS_TEST_ROLE};`;
+    // The role is one per cluster. The local gate (scripts/prepush.sh) runs
+    // RLS shards on several test databases at once, and two of these at the
+    // same moment fail one with "tuple concurrently updated" on the role's
+    // row. Every statement is idempotent, so a failed attempt is re-run.
+    for (let attempt = 1; ; attempt++) {
+        try {
+            prisma(["db", "execute", "--stdin"], grantRole);
+            break;
+        } catch (error) {
+            if (attempt >= 5) throw error;
+            Atomics.wait(
+                new Int32Array(new SharedArrayBuffer(4)),
+                0,
+                0,
+                250 + Math.floor(Math.random() * 750),
+            );
+        }
+    }
 
     process.env[RLS_URL_ENV] = roleUrl(
         testDatabaseUrl,

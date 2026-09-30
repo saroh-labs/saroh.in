@@ -1,3 +1,4 @@
+import { rolledOut, rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 
 /**
@@ -94,11 +95,28 @@ export function turnOnOrder(modules: ModuleView[], key: string): string[] {
  */
 export function firstRunJobs(modules: ModuleView[]): FirstRunJob[] {
     const byKey = new Map(modules.map((m) => [m.key, m]));
+    // Only what Saroh has rolled out here (DEC-057): the API lists every
+    // module, a dark one with ROLLOUT_DISABLED.
+    const shown = rolledOutKeys(modules);
     return JOBS.flatMap((job) => {
+        if (!shown.has(job.key)) return [];
         const view = byKey.get(job.key);
         if (!view || view.lifecycle === "ENABLED") return [];
         const order = turnOnOrder(modules, job.key);
         if (!order.every((k) => byKey.get(k)?.canManage)) return [];
         return [{ ...job, pulls: order.filter((k) => k !== job.key) }];
     });
+}
+
+/**
+ * Whether the business has turned on something this person's role doesn't
+ * reach. Home then says it isn't open to them, never that the business
+ * picked nothing (F16: a Storefront team member reaches no module).
+ */
+export function onButNotOpen(modules: readonly ModuleView[]): boolean {
+    return rolledOut(modules).some(
+        (m) =>
+            m.lifecycle === "ENABLED" &&
+            m.blockers.some((b) => b.code === "UNAUTHORIZED"),
+    );
 }

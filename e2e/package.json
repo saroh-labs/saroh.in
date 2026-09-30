@@ -11,6 +11,7 @@
         "test:permissions": "playwright test --config=permissions.config.ts"
     },
     "devDependencies": {
+        "@axe-core/playwright": "^4.13.0",
         "@playwright/test": "^1.50.1",
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tsconfig": "workspace:*",

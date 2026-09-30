@@ -27,18 +27,28 @@ const NOW: Record<StepTone, string> = {
     bad: "bg-destructive-subtle-foreground",
 };
 
-export function StepPill({ progress }: { progress: RowProgress }) {
+export function StepPill({
+    progress,
+    dot = true,
+}: {
+    progress: RowProgress;
+    /** The desk row's dot; a phone card's pill has none (the design). */
+    dot?: boolean;
+}) {
     return (
         <span
             className={cn(
-                "inline-flex h-[22px] items-center gap-1.5 whitespace-nowrap rounded-full border pl-2 pr-[9px] text-[12px] font-semibold",
+                "inline-flex h-[22px] items-center gap-1.5 whitespace-nowrap rounded-full border pr-[9px] text-[12px] font-semibold",
+                dot ? "pl-2" : "pl-[9px]",
                 PILL[progress.tone],
             )}
         >
-            <span
-                aria-hidden
-                className="size-1.5 flex-none rounded-full bg-current"
-            />
+            {dot ? (
+                <span
+                    aria-hidden
+                    className="size-1.5 flex-none rounded-full bg-current"
+                />
+            ) : null}
             {progress.word}
         </span>
     );

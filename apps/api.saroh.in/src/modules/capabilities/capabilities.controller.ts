@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -19,6 +20,7 @@ import { ModuleAvailabilityService } from "./module-availability.service";
 import { ModuleLifecycleService } from "./module-lifecycle.service";
 import type { ModuleKey } from "./module-registry";
 import { isModuleKey } from "./module-registry";
+import { ModuleSetupService } from "./setup/module-setup.service";
 
 /**
  * Organization + Project module controls (ADR-003 / #115).
@@ -36,6 +38,7 @@ export class CapabilitiesController {
     constructor(
         private readonly availability: ModuleAvailabilityService,
         private readonly lifecycle: ModuleLifecycleService,
+        private readonly setup: ModuleSetupService,
     ) {}
 
     /** Catalog + effective state for every module. */
@@ -69,7 +72,27 @@ export class CapabilitiesController {
         return { data: await this.lifecycle.impact(ctx, moduleKey) };
     }
 
-    /** Set an Organization module's lifecycle (enable / disable / archive). */
+    /**
+     * What the Turn on sheet prefills (DEC-068): the setup payload with its
+     * defaults, the modules that turn on with it, and whether the business
+     * may see it at all. `module:manage`.
+     */
+    @Get("modules/:moduleKey/setup-defaults")
+    async setupDefaults(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("moduleKey") moduleKeyParam: string,
+    ) {
+        const moduleKey = this.moduleKey(moduleKeyParam);
+        return { data: await this.setup.defaults(ctx, moduleKey) };
+    }
+
+    /**
+     * Set an Organization module's lifecycle (enable / disable / archive).
+     *
+     * `setup` (DEC-068) goes with ENABLED only: the module's minimum is
+     * created and the module switched on in one transaction, and the answer
+     * adds `alreadyEnabled` and `created`. Without it, as before.
+     */
     @Put("modules/:moduleKey")
     async setStatus(
         @OrgContext() ctx: OrganizationContext,
@@ -77,6 +100,20 @@ export class CapabilitiesController {
         @Body() dto: ModuleMutationDto,
     ) {
         const moduleKey = this.moduleKey(moduleKeyParam);
+        if (dto.setup !== undefined) {
+            if (dto.status !== "ENABLED") {
+                throw new BadRequestException({
+                    message: "Only turning a module on takes a setup.",
+                    details: { field: "setup" },
+                });
+            }
+            const outcome = await this.setup.enable(ctx, moduleKey, dto.setup);
+            return {
+                data: await this.viewOf(ctx, moduleKey),
+                alreadyEnabled: outcome.alreadyEnabled,
+                created: outcome.created,
+            };
+        }
         switch (dto.status) {
             case "ENABLED":
                 await this.lifecycle.enable(ctx, moduleKey);

@@ -97,7 +97,7 @@ export function ProductDiscountsTab({
                                     </Badge>
                                     <Link
                                         href="/commerce/discounts"
-                                        className="ml-auto text-[12px] text-brand hover:text-foreground"
+                                        className="ml-auto text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                     >
                                         Open in Discounts
                                     </Link>

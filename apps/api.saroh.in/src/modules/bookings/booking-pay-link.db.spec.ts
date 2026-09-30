@@ -7,6 +7,7 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { hashPayToken } from "../invoices/pay-token";
 import { markBookingPaidInTx } from "./booking-pay-link";
@@ -53,6 +54,7 @@ beforeAll(async () => {
             data: { name: "Another clinic", slug: `e4-pay-o-${process.pid}` },
         }),
     ]);
+    await giveBusinessDetails(org.id);
     const user = await prisma.user.create({
         data: { email: `e4-pay-${process.pid}@example.in` },
     });

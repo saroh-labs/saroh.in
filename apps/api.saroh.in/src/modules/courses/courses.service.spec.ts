@@ -1,6 +1,16 @@
 // Courses with a mocked database: who may, whose ids are trusted, what an
 // enrolment books and invoices, and the plain refusals. The races and the
 // held seats run against a real Postgres in courses.db.spec.ts.
+// The business-details refusal (DEC-068) has its own specs
+// (`business-details.spec.ts`, `business-details.db.spec.ts`); here
+// the business has its address.
+jest.mock("../invoices/business-details", () => ({
+    ...jest.requireActual<typeof import("../invoices/business-details")>(
+        "../invoices/business-details",
+    ),
+    assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
