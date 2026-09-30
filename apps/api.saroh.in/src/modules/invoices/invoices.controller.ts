@@ -33,7 +33,7 @@ import {
 import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesService } from "./invoices.service";
-import { payLinkUrl } from "./pay-link-url";
+import { payLinkUrlFor } from "./pay-link-url";
 
 /**
  * Billing → Invoices (ADR-007). Invoicing needs no module (DEC-070): a
@@ -186,7 +186,7 @@ export class InvoicesController {
         @Param("invoiceId") id: string,
     ): Promise<{ url: string }> {
         const { token } = await this.invoices.createPayLink(ctx, id);
-        return { url: payLinkUrl(token) };
+        return { url: await payLinkUrlFor(ctx.organizationId, token) };
     }
 
     /**

@@ -8,7 +8,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
-import { payLinkUrl } from "../invoices/pay-link-url";
+import { payLinkUrlFor } from "../invoices/pay-link-url";
 import { AutopayService } from "../payments/autopay.service";
 import { subscriptionChargesUnderWay } from "../payments/charge-under-way";
 import { MandateChargesService } from "../payments/mandate-charges.service";
@@ -356,7 +356,7 @@ export class AccountPlanService {
             id,
             (invoiceId) => this.chargePending(member.organizationId, invoiceId),
         );
-        return { url: payLinkUrl(token) };
+        return { url: await payLinkUrlFor(member.organizationId, token) };
     }
 
     private async changed(

@@ -21,7 +21,7 @@ import {
     IgnoreModuleReadiness,
     RequireModule,
 } from "../capabilities/require-module.decorator";
-import { payLinkUrl } from "../invoices/pay-link-url";
+import { payLinkUrlFor } from "../invoices/pay-link-url";
 import {
     AutopayLinkDto,
     CancelSubscriptionDto,
@@ -386,7 +386,9 @@ export class SubscriptionsController {
         const done = await this.subscriptions.retryPayment(ctx, id, dto.via);
         return {
             ...done,
-            url: done.token ? payLinkUrl(done.token) : null,
+            url: done.token
+                ? await payLinkUrlFor(ctx.organizationId, done.token)
+                : null,
         };
     }
 

@@ -21,7 +21,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { payLinkUrl } from "../invoices/pay-link-url";
+import { payLinkUrlFor } from "../invoices/pay-link-url";
 import type { DeskPayment } from "./booking-desk-pay";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { withoutIntakeNote } from "./booking-intake";
@@ -254,7 +254,7 @@ export class BookingsController {
         @Param("bookingId") bookingId: string,
     ): Promise<{ url: string }> {
         const { token } = await this.bookings.payLink(ctx, bookingId);
-        return { url: payLinkUrl(token) };
+        return { url: await payLinkUrlFor(ctx.organizationId, token) };
     }
 
     /**

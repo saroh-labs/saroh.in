@@ -455,8 +455,15 @@ export class OrdersService {
                         created.id,
                     );
                 }
-                return created.payLink
-                    ? { id: created.id, payLink: created.payLink }
+                // The business rides along with a pay link, so the
+                // controller can put it on the business's own address
+                // (DEC-069, L7).
+                return created.payLink && organizationId
+                    ? {
+                          id: created.id,
+                          organizationId,
+                          payLink: created.payLink,
+                      }
                     : { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;
