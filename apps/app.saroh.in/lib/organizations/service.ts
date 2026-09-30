@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
+import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 
 /**
  * Organization data access for app.saroh.in. Organization is the tenant root
@@ -80,7 +81,9 @@ export interface AddressAvailability {
 export async function listOrganizations(): Promise<Organization[]> {
     const res = await apiFetch("/organizations");
     if (!res.ok) return [];
-    return (await res.json()) as Organization[];
+    const orgs = (await res.json()) as Organization[];
+    // The role's words on screen, not its stored name (DEC-069, L10).
+    return orgs.map((o) => ({ ...o, roleLabel: shownRoleLabel(o.roleLabel) }));
 }
 
 /**
