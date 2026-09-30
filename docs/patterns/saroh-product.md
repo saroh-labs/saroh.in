@@ -48,13 +48,13 @@ pattern files refer back here.
     client" turns nothing on: it opens a new invoice, for someone with
     `invoice:write`, until the business has one.
 
-- **Not yet true** (DEC-070, K4) — The registered address, business type
-  and logo steps are meant to appear only once something invoices or takes
-  money (Sell, Bookings, Courses, Class packs or Payments on, or an invoice
-  exists), in the kind's words ("Add your address", "Add your details").
-  Until that unit lands, Settings' ready list and nudges and Home's
-  take-money card still ask every business for them, in a business's words.
-  Don't write copy that says a site-only account is spared them.
+- **Current** (DEC-070, K4) — The registered address, business type and
+  logo steps appear only once something invoices or takes money: Sell,
+  Bookings, Courses, Class packs or Payments on, or an invoice exists
+  (`handlesMoney` in `lib/settings/ready.ts`, which never reads the kind).
+  They use the kind's words ("Add your address", "Add your details"), and the
+  checklist's heading follows its steps ("Get your site live" when only
+  publishing is left).
 - **Not yet true** (DEC-070, K11–K15) — The Portfolio, Blog/writing and
   Personal/consultant templates and the Projects block aren't built, so a
   new site starts from the starter template for every kind. Its second
