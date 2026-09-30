@@ -42,9 +42,10 @@ export interface PlanJoinAttempt {
  * Why a join couldn't start, with the sentence for it.
  * - signed-out: the session ended since the page loaded; sign in again.
  * - ask: the business can't take the payment online now.
+ * - test-release: the page is a test release (DEC-071); nobody joins.
  * - error: anything else, said in words.
  */
-export type JoinProblem = "signed-out" | "ask" | "error";
+export type JoinProblem = "signed-out" | "ask" | "error" | "test-release";
 
 export type JoinResult<T> =
     { ok: true; data: T } | { ok: false; reason: JoinProblem; message: string };

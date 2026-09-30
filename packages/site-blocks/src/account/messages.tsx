@@ -10,6 +10,7 @@ import {
 
 import { focusRing, inputFill, quietFill } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
+import type { TestReleaseRefusal } from "../test-release/words";
 import type { AccountMessage, AccountThread, Block } from "./model";
 import { messageMeta } from "./model";
 import { Unavailable } from "./parts";
@@ -28,7 +29,9 @@ import { Unavailable } from "./parts";
  */
 
 export type SendResult =
-    { ok: true; message: AccountMessage } | { ok: false; message: string };
+    | { ok: true; message: AccountMessage }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export interface MessagesApi {
     send: (text: string) => Promise<SendResult>;

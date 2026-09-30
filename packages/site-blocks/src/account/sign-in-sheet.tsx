@@ -6,6 +6,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { destructiveAlertClasses } from "../alert";
 import { focusRing, quietFill } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
+import { useTestRelease } from "../test-release/context";
+import { SIGN_IN_OFF_TEXT } from "../test-release/words";
 import type {
     CodeRequestResult,
     SignedInCustomer,
@@ -36,6 +38,10 @@ import { ChallengeWidget } from "./challenge";
  * It takes focus, keeps Tab inside, closes on Escape and gives focus back
  * to whatever opened it. Drawn in the site's own tokens and type only (H1).
  * It never calls the API: the site's server actions arrive as `api`.
+ *
+ * On a test release (DEC-071, KTD-9) signing in is off: a first sign-in
+ * makes a contact and sends a real code. The sheet takes the email as
+ * usual, then says so instead of asking for a code, and nothing is sent.
  */
 
 export interface SignInSheetProps {
@@ -88,6 +94,7 @@ export function SignInSheet({
     const sheet = useRef<HTMLDivElement>(null);
     const field = useRef<HTMLInputElement>(null);
     const opener = useRef<Element | null>(null);
+    const testRelease = useTestRelease() !== null;
 
     const [step, setStep] = useState<"email" | "code">("email");
     const [email, setEmail] = useState("");
@@ -122,6 +129,10 @@ export function SignInSheet({
 
     async function sendCode() {
         if (busy || !emailReady) return;
+        if (testRelease) {
+            setProblem({ ok: false, reason: "test-release" });
+            return;
+        }
         setBusy(true);
         setProblem(null);
         const result = await api
@@ -141,6 +152,10 @@ export function SignInSheet({
 
     async function verify() {
         if (busy || !codeReady) return;
+        if (testRelease) {
+            setProblem({ ok: false, reason: "test-release" });
+            return;
+        }
         setBusy(true);
         setProblem(null);
         const result = await api
@@ -358,6 +373,18 @@ function ProblemText({
     businessName: string;
     phone: string | null;
 }) {
+    if (problem.reason === "test-release") {
+        // Not a failure: what a test release does here, said plainly.
+        return (
+            <p
+                role="status"
+                data-test-release-stop=""
+                className="border-site-border text-site-fg mt-3 rounded-[calc(var(--site-radius)+10px)] border border-dashed px-3.5 py-3 text-sm leading-normal"
+            >
+                {SIGN_IN_OFF_TEXT}
+            </p>
+        );
+    }
     let body: ReactNode;
     switch (problem.reason) {
         case "unavailable": {

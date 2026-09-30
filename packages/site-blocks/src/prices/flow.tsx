@@ -7,6 +7,8 @@ import type { SignedInCustomer } from "../account/api";
 import { SignInSheet } from "../account/sign-in-sheet";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
+import { useTestRelease } from "../test-release/context";
+import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import type { PricesActions } from "./api";
 
 /**
@@ -17,11 +19,20 @@ import type { PricesActions } from "./api";
  * and the join or purchase goes on by itself once the code checks. When the
  * code can't be sent the sheet says so, with the business's phone, and
  * nothing is started.
+ *
+ * On a test release (DEC-071, T6) Join and Buy stop where the sign-in sheet
+ * would open, and say what the live site would take: nobody joins, nothing
+ * is bought or paid.
  */
 export function useSignInFirst(actions: PricesActions | null): {
     customer: SignedInCustomer | null;
-    /** Run `then` as the signed-in customer, signing in first if needed. */
-    signedIn: (then: (who: SignedInCustomer) => void) => void;
+    /**
+     * Run `then` as the signed-in customer, signing in first if needed. On
+     * a test release it stops instead, saying `live` (what the live site
+     * does here: "the customer signs in here and pays ₹1,200 / month to
+     * join Monthly").
+     */
+    signedIn: (then: (who: SignedInCustomer) => void, live: string) => void;
     /** The session ended: forget who it was, and sign in again. */
     signInAgain: (then: (who: SignedInCustomer) => void) => void;
     sheet: ReactNode;
@@ -29,6 +40,8 @@ export function useSignInFirst(actions: PricesActions | null): {
     const [customer, setCustomer] = useState(actions?.customer ?? null);
     const [asking, setAsking] = useState(false);
     const next = useRef<((who: SignedInCustomer) => void) | null>(null);
+    const testRelease = useTestRelease() !== null;
+    const [stop, setStop] = useState<string | null>(null);
 
     function ask(then: (who: SignedInCustomer) => void) {
         next.current = then;
@@ -37,29 +50,42 @@ export function useSignInFirst(actions: PricesActions | null): {
 
     return {
         customer,
-        signedIn: (then) => (customer ? then(customer) : ask(then)),
+        signedIn: (then, live) => {
+            if (testRelease) setStop(live);
+            else if (customer) then(customer);
+            else ask(then);
+        },
         signInAgain: (then) => {
             setCustomer(null);
             ask(then);
         },
         sheet: actions ? (
-            <SignInSheet
-                open={asking}
-                onClose={() => {
-                    next.current = null;
-                    setAsking(false);
-                }}
-                options={actions.signInOptions}
-                api={actions.signIn}
-                purpose="book"
-                onSignedIn={(who) => {
-                    setCustomer(who);
-                    setAsking(false);
-                    const then = next.current;
-                    next.current = null;
-                    then?.(who);
-                }}
-            />
+            <>
+                <TestReleaseStopSheet
+                    open={stop !== null}
+                    live={stop ?? ""}
+                    nothing="paid"
+                    back="Back"
+                    onClose={() => setStop(null)}
+                />
+                <SignInSheet
+                    open={asking}
+                    onClose={() => {
+                        next.current = null;
+                        setAsking(false);
+                    }}
+                    options={actions.signInOptions}
+                    api={actions.signIn}
+                    purpose="book"
+                    onSignedIn={(who) => {
+                        setCustomer(who);
+                        setAsking(false);
+                        const then = next.current;
+                        next.current = null;
+                        then?.(who);
+                    }}
+                />
+            </>
         ) : null,
     };
 }

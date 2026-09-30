@@ -1,4 +1,5 @@
 import type { AutopayMethod, AutopayStart } from "../autopay/api";
+import type { TestReleaseRefusal } from "../test-release/words";
 import type { AccountPlanTab } from "./model";
 
 /**
@@ -9,10 +10,13 @@ import type { AccountPlanTab } from "./model";
 
 export type PlanChangeResult =
     | { ok: true; message: string; tab: AccountPlanTab }
-    | { ok: false; message: string };
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export type PayNowResult =
-    { ok: true; url: string } | { ok: false; message: string };
+    | { ok: true; url: string }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export interface PlanApi {
     pause: (ref: string, weeks: number) => Promise<PlanChangeResult>;
@@ -32,7 +36,9 @@ export interface PlanApi {
 }
 
 export type AutopayStartResult =
-    { ok: true; data: AutopayStart } | { ok: false; message: string };
+    | { ok: true; data: AutopayStart }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 /** Said when the site's server couldn't be reached. */
 export const PLAN_OFFLINE =
