@@ -503,6 +503,16 @@ notes (P1, P3, Z2a, D13B, WHSECRET, F10b) are in
 - **Test host on a custom domain** (`test.` + the merchant's domain) needs
   the merchant's DNS record and the host added by hand, as the domain
   itself does. Until then only the platform test host is offered.
+- **Before `SITE_TEST_RELEASES` goes on for everyone** (release review):
+    - a backstop so a scheduled go-live that gave up during an outage can't
+      stay "scheduled": a sweep or read-time check that marks a past-due
+      schedule with no live `site.go_live` job as not live. Today the job
+      logs the release at ERROR; an operator clears it by cancelling.
+    - the renderer reads `test.` hosts by shape alone (fail closed), so the
+      pre-flight Domain query in 3C must stay at 0.
+- **Provider deadlines on the other calls** (release review): create order,
+  refunds, billing subscriptions, WhatsApp and email still have no timeout.
+  Give them `providerCallSignal()` as the lookups and mandate calls have.
 - Optional: delete `components/invoices/payments-denied.tsx` once no route
   uses it (DEC-070 plan).
 
