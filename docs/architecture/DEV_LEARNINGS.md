@@ -1998,3 +1998,18 @@ the day enough holds have run out.
 it; count what the write adds. Pinned by `web-address.service.db.spec.ts`
 "counts both holds a change would add".
 **Category**: organizations · limits
+## App — a test-release sheet stuck on "Going live…" when the API was down
+
+**Problem**: the release review found that the go-live, schedule, cancel and
+discard actions in the editor's test-release panel left their sheet busy,
+with both buttons disabled, if the API couldn't be reached.
+**Root cause**: `send()` in `lib/sites/test-releases-api.ts` awaited
+`apiFetch` bare. A dropped connection rejects instead of answering, so the
+server action threw and the sheet's `confirm()` never reset `busy`.
+**Fix**: `send()` catches the rejection and returns `{ ok: false }` with
+`SEND_UNREACHABLE`, like the read beside it already did
+(`test-releases-api.test.ts`).
+**Rule**: a server action's API call returns a result for every outcome,
+the unreachable one included; a sheet never depends on a throw to leave its
+busy state.
+**Category**: frontend · error feedback
