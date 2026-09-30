@@ -29,6 +29,7 @@ import {
     FakeWebhookProviderFactory,
 } from "../webhooks/providers/fake.webhook";
 import { WebhooksService } from "../webhooks/webhooks.service";
+import { cancelMandatesInTx } from "./mandate-cancel-job";
 import {
     earliestDebitAt,
     MandateChargesService,
@@ -487,7 +488,9 @@ describe("what is never charged", () => {
             }),
         ).toMatchObject({ status: "CANCELLED", cancelConfirmedAt: null });
 
-        // The charge prepared before the cancel is closed, not debited.
+        // The charge prepared before the cancel was closed by the cancel
+        // itself, and is not debited.
+        expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
         fake.settlePreDebit(prepared.providerIntentId, "DELIVERED");
         clock = new Date(clock.getTime() + 27 * HOUR);
         expect(
@@ -496,7 +499,7 @@ describe("what is never charged", () => {
                 intentId: prepared.intentId,
                 now: clock,
             }),
-        ).toMatchObject({ status: "REFUSED", reason: "MANDATE_NOT_ACTIVE" });
+        ).toMatchObject({ status: "ALREADY", intentStatus: "CANCELLED" });
         expect(debitCalls()).toHaveLength(0);
         expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
 
@@ -506,6 +509,100 @@ describe("what is never charged", () => {
             status: "REFUSED",
             reason: "MANDATE_NOT_ACTIVE",
         });
+    });
+
+    /**
+     * A prepared charge whose notice is due, and `during` run while the
+     * charge is asking the provider about the notice: after its checks and
+     * before its claim.
+     */
+    async function chargeWith(
+        during: (who: {
+            subscriptionId: string;
+            mandateId: string;
+            invoiceId: string;
+        }) => Promise<void>,
+    ) {
+        const who = await autopayMember();
+        const invoice = await invoiceFor(who);
+        const prepared = await prepare(who.mandateId, invoice.id);
+        if (prepared.status !== "PREPARED") throw new Error("not prepared");
+        fake.settlePreDebit(prepared.providerIntentId, "DELIVERED");
+        clock = new Date(clock.getTime() + 27 * HOUR);
+        const ask = fake.mandates.getPreDebit;
+        fake.mandates.getPreDebit = async (input) => {
+            await during({ ...who, invoiceId: invoice.id });
+            return ask(input);
+        };
+        try {
+            const result = await charges.charge({
+                organizationId: owner.organizationId,
+                intentId: prepared.intentId,
+                now: clock,
+            });
+            return { result, intentId: prepared.intentId };
+        } finally {
+            fake.mandates.getPreDebit = ask;
+        }
+    }
+
+    it("a mandate cancelled after the checks, before the claim: never debited", async () => {
+        const { result, intentId } = await chargeWith((who) =>
+            prisma
+                .$transaction((tx) =>
+                    cancelMandatesInTx(
+                        tx,
+                        {
+                            organizationId: owner.organizationId,
+                            subscriptionId: who.subscriptionId,
+                        },
+                        "CUSTOMER",
+                        { queue: false },
+                    ),
+                )
+                .then(() => undefined),
+        );
+        expect(result).toMatchObject({ status: "REFUSED" });
+        expect(debitCalls()).toHaveLength(0);
+        expect((await intentOf(intentId)).status).toBe("CANCELLED");
+    });
+
+    it("an invoice voided after the checks, before the claim: never debited", async () => {
+        const { result, intentId } = await chargeWith((who) =>
+            prisma.invoice
+                .update({
+                    where: { id: who.invoiceId },
+                    data: { status: "VOID" },
+                })
+                .then(() => undefined),
+        );
+        expect(result).toMatchObject({
+            status: "REFUSED",
+            reason: "INVOICE_NOT_PAYABLE",
+        });
+        expect(debitCalls()).toHaveLength(0);
+        expect((await intentOf(intentId)).status).toBe("CANCELLED");
+    });
+
+    it("cancelling a mandate closes its prepared charges for the pay link", async () => {
+        const who = await autopayMember();
+        const invoice = await invoiceFor(who);
+        const prepared = await prepare(who.mandateId, invoice.id);
+        if (prepared.status !== "PREPARED") throw new Error("not prepared");
+
+        await prisma.$transaction((tx) =>
+            cancelMandatesInTx(
+                tx,
+                {
+                    organizationId: owner.organizationId,
+                    subscriptionId: who.subscriptionId,
+                },
+                "CUSTOMER",
+                { queue: false },
+            ),
+        );
+
+        expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
     });
 
     it("a mandate of another business is not found", async () => {

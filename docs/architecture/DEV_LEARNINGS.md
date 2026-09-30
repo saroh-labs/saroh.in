@@ -1880,3 +1880,28 @@ the competing writers take, before it reads. Pinned by
 `test-release-schedule.db.spec.ts` "doesn't go live over a publish that
 commits while it runs".
 **Category**: sites · jobs · concurrency
+
+## Autopay — a debit could be asked for after the mandate was cancelled (release review)
+
+**Symptom**: found in the production release review, behind
+`RAZORPAY_AUTOPAY`. A customer cancels autopay while the charge job is
+asking the provider whether the pre-debit notice was delivered; the job
+then claims the charge and the bank is asked for the money anyway.
+**Cause**: `MandateChargesService.charge` checked "mandate ACTIVE" and
+"invoice ISSUED" on its first read, made a provider round trip
+(`getPreDebit`), and then claimed REQUIRES_PAYMENT → PROCESSING on the
+intent's status alone. The cancel paths moved the mandate to CANCELLED but
+left its prepared charge REQUIRES_PAYMENT, so nothing stopped the claim.
+**Fix**: the claim's `updateMany` WHERE carries both guards
+(`viaMandate: { is: { status: "ACTIVE" } }`, `invoice: { is: { status:
+"ISSUED" } }`); a refused claim is re-read and answered REFUSED with the
+reason. Every in-transaction cancel (`cancelMandatesInTx`, which the cancel
+job, `cancelFor` and the subscription paths use; REPLACED and a provider's
+own cancel in `mandate-events.ts`) calls `cancelOpenCharges`, which moves
+the mandate's REQUIRES_PAYMENT charges to CANCELLED, so the claim and the
+cancel meet on the intent's row lock.
+**Rule**: a guard read before a provider call is re-asked in the WHERE of
+the conditional write that commits to money. Pinned by
+`mandate-charges.db.spec.ts` "a mandate cancelled after the checks, before
+the claim" and "an invoice voided after the checks".
+**Category**: payments · autopay · concurrency

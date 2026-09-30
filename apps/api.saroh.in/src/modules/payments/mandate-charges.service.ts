@@ -425,12 +425,48 @@ export class MandateChargesService {
             };
         }
 
+        /*
+         * The claim re-asks the checks above in its own WHERE: the notice
+         * call is a provider round trip, and a mandate cancelled or an
+         * invoice voided while it ran must not be debited. A cancel moves
+         * the mandate's open charges to CANCELLED in its transaction
+         * (`cancelMandatesInTx`), so a claim either lands first, or waits
+         * for that and finds nothing to claim.
+         */
         const claimed = await prisma.paymentIntent.updateMany({
-            where: { id: intentId, status: "REQUIRES_PAYMENT" },
+            where: {
+                id: intentId,
+                status: "REQUIRES_PAYMENT",
+                viaMandate: {
+                    is: {
+                        status: "ACTIVE",
+                        providerMandateId: { not: null },
+                    },
+                },
+                invoice: { is: { status: "ISSUED" } },
+            },
             data: { status: "PROCESSING" },
         });
         if (claimed.count === 0) {
-            return { status: "ALREADY", intentId, intentStatus: "PROCESSING" };
+            const current = await prisma.paymentIntent.findFirst({
+                where: { id: intentId, organizationId },
+                select: {
+                    status: true,
+                    viaMandate: { select: { status: true } },
+                    invoice: { select: { status: true } },
+                },
+            });
+            if (current?.viaMandate?.status !== "ACTIVE") {
+                return refuse("MANDATE_NOT_ACTIVE");
+            }
+            if (current.invoice?.status !== "ISSUED") {
+                return refuse("INVOICE_NOT_PAYABLE");
+            }
+            return {
+                status: "ALREADY",
+                intentId,
+                intentStatus: current.status,
+            };
         }
 
         try {

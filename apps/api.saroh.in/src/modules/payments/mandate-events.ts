@@ -10,7 +10,10 @@ import {
 
 import { heldReportOf, readJoinAutopay } from "./join-autopay";
 
-import { enqueueMandateCancelInTx } from "./mandate-cancel-job";
+import {
+    cancelOpenCharges,
+    enqueueMandateCancelInTx,
+} from "./mandate-cancel-job";
 import type { MandateStatus, ReportedMandateChange } from "./mandate-rules";
 import {
     nextMandateStatus,
@@ -172,6 +175,7 @@ export async function applyMandateChangeInTx(
                 },
             });
             if (count === 0) return { applied: false };
+            await cancelOpenCharges(tx, organizationId, row.id);
             await recordSubscriptionEvent(
                 tx,
                 organizationId,
@@ -230,6 +234,7 @@ async function activate(
                 },
             });
             if (count > 0) {
+                await cancelOpenCharges(tx, organizationId, old.id);
                 await recordSubscriptionEvent(
                     tx,
                     organizationId,
