@@ -52,6 +52,7 @@ export function EditorPanels({
     rail,
     canvas,
     inspector,
+    releases,
 }: {
     layout: EditorLayout;
     viewport: EditorViewport;
@@ -67,6 +68,12 @@ export function EditorPanels({
     rail: ReactNode;
     canvas: ReactNode;
     inspector: ReactNode;
+    /**
+     * The Test releases panel (DEC-071, T11), laid over the page like the
+     * editor's other sheets: beside it on a desk or a narrow window, from
+     * the foot on a phone. Absent while test releases are off.
+     */
+    releases?: { open: boolean; onClose: () => void; content: ReactNode };
 }) {
     // The sheets are drawn inside the body, below the top bar (the design).
     const [body, setBody] = useState<HTMLDivElement | null>(null);
@@ -180,6 +187,22 @@ export function EditorPanels({
                         onFeedback={() => selection.setInspector("feedback")}
                     />
                 </>
+            ) : null}
+
+            {releases ? (
+                <EditorSheet
+                    open={releases.open}
+                    onClose={releases.onClose}
+                    container={body}
+                    side={phone ? "bottom" : "right"}
+                    title="Test releases"
+                    closeLabel="Close test releases"
+                    // Wider than the inspector: a release carries its links
+                    // and five actions.
+                    className={phone ? "h-[85%]" : "w-[400px] max-w-[92%]"}
+                >
+                    {releases.content}
+                </EditorSheet>
             ) : null}
         </>
     );

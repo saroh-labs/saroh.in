@@ -485,6 +485,14 @@ export interface SiteDetail extends SiteSummary {
     canEdit: boolean;
     /** Everything this caller may do here (#275). */
     can: SiteCapabilities;
+    /**
+     * "Publishing needs approval" (DEC-071, R10): on, Publish and restore are
+     * refused and only an approved test release goes live, unless an owner
+     * overrides. Absent from an older API, which reads as off.
+     */
+    publishNeedsApproval?: boolean;
+    /** This caller is an owner who can publish: may go live past it (KTD-11). */
+    canOverride?: boolean;
     pages: SitePage[];
     /** Always present on a detail read; null only before the first publish. */
     pendingSectionChanges: number | null;
@@ -621,6 +629,12 @@ export type SitesResult<T> =
            * Offered, never applied.
            */
           suggestion?: string;
+          /**
+           * The API's `details.code` for a refusal a screen answers in its
+           * own way: `APPROVAL_REQUIRED` while "Publishing needs approval"
+           * is on (DEC-071, T9).
+           */
+          code?: string;
       };
 
 // ---------------------------------------------------------------------------
@@ -651,7 +665,7 @@ async function sitesBase(): Promise<string | null> {
 function readError(
     data: unknown,
     fallback: string,
-): { error: string; index?: number; suggestion?: string } {
+): { error: string; index?: number; suggestion?: string; code?: string } {
     const body = (typeof data === "object" && data !== null ? data : {}) as {
         message?: unknown;
         error?: unknown;
@@ -670,11 +684,13 @@ function readError(
         typeof inner?.details === "object" && inner.details !== null
             ? inner.details
             : {}
-    ) as { index?: unknown; suggestion?: unknown };
+    ) as { index?: unknown; suggestion?: unknown; code?: unknown };
 
     return {
         error: message ?? fallback,
         index: typeof details.index === "number" ? details.index : undefined,
+        // `APPROVAL_REQUIRED` (DEC-071, T9): the screen offers the way on.
+        ...(typeof details.code === "string" ? { code: details.code } : {}),
         // An address the API offers instead of a refused one (G14).
         ...(typeof details.suggestion === "string" &&
         details.suggestion.startsWith("/")
@@ -884,10 +900,18 @@ export async function saveDraftSections(
 /** Publish an immutable snapshot of the site's current drafts. */
 export async function publishSite(
     siteId: string,
+    /**
+     * An owner going live past "Publishing needs approval" (DEC-071, T9):
+     * refused from anyone else, and recorded when it goes through.
+     */
+    override = false,
 ): Promise<SitesResult<{ publicationId?: string; bypassed: boolean }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
-    const res = await apiFetch(`${base}/${siteId}/publish`, { method: "POST" });
+    const res = await apiFetch(`${base}/${siteId}/publish`, {
+        method: "POST",
+        ...(override ? { body: JSON.stringify({ override: true }) } : {}),
+    });
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
         bypassed?: boolean;
@@ -1019,12 +1043,17 @@ export async function getPublication(
 export async function restorePublication(
     siteId: string,
     publicationId: string,
+    /** An owner's restore past "Publishing needs approval" (DEC-071, Q3). */
+    override = false,
 ): Promise<SitesResult<{ publicationId: string; bypassed: boolean }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(
         `${base}/${siteId}/publications/${publicationId}/restore`,
-        { method: "POST" },
+        {
+            method: "POST",
+            ...(override ? { body: JSON.stringify({ override: true }) } : {}),
+        },
     );
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
@@ -1067,12 +1096,13 @@ export interface SiteCommentView {
 /**
  * What the latest verdict on a site was. `BYPASSED` is not a reviewer's word:
  * it is the record that someone published over a request for changes (#199).
- * A union rather than a string so every place that words a verdict has to
- * word all three — a new outcome is a type error, not a line that quietly
- * renders as "asked for changes".
+ * Nor is `OVERRIDDEN`: an owner went live past "Publishing needs approval"
+ * (DEC-071, T9). A union rather than a string so every place that words a
+ * verdict has to word them all — a new outcome is a type error, not a line
+ * that quietly renders as "asked for changes", or a lookup that throws.
  */
 export type ApprovalOutcome =
-    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED";
+    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED" | "OVERRIDDEN";
 
 export interface ReviewState {
     openNotes: number;
@@ -1179,7 +1209,7 @@ export async function createComment(
  */
 export type ReviewerVerdict = Exclude<
     ApprovalOutcome,
-    "REQUESTED" | "BYPASSED"
+    "REQUESTED" | "BYPASSED" | "OVERRIDDEN"
 >;
 
 /**

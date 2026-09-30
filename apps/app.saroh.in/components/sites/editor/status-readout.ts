@@ -44,7 +44,19 @@ export const APPROVAL_BADGE: Record<
         approved: () => false,
         text: (by) => `Published without approval by ${by}`,
     },
+    // An owner went live past "Publishing needs approval" (DEC-071, T9).
+    OVERRIDDEN: {
+        approved: () => false,
+        text: (by) => `Gone live without approval by ${by}`,
+    },
 };
+
+/**
+ * Why Publish reads "Needs approval" (DEC-071, R10): the API's own words for
+ * the refusal (`APPROVAL_REQUIRED`), said before it is pressed.
+ */
+export const NEEDS_APPROVAL_HINT =
+    "This site goes live only from an approved test release.";
 
 /** The status pill's colour, by what it means (#335). */
 export const STATUS_BADGE: Record<
@@ -78,6 +90,7 @@ export function statusReadout({
     pendingKnown,
     lastSavedAt,
     openNotes,
+    scheduled = null,
 }: {
     saving: boolean;
     styleSaving: boolean;
@@ -95,6 +108,12 @@ export function statusReadout({
     pendingKnown: boolean;
     lastSavedAt: Date | null;
     openNotes: number;
+    /**
+     * A scheduled go-live, in the business's zone: "Going live Fri 6:00pm ·
+     * Diwali menu" (DEC-071, T11). First on the line: it is what happens
+     * next to the live site, whatever the draft says.
+     */
+    scheduled?: string | null;
 }): { status: EditorStatus; detail: string; line: string } {
     const status = editorStatus({
         // The style is saved on its own clock; unsaved or saving style is
@@ -126,6 +145,7 @@ export function statusReadout({
      * what publishing would change, and the reviewer's verdict in full.
      */
     const detail = [
+        scheduled,
         lastSavedAt && !dirty
             ? `Saved at ${lastSavedAt.toLocaleTimeString(DISPLAY_LOCALE, { hour: "2-digit", minute: "2-digit" })}`
             : null,
@@ -147,6 +167,7 @@ export function statusReadout({
 
     /** The visible line beside the pill: the same facts, in one row. */
     const line = [
+        scheduled,
         pendingSummary && !pillSaysPending ? `${pendingSummary} changed` : null,
         review.latestApproval
             ? APPROVAL_BADGE[review.latestApproval.outcome].text(
@@ -179,6 +200,8 @@ export function publishTitle({
     neverPublished,
     pendingShort,
     pendingKnown,
+    needsApproval = false,
+    canOverride = false,
 }: {
     publishing: boolean;
     dirty: boolean;
@@ -189,6 +212,10 @@ export function publishTitle({
     neverPublished: boolean;
     pendingShort: string | null;
     pendingKnown: boolean;
+    /** "Publishing needs approval" is on (DEC-071, R10). */
+    needsApproval?: boolean;
+    /** An owner, who may still publish past it, on the record (KTD-11). */
+    canOverride?: boolean;
 }): string {
     if (publishing) return "Publishing your site";
     if (onlyHeldBack) {
@@ -198,6 +225,11 @@ export function publishTitle({
         return "Not saved — publish waits until your changes save";
     }
     if (dirty) return "Saving your changes — publish is available in a moment";
+    if (needsApproval) {
+        return canOverride
+            ? `${NEEDS_APPROVAL_HINT} As an owner you can still publish without approval; it's recorded.`
+            : `${NEEDS_APPROVAL_HINT} Make a test release and ask for a review.`;
+    }
     if (neverPublished) return "Put this site live";
     if (!pendingKnown) return "Put this site live as it is now";
     if (pendingShort) return `Put live: ${pendingShort}`;

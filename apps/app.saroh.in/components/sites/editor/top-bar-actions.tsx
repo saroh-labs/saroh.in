@@ -1,12 +1,22 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
 import {
+    ChevronDown,
     Eye,
+    FlaskConical,
     Link2,
+    ListChecks,
     MessageSquare,
     Monitor,
+    Plus,
     Smartphone,
     Tablet,
 } from "lucide-react";
@@ -38,6 +48,27 @@ export interface TopBarActionProps {
      */
     onFeedback?: () => void;
     openNotes: number;
+    /**
+     * "Publishing needs approval" is on (DEC-071, R10): Publish reads "Needs
+     * approval", and only an owner (`canOverride`) can press it.
+     */
+    needsApproval?: boolean;
+    canOverride?: boolean;
+    /**
+     * Test releases (DEC-071, T11), beside Publish. Absent while they are off
+     * for the business (KTD-16): then nothing is drawn.
+     */
+    testRelease?: TestReleaseActions;
+}
+
+/** What the "Test release" split button can do. */
+export interface TestReleaseActions {
+    /** Make one: `site:update`. Absent without it; the list opens instead. */
+    onMake?: () => void;
+    /** The site's releases: open them, share, go live, schedule. */
+    onOpenList: () => void;
+    /** How many are ready or scheduled, for the menu's count. */
+    count: number;
 }
 
 const ACTION =
@@ -173,6 +204,10 @@ export function TopBarActions({
                 {p.inReview ? "In review" : "Share for review"}
             </Button>
 
+            {p.testRelease ? (
+                <TestReleaseSplit actions={p.testRelease} stacked={stacked} />
+            ) : null}
+
             {/*
              * The one action that puts the site in front of the
              * public. Not disabled while In review: publishing then
@@ -189,9 +224,17 @@ export function TopBarActions({
                 )}
                 title={p.publishHint}
                 onClick={p.onPublish}
-                disabled={p.publishDisabled}
+                // With "Publishing needs approval" on, only an owner can
+                // press it, and it says so rather than refusing on the press.
+                disabled={
+                    p.publishDisabled || (p.needsApproval && !p.canOverride)
+                }
             >
-                {p.publishing ? "Publishing…" : "Publish"}
+                {p.publishing
+                    ? "Publishing…"
+                    : p.needsApproval
+                      ? "Needs approval"
+                      : "Publish"}
                 {/*
                  * The outstanding flag count as a badge, so the
                  * button keeps its width while the number moves.
@@ -208,6 +251,93 @@ export function TopBarActions({
                     {p.publishHint}
                 </p>
             ) : null}
+        </div>
+    );
+}
+
+/**
+ * "Test release" beside Publish (DEC-071, T11): the main half makes one (or,
+ * without `site:update`, opens the list), and the chevron offers both. In a
+ * phone's menu the two are full-width buttons: a menu inside a menu is a
+ * trap for a thumb.
+ */
+function TestReleaseSplit({
+    actions,
+    stacked,
+}: {
+    actions: TestReleaseActions;
+    stacked: boolean;
+}) {
+    const listLabel =
+        actions.count > 0
+            ? `Test releases · ${actions.count}`
+            : "Test releases";
+    if (stacked) {
+        return (
+            <>
+                {actions.onMake ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(ACTION, "h-11 w-full justify-start")}
+                        onClick={actions.onMake}
+                    >
+                        <Plus aria-hidden className="size-[15px]" />
+                        Make a test release
+                    </Button>
+                ) : null}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(ACTION, "h-11 w-full justify-start")}
+                    onClick={actions.onOpenList}
+                >
+                    <FlaskConical aria-hidden className="size-[15px]" />
+                    {listLabel}
+                </Button>
+            </>
+        );
+    }
+    return (
+        <div role="group" aria-label="Test release" className="flex">
+            <Button
+                variant="outline"
+                size="sm"
+                className={cn(ACTION, "rounded-r-none")}
+                title={
+                    actions.onMake
+                        ? "Freeze the draft into a test release, to share and go live with later"
+                        : "See this site's test releases"
+                }
+                onClick={actions.onMake ?? actions.onOpenList}
+            >
+                <FlaskConical aria-hidden className="size-[15px]" />
+                Test release
+            </Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label="More test release actions"
+                        className="h-[34px] w-8 rounded-l-none rounded-r-[9px] border-l-0 px-0 text-muted-foreground"
+                    >
+                        <ChevronDown aria-hidden className="size-[13px]" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                    {actions.onMake ? (
+                        <DropdownMenuItem onSelect={actions.onMake}>
+                            <Plus aria-hidden className="size-4" />
+                            Make a test release
+                        </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuItem onSelect={actions.onOpenList}>
+                        <ListChecks aria-hidden className="size-4" />
+                        {listLabel}
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
     );
 }
