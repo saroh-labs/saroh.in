@@ -418,7 +418,7 @@ export function readyChecklist({
 }
 
 /** The steps that are about money, rather than getting the site live. */
-const MONEY_STEPS: ReadonlySet<ReadyItem["key"]> = new Set([
+const MONEY_STEPS: ReadonlySet<ReadyItem["key"]> = new Set<ReadyItem["key"]>([
     "payments",
     "address",
     "tax",
