@@ -38,9 +38,11 @@ async function signIn(page: Page) {
  * the seed's services, with no weekly hours (so every hour is closed). One
  * an earlier run archived is brought back rather than another made.
  */
-async function diaryOfOne(
-    request: APIRequestContext,
-): Promise<{ id: string; name: string }> {
+async function diaryOfOne(request: APIRequestContext): Promise<{
+    id: string;
+    name: string;
+    service: { id: string; name: string };
+}> {
     const nw = northwind(request);
     const name = "E2E Diary";
     const service = await aService(request);
@@ -53,13 +55,42 @@ async function diaryOfOne(
         await nw.put(`/staff/${found.id}/services`, {
             serviceIds: [service.id],
         });
-        return found;
+        return { id: found.id, name, service };
     }
     const made = await nw.post<{ id: string }>("/staff", {
         name,
         serviceIds: [service.id],
     });
-    return { id: made.id, name };
+    return { id: made.id, name, service };
+}
+
+/**
+ * Two days, in India, on which `serviceId` runs by its own weekly rules,
+ * `after` days ahead or later: the desk books into the first, the phone into
+ * the second. A one-to-one start is the person's hours intersected with the
+ * service's rules (ADR-008), so hours opened on a day the service does not
+ * run offer it nothing — Northwind's seeded services run Mon–Fri, and a
+ * fixed "three days ahead" was a Saturday every Wednesday.
+ */
+async function serviceDays(
+    request: APIRequestContext,
+    serviceId: string,
+    after: number,
+): Promise<[string, string]> {
+    const rules = await northwind(request).get<{ dayOfWeek: number }[]>(
+        `/services/${serviceId}/rules`,
+    );
+    const runs = new Set(rules.map((r) => r.dayOfWeek));
+    expect(
+        runs.size,
+        "the service runs on some day of the week",
+    ).toBeGreaterThan(0);
+    const days: string[] = [];
+    for (let d = after; days.length < 2; d++) {
+        const day = istDay(d);
+        if (runs.has(new Date(`${day}T00:00:00Z`).getUTCDay())) days.push(day);
+    }
+    return [days[0], days[1]];
 }
 
 /** "YYYY-MM-DD" in India, `days` from today. */
@@ -282,12 +313,18 @@ test.describe("bookings calendar", () => {
             await useSession(page);
             await page.goto(`/open/${NORTHWIND}`);
             const nw = northwind(page.request);
+            const person = await diaryOfOne(page.request);
             // A day per project: the desk run leaves its cancelled booking
             // drawn on its day, over the closed time the phone would open.
-            const day = istDay(
-                test.info().project.name.startsWith("phone") ? 3 : 2,
+            // Both are days the service runs, whatever today is.
+            const [deskDay, phoneDay] = await serviceDays(
+                page.request,
+                person.service.id,
+                2,
             );
-            const person = await diaryOfOne(page.request);
+            const day = test.info().project.name.startsWith("phone")
+                ? phoneDay
+                : deskDay;
             // Digits: the form capitalises each word of a new name.
             const customer = `E2E Walk-in ${Date.now()}`;
 
@@ -382,8 +419,11 @@ test.describe("bookings calendar", () => {
                         .first(),
                 ).toBeVisible();
 
-                const from = new Date().toISOString();
-                const to = new Date(Date.now() + 4 * 86_400_000).toISOString();
+                // The whole of the booked day, in India.
+                const from = new Date(`${day}T00:00:00+05:30`).toISOString();
+                const to = new Date(
+                    Date.parse(from) + 86_400_000,
+                ).toISOString();
                 const made = (
                     await nw.get<{ diaries: Diary[] }>(
                         `/services/bookings?from=${from}&to=${to}`,
