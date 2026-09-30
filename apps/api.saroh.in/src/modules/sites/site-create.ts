@@ -20,7 +20,7 @@ import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
 import { authorize } from "../organizations/organization-policy";
 import { automaticStorefront } from "./sells-from";
 import { buildTemplateContext } from "./site-access";
-import { addressProblem, freeAddress } from "./site-address";
+import { addressProblem, addressUse, freeAddress } from "./site-address";
 
 /**
  * Creating a website from a template (S2-003), in two halves so a caller
@@ -188,9 +188,9 @@ export async function writeSiteFromTemplate(
      * Where the site is served (`<subdomain>.saroh.app`).
      *
      * Asked for: it must be a usable address, free of other sites,
-     * and not the address ANOTHER business reserved at setup — that
-     * reservation is a promise (see site-address.ts), and a site
-     * taking it would break it.
+     * and not the address ANOTHER business reserved at setup or still
+     * holds after a change — that is a promise (see site-address.ts),
+     * and a site taking it would break it.
      *
      * Not asked for: the site takes the address its own business
      * reserved, while no site of theirs uses it yet — so the address
@@ -205,11 +205,12 @@ export async function writeSiteFromTemplate(
                 details: { field },
             });
         }
-        const reserved = await tx.organization.findUnique({
-            where: { slug: subdomain },
-            select: { id: true },
-        });
-        if (reserved && reserved.id !== ctx.organizationId) {
+        // Read across every business (site-address.ts): under RLS `tx`
+        // sees only this one, and another's claim would look free.
+        const use = await addressUse(tx, subdomain);
+        const another = (owner: string | null) =>
+            owner !== null && owner !== ctx.organizationId;
+        if (another(use.reservedBy) || another(use.heldBy)) {
             const suggestion = await freeAddress(
                 tx,
                 subdomain,
@@ -238,10 +239,8 @@ export async function writeSiteFromTemplate(
     // rather than surfacing a raw constraint error. A default that
     // turns out to be in use is simply not taken, not an error.
     if (subdomain) {
-        const taken = await tx.site.findUnique({
-            where: { subdomain },
-            select: { id: true },
-        });
+        // Any website at it, another business's too (read across them all).
+        const taken = (await addressUse(tx, subdomain)).siteOf !== null;
         if (taken && options.subdomain) {
             const suggestion = await freeAddress(
                 tx,

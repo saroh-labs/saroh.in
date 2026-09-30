@@ -133,18 +133,28 @@ function acrossBusinesses<T>(
     return read(db);
 }
 
+/** Who uses an address, read across every business (see {@link addressUse}). */
+export interface AddressUse {
+    /** The business that reserved it at setup (`Organization.slug`). */
+    reservedBy: string | null;
+    /** The business whose website is served at it. */
+    siteOf: string | null;
+    /** The business still holding it after a change, while the hold lasts. */
+    heldBy: string | null;
+}
+
 /**
- * Whether an address is in use by someone OTHER than `organizationId`: a
- * business that reserved it at setup, a website served at it, or a business
- * that had it before a change and still holds it. A business's own
- * reservation is free to itself — that is what reserving it was for — and a
- * held address past its `reservedUntil` is free to everyone.
+ * Every use of `address`, from every business's rows even inside one
+ * business's request under RLS. Anything that decides whether an address can
+ * be claimed reads it here, never with its own `tx.site`/`tx.organization`
+ * lookup: under RLS those see only the caller's business, so another
+ * business's site looks free and the claim ends in the unique index's raw
+ * error instead of a 409 with a suggestion.
  */
-export async function addressTaken(
+export async function addressUse(
     db: Reader,
     address: string,
-    organizationId: string | null = null,
-): Promise<boolean> {
+): Promise<AddressUse> {
     const [business, site, held] = await acrossBusinesses(db, (r) =>
         Promise.all([
             r.organization.findUnique({
@@ -161,16 +171,32 @@ export async function addressTaken(
             }),
         ]),
     );
-    if (business && business.id !== organizationId) return true;
-    if (site && site.organizationId !== organizationId) return true;
-    if (
-        held &&
-        held.organizationId !== organizationId &&
-        held.reservedUntil > new Date()
-    ) {
-        return true;
-    }
-    return false;
+    return {
+        reservedBy: business?.id ?? null,
+        siteOf: site?.organizationId ?? null,
+        heldBy:
+            held && held.reservedUntil > new Date()
+                ? held.organizationId
+                : null,
+    };
+}
+
+/**
+ * Whether an address is in use by someone OTHER than `organizationId`: a
+ * business that reserved it at setup, a website served at it, or a business
+ * that had it before a change and still holds it. A business's own
+ * reservation is free to itself — that is what reserving it was for — and a
+ * held address past its `reservedUntil` is free to everyone.
+ */
+export async function addressTaken(
+    db: Reader,
+    address: string,
+    organizationId: string | null = null,
+): Promise<boolean> {
+    const use = await addressUse(db, address);
+    return [use.reservedBy, use.siteOf, use.heldBy].some(
+        (owner) => owner !== null && owner !== organizationId,
+    );
 }
 
 /**
@@ -222,16 +248,13 @@ export async function freeAddress(
     for (let n = 1; n <= VARIANTS; n++) {
         const candidate = n === 1 ? base : `${base}-${n}`;
         if (addressProblem(candidate)) continue;
-        const [taken, site] = await Promise.all([
-            addressTaken(db, candidate, organizationId),
-            acrossBusinesses(db, (r) =>
-                r.site.findUnique({
-                    where: { subdomain: candidate },
-                    select: { id: true },
-                }),
-            ),
-        ]);
-        if (!taken && !site) return candidate;
+        const use = await addressUse(db, candidate);
+        const taken =
+            use.siteOf !== null ||
+            [use.reservedBy, use.heldBy].some(
+                (owner) => owner !== null && owner !== organizationId,
+            );
+        if (!taken) return candidate;
     }
     return null;
 }
