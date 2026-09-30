@@ -400,5 +400,12 @@ On each unit's GitHub issue, comment when the unit lands on development.
   needs one. D22 (CP-1): run the Razorpay public key backfill **before** the
   new API serves — that API takes no online payment through a Razorpay
   connection without one — and again after.
+- **Current** — **The launch-readiness release** (everything after #708:
+  round-2 follow-ups, DEC-069, DEC-070, DEC-071) is
+  `docs/architecture/LAUNCH_READINESS_ROLLOUT.md`: pre-flight checks and the
+  Z1/Z2a gates, build the image by hand, back up, migrate, order-number
+  backfill, roll the API out at once (DEC-074's role update), then the
+  `pvt` backfill; the release PR's merge ships the frontends last. Its four
+  new flags stay off in production until their conditions are met.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.
