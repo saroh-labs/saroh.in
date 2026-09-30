@@ -21,7 +21,7 @@ describe("checkShop", () => {
                 pageId: null,
                 field: "storefrontId",
                 message: expect.stringContaining(
-                    "Pick which storefront this site sells from",
+                    "Pick which location your online shop sells from",
                 ),
             }),
         ]);
