@@ -44,25 +44,20 @@ async function setUp(page: Page, name: string, button: string) {
 
 /** The business Asha just set up, as the API lists it and summarises it. */
 async function kindOf(page: Page, name: string) {
-    let id = "";
+    let listed: OrgRow | undefined;
     await expect
         .poll(async () => {
             const res = await page.request.get(`${urls.API_URL}/organizations`);
             const rows = (await res.json()) as OrgRow[];
-            const row = rows.find((r) => r.name === name);
-            id = row?.id ?? "";
-            return row?.kind;
+            listed = rows.find((r) => r.name === name);
+            return listed?.kind;
         })
         .toBeTruthy();
+    // The summary wraps the organization beside the caller's role.
     const summary = (await (
-        await page.request.get(`${urls.API_URL}/organizations/${id}`)
-    ).json()) as OrgRow;
-    const listed = (
-        (await (
-            await page.request.get(`${urls.API_URL}/organizations`)
-        ).json()) as OrgRow[]
-    ).find((r) => r.id === id);
-    return { listed: listed?.kind, summary: summary.kind };
+        await page.request.get(`${urls.API_URL}/organizations/${listed?.id}`)
+    ).json()) as { organization?: OrgRow };
+    return { listed: listed?.kind, summary: summary.organization?.kind };
 }
 
 function aName(prefix: string, testInfo: TestInfo) {
