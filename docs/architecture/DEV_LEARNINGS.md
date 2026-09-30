@@ -1450,3 +1450,40 @@ by a merge: two units, one merge.
 outside the org context, as `site-address.ts` does. Test releases' host
 lookups (`site-host-mode.ts`, `test-release-lookup.ts`) follow the same rule.
 **Category**: RLS · tests · merge
+
+## Invoices — a rule moved, and the sentences that described it stayed
+
+**Problem**: after K6 (DEC-070) made invoices work without Payments, three
+places still said the old rule: turning Payments off promised "their pay
+links still work" (`module-deactivation-impact.ts`), the Modules list said
+Payments is where you "send invoices", and the workspace offered "Copy pay
+link" and "Issue with pay link" from a connected provider alone — a link the
+API now refuses with Payments off.
+**Root cause**: the rule was changed where it is enforced, and the words and
+the workspace's own guesses (`online.providerConnected`) were not searched
+for. `navRowsForModule` also listed Invoices as a Payments row, so turning
+Payments off would have said Invoices go with it.
+**Fix**: K7 reads `send.payOnline` (`paysOnline` in `lib/invoices/send.ts`)
+for every pay-link offer on an invoice, `payLinkPossible` for New and Edit,
+rewords the impact line and the Modules note, and a rail row can stand in
+for a module's page while it is off (`unlessModule`), which
+`navRowsForModule` skips.
+**Rule**: when a gate moves, grep the copy for the old promise ("pay link",
+"with Payments") as well as the code, and let the workspace read the API's
+flag rather than rebuild the rule from a provider list.
+**Category**: copy · invoices · nav
+
+## e2e — a @serial test on the phone is project "phone-serial", not "phone"
+
+**Problem**: K7's @serial spec took the desk path on the phone and failed
+looking for the desk rail ("Primary") at Pixel width.
+**Root cause**: `e2e/run.mjs` runs @serial tests in their own projects,
+`desk-serial` and `phone-serial`. `testInfo.project.name === "phone"` is
+false there, so a phone branch in a @serial spec never runs — and where the
+phone branch only adds checks (`module-turn-on.spec.ts`'s sheet and 44px
+asserts), it passes without checking them.
+**Fix**: `project.name.startsWith("phone")` in the spec.
+**Rule**: in a spec that can be @serial, test the project with
+`startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
+worth the same change.
+**Category**: e2e · tests

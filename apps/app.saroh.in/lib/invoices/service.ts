@@ -63,19 +63,26 @@ export type SendChannel = "email" | "thread";
 
 /**
  * Whether it can be sent, and how (D17) — the one flag Invoice Detail and
- * Home both read. No channels: no Send, only "Copy pay link".
+ * Home both read. No channels: no Send, and "Copy pay link" only where it
+ * can be paid online (`payOnline`).
  */
 export interface InvoiceSend {
     channels: SendChannel[];
     reason?:
         | "NOT_OWED"
-        | "NO_PAYMENT_PROVIDER"
         | "NO_EMAIL_PROVIDER"
         | "NO_EMAIL_ADDRESS"
         /** An autopay charge is under way on it (D13). */
         | "AUTOPAY_PENDING";
     /** Where the email would go. */
     emailTo?: string;
+    /**
+     * The link it sends is a pay link: Payments is on and a provider can
+     * take the money (DEC-070). False: a link to view the invoice, with no
+     * Pay button. Absent from an API before DEC-070, which read a connected
+     * provider instead. The workspace reads it and never guesses.
+     */
+    payOnline?: boolean;
     /** Something went in the last day: the next reminder can go from here. */
     nextReminderAt: string | null;
 }

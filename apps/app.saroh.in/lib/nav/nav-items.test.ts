@@ -833,9 +833,51 @@ describe("Payments (ADR-007)", () => {
         }
     });
 
-    it("offers it to no one without Payments", () => {
+    it("offers Payments to no one without it, and Invoices a row of their own (DEC-070)", () => {
+        const groups = navFor({
+            role: "OWNER",
+            moduleKeys: ["COMMERCE", "CRM"],
+        });
+        const items = groups.flatMap((g) => g.items);
+        expect(items.map((i) => i.label)).not.toContain("Payments");
+        expect(hrefs(groups)).not.toContain("/billing/subscriptions");
+        // A top-level row, not a page under a section.
+        const invoices = items.find((i) => i.label === "Invoices");
+        expect(invoices?.href).toBe("/billing/invoices");
+        expect(invoices?.children).toBeUndefined();
+        expect(
+            isNavItemActive("/billing/invoices/inv_1", "/billing/invoices"),
+        ).toBe(true);
+    });
+
+    it("keeps Invoices under Payments while it's on, with no second row", () => {
+        const items = navFor({
+            role: "OWNER",
+            moduleKeys: AVAILABLE_TO.OWNER,
+        }).flatMap((g) => g.items);
+        expect(items.map((i) => i.label)).not.toContain("Invoices");
+        const payments = items.find((i) => i.label === "Payments");
+        expect(payments?.children?.map((c) => c.href)).toContain(
+            "/billing/invoices",
+        );
+    });
+
+    it("gives a business with no modules on its Invoices row", () => {
+        const offered = hrefs(navFor({ role: "OWNER", moduleKeys: [] }));
+        expect(offered).toContain("/billing/invoices");
+    });
+
+    it("shows Payments' own Invoices, not the stand-in row, while availability is unknown", () => {
+        const items = navFor({ role: "OWNER", moduleKeys: null }).flatMap(
+            (g) => g.items,
+        );
+        expect(items.filter((i) => i.label === "Invoices")).toHaveLength(0);
+        expect(items.map((i) => i.label)).toContain("Payments");
+    });
+
+    it("does not offer the Invoices row to a role without invoice:read", () => {
         const offered = hrefs(
-            navFor({ role: "OWNER", moduleKeys: ["COMMERCE", "CRM"] }),
+            navFor({ role: "MEMBER", moduleKeys: ["WEBSITE", "CRM"] }),
         );
         expect(offered).not.toContain("/billing/invoices");
     });
@@ -1079,10 +1121,10 @@ describe("Bookings, a section across two modules", () => {
         ]);
         expect(navRowsForModule("COURSES")).toEqual(["Courses"]);
         expect(navRowsForModule("CLASS_PACKS")).toEqual(["Class packs"]);
+        // Invoices keep a row of their own with Payments off (DEC-070).
         expect(navRowsForModule("PAYMENTS")).toEqual([
             "Payments",
             "Subscriptions",
-            "Invoices",
         ]);
     });
 });

@@ -5,6 +5,8 @@ import {
     payChargingOf,
     payDate,
     payMoney,
+    payOffer,
+    payOnlineOf,
     payTitle,
 } from "./invoice-pay-shape";
 
@@ -28,6 +30,39 @@ const INVOICE = {
     billedTo: "Asha Rao",
     theme: null,
 };
+
+describe("without online payment (DEC-070)", () => {
+    const at = { at: "2026-09-10T04:30:00.000Z" };
+
+    it("reads payOnline only as a real boolean", () => {
+        expect(payOnlineOf(false)).toBe(false);
+        expect(payOnlineOf(true)).toBe(true);
+        expect(payOnlineOf("false")).toBeUndefined();
+        expect(payOnlineOf(undefined)).toBeUndefined();
+    });
+
+    it("offers Pay only when the business takes payment online", () => {
+        expect(payOffer({ status: "ISSUED", payOnline: true })).toBe("pay");
+        expect(payOffer({ status: "OVERDUE", payOnline: false })).toBe(
+            "elsewhere",
+        );
+        expect(payOffer({ status: "ISSUED", payOnline: false })).toBe(
+            "elsewhere",
+        );
+    });
+
+    it("an older API sends no payOnline: Pay, as before", () => {
+        expect(payOffer({ status: "ISSUED" })).toBe("pay");
+    });
+
+    it("settled, or charging, whatever payOnline says", () => {
+        expect(payOffer({ status: "PAID", payOnline: false })).toBe("settled");
+        expect(payOffer({ status: "VOID" })).toBe("settled");
+        expect(payOffer({ status: "ISSUED", autopayCharging: at })).toBe(
+            "charging",
+        );
+    });
+});
 
 describe("isPayInvoice", () => {
     it("accepts the API's allow-listed invoice", () => {

@@ -158,7 +158,7 @@ export const GIVES: Readonly<Record<string, string>> = {
     CRM: "Contacts, leads and a pipeline, ready to use.",
     WEBSITE: "A starter site at your address, ready for you to publish.",
     PAYMENTS:
-        "Subscriptions, plans and invoices. Online payment stays off until you connect a provider.",
+        "Subscriptions, plans, and pay links on your invoices. Online payment stays off until you connect a provider.",
     COMMUNICATIONS:
         "Email and WhatsApp to your customers and leads. Nothing is sent until you connect a provider.",
     INSIGHTS: "Figures across whatever else is turned on.",

@@ -155,7 +155,7 @@ export function InvoiceForm({
     /** A GST-registered business: lines carry a rate and HSN/SAC. */
     registered: boolean;
     businessName: string;
-    /** A payment provider is connected, so issuing can make a pay link. */
+    /** A pay link can be made (Payments on, a provider connected), so issuing makes one. */
     providerConnected: boolean;
 }) {
     const router = useRouter();
