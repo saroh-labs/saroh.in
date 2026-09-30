@@ -20,6 +20,8 @@ export { TEAM_ALERT_TYPE } from "./team-alerts";
 export const ORDER_NEW_NOTIFICATION_TYPE = "order.new";
 export const PAYMENT_FAILED_NOTIFICATION_TYPE = "payment.failed";
 export const TEAM_JOINED_NOTIFICATION_TYPE = "team.joined";
+export const SITE_LIVE_NOTIFICATION_TYPE = "site.live";
+export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live";
 
 type Tx = Prisma.TransactionClient;
 
@@ -37,6 +39,11 @@ export interface WordedAlert {
     path: string | null;
     /** Not emailed about their own doing. */
     skipUserId: string | null;
+    /**
+     * Emailed whatever they chose, while still on the team: whoever
+     * scheduled a go-live hears how it went (DEC-071, T10).
+     */
+    alwaysUserId?: string | null;
     orderId?: string;
 }
 
@@ -46,6 +53,7 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     booking: "New booking",
     failed: "Payment failed",
     team: "Someone joins the team",
+    site: "Website goes live",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -58,8 +66,8 @@ const BUILT_IN_LABEL: Partial<Record<string, string>> = {
 /**
  * Consumer for `team.alert` (round-2 F14): tells the business's team about
  * a new order, a booking the customer made, moved or cancelled, a failed
- * payment, or someone joining, as each person chose in Settings › Your
- * profile.
+ * payment, someone joining, or a scheduled go-live of the website that ran
+ * (DEC-071, T10), as each person chose in Settings › Your profile.
  *
  * On one transaction, in the business's RLS context:
  *  1. What it is about is read again now, and worded. Something that no
@@ -73,7 +81,8 @@ const BUILT_IN_LABEL: Partial<Record<string, string>> = {
  *     (`notifications.service.ts`). A booking's notice is already there.
  *  4. **Email:** through the business's own connected provider only
  *     (DEC-011), to each person on the team whose role reads it and who has
- *     email on for it — by default, a failed payment only.
+ *     email on for it — by default, a failed payment and a scheduled
+ *     go-live. Whoever scheduled a go-live is emailed whatever they chose.
  *
  * Nothing goes by WhatsApp or SMS: Saroh keeps no number for a team member.
  */
@@ -186,6 +195,7 @@ async function emailTeam(
 
     const recipients = members.filter((m) => {
         if (m.userId === alert.skipUserId) return false;
+        if (m.userId === alert.alwaysUserId) return true;
         const actions = resolveCapabilities(
             m.role,
             roles.find((r) => r.key === m.role)?.actions ?? null,
@@ -247,6 +257,8 @@ export async function wordAlert(
             return wordJoined(tx, organizationId, payload);
         case "booking":
             return wordBooking(tx, organizationId, payload);
+        case "site":
+            return wordSite(tx, organizationId, payload);
     }
 }
 
@@ -400,6 +412,52 @@ async function wordBooking(
     };
 }
 
+/**
+ * A scheduled go-live, said as it turned out (DEC-071, T10). A LIVE that
+ * the release no longer shows (it can't be undone, so only a deleted
+ * release) is not announced; a NOT_LIVE is, with the run's own reason.
+ */
+async function wordSite(
+    tx: Tx,
+    organizationId: string,
+    p: Extract<TeamAlertPayload, { event: "site" }>,
+): Promise<WordedAlert | null> {
+    const release = await tx.siteTestRelease.findFirst({
+        where: { id: p.testReleaseId, organizationId },
+        select: {
+            siteId: true,
+            name: true,
+            wentLiveAt: true,
+            site: { select: { name: true } },
+        },
+    });
+    if (!release) return null;
+    const base = {
+        event: "site" as const,
+        eventKey: `team:site:${p.testReleaseId}:${p.goLiveAt}`,
+        notificationId: null,
+        skipUserId: null,
+        alwaysUserId: p.schedulerUserId,
+    };
+    if (p.outcome === "LIVE") {
+        if (!release.wentLiveAt) return null;
+        return {
+            ...base,
+            type: SITE_LIVE_NOTIFICATION_TYPE,
+            title: `${release.name} is live on ${release.site.name}`,
+            body: "It went live at the time it was scheduled for.",
+            path: `/sites/${release.siteId}/versions`,
+        };
+    }
+    return {
+        ...base,
+        type: SITE_NOT_LIVE_NOTIFICATION_TYPE,
+        title: `${release.name} didn't go live on ${release.site.name}`,
+        body: p.reason ?? "Go live now, or schedule it again.",
+        path: `/sites/${release.siteId}/pages`,
+    };
+}
+
 function payloadOf(value: unknown): TeamAlertPayload | null {
     if (typeof value !== "object" || value === null) return null;
     const p = value as Record<string, unknown>;
@@ -417,6 +475,13 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
                 : null;
         case "booking":
             return str("notificationId") ? (p as TeamAlertPayload) : null;
+        case "site":
+            return str("testReleaseId") &&
+                str("goLiveAt") &&
+                str("schedulerUserId") &&
+                (p.outcome === "LIVE" || p.outcome === "NOT_LIVE")
+                ? (p as TeamAlertPayload)
+                : null;
         default:
             return null;
     }

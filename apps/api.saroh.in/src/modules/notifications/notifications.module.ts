@@ -5,6 +5,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { AuditModule } from "../audit/audit.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { CommunicationsService } from "../communications/communications.service";
+import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
@@ -43,6 +44,7 @@ import { TEAM_ALERT_TYPE, TeamAlertHandler } from "./team-alert.handler";
         JobsModule,
         AuditModule,
         CapabilitiesModule,
+        FeatureFlagModule,
         forwardRef(() => OrganizationsModule),
     ],
     controllers: [NotificationsController, NotificationPreferencesController],

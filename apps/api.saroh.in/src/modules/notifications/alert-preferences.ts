@@ -17,7 +17,13 @@ import type { OrgAction } from "../organizations/organization-actions";
  */
 
 /** The alerts, in the design's order. */
-export const ALERT_EVENTS = ["order", "booking", "failed", "team"] as const;
+export const ALERT_EVENTS = [
+    "order",
+    "booking",
+    "failed",
+    "team",
+    "site",
+] as const;
 export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
 /**
@@ -39,12 +45,14 @@ export function isAlertChannel(value: unknown): value is AlertChannel {
 
 /**
  * The defaults (default 126): the bell on for everything, email on for a
- * failed payment only, WhatsApp off. Code, not rows: a row is written only
+ * failed payment and for a scheduled go-live (DEC-071, T10: whoever can
+ * publish should hear that the site changed, or didn't, while nobody was
+ * watching), WhatsApp off. Code, not rows: a row is written only
  * when someone's choice differs from these.
  */
 export function defaultOn(event: AlertEvent, channel: AlertChannel): boolean {
     if (channel === "bell") return true;
-    if (channel === "email") return event === "failed";
+    if (channel === "email") return event === "failed" || event === "site";
     return false;
 }
 
@@ -58,6 +66,8 @@ export const ALERT_READS: Record<AlertEvent, readonly OrgAction[]> = {
     booking: ["booking:read"],
     failed: ["payment:read", "invoice:read"],
     team: ["member:read"],
+    // Who can put the site live hears when it went live without them.
+    site: ["site:publish"],
 };
 
 /**
@@ -70,6 +80,7 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
     booking: "APPOINTMENTS",
     failed: "PAYMENTS",
     team: null,
+    site: "WEBSITE",
 };
 
 /** The inbox notice types each row covers. */
@@ -78,6 +89,7 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     booking: ["booking.new", "booking.moved", "booking.cancelled"],
     failed: ["payment.failed"],
     team: ["team.joined"],
+    site: ["site.live", "site.not_live"],
 };
 
 /** Which row an inbox notice type belongs to, or null (enquiries, reviews). */
