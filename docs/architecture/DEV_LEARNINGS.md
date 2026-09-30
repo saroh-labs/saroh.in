@@ -1565,6 +1565,7 @@ with two.
 Never "today", "the first open day" or "N days from now" (see also the
 Saturday failure above).
 **Category**: e2e · tests · dates
+
 ## Sites — the scheduled go-live was refused by the go-live it runs (T10)
 
 **Symptom**: the first draft of `site.go_live` called T7's
@@ -1584,6 +1585,7 @@ the order (retry, then record on the last try) is pinned with a mocked
 **Rule**: a guard that refuses "something is scheduled" needs a way for the
 schedule itself through. Fake `prisma` with `jest.mock`, not `spyOn`.
 **Category**: sites · jobs · tests
+
 ## Sites — a customer is signed out after the business changes its web address (L3)
 
 **Problem**: after an owner changes the web address, the old one forwards
@@ -1625,3 +1627,56 @@ that writes such a row is covered against a real database
 can make, and a test-made business can't reach it, seed the resulting row
 on Northwind and read it. Don't change Northwind's shared settings.
 **Category**: e2e · seed · DEC-069
+
+## Renderer — a page's metadata inherits the layout's share card (T5)
+
+**Symptom** (found while building, not shipped): stripping the share card
+in the tenant layout alone would leave each page's own `og:*` tags on a
+test host, and stripping it in the pages alone would leave the layout's.
+**Cause**: Next merges metadata down the tree. A key a page leaves out is
+inherited from the layout, and a key a page sets replaces the layout's. So
+the share card has to go at every level that writes one: the tenant layout
+and each page with its own `generateMetadata` (`[slug]`, the post, `/shop`,
+the product, `/book`).
+**Fix**: every one of them returns through `shareable(resolved, meta)`
+(`apps/saroh.app/lib/test-metadata.ts`), which on a test host keeps only the
+title and adds `noindex` and `no-referrer`. `site-test-release.spec.ts`
+asserts no `og:title`.
+**Rule**: a new tenant route that writes `openGraph` or `twitter` returns
+through `shareable`.
+**Category**: renderer · metadata · DEC-071
+
+## Renderer — a relative Location from the middleware throws (T5)
+
+**Symptom**: every test release link failed in the browser specs; the
+renderer's log said `TypeError: Invalid URL, input: '/'`. The middleware's
+unit tests had passed.
+**Cause**: the redirect that drops `?release=` was a `NextResponse` with a
+relative `location` header. The unit test reads the header back as set; the
+edge runtime turns a response's Location into a URL and throws on a
+relative one.
+**Fix**: the Location is absolute, built from the visitor's Host and
+`x-forwarded-proto` (`visitorOrigin` in `apps/saroh.app/lib/test-host.ts`),
+since the server behind portless or Vercel sees plain http. A unit test
+pins both a proxied https host and a bare-port one.
+**Rule**: a middleware redirect's Location is always absolute, and a new
+redirect is proved by a browser spec, not only by `middleware.test.ts`.
+**Category**: renderer · middleware · DEC-071
+
+## Renderer — a constant from a "use client" file is not a value on the server (T5)
+
+**Symptom**: on a test host the site's sticky header slid under the Test
+release bar. The page's CSS read
+`top:var(function(){throw Error("Attempted to call BAR_HEIGHT_VAR() …`.
+**Cause**: the tenant layout (a server component) imported the string
+`BAR_HEIGHT_VAR` from the "use client" bar. On the server every export of a
+client module is a client reference, constants included.
+`lib/server-imports.test.ts` guarded only functions from `@saroh/site-blocks`
+and said constants were fine.
+**Fix**: the shared values live in `apps/saroh.app/lib/test-release-chrome.ts`
+(no directive). A second test in `server-imports.test.ts` fails a server
+file that imports anything but a component (PascalCase) from one of the
+app's own client modules.
+**Rule**: a value both a server file and a client component need lives in a
+module with no "use client".
+**Category**: renderer · RSC · DEC-071

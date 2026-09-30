@@ -6,6 +6,11 @@ import { accountAreaOn, isAccountPath } from "@/lib/account-area-switch";
 import { isPayPath, TENANT_HOST_HEADER } from "@/lib/pay-host";
 import { REQUEST_PATH_HEADER, requestPathOf } from "@/lib/request-path";
 import { tenantUrl } from "@/lib/tenant-url";
+import {
+    isTestHost,
+    testHostResponse,
+    withoutForgedTestHeaders,
+} from "@/lib/test-host";
 
 export const config = {
     matcher: [
@@ -61,6 +66,10 @@ export default function middleware(req: NextRequest) {
         .split(":")[0]
         .toLowerCase();
     const path = url.pathname;
+    // A test release's token reaches the pages only from this middleware
+    // (DEC-071, T5): a visitor's own copy of that header is dropped on
+    // every host, before anything else reads it.
+    const forged = withoutForgedTestHeaders(req);
 
     // The legacy scaffold domain still has DNS pointed here.
     if (hostname === "saroh.site" || hostname === "www.saroh.site") {
@@ -76,9 +85,10 @@ export default function middleware(req: NextRequest) {
         // pay page never redirects.
         if (
             req.headers.has(TENANT_HOST_HEADER) ||
-            req.headers.has(REQUEST_PATH_HEADER)
+            req.headers.has(REQUEST_PATH_HEADER) ||
+            forged
         ) {
-            const headers = new Headers(req.headers);
+            const headers = forged ?? new Headers(req.headers);
             headers.delete(TENANT_HOST_HEADER);
             headers.delete(REQUEST_PATH_HEADER);
             return NextResponse.next({ request: { headers } });
@@ -86,12 +96,19 @@ export default function middleware(req: NextRequest) {
         return NextResponse.next();
     }
 
+    // A test release's host (DEC-071, T5): its link, its cookie, its gate
+    // and its noindex, and no pay pages (`lib/test-host.ts`).
+    if (isTestHost(hostname, env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app")) {
+        if (isAccountPath(path) && !accountAreaOn()) return accountOff();
+        return testHostResponse(req, tenantUrl(hostname, url), isPayPath(path));
+    }
+
     // A pay link on the business's own address (DEC-069, L6): the apex's
     // pay pages, told which host they were opened on (`lib/pay-host.ts`).
     // Before the account area's switch, and never into `[domain]`, which
     // 404s a site that has since been unpublished.
     if (isPayPath(path)) {
-        const headers = new Headers(req.headers);
+        const headers = forged ?? new Headers(req.headers);
         headers.set(TENANT_HOST_HEADER, hostname);
         // The same path and query, served by `app/pay/**`.
         return NextResponse.rewrite(new URL(url.toString()), {
@@ -102,24 +119,28 @@ export default function middleware(req: NextRequest) {
     // The account area switched off (`lib/account-area.ts`) is not there: a
     // real 404, decided here because the page's own `notFound()` runs after
     // `[domain]/loading.tsx` has already sent a 200 and started streaming.
-    if (isAccountPath(path) && !accountAreaOn()) {
-        return new NextResponse("Not found", {
-            status: 404,
-            headers: {
-                "content-type": "text/plain; charset=utf-8",
-                "x-robots-tag": "noindex",
-            },
-        });
-    }
+    if (isAccountPath(path) && !accountAreaOn()) return accountOff();
 
     // Everything else is a tenant hostname: rewrite to the /[domain] route,
     // naming the path and query asked for. The layout reads them only when
     // the host has no live site and is an old address that forwards
     // (DEC-069, L3): the visitor then lands on the same page at the new one.
-    // Set, never appended, so a value the visitor sent is replaced.
-    const headers = new Headers(req.headers);
+    // Set, never appended, so a value the visitor sent is replaced. Built on
+    // the headers without a forged test-release header (T5).
+    const headers = forged ?? new Headers(req.headers);
     headers.set(REQUEST_PATH_HEADER, requestPathOf(url));
     return NextResponse.rewrite(tenantUrl(hostname, url), {
         request: { headers },
+    });
+}
+
+/** The account area, switched off: a real 404. */
+function accountOff(): NextResponse {
+    return new NextResponse("Not found", {
+        status: 404,
+        headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "x-robots-tag": "noindex",
+        },
     });
 }

@@ -13,6 +13,7 @@ import { isFreePage, moduleLabel, moduleRoute } from "@/lib/module-pages";
 import type { PublicationSnapshot } from "@/lib/publication";
 import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
+import { shareable } from "@/lib/test-metadata";
 
 import SlugPage, { generateMetadata as slugMetadata } from "../[slug]/page";
 
@@ -54,7 +55,7 @@ export async function generateMetadata({
     const name = snapshot.site.name;
     // The Shop page's own title (G15), which is also its menu name.
     const label = moduleLabel(snapshot.pages, "SHOP", "Shop");
-    return {
+    return shareable(resolved, {
         title: `${label} · ${name}`,
         openGraph: {
             title: `${label} · ${name}`,
@@ -62,7 +63,7 @@ export async function generateMetadata({
             url: "/shop",
         },
         metadataBase: new URL(`https://${domain}`),
-    };
+    });
 }
 
 /** A free-form page of the merchant's own, or their writing, lives here. */

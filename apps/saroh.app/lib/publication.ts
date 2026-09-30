@@ -3,7 +3,11 @@ import type { JournalFeed, ModulePageStates } from "@saroh/site-blocks";
 import { env } from "@/env";
 import { journalFeed } from "@/lib/journal-feed";
 import { modulePageStatesOf } from "@/lib/module-pages";
+import type { SiteHostKind } from "@/lib/site-host-mode";
+import { classifySiteHost } from "@/lib/site-host-mode";
 import { SITE_RELAY_HEADER } from "@/lib/site-relay";
+import type { TestReleaseInfo } from "@/lib/test-release";
+import { getTestRelease, rootDomain } from "@/lib/test-release";
 
 /**
  * Public publication client for the multi-tenant renderer (S2-006).
@@ -155,6 +159,13 @@ export interface ResolvedSite {
     snapshot: PublicationSnapshot;
     siteId: string | null;
     modules: ModulePageStates | null;
+    /**
+     * `test` on a test release's host (DEC-071, T5): the snapshot is the
+     * release's frozen one, and nothing here takes a real order.
+     */
+    mode: SiteHostKind;
+    /** The release a test host shows; null on a live host. */
+    release: TestReleaseInfo | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -237,20 +248,9 @@ export async function getPublicationBySubdomain(
 export async function getPublicationForHost(
     host: string | null | undefined,
 ): Promise<PublicationSnapshot | null> {
-    const hostname = host?.split(":")[0]?.toLowerCase().trim();
-    if (!hostname) return null;
-    // A host that is not under the platform root is a merchant's own domain
-    // (#200): ask for it by hostname, which resolves only once its claim is
-    // VERIFIED. The subdomain heuristic below stays as the fallback so nothing
-    // that resolved before this stops resolving.
-    const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
-    if (root && hostname !== root && !hostname.endsWith(`.${root}`)) {
-        const byHostname = await getPublicationByHostname(hostname);
-        if (byHostname) return byHostname;
-    }
-    const subdomain = subdomainFromHost(host);
-    if (!subdomain) return null;
-    return getPublicationBySubdomain(subdomain);
+    // Through the one resolution every page uses, so a test host shows its
+    // release here too, and never the live site (DEC-071, R12).
+    return (await getSiteForHost(host))?.snapshot ?? null;
 }
 
 /** A VERIFIED custom hostname's current publication, or null. */
@@ -619,6 +619,25 @@ export async function getSiteForHost(
     const hostname = host?.split(":")[0]?.toLowerCase().trim();
     if (!hostname) return null;
 
+    /*
+     * A test release's host (DEC-071, T5) shows that release, read with the
+     * token its link left, and nothing else: never the live site, whatever
+     * the lookup answers (R12). The live reads below are never asked about
+     * a test host.
+     */
+    const shaped = classifySiteHost(hostname, rootDomain());
+    if (shaped.mode === "test") {
+        const found = await getTestRelease(shaped.host);
+        if (!found.ok) return null;
+        return {
+            snapshot: found.snapshot as PublicationSnapshot,
+            siteId: found.siteId,
+            modules: found.modules,
+            mode: "test",
+            release: found.release,
+        };
+    }
+
     const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
     if (root && hostname !== root && !hostname.endsWith(`.${root}`)) {
         const view = await fetchSiteView(
@@ -649,6 +668,8 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
         snapshot: body.snapshot,
         siteId: body.siteId ?? null,
         modules: modulePageStatesOf(body.modules),
+        mode: "live",
+        release: null,
     };
 }
 
