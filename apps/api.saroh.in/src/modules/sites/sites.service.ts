@@ -495,6 +495,42 @@ export interface PublicationDetail {
     snapshot: unknown;
     /** Whether this build can still draw every section it holds (#283). */
     renderability: Renderability;
+    /** The test release this version went live from, if any (T12). */
+    testRelease: PublicationRelease | null;
+}
+
+/** A test release, as a version it went live as names it (T12). */
+export interface PublicationRelease {
+    id: string;
+    number: number;
+    name: string;
+}
+
+/**
+ * What a LIVE publication needs selected to say which test release it went
+ * live from (DEC-071, T12): the release that names it as its live copy, or
+ * the release whose TEST row it was copied from (KTD-2). A restore of that
+ * copy is a restore, and names neither.
+ */
+const RELEASE_NAME = { id: true, number: true, name: true } as const;
+const FROM_TEST_RELEASE = {
+    wentLiveFor: { select: RELEASE_NAME },
+    sourcePublication: {
+        select: { kind: true, testRelease: { select: RELEASE_NAME } },
+    },
+} as const;
+
+function releaseOf(p: {
+    wentLiveFor: PublicationRelease | null;
+    sourcePublication: {
+        kind: string;
+        testRelease: PublicationRelease | null;
+    } | null;
+}): PublicationRelease | null {
+    if (p.wentLiveFor) return p.wentLiveFor;
+    return p.sourcePublication?.kind === "TEST"
+        ? p.sourcePublication.testRelease
+        : null;
 }
 
 /**
@@ -1151,15 +1187,20 @@ export class SitesService {
                 // rows published before it was recorded.
                 reviewRoute: true,
                 // Whether this publish went past an outstanding change
-                // request (#199): the bypass row names its publication.
+                // request (#199), or an owner went live past "Publishing
+                // needs approval" (DEC-071, T9): each record names its
+                // publication.
                 approvals: {
-                    where: { outcome: "BYPASSED" },
-                    take: 1,
+                    where: { outcome: { in: ["BYPASSED", "OVERRIDDEN"] } },
+                    orderBy: { createdAt: "asc" },
                     select: {
+                        outcome: true,
                         createdAt: true,
                         by: { select: { name: true, email: true } },
                     },
                 },
+                // The test release this version went live from (T12).
+                ...FROM_TEST_RELEASE,
             },
         });
 
@@ -1169,23 +1210,33 @@ export class SitesService {
             publications.map((p) => p.publishedByUserId),
         );
 
-        return publications.map(({ approvals, ...p }) => ({
-            ...p,
-            publishedBy: p.publishedByUserId
-                ? (publishers.get(p.publishedByUserId) ?? null)
-                : null,
-            bypass:
-                approvals.length === 0
-                    ? null
-                    : {
-                          at: approvals[0].createdAt,
-                          by: approvals[0].by.name ?? approvals[0].by.email,
-                      },
-            // Which one the public is actually being served. Marked rather than
-            // implied by position: after a restore the live version is NOT the
-            // newest by content, only by publish time.
-            isCurrent: p.id === site.currentPublicationId,
-        }));
+        const record = (
+            approvals: (typeof publications)[number]["approvals"],
+            outcome: "BYPASSED" | "OVERRIDDEN",
+        ) => {
+            const row = approvals.find((a) => a.outcome === outcome);
+            return row
+                ? { at: row.createdAt, by: row.by.name ?? row.by.email }
+                : null;
+        };
+
+        return publications.map(
+            ({ approvals, wentLiveFor, sourcePublication, ...p }) => ({
+                ...p,
+                publishedBy: p.publishedByUserId
+                    ? (publishers.get(p.publishedByUserId) ?? null)
+                    : null,
+                bypass: record(approvals, "BYPASSED"),
+                // Who went live past the setting, beside a bypass rather than
+                // in place of one (T12).
+                override: record(approvals, "OVERRIDDEN"),
+                testRelease: releaseOf({ wentLiveFor, sourcePublication }),
+                // Which one the public is actually being served. Marked rather than
+                // implied by position: after a restore the live version is NOT the
+                // newest by content, only by publish time.
+                isCurrent: p.id === site.currentPublicationId,
+            }),
+        );
     }
 
     /** One past publish, with its snapshot, for previewing. Requires `site:read`. */
@@ -1211,6 +1262,7 @@ export class SitesService {
                 templateId: true,
                 templateVersion: true,
                 snapshot: true,
+                ...FROM_TEST_RELEASE,
             },
         });
         if (!publication) {
@@ -1218,15 +1270,17 @@ export class SitesService {
                 `Publication "${publicationId}" not found`,
             );
         }
+        const { wentLiveFor, sourcePublication, ...row } = publication;
         const publishers = await this.userNames([
             publication.publishedByUserId,
         ]);
         return {
-            ...publication,
-            publishedBy: publication.publishedByUserId
-                ? (publishers.get(publication.publishedByUserId) ?? null)
+            ...row,
+            publishedBy: row.publishedByUserId
+                ? (publishers.get(row.publishedByUserId) ?? null)
                 : null,
-            renderability: checkRenderability(publication.snapshot),
+            renderability: checkRenderability(row.snapshot),
+            testRelease: releaseOf({ wentLiveFor, sourcePublication }),
         };
     }
 

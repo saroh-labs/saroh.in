@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { Renderability } from "./publication-renderability";
 import { ReviewRoute } from "./review-route";
 import type {
     TestReleaseLinkPurpose,
@@ -100,6 +101,20 @@ export interface TestReleaseList {
      */
     zone: string;
     releases: TestReleaseView[];
+}
+
+/**
+ * One release with the bytes it froze (T12), for reading it in the
+ * workspace: the in-app release view draws the snapshot with the session and
+ * `site:read`, no link token. `renderability` says which sections this build
+ * can no longer draw, as version history does.
+ */
+export interface TestReleaseDetailView {
+    release: TestReleaseView;
+    /** The business's time zone, the one its dates are said in. */
+    zone: string;
+    snapshot: unknown;
+    renderability: Renderability;
 }
 
 export interface CreatedTestReleaseView {

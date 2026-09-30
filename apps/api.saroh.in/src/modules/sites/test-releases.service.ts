@@ -40,6 +40,7 @@ import {
 import type {
     CreatedTestReleaseLinkView,
     CreatedTestReleaseView,
+    TestReleaseDetailView,
     TestReleaseGoLiveView,
     TestReleaseLinkView,
     TestReleaseList,
@@ -221,6 +222,44 @@ export class TestReleasesService {
                     now,
                 ),
             ),
+        };
+    }
+
+    /**
+     * One release with its frozen snapshot, to read it in the workspace
+     * (T12). Requires `site:read`, narrowed per site for a reviewer, as the
+     * list is. Read-only, and a release that is live or discarded is still
+     * read, as history.
+     */
+    async get(
+        ctx: OrganizationContext,
+        siteId: string,
+        releaseId: string,
+    ): Promise<TestReleaseDetailView> {
+        await this.gate(ctx, "site:read", siteId);
+        const [release, row, zone] = await Promise.all([
+            this.readOne(ctx, siteId, releaseId),
+            prisma.siteTestRelease.findFirst({
+                where: {
+                    id: releaseId,
+                    siteId,
+                    organizationId: ctx.organizationId,
+                },
+                select: { publication: { select: { snapshot: true } } },
+            }),
+            businessTimezone(prisma, ctx.organizationId),
+        ]);
+        if (!row) {
+            throw new NotFoundException(
+                `Test release "${releaseId}" not found`,
+            );
+        }
+        const snapshot = row.publication.snapshot;
+        return {
+            release,
+            zone,
+            snapshot,
+            renderability: checkRenderability(snapshot),
         };
     }
 

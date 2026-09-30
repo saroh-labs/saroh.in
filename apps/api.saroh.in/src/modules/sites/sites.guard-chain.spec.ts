@@ -343,6 +343,14 @@ const OPERATIONS: readonly Operation[] = [
         allowed: ["OWNER", "ADMIN", "MEMBER", "REVIEWER"],
     },
     {
+        what: "read a test release in the workspace",
+        handler: "list",
+        target: releaseRoute("get"),
+        method: "GET",
+        run: (ctx) => releases().get(ctx, SITE, "release_1"),
+        allowed: ["OWNER", "ADMIN", "MEMBER", "REVIEWER"],
+    },
+    {
         what: "open a test release",
         handler: "list",
         target: releaseRoute("open"),
