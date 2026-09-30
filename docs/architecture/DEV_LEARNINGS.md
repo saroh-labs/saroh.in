@@ -1680,6 +1680,7 @@ app's own client modules.
 **Rule**: a value both a server file and a client component need lives in a
 module with no "use client".
 **Category**: renderer · RSC · DEC-071
+
 ## e2e — a business made in a spec has every module dark
 
 **Problem**: K3's first-run spec set up a business through the API and
@@ -1697,6 +1698,7 @@ reads them without saving.
 business; one it makes itself can only check what needs no module (setup,
 the kind, invoices).
 **Category**: e2e · seed · modules
+
 ## e2e — a business a test sets up can still write contacts and invoices (K4)
 
 **Problem**: K4 needed a "site for my work" with nothing that takes money
@@ -1714,3 +1716,20 @@ through the API, then reads Settings and Home.
 e2e. Plan on turning one on only where the spec needs the module to read as
 on (Home, the rail, the checklist's module steps).
 **Category**: e2e · tests · modules
+
+## Tests — two reviews in the same millisecond read as either one (seen on K14)
+
+**Problem**: `test-release-review.db.spec.ts` "unsettles on a later change
+request" failed about one run in three (`approved: true` where `false` was
+expected), on a branch that touched only `packages/templates`.
+**Root cause**: the spec writes an approval and then a change request back
+to back, and the standing reads the latest review by time. Both rows can
+carry the same `createdAt`, so "latest" is whichever the database returns
+first.
+**Fix**: for the owner of the review standing (DEC-071 T8/T9): break the
+tie on a second, monotonic key (the id, or a sequence), or have the spec
+space the two writes. Not fixed in K14, which doesn't own those files.
+**Rule**: "the latest row" is read on `createdAt` plus a tie-breaker, never
+on `createdAt` alone, wherever two rows can be written in one request or
+one test step.
+**Category**: tests · flaky · ordering
