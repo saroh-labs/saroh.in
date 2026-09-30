@@ -111,6 +111,14 @@ src/
   not a trusted origin, or that carries neither (#50). This is CSRF defence on
   top of the `SameSite` cookie. `/public/*`, `/api/auth/*` and `/health` are
   exempt.
+- `TestHostWriteGuard` (`common/guards/test-host.guard.ts`, DEC-071) refuses
+  every non-GET `/public/*` call whose `Origin` (or `Referer`) or verified
+  `x-saroh-relay` host is a test-release host, with 409 and
+  `details.code: "TEST_RELEASE"`. Webhooks and the checkout return are exempt.
+  A new public write is refused on test hosts by default, and
+  `test-host-routes.spec.ts` makes it choose a list: REFUSED, or ALLOWED with
+  `@AllowOnTestRelease()` and a reason (read-shaped POSTs only, such as the
+  checkout quote).
 - Retry-safe writes use `IdempotencyService`: the same key with the same request
   fingerprint replays the original response; the same key with a different
   request is a 409.
