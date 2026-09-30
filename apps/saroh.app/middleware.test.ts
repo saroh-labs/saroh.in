@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 
 import { TENANT_HOST_HEADER } from "./lib/pay-host";
+import { REQUEST_PATH_HEADER } from "./lib/request-path";
 import middleware from "./middleware";
 
 /**
@@ -79,5 +80,48 @@ describe("middleware: pay links on a business's address", () => {
             "https://northwind.saroh.app/northwind.saroh.app/shop?page=2",
         );
         expect(passedOn(shop, TENANT_HOST_HEADER)).toBeNull();
+    });
+});
+
+/**
+ * The path a tenant page was asked for (DEC-069, L3): the layout needs it
+ * to send a visitor on an old address to the same page on the new one.
+ */
+describe("middleware: the request path on a tenant rewrite", () => {
+    it("names the path and query on the rewrite to [domain]", () => {
+        const res = middleware(request("https://rye.saroh.app/shop?x=1"));
+        expect(rewrittenTo(res)).toBe(
+            "https://rye.saroh.app/rye.saroh.app/shop?x=1",
+        );
+        expect(passedOn(res, REQUEST_PATH_HEADER)).toBe("/shop?x=1");
+    });
+
+    it("names the root when that is what was asked for", () => {
+        const res = middleware(request("https://rye.saroh.app/"));
+        expect(passedOn(res, REQUEST_PATH_HEADER)).toBe("/");
+    });
+
+    it("replaces a request path the visitor sent", () => {
+        const res = middleware(
+            request("https://rye.saroh.app/book", {
+                [REQUEST_PATH_HEADER]: "//evil.com",
+            }),
+        );
+        expect(passedOn(res, REQUEST_PATH_HEADER)).toBe("/book");
+    });
+
+    it("drops a request path a visitor sent to the apex", () => {
+        const res = middleware(
+            request("https://saroh.app/", {
+                [REQUEST_PATH_HEADER]: "/shop",
+            }),
+        );
+        expect(rewrittenTo(res)).toBeNull();
+        expect(passedOn(res, REQUEST_PATH_HEADER)).toBeNull();
+    });
+
+    it("leaves a pay page's rewrite without one", () => {
+        const res = middleware(request("https://rye.saroh.app/pay/abc"));
+        expect(passedOn(res, REQUEST_PATH_HEADER)).toBeNull();
     });
 });

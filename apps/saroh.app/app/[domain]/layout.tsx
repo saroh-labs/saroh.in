@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 
 import type { SignInOptions } from "@saroh/site-blocks";
 import {
@@ -17,12 +18,15 @@ import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import {
+    getMovedTo,
     getPublicationForHost,
     getSiteForHost,
     shareImages,
 } from "@/lib/publication";
+import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
+import { relayFor } from "@/lib/site-relay";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import {
@@ -120,6 +124,10 @@ export default async function SiteLayout({
     const resolved = await getSiteForHost(domain);
 
     if (!resolved) {
+        // Nothing live here. An old address still forwarding sends the
+        // visitor to the same page on the new one; anything else 404s.
+        const movedTo = await movedHere(domain);
+        if (movedTo) redirect(movedTo);
         notFound();
     }
     const { snapshot, siteId } = resolved;
@@ -236,4 +244,31 @@ export default async function SiteLayout({
             </SiteChromeFrame>
         </div>
     );
+}
+
+/**
+ * Where a host with no live site forwards to, or null (DEC-069, plan L3).
+ *
+ * After a change of web address the old one forwards for 90 days. Asked
+ * only here, on a miss (KTD-5), so a live site never pays for the read.
+ * The path and query come from the middleware's header, and only a path on
+ * this host is kept (`lib/request-path.ts`).
+ *
+ * `redirect()` answers 307, never 308: a browser must not cache a hop that
+ * stops being true after 90 days, when the address may be someone else's.
+ * The customer lands signed out on the new host, since the session cookie
+ * is host-only (`__Host-`, `lib/customer-session.ts`); the account area
+ * already handles a visitor who is signed out.
+ */
+async function movedHere(domain: string): Promise<string | null> {
+    const requestHeaders = await headers();
+    let relay: string | null = null;
+    try {
+        relay = relayFor(requestHeaders, domain);
+    } catch {
+        // No SITE_RELAY_SECRET here: read unsigned rather than not at all.
+    }
+    const to = await getMovedTo(domain, relay);
+    if (!to) return null;
+    return movedLocation(to, requestHeaders.get(REQUEST_PATH_HEADER));
 }
