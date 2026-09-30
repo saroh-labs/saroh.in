@@ -60,6 +60,18 @@ export const FlagKey = {
      * charging and cancelling a mandate already made never wait on it.
      */
     RAZORPAY_AUTOPAY: "RAZORPAY_AUTOPAY",
+
+    /**
+     * Test releases (DEC-071): making, sharing and going live with a frozen
+     * version of a site, and serving it on its test host. Per business, off
+     * by default. Its five readers, once the plan's units land: the release
+     * endpoints (404 when off), the test-host lookup (404 when off, so it is
+     * also the host's kill switch), the scheduled go-live endpoint, the
+     * editor's Test releases panel and the "Publishing needs approval"
+     * settings row. A go-live already scheduled still runs with it off.
+     * Deleted with those readers one release after it is on for everyone.
+     */
+    SITE_TEST_RELEASES: "SITE_TEST_RELEASES",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -141,5 +153,13 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-01-31",
         removeWhen:
             "Razorpay autopay has run in production on every instance for a release and has needed no kill switch.",
+    },
+    SITE_TEST_RELEASES: {
+        purpose:
+            "Lets a business make test releases of its website: a frozen version on a test address, shared by link, that it can then put live now or at a set time, and the Publishing needs approval setting. Off hides all of it and the test address answers not found; a go-live already scheduled still runs. Turn it on only once the API that keeps test releases out of version history has been live for a release.",
+        owner: "Release manager",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Test releases are on for every business on every instance, have needed no kill switch for a release, and the flag's five readers (release endpoints, test-host lookup, scheduling, the editor panel and the settings row) have been removed.",
     },
 };
