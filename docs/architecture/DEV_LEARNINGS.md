@@ -1450,3 +1450,20 @@ by a merge: two units, one merge.
 outside the org context, as `site-address.ts` does. Test releases' host
 lookups (`site-host-mode.ts`, `test-release-lookup.ts`) follow the same rule.
 **Category**: RLS · tests · merge
+
+## Gate — the shared browser worktree ran a spec this tree doesn't have (T4)
+
+**Symptom**: T4's `pnpm prepush --e2e` failed on
+`tests/web-address-change.spec.ts`, a spec that is not in T4's tree. It
+failed on the address it expected, not on anything T4 touched. The same
+run also had `public-booking` and `site-sign-in` fail on one project each.
+A rerun passed all of them.
+**Cause**: parallel units share one detached browser worktree
+(`$TMPDIR/saroh-prepush-e2e`). `e2e_worktree` moved it to HEAD with
+`checkout -f`, which leaves untracked files in place, so a spec another
+unit's run left there ran against this tree.
+**Fix**: `e2e_worktree` cleans untracked files after the checkout. Ignored
+files (node_modules, .next) stay, so the build cache is kept.
+**Rule**: a failing browser spec that isn't in `e2e/tests` of your tree is
+the shared worktree's leftover, not your change.
+**Category**: gate · parallel units
