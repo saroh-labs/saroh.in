@@ -1,5 +1,5 @@
 // @covers app:/sites api:sites site:/
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
@@ -56,7 +56,7 @@ async function openMake(page: Page) {
         } else {
             await page
                 .getByRole("group", { name: "Test release" })
-                .getByRole("button", { name: "Test release" })
+                .getByRole("button", { name: "Test release", exact: true })
                 .click();
         }
         await expect(sheet).toBeVisible({ timeout: 2_000 });
@@ -80,6 +80,36 @@ async function openPanel(page: Page) {
     return panel;
 }
 
+/** "2026-10-01" for an instant, in a zone. */
+function dayIn(at: Date, zone: string): string {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(at);
+}
+
+/**
+ * Pick tomorrow, in the business's zone, in the sheet's date picker. The
+ * picker opens on the sheet's default day (the next half hour at least an
+ * hour ahead), so tomorrow may be next month's page, or already chosen.
+ */
+async function pickTomorrow(page: Page, sheet: Locator, zone: string) {
+    const tomorrow = dayIn(new Date(Date.now() + 86_400_000), zone);
+    const field = sheet.getByLabel("Date");
+    // The day the field shows ("1 Oct 2026"), as YYYY-MM-DD.
+    const shown = new Date(`${(await field.innerText()).trim()} 12:00 UTC`);
+    const opened = shown.toISOString().slice(0, 10);
+    if (opened === tomorrow) return;
+    await field.click();
+    const calendar = page.locator("[data-radix-popper-content-wrapper]");
+    if (tomorrow.slice(0, 7) !== opened.slice(0, 7)) {
+        await calendar.getByRole("button", { name: /next month/i }).click();
+    }
+    const day = String(Number(tomorrow.slice(8, 10)));
+    await calendar
+        .locator('button[name="day"]:not(.day-outside)')
+        .getByText(day, { exact: true })
+        .click();
+    await expect(calendar).toBeHidden();
+}
+
 test.describe("test releases in the editor (T11)", { tag: "@serial" }, () => {
     test("make, schedule, cancel and go live; the live site shows it", async ({
         page,
@@ -96,6 +126,10 @@ test.describe("test releases in the editor (T11)", { tag: "@serial" }, () => {
             pages: { id: string; isHome: boolean }[];
         }>(`/sites/${siteId}`);
         const home = site.pages.find((p) => p.isHome) ?? site.pages[0];
+        // The zone a schedule is read in: the business's (T10).
+        const { zone } = await nw.get<{ zone: string }>(
+            `/sites/${siteId}/test-releases`,
+        );
         const draftPath = `/sites/${siteId}/pages/${home.id}/draft`;
         const before = await nw.get<{
             revision: number;
@@ -155,11 +189,7 @@ test.describe("test releases in the editor (T11)", { tag: "@serial" }, () => {
             await expect(
                 goLive.getByRole("radio", { name: "At a date and time" }),
             ).toHaveAttribute("aria-checked", "true");
-            await goLive.getByLabel("Date").click();
-            // The calendar opens on the chosen day: one to the right is
-            // tomorrow, across a month's end too.
-            await page.keyboard.press("ArrowRight");
-            await page.keyboard.press("Enter");
+            await pickTomorrow(page, goLive, zone);
             await goLive
                 .getByRole("button", { name: "Schedule go-live" })
                 .click();
