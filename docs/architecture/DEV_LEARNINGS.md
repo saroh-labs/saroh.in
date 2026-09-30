@@ -1403,6 +1403,7 @@ landed) are re-gated when they land together: run `pnpm prepush --int`
 per unit. A uniqueness check across businesses reads outside the org
 context (`docs/patterns/backend-data-and-money.md`).
 **Category**: gate · RLS · copy
+
 ## Merges — a new guard and a new string landed in one batch, and the guard failed (L2)
 
 **Symptom**: on `batch-2026-09-30-5`, `src/common/merchant-copy.spec.ts`
@@ -1416,6 +1417,7 @@ put them together with nothing re-running the unit suite on the result.
 catalogue check), run the API unit suite on the batch before starting the
 next wave from it.
 **Category**: merges · testing · DEC-069
+
 ## Batch — a DEC-074 refusal said "storefront" once L11's copy scan landed (K2)
 
 **Symptom**: `api-unit` failed on `batch-2026-09-30-5` itself:
@@ -1430,3 +1432,21 @@ change, since it blocked its gate).
 before branching the next wave from it; a scan added by one unit judges every
 other unit's strings.
 **Category**: batches · copy · DEC-069
+
+## Capabilities — Sell's store slug read as free under RLS (batch 2026-09-30-5)
+
+**Problem**: on `batch-2026-09-30-5`, `pnpm prepush --int` failed only in
+`int-rls`. `module-setup.db.spec.ts` (L13) failed with a unique constraint
+error on `tx.store.create`. The base also failed `api-unit`, because
+`merchant-copy.spec.ts` (L9) found "storefront" in `OTHER_LOCATION_REFUSAL`.
+**Root cause**: `freeStoreSlug` checked a globally unique `Store.slug` through
+the request's `tx`. Under RLS that client sees only this business's stores,
+so a slug another business held read as free. The copy line was left behind
+by a merge: two units, one merge.
+**Fix**: under RLS with an org context, the slug is read in
+`outsideOrgContext` (`module-setup.writers.ts`). The refusal now says
+"location". Both fixes landed with T3 (#754).
+**Rule**: every uniqueness check on a column unique across businesses is read
+outside the org context, as `site-address.ts` does. Test releases' host
+lookups (`site-host-mode.ts`, `test-release-lookup.ts`) follow the same rule.
+**Category**: RLS · tests · merge
