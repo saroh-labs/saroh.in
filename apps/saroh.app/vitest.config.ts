@@ -16,6 +16,7 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
-        include: ["lib/**/*.test.ts"],
+        // And the middleware's routing (DEC-069, L6).
+        include: ["lib/**/*.test.ts", "middleware.test.ts"],
     },
 });

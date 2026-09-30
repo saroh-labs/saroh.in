@@ -504,6 +504,10 @@ jobs:
       # The site-review flow takes the token out of that address and opens it
       # against this origin instead.
       E2E_RENDERER_URL: http://localhost:3005
+      # The API's links to the renderer (pay links, DEC-069 L6): this
+      # stack's, not production's saroh.app, which a pay page opened on a
+      # tenant host would otherwise redirect to.
+      RENDERER_URL: http://localhost:3005
       # Site sign-in (round-2 A9): every booking page asks for an emailed
       # code at the last step. The built apps have no development fallback
       # for the relay and code secrets, so the stack gets throwaway ones (the

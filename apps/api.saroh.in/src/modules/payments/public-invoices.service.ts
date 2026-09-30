@@ -14,7 +14,7 @@ import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
-import { payLinkUrl } from "../invoices/pay-link-url";
+import { payLinkUrl, payLinkUrlFor } from "../invoices/pay-link-url";
 import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
@@ -85,6 +85,13 @@ export interface PublicInvoiceView {
      * paid, autopay on — the next renewal's, by the business's timing.
      */
     autopayNextCharge?: { at: string } | null;
+    /**
+     * Where this link lives (DEC-069, plan L6): `payLinkUrlFor`'s answer,
+     * the business's own address or the apex. The renderer sends a pay
+     * page opened on another host here. Only the pay read carries it; a
+     * receipt in the account area does not.
+     */
+    payUrl?: string;
 }
 
 /** What the pay page may say about autopay (D12). */
@@ -257,6 +264,7 @@ export class PublicInvoicesService {
                     : null;
             return {
                 ...view,
+                payUrl: await payLinkUrlFor(found.organizationId, token),
                 ...(charging
                     ? { autopayCharging: { at: charging.at.toISOString() } }
                     : {}),

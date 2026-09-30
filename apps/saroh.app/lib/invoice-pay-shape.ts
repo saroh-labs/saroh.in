@@ -59,6 +59,17 @@ export interface PayInvoice {
      * Null or absent: none to say.
      */
     autopayNextCharge?: { at: string } | null;
+    /**
+     * Where this link lives (DEC-069, L6): the business's own address, or
+     * the apex. A pay page opened on another host is sent here. Null or
+     * absent (an older API): the page is served wherever it was opened.
+     */
+    payUrl?: string | null;
+}
+
+/** The link's own address from the API, checked; anything strange is none. */
+export function payUrlOf(v: unknown): string | null {
+    return isString(v) && /^https?:\/\//.test(v) ? v : null;
 }
 
 export interface PayAutopay {

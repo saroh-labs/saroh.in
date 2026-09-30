@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { SiteTheme } from "@saroh/site-blocks";
 
 import { OrderPay } from "@/components/order-pay";
 import { getPayOrder } from "@/lib/order-pay";
+import { payRedirect, TENANT_HOST_HEADER } from "@/lib/pay-host";
 
 /**
- * A customer paying for an order from its pay link (plan B, B11). On this
- * service's own apex, as the invoice pay page is, wearing the business's
- * site theme, never Saroh's.
+ * A customer paying for an order from its pay link (plan B, B11), wearing
+ * the business's site theme, never Saroh's. On the apex and on the
+ * business's own address, as the invoice pay page is (DEC-069, L6); on any
+ * other host it sends the customer to the link's own address.
  *
  * The link is a credential: the page is noindex and sends no referrer, so
  * the token never leaves in a Referer header.
@@ -60,6 +64,11 @@ export default async function OrderPayPage({
     }
 
     const { order } = result;
+    const elsewhere = payRedirect(
+        (await headers()).get(TENANT_HOST_HEADER),
+        order.payUrl,
+    );
+    if (elsewhere) redirect(elsewhere);
     return (
         <main className="min-h-screen bg-site-bg text-site-body">
             {order.theme ? <SiteTheme variables={order.theme} /> : null}

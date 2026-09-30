@@ -27,6 +27,11 @@ export interface PayOrder {
     status: OrderPayStatus;
     /** `--site-*` variables for the business's theme, or null for defaults. */
     theme: Record<string, string> | null;
+    /**
+     * Where this link lives (DEC-069, L6): the business's own address, or
+     * the apex. Null or absent (an older API): served wherever opened.
+     */
+    payUrl?: string | null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
