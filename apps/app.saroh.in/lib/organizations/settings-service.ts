@@ -5,6 +5,8 @@ import type {
     NumberRestart,
 } from "@/lib/invoices/invoice-number";
 
+import type { OrganizationKind } from "./kind";
+
 /**
  * Organization settings access (name + business profile).
  *
@@ -81,6 +83,11 @@ export interface OrganizationSettings {
     id: string;
     name: string;
     slug: string;
+    /**
+     * What is being set up (DEC-070); words and defaults only. Absent from
+     * an API older than it — read it through `kindOf`.
+     */
+    kind?: OrganizationKind;
     profile: OrganizationProfile | null;
     /** The earliest order in the business, ISO; `null` before the first. */
     tradingSince: string | null;
