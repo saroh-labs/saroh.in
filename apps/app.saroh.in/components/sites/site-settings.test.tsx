@@ -14,6 +14,7 @@ vi.mock("@/lib/sites/actions", () => ({
     updateSiteFooter: vi.fn(),
     updateSiteNavigation: vi.fn(),
     updateSiteSettings: vi.fn(),
+    setPublishNeedsApproval: vi.fn(),
 }));
 // Each reads on its own once mounted; the words around them are what is
 // under test here.
@@ -98,5 +99,72 @@ describe("the site's settings name each address (DEC-069, L12)", () => {
         );
         expect(read).toContain("Web address On Saroh rye.saroh.app");
         expect(read).not.toMatch(/Saroh address/);
+    });
+});
+
+/**
+ * "Publishing needs approval" (DEC-071, T13): the owner gets the switch,
+ * everyone else reads whether it's on and that only the owner can change it,
+ * and nothing shows while the business has no test releases.
+ */
+describe("the site's settings show whether publishing needs approval (T13)", () => {
+    const render = (approval: { on: boolean; canChange: boolean } | null) =>
+        renderToStaticMarkup(
+            <SiteSettings site={site} address={address} approval={approval} />,
+        );
+
+    it("gives the owner the switch, with what it does", () => {
+        const html = render({ on: false, canChange: true });
+        expect(html).toContain('role="switch"');
+        expect(html).toContain('aria-checked="false"');
+        expect(html).toContain('aria-label="Publishing needs approval"');
+        const text = words(html);
+        expect(text).toContain(
+            "Only an approved test release can go live. You can still go live without approval; it's recorded.",
+        );
+        expect(text).not.toContain("only the owner can change this");
+    });
+
+    it("shows the owner's switch on when the setting is on", () => {
+        expect(render({ on: true, canChange: true })).toContain(
+            'aria-checked="true"',
+        );
+    });
+
+    it("gives an admin the read-only line, and no switch", () => {
+        const html = render({ on: true, canChange: false });
+        expect(html).not.toContain('role="switch"');
+        const text = words(html);
+        expect(text).toContain(
+            "Needs approval On · only the owner can change this",
+        );
+        expect(text).toContain("Only an approved test release can go live.");
+        expect(text).not.toContain("it's recorded");
+    });
+
+    it("tells an admin when it's off, too", () => {
+        const text = words(render({ on: false, canChange: false }));
+        expect(text).toContain("Off · only the owner can change this");
+    });
+
+    it("leaves the row out while it's hidden", () => {
+        const text = words(render(null));
+        expect(text).not.toContain("Needs approval");
+        expect(text).not.toContain("only the owner can change this");
+    });
+
+    it("says the same in the read-only view", () => {
+        const read = words(
+            renderToStaticMarkup(
+                <SiteSettingsRead
+                    site={site}
+                    address={address}
+                    approval={{ on: true, canChange: false }}
+                />,
+            ),
+        );
+        expect(read).toContain(
+            "Needs approval On · only the owner can change this",
+        );
     });
 });
