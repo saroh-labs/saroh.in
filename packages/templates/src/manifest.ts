@@ -85,6 +85,13 @@ export interface TemplateSection {
      * instantiation, so it can never reach the DB in an invalid shape.
      */
     content: TemplateContent;
+    /**
+     * Whether the section is laid down for this context. Absent means always.
+     * A template that offers one of two blocks (the real Services, or
+     * placeholder offers) names both, each with its condition; `order` counts
+     * only the sections that are laid down.
+     */
+    when?: (ctx: TemplateContext) => boolean;
 }
 
 /** One page within a template. `order` of its sections is array position. */

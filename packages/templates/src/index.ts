@@ -36,3 +36,10 @@ export {
     starterTemplate,
     starterTemplateV1,
 } from "./templates/starter";
+
+// The Personal/consultant template (DEC-070, K14). K15 registers it.
+export {
+    PERSONAL_TEMPLATE_ID,
+    personalServiceIds,
+    personalTemplate,
+} from "./templates/personal";
