@@ -308,7 +308,10 @@ function PackCards({
 
     function buy(pack: PublicPack) {
         setDone(null);
-        flow.signedIn(() => setBuying(pack));
+        flow.signedIn(
+            () => setBuying(pack),
+            `the customer signs in here and pays ${accountMoney(pack.price, pack.currency)} for ${pack.name}`,
+        );
     }
 
     return (

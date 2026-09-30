@@ -347,6 +347,13 @@ describe("Sell", () => {
             "Your online shop goes on your website at northwind.saroh.app/shop — we'll set up the website for you.",
         );
         expect(byLabel("Web address").value).toBe("northwind");
+        // With the web address cleared, the note still names /shop, and
+        // never reads "your address.saroh.app" (DEC-069, L12).
+        typeInto(byLabel("Web address"), "");
+        expect(text()).toContain(
+            "Your online shop goes on your website at /shop on your web address — we'll set up the website for you.",
+        );
+        typeInto(byLabel("Web address"), "northwind");
         await press(button(/^Turn on$/));
         expect(enableModuleAction.mock.calls.map((c) => c[0])).toEqual([
             "COMMERCE",

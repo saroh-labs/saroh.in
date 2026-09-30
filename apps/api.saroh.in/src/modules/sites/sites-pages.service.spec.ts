@@ -121,8 +121,8 @@ describe("SitesService.createPage", () => {
     it.each([
         ["/book", "your booking page", "/book"],
         ["/book/walkthrough", "your booking page", "/book"],
-        ["/shop", "your shop", "/shop"],
-        ["/shop/sale", "your shop", "/shop"],
+        ["/shop", "your online shop", "/shop"],
+        ["/shop/sale", "your online shop", "/shop"],
         ["/checkout", "where your customers pay", "/checkout"],
         ["/checkout/thanks", "where your customers pay", "/checkout"],
         // The account area's route wins there, on or off (G15).

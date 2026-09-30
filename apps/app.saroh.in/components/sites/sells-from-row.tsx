@@ -16,10 +16,10 @@ import {
 import type { SellsFrom } from "@/lib/sites/service";
 
 /**
- * Where the site's shop sells from (round-2 G11). Shown, never silent:
- * "Your site sells from Online · Change" when it is set — on its own when
- * the business has one storefront with products, or by the merchant — and
- * the question when it isn't. Until it is answered the shop, the Product
+ * Where the site's online shop sells from (round-2 G11, worded as DEC-069).
+ * Shown, never silent: "Your online shop sells from Online · Change" when
+ * it is set — on its own when the business has one location with products,
+ * or by the merchant — and the question when it isn't. Until it is answered the shop, the Product
  * grid and checkout show nothing live, and the pre-publish check says so.
  *
  * Unlike the rest of this screen it is not draft state: the shop reads it
@@ -64,7 +64,7 @@ export function SellsFromRow({
             setEditing(false);
             router.refresh();
             showSuccess(
-                `Your site now sells from ${choice?.name ?? "that storefront"}.`,
+                `Your online shop now sells from ${choice?.name ?? "that location"}.`,
             );
         });
     }
@@ -77,8 +77,8 @@ export function SellsFromRow({
         // The readiness step links here (`#sells-from`).
         <div id={SELLS_FROM_ANCHOR} className="scroll-mt-20">
             <Section
-                title="Shop"
-                description="The storefront whose products your site lists at /shop. Changes here show at once; there's nothing to publish."
+                title="Your online shop"
+                description="The location whose products your online shop lists at /shop. Changes here show at once; there's nothing to publish."
                 badge={
                     waiting ? (
                         <Badge variant="warning">Not live</Badge>
@@ -135,7 +135,7 @@ export function SellsFromRow({
                     {asking && canChange && sellsFrom.choices.length > 0 ? (
                         <fieldset className="space-y-2">
                             <legend className="text-sm font-medium">
-                                Which storefront does this site sell from?
+                                Which location does your online shop sell from?
                             </legend>
                             {sellsFrom.choices.map((choice) => (
                                 <label

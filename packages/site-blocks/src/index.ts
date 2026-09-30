@@ -373,3 +373,25 @@ export { ModulePageTop, modulePageTopOf } from "./module-page-top";
 export type { ModulePageTopContent } from "./module-page-top";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";
+
+// A test release (DEC-071, T6): the layout's provider, the hook the flows
+// read, the stop they show instead of taking a real order, booking,
+// payment or enquiry, and the words the site's server actions refuse in.
+export { TestReleaseProvider, useTestRelease } from "./test-release/context";
+export type { TestReleaseInfo } from "./test-release/context";
+export {
+    TestReleaseStop,
+    TestReleaseStopSheet,
+} from "./test-release/test-release-stop";
+export type { TestReleaseVerb } from "./test-release/test-release-stop";
+// Server-safe: the site's server actions refuse in these words.
+export {
+    SIGN_IN_OFF_TEXT,
+    TEST_RELEASE_CODE,
+    TEST_RELEASE_MESSAGE,
+    TEST_RELEASE_REASON,
+    TEST_RELEASE_REFUSAL,
+    isTestReleaseRefusal,
+    itemsText,
+} from "./test-release/words";
+export type { TestReleaseRefusal } from "./test-release/words";

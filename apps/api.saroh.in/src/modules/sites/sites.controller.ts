@@ -25,6 +25,7 @@ import {
     CreatePageDto,
     CreatePreviewLinkDto,
     CreateSiteFromTemplateDto,
+    GoLiveOptionsDto,
     RequestReviewDto,
     ReviewTargetQueryDto,
     SetCommentResolvedDto,
@@ -391,7 +392,9 @@ export class SitesController {
 
     /**
      * Put a past version back. Appends a new publication rather than deleting
-     * the ones after it, so the restore can itself be undone.
+     * the ones after it, so the restore can itself be undone. With
+     * "Publishing needs approval" on, 409 unless an owner sends `override`
+     * (DEC-071, Q3).
      */
     @Post(":siteId/publications/:publicationId/restore")
     @HttpCode(200)
@@ -399,21 +402,26 @@ export class SitesController {
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
         @Param("publicationId") publicationId: string,
+        @Body() dto: GoLiveOptionsDto,
     ) {
-        return this.sites.restorePublication(ctx, siteId, publicationId);
+        return this.sites.restorePublication(ctx, siteId, publicationId, {
+            override: dto.override,
+        });
     }
 
     /**
      * Publish the site: snapshot its pages' current drafts into a new immutable
      * Publication (sanitizing rich fields) and repoint the live pointer.
-     * Requires `site:publish`.
+     * Requires `site:publish`. With "Publishing needs approval" on, 409
+     * unless an owner sends `override` (DEC-071, R10).
      */
     @Post(":siteId/publish")
     @HttpCode(200)
     publish(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Body() dto: GoLiveOptionsDto,
     ) {
-        return this.sites.publishSite(ctx, siteId);
+        return this.sites.publishSite(ctx, siteId, { override: dto.override });
     }
 }

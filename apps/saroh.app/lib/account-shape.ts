@@ -24,6 +24,7 @@ import {
     autopayChecksOf,
     autopayMethodsOf,
     autopayStateOf,
+    isTestReleaseRefusal,
 } from "@saroh/site-blocks";
 
 /**
@@ -473,7 +474,10 @@ export function threadResult(v: unknown): AccountThread | null {
  */
 export type EmailChangeAnswer =
     | { ok: true }
-    | { ok: false; reason: "invalid" | "expired" | "closed" | "error" }
+    | {
+          ok: false;
+          reason: "invalid" | "expired" | "closed" | "error" | "test-release";
+      }
     | { ok: false; reason: "limit"; retryAfterSeconds: number };
 
 export function emailChangeAnswer(
@@ -483,6 +487,10 @@ export function emailChangeAnswer(
     const error = isRecord(body) && isRecord(body.error) ? body.error : null;
     const details = error && isRecord(error.details) ? error.details : {};
     if (status === 200) return { ok: true };
+    // A test host's write refused by the API (DEC-071, T4).
+    if (isTestReleaseRefusal(status, body)) {
+        return { ok: false, reason: "test-release" };
+    }
     if (status === 400) {
         return {
             ok: false,

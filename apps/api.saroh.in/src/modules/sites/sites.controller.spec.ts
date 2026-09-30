@@ -321,8 +321,9 @@ const ROUTES: Route[] = [
         path: ":siteId/publications/:publicationId/restore",
         target: "sites",
         call: "restorePublication",
-        args: [ctx, SITE, PUBLICATION],
-        expect: [ctx, SITE, PUBLICATION],
+        // An owner's override travels through (DEC-071, T9).
+        args: [ctx, SITE, PUBLICATION, { override: true }],
+        expect: [ctx, SITE, PUBLICATION, { override: true }],
     },
     {
         handler: "publish",
@@ -330,8 +331,8 @@ const ROUTES: Route[] = [
         path: ":siteId/publish",
         target: "sites",
         call: "publishSite",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        args: [ctx, SITE, { override: true }],
+        expect: [ctx, SITE, { override: true }],
     },
 ];
 

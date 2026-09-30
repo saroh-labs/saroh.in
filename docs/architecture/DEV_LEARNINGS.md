@@ -1680,6 +1680,7 @@ app's own client modules.
 **Rule**: a value both a server file and a client component need lives in a
 module with no "use client".
 **Category**: renderer · RSC · DEC-071
+
 ## e2e — a business made in a spec has every module dark
 
 **Problem**: K3's first-run spec set up a business through the API and
@@ -1697,6 +1698,7 @@ reads them without saving.
 business; one it makes itself can only check what needs no module (setup,
 the kind, invoices).
 **Category**: e2e · seed · modules
+
 ## e2e — a business a test sets up can still write contacts and invoices (K4)
 
 **Problem**: K4 needed a "site for my work" with nothing that takes money
@@ -1714,3 +1716,74 @@ through the API, then reads Settings and Home.
 e2e. Plan on turning one on only where the spec needs the module to read as
 on (Home, the rail, the checklist's module steps).
 **Category**: e2e · tests · modules
+
+## Sites — a new approval outcome reaches maps that index by outcome (T9)
+
+**Problem**: T9 adds OVERRIDDEN, the record of an owner going live past
+"Publishing needs approval". `getReviewState` returns the newest approval
+row of any kind as `latestApproval`, so after an override the draft's (or
+the release's) review reads `outcome: "OVERRIDDEN"`.
+**Root cause**: the app reads that outcome through lookup tables keyed by
+the four outcomes it knew (`APPROVAL_BADGE` in
+`components/sites/editor/status-readout.ts`, `APPROVAL_LINE` in
+`pre-publish-check.tsx`) and calls `.text(…)` on the entry, so an unknown
+outcome is a TypeError, not a missing label. The API's union and the app's
+(`lib/sites/service.ts`) are typed separately, so no type check joins them.
+**Fix**: none needed yet. The setting can't be turned on while
+`SITE_TEST_RELEASES` is off (the API answers 409), and the flag goes on only
+after the app units (T11, T12, T13) ship, which add OVERRIDDEN to those
+tables and to `site-review-view.tsx`.
+**Rule**: a new `SiteApproval.outcome` or `Publication.reviewRoute` value is
+added to every app table that indexes by it in the same release, or kept
+unreachable behind a flag until it is.
+**Category**: sites · review · DEC-071
+
+## Templates — a template's enquiry form has no Form until the editor saves (K13)
+
+**Problem**: `writing@1` (and K12's portfolio) give Contact an enquiry
+section, but a template can only lay down its content: the `formId` the
+public submit endpoint needs is missing.
+**Root cause**: `instantiateTemplate` is pure (no Prisma), and
+`site-create.ts` writes the sections as they are. Only two paths make a
+Form: the module pages (`module-page-sections.ts`, `contact`) and the
+editor's `syncEnquiryForms` on save. The enquiry block draws nothing without
+a `formId`, so a site published without an editor save has a blank form.
+**Fix**: not yet. The template leaves `formId` out (the contract allows
+it), and its Home link falls back to the email when there is one. K15,
+which owns `site-create.ts`, should make the Form for any template enquiry
+section as `module-page-sections.ts` does.
+**Rule**: a template section that needs a record behind it (a Form, a
+service, a storefront) is only half-made by the template. Name who makes
+the record before the template ships.
+**Category**: templates · sites · enquiry
+
+## Tests — two reviews in the same millisecond read as either one (seen on K14)
+
+**Problem**: `test-release-review.db.spec.ts` "unsettles on a later change
+request" failed about one run in three (`approved: true` where `false` was
+expected), on a branch that touched only `packages/templates`.
+**Root cause**: the spec writes an approval and then a change request back
+to back, and the standing reads the latest review by time. Both rows can
+carry the same `createdAt`, so "latest" is whichever the database returns
+first.
+**Fix**: for the owner of the review standing (DEC-071 T8/T9): break the
+tie on a second, monotonic key (the id, or a sequence), or have the spec
+space the two writes. Not fixed in K14, which doesn't own those files.
+**Rule**: "the latest row" is read on `createdAt` plus a tie-breaker, never
+on `createdAt` alone, wherever two rows can be written in one request or
+one test step.
+**Category**: tests · flaky · ordering
+
+## Sites — "the latest review" tied when two were written in one millisecond
+
+**Problem**: `test-release-review.db.spec.ts` › "unsettles on a later change
+request" failed about one run in three (found by K14).
+**Root cause**: the verdicts and the latest-approval read ordered by
+`createdAt` alone. An approval and a change request written back to back
+share a millisecond, so either could come first — in the test, and for two
+reviewers acting at the same moment.
+**Fix**: both reads order by `[createdAt desc, id desc]` (`readVerdicts` in
+`sites/live-pointer.ts`, the latest approval in `sites.service.ts`). A
+`cuid()` grows within a process, so the id settles the tie.
+**Rule**: "the newest row" is never ordered by a timestamp alone; add the id.
+**Category**: data · ordering · tests

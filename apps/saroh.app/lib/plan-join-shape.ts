@@ -3,7 +3,7 @@ import type {
     PlanJoinAttempt,
     PlanJoinStarted,
 } from "@saroh/site-blocks";
-import { autopayStartOf } from "@saroh/site-blocks";
+import { autopayStartOf, isTestReleaseRefusal } from "@saroh/site-blocks";
 
 /**
  * Joining a plan from the site (round-2 G20): the API's answers narrowed,
@@ -102,7 +102,13 @@ export function joinStartAnswer(
     if (status === 409 && message) {
         return {
             ok: false,
-            reason: details?.reason === "ask" ? "ask" : "error",
+            reason:
+                // A test host's join refused by the API (DEC-071, T4).
+                isTestReleaseRefusal(status, body)
+                    ? "test-release"
+                    : details?.reason === "ask"
+                      ? "ask"
+                      : "error",
             message,
         };
     }

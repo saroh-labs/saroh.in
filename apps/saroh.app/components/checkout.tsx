@@ -12,7 +12,12 @@ import type {
 import { createPaymentIntent, fetchReceipt } from "@/lib/checkout";
 import { cn } from "@saroh/ui/lib/utils";
 
-import { ctaClasses, destructiveAlertClasses } from "@saroh/site-blocks";
+import {
+    ctaClasses,
+    destructiveAlertClasses,
+    TestReleaseStop,
+    useTestRelease,
+} from "@saroh/site-blocks";
 
 /**
  * `Checkout` (S5-004) — the PUBLIC buyer checkout + receipt view behind
@@ -32,6 +37,9 @@ import { ctaClasses, destructiveAlertClasses } from "@saroh/site-blocks";
  *
  * A stable idempotency key per mount means a double-click can't create two
  * intents.
+ *
+ * On a test release (DEC-071, T6) "Pay" asks for nothing: the page says
+ * what the live site would take here instead. The receipt is still read.
  */
 
 /**
@@ -127,6 +135,8 @@ export default function Checkout({ orderId }: { orderId: string }) {
     const [paying, setPaying] = useState(false);
     const [payError, setPayError] = useState<string | null>(null);
     const [intent, setIntent] = useState<CheckoutIntent | null>(null);
+    const testRelease = useTestRelease() !== null;
+    const [testStop, setTestStop] = useState(false);
 
     // A stable idempotency key per mount so a double-click / retry can't create
     // two intents for this checkout attempt.
@@ -164,6 +174,10 @@ export default function Checkout({ orderId }: { orderId: string }) {
     }, [fetchState]);
 
     async function onPay() {
+        if (testRelease) {
+            setTestStop(true);
+            return;
+        }
         setPaying(true);
         setPayError(null);
         const res = await createPaymentIntent(orderId, { idempotencyKey });
@@ -270,6 +284,13 @@ export default function Checkout({ orderId }: { orderId: string }) {
                         <p role="alert" className={destructiveAlertClasses}>
                             {payError}
                         </p>
+                    ) : null}
+
+                    {testStop ? (
+                        <TestReleaseStop
+                            live={`the customer pays ${cur} ${receipt.total} here`}
+                            nothing="paid"
+                        />
                     ) : null}
 
                     {intent ? (

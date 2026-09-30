@@ -109,6 +109,12 @@ export interface BagDraft {
     checkout: { print: string; key: string } | null;
 }
 
+/** The bag as the button priced it: "₹1,240", and how many things. */
+export interface BagPriced {
+    total: string;
+    count: number;
+}
+
 export const EMPTY_DRAFT: BagDraft = {
     way: null,
     address: EMPTY_ADDRESS,
@@ -138,8 +144,11 @@ export function BagSheet({
     /** The way, the address and the checkout key, kept above the sheet. */
     draft: BagDraft;
     onDraft: (change: (draft: BagDraft) => BagDraft) => void;
-    /** Place it: the request, with its key. */
-    onPlace: (request: StartCheckout) => void;
+    /**
+     * Place it: the request, with its key, and what the button said it
+     * costs (a test release's stop names them, DEC-071).
+     */
+    onPlace: (request: StartCheckout, priced: BagPriced) => void;
     onClose: () => void;
 }) {
     const { way, address } = draft;
@@ -224,7 +233,13 @@ export function BagSheet({
         if (checkout !== draft.checkout) {
             onDraft((d) => ({ ...d, checkout }));
         }
-        onPlace({ ...body, key: checkout.key });
+        onPlace(
+            { ...body, key: checkout.key },
+            {
+                total,
+                count: items.reduce((sum, item) => sum + item.quantity, 0),
+            },
+        );
     }
 
     const setField = (name: keyof DeliveryAddress) => (value: string) =>

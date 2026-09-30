@@ -333,7 +333,10 @@ function PlanCards({
 
     function join(plan: PublicPlan) {
         setDone(null);
-        flow.signedIn(() => setJoining(plan));
+        flow.signedIn(
+            () => setJoining(plan),
+            `the customer signs in here and pays ${planPrice(plan)} to join ${plan.name}`,
+        );
     }
 
     return (

@@ -36,3 +36,13 @@ export {
     starterTemplate,
     starterTemplateV1,
 } from "./templates/starter";
+
+// Blog/writing (DEC-070, K13). Exported, not yet registered: K15 registers it.
+export { WRITING_TEMPLATE_ID, writingTemplate } from "./templates/writing";
+
+// The Personal/consultant template (DEC-070, K14). K15 registers it.
+export {
+    PERSONAL_TEMPLATE_ID,
+    personalServiceIds,
+    personalTemplate,
+} from "./templates/personal";

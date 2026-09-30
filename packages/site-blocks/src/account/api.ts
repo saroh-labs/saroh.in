@@ -38,6 +38,8 @@ export type CodeRequestResult =
     | { ok: false; reason: "closed" }
     /** Not an email address. */
     | { ok: false; reason: "email" }
+    /** A test release (DEC-071, KTD-9): signing in is off. */
+    | { ok: false; reason: "test-release" }
     | { ok: false; reason: "error" };
 
 export type VerifyResult =
@@ -49,6 +51,8 @@ export type VerifyResult =
     /** The business isn't taking sign-ins (suspended or closing). */
     | { ok: false; reason: "closed" }
     | { ok: false; reason: "limit"; retryAfterSeconds: number }
+    /** A test release (DEC-071, KTD-9): signing in is off. */
+    | { ok: false; reason: "test-release" }
     | { ok: false; reason: "error" };
 
 /** The site's server actions, handed to the sheet. */

@@ -17,6 +17,8 @@ import {
 import { refusalMessage } from "@/lib/account-shape";
 import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
+import { testMode } from "@/lib/test-release";
+import { TEST_RELEASE_REFUSAL } from "@saroh/site-blocks";
 
 /**
  * What a signed-in customer changes in their Bookings (round-2 plan A, A6):
@@ -101,6 +103,7 @@ export async function moveBooking(
     if (!(await siteOrigin()) || !accountAreaOn()) {
         return { ok: false, message: OFFLINE };
     }
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     const id = cleanRef(ref);
     const at = cleanInstant(startAt);
     if (!id || !at) return { ok: false, message: OFFLINE };
@@ -125,6 +128,7 @@ export async function cancelBooking(ref: string): Promise<AccountCancelAnswer> {
     if (!(await siteOrigin()) || !accountAreaOn()) {
         return { ok: false, message: OFFLINE };
     }
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     const id = cleanRef(ref);
     if (!id) return { ok: false, message: OFFLINE };
     const got = await answer(
@@ -156,6 +160,7 @@ export async function bookVisit(
     if (!(await siteOrigin()) || !accountAreaOn()) {
         return { ok: false, message: OFFLINE };
     }
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     const id = cleanRef(orderRef);
     const at = cleanInstant(startAt);
     if (!id || !at) return { ok: false, message: OFFLINE };

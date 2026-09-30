@@ -9,6 +9,9 @@ import type { SignedInCustomer } from "../account/api";
 import type { SendResult } from "../account/messages";
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import { useTestRelease } from "../test-release/context";
+import { TestReleaseStop } from "../test-release/test-release-stop";
+import { isTestReleaseRefusal } from "../test-release/words";
 import { ctaClasses } from "./cta";
 
 /**
@@ -27,13 +30,24 @@ import { ctaClasses } from "./cta";
  * A section with no `formId` (never synced) renders nothing rather than POST to
  * a broken URL. `idempotencyKey` is stable per mount so a double-click / retry
  * can't create two leads.
+ *
+ * On a test release (DEC-071, T6) Send posts nothing: the form says what the
+ * live site would do with it instead. The API refuses a post from a test
+ * host on its own too (409 `TEST_RELEASE`), and that answer reads the same.
  */
 
 type SubmitState =
     | { kind: "idle" }
     | { kind: "submitting" }
     | { kind: "success" }
-    | { kind: "error"; message: string };
+    | { kind: "error"; message: string }
+    /** A test release: nothing was sent, and the form says why. */
+    | { kind: "test-release" };
+
+/** What the live site does with an enquiry, for a test release's stop. */
+const ENQUIRY_LIVE = "this form sends your message to the business";
+/** And with a message to the customer's thread. */
+const THREAD_LIVE = "this sends your message to the business's inbox";
 
 /**
  * The message a link asked for: `?about=` names a product "Ask about
@@ -124,6 +138,7 @@ function EnquiryForm({
 
     const [values, setValues] = useState<Record<string, string>>({});
     const [state, setState] = useState<SubmitState>({ kind: "idle" });
+    const testRelease = useTestRelease() !== null;
 
     // "Ask about ordering" on a product page (G13) links here with
     // `?about=<product>`, and "Ask about joining" on a Plans block (G9) with
@@ -153,6 +168,10 @@ function EnquiryForm({
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (testRelease) {
+            setState({ kind: "test-release" });
+            return;
+        }
         setState({ kind: "submitting" });
         try {
             const res = await fetch(
@@ -181,6 +200,10 @@ function EnquiryForm({
             const body = (await res.json().catch(() => null)) as {
                 message?: string;
             } | null;
+            if (isTestReleaseRefusal(res.status, body)) {
+                setState({ kind: "test-release" });
+                return;
+            }
             setState({
                 kind: "error",
                 message:
@@ -288,6 +311,9 @@ function EnquiryForm({
                         {state.message}
                     </p>
                 ) : null}
+                {state.kind === "test-release" ? (
+                    <TestReleaseStop live={ENQUIRY_LIVE} nothing="sent" />
+                ) : null}
 
                 <button
                     type="submit"
@@ -330,6 +356,7 @@ function ThreadForm({
     const fieldId = useId();
     const [text, setText] = useState("");
     const [state, setState] = useState<SubmitState>({ kind: "idle" });
+    const testRelease = useTestRelease() !== null;
     const areaLabel = content.fields.find((f) => f.type === "textarea")?.label;
     const label = said(areaLabel) ?? "Message";
 
@@ -361,6 +388,10 @@ function ThreadForm({
             });
             return;
         }
+        if (testRelease) {
+            setState({ kind: "test-release" });
+            return;
+        }
         setState({ kind: "submitting" });
         const result = await thread.send(body).catch((): SendResult => ({
             ok: false,
@@ -369,6 +400,9 @@ function ThreadForm({
         if (result.ok) {
             setText("");
             setState({ kind: "success" });
+        } else if ("reason" in result) {
+            // The only refusal with a reason: a test release (DEC-071).
+            setState({ kind: "test-release" });
         } else {
             setState({ kind: "error", message: result.message });
         }
@@ -449,6 +483,9 @@ function ThreadForm({
                     <p role="alert" className={destructiveAlertClasses}>
                         {state.message}
                     </p>
+                ) : null}
+                {state.kind === "test-release" ? (
+                    <TestReleaseStop live={THREAD_LIVE} nothing="sent" />
                 ) : null}
 
                 <button

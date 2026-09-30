@@ -72,11 +72,14 @@ export const FlagKey = {
     /**
      * Test releases (DEC-071): making, sharing and going live with a frozen
      * version of a site, and serving it on its test host. Per business, off
-     * by default. Its six readers, once the plan's units land: the release
+     * by default. Its seven readers, once the plan's units land: the release
      * endpoints (404 when off), the test-host lookup (404 when off, so it is
      * also the host's kill switch), the scheduled go-live endpoint, the
      * "Website goes live" row in each person's alerts (T10), the editor's
-     * Test releases panel and the "Publishing needs approval" settings row. A go-live already scheduled still runs with it off.
+     * Test releases panel, the "Publishing needs approval" settings row, and
+     * the API turning that setting on (409 when off, T9: with no releases,
+     * nothing but an owner's override could go live). A go-live already
+     * scheduled still runs with it off.
      * Deleted with those readers one release after it is on for everyone.
      */
     SITE_TEST_RELEASES: "SITE_TEST_RELEASES",
@@ -186,7 +189,7 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         owner: "Release manager",
         reviewBy: "2027-03-31",
         removeWhen:
-            "Test releases are on for every business on every instance, have needed no kill switch for a release, and the flag's six readers (release endpoints, test-host lookup, scheduling, the Website alert row, the editor panel and the settings row) have been removed.",
+            "Test releases are on for every business on every instance, have needed no kill switch for a release, and the flag's seven readers (release endpoints, test-host lookup, scheduling, the Website alert row, the editor panel, the settings row and the setting's own write) have been removed.",
     },
     WEB_ADDRESS_CHANGE: {
         purpose:

@@ -292,7 +292,7 @@ describe("the open page's settings (G16)", () => {
     it("offers the address the API suggests when a rename is refused", async () => {
         actions.updatePage.mockResolvedValue({
             ok: false,
-            error: "/shop is your shop, so a page can't use /shop/sale. Pick another address, such as /sale.",
+            error: "/shop is your online shop, so a page can't use /shop/sale. Pick another address, such as /sale.",
             suggestion: "/sale",
         });
         render({ active: "p-story" });

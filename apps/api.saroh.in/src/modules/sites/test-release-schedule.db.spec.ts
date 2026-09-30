@@ -714,6 +714,26 @@ describe("the site.go_live job (T10)", () => {
             lastGoLiveOutcome: "LIVE",
         });
         expect(await liveCount(b.site.id)).toBe(2);
+        // Recorded as the owner's override, as going live by hand with one
+        // is (T9), and against the release.
+        const live = await prisma.site.findUniqueOrThrow({
+            where: { id: b.site.id },
+            select: {
+                currentPublication: { select: { id: true, reviewRoute: true } },
+            },
+        });
+        expect(live.currentPublication?.reviewRoute).toBe("OVERRIDDEN");
+        expect(
+            await prisma.siteApproval.findMany({
+                where: { siteId: b.site.id, outcome: "OVERRIDDEN" },
+                select: { publicationId: true, testReleaseId: true },
+            }),
+        ).toEqual([
+            {
+                publicationId: live.currentPublication?.id,
+                testReleaseId: made.release.id,
+            },
+        ]);
     });
 
     it("doesn't go live with a section this build can no longer draw, and names it", async () => {

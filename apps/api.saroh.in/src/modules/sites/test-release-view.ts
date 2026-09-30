@@ -113,6 +113,8 @@ export interface TestReleaseGoLiveView {
     /** The review route it took (#278), and whether that was a bypass. */
     route: ReviewRoute;
     bypassed: boolean;
+    /** An owner went live past "Publishing needs approval" (T9). */
+    overridden: boolean;
     replaced: {
         publicationId: string;
         publishedAt: Date;

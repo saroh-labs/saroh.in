@@ -1,9 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { sameOriginHost, servedHost } from "./origin";
+import { actionFiles, exportedActions, SITE_ROUTES } from "./site-actions.scan";
 
 /**
  * The Origin check on a merchant's site (round-2 plan A, A3), and the rule
@@ -77,33 +78,14 @@ describe("sameOriginHost", () => {
 
 /** The exported actions in a file that don't call `siteOrigin()` first. */
 function actionsSkippingOrigin(source: string): string[] {
-    const skipped: string[] = [];
-    const exported = /export async function (\w+)\s*\(/g;
-    let match: RegExpExecArray | null;
-    while ((match = exported.exec(source)) !== null) {
-        const bodyStart = source.indexOf("{\n", match.index);
-        const firstLine = source
-            .slice(bodyStart + 2)
-            .split("\n")
-            .find((line) => line.trim() !== "");
-        if (!firstLine?.includes("await siteOrigin()")) {
-            skipped.push(match[1]);
-        }
-    }
-    return skipped;
-}
-
-function actionFiles(dir: string): string[] {
-    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) return actionFiles(full);
-        return entry.name === "actions.ts" ? [full] : [];
-    });
+    return exportedActions(source)
+        .filter(({ lines }) => !lines[0]?.includes("await siteOrigin()"))
+        .map(({ name }) => name);
 }
 
 describe("state-changing actions on a merchant's site", () => {
-    const root = path.resolve(__dirname, "../app/[domain]");
-    const files = actionFiles(root);
+    const root = SITE_ROUTES;
+    const files = actionFiles();
 
     it("finds the site's actions", () => {
         expect(files.map((f) => path.relative(root, f))).toContain(

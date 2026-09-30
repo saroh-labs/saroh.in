@@ -20,13 +20,6 @@ import * as ts from "typescript";
 
 const SRC = join(__dirname, "..");
 
-/**
- * Left to the units that own their copy: L12 rewords `sites/**` ("Your
- * online shop sells from") and L13 owns `capabilities/setup/**`. Remove an
- * entry once its unit lands.
- */
-const OWNED_ELSEWHERE = ["modules/sites/", "modules/capabilities/setup/"];
-
 function sourceFiles(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
         const path = join(dir, name);
@@ -85,7 +78,6 @@ describe("merchant copy says location (DEC-069)", () => {
     it("no API string a merchant reads says storefront", () => {
         const offenders = sourceFiles(SRC)
             .map((path) => relative(SRC, path).split(sep).join("/"))
-            .filter((rel) => !OWNED_ELSEWHERE.some((p) => rel.startsWith(p)))
             .flatMap((rel) =>
                 literals(join(SRC, rel))
                     .filter(({ text }) => saysStorefront(text))

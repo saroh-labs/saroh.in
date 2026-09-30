@@ -79,7 +79,7 @@ export interface SiteAddress {
     host: string;
     /** `https://` + host, for Open and View. */
     url: string;
-    /** "rye.saroh.app": the Saroh address, which a domain never replaces. */
+    /** "rye.saroh.app": the web address on Saroh, which a domain never replaces. */
     platformHost: string;
 }
 

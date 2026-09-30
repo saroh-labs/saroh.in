@@ -12,7 +12,7 @@ describe("sellsFromLine (G11)", () => {
                 storefront: { id: online.id, name: "Online" },
                 choices: [online],
             }),
-        ).toBe("Your site sells from Online");
+        ).toBe("Your online shop sells from Online");
     });
 
     it("says the shop shows nothing until one is picked", () => {
@@ -21,7 +21,7 @@ describe("sellsFromLine (G11)", () => {
         ).toMatch(/Not chosen yet/);
     });
 
-    it("says where products live when no storefront sells any", () => {
+    it("says where products live when no location sells any", () => {
         expect(sellsFromLine({ storefront: null, choices: [] })).toMatch(
             /Sell › Products/,
         );

@@ -88,7 +88,8 @@ const ROUTES: readonly Route[] = [
         method: RequestMethod.POST,
         path: ":releaseId/go-live",
         call: "goLive",
-        args: [ctx, SITE, RELEASE],
+        // An owner's override travels through (T9).
+        args: [ctx, SITE, RELEASE, { override: true }],
     },
     {
         handler: "schedule",

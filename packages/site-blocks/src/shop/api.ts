@@ -95,13 +95,20 @@ export interface CheckoutStanding {
 
 /**
  * Why something couldn't be done, with the page's sentence for it.
+ * - test-release: the page is a test release (DEC-071); nothing is ordered.
  * - signed-out: the session ended; sign in again.
  * - bag-changed: price it again before paying.
  * - busy: a checkout is open already, or too many tries.
  * - cant-order: the shop isn't taking orders online now.
  */
 export type ShopProblem =
-    "signed-out" | "bag-changed" | "busy" | "cant-order" | "invalid" | "error";
+    | "signed-out"
+    | "bag-changed"
+    | "busy"
+    | "cant-order"
+    | "invalid"
+    | "error"
+    | "test-release";
 
 export type ShopResult<T> =
     { ok: true; data: T } | { ok: false; reason: ShopProblem; message: string };

@@ -1,3 +1,4 @@
+import type { TestReleaseRefusal } from "../test-release/words";
 import type { SignInApi } from "./api";
 import type { AccountNote, AccountView } from "./model";
 
@@ -7,10 +8,14 @@ import type { AccountNote, AccountView } from "./model";
  */
 
 export type DetailsResult =
-    { ok: true; account: AccountView } | { ok: false; message: string };
+    | { ok: true; account: AccountView }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export type NoteResult =
-    { ok: true; note: AccountNote } | { ok: false; message: string };
+    | { ok: true; note: AccountNote }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export interface MeApi {
     updateDetails: (input: {

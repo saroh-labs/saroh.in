@@ -456,6 +456,25 @@ export class UpdateSiteSettingsDto {
     @MinLength(1)
     @MaxLength(64)
     storefrontId?: string | null;
+
+    /**
+     * "Publishing needs approval" (DEC-071, R10). An owner's alone: 403 for
+     * anyone else, checked in the service. Never null: it is on or off.
+     */
+    @IsOptional()
+    @IsBoolean({ message: "publishNeedsApproval must be true or false" })
+    publishNeedsApproval?: boolean;
+}
+
+/**
+ * Publish, restore or go live with a test release (DEC-071, T9). The body
+ * is optional. `override` is an owner's "go live without approval" while
+ * Publishing needs approval is on; 403 from anyone else.
+ */
+export class GoLiveOptionsDto {
+    @IsOptional()
+    @IsBoolean({ message: "override must be true or false" })
+    override?: boolean;
 }
 
 /** Mint a preview link (#198). The choices are the ones the design offers. */

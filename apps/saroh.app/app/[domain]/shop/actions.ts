@@ -8,6 +8,7 @@ import type {
     CheckoutStarted,
     ShopResult,
 } from "@saroh/site-blocks";
+import { TEST_RELEASE_MESSAGE, TEST_RELEASE_REASON } from "@saroh/site-blocks";
 
 import { accountSitesFetch, sitesFetch } from "@/lib/customer-session";
 import { servedHost, siteOrigin } from "@/lib/origin";
@@ -21,6 +22,7 @@ import {
     SHOP_TROUBLE,
     startBody,
 } from "@/lib/shop-checkout-shape";
+import { testMode } from "@/lib/test-release";
 
 /**
  * The bag and checkout on a merchant's site (round-2 G13): price the bag,
@@ -31,14 +33,22 @@ import {
  * on (never from the browser), every call carries the signed relay, and
  * starting carries the customer's session from its host-only cookie. What
  * the browser sent is rebuilt field by field (`shop-checkout-shape.ts`), so
- * no amount travels on. Every action checks `Origin` first.
+ * no amount travels on. Every action checks `Origin` first, and starting
+ * refuses on a test release (DEC-071, T6) before anything is sent.
  */
 
 interface Refusal {
     ok: false;
-    reason: "error" | "invalid" | "signed-out";
+    reason: "error" | "invalid" | "signed-out" | "test-release";
     message: string;
 }
+
+/** A test release (DEC-071, T6): nothing is ordered, and nothing is sent. */
+const TEST_REFUSAL: Refusal = {
+    ok: false,
+    reason: TEST_RELEASE_REASON,
+    message: TEST_RELEASE_MESSAGE,
+};
 
 const TROUBLE: Refusal = { ok: false, reason: "error", message: SHOP_TROUBLE };
 const INVALID: Refusal = {
@@ -89,6 +99,7 @@ export async function startCheckout(
     request: unknown,
 ): Promise<ShopResult<CheckoutStarted>> {
     if (!(await siteOrigin())) return TROUBLE;
+    if (await testMode()) return TEST_REFUSAL;
     const body = startBody(request);
     if (!body) return INVALID;
     const siteId = await hostSiteId();

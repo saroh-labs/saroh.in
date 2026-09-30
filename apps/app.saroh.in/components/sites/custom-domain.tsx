@@ -335,7 +335,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                                     an outage for a verified one. */}
                                 <p className="text-muted-foreground">
                                     {verified
-                                        ? `Visitors to ${domain.hostname} will stop reaching your site and see an error until you point the domain somewhere else. Your Saroh address keeps working.`
+                                        ? `Visitors to ${domain.hostname} will stop reaching your site and see an error until you point the domain somewhere else. Your web address on Saroh keeps working.`
                                         : `Nothing changes for visitors: ${domain.hostname} is not serving your site yet. You can add it again later; the record will be different.`}
                                 </p>
                                 <div className="mt-2 flex gap-2">

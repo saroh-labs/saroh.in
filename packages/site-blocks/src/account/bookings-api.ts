@@ -1,3 +1,4 @@
+import type { TestReleaseRefusal } from "../test-release/words";
 import type {
     AccountBookingRow,
     AccountCancelResult,
@@ -17,13 +18,18 @@ export type TimesResult =
 /** `told`: the business is told of the move (A14); absent before A14. */
 export type MoveResult =
     | { ok: true; booking: AccountBookingRow; told?: boolean }
-    | { ok: false; message: string };
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export type CancelResult =
-    { ok: true; result: AccountCancelResult } | { ok: false; message: string };
+    | { ok: true; result: AccountCancelResult }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export type VisitResult =
-    { ok: true; treatment: AccountTreatment } | { ok: false; message: string };
+    | { ok: true; treatment: AccountTreatment }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export interface BookingsApi {
     /** Free times to move a one-to-one to, with the same person. */

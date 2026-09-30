@@ -53,10 +53,16 @@ import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
 import {
+    assertOverrideAllowed,
+    isOwner,
+    setPublishNeedsApproval,
+} from "./publish-approval";
+import {
     frozenPages,
     isOnFrozenPage,
     releaseUnderReview,
 } from "./release-under-review";
+import type { ReviewRoute } from "./review-route";
 import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import type { SellsFromView } from "./sells-from";
@@ -242,6 +248,13 @@ export interface PublishResult {
     currentPublicationId: string;
     /** True when this publish went past an outstanding change request (#199). */
     bypassed: boolean;
+    /**
+     * True when an owner published past "Publishing needs approval"
+     * (DEC-071, KTD-11); `route` is then OVERRIDDEN.
+     */
+    overridden: boolean;
+    /** Which route this publish took (#278). */
+    route: ReviewRoute;
 }
 
 /**
@@ -353,6 +366,16 @@ export interface SiteDetailView {
     canEdit: boolean;
     /** Everything this caller may do here, decided by the policy (#275). */
     can: SiteCapabilities;
+    /**
+     * "Publishing needs approval" (DEC-071, R10): on, only an approved test
+     * release goes live, unless an owner overrides.
+     */
+    publishNeedsApproval: boolean;
+    /**
+     * Whether this caller may go live past that setting, and turn it on or
+     * off: an owner who can publish (KTD-11).
+     */
+    canOverride: boolean;
     id: string;
     name: string;
     slug: string;
@@ -798,6 +821,7 @@ export class SitesService {
                 footer: true,
                 navigation: true,
                 storefrontId: true,
+                publishNeedsApproval: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -839,6 +863,9 @@ export class SitesService {
         return {
             ...rest,
             canEdit: allows(ctx, "section:write"),
+            // Only an owner goes live past "Publishing needs approval", and
+            // only an owner changes it (DEC-071, KTD-11).
+            canOverride: isOwner(ctx) && allows(ctx, "site:publish"),
             can: {
                 edit: allows(ctx, "section:write"),
                 publish: allows(ctx, "site:publish"),
@@ -888,6 +915,9 @@ export class SitesService {
      * Requires `site:update` — the same gate as renaming a site, because this is
      * what the public sees. Writing here does NOT publish: these values reach
      * the live site only through the next publish, exactly like a section edit.
+     *
+     * `publishNeedsApproval` is the exception to both: it is an owner's
+     * alone (403 for anyone else), and it takes effect at once.
      */
     async updateSettings(
         ctx: OrganizationContext,
@@ -951,6 +981,19 @@ export class SitesService {
             data.storefrontId = dto.storefrontId;
         }
 
+        /*
+         * "Publishing needs approval" (DEC-071, R10): owner only, recorded
+         * as an audit event, and in its own transaction with that record.
+         * Saved first, so an admin's 403 leaves the rest of the form unsaved
+         * rather than half of it written.
+         */
+        const needsApproval = dto.publishNeedsApproval;
+        if (needsApproval !== undefined) {
+            await prisma.$transaction((tx) =>
+                setPublishNeedsApproval(tx, ctx, siteId, needsApproval),
+            );
+        }
+
         const site = await prisma.site.update({
             where: { id: siteId },
             data,
@@ -958,6 +1001,7 @@ export class SitesService {
                 id: true,
                 name: true,
                 storefrontId: true,
+                publishNeedsApproval: true,
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
@@ -1225,8 +1269,15 @@ export class SitesService {
         ctx: OrganizationContext,
         siteId: string,
         publicationId: string,
+        /**
+         * An owner restoring past "Publishing needs approval" (DEC-071, Q3):
+         * with the setting on, a restore is refused (409) unless an owner
+         * overrides, and the override is recorded. 403 from anyone else.
+         */
+        options: { override?: boolean } = {},
     ) {
         authorize(ctx, "site:publish");
+        assertOverrideAllowed(ctx, options.override);
         await assertSiteInOrg(ctx, siteId);
 
         const source = await prisma.publication.findFirst({
@@ -1270,7 +1321,8 @@ export class SitesService {
                 site: { id: siteId, organizationId: ctx.organizationId },
                 snapshot: source.snapshot,
                 source: "restore",
-                actor: { userId: ctx.userId },
+                actor: { userId: ctx.userId, owner: isOwner(ctx) },
+                override: options.override,
                 fingerprint,
                 template: {
                     id: source.templateId,
@@ -1278,11 +1330,21 @@ export class SitesService {
                 },
                 pageId: source.pageId,
                 path: source.path,
-            }).then(({ publicationId, publishedAt, bypassed }) => ({
-                publicationId,
-                publishedAt,
-                bypassed,
-            })),
+            }).then(
+                ({
+                    publicationId,
+                    publishedAt,
+                    bypassed,
+                    overridden,
+                    route,
+                }) => ({
+                    publicationId,
+                    publishedAt,
+                    bypassed,
+                    overridden,
+                    route,
+                }),
+            ),
         );
     }
 
@@ -1740,8 +1802,16 @@ export class SitesService {
     async publishSite(
         ctx: OrganizationContext,
         siteId: string,
+        /**
+         * An owner publishing past "Publishing needs approval" (DEC-071,
+         * R10): with the setting on, a direct publish is refused (409)
+         * unless an owner overrides, and the override is recorded. 403
+         * from anyone else.
+         */
+        options: { override?: boolean } = {},
     ): Promise<PublishResult> {
         authorize(ctx, "site:publish");
+        assertOverrideAllowed(ctx, options.override);
 
         const site = await this.loadDraftSite({
             id: siteId,
@@ -1794,7 +1864,8 @@ export class SitesService {
                 site: { id: site.id, organizationId: ctx.organizationId },
                 snapshot,
                 source: "publish",
-                actor: { userId: ctx.userId },
+                actor: { userId: ctx.userId, owner: isOwner(ctx) },
+                override: options.override,
                 fingerprint,
                 template: {
                     id: starterTemplate.id,
@@ -1807,6 +1878,8 @@ export class SitesService {
                 publishedAt: live.publishedAt,
                 currentPublicationId: live.publicationId,
                 bypassed: live.bypassed,
+                overridden: live.overridden,
+                route: live.route,
             };
         });
     }
@@ -2370,7 +2443,9 @@ export class SitesService {
                           }
                         : { testReleaseId: null }),
                 },
-                orderBy: { createdAt: "desc" },
+                // Two reviews can share a millisecond; the id (a cuid, which grows)
+                // keeps "newest" deterministic.
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 select: {
                     outcome: true,
                     createdAt: true,

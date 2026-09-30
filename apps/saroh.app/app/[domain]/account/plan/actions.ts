@@ -24,6 +24,8 @@ import { AUTOPAY_METHOD, autopayStartAnswer } from "@/lib/autopay-shape";
 import { accountFetch } from "@/lib/customer-session";
 import { siteOrigin } from "@/lib/origin";
 import { joinStandingAnswer, joinStartAnswer } from "@/lib/plan-join-shape";
+import { testMode } from "@/lib/test-release";
+import { TEST_RELEASE_REFUSAL } from "@saroh/site-blocks";
 
 /**
  * What a member does to their own plan from the account's Plan tab (round-2
@@ -66,6 +68,7 @@ export async function pausePlan(
     weeks: number,
 ): Promise<PlanChangeResult> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     if (!PAUSE_WEEKS.includes(weeks)) {
         return { ok: false, message: "Pause for 2, 4 or 8 weeks" };
     }
@@ -74,16 +77,19 @@ export async function pausePlan(
 
 export async function resumePlan(ref: string): Promise<PlanChangeResult> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     return change(ref, "resume");
 }
 
 export async function cancelPlan(ref: string): Promise<PlanChangeResult> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     return change(ref, "cancel");
 }
 
 export async function payPlanNow(ref: string): Promise<PayNowResult> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     if (!accountAreaOn()) return { ok: false, message: OFFLINE };
     if (typeof ref !== "string" || !REF.test(ref)) {
         return { ok: false, message: OFFLINE };
@@ -115,6 +121,7 @@ export async function buyPack(
     idempotencyKey: string,
 ): Promise<PackResult<AccountPackCheckout>> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     if (!accountAreaOn()) return { ok: false, message: OFFLINE };
     if (typeof ref !== "string" || !REF.test(ref)) {
         return { ok: false, message: OFFLINE };
@@ -176,6 +183,7 @@ export async function joinPlan(
     autopay?: AutopayMethod,
 ): Promise<JoinResult<PlanJoinStarted>> {
     if (!(await siteOrigin())) return OFFLINE_JOIN;
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     if (!accountAreaOn()) return OFFLINE_JOIN;
     if (typeof ref !== "string" || !REF.test(ref)) return OFFLINE_JOIN;
     if (typeof idempotencyKey !== "string" || !KEY.test(idempotencyKey)) {
@@ -230,6 +238,7 @@ export async function startPlanAutopay(
     idempotencyKey: string,
 ): Promise<AutopayStartResult> {
     if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     if (!accountAreaOn()) return { ok: false, message: OFFLINE };
     if (
         typeof ref !== "string" ||
@@ -262,6 +271,7 @@ export async function joinStartAutopay(
     idempotencyKey: string,
 ): Promise<JoinResult<AutopayStart>> {
     if (!(await siteOrigin())) return OFFLINE_JOIN;
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
     const result = await startPlanAutopay(
         subscriptionRef,
         method,

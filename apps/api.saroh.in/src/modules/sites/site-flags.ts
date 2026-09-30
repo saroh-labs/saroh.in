@@ -703,7 +703,7 @@ export function checkShop(input: ShopFlagInput): Flag[] {
         flags.push({
             type: "storefrontUnchosen",
             message:
-                "Pick which storefront this site sells from. Until you do, the shop and its products don't show on the site.",
+                "Pick which location your online shop sells from. Until you do, the shop and its products don't show on the site.",
             pageId: null,
             sectionIndex: null,
             field: "storefrontId",
@@ -724,7 +724,7 @@ export function checkShop(input: ShopFlagInput): Flag[] {
         if (page.kind === "SHOP" && page.path === SHOP_ROOT) continue;
         flags.push({
             type: "reservedAddress",
-            message: `${page.path} is where your shop lives. This page keeps showing there for now. Change its address so the shop can open.`,
+            message: `${page.path} is where your online shop lives. This page keeps showing there for now. Change its address so the shop can open.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",
