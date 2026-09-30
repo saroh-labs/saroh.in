@@ -26,7 +26,7 @@ export function StorefrontChooser({
     crumb: string;
     title: string;
     description: string;
-    stores: { id: string; name: string; slug: string }[];
+    stores: { id: string; name: string }[];
     hrefFor: (storeId: string) => string;
 }) {
     return (
@@ -71,13 +71,8 @@ export function StorefrontChooser({
                                 href={hrefFor(s.id)}
                                 className="flex items-center gap-3 bg-card px-[18px] py-[14px] transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
-                                <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[13.5px] font-medium">
-                                        {s.name}
-                                    </span>
-                                    <span className="block font-mono text-[11.5px] text-muted-foreground">
-                                        /{s.slug}
-                                    </span>
+                                <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
+                                    {s.name}
                                 </span>
                                 <ChevronRight
                                     aria-hidden
