@@ -49,6 +49,7 @@ import {
     syncStorefrontFulfilmentTypes,
     writeSite,
 } from "./helpers";
+import { seedPreviousAddress } from "./previous-address";
 import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
@@ -274,6 +275,8 @@ export async function seed(): Promise<void> {
     const sideOrgIds = await seedSideBusinesses(prisma, user.id, now);
     const siteIds = await seedWebsite(prisma, org.id, sideOrgIds, user.id, now);
     await seedReviewer(prisma, org.id, user.id, siteIds[0]);
+    // An old address of Northwind's that still forwards to its site (L3).
+    await seedPreviousAddress(prisma, org.id, siteIds[0], now);
     await seedStorefrontTeammate(prisma, org.id, storeId);
     await seedFounder(prisma);
     // Content after the website: a post belongs to the site it is published on
@@ -1544,6 +1547,9 @@ export async function deleteSeeded(
         // Cascades from either side, but removed explicitly so the count the
         // reset reports is the number of rows the seed actually wrote.
         () => prisma.siteReviewer.deleteMany({ where }),
+        // An old address held for Northwind (DEC-069, L3): it goes with
+        // its business and loses its site, but is removed and counted here.
+        () => prisma.addressReservation.deleteMany({ where }),
         () => prisma.site.deleteMany({ where }),
         () => prisma.subscription.deleteMany({ where }),
         () => prisma.plan.deleteMany({ where }),

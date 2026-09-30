@@ -1,4 +1,4 @@
-// @covers app:/settings/organization app:/open api:organizations
+// @covers app:/settings/organization app:/open api:organizations site:/[slug] site:/shop api:sites
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -18,8 +18,11 @@ import { urls } from "../playwright.config";
  *
  * A business set up here has no website — the seed's module flags reach
  * only its own businesses — so its old address is kept, not forwarded. The
- * forwarding half (the new host serves, the old one answers 307) is L3's,
- * which adds it to this spec on a business with a live site.
+ * forwarding half (L3) reads an old address the seed holds for Northwind,
+ * as a change leaves one (`packages/database/src/seed/previous-address.ts`):
+ * it answers 307 to the same page on Northwind's site, which serves, and an
+ * address nobody holds still 404s. That a change writes such a row is
+ * covered against a real database (`web-address.service.db.spec.ts`).
  *
  * An admin is checked on Prana Yoga, where the demo owner is an admin:
  * read only, as the film sets are.
@@ -143,4 +146,49 @@ test("an admin reads the web address, and has no Change", async ({ page }) => {
     await expect(row).toContainText(`${view.address}${suffixOf(view)}`);
     await expect(row).toContainText("Only the owner can change this.");
     await expect(row.getByRole("button", { name: "Change" })).toHaveCount(0);
+});
+
+/** A host on the renderer, as this stack serves one. */
+const renderer = new URL(urls.RENDERER_URL);
+const hostOf = (address: string) =>
+    `${renderer.protocol}//${address}.${renderer.host}`;
+
+/** The old address the seed holds for Northwind (`previous-address.ts`). */
+const NORTHWIND_BEFORE = "northwind-before";
+
+test("an old address forwards to the same page on the new one (L3)", async ({
+    request,
+}) => {
+    // Where the API says the old address forwards: Northwind's site.
+    const moved = await request.get(
+        `${urls.API_URL}/public/sites/moved/${NORTHWIND_BEFORE}`,
+    );
+    expect(moved.ok(), await moved.text()).toBe(true);
+    const { to } = (await moved.json()) as { to: string };
+    expect(new URL(to).hostname.startsWith("northwind.")).toBe(true);
+
+    // The same path and query, with a temporary redirect: a browser must
+    // not keep a hop that stops being true after 90 days.
+    const old = await request.get(`${hostOf(NORTHWIND_BEFORE)}/shop?x=1`, {
+        maxRedirects: 0,
+    });
+    expect(old.status()).toBe(307);
+    expect(old.headers()["location"]).toBe(`${to}/shop?x=1`);
+
+    // A post, and the root, go the same way.
+    const post = await request.get(`${hostOf(NORTHWIND_BEFORE)}/posts/a-b`, {
+        maxRedirects: 0,
+    });
+    expect(post.status()).toBe(307);
+    expect(post.headers()["location"]).toBe(`${to}/posts/a-b`);
+
+    // The new address serves.
+    const live = await request.get(`${hostOf("northwind")}/`);
+    expect(live.status()).toBe(200);
+
+    // An address nobody holds is still a 404, not a redirect.
+    const unknown = await request.get(`${hostOf("nobody-holds-this")}/shop`, {
+        maxRedirects: 0,
+    });
+    expect(unknown.status()).toBe(404);
 });
