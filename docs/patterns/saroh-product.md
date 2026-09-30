@@ -206,6 +206,18 @@ organizations/:org/customers`: everyone who has paid (an order through a
   release's Go live all repoint through `putLive` (`sites/live-pointer.ts`,
   DEC-071), which records the review route and any bypass; nothing else in
   `modules/sites` writes the pointer (`live-pointer.source.spec.ts`).
+- **Current** — Approval is advisory (DEC-047) unless the site turns on
+  **"Publishing needs approval"** (DEC-071, off by default). While it is on,
+  Publish and restore answer 409 `APPROVAL_REQUIRED`, and Go live works only
+  for a test release someone other than the person going live approved, with
+  no newer change request or review request on it. An owner can still go
+  live without approval (`override: true`); that is recorded as the route
+  OVERRIDDEN, an OVERRIDDEN approval row and a
+  `site.publish_approval.override` audit event. Only an owner turns the
+  setting on or off (an audit event each way) or overrides. The rule is
+  enforced in `putLive`, with the words and the owner check in
+  `sites/publish-approval.ts`, so every way of going live obeys it, a
+  scheduled go-live included.
 - **Current** — Section content validates against the versioned contract in
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing
