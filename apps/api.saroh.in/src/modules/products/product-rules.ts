@@ -98,7 +98,7 @@ export function assertDetailsCoherent(state: DetailsState): void {
     if (state.returnsMode === "OWN" && !state.returnsText) {
         throw new BadRequestException({
             message:
-                "Write this product's returns rule, or use the storefront's.",
+                "Write this product's returns rule, or use the location's.",
             field: "returnsText",
         });
     }

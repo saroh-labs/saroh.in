@@ -81,6 +81,21 @@ typography, shape, density, motion — is explicitly open (confirmed 2026-08-04)
 storefronts and must never inherit Saroh's brand. The `--site-*` token layer is
 separate by design and stays that way.
 
+## Vocabulary
+
+The words a merchant reads (DEC-069). Code identifiers keep their older names.
+
+| Say                    | Means                                                                     | Never say                         |
+| ---------------------- | ------------------------------------------------------------------------- | --------------------------------- |
+| **Location**           | A place the business sells from in person (`Store`, "storefront" in code) | storefront, store                 |
+| **Your online shop**   | The website's `/shop`, selling from one location's stock                  | online store, storefront          |
+| **Customers visit**    | A location with an address, hours and collection (`SHOP` kind)            | shop (as a kind)                  |
+| **No counter**         | A location holding stock for online orders only (`ONLINE` kind)           | online store (as a kind)          |
+| **Web address**        | The business's website address, `<address>.saroh.app` or its domain       | address, subdomain, Saroh address |
+| **Registered address** | The business's legal address, on invoices                                 | address                           |
+| **Location address**   | Where a location is, on its receipts                                      | address                           |
+| **Posts path**         | Where the blog's posts live on the site                                   | writing address                   |
+
 ## Evidence on Hand
 
 - `docs/product-transformation/` — six audit and strategy documents

@@ -141,10 +141,21 @@ const MEMBER_ACTIONS: readonly OrgAction[] = ["order:stage"];
  * Sets are frozen-by-construction (never mutated after build) so a leaked
  * reference can't widen a role's capabilities.
  */
+/**
+ * The powers only the built-in Owner holds: closing the business, and
+ * changing its web address (DEC-069, plan L2). Not an Admin's, never an
+ * extra, never grantable to an invented role (`ownerOnly` in the catalogue;
+ * `capability-catalogue.spec.ts` keeps the two in step).
+ */
+export const OWNER_ONLY_ACTIONS: readonly OrgAction[] = [
+    "org:delete",
+    "org:address:update",
+];
+
 const CAPABILITIES: Record<OrgRole, ReadonlySet<OrgAction>> = {
     OWNER: new Set<OrgAction>(ORG_ACTIONS),
     ADMIN: new Set<OrgAction>(
-        ORG_ACTIONS.filter((action) => action !== "org:delete"),
+        ORG_ACTIONS.filter((action) => !OWNER_ONLY_ACTIONS.includes(action)),
     ),
     MEMBER: new Set<OrgAction>([...READ_ONLY_ACTIONS, ...MEMBER_ACTIONS]),
     /*
@@ -283,7 +294,9 @@ function isKnownAction(action: string): action is OrgAction {
  * been vetted by the write path; `capability-catalogue.spec.ts` keeps the
  * two in step.
  */
-const NEVER_EXTRA: ReadonlySet<OrgAction> = new Set<OrgAction>(["org:delete"]);
+const NEVER_EXTRA: ReadonlySet<OrgAction> = new Set<OrgAction>(
+    OWNER_ONLY_ACTIONS,
+);
 
 /**
  * What a Reviewer may hold as an extra: the website review powers and

@@ -67,14 +67,14 @@ export class MembersService {
     /** Throw 404 (no existence leak) unless the caller owns the store. */
     private async requireOwner(storeId: string, userId: string): Promise<void> {
         if (!(await this.isOwner(storeId, userId))) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
     }
 
     /** The team: owners + staff, each with their user's email/name. */
     async listMembers(storeId: string, callerId: string) {
         if (!(await this.hasAccess(storeId, callerId))) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
 
         const [owners, members] = await Promise.all([
@@ -373,14 +373,14 @@ export class MembersService {
             where: { id: storeId },
             select: { organizationId: true },
         });
-        if (!store) throw new NotFoundException("Store not found");
+        if (!store) throw new NotFoundException("Location not found");
         // Not on the business's team at all: a 403 like any other refusal.
         const ctx = await this.contexts
             .resolve(callerId, store.organizationId)
             .catch(() => null);
         if (!ctx || !allows(ctx, "member:invite")) {
             throw new ForbiddenException(
-                "Inviting someone to a storefront also adds them to your team, and you can't invite people to the team. Ask an owner or admin.",
+                "Inviting someone to a location also adds them to your team, and you can't invite people to the team. Ask an owner or admin.",
             );
         }
         const role = await prisma.organizationRole.findUnique({

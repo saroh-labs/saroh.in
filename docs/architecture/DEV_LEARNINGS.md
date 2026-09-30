@@ -1208,6 +1208,117 @@ updated". `test/global-setup.ts` re-runs the (idempotent) grants.
 the pattern doc saying why not. A new CI job lands with its prepush step.
 **Category**: tooling · `scripts/prepush.sh`, `scripts/e2e-affected.mjs`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+
+## Integration — a probe role failed DROP ROLE beside another test database (K1)
+
+**Problem**: `prepush --int` failed `public-catalogue.db.spec.ts` in teardown
+with `role "saroh_g11_rls_probe" cannot be dropped because some objects
+depend on it` (2BP01), after several units ran their suites at once and a
+machine restart killed runs mid-way.
+**Root cause**: a Postgres role belongs to the whole cluster, not one
+database. Every `saroh-test-*` database shares it, so a grant left in another
+database (a parallel run, or one that died before its `afterAll`) blocks the
+drop.
+**Fix**: the teardown drops the role in a `DO` block that ignores
+`dependent_objects_still_exist`; the role is NOLOGIN and holds nothing in the
+database being torn down.
+**Rule**: a spec that creates a role must not fail when another database still
+uses it — drop it tolerantly, or give it a per-database name.
+**Category**: tests · integration · parallel databases
+
+## Copy — the service editor matched an API refusal by its words (DEC-069 L11)
+
+**Problem**: Rewording the API's "Treatments are sold as orders — add a
+storefront first." to say location would have silently moved the app's
+inline note under Time into a generic error toast.
+**Root cause**: `components/services/service-editor/service-editor.tsx`
+decides where to show the refusal with `error === TREATMENT_NEEDS_STOREFRONT`,
+a copy of the API's sentence kept in `lib/services/service-editor.ts`. The
+API already sends `details.reason: "no-storefront"`, but the app's save path
+passes only the message on.
+**Fix**: the app's constant changed in the same commit as the API's words.
+`src/common/merchant-copy.spec.ts` now fails on any API prose that says
+storefront, so a copy change there is visible in review.
+**Rule**: branch on a code or `details.reason`, never on a message's words;
+when an old app still compares words, change both sides together and expect
+an old app to fall back to the toast until it is redeployed.
+**Category**: copy · API contract · DEC-069
+
+## Sites — every new site opened with broken images (DEC-070 K10)
+
+**Problem**: A site made from the starter template (Turn on Website, or
+`/sites/new`) drafted a hero and a three-image gallery, and all four images
+were broken in the editor and on the published page. With no contact email,
+its "Get in touch" went to `/contact`, a page it never made, which the
+pre-publish check then flagged.
+**Root cause**: `starter@1` named `/templates/starter/*.jpg`, relative
+paths that no app's `public/` has. The template's tests only parsed the
+content against the block contract, which checks that `src` is a string,
+not that anything serves it. Nothing ever rendered a template.
+**Fix**: `starter@2` carries no image and links only to its email or its
+own About page. `packages/site-blocks/src/starter-template.test.tsx` renders
+every page through `SectionRenderer` and fails on any `<img>` or
+`/templates/` path; `starter@1` is its control. `starter-site.db.spec.ts`
+checks a real Turn on Website draft. `listTemplates()` now lists only the
+latest version of each id: registering v2 beside v1 would otherwise have
+shown "Starter" twice in the picker, which keys options by id.
+**Rule**: a template may name an image only by an absolute address the
+media library served, never a path an app is assumed to have. Render a new
+template in a test, not only parse it (K12–K14 follow the same test).
+**Category**: sites · templates · DEC-070
+
+## E2E stack — the API's renderer links pointed at production (DEC-069 L6)
+
+**Problem**: a pay page opened on a tenant host in the CI and prepush e2e
+stacks would have redirected the browser to `https://saroh.app/pay/…`, the
+live service, instead of the stack's own renderer.
+**Root cause**: the stacks set `E2E_RENDERER_URL` for the specs but never
+the API's `RENDERER_URL`, so every link the API built for the renderer
+(pay links, review links) fell back to production's `saroh.app`. Specs had
+worked around it by keeping only the path of a link (`invoices.spec.ts`).
+**Fix**: both stacks set `RENDERER_URL=http://localhost:3005`
+(`scripts/prepush.sh`, `.github/workflows/ci.yml`), and
+`pay-on-site.spec.ts` fails when `payUrl` names any host outside the
+stack's renderer.
+**Rule**: an origin the API hands to customers is set in every stack that
+runs the API; a spec that follows a link asserts it stays on the stack.
+**Category**: e2e · environment · `docs/patterns/devops-environments-and-flags.md`
+
+## Sites — a Shop page can't be shown in the browser suite (DEC-069, L13)
+
+**Problem**: L13's plan asked for a browser spec: turn on Sell with Delivery
+on a business the test makes, then see Website › Pages show Shop (draft).
+It can't pass on the seeded e2e stack.
+**Root cause**: the Shop page and the Sells from row sit behind `SITE_SHOP`,
+which is off by default and on for no seeded business (`site-shop.spec.ts`
+runs only with `E2E_SITE_SHOP=1`, which neither CI nor `prepush --e2e`
+sets). A business a test makes also has no `MODULE_*` overrides, so Sell
+isn't even offered to it (DEC-057). The brief's "write to Northwind only"
+rules out the other route: Northwind already has its site and pages.
+**Fix**: the scenarios run against a real Postgres instead
+(`module-setup.db.spec.ts` "selling online leaves the shop ready to
+publish", `module-page-create.db.spec.ts`), with the flag turned on per
+business by an override.
+**Rule**: before planning a browser spec for a flag-gated surface, check the
+flag is on in the e2e seed; if it isn't, plan the proof as a db spec, or
+seed the flag for Northwind first.
+**Category**: testing · feature flags · DEC-069
+
+## Tooling — a killed `eslint --fix` left three source files empty (L9)
+
+**Symptom**: after a machine restart, a unit worktree's uncommitted
+`storefronts-screen.tsx` and two new files were 0 bytes, though `git status`
+listed them only as modified or untracked.
+**Cause**: `eslint --fix` over a directory was still writing when the
+machine went down; a fix rewrites the file in place, so a kill mid-write
+truncates it.
+**Fix**: restored the tracked file from HEAD and re-applied the edits; the
+new files were rewritten.
+**Rule**: after any interruption, look for empty files before committing
+(`find apps -path '*/node_modules' -prune -o -type f -empty -print`), and
+commit work in progress before a long `--fix` run.
+**Category**: tooling · worktrees
+
 ## CI — four reds on batch 4 (#765) that the local gate passed
 
 **Problem**: `pnpm prepush --all` passed; CI failed four jobs. (1) Unit:
@@ -1245,3 +1356,77 @@ evidence, never on absence. Run `TEST_RLS=on` for any spec touching a
 cross-business read, and the permission suite for anything on Team, until
 `scripts/prepush.sh` runs both.
 **Category**: CI · tests · RLS · a11y
+
+## Capabilities — the annotation spec counted a decorator named in a comment
+
+**Problem**: after K6 (DEC-070) moved the Payments gate off `InvoicesController`
+onto its pay-link handler, `module-annotations.spec.ts` said the file had two
+`@RequireModule(` but only one `@IgnoreModuleReadiness()`.
+**Root cause**: the spec is a source scan. The class doc comment spelled out
+`@RequireModule("PAYMENTS")` to explain the handler gate, and the regex
+counted it as a second gate.
+**Fix**: the comment says "its own Payments gate on the handler". A new case
+pins that the invoices controller has exactly one gate, on the pay link.
+**Rule**: in a controller, never write a decorator's literal text in a
+comment; the annotation spec reads comments as code. Also: a service that
+starts reading `organizationModule` (`paymentsOn`) breaks every unit spec
+whose mocked Prisma lacks it with a TypeError, not a clear failure — add
+`organizationModule: { findFirst: jest.fn().mockResolvedValue(null) }` (no
+row reads as on).
+**Category**: tests · capabilities · mocks
+
+## Gate — batch 5's units passed alone and failed together: a copy guard and RLS (DEC-069/070/071)
+
+**Problem**: batch 2026-09-30-5 (batch 4, wave 1 of DEC-069/070/071, K6)
+failed two gates once merged, though each unit had passed its own.
+(1) api-unit: L11's `merchant-copy.spec.ts` flagged DEC-074's refusal in
+`orders/order-location.ts`, "Your role moves only your storefront's
+orders." (2) int-rls: in `module-setup.db.spec.ts`, L13's "selling online
+leaves the shop ready to publish" cases died at `tx.store.create()` with
+"Unique constraint failed".
+**Root cause**: (1) DEC-074 and L11 were built side by side; the guard
+didn't exist when DEC-074 wrote its copy. (2) `freeStoreSlug` (Sell's
+turn-on) asked `tx.store.findUnique({ where: { slug } })`. `Store.slug` is
+unique across every business, but under RLS `tx` sees only the caller's,
+so the other business's "rye-counter" looked free. L13 added the spec
+cases that make two businesses with the same shop name; the units that
+built them ran before the gate ran `TEST_RLS=on` (FAST-PREPUSH).
+`StoresService.isSlugAvailable` had the same read (backstopped by a 409).
+**Fix**: (1) "Your role moves only your location's orders." (2)
+`storeSlugInUse()` (`stores/store-slug.ts`) reads every business's
+storefronts through `outsideOrgContext`, as `addressUse()` does for web
+addresses; both slug checks use it. The spec failed 5 cases under
+`TEST_RLS=on` before and passes in both modes after.
+**Rule**: units built before the gate ran RLS (or before a guard spec
+landed) are re-gated when they land together: run `pnpm prepush --int`
+(plain and RLS) and the full api unit suite on the batch branch, not only
+per unit. A uniqueness check across businesses reads outside the org
+context (`docs/patterns/backend-data-and-money.md`).
+**Category**: gate · RLS · copy
+## Merges — a new guard and a new string landed in one batch, and the guard failed (L2)
+
+**Symptom**: on `batch-2026-09-30-5`, `src/common/merchant-copy.spec.ts`
+(L11) failed on `orders/order-location.ts`: "Your role moves only your
+storefront's orders."
+**Cause**: DEC-074's location-team refusal and L11's "API prose never says
+storefront" guard were built in parallel; each passed alone, and the merge
+put them together with nothing re-running the unit suite on the result.
+**Fix**: the refusal says "your location's orders" (L2's first commit).
+**Rule**: after merging a unit that adds a guard test (a source scan, a
+catalogue check), run the API unit suite on the batch before starting the
+next wave from it.
+**Category**: merges · testing · DEC-069
+## Batch — a DEC-074 refusal said "storefront" once L11's copy scan landed (K2)
+
+**Symptom**: `api-unit` failed on `batch-2026-09-30-5` itself:
+`common/merchant-copy.spec.ts` flagged `orders/order-location.ts`'s
+"Your role moves only your storefront's orders."
+**Cause**: DEC-074's unit wrote the refusal before DEC-069 L11's scan (merchant
+copy says location) existed; each unit passed alone, and the batch merge put
+them together without re-running `api-unit`.
+**Fix**: the refusal says "your location's orders" (K2 made the one-word
+change, since it blocked its gate).
+**Rule**: after landing units into a batch, run `pnpm prepush` on the batch
+before branching the next wave from it; a scan added by one unit judges every
+other unit's strings.
+**Category**: batches · copy · DEC-069

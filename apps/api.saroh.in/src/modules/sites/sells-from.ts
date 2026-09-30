@@ -9,13 +9,15 @@ import { FlagKey } from "../feature-flags/flags";
 /**
  * The storefront a site sells from (round-2 G11): `Site.storefrontId`.
  *
- * Shown, never silent. It is set on its own only when the business has
- * exactly one open storefront with listings (the migration's backfill and
- * site creation), and the site's settings then say "Your site sells from
- * Online · Change". With several it stays unset until the merchant answers
- * "Which storefront does this site sell from?", and the pre-publish check
- * names it. It is never "the first storefront" by creation order. Closing
- * the storefront clears it (`storefronts.service.ts`), and a read treats a
+ * Shown, never silent. It is set on its own only when there is one clear
+ * answer ({@link automaticStorefront}: the one open storefront with
+ * listings, or the only open storefront when none has any), and when Sell is
+ * turned on for a site that has none (DEC-069); the site's settings then say
+ * "Your site sells from Online · Change". With several it stays unset until
+ * the merchant answers "Which storefront does this site sell from?", and
+ * the pre-publish check names it. It is never "the first storefront" by
+ * creation order over products listed elsewhere. Closing the storefront
+ * clears it (`storefronts.service.ts`), and a read treats a
  * closed one as unset anyway.
  *
  * `/shop`, the product pages, the Product grid (G12) and checkout (G13) all
@@ -113,9 +115,16 @@ export async function sellsFromChoices(
 }
 
 /**
- * The storefront to set on its own: the only candidate, or null when there
- * are none or several. Used at site creation, as the migration's backfill
- * did for existing sites.
+ * The storefront to set on its own, or null to leave the question to the
+ * merchant (KTD-10 of DEC-069's plan):
+ *
+ * - the only open storefront with listings, when exactly one has any (G11);
+ * - when none has listings yet, the business's only open storefront — at
+ *   Sell's turn-on no product exists, and the merchant has already named
+ *   where they sell from;
+ * - otherwise (several with listings, or several and none listed) null.
+ *
+ * Used at site creation, as the migration's backfill did for existing sites.
  */
 export async function automaticStorefront(
     db: Db,
@@ -126,7 +135,27 @@ export async function automaticStorefront(
         select: { id: true },
         take: 2,
     });
-    return candidates.length === 1 ? (candidates[0]?.id ?? null) : null;
+    if (candidates.length > 0) {
+        return candidates.length === 1 ? (candidates[0]?.id ?? null) : null;
+    }
+    const open = await db.store.findMany({
+        where: { organizationId, deletedAt: null },
+        select: { id: true },
+        take: 2,
+    });
+    return open.length === 1 ? (open[0]?.id ?? null) : null;
+}
+
+/** Whether any open storefront of the business lists a published product. */
+export async function anyListed(
+    db: Pick<Prisma.TransactionClient, "store">,
+    organizationId: string,
+): Promise<boolean> {
+    const listed = await db.store.findFirst({
+        where: { organizationId, ...SELLS_SOMETHING },
+        select: { id: true },
+    });
+    return listed !== null;
 }
 
 /**

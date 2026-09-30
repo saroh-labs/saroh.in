@@ -107,7 +107,7 @@ describe("StoresService (dev DB)", () => {
             }),
         ).rejects.toMatchObject({
             status: 403,
-            response: { message: expect.stringMatching(/5 storefronts/) },
+            response: { message: expect.stringMatching(/5 locations/) },
         });
         expect(
             await prisma.store.count({ where: { organizationId: orgId } }),

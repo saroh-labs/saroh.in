@@ -398,7 +398,7 @@ describe("how it leaves (B13)", () => {
                 address,
                 payment: { kind: "CARD" },
             } as CreateOrderDto),
-        ).rejects.toThrow("This storefront doesn't offer Shipping");
+        ).rejects.toThrow("This location doesn't offer Shipping");
     });
 });
 

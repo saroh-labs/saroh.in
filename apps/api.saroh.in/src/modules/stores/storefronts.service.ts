@@ -314,7 +314,7 @@ export class StorefrontsService {
         ) {
             throw new ConflictException({
                 message:
-                    "This storefront has taken orders in " +
+                    "This location has taken orders in " +
                     current.currency +
                     ", so its currency cannot change.",
                 field: "currency",
@@ -337,7 +337,7 @@ export class StorefrontsService {
             if (row?.status !== "CONNECTED") {
                 throw new BadRequestException({
                     message:
-                        "Connect that provider for the business before a storefront can use it.",
+                        "Connect that provider for the business before a location can use it.",
                     field: "checkoutProvider",
                 });
             }
@@ -694,7 +694,7 @@ export class StorefrontsService {
                 _count: { select: { orders: true } },
             },
         });
-        if (!store) throw new NotFoundException("Storefront not found");
+        if (!store) throw new NotFoundException("Location not found");
         return store;
     }
 }

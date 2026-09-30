@@ -4,11 +4,14 @@ import { Prisma, prisma } from "@saroh/database";
 import { randomUUID } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { PricesOffer } from "./module-page-sections";
 import { defaultModuleSections } from "./module-page-sections";
 import { modulePageState, pricesOffer } from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import { assertPathIsFree } from "./site-access";
+
+type Tx = Prisma.TransactionClient;
 
 /** A page as the page endpoints return it. */
 export interface CreatedPage {
@@ -123,48 +126,15 @@ export async function createModulePage(
         kind === "PRICES" ? await pricesOffer(ctx.organizationId) : undefined;
 
     try {
-        return await prisma.$transaction(async (tx) => {
-            const sections = await defaultModuleSections(tx, {
-                organizationId: ctx.organizationId,
-                siteId: site.id,
-                siteName: site.name,
+        return await prisma.$transaction((tx) =>
+            insertModulePage(tx, ctx, site, {
                 kind,
+                path,
+                title,
+                inMenu: dto.inMenu ?? true,
                 prices,
-            });
-            return tx.page.create({
-                data: {
-                    siteId: site.id,
-                    organizationId: ctx.organizationId,
-                    path,
-                    title,
-                    isHome: false,
-                    kind,
-                    inMenu: dto.inMenu ?? true,
-                    versions: {
-                        create: {
-                            organizationId: ctx.organizationId,
-                            status: "DRAFT",
-                            createdByUserId: ctx.userId,
-                            sections: {
-                                create: sections.map((section, order) => ({
-                                    organizationId: ctx.organizationId,
-                                    // Minted here, as a template's are: a
-                                    // section is keyed from the moment it
-                                    // exists.
-                                    key: randomUUID(),
-                                    type: section.type,
-                                    contractVersion: section.contractVersion,
-                                    order,
-                                    content:
-                                        section.content as Prisma.InputJsonValue,
-                                })),
-                            },
-                        },
-                    },
-                },
-                select: PAGE_VIEW_SELECT,
-            });
-        });
+            }),
+        );
     } catch (error) {
         // Two adds racing past the checks above: the partial unique index
         // (one of each kind) or the path's decides, and the loser is told
@@ -185,4 +155,108 @@ export async function createModulePage(
         }
         throw error;
     }
+}
+
+/** The page, its DRAFT version and its default sections, on `tx`. */
+async function insertModulePage(
+    tx: Tx,
+    ctx: OrganizationContext,
+    site: { id: string; name: string },
+    page: {
+        kind: ModulePageKind;
+        path: string;
+        title: string;
+        inMenu: boolean;
+        prices?: PricesOffer;
+    },
+): Promise<CreatedPage> {
+    const sections = await defaultModuleSections(tx, {
+        organizationId: ctx.organizationId,
+        siteId: site.id,
+        siteName: site.name,
+        kind: page.kind,
+        prices: page.prices,
+    });
+    return tx.page.create({
+        data: {
+            siteId: site.id,
+            organizationId: ctx.organizationId,
+            path: page.path,
+            title: page.title,
+            isHome: false,
+            kind: page.kind,
+            inMenu: page.inMenu,
+            versions: {
+                create: {
+                    organizationId: ctx.organizationId,
+                    status: "DRAFT",
+                    createdByUserId: ctx.userId,
+                    sections: {
+                        create: sections.map((section, order) => ({
+                            organizationId: ctx.organizationId,
+                            // Minted here, as a template's are: a section is
+                            // keyed from the moment it exists.
+                            key: randomUUID(),
+                            type: section.type,
+                            contractVersion: section.contractVersion,
+                            order,
+                            content: section.content as Prisma.InputJsonValue,
+                        })),
+                    },
+                },
+            },
+        },
+        select: PAGE_VIEW_SELECT,
+    });
+}
+
+/**
+ * Add a module page on the caller's transaction, only where it is missing
+ * (DEC-069, L13): selling online leaves the website a draft Shop page. The
+ * caller has authorized what it does — turning a module on — so no
+ * per-request check runs here, and nothing is refused: a page that can't be
+ * added is simply not added, and the turn-on still commits.
+ *
+ * Null, and nothing written, when:
+ * - the kind isn't on for the business (its module off, or not rolled out —
+ *   DEC-057: never offered, so never made);
+ * - the site has a page of the kind already (never a second);
+ * - a page of the merchant's own holds the kind's address (theirs stays).
+ *
+ * It goes in at its default address and title, in the menu, as a draft: the
+ * merchant publishes it with the site.
+ */
+export async function addModulePageIfMissing(
+    tx: Tx,
+    ctx: OrganizationContext,
+    site: { id: string; name: string },
+    kind: ModulePageKind,
+): Promise<CreatedPage | null> {
+    const gate = await modulePageState(kind, ctx.organizationId, tx);
+    if (gate.state !== "on") return null;
+
+    const defaults = MODULE_PAGE_DEFAULTS[kind];
+    // One query at a time: a transaction runs on one connection.
+    const existing = await tx.page.findFirst({
+        where: { siteId: site.id, kind },
+        select: { id: true },
+    });
+    if (existing) return null;
+    const holder = await tx.page.findFirst({
+        where: { siteId: site.id, path: defaults.path },
+        select: { id: true },
+    });
+    if (holder) return null;
+
+    const prices =
+        kind === "PRICES"
+            ? await pricesOffer(ctx.organizationId, tx)
+            : undefined;
+    return insertModulePage(tx, ctx, site, {
+        kind,
+        path: defaults.path,
+        title: defaults.title,
+        inMenu: true,
+        prices,
+    });
 }

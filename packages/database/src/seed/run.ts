@@ -34,6 +34,7 @@ import {
     STORE_SLUG,
     SUBMISSIONS,
 } from "./data";
+import { seedFounder } from "./founder";
 import type { Db } from "./helpers";
 import {
     assertHeldStock,
@@ -254,6 +255,7 @@ export async function seed(): Promise<void> {
     const siteIds = await seedWebsite(prisma, org.id, sideOrgIds, user.id, now);
     await seedReviewer(prisma, org.id, user.id, siteIds[0]);
     await seedStorefrontTeammate(prisma, org.id, storeId);
+    await seedFounder(prisma);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);

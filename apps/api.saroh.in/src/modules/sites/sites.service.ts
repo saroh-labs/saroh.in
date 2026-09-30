@@ -429,8 +429,13 @@ export interface SiteDetailView {
  * snapshot with no pages and take the live site down. A post publish is not a
  * version of the site, so it is not offered as one — restoring one is a 404, not
  * a broken home page.
+ *
+ * A test release's frozen snapshot is a Publication too (`kind = 'TEST'`,
+ * DEC-071). It has never been live, so it is not a version either: it is not
+ * listed, opened or restored as one. Restoring one would put an unapproved
+ * candidate live by a path that skips going live.
  */
-const SITE_VERSION = { postId: null } as const;
+const SITE_VERSION = { postId: null, kind: "LIVE" } as const;
 
 export interface PublicationDetail {
     id: string;
@@ -1935,7 +1940,9 @@ export class SitesService {
         label: string,
     ): Promise<PublicSiteView> {
         const site = await prisma.site.findFirst({
-            where,
+            // A second lock (DEC-071, KTD-2): the live pointer only ever names
+            // a LIVE row, and a real host is never served anything else.
+            where: { AND: [where, { currentPublication: { kind: "LIVE" } }] },
             select: {
                 id: true,
                 organizationId: true,
@@ -2347,9 +2354,10 @@ export class SitesService {
 
     /**
      * A hash of the draft as publishing would write it, for binding an
-     * approval to the work it approved (#278).
+     * approval to the work it approved (#278). Test releases compare theirs
+     * against it to say "Your draft has changed since" (DEC-071).
      */
-    private async currentDraftFingerprint(
+    async currentDraftFingerprint(
         ctx: OrganizationContext,
         siteId: string,
     ): Promise<string> {

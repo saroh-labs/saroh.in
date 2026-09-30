@@ -208,7 +208,9 @@ export function OrganizationSwitcher({
                         className="flex items-center gap-[9px] rounded-lg px-[9px] py-2 text-[12.5px] text-neutral-600 transition-colors duration-fast hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:text-muted-foreground"
                     >
                         <Plus aria-hidden className="size-4" />
-                        New business
+                        {/* Setup asks what it is (DEC-070): not always a
+                            business. */}
+                        Set up another
                     </Link>
                 </div>
             </PopoverContent>

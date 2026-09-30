@@ -117,6 +117,42 @@ describe("version history holds site publishes only (#283)", () => {
     });
 });
 
+describe("version history holds LIVE rows only, never a test release's (DEC-071)", () => {
+    it("lists only LIVE rows", async () => {
+        publicationFindMany.mockResolvedValue([]);
+
+        await service.listPublications(ctx, "site_1");
+
+        expect(publicationFindMany.mock.calls[0][0].where).toMatchObject({
+            kind: "LIVE",
+            postId: null,
+        });
+    });
+
+    it("does not open a TEST row as a version", async () => {
+        publicationFindFirst.mockResolvedValue(null);
+
+        await expect(
+            service.getPublication(ctx, "site_1", "pub_test"),
+        ).rejects.toThrow(/not found/);
+        expect(publicationFindFirst.mock.calls[0][0].where).toMatchObject({
+            kind: "LIVE",
+        });
+    });
+
+    it("does not restore a TEST row: 404, and nothing is written", async () => {
+        publicationFindFirst.mockResolvedValue(null);
+
+        await expect(
+            service.restorePublication(ctx, "site_1", "pub_test"),
+        ).rejects.toThrow(/not found/);
+        expect(publicationFindFirst.mock.calls[0][0].where).toMatchObject({
+            id: "pub_test",
+            kind: "LIVE",
+        });
+    });
+});
+
 describe("SitesService.getPublication reports what it can draw (#283)", () => {
     it("returns the publisher and a renderability check of the snapshot", async () => {
         publicationFindFirst.mockResolvedValue({

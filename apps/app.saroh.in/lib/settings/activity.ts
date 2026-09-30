@@ -146,7 +146,7 @@ const PRODUCTS = { label: "Products", href: "/commerce/products" };
 const PLAN = { label: "Plan and billing", href: "/settings/billing" };
 /** A storefront's own settings, or the list when it isn't named. */
 const STOREFRONTS_HREF = (storeId: string | null) =>
-    storeId ? storefrontHref(storeId) : "/commerce/storefronts";
+    storeId ? storefrontHref(storeId) : "/commerce/locations";
 
 const business = (tab?: BusinessTab) => ({
     label: tab ? TAB_LABEL[tab] : "Business",

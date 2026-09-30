@@ -529,7 +529,7 @@ describe("Stock log and rules (DB)", () => {
                     units: 1,
                 }),
             ),
-        ).rejects.toThrow("This storefront is closed");
+        ).rejects.toThrow("This location is closed");
         await expect(
             tx((t) =>
                 count(t, actor, {

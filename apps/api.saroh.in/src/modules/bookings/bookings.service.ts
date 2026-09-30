@@ -979,8 +979,7 @@ export class BookingsService {
             : null;
         if (treatment && !treatmentStore) {
             throw new ConflictException({
-                message:
-                    "Treatments are sold as orders. Add a storefront first.",
+                message: "Treatments are sold as orders. Add a location first.",
                 details: { reason: "no-storefront" },
             });
         }

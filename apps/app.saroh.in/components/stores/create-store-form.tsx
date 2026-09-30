@@ -74,7 +74,7 @@ export function CreateStoreForm() {
                     name="name"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Storefront name</FormLabel>
+                            <FormLabel>Location name</FormLabel>
                             <FormControl>
                                 <Input
                                     placeholder="Hill Road shop"
@@ -134,7 +134,7 @@ export function CreateStoreForm() {
                     className="wk-press justify-self-start"
                     disabled={isSubmitting || !name.trim()}
                 >
-                    {isSubmitting ? "Creating…" : "Create storefront"}
+                    {isSubmitting ? "Creating…" : "Create location"}
                 </Button>
             </form>
         </Form>

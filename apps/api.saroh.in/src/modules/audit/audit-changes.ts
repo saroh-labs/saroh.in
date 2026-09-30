@@ -30,6 +30,8 @@ export interface FieldChange {
  */
 export const VALUE_FIELDS = [
     "name",
+    // What is being set up (DEC-070): BUSINESS, SOLO or WORK.
+    "kind",
     "legalName",
     "type",
     "country",

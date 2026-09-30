@@ -19,7 +19,11 @@ import {
 // implementation so this test actually pins behavior rather than mirroring it.
 const EXPECTED: Record<OrgRole, OrgAction[]> = {
     OWNER: [...ORG_ACTIONS],
-    ADMIN: ORG_ACTIONS.filter((action) => action !== "org:delete"),
+    // Closing the business and changing its web address (DEC-069) are the
+    // Owner's alone.
+    ADMIN: ORG_ACTIONS.filter(
+        (action) => action !== "org:delete" && action !== "org:address:update",
+    ),
     // audit:read is deliberately OWNER/ADMIN-only, so MEMBER (read-only floor)
     // does NOT include it. media:read IS in the floor; media:write is not.
     // site:read IS in the floor; site:create/update/delete are not.
@@ -70,10 +74,21 @@ describe("organization-policy: can()", () => {
         }
     });
 
-    it("ADMIN may do everything except org:delete", () => {
+    it("ADMIN may do everything except org:delete and org:address:update", () => {
+        const ownerOnly = ["org:delete", "org:address:update"];
         expect(can("ADMIN", "org:delete")).toBe(false);
-        for (const action of ORG_ACTIONS.filter((a) => a !== "org:delete")) {
+        expect(can("ADMIN", "org:address:update")).toBe(false);
+        for (const action of ORG_ACTIONS.filter(
+            (a) => !ownerOnly.includes(a),
+        )) {
             expect(can("ADMIN", action)).toBe(true);
+        }
+    });
+
+    it("only the OWNER may change the web address (DEC-069)", () => {
+        expect(can("OWNER", "org:address:update")).toBe(true);
+        for (const role of ["ADMIN", "MEMBER", "REVIEWER"] as const) {
+            expect(can(role, "org:address:update")).toBe(false);
         }
     });
 
@@ -276,7 +291,10 @@ describe("reach (F19): nobody grants what they don't hold", () => {
         // OWNER holds everything; ADMIN everything except closing the
         // business, so a role holding that is beyond an Admin.
         expect(withinReach(ctx("OWNER"), ORG_ACTIONS)).toBe(true);
-        expect(outOfReach(ctx("ADMIN"), ORG_ACTIONS)).toEqual(["org:delete"]);
+        expect(outOfReach(ctx("ADMIN"), ORG_ACTIONS)).toEqual([
+            "org:delete",
+            "org:address:update",
+        ]);
         expect(withinReach(ctx("MEMBER"), ["payment:manage"])).toBe(false);
     });
 });

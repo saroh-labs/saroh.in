@@ -185,7 +185,7 @@ export class CatalogueService {
         for (const e of dto.entries) {
             if (e.returnsMode === "OWN" && !e.returnsText) {
                 throw new BadRequestException({
-                    message: "Write the returns rule, or use the storefront's.",
+                    message: "Write the returns rule, or use the location's.",
                     field: "returnsText",
                 });
             }

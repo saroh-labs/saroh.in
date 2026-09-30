@@ -249,7 +249,7 @@ async function resolveRowId(
               })
             : Promise.resolve({ id: null }),
     ]);
-    if (!store) throw new NotFoundException("Store not found");
+    if (!store) throw new NotFoundException("Location not found");
     if (!product) throw new NotFoundException("Product not found");
     if (!variant) throw new NotFoundException("Variant not found");
     const findRow = () =>
@@ -419,7 +419,7 @@ async function storefrontName(tx: Tx, storeId: string): Promise<string> {
         where: { id: storeId },
         select: { name: true },
     });
-    return store?.name ?? "this storefront";
+    return store?.name ?? "this location";
 }
 
 // ---------------------------------------------------------------------------
@@ -892,7 +892,7 @@ export async function move(
     });
     if (source.storeId === input.toStoreId) {
         throw new BadRequestException({
-            message: "Pick another storefront to move it to.",
+            message: "Pick another location to move it to.",
             field: "toStoreId",
         });
     }

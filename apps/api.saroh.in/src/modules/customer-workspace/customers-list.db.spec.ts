@@ -536,10 +536,10 @@ describe("Customers list (DB)", () => {
         ]);
         const theirs = await makeStore(otherOrg, "Their shop");
         await expect(list.list(ctx, { store: theirs })).rejects.toThrow(
-            "Storefront not found",
+            "Location not found",
         );
         await expect(list.unlinked(ctx, { store: theirs })).rejects.toThrow(
-            "Storefront not found",
+            "Location not found",
         );
     });
 

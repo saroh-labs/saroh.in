@@ -5,6 +5,10 @@
  * slug is even looked at.
  */
 jest.mock("@saroh/database", () => ({
+    // Plain mode: the slug check reads through `prisma` (store-slug.ts).
+    isRlsEnforcementEnabled: () => false,
+    currentOrgContext: () => undefined,
+    outsideOrgContext: <T>(fn: () => T) => fn(),
     prisma: {
         store: {
             count: jest.fn(),
@@ -94,7 +98,7 @@ describe("StoresService.createForUser — storefronts up to the plan", () => {
             status: 403,
             response: {
                 message:
-                    "Your plan includes 2 storefronts. A bigger plan adds more.",
+                    "Your plan includes 2 locations. A bigger plan adds more.",
             },
         });
         expect(storeFindUnique).not.toHaveBeenCalled();

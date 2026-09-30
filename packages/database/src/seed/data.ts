@@ -41,6 +41,16 @@ export const REVIEWER_PASSWORD = "demo-password-123";
 export const STOREFRONT_TEAM_EMAIL = "farah.storefront@saroh.dev";
 export const STOREFRONT_TEAM_PASSWORD = "demo-password-123";
 
+/**
+ * Someone who has just signed up and set nothing up (DEC-070, K2). Owns no
+ * business, so setup is the first thing they see. Browser specs about
+ * setting up — "What are you setting up?", a first run for each kind — sign
+ * in as them and make businesses of their own, never touching the demo
+ * owner's.
+ */
+export const FOUNDER_EMAIL = "founder@saroh.dev";
+export const FOUNDER_PASSWORD = "demo-password-123";
+
 export const ORG_SLUG = "demo-org";
 export const ORG_NAME = "Northwind Supply";
 /**
@@ -962,9 +972,12 @@ export const SIDE_BUSINESSES: readonly {
  * is composed at render time from NEXT_PUBLIC_ROOT_DOMAIN, which is why moving
  * tenants from saroh.in to saroh.app needed no data migration at all.
  *
- * No section here carries an image. The shipped starter template points at
- * `/templates/starter/*.jpg`, and those files do not exist in any app's
- * `public/` — seeding them would put broken images in the editor.
+ * No section here carries an image. `starter@1` pointed at
+ * `/templates/starter/*.jpg`, files no app's `public/` has, so seeding its
+ * sections would have put broken images in the editor. `starter@2` (DEC-070,
+ * what a new site starts from) carries no image at all. These sites are
+ * written from explicit sections, not from a template, so neither version
+ * changes them.
  */
 export const SITES: readonly SeedSite[] = [
     {

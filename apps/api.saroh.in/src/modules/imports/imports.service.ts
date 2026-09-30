@@ -258,7 +258,7 @@ export class ImportsService {
             // Every storefront belongs to a business; so does every product.
             if (!organizationId) {
                 throw new BadRequestException(
-                    "This storefront is not attached to a business.",
+                    "This location is not attached to a business.",
                 );
             }
             if (row.outcome === "CREATE") {
@@ -345,7 +345,7 @@ export class ImportsService {
             userId,
         );
         if (writable === null) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
         return writable.organizationId;
     }

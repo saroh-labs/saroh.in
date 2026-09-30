@@ -460,7 +460,7 @@ describe("within reach (F19)", () => {
                 label: "Shopfront",
                 actions: ["store:write"],
             }),
-        ).rejects.toThrow(/you don't have: Change storefronts\.$/);
+        ).rejects.toThrow(/you don't have: Change locations\.$/);
     });
 
     it("leaves the Owner unaffected: everything grantable is within reach", async () => {

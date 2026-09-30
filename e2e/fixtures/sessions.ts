@@ -42,6 +42,11 @@ export const people = {
         email: "farah.storefront@saroh.dev",
         password: demoUser.password,
     },
+    /**
+     * Asha, just signed up (DEC-070): seeded with no business of her own.
+     * Specs about setting up make theirs as her, never as the demo owner.
+     */
+    founder: { email: "founder@saroh.dev", password: demoUser.password },
 } as const;
 
 export type Role = keyof typeof people;

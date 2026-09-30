@@ -435,7 +435,7 @@ describe("editing an order before preparing", () => {
             kitchen.edit(owner, order, {
                 add: [{ productId: tee.id, variantId: medium.id, quantity: 1 }],
             }),
-        ).rejects.toThrow("isn't sold at this storefront");
+        ).rejects.toThrow("isn't sold at this location");
 
         const item = await line(order, tee.id);
         await kitchen.edit(owner, order, {

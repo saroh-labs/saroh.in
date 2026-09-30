@@ -44,4 +44,32 @@ export default [
             ],
         },
     },
+    /*
+     * A TEST may also draw a shipped site template through the blocks
+     * (`starter-template.test.tsx`, DEC-070 K10): what a new site opens with
+     * is only proven by rendering it. `@saroh/templates` is pure data, and a
+     * test ships nothing to a merchant's page, so G1's reason does not reach
+     * it. Everything else stays shut, `@saroh/ui` included.
+     */
+    {
+        files: ["src/**/*.test.tsx"],
+        rules: {
+            "no-restricted-imports": [
+                "error",
+                {
+                    patterns: [
+                        {
+                            group: [
+                                "@saroh/*",
+                                "!@saroh/block-contract",
+                                "!@saroh/block-contract/*",
+                                "!@saroh/templates",
+                            ],
+                            message,
+                        },
+                    ],
+                },
+            ],
+        },
+    },
 ];

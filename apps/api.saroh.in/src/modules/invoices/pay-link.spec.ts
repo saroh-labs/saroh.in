@@ -27,6 +27,10 @@ jest.mock("@saroh/database", () => {
                 findFirst: jest.fn(),
             },
             paymentIntent: { findMany: jest.fn() },
+            // DEC-070: Payments on (no row) unless a test turns it off.
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },
@@ -225,6 +229,9 @@ describe("making a pay link", () => {
             },
             merchantPaymentProvider: {
                 findFirst: jest.fn().mockResolvedValue(RAZORPAY_READY),
+            },
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
             },
             // D13: no autopay charge under way.
             paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },

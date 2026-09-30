@@ -102,7 +102,9 @@ function makeService(
             ? jest.fn().mockResolvedValue({ id: STORE })
             : jest
                   .fn()
-                  .mockRejectedValue(new NotFoundException("Store not found")),
+                  .mockRejectedValue(
+                      new NotFoundException("Location not found"),
+                  ),
     } as unknown as StoresService;
     // Activation events are fire-and-forget instrumentation (#176); a stub
     // keeps these tests about order writes rather than about analytics.

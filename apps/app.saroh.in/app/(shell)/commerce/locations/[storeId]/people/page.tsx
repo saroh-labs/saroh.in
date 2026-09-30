@@ -10,7 +10,7 @@ import { requireSession } from "@/lib/session";
 import { storefrontHref } from "@/lib/stores/links";
 import { getStore } from "@/lib/stores/service";
 
-export const metadata = { title: "Storefront people" };
+export const metadata = { title: "Location people" };
 
 /**
  * Who may work on one storefront — its catalogue, orders and customers — and
@@ -50,7 +50,7 @@ export default async function StorefrontPeoplePage({
         <PageContainer width="form">
             <PageHeader
                 breadcrumb={sellCrumbs(
-                    { label: "Storefront", href: "/commerce/storefronts" },
+                    { label: "Location", href: "/commerce/locations" },
                     { label: store.name, href: storefrontHref(store.id) },
                     "People",
                 )}

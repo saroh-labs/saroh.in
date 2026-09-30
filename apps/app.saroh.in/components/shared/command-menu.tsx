@@ -188,8 +188,8 @@ const ACTIONS: {
         action: "invoice:write",
     },
     {
-        href: "/commerce/storefronts/new",
-        label: "New storefront",
+        href: "/commerce/locations/new",
+        label: "New location",
         icon: Store,
         moduleKey: "COMMERCE",
         limit: "storefront",
@@ -247,7 +247,7 @@ export function CommandMenu({
     sites?: { id: string; name: string }[];
     /**
      * How many storefronts the business has and may have; `null` = unknown,
-     * and "New storefront" is offered.
+     * and "New location" is offered.
      */
     storefronts?: StorefrontAllowance | null;
     /** The business tracks stock; off, Sell › Stock is not offered. */

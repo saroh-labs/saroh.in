@@ -282,6 +282,9 @@ e2e_stack() {
     export E2E_ACCOUNTS_URL=http://localhost:3000
     export E2E_API_URL=http://localhost:3333
     export E2E_RENDERER_URL=http://localhost:3005
+    # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
+    # never production's saroh.app, which a redirect would otherwise leave for.
+    export RENDERER_URL=http://localhost:3005
     export SITE_RELAY_SECRET=saroh-dev-insecure-site-relay-secret-not-for-production
     export SITE_ACCOUNTS_CODE_SECRET=ci-placeholder-site-code-secret-at-least-32-chars # gitleaks:allow (CI placeholder)
     export SITE_CODES_EMAIL_FAKE=log
