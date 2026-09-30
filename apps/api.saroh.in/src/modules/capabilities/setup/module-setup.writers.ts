@@ -22,7 +22,12 @@
  * missing is added: a site keeps the Sells from and the pages it has.
  */
 import { ForbiddenException } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import {
+    currentOrgContext,
+    isRlsEnforcementEnabled,
+    outsideOrgContext,
+    prisma,
+} from "@saroh/database";
 
 import { toMinor } from "../../../common/money";
 import type { OrganizationContext } from "../../../common/types/organization-context";
@@ -162,7 +167,16 @@ async function freeStoreSlug(
     const base = storeSlugify(name).slice(0, 60) || "storefront";
     for (let n = 1; n <= 50; n++) {
         const slug = n === 1 ? base : `${base}-${n}`;
-        if (!(await tx.store.findUnique({ where: { slug } }))) return slug;
+        // Slugs are unique across every business, so the check reads across
+        // them (`site-address.ts`'s rule): under RLS the transaction, and
+        // the client inside the request's context, see only this business.
+        const taken = await (isRlsEnforcementEnabled() &&
+        currentOrgContext() !== undefined
+            ? outsideOrgContext(() =>
+                  prisma.store.findUnique({ where: { slug } }),
+              )
+            : tx.store.findUnique({ where: { slug } }));
+        if (!taken) return slug;
     }
     return `${base}-${Date.now().toString(36)}`;
 }
