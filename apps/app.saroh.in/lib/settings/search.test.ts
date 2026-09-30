@@ -88,8 +88,39 @@ describe("searchSettings", () => {
     it("leaves the page's name out when asked (the ⌘K menu)", () => {
         expect(searchSettings("business", owner, { byPage: false })).toEqual([
             expect.objectContaining({ label: "Business name" }),
+            // "A business" is one of its answers (DEC-070).
+            expect.objectContaining({ label: "What you're setting up" }),
             expect.objectContaining({ label: "Type of business" }),
         ]);
+    });
+
+    it("finds what you're setting up by each answer (DEC-070, K5)", () => {
+        const hit = {
+            label: "What you're setting up",
+            where: "Business",
+            href: "/settings/organization?section=identity",
+        };
+        for (const query of ["just me", "A site for my work", "portfolio"]) {
+            expect(searchSettings(query, owner)).toEqual([hit]);
+        }
+        expect(searchSettings("freelancer", owner)).toContainEqual(hit);
+    });
+
+    it("names the Business page in the kind's words", () => {
+        expect(
+            searchSettings("gstin", { ...owner, kind: "SOLO" })[0]?.where,
+        ).toBe("Your details");
+        expect(
+            searchSettings("gstin", { ...owner, kind: "WORK" })[0]?.where,
+        ).toBe("Your details");
+        expect(searchSettings("gstin", { ...owner, kind: "X" })[0]?.where).toBe(
+            "Business",
+        );
+        // Found by the page's own name, as it is shown.
+        expect(
+            searchSettings("your details", { ...owner, kind: "SOLO" }).length,
+        ).toBeGreaterThan(0);
+        expect(searchSettings("your details", owner)).toEqual([]);
     });
 
     it("lists the first eight before anything is typed", () => {

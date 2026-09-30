@@ -4,6 +4,7 @@ import {
     settingsPagesFor,
 } from "@/components/shared/nav-items";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
+import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
 
 /**
  * Search settings ("Saroh Settings" design): the things a person comes to
@@ -20,6 +21,20 @@ import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
  */
 
 type SettingsHref = (typeof SETTINGS_PAGES)[number]["href"];
+
+/**
+ * A settings page's name in the words of what is being set up (DEC-070,
+ * K5): Business is "Your details" for Just me and A site for my work. The
+ * rest keep their names.
+ */
+export function settingsPageLabel(
+    page: { href: string; label: string },
+    kind: unknown,
+): string {
+    return page.href === "/settings/organization"
+        ? kindWords(kind).settingsTab
+        : page.label;
+}
 
 /** The query a settings page reads its own tab from. */
 export const BUSINESS_TAB_PARAM = "section";
@@ -68,6 +83,16 @@ const team = (label: string, value: string): SettingsEntry => ({
  */
 export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
+    {
+        ...business("What you're setting up", "identity"),
+        // Each answer by its name, and what it is examples of (DEC-070).
+        words: [
+            ...KIND_CHOICES.map((c) => c.label),
+            ...KIND_CHOICES.flatMap((c) =>
+                c.examples.split(",").map((w) => w.trim()),
+            ),
+        ],
+    },
     business("Logo", "identity"),
     business("Legal name", "identity"),
     {
@@ -137,6 +162,11 @@ export interface SettingsActor {
      * unknown, and every setting is offered, as the rail fails open.
      */
     modules?: readonly string[] | null;
+    /**
+     * What is being set up (DEC-070), for the words a page is named in.
+     * Absent reads as a business.
+     */
+    kind?: unknown;
 }
 
 /**
@@ -179,7 +209,10 @@ export function searchSettings(
     { limit = 8, byPage = true }: { limit?: number; byPage?: boolean } = {},
 ): SettingsHit[] {
     const pages = new Map(
-        settingsPagesFor(actor).map((page) => [page.href, page.label]),
+        settingsPagesFor(actor).map((page) => [
+            page.href,
+            settingsPageLabel(page, actor.kind),
+        ]),
     );
     const needle = query.trim().toLowerCase();
     const hits: SettingsHit[] = [];
