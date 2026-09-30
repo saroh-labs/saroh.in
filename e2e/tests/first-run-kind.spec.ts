@@ -90,7 +90,9 @@ test.describe("first run follows the kind (DEC-070)", () => {
         await expect(
             page.getByRole("checkbox", { name: "Sell products" }),
         ).not.toBeChecked();
-        await expect(page.getByText("Manage readers & leads")).toBeVisible();
+        await expect(
+            page.getByText("Manage readers & leads", { exact: true }),
+        ).toBeVisible();
     });
 
     test("just me starts with bookings, then an invoice, which opens a new one", async ({
