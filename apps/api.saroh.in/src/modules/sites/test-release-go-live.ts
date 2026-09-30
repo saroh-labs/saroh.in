@@ -30,6 +30,13 @@ export interface GoLiveInput {
     releaseId: string;
     /** Who is going live: the publisher on the record. */
     actorUserId: string;
+    /** They are an owner of the business now (KTD-11). */
+    actorIsOwner?: boolean;
+    /**
+     * An owner going live past "Publishing needs approval" (T9). `putLive`
+     * refuses it from anyone else, and records it when it was needed.
+     */
+    override?: boolean;
     /** When it goes live. Defaults to now. */
     at?: Date;
     /**
@@ -156,7 +163,8 @@ export async function goLiveWithRelease(
         // release still matches the copy.
         snapshot: restamp(snapshot, at),
         source: "go-live",
-        actor: { userId: input.actorUserId },
+        actor: { userId: input.actorUserId, owner: input.actorIsOwner },
+        override: input.override,
         fingerprint: release.fingerprint,
         template: {
             id: release.publication.templateId,

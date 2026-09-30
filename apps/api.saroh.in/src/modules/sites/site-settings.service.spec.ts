@@ -10,14 +10,29 @@ jest.mock("@saroh/database", () => {
         site: {
             findFirst: jest.fn(),
             update: jest.fn(),
+            // "Publishing needs approval" reads the value it replaces (T9).
+            findUniqueOrThrow: jest.fn(),
         },
         store: { findFirst: jest.fn() },
+        auditEvent: { create: jest.fn() },
+        // The setting and its audit event are one transaction, on the same
+        // mocked client, so every write is seen here.
+        $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(client)),
     };
     return { prisma: client };
 });
 
+// Whether test releases are on for the business (`SITE_TEST_RELEASES`).
+const flagOn = jest.fn();
+jest.mock("../feature-flags/feature-flags.service", () => ({
+    FeatureFlagService: jest.fn().mockImplementation(() => ({
+        isEnabled: (...args: unknown[]) => flagOn(...args) as unknown,
+    })),
+}));
+
 import {
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     NotFoundException,
 } from "@nestjs/common";
@@ -240,5 +255,98 @@ describe("SitesService.updateSettings — sells from (G11)", () => {
         ).rejects.toBeDefined();
         expect(storeFindFirst).not.toHaveBeenCalled();
         expect(siteUpdate).not.toHaveBeenCalled();
+    });
+});
+
+/*
+ * "Publishing needs approval" (DEC-071, T9): an owner's alone, recorded as
+ * an audit event in the same transaction, and only with test releases on.
+ */
+describe("SitesService.updateSettings — Publishing needs approval (T9)", () => {
+    const ADMIN: OrganizationContext = {
+        organizationId: "org_1",
+        userId: "u_4",
+        role: "ADMIN",
+    };
+    const siteRead = prisma.site.findUniqueOrThrow as jest.Mock;
+    const auditCreate = prisma.auditEvent.create as jest.Mock;
+
+    beforeEach(() => {
+        siteRead.mockResolvedValue({ publishNeedsApproval: false });
+        flagOn.mockResolvedValue(true);
+    });
+
+    it("lets the owner turn it on, and records who did it", async () => {
+        await service.updateSettings(OWNER, SITE, {
+            publishNeedsApproval: true,
+        });
+
+        expect(siteUpdate).toHaveBeenCalledWith({
+            where: { id: SITE },
+            data: { publishNeedsApproval: true },
+            select: { id: true },
+        });
+        expect(auditCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "site.publish_approval.on",
+                actorUserId: "u_1",
+                organizationId: "org_1",
+                targetType: "site",
+                targetId: SITE,
+                outcome: "SUCCESS",
+                metadata: { from: false, to: true },
+            }) as unknown,
+            select: { id: true },
+        });
+    });
+
+    it("records turning it off as its own event", async () => {
+        siteRead.mockResolvedValue({ publishNeedsApproval: true });
+        await service.updateSettings(OWNER, SITE, {
+            publishNeedsApproval: false,
+        });
+        expect(auditCreate.mock.calls[0][0].data.action).toBe(
+            "site.publish_approval.off",
+        );
+    });
+
+    it("refuses an admin with a 403, and writes nothing", async () => {
+        await expect(
+            service.updateSettings(ADMIN, SITE, {
+                publishNeedsApproval: false,
+                seoTitle: "Rye",
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(siteUpdate).not.toHaveBeenCalled();
+        expect(auditCreate).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing, and records nothing, when it already has that value", async () => {
+        siteRead.mockResolvedValue({ publishNeedsApproval: true });
+        await service.updateSettings(OWNER, SITE, {
+            publishNeedsApproval: true,
+        });
+        expect(auditCreate).not.toHaveBeenCalled();
+        expect(siteUpdate).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: { publishNeedsApproval: true },
+            }),
+        );
+    });
+
+    it("can't be turned on while test releases are off (409), and can still be turned off", async () => {
+        flagOn.mockResolvedValue(false);
+        await expect(
+            service.updateSettings(OWNER, SITE, {
+                publishNeedsApproval: true,
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(auditCreate).not.toHaveBeenCalled();
+
+        siteRead.mockResolvedValue({ publishNeedsApproval: true });
+        await service.updateSettings(OWNER, SITE, {
+            publishNeedsApproval: false,
+        });
+        expect(auditCreate).toHaveBeenCalledTimes(1);
     });
 });

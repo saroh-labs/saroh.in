@@ -1,7 +1,6 @@
 import {
     BadRequestException,
     ConflictException,
-    ForbiddenException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
@@ -17,6 +16,7 @@ import { FlagKey } from "../feature-flags/flags";
 import { authorize } from "../organizations/organization-policy";
 import { readVerdicts } from "./live-pointer";
 import { checkRenderability } from "./publication-renderability";
+import { assertOverrideAllowed, isOwner } from "./publish-approval";
 import { draftFingerprint } from "./review-route";
 import { assertSiteInOrg } from "./site-access";
 import { SitesService } from "./sites.service";
@@ -34,7 +34,6 @@ import {
 import {
     assertScheduleWindow,
     cancelGoLive,
-    OVERRIDE_OWNER_ONLY_MESSAGE,
     scheduleGoLive,
     scheduleInstant,
 } from "./test-release-schedule";
@@ -306,14 +305,24 @@ export class TestReleasesService {
         ctx: OrganizationContext,
         siteId: string,
         releaseId: string,
+        /**
+         * An owner going live past "Publishing needs approval" (T9): with
+         * the setting on, an unapproved release is refused (409) unless an
+         * owner overrides, and the override is recorded. 403 from anyone
+         * else.
+         */
+        options: { override?: boolean } = {},
     ): Promise<TestReleaseGoLiveView> {
         await this.gate(ctx, "site:publish", siteId);
+        assertOverrideAllowed(ctx, options.override);
         const outcome = await prisma.$transaction((tx) =>
             goLiveWithRelease(tx, {
                 siteId,
                 organizationId: ctx.organizationId,
                 releaseId,
                 actorUserId: ctx.userId,
+                actorIsOwner: isOwner(ctx),
+                override: options.override,
             }),
         );
         const [release, names] = await Promise.all([
@@ -330,6 +339,7 @@ export class TestReleasesService {
             publishedAt: outcome.publishedAt,
             route: outcome.route,
             bypassed: outcome.bypassed,
+            overridden: outcome.overridden,
             replaced: replaced
                 ? {
                       publicationId: replaced.publicationId,
@@ -362,9 +372,7 @@ export class TestReleasesService {
     ): Promise<TestReleaseView> {
         await this.gate(ctx, "site:publish", siteId);
         const override = input.override === true;
-        if (override && (ctx.roleKey ?? ctx.role) !== "OWNER") {
-            throw new ForbiddenException(OVERRIDE_OWNER_ONLY_MESSAGE);
-        }
+        assertOverrideAllowed(ctx, override);
         const zone = await businessTimezone(prisma, ctx.organizationId);
         const goLiveAt = scheduleInstant(input.date, input.time, zone);
         const now = new Date();

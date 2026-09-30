@@ -98,8 +98,9 @@ export async function runScheduledGoLive(
     }
     const schedulerId = release.scheduledByUserId;
 
-    const reason = await whyNotLive(tx, organizationId, release, now);
-    if (reason) {
+    const check = await mayGoLive(tx, organizationId, release, now);
+    if (!check.go) {
+        const { reason } = check;
         await notLive(tx, organizationId, release, reason, schedulerId);
         return { outcome: "NOT_LIVE", reason };
     }
@@ -111,6 +112,10 @@ export async function runScheduledGoLive(
             organizationId,
             releaseId: release.id,
             actorUserId: schedulerId,
+            actorIsOwner: check.owner,
+            // The owner's override stored with the schedule, so `putLive`
+            // records it as OVERRIDDEN, as going live by hand would (T9).
+            override: check.override,
             at: now,
             scheduledFor: release.goLiveAt,
         });
@@ -183,15 +188,22 @@ async function lockedRelease(
 }
 
 /**
- * Why this schedule must not go live now, in the merchant's words, or null
- * when it may (KTD-14). Each reason ends with what they can do next.
+ * Whether this schedule may go live now (KTD-14). No: why, in the
+ * merchant's words, each reason ending with what they can do next. Yes:
+ * whether it goes live on the owner's override, and whether the scheduler
+ * is an owner now, which is what `putLive` takes an override from.
  */
-async function whyNotLive(
+type GoLiveCheck =
+    | { go: false; reason: string }
+    | { go: true; override: boolean; owner: boolean };
+
+async function mayGoLive(
     tx: Tx,
     organizationId: string,
     release: LockedRelease,
     now: Date,
-): Promise<string | null> {
+): Promise<GoLiveCheck> {
+    const no = (reason: string): GoLiveCheck => ({ go: false, reason });
     const again = "Go live now, or schedule it again.";
     const site = await tx.site.findFirst({
         where: { id: release.siteId, organizationId },
@@ -201,7 +213,7 @@ async function whyNotLive(
             currentPublication: { select: { id: true, publishedAt: true } },
         },
     });
-    if (!site || site.deletedAt) return "The site was deleted.";
+    if (!site || site.deletedAt) return no("The site was deleted.");
 
     // Published since: a scheduled older version must never wipe out a
     // later fix (KTD-14, Q2).
@@ -210,9 +222,11 @@ async function whyNotLive(
         const zone =
             release.goLiveZone ?? (await businessTimezone(tx, organizationId));
         const when = live ? localTime(live.publishedAt, zone, now) : null;
-        return when
-            ? `The site was published at ${when}, after this was scheduled. ${again}`
-            : `The site's live version changed after this was scheduled. ${again}`;
+        return no(
+            when
+                ? `The site was published at ${when}, after this was scheduled. ${again}`
+                : `The site's live version changed after this was scheduled. ${again}`,
+        );
     }
 
     const scheduler = await schedulerStanding(
@@ -221,12 +235,17 @@ async function whyNotLive(
         release.scheduledByUserId ?? "",
     );
     if (!scheduler.member) {
-        return `${scheduler.name}, who scheduled it, is no longer on the team. ${again}`;
+        return no(
+            `${scheduler.name}, who scheduled it, is no longer on the team. ${again}`,
+        );
     }
     if (!scheduler.canPublish) {
-        return `${scheduler.name}, who scheduled it, can no longer publish the site. ${again}`;
+        return no(
+            `${scheduler.name}, who scheduled it, can no longer publish the site. ${again}`,
+        );
     }
 
+    let override = false;
     if (site.publishNeedsApproval) {
         const approved = releaseApproved(
             await readVerdicts(tx, { siteId: release.siteId, organizationId }),
@@ -236,10 +255,13 @@ async function whyNotLive(
         // An owner's override holds only while they are still an owner.
         const overridden = release.scheduleOverride && scheduler.owner;
         if (!approved && !overridden) {
-            return "Publishing needs approval, and this test release isn't approved. Get it approved, then go live or schedule it again.";
+            return no(
+                "Publishing needs approval, and this test release isn't approved. Get it approved, then go live or schedule it again.",
+            );
         }
+        override = !approved && overridden;
     }
-    return null;
+    return { go: true, override, owner: scheduler.owner };
 }
 
 /** Who scheduled it, as the business sees them now. */

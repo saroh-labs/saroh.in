@@ -8,6 +8,11 @@ export const ReviewRoute = {
     Bypassed: "BYPASSED",
     /** Nobody was asked. The ordinary case, and not a lesser one. */
     None: "NONE",
+    /**
+     * An owner put it live past "Publishing needs approval" without an
+     * approval that covered it (DEC-071, KTD-11). Recorded, never silent.
+     */
+    Overridden: "OVERRIDDEN",
 } as const;
 
 export type ReviewRoute = (typeof ReviewRoute)[keyof typeof ReviewRoute];
