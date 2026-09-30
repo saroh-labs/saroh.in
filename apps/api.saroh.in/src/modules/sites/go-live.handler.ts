@@ -75,12 +75,24 @@ export class GoLiveHandler {
             );
         } catch (err) {
             if (job.attempts + 1 < job.maxAttempts) throw err;
-            // The last try: say it didn't go live before giving up.
-            await runInOrgContext(organizationId, () =>
-                prisma.$transaction((tx) =>
-                    recordGaveUp(tx, organizationId, payload),
-                ),
-            );
+            // The last try: say it didn't go live before giving up. The same
+            // outage can fail this write too; then the run's own error is
+            // what the job dies with, and the release is named in the log so
+            // an operator can clear the schedule (release review).
+            try {
+                await runInOrgContext(organizationId, () =>
+                    prisma.$transaction((tx) =>
+                        recordGaveUp(tx, organizationId, payload),
+                    ),
+                );
+            } catch (recordErr) {
+                this.logger.error(
+                    `${SITE_GO_LIVE_TYPE} ${payload.testReleaseId}: gave up, and couldn't record it; the release still reads as scheduled`,
+                    recordErr instanceof Error
+                        ? recordErr.stack
+                        : String(recordErr),
+                );
+            }
             throw err;
         }
     };

@@ -1999,6 +1999,7 @@ the day enough holds have run out.
 it; count what the write adds. Pinned by `web-address.service.db.spec.ts`
 "counts both holds a change would add".
 **Category**: organizations · limits
+
 ## App — a test-release sheet stuck on "Going live…" when the API was down
 
 **Problem**: the release review found that the go-live, schedule, cancel and
@@ -2014,6 +2015,7 @@ server action threw and the sheet's `confirm()` never reset `busy`.
 the unreachable one included; a sheet never depends on a throw to leave its
 busy state.
 **Category**: frontend · error feedback
+
 ## Payments — the pending sweep asks the same failing intents every minute
 
 **Problem**: (release review) an intent whose lookup threw — its business's
@@ -2115,3 +2117,19 @@ polls until the sheet's bottom meets the screen's.
 **Rule**: compare a Playwright project by prefix; the lint rule says so. A
 geometry check on an animated sheet polls until it settles.
 **Category**: e2e · tests · lint
+
+## Sites — a scheduled go-live that gave up could hide why
+
+**Problem**: the release review found that on a scheduled go-live's last
+attempt, `recordGaveUp` runs in a fresh transaction inside the catch. When
+the same outage failed that write too, its error replaced the run's own, and
+nothing logged which release was left reading "scheduled".
+**Fix**: `go-live.handler.ts` wraps the record in its own try/catch, logs at
+ERROR with the release id, and rethrows the run's original error
+(`go-live.handler.spec.ts`).
+**Still open**: a backstop that marks a past-due schedule with no live
+`site.go_live` job as NOT_LIVE (a sweep or a read-time check). Behind
+`SITE_TEST_RELEASES`; needed before that flag goes on for everyone.
+**Rule**: a "record the failure" step in a catch never replaces the failure
+it records.
+**Category**: jobs · reliability
