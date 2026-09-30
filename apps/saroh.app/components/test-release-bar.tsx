@@ -2,6 +2,11 @@
 
 import { useEffect, useRef } from "react";
 
+import {
+    BAR_HEIGHT_VAR,
+    LIVE_OUTSIDE_RELEASE,
+} from "@/lib/test-release-chrome";
+
 /**
  * The Test release bar (DEC-071, R5 and R6): on every page of a test host,
  * pinned to the top, and never dismissed.
@@ -17,21 +22,8 @@ import { useEffect, useRef } from "react";
  *
  * The site's own header is sticky at the top too. The bar tells it how tall
  * it is (`--test-release-bar-h`), so the header sticks below the bar rather
- * than under it; the layout's one rule reads the variable.
+ * than under it; the layout's one rule (`HEADER_BELOW_BAR`) reads it.
  */
-
-/** What stays live on a test release (R6), in the words the sheet uses. */
-export const LIVE_OUTSIDE_RELEASE = [
-    "Products, prices and stock",
-    "Plans and packs",
-    "Opening hours",
-    "Where your online shop sells from",
-    "Posts",
-    "Which parts of your business are switched on",
-] as const;
-
-/** The CSS variable the bar keeps at its own height. */
-export const BAR_HEIGHT_VAR = "--test-release-bar-h";
 
 export function TestReleaseBar({
     name,

@@ -90,17 +90,24 @@ test.describe("a test release on its own host (T5)", () => {
         await expect(bar(page)).toContainText("Products, prices and stock");
         await expect(bar(page)).toContainText("Opening hours");
 
-        // The whole site: each page the live site serves, the test host
-        // serves too, under the bar.
+        // The whole site: each page answers on the test host as it does on
+        // the live one (the shop and the account area may be switched off
+        // on this stack, and then both are "not found"), and every page the
+        // live site draws in its chrome is drawn under the bar.
         for (const path of ["/shop", "/book", "/account"]) {
-            const live = await page.request.get(`${LIVE}${path}`);
+            const live = await page.goto(`${LIVE}${path}`);
+            const drawn = await page.locator("header.sticky").count();
             const res = await page.goto(`${TEST}${path}`);
             expect(res?.status(), `${path} on the test host`).toBe(
-                live.status(),
+                live?.status(),
             );
             expect(res?.headers()["x-robots-tag"]).toContain("noindex");
-            if (live.ok()) await expect(bar(page)).toContainText(name);
+            await expect(page.locator("header.sticky")).toHaveCount(drawn);
+            if (drawn > 0) await expect(bar(page)).toContainText(name);
         }
+        // Northwind takes bookings, so /book at least is drawn.
+        await page.goto(`${TEST}/book`);
+        await expect(bar(page)).toContainText(name);
     });
 
     test("without the link, the host shows the gate; the live site has no bar", async ({

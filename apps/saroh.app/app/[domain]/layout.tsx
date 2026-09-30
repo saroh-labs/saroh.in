@@ -9,7 +9,7 @@ import {
     SiteTheme,
 } from "@saroh/site-blocks";
 
-import { BAR_HEIGHT_VAR, TestReleaseBar } from "@/components/test-release-bar";
+import { TestReleaseBar } from "@/components/test-release-bar";
 import { TestReleaseGate } from "@/components/test-release-gate";
 import { accountAreaOn } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
@@ -28,6 +28,7 @@ import { getSignInOptions } from "@/lib/sign-in";
 import { classifySiteHost } from "@/lib/site-host-mode";
 import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
+import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import {
@@ -249,7 +250,7 @@ export default async function SiteLayout({
                     />
                     {/* The site's sticky header sits below the bar, not
                         under it: the bar keeps this variable at its height. */}
-                    <style>{`[data-test-release] header.sticky{top:var(${BAR_HEIGHT_VAR},2.25rem)}`}</style>
+                    <style>{HEADER_BELOW_BAR}</style>
                 </>
             ) : null}
             <SiteTheme variables={snapshot.site.styleVariables} />
