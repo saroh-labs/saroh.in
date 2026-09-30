@@ -1208,3 +1208,19 @@ updated". `test/global-setup.ts` re-runs the (idempotent) grants.
 the pattern doc saying why not. A new CI job lands with its prepush step.
 **Category**: tooling · `scripts/prepush.sh`, `scripts/e2e-affected.mjs`,
 `docs/patterns/devops-tooling-and-deploy.md` → How the gate stays fast
+## Integration — a probe role failed DROP ROLE beside another test database (K1)
+
+**Problem**: `prepush --int` failed `public-catalogue.db.spec.ts` in teardown
+with `role "saroh_g11_rls_probe" cannot be dropped because some objects
+depend on it` (2BP01), after several units ran their suites at once and a
+machine restart killed runs mid-way.
+**Root cause**: a Postgres role belongs to the whole cluster, not one
+database. Every `saroh-test-*` database shares it, so a grant left in another
+database (a parallel run, or one that died before its `afterAll`) blocks the
+drop.
+**Fix**: the teardown drops the role in a `DO` block that ignores
+`dependent_objects_still_exist`; the role is NOLOGIN and holds nothing in the
+database being torn down.
+**Rule**: a spec that creates a role must not fail when another database still
+uses it — drop it tolerantly, or give it a per-database name.
+**Category**: tests · integration · parallel databases

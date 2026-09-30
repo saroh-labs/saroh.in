@@ -32,6 +32,8 @@ import {
 } from "./business-tax-settings";
 import { businessTypeRead, businessTypeWrite } from "./business-type";
 import type { UpdateOrganizationDto } from "./dto";
+import type { OrganizationKind } from "./organization-kind";
+import { kindRead } from "./organization-kind";
 import { authorize } from "./organization-policy";
 import { settingsChanges, settingsSnapshot } from "./settings-audit";
 
@@ -40,6 +42,11 @@ export interface OrganizationSettings {
     id: string;
     name: string;
     slug: string;
+    /**
+     * What is being set up (DEC-070): BUSINESS, SOLO ("Just me") or WORK
+     * ("A site for my work"). Words and defaults only.
+     */
+    kind: OrganizationKind;
     profile: {
         legalName: string | null;
         type: string | null;
@@ -297,6 +304,7 @@ export class OrganizationSettingsService {
             : {};
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
+            ...(dto.kind !== undefined ? ["kind"] : []),
             ...Object.keys(profileData),
             ...Object.keys(phone),
             ...Object.keys(taxData),
@@ -314,6 +322,7 @@ export class OrganizationSettingsService {
                 id: true,
                 name: true,
                 slug: true,
+                kind: true,
                 businessProfile: { select: PROFILE_SELECT },
             },
         } as const;
@@ -321,10 +330,15 @@ export class OrganizationSettingsService {
             // As it was, inside the write's own transaction, so the audit
             // row's "before" is what this save replaced.
             const before = await tx.organization.findUnique(read);
-            if (dto.name !== undefined) {
+            // The name and the kind are the organization's own columns.
+            const own = {
+                ...(dto.name !== undefined ? { name: dto.name } : {}),
+                ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+            };
+            if (Object.keys(own).length > 0) {
                 await tx.organization.update({
                     where: { id: ctx.organizationId },
-                    data: { name: dto.name },
+                    data: own,
                 });
             }
 
@@ -380,6 +394,7 @@ export class OrganizationSettingsService {
             id: settings.id,
             name: settings.name,
             slug: settings.slug,
+            kind: kindRead(settings.kind),
             ...splitProfile(
                 settings.businessProfile,
                 await this.counters(
@@ -481,6 +496,7 @@ export class OrganizationSettingsService {
                 id: true,
                 name: true,
                 slug: true,
+                kind: true,
                 businessProfile: { select: PROFILE_SELECT },
             },
         });
@@ -491,6 +507,7 @@ export class OrganizationSettingsService {
             id: organization.id,
             name: organization.name,
             slug: organization.slug,
+            kind: kindRead(organization.kind),
             ...splitProfile(
                 organization.businessProfile,
                 await this.counters(

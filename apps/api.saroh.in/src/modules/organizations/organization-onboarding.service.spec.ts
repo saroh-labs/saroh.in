@@ -89,7 +89,8 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(transaction).toHaveBeenCalledTimes(1);
 
         expect(orgCreate).toHaveBeenCalledWith({
-            data: { name: "Acme", slug: "acme" },
+            // No kind sent (an app from before DEC-070): a business.
+            data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
             select: { id: true, slug: true },
         });
         expect(profileCreate).toHaveBeenCalledWith({
@@ -138,7 +139,35 @@ describe("OrganizationOnboardingService.onboard", () => {
             targetType: "organization",
             targetId: "org_1",
             outcome: AuditOutcome.Success,
-            metadata: { slug: "acme" },
+            metadata: { slug: "acme", kind: "BUSINESS" },
+        });
+    });
+
+    describe("what is being set up (DEC-070)", () => {
+        it.each(["BUSINESS", "SOLO", "WORK"] as const)(
+            "stores %s as chosen, and audits it",
+            async (kind) => {
+                await service.onboard("user_1", { name: "Asha Rao", kind });
+
+                expect(orgCreate).toHaveBeenCalledWith({
+                    data: { name: "Asha Rao", slug: "asha-rao", kind },
+                    select: { id: true, slug: true },
+                });
+                expect(record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        metadata: { slug: "acme", kind },
+                    }),
+                );
+            },
+        );
+
+        it("stores a business when an older app sends no kind", async () => {
+            await service.onboard("user_1", { name: "Rye" });
+            expect(orgCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ kind: "BUSINESS" }),
+                }),
+            );
         });
     });
 
@@ -207,7 +236,7 @@ describe("OrganizationOnboardingService.onboard", () => {
             select: { id: true },
         });
         expect(orgCreate).toHaveBeenCalledWith({
-            data: { name: "  My Shop!  ", slug: "my-shop" },
+            data: { name: "  My Shop!  ", slug: "my-shop", kind: "BUSINESS" },
             select: { id: true, slug: true },
         });
     });
@@ -220,7 +249,11 @@ describe("OrganizationOnboardingService.onboard", () => {
             });
             expect(orgCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    data: { name: "Rye & Co. Bakery", slug: "ryeandco" },
+                    data: {
+                        name: "Rye & Co. Bakery",
+                        slug: "ryeandco",
+                        kind: "BUSINESS",
+                    },
                 }),
             );
         });

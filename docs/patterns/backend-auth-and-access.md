@@ -204,6 +204,14 @@ what the API allows.
   modules and stays dark until `MODULE_ENFORCEMENT` is set;
   `module-annotations.spec.ts` pins what is gated and what must never be
   (refunds, consent withdrawal, public checkout, published sites, webhooks).
+- **Current** (DEC-070) — **What is being set up never decides access.**
+  `Organization.kind` (BUSINESS, SOLO, WORK) picks words and defaults only.
+  It is served on the `org:read` summary and the organization list, changed
+  with `org:update`, and read elsewhere only through `organizationKind(db,
+orgId)` (`organizations/organization-kind.ts`).
+  `organization-kind.readers.spec.ts` scans the source and fails on a read off
+  its allow-list, in `common/guards`, a `capabilities/module-*` file, an
+  entitlement, or inside an `assert*`.
 - **Current** — **Three control planes, never conflated** (ADR-003): feature flags
   are Saroh's rollout, entitlements are what a plan permits, modules are what an
   Organization has chosen.

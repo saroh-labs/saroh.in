@@ -81,6 +81,15 @@ model Organization {
   lifecycleStatus  String @default("ACTIVE")
   lifecycleVersion Int    @default(1)
 
+  // What is being set up (DEC-070): BUSINESS (a shop, studio, practice),
+  // SOLO ("Just me": a freelancer, consultant, creator) or WORK ("A site for
+  // my work": a portfolio, blog, projects). It changes Saroh's words and
+  // defaults only, never a feature, gate or entitlement. The API reads it
+  // through `organizations/organization-kind.ts`, and a source scan pins who
+  // may. Every business before it is BUSINESS. A CHECK constraint holds the
+  // values.
+  kind String @default("BUSINESS")
+
   suspendedAt         DateTime?
   suspendedByUserId   String?
   suspensionReason    String?
