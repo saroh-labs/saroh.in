@@ -25,6 +25,7 @@ import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 import { slugify } from "./slug";
+import { storeSlugInUse } from "./store-slug";
 
 /** Staff roles allowed to mutate a store (VIEWER is read-only). */
 const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
@@ -456,9 +457,9 @@ export class StoresService {
         }
     }
 
-    /** Store slugs are globally unique (Store.slug @unique). */
+    /** Store slugs are globally unique (Store.slug @unique), so this reads
+     *  every business's storefronts, even under RLS (storeSlugInUse). */
     private async isSlugAvailable(slug: string): Promise<boolean> {
-        const existing = await prisma.store.findUnique({ where: { slug } });
-        return !existing;
+        return !(await storeSlugInUse(prisma, slug));
     }
 }
