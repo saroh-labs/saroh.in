@@ -65,6 +65,41 @@ export interface PayInvoice {
      * absent (an older API): the page is served wherever it was opened.
      */
     payUrl?: string | null;
+    /**
+     * The business takes payment online (DEC-070): Payments is on and its
+     * provider can open the checkout window. False: the page shows the
+     * invoice and a copy to save, with no Pay button, and says to pay the
+     * business the way they've asked. Absent (an older API, or the account
+     * area's receipt): as before, Pay is offered.
+     */
+    payOnline?: boolean;
+}
+
+/** `payOnline` from the API, checked: only a real `false` turns Pay off. */
+export function payOnlineOf(v: unknown): boolean | undefined {
+    return typeof v === "boolean" ? v : undefined;
+}
+
+/**
+ * What the page offers under the invoice:
+ * - `pay`: it's owed and the business takes payment online — Pay (or
+ *   autopay's choice) and "Check again";
+ * - `charging`: an autopay charge is under way (D13), so nothing to pay
+ *   (said whatever its status, as before);
+ * - `elsewhere`: it's owed, but the business doesn't take payment online
+ *   (DEC-070) — the invoice, a copy to save, and "Pay ‹business› the way
+ *   they've asked you to";
+ * - `settled`: paid, void or credited — nothing to do.
+ */
+export type PayOffer = "pay" | "charging" | "elsewhere" | "settled";
+
+export function payOffer(
+    invoice: Pick<PayInvoice, "status" | "autopayCharging" | "payOnline">,
+): PayOffer {
+    if (invoice.autopayCharging) return "charging";
+    const owed = invoice.status === "ISSUED" || invoice.status === "OVERDUE";
+    if (!owed) return "settled";
+    return invoice.payOnline === false ? "elsewhere" : "pay";
 }
 
 /** The link's own address from the API, checked; anything strange is none. */
