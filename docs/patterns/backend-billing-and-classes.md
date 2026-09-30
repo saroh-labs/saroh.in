@@ -310,8 +310,12 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, currency, status, billed-to name) served server-to-server to
-  `saroh.app/pay/<token>`; reads and payment starts are rate-limited per link.
+  tax, total, currency, status, billed-to name, and `payOnline`) served
+  server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
+  rate-limited per link. With `payOnline` false (DEC-070) the page shows the
+  invoice with no Pay button, only "Print or save as PDF", and starting a payment or autopay
+  is a 409 (`assertPaysOnline`). An older API without the field means "as
+  before": show Pay.
 - **The amount is the stored invoice's.** A payment request carries only a
   provider and an idempotency key; anything else is ignored.
 - **`PaymentIntent` pays an Order or an Invoice** — exactly one (a CHECK in the
@@ -698,8 +702,13 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
 
 ## Modules and routes — **Current**
 
-- Subscriptions and invoices: PAYMENTS, with `@IgnoreModuleReadiness()` so a
-  business with no provider still records payments by hand. Courses: its own
+- Subscriptions: PAYMENTS, with `@IgnoreModuleReadiness()` so a business
+  with no provider still records payments by hand. Invoices: no module
+  (DEC-070), `invoice:*` alone; only `POST :invoiceId/pay-link` keeps a
+  method-level `@RequireModule("PAYMENTS")` + `@IgnoreModuleReadiness()`,
+  pinned in `capabilities/module-annotations.spec.ts`. The rail shows
+  Invoices under Payments while it's on, and as its own row while it's off
+  (`nav-items.tsx`, `unlessModule`). Courses: its own
   COURSES module (depends on APPOINTMENTS). Class packs: its own CLASS_PACKS
   module (depends on APPOINTMENTS; E12, default 44), reached with
   `pack:read`. Online classes: APPOINTMENTS.

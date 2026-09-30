@@ -3,7 +3,7 @@
 > **Read when:** designing or changing anything a merchant sees, deciding what
 > to build, or writing copy, a claim or a status.
 > Sources: `PRODUCT.md` (the short brief), `docs/PRODUCT_STRATEGY.md` (§ numbers
-> below), ADR-001 to ADR-006, ADR-010 and DEC-010 to DEC-018, DEC-030. Where
+> below), ADR-001 to ADR-006, ADR-010 and DEC-010 to DEC-018, DEC-030, DEC-070. Where
 > this file and those disagree, they win — fix this file in the same change.
 
 These are the product facts that change engineering rules. The technical
@@ -11,8 +11,57 @@ pattern files refer back here.
 
 ## Who uses it
 
-- **Current** — A small team of 2–5 people with mixed roles, sharing one
-  workspace; nobody is a full-time software operator (`PRODUCT.md`). Avoid
+- **Current** (DEC-070) — **Three kinds of people**: **a business** (shop,
+  studio, practice), **Just me** (freelancer, consultant, creator) and **a
+  site for my work** (portfolio, blog, projects). Setup asks "What are you
+  setting up?" first, with nothing chosen, and stores the answer as
+  `Organization.kind` (`BUSINESS`, `SOLO`, `WORK`; every business set up
+  before it is `BUSINESS`). Whoever holds `org:update` (Owner and Admin)
+  changes it at the top of Settings › Business › Identity, with Undo.
+- **Current** (DEC-070) — **The kind changes words and defaults, never
+  features.** Every module is available to every kind. No guard, module
+  gate, entitlement or refusal reads it: the API reads it through
+  `organizationKind()` only, and `organization-kind.readers.spec.ts` fails
+  a read off its allow-list (onboarding, settings, the summary, the Turn on
+  sheet's prefill, a new site's template) or in a guard, `capabilities/module-*`
+  or entitlements. So never write "only for businesses" or hide anything by
+  kind. The app's words and defaults are one pure file,
+  `apps/app.saroh.in/lib/organizations/kind.ts` (`kindWords`,
+  `kindDefaults`); an unknown or missing kind reads as `BUSINESS`.
+
+    |                                       | A business                        | Just me                                             | A site for my work                |
+    | ------------------------------------- | --------------------------------- | --------------------------------------------------- | --------------------------------- |
+    | The owner                             | your business                     | you                                                 | you                               |
+    | Their people                          | customers                         | clients                                             | readers                           |
+    | Setup's name field                    | What is it called?                | Your name or brand                                  | Your name or brand                |
+    | Settings tab                          | Business                          | Your details                                        | Your details                      |
+    | Home's first run, in order            | Sell, Bookings, Website, Contacts | Bookings, Invoice a client, Contacts, Website, Sell | Website, Contacts, Bookings, Sell |
+    | The module picker suggests            | Sell                              | nothing                                             | Website                           |
+    | Setup asks "registered as a company?" | yes                               | yes                                                 | no                                |
+    | Bookings' Turn on prefill             | Mon–Sat 10–7, no service          | Mon–Fri 10–6, "Consultation", 60 min                | Mon–Sat 10–7, no service          |
+
+    The words reach the surfaces that name the owner or their people in
+    general terms: setup, the module picker, Home's first run and the
+    Settings tab and search. Entity names stay: Sell's **Customers** is the
+    record of who pays and keeps its name for every kind. Sell is never
+    removed for Just me or A site for my work, only moved last. "Invoice a
+    client" turns nothing on: it opens a new invoice, for someone with
+    `invoice:write`, until the business has one.
+
+- **Not yet true** (DEC-070, K4) — The registered address, business type
+  and logo steps are meant to appear only once something invoices or takes
+  money (Sell, Bookings, Courses, Class packs or Payments on, or an invoice
+  exists), in the kind's words ("Add your address", "Add your details").
+  Until that unit lands, Settings' ready list and nudges and Home's
+  take-money card still ask every business for them, in a business's words.
+  Don't write copy that says a site-only account is spared them.
+- **Not yet true** (DEC-070, K11–K15) — The Portfolio, Blog/writing and
+  Personal/consultant templates and the Projects block aren't built, so a
+  new site starts from the starter template for every kind. Its second
+  version (`starter@2`) no longer assumes a business and has no images.
+- **Current** — A business is often a small team of 2–5 people with mixed
+  roles, sharing one workspace; someone working for themselves is a team of
+  one. Nobody is a full-time software operator (`PRODUCT.md`). Avoid
   complexity designed for large specialised teams (§3). Saroh staff use
   `admin.saroh.in`, a separate surface with its own authorization.
 - **Current** — Four primary scenes: desk, phone one-handed, bright shop floor,
@@ -170,9 +219,24 @@ organizations/:org/customers`: everyone who has paid (an order through a
 
 ## Money a person owes, and classes sold ahead (ADR-007)
 
-- **Current** — Invoices, subscriptions and plans live under **Billing**
-  (`/billing/…`) with Payments; courses under **Courses** (its own module);
+- **Current** — Subscriptions and plans live under **Payments** in the rail
+  (addresses `/billing/…`); courses under **Courses** (its own module);
   class packs beside the schedule, under Appointments.
+- **Current** (DEC-070, amending DEC-019) — **Invoicing needs no module.**
+  Creating, issuing, sending, voiding, crediting, downloading and recording
+  an invoice paid need only `invoice:*`. While Payments is on, Invoices sits
+  under Payments in the rail; while it's off, Invoices is a row of its own
+  at the same address, and `/billing` lands there. **Taking money online
+  needs Payments** and a connected provider that can open the checkout:
+  the API says which as `payOnline`, and the workspace never guesses. With
+  it, Send reads "Send with pay link" and the link can be copied; without
+  it, Send reads "Send invoice", there is no pay link to copy, the email
+  says "view it and download a copy", and the customer's page shows the
+  invoice with no Pay button, "Pay ‹business› the way they've asked you
+  to", and "Print or save as PDF". Home's overdue invoices row needs
+  `invoice:read`, not Payments. Issue and Send still need the registered
+  address first for every kind (DEC-068 M3, in place in the business
+  details sheet); recording a payment doesn't.
 - **Current** — Saroh records and invoices; it does not charge a card on file
   and does not send the invoice. Copy says so: "Nothing is charged and nobody is
   contacted", "Saroh doesn't send this. Print it and hand it over."
@@ -180,14 +244,17 @@ organizations/:org/customers`: everyone who has paid (an order through a
   provider's mandates, with a pay link as the fallback. The copy above stays
   true for every subscription without a mandate.
   **Current** (round-2 D17): an invoice is sent only when someone presses
-  "Send with pay link" or "Send reminder", and only where the API's `send`
-  flag names a channel (the business's own email provider; the account
-  thread once A13 and A14 are live). Where it names none, the old copy
-  stays: "Saroh doesn't send it", "Copy pay link".
-- **Current** — **Mention an invoice only when Payments is on.** With Payments
-  off, subscribing is refused, and a pack or course is recorded with the price
-  paid and no invoice — so no copy may promise one. The API says which
-  (`invoicesOnEnrol`); the workspace never guesses.
+  "Send with pay link" (or "Send invoice", above) or "Send reminder", and
+  only where the API's `send` flag names a channel (the business's own
+  email provider; the account thread once A13 and A14 are live). Where it
+  names none, the old copy stays: "Saroh doesn't send it", with "Copy pay
+  link" only when `payOnline` is true.
+- **Current** — **Promise an automatic invoice only when Payments is on.**
+  Invoicing by hand works either way (above), but with Payments off nothing
+  is invoiced automatically: subscribing is refused, renewals wait, and a
+  pack or course is recorded with the price paid and no invoice — so no copy
+  may promise one. The API says which (`invoicesOnEnrol`); the workspace
+  never guesses.
 - **Current** — Overdue, seats left, classes left and "next renewal" are
   derived and said in words, never stored and never shown as colour alone.
 - **Current** — A dialog says what an action books and charges before it
