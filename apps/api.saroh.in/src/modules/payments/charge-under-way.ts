@@ -136,6 +136,36 @@ export async function subscriptionChargesUnderWay(
     return bySubscription;
 }
 
+/**
+ * The other half of "one charge at a time": a pay-link checkout the
+ * customer has open on the invoice. A sale's intent that isn't autopay's
+ * (no mandate, no `purpose`, so never D12B's ₹1 check), still open. Retiring
+ * the link wouldn't stop it: the checkout already holds its provider order,
+ * and the customer can finish it. So while one is open, autopay neither
+ * queues, prepares nor debits a charge on the invoice.
+ *
+ * A checkout the customer walked away from stays open, and keeps autopay
+ * off this invoice; the pay link, as before autopay, is the way to be paid.
+ */
+export const OPEN_CHECKOUT_WHERE = {
+    viaMandateId: null,
+    purpose: null,
+    status: { in: OPEN_MANDATE_CHARGE },
+} satisfies Prisma.PaymentIntentWhereInput;
+
+/** Whether a pay-link checkout is open on the invoice (above). */
+export async function checkoutOpenOn(
+    db: Db,
+    organizationId: string,
+    invoiceId: string,
+): Promise<boolean> {
+    const open = await db.paymentIntent.findFirst({
+        where: { organizationId, invoiceId, ...OPEN_CHECKOUT_WHERE },
+        select: { id: true },
+    });
+    return open !== null;
+}
+
 /** The 409 every other way to pay answers while a charge is under way. */
 export function autopayChargeInProgress(): ConflictException {
     return new ConflictException({

@@ -1905,3 +1905,34 @@ the conditional write that commits to money. Pinned by
 `mandate-charges.db.spec.ts` "a mandate cancelled after the checks, before
 the claim" and "an invoice voided after the checks".
 **Category**: payments · autopay · concurrency
+
+## Autopay — Retry by autopay while the customer's pay-link checkout was open (release review)
+
+**Symptom**: found in the production release review, behind
+`RAZORPAY_AUTOPAY`. After a failed renewal the customer opens the pay
+link's checkout; staff then click Retry by autopay. A card mandate is
+debited at once, the customer finishes the checkout too, and the second
+capture is only recorded as owed back.
+**Cause**: "one charge at a time" (`charge-under-way.ts`) ran one way:
+an open autopay charge refused new pay-link intents, but nothing asked
+whether a pay-link intent was already open before queueing, preparing or
+debiting an autopay charge. `queueInTx` looked only for open mandate
+intents.
+**Fix**: the smallest safe version — refuse, don't retire. `checkoutOpenOn`
+/ `OPEN_CHECKOUT_WHERE` (a non-mandate, non-`purpose` intent still CREATED,
+REQUIRES_PAYMENT or PROCESSING) makes `queueInTx` answer `CHECKOUT_OPEN`
+(Retry: 409 "The customer is paying this by link…"), `prepareCharge`
+refuse before the provider order, and `charge()`'s PROCESSING claim carry
+`invoice.paymentIntents: { none: OPEN_CHECKOUT_WHERE }` in its WHERE, so a
+checkout opened in a race is caught at the claim. Retiring the pay link
+was left out: a checkout already open holds its provider order, so a
+retired token wouldn't stop it, and new pay-link intents are already
+refused while a charge is under way. The cost: a checkout the customer
+abandoned stays open and keeps autopay off that invoice; the pay link is
+the way, as before autopay.
+**Rule**: "one at a time" between two ways to pay is checked from both
+sides, and on the side that moves money, in the claim's WHERE. Pinned by
+`subscriptions.charge.db.spec.ts` "Retry by autopay is refused while the
+customer's pay-link checkout is open" and `mandate-charges.db.spec.ts`
+"a pay-link checkout …".
+**Category**: payments · autopay · subscriptions

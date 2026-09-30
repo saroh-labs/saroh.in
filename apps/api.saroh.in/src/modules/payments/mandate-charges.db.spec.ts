@@ -605,6 +605,53 @@ describe("what is never charged", () => {
         expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
     });
 
+    /** A pay-link checkout the customer has open on the invoice. */
+    const openCheckout = (invoiceId: string) =>
+        prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                invoiceId,
+                provider: "RAZORPAY",
+                amountCents: 120_000,
+                currency: "INR",
+                status: "REQUIRES_PAYMENT",
+                providerIntentId: `order_link_${next()}`,
+            },
+        });
+
+    it("a pay-link checkout open on the invoice: not prepared", async () => {
+        const who = await autopayMember();
+        const invoice = await invoiceFor(who);
+        await openCheckout(invoice.id);
+        expect(await prepare(who.mandateId, invoice.id)).toMatchObject({
+            status: "REFUSED",
+            reason: "CHECKOUT_OPEN",
+        });
+        expect(
+            fake.mandateCalls.filter((c) => c.op === "prepareCharge"),
+        ).toHaveLength(0);
+    });
+
+    it("a pay-link checkout opened after the charge was prepared: never debited", async () => {
+        const who = await autopayMember();
+        const invoice = await invoiceFor(who);
+        const prepared = await prepare(who.mandateId, invoice.id);
+        if (prepared.status !== "PREPARED") throw new Error("not prepared");
+        await openCheckout(invoice.id);
+        fake.settlePreDebit(prepared.providerIntentId, "DELIVERED");
+        clock = new Date(clock.getTime() + 27 * HOUR);
+
+        expect(
+            await charges.charge({
+                organizationId: owner.organizationId,
+                intentId: prepared.intentId,
+                now: clock,
+            }),
+        ).toMatchObject({ status: "REFUSED", reason: "CHECKOUT_OPEN" });
+        expect(debitCalls()).toHaveLength(0);
+        expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
+    });
+
     it("a mandate of another business is not found", async () => {
         const who = await autopayMember();
         const invoice = await invoiceFor(who);

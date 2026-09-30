@@ -1474,7 +1474,8 @@ export class SubscriptionsService {
      * - `MANDATE`: a new autopay charge (a new attempt key, so a new order
      *   and pre-debit notice), when the subscription's mandate is ACTIVE,
      *   its provider's charging is on and the invoice is within its limit;
-     *   otherwise 409.
+     *   otherwise 409. Also 409 while the customer has a pay-link checkout
+     *   open on the invoice (`checkoutOpenOn`): they could pay both.
      * - `PAY_LINK` (the default, as before D13): a new pay link, replacing
      *   the old one; needs `invoice:write`, as any pay link does.
      *
@@ -1530,6 +1531,13 @@ export class SubscriptionsService {
                           now,
                       })
                     : ({ status: "NONE" } as const);
+                if (queued.status === "CHECKOUT_OPEN") {
+                    throw new ConflictException({
+                        message:
+                            "The customer is paying this by link. Wait for that payment, or make a new pay link.",
+                        details: { reason: "checkout-open" },
+                    });
+                }
                 if (queued.status !== "QUEUED") {
                     throw new ConflictException({
                         message:
