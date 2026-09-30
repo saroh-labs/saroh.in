@@ -52,6 +52,9 @@ export function TestReleasesPanel({
                     <Button
                         type="button"
                         size="sm"
+                        // Outline: a release's Go live is the panel's one
+                        // filled action.
+                        variant="outline"
                         className="w-fit"
                         onClick={() => state.setMaking(true)}
                     >
