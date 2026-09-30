@@ -297,6 +297,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   enforced in `putLive`, with the words and the owner check in
   `sites/publish-approval.ts`, so every way of going live obeys it, a
   scheduled go-live included.
+- **Current** (DEC-071, T12) — Reviewers review a test release on its own
+  page (`/sites/:siteId/releases/:releaseId`), drawn from its frozen
+  snapshot with the session and `site:read`, no link token. A verdict, a
+  request or a note there carries `testReleaseId` and never touches the
+  draft's review; a note pins a section by its position on the frozen page.
+  Every review panel says what it reviews: "Draft" or "Test release N ·
+  name". Version history says which release a go-live came from, badges
+  Approved, Bypassed and "Overridden by ‹owner›", and lists scheduled
+  go-lives.
 - **Current** — Section content validates against the versioned contract in
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing

@@ -5,6 +5,8 @@
  * The words the editor says about them are `test-releases.ts`.
  */
 
+import type { PublishedSnapshot, UnrenderableSection } from "./service";
+
 export type TestReleaseStatus = "ready" | "scheduled" | "live" | "discarded";
 
 /** Why a link does not open its release; `ended` is its release's doing. */
@@ -90,4 +92,19 @@ export interface GoLiveResult {
         publishedBy: { name: string | null };
     } | null;
     release: TestRelease;
+}
+
+/**
+ * One release with the bytes it froze (T12), for reading it in the
+ * workspace: drawn with the session and `site:read`, no link token.
+ */
+export interface TestReleaseDetail {
+    release: TestRelease;
+    /** The business's time zone, the one its dates are said in. */
+    zone: string;
+    snapshot: PublishedSnapshot;
+    renderability: {
+        renderable: boolean;
+        unrenderable: UnrenderableSection[];
+    };
 }
