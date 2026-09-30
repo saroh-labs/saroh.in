@@ -56,6 +56,25 @@ describe("renderTransactional", () => {
         expect(body).not.toContain("due");
     });
 
+    it("offers to take the payment only when the link is a pay link (DEC-070)", () => {
+        for (const payOnline of [true, undefined]) {
+            const { body } = renderTransactional("INVOICE_SENT", {
+                ...vars,
+                payOnline,
+            });
+            expect(body).toContain("You can pay it by UPI or card here:");
+        }
+        const view = renderTransactional("INVOICE_REMINDER", {
+            ...vars,
+            payOnline: false,
+        });
+        expect(view.body).toContain(
+            "You can view it and download a copy here:",
+        );
+        expect(view.body).not.toContain("UPI or card");
+        expect(view.body).toContain(`href="${SECRET_LINK_SLOT}"`);
+    });
+
     it("escapes what a person or business typed", () => {
         const { body } = renderTransactional("INVOICE_SENT", {
             ...vars,

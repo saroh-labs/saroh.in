@@ -42,7 +42,7 @@ import { payLinkUrl } from "./pay-link-url";
  * the service checks on every route.
  *
  * The one route that is Payments' is the pay link: a way to take money
- * online. It keeps its own `@RequireModule("PAYMENTS")`, and the guard reads
+ * online. It keeps its own Payments gate on the handler, and the guard reads
  * a handler's metadata before the class's. It still skips the "no provider
  * connected" readiness blocker, so the service can say what the link needs.
  */
