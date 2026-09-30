@@ -297,6 +297,44 @@ describe("the business-details step (DEC-068)", () => {
         expect(result).toBeNull();
     });
 
+    it("speaks in the kind's words: Just me adds 'your details' (DEC-070)", async () => {
+        for (const kind of ["SOLO", "WORK"] as const) {
+            readBusinessDetails.mockResolvedValue({
+                ok: true,
+                data: { ...SETTINGS, kind },
+            });
+            action.mockResolvedValue(REFUSED);
+            await press("Issue it");
+            const t = sheet()?.textContent ?? "";
+            expect(t, kind).toContain("Add your details");
+            expect(t, kind).not.toContain("business details");
+            expect(t, kind).toContain(
+                "Every invoice prints your address. Add it once and we'll issue it.",
+            );
+            await press("Not now");
+        }
+    });
+
+    it("keeps a business's words, and an older API's with no kind", async () => {
+        for (const kind of ["BUSINESS", undefined] as const) {
+            readBusinessDetails.mockResolvedValue({
+                ok: true,
+                data: { ...SETTINGS, kind },
+            });
+            action.mockResolvedValue({
+                ...REFUSED,
+                missing: ["address", "gstin"],
+            });
+            await press("Issue it");
+            const t = sheet()?.textContent ?? "";
+            expect(t).toContain("Add your business details");
+            expect(t).toContain(
+                "Every invoice prints your registered address and GSTIN. Add them once and we'll issue it.",
+            );
+            await press("Not now");
+        }
+    });
+
     it("passes any other outcome straight through, with no sheet", async () => {
         action.mockResolvedValue({
             ok: false,

@@ -1,6 +1,6 @@
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
-import { inIndia } from "@/lib/organizations/business-details";
+import { inIndia, yourAddress } from "@/lib/organizations/business-details";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -113,6 +113,26 @@ export const business = (section: string) =>
 /** Modules that take money for something: a sale, a booking, a course, a pack. */
 const SELLING = ["COMMERCE", "APPOINTMENTS", "COURSES", "CLASS_PACKS"] as const;
 
+/**
+ * Whether the business invoices or takes money (DEC-070, KTD-7): something
+ * that sells is on, or Payments is, or it has an invoice (drafts count, void
+ * ones don't). Only then do the address, business-type and logo steps apply:
+ * a portfolio with only a website is never told to register a company.
+ *
+ * A fact, never the kind — the kind picks a step's words, not whether it
+ * applies. `null` is unknown (the modules could not be read and no invoice
+ * says so): the steps are then asked as they always were. An API older than
+ * the invoice count is read from the modules alone.
+ */
+export function handlesMoney(
+    modules: readonly ModuleView[] | null,
+    facts: Pick<SetupFacts, "invoices"> | undefined,
+): boolean | null {
+    if ((facts?.invoices ?? 0) > 0) return true;
+    if (!modules) return null;
+    return [...SELLING, "PAYMENTS"].some((k) => on(modules, k));
+}
+
 type Check = ReadyItem & { left: boolean };
 
 const connect = (href: string): ReadyItem => ({
@@ -181,10 +201,12 @@ const filled = (v: string | null | undefined) => !!v?.trim();
 function address(
     registered: NonNullable<OrganizationSettings["registeredAddress"]>,
     country: string | null | undefined,
+    kind: unknown,
 ): Check {
     return {
         key: "address",
-        label: "Add your registered address",
+        // "your registered address", or "your address" (DEC-070).
+        label: `Add ${yourAddress(kind)}`,
         why: "It's printed on every invoice you send.",
         cta: "Add address",
         href: business("address"),
@@ -341,7 +363,7 @@ function shop(modules: readonly ModuleView[]): Check | null {
 
 /**
  * The steps to take money, in order: connect payments, the registered
- * address, GST, a first product or service, publishing the site and,
+ * address (once something invoices or takes money, `handlesMoney`), GST, a first product or service, publishing the site and,
  * while its shop waits on it, choosing the storefront it sells from.
  *
  * Each check is left, done, or not a step at all. Unknown — the list behind
@@ -356,7 +378,7 @@ export function readyChecklist({
 }: {
     settings: Pick<
         OrganizationSettings,
-        "tax" | "profile" | "registeredAddress" | "setup"
+        "tax" | "profile" | "registeredAddress" | "setup" | "kind"
     >;
     modules: readonly ModuleView[] | null;
 }): ReadyChecklist {
@@ -365,8 +387,14 @@ export function readyChecklist({
     const checks = [
         modules ? payments(modules) : null,
         // Absent from an API older than the registered address: unknown.
-        settings.registeredAddress
-            ? address(settings.registeredAddress, settings.profile?.country)
+        // Asked only once something invoices or takes money (DEC-070).
+        settings.registeredAddress &&
+        handlesMoney(modules, settings.setup) !== false
+            ? address(
+                  settings.registeredAddress,
+                  settings.profile?.country,
+                  settings.kind,
+              )
             : null,
         tax(settings),
         modules ? catalogue(modules, settings.setup) : null,
@@ -387,6 +415,43 @@ export function readyChecklist({
         done: steps.length - left.length,
         total: steps.length,
     };
+}
+
+/** The steps that are about money, rather than getting the site live. */
+const MONEY_STEPS: ReadonlySet<ReadyItem["key"]> = new Set([
+    "payments",
+    "address",
+    "tax",
+    "catalogue",
+    "shop",
+    "businessType",
+    "logo",
+]);
+
+/** Whether any step, done or left, is about money (DEC-070). */
+export function takesMoney(list: Pick<ReadyChecklist, "steps">): boolean {
+    return list.steps.some((s) => MONEY_STEPS.has(s.key));
+}
+
+/**
+ * The checklist's heading follows its steps, never the kind (DEC-070): Home's
+ * "Get ready to take money" and Settings' "Ready to take payments" while a
+ * money step is in the list. Without one, a list that publishes the site is
+ * "Get your site live", and Settings' other asks (email, a pipeline) are
+ * "Finish setting up".
+ */
+export function checklistHeading(
+    list: Pick<ReadyChecklist, "steps">,
+    where: "home" | "settings",
+): string {
+    if (takesMoney(list)) {
+        return where === "home"
+            ? "Get ready to take money"
+            : "Ready to take payments";
+    }
+    return list.steps.some((s) => s.key === "site")
+        ? "Get your site live"
+        : "Finish setting up";
 }
 
 /**

@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
+import { settingsChecklist } from "./nudges";
+import type { ReadyStep } from "./ready";
 import {
     SETUP_HIDDEN_KEY,
+    checklistHeading,
     emailAttention,
+    handlesMoney,
     providersTabNote,
     readSetupHidden,
     readyChecklist,
@@ -214,9 +218,10 @@ describe("readyChecklist", () => {
                 }),
             ],
         });
-        // Not GST-registered, nothing sells, no website: only the address.
-        expect(r.steps.map((s) => s.key)).toEqual(["address"]);
-        expect([r.done, r.total]).toEqual([1, 1]);
+        // Not GST-registered, nothing sells, no website, no invoice: no
+        // step at all — not even the address (DEC-070).
+        expect(r.steps.map((s) => s.key)).toEqual([]);
+        expect([r.done, r.total]).toEqual([0, 0]);
     });
 
     it("asks for Payments to come on when something sells and it is off", () => {
@@ -464,6 +469,153 @@ describe("readyChecklist", () => {
         expect(left(null)).toEqual(["address"]);
         // An address abroad has no Indian state to add.
         expect(left("GB")).toEqual([]);
+    });
+});
+
+describe("steps only when something invoices or takes money (DEC-070)", () => {
+    const facts = (invoices: number) => ({
+        products: 0,
+        services: 0,
+        sites: 1,
+        sitesNotLive: 1,
+        invoices,
+    });
+    /** A portfolio: only its website on, nothing on file yet. */
+    const portfolio = (
+        invoices: number,
+        kind?: "BUSINESS" | "SOLO" | "WORK",
+    ) => ({
+        settings: {
+            ...fresh.settings,
+            tax: { ...fresh.settings.tax, registered: false },
+            profile: { ...fresh.settings.profile, type: null },
+            logo: null,
+            setup: facts(invoices),
+            kind,
+        },
+        modules: [
+            mod("PAYMENTS", { lifecycle: "DISABLED", readiness: "DISABLED" }),
+            mod("WEBSITE", {
+                readiness: "SETUP_REQUIRED",
+                blockers: [
+                    { code: "WEBSITE_NO_PUBLICATION", actionHref: "/sites" },
+                ],
+            }),
+        ],
+    });
+
+    it("only Website on and no invoice: one step, the site; no address, type or logo", () => {
+        const input = { ...portfolio(0, "WORK"), messaging: null };
+        expect(readyChecklist(input).steps.map((s) => s.key)).toEqual(["site"]);
+        expect(settingsChecklist(input).steps.map((s) => s.key)).toEqual([
+            "site",
+        ]);
+    });
+
+    it("the same with one draft invoice: the address, type and logo are back", () => {
+        const input = { ...portfolio(1, "WORK"), messaging: null };
+        expect(readyChecklist(input).steps.map((s) => s.key)).toEqual([
+            "address",
+            "site",
+        ]);
+        expect(settingsChecklist(input).steps.map((s) => s.key)).toEqual([
+            "address",
+            "site",
+            "businessType",
+            "logo",
+        ]);
+    });
+
+    it("Bookings on: the address applies, as it always did", () => {
+        const { settings } = portfolio(0);
+        const r = readyChecklist({
+            settings,
+            modules: [mod("APPOINTMENTS")],
+        });
+        expect(r.steps.map((s) => s.key)).toContain("address");
+    });
+
+    it("asks for the address as before when the modules could not be read", () => {
+        const { settings } = portfolio(0);
+        expect(
+            readyChecklist({ settings, modules: null }).steps.map((s) => s.key),
+        ).toEqual(["address"]);
+    });
+
+    it("an API older than the invoice count reads the modules alone", () => {
+        const { settings, modules } = portfolio(0);
+        const { invoices: _invoices, ...older } = settings.setup;
+        const r = readyChecklist({
+            settings: { ...settings, setup: older },
+            modules,
+        });
+        expect(r.steps.map((s) => s.key)).toEqual(["site"]);
+    });
+
+    it("handlesMoney is a fact: selling modules, Payments, or an invoice", () => {
+        expect(handlesMoney([mod("WEBSITE")], facts(0))).toBe(false);
+        expect(handlesMoney([mod("WEBSITE")], facts(2))).toBe(true);
+        expect(handlesMoney([mod("COURSES")], facts(0))).toBe(true);
+        expect(handlesMoney([mod("CLASS_PACKS")], undefined)).toBe(true);
+        expect(handlesMoney([mod("PAYMENTS")], undefined)).toBe(true);
+        expect(handlesMoney(null, facts(1))).toBe(true);
+        expect(handlesMoney(null, facts(0))).toBeNull();
+    });
+
+    it("speaks in the kind's words: SOLO adds 'your address'", () => {
+        const label = (kind?: "BUSINESS" | "SOLO" | "WORK") =>
+            readyChecklist(portfolio(1, kind)).steps.find(
+                (s) => s.key === "address",
+            )?.label;
+        expect(label("SOLO")).toBe("Add your address");
+        expect(label("WORK")).toBe("Add your address");
+        // A business, and an API older than the kind: unchanged.
+        expect(label("BUSINESS")).toBe("Add your registered address");
+        expect(label(undefined)).toBe("Add your registered address");
+    });
+
+    it("the kind never decides whether the address applies", () => {
+        for (const kind of ["BUSINESS", "SOLO", "WORK"] as const) {
+            expect(
+                readyChecklist(portfolio(0, kind)).steps.map((s) => s.key),
+            ).toEqual(["site"]);
+            expect(
+                readyChecklist(portfolio(1, kind)).steps.map((s) => s.key),
+            ).toEqual(["address", "site"]);
+        }
+    });
+});
+
+describe("checklistHeading (DEC-070)", () => {
+    const steps = (...keys: string[]) => ({
+        steps: keys.map((key) => ({ key }) as ReadyStep),
+    });
+
+    it("says money while a money step is in the list, done or not", () => {
+        expect(checklistHeading(steps("address", "site"), "home")).toBe(
+            "Get ready to take money",
+        );
+        expect(checklistHeading(steps("payments"), "settings")).toBe(
+            "Ready to take payments",
+        );
+        expect(checklistHeading(steps("site", "logo"), "settings")).toBe(
+            "Ready to take payments",
+        );
+    });
+
+    it("says the site when publishing it is all there is", () => {
+        expect(checklistHeading(steps("site"), "home")).toBe(
+            "Get your site live",
+        );
+        expect(checklistHeading(steps("site", "pipeline"), "settings")).toBe(
+            "Get your site live",
+        );
+    });
+
+    it("says setting up for Settings' other asks alone", () => {
+        expect(checklistHeading(steps("email", "pipeline"), "settings")).toBe(
+            "Finish setting up",
+        );
     });
 });
 

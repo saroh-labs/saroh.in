@@ -19,7 +19,7 @@ import {
     SheetTitle,
 } from "@saroh/ui/sheet";
 import { Switch } from "@saroh/ui/switch";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -34,10 +34,12 @@ import type {
 import {
     detailsInput,
     detailsProblems,
+    detailsTitle,
     detailsValuesOf,
     detailsWhy,
     inIndia,
 } from "@/lib/organizations/business-details";
+import type { OrganizationKind } from "@/lib/organizations/kind";
 import {
     readBusinessDetails,
     saveOrganizationSettings,
@@ -52,10 +54,34 @@ const FIELDS = [
     "taxId",
 ] as const;
 
-type Loaded =
-    | { state: "loading" }
+/** What is on file, read before the sheet opens — or why it couldn't be. */
+export type DetailsOnFile =
     | { state: "failed"; message: string; forbidden: boolean }
-    | { state: "ready"; values: BusinessDetailsValues; inIndia: boolean };
+    | {
+          state: "ready";
+          values: BusinessDetailsValues;
+          inIndia: boolean;
+          /** Picks the sheet's words (DEC-070); absent from an older API. */
+          kind: OrganizationKind | undefined;
+      };
+
+/**
+ * Read what is on file for the step. It is read before the sheet opens, so
+ * the sheet speaks in the business's own words from its first frame ("Add
+ * your details" for someone working for themselves) instead of changing
+ * them once the read lands.
+ */
+export async function readDetailsOnFile(): Promise<DetailsOnFile> {
+    const res = await readBusinessDetails();
+    return res.ok
+        ? {
+              state: "ready",
+              values: detailsValuesOf(res.data),
+              inIndia: inIndia(res.data.profile?.country),
+              kind: res.data.kind,
+          }
+        : { state: "failed", message: res.error, forbidden: res.forbidden };
+}
 
 /**
  * "Add your business details" (DEC-068): the small sheet a merchant meets
@@ -65,15 +91,20 @@ type Loaded =
  * Business's own (`RegisteredAddressFields`); Save writes them to the
  * business profile, and the caller carries on with what the merchant
  * started (`useBusinessDetailsStep`).
+ *
+ * The rule is the same for every kind (DEC-070, KTD-8); only the words
+ * change: "Add your details" and "your address" for Just me and A site for
+ * my work.
  */
 export function BusinessDetailsSheet({
-    open,
+    onFile,
     missing,
     then,
     continueLabel,
     onDone,
 }: {
-    open: boolean;
+    /** What is on file; the sheet is open while there is something. */
+    onFile: DetailsOnFile | null;
     missing: readonly BusinessDetail[];
     /** What happens once saved, for the line under the title ("issue it"). */
     then: string;
@@ -82,65 +113,53 @@ export function BusinessDetailsSheet({
     /** Saved (carry on), or closed without saving. */
     onDone: (saved: boolean) => void;
 }) {
+    // A role that can't read the settings can't read the kind either: it
+    // reads in a business's words.
+    const kind = onFile?.state === "ready" ? onFile.kind : undefined;
     return (
-        <Sheet open={open} onOpenChange={(o) => (o ? null : onDone(false))}>
+        <Sheet
+            open={onFile !== null}
+            onOpenChange={(o) => (o ? null : onDone(false))}
+        >
             <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-[440px]">
                 <div className="border-b border-border px-[18px] py-3.5">
                     <SheetTitle className="font-display text-[18px] font-semibold">
-                        Add your business details
+                        {detailsTitle(kind)}
                     </SheetTitle>
                     <SheetDescription className="mt-1 text-[12.5px] text-muted-foreground">
-                        {detailsWhy(missing, then)}
+                        {detailsWhy(missing, then, kind)}
                     </SheetDescription>
                 </div>
-                <DetailsBody continueLabel={continueLabel} onDone={onDone} />
+                {onFile ? (
+                    <DetailsBody
+                        onFile={onFile}
+                        continueLabel={continueLabel}
+                        onDone={onDone}
+                    />
+                ) : null}
             </SheetContent>
         </Sheet>
     );
 }
 
 /**
- * What is on file, read when the sheet opens (it mounts with it), then the
- * form — or why it can't be read: a role without the business's settings
- * is told who can add them.
+ * The form, from what is on file — or why it couldn't be read: a role
+ * without the business's settings is told who can add them.
  */
 function DetailsBody({
+    onFile,
     continueLabel,
     onDone,
 }: {
+    onFile: DetailsOnFile;
     continueLabel: string;
     onDone: (saved: boolean) => void;
 }) {
-    const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
-
-    useEffect(() => {
-        let live = true;
-        void readBusinessDetails().then((res) => {
-            if (!live) return;
-            setLoaded(
-                res.ok
-                    ? {
-                          state: "ready",
-                          values: detailsValuesOf(res.data),
-                          inIndia: inIndia(res.data.profile?.country),
-                      }
-                    : {
-                          state: "failed",
-                          message: res.error,
-                          forbidden: res.forbidden,
-                      },
-            );
-        });
-        return () => {
-            live = false;
-        };
-    }, []);
-
-    if (loaded.state === "ready") {
+    if (onFile.state === "ready") {
         return (
             <DetailsForm
-                initial={loaded.values}
-                inIndia={loaded.inIndia}
+                initial={onFile.values}
+                inIndia={onFile.inIndia}
                 continueLabel={continueLabel}
                 onDone={onDone}
             />
@@ -148,17 +167,11 @@ function DetailsBody({
     }
     return (
         <div className="flex flex-1 flex-col gap-3 px-[18px] py-4 text-[13px]">
-            {loaded.state === "loading" ? (
-                <p role="status" className="text-muted-foreground">
-                    Reading your business details…
-                </p>
-            ) : (
-                <p role="alert" className="text-foreground">
-                    {loaded.forbidden
-                        ? "Only an owner or an admin can add these. Ask one of them to add your business's registered address in Settings › Business."
-                        : loaded.message}
-                </p>
-            )}
+            <p role="alert" className="text-foreground">
+                {onFile.forbidden
+                    ? "Only an owner or an admin can add these. Ask one of them to add your business's registered address in Settings › Business."
+                    : onFile.message}
+            </p>
             <div className="mt-auto flex justify-end border-t border-border pt-3">
                 <Button
                     type="button"
