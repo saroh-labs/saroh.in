@@ -1737,6 +1737,7 @@ tables and to `site-review-view.tsx`.
 added to every app table that indexes by it in the same release, or kept
 unreachable behind a flag until it is.
 **Category**: sites · review · DEC-071
+
 ## Templates — a template's enquiry form has no Form until the editor saves (K13)
 
 **Problem**: `writing@1` (and K12's portfolio) give Contact an enquiry
@@ -1755,3 +1756,20 @@ section as `module-page-sections.ts` does.
 service, a storefront) is only half-made by the template. Name who makes
 the record before the template ships.
 **Category**: templates · sites · enquiry
+
+## Tests — two reviews in the same millisecond read as either one (seen on K14)
+
+**Problem**: `test-release-review.db.spec.ts` "unsettles on a later change
+request" failed about one run in three (`approved: true` where `false` was
+expected), on a branch that touched only `packages/templates`.
+**Root cause**: the spec writes an approval and then a change request back
+to back, and the standing reads the latest review by time. Both rows can
+carry the same `createdAt`, so "latest" is whichever the database returns
+first.
+**Fix**: for the owner of the review standing (DEC-071 T8/T9): break the
+tie on a second, monotonic key (the id, or a sequence), or have the spec
+space the two writes. Not fixed in K14, which doesn't own those files.
+**Rule**: "the latest row" is read on `createdAt` plus a tie-breaker, never
+on `createdAt` alone, wherever two rows can be written in one request or
+one test step.
+**Category**: tests · flaky · ordering
