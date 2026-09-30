@@ -18,6 +18,11 @@ export type OrgAction =
     | "org:settings:read"
     | "org:update"
     | "org:delete"
+    // Change the business's web address (DEC-069, plan L2): its old address
+    // forwards for 90 days and stays held for it. Owner-only, like closing
+    // the business — every change holds an address, and it moves every link
+    // the business has shared.
+    | "org:address:update"
     | "member:read"
     | "member:invite"
     | "member:remove"
@@ -158,6 +163,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "org:settings:read",
     "org:update",
     "org:delete",
+    "org:address:update",
     "member:read",
     "member:invite",
     "member:remove",
