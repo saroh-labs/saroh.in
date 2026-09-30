@@ -17,7 +17,6 @@ import type { CreateStoreInput, StoreResult, UpdateStoreInput } from "./schema";
 export interface Store {
     id: string;
     name: string;
-    slug: string;
     description: string | null;
     logo: string | null;
     createdAt: string;
@@ -51,10 +50,7 @@ async function mutate(
     return {
         ok: false,
         error: failure.error,
-        field:
-            field === "name" || field === "slug" || field === "logo"
-                ? field
-                : undefined,
+        field: field === "name" || field === "logo" ? field : undefined,
     };
 }
 

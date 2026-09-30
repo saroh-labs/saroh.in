@@ -157,6 +157,12 @@ describe("StorefrontsScreen as Locations (DEC-069, L9)", () => {
         expect(html).not.toContain('data-testid="location-selling"');
     });
 
+    it("links to Description and logo, with no Web address (L14)", () => {
+        const t = text(screen());
+        expect(t).toContain("Description and logo");
+        expect(t).not.toContain("Web address");
+    });
+
     it("no location yet: says so, and offers Add a location", () => {
         const t = text(screen({ storefronts: [], selected: null }));
         expect(t).toContain("No location yet");

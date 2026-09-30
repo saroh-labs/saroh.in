@@ -3,7 +3,6 @@ import {
     IsOptional,
     IsString,
     IsUrl,
-    Matches,
     MaxLength,
     MinLength,
     ValidateIf,
@@ -12,10 +11,6 @@ import {
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
-const SLUG_RE = /^[a-z0-9-]+$/;
-const SLUG_MSG =
-    "Slug may only contain lowercase letters, numbers, and hyphens";
-
 export class CreateStoreDto {
     @Transform(trim)
     @IsString()
@@ -23,14 +18,13 @@ export class CreateStoreDto {
     @MaxLength(100)
     name!: string;
 
-    // Optional: derived from the name when omitted.
+    /**
+     * Ignored: the storefront "Web address" is gone (DEC-069, L14). Still
+     * declared so an older app that sends it isn't refused by
+     * `forbidNonWhitelisted`. Remove in L15.
+     */
     @IsOptional()
-    @Transform(trim)
-    @IsString()
-    @MinLength(1)
-    @MaxLength(100)
-    @Matches(SLUG_RE, { message: SLUG_MSG })
-    slug?: string;
+    slug?: unknown;
 
     @IsOptional()
     @Transform(trim)
@@ -46,12 +40,13 @@ export class UpdateStoreDto {
     @MaxLength(100)
     name!: string;
 
-    @Transform(trim)
-    @IsString()
-    @MinLength(1)
-    @MaxLength(100)
-    @Matches(SLUG_RE, { message: SLUG_MSG })
-    slug!: string;
+    /**
+     * Ignored: the storefront "Web address" is gone (DEC-069, L14). Still
+     * declared so an older app that sends it isn't refused by
+     * `forbidNonWhitelisted`. Remove in L15.
+     */
+    @IsOptional()
+    slug?: unknown;
 
     @IsOptional()
     @Transform(trim)

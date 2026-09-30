@@ -1,11 +1,10 @@
 /**
  * ADR-010 — several storefronts, up to the plan. Pure unit test with a mocked
  * Prisma: the product's ceiling is checked first (409), the plan's
- * `storefronts` entitlement second (403), and both refusals come before the
- * slug is even looked at.
+ * `storefronts` entitlement second (403), and both refusals come before
+ * anything is written.
  */
 jest.mock("@saroh/database", () => ({
-    // Plain mode: the slug check reads through `prisma` (store-slug.ts).
     isRlsEnforcementEnabled: () => false,
     currentOrgContext: () => undefined,
     outsideOrgContext: <T>(fn: () => T) => fn(),

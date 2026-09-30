@@ -174,14 +174,14 @@ export async function seedBoutique(
     });
 
     // --- the storefront
+    // Keyed by its fixed id: a location has no slug (DEC-069, L14).
     await prisma.store.upsert({
-        where: { slug: BOUTIQUE.slug },
+        where: { id: storeId },
         update: { name: BOUTIQUE_NAME, organizationId: orgId },
         create: {
             id: storeId,
             organizationId: orgId,
             name: BOUTIQUE_NAME,
-            slug: BOUTIQUE.slug,
             description:
                 "Skincare for everyone, and dresses made to be lived in.",
             createdAt,

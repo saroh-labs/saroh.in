@@ -32,9 +32,9 @@
   but under `RLS_ENFORCEMENT` the request's `tx`/`prisma` sees only the
   caller's, so another business's row looks free and the insert ends in the
   unique index's raw error. Web addresses go through `addressUse()`
-  (`sites/site-address.ts`), store slugs through `storeSlugInUse()`
-  (`stores/store-slug.ts`); both use `outsideOrgContext` only when
-  enforcement is on and a context is active. Never a `tx.<model>.findUnique`
+  (`sites/site-address.ts`), which uses `outsideOrgContext` only when
+  enforcement is on and a context is active. (Store slugs had the same
+  check until L14 stopped writing them.) Never a `tx.<model>.findUnique`
   on a globally unique column. Prove it under `TEST_RLS=on`.
 - **Current** — **Read a lost serializable race with `isSerializationFailure()`**
   (or `prismaErrorCode()`, `apps/api.saroh.in/src/common/prisma-errors.ts`),

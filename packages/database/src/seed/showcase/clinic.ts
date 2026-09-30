@@ -269,14 +269,14 @@ async function writeStorefront(
     prisma: Db,
     a: { orgId: string; createdAt: Date; demoUserId: string },
 ) {
+    // Keyed by its fixed id: a location has no slug (DEC-069, L14).
     await prisma.store.upsert({
-        where: { slug: KAVI.storeSlug },
+        where: { id: KAVI.storeId },
         update: { name: KAVI_NAME, organizationId: a.orgId, deletedAt: null },
         create: {
             id: KAVI.storeId,
             organizationId: a.orgId,
             name: KAVI_NAME,
-            slug: KAVI.storeSlug,
             description: "Dental care in Indiranagar.",
             createdAt: a.createdAt,
         },

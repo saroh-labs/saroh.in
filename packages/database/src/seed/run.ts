@@ -31,7 +31,6 @@ import {
     SERVICES,
     SIDE_BUSINESSES,
     SITES,
-    STORE_SLUG,
     SUBMISSIONS,
 } from "./data";
 import { seedFounder } from "./founder";
@@ -513,14 +512,14 @@ async function seedCommerce(
     userId: string,
     now: Date,
 ): Promise<string> {
+    // Keyed by its fixed id: a location has no slug (DEC-069, L14).
     const store = await prisma.store.upsert({
-        where: { slug: STORE_SLUG },
+        where: { id: id("store") },
         update: { name: `${ORG_NAME} Store`, organizationId: orgId },
         create: {
             id: id("store"),
             organizationId: orgId,
             name: `${ORG_NAME} Store`,
-            slug: STORE_SLUG,
             description: "Packaging, storage and safety supplies.",
         },
     });
@@ -780,13 +779,12 @@ async function seedOnlineStorefront(
 ) {
     const storeId = id("store", "online");
     await prisma.store.upsert({
-        where: { slug: `${STORE_SLUG}-online` },
+        where: { id: storeId },
         update: { name: "Online", organizationId: a.orgId, deletedAt: null },
         create: {
             id: storeId,
             organizationId: a.orgId,
             name: "Online",
-            slug: `${STORE_SLUG}-online`,
             description: "The website's shop: delivered anywhere in India.",
         },
     });

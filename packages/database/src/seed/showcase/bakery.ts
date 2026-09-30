@@ -104,7 +104,6 @@ export const RYE = {
     /** Online: the website's shop, delivery only (#526). */
     onlineStoreId: sid("store", "online"),
     slug: "rye-and-co",
-    onlineSlug: "rye-and-co-online",
     prefix: sid(""),
 };
 
@@ -625,7 +624,6 @@ export async function seedBakery(
         id: storeId,
         key: "",
         orgId,
-        slug: RYE.slug,
         name: "Hill Road",
         description: "Sourdough, pastry and coffee, baked on Hill Road.",
         address: "3 Hill Road, Indiranagar, Bengaluru 560038",
@@ -637,7 +635,6 @@ export async function seedBakery(
         id: RYE.onlineStoreId,
         key: "online",
         orgId,
-        slug: RYE.onlineSlug,
         name: "Online",
         description: "Loaves, beans and gift boxes, delivered.",
         address: null,
@@ -826,7 +823,6 @@ async function writeStorefront(
         /** "" for the first storefront, whose rows predate the second. */
         key: string;
         orgId: string;
-        slug: string;
         name: string;
         description: string;
         address: string | null;
@@ -837,14 +833,14 @@ async function writeStorefront(
     },
 ) {
     const rowId = (what: string) => (a.key ? sid(what, a.key) : sid(what));
+    // Keyed by its fixed id: a location has no slug (DEC-069, L14).
     await prisma.store.upsert({
-        where: { slug: a.slug },
+        where: { id: a.id },
         update: { name: a.name, organizationId: a.orgId, deletedAt: null },
         create: {
             id: a.id,
             organizationId: a.orgId,
             name: a.name,
-            slug: a.slug,
             description: a.description,
             createdAt: a.createdAt,
         },

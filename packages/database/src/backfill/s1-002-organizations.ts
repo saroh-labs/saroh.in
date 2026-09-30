@@ -34,7 +34,9 @@ async function main() {
 
         await prisma.$transaction(async (tx) => {
             const org = await tx.organization.create({
-                data: { name: store.name, slug: store.slug },
+                // Only pre-ADR-001 stores reach here, and each had a slug;
+                // one made after L14 has none (and always an organization).
+                data: { name: store.name, slug: store.slug ?? store.id },
             });
             await tx.store.update({
                 where: { id: store.id },
@@ -59,7 +61,7 @@ async function main() {
             }
         });
 
-        if (store.owners.length === 0) noOwner.push(store.slug);
+        if (store.owners.length === 0) noOwner.push(store.id);
         created++;
     }
 
