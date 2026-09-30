@@ -202,6 +202,27 @@ describe("settingsUndo (F12)", () => {
     });
 });
 
+describe("settingsUndo: what is being set up (DEC-070, K5)", () => {
+    it("puts the kind back, and expects the one the save left", () => {
+        const before = org({ kind: "BUSINESS" });
+        const after = org({ kind: "SOLO" });
+        const undo = must(settingsUndo(before, after, { kind: "SOLO" }));
+        expect(undo.input).toEqual({ kind: "BUSINESS" });
+        expect(undo.expect).toEqual({ kind: "SOLO" });
+        expect(undo.counters).toBeNull();
+        expect(undoRefusal(undo, after)).toBeNull();
+        expect(undoRefusal(undo, org({ kind: "WORK" }))).toBe(CHANGED_SINCE);
+    });
+
+    it("reads a kind an older API never sent as a business", () => {
+        const older = org();
+        const undo = must(
+            settingsUndo(older, org({ kind: "WORK" }), { kind: "WORK" }),
+        );
+        expect(undo.input).toEqual({ kind: "BUSINESS" });
+    });
+});
+
 describe("undoRefusal (F12)", () => {
     const before = org();
     const sent: OrganizationSettingsInput = { tax: { invoicePrefix: "RY" } };

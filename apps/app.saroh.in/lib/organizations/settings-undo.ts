@@ -1,3 +1,4 @@
+import { kindOf } from "@/lib/organizations/kind";
 import { sameWeek } from "@/lib/organizations/opening-hours";
 import type { OpeningHoursDay } from "@/lib/stores/storefronts";
 
@@ -87,6 +88,7 @@ export function touchedFields(
 ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     if (sent.name !== undefined) out.name = settings.name;
+    if (sent.kind !== undefined) out.kind = kindOf(settings.kind);
     for (const key of keysOf(sent.profile)) {
         out[`profile.${key}`] = settings.profile?.[key] ?? null;
     }
@@ -129,6 +131,8 @@ export function settingsUndo(
 
     const input: OrganizationSettingsInput = {};
     if (sent.name !== undefined) input.name = before.name;
+    // An API older than DEC-070 sent none: it was a business.
+    if (sent.kind !== undefined) input.kind = kindOf(before.kind);
     if (sent.profile) {
         input.profile = Object.fromEntries(
             keysOf(sent.profile).map((key) => [
