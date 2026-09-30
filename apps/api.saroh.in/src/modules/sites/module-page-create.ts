@@ -236,17 +236,17 @@ export async function addModulePageIfMissing(
     if (gate.state !== "on") return null;
 
     const defaults = MODULE_PAGE_DEFAULTS[kind];
-    const [existing, holder] = await Promise.all([
-        tx.page.findFirst({
-            where: { siteId: site.id, kind },
-            select: { id: true },
-        }),
-        tx.page.findFirst({
-            where: { siteId: site.id, path: defaults.path },
-            select: { id: true },
-        }),
-    ]);
-    if (existing || holder) return null;
+    // One query at a time: a transaction runs on one connection.
+    const existing = await tx.page.findFirst({
+        where: { siteId: site.id, kind },
+        select: { id: true },
+    });
+    if (existing) return null;
+    const holder = await tx.page.findFirst({
+        where: { siteId: site.id, path: defaults.path },
+        select: { id: true },
+    });
+    if (holder) return null;
 
     const prices =
         kind === "PRICES"

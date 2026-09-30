@@ -439,15 +439,14 @@ async function shopForWebsite(
         select: { status: true },
     });
     if (commerce?.status !== "ENABLED") return;
-    const [site, location, listed] = await Promise.all([
-        tx.site.findUniqueOrThrow({
-            where: { id: siteId },
-            select: { id: true, name: true, storefrontId: true },
-        }),
-        firstStorefront(tx, organizationId),
-        anyListed(tx, organizationId),
-    ]);
+    // One query at a time: a transaction runs on one connection.
+    const location = await firstStorefront(tx, organizationId);
     if (!location) return;
+    const site = await tx.site.findUniqueOrThrow({
+        where: { id: siteId },
+        select: { id: true, name: true, storefrontId: true },
+    });
+    const listed = await anyListed(tx, organizationId);
     await completeShop(
         tx,
         ctx,
