@@ -1136,3 +1136,20 @@ renewal PDF against a real database.
 reading it as a number. `docs/patterns/backend-billing-and-classes.md` → GST
 shows only when it applies.
 **Category**: invoices · GST · DEC-072
+
+## E2E stack — the API's renderer links pointed at production (DEC-069 L6)
+
+**Problem**: a pay page opened on a tenant host in the CI and prepush e2e
+stacks would have redirected the browser to `https://saroh.app/pay/…`, the
+live service, instead of the stack's own renderer.
+**Root cause**: the stacks set `E2E_RENDERER_URL` for the specs but never
+the API's `RENDERER_URL`, so every link the API built for the renderer
+(pay links, review links) fell back to production's `saroh.app`. Specs had
+worked around it by keeping only the path of a link (`invoices.spec.ts`).
+**Fix**: both stacks set `RENDERER_URL=http://localhost:3005`
+(`scripts/prepush.sh`, `.github/workflows/ci.yml`), and
+`pay-on-site.spec.ts` fails when `payUrl` names any host outside the
+stack's renderer.
+**Rule**: an origin the API hands to customers is set in every stack that
+runs the API; a spec that follows a link asserts it stays on the stack.
+**Category**: e2e · environment · `docs/patterns/devops-environments-and-flags.md`
