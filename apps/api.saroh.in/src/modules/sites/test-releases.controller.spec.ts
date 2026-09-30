@@ -91,6 +91,20 @@ const ROUTES: readonly Route[] = [
         args: [ctx, SITE, RELEASE],
     },
     {
+        handler: "schedule",
+        method: RequestMethod.POST,
+        path: ":releaseId/schedule",
+        call: "schedule",
+        args: [ctx, SITE, RELEASE, DTO],
+    },
+    {
+        handler: "cancelSchedule",
+        method: RequestMethod.DELETE,
+        path: ":releaseId/schedule",
+        call: "cancelSchedule",
+        args: [ctx, SITE, RELEASE],
+    },
+    {
         handler: "revokeLink",
         method: RequestMethod.POST,
         path: "links/:linkId/revoke",
