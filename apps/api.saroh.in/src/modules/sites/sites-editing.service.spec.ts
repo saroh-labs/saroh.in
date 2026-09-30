@@ -45,6 +45,8 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             create: jest.fn(),
         },
+        // putLive's lock on the site row (KTD-14).
+        $queryRaw: jest.fn().mockResolvedValue([]),
     };
     return {
         ...actual,

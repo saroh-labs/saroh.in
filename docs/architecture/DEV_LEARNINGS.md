@@ -1842,6 +1842,7 @@ it the body the controller returns, envelope and all.
 **Rule**: a lenient decoder's test uses the producer's real body (copy it
 from the controller spec), never a shape written from the consumer's side.
 **Category**: contract · app↔api · tests
+
 ## e2e — a new test release already reads Approved (T12)
 
 **Problem**: `site-review.spec.ts`'s new test passed on desk-serial and
@@ -1856,3 +1857,144 @@ release has bytes no other run has, and puts the draft back.
 **Rule**: a spec that reviews a test release makes the release's content
 its own (a stamped section), never a release of the seed's draft as it is.
 **Category**: e2e · test releases · own data
+
+## Sites — a scheduled go-live could replace a fix published while it ran (release review)
+
+**Symptom**: found in the production release review, not in use (behind
+`SITE_TEST_RELEASES`). A merchant publishes a price fix at the moment a
+scheduled older test release goes live; the job's "published since?"
+check passed, and the release then repointed the site over the fix.
+**Cause**: check-then-act without a shared lock. The job locked only its
+`SiteTestRelease` row and read `Site.currentPublicationId` unlocked; publish
+and restore never touch that row, and `putLive` didn't lock the site. A
+publish that committed between the job's read and its `putLive` was
+overwritten, which KTD-14 says must never happen.
+**Fix**: `lockSite` (`sites/live-pointer.ts`) takes the Site row FOR NO KEY
+UPDATE; `putLive` takes it first, so every way of going live is serialised
+per site, and the job takes it before it reads the pointer, so a publish in
+flight is either committed and seen ("The site was published at …") or
+waits. FOR NO KEY UPDATE rather than FOR UPDATE, so inserts naming the site
+(its FK's KEY SHARE) don't wait on a publish.
+**Rule**: a job that decides from a row whether to write must take the lock
+the competing writers take, before it reads. Pinned by
+`test-release-schedule.db.spec.ts` "doesn't go live over a publish that
+commits while it runs".
+**Category**: sites · jobs · concurrency
+
+## Autopay — a debit could be asked for after the mandate was cancelled (release review)
+
+**Symptom**: found in the production release review, behind
+`RAZORPAY_AUTOPAY`. A customer cancels autopay while the charge job is
+asking the provider whether the pre-debit notice was delivered; the job
+then claims the charge and the bank is asked for the money anyway.
+**Cause**: `MandateChargesService.charge` checked "mandate ACTIVE" and
+"invoice ISSUED" on its first read, made a provider round trip
+(`getPreDebit`), and then claimed REQUIRES_PAYMENT → PROCESSING on the
+intent's status alone. The cancel paths moved the mandate to CANCELLED but
+left its prepared charge REQUIRES_PAYMENT, so nothing stopped the claim.
+**Fix**: the claim's `updateMany` WHERE carries both guards
+(`viaMandate: { is: { status: "ACTIVE" } }`, `invoice: { is: { status:
+"ISSUED" } }`); a refused claim is re-read and answered REFUSED with the
+reason. Every in-transaction cancel (`cancelMandatesInTx`, which the cancel
+job, `cancelFor` and the subscription paths use; REPLACED and a provider's
+own cancel in `mandate-events.ts`) calls `cancelOpenCharges`, which moves
+the mandate's REQUIRES_PAYMENT charges to CANCELLED, so the claim and the
+cancel meet on the intent's row lock.
+**Rule**: a guard read before a provider call is re-asked in the WHERE of
+the conditional write that commits to money. Pinned by
+`mandate-charges.db.spec.ts` "a mandate cancelled after the checks, before
+the claim" and "an invoice voided after the checks".
+**Category**: payments · autopay · concurrency
+
+## Autopay — Retry by autopay while the customer's pay-link checkout was open (release review)
+
+**Symptom**: found in the production release review, behind
+`RAZORPAY_AUTOPAY`. After a failed renewal the customer opens the pay
+link's checkout; staff then click Retry by autopay. A card mandate is
+debited at once, the customer finishes the checkout too, and the second
+capture is only recorded as owed back.
+**Cause**: "one charge at a time" (`charge-under-way.ts`) ran one way:
+an open autopay charge refused new pay-link intents, but nothing asked
+whether a pay-link intent was already open before queueing, preparing or
+debiting an autopay charge. `queueInTx` looked only for open mandate
+intents.
+**Fix**: the smallest safe version — refuse, don't retire. `checkoutOpenOn`
+/ `OPEN_CHECKOUT_WHERE` (a non-mandate, non-`purpose` intent still CREATED,
+REQUIRES_PAYMENT or PROCESSING) makes `queueInTx` answer `CHECKOUT_OPEN`
+(Retry: 409 "The customer is paying this by link…"), `prepareCharge`
+refuse before the provider order, and `charge()`'s PROCESSING claim carry
+`invoice.paymentIntents: { none: OPEN_CHECKOUT_WHERE }` in its WHERE, so a
+checkout opened in a race is caught at the claim. Retiring the pay link
+was left out: a checkout already open holds its provider order, so a
+retired token wouldn't stop it, and new pay-link intents are already
+refused while a charge is under way. The cost: a checkout the customer
+abandoned stays open and keeps autopay off that invoice; the pay link is
+the way, as before autopay.
+**Rule**: "one at a time" between two ways to pay is checked from both
+sides, and on the side that moves money, in the claim's WHERE. Pinned by
+`subscriptions.charge.db.spec.ts` "Retry by autopay is refused while the
+customer's pay-link checkout is open" and `mandate-charges.db.spec.ts`
+"a pay-link checkout …".
+**Category**: payments · autopay · subscriptions
+
+## Turn on — Bookings priced the first service in INR for every business (release review)
+
+**Symptom**: found in the production release review. A business that sells
+in pounds turns Bookings on with a price in the sheet; its first service is
+stored in INR, and its booking page shows (and would charge) rupees.
+**Cause**: `writeAppointments` (`capabilities/setup/module-setup.writers.ts`)
+wrote the file's `DEFAULT_CURRENCY` constant. `writeCommerce`, a screen
+above it in the same file, already read `businessCurrency` first; the
+second writer copied the fallback, not the rule.
+**Fix**: `(await businessCurrency(tx, organizationId)) ?? DEFAULT_CURRENCY`,
+read only when the service is priced.
+**Rule**: a default currency is the last fallback after the business's own
+(`stores/currency.ts`), never the value. Pinned by `module-setup.db.spec.ts`
+"prices the first service in the business's currency, not INR".
+**Category**: capabilities · money
+
+## Web address — moving back to an own expired address said "is taken" once, under RLS (release review)
+
+**Symptom**: found in the production release review, behind
+`WEB_ADDRESS_CHANGE`. With RLS enforced, a business moving back to an
+address it held more than 90 days ago got "<address>.saroh.app is taken"
+on the first try, and succeeded on the second.
+**Cause**: `releaseExpired` reads and deletes across businesses, so under
+RLS it runs on another connection (`acrossBusinesses`), outside the
+change's serializable transaction. It committed the delete of the expired
+hold after the transaction's snapshot; the transaction's own
+`deleteMany({ organizationId, address })` then touched that row again, and
+Postgres failed it as a concurrent delete (40001), which `isRaceLost`
+turns into "is taken". A plain run shares one connection, so only the RLS
+suite could see it.
+**Fix**: `WebAddressService.change` calls `releaseExpired` before it opens
+the transaction, and the own-row deletes (the change back, and `hold`)
+match only live holds (`reservedUntil > now`), leaving expired ones to
+`releaseExpired`.
+**Rule**: inside a serializable transaction, never write a row another
+connection may have just deleted: clear across businesses before the
+transaction, and scope in-transaction writes away from what that clearing
+owns. Pinned by `web-address.service.db.spec.ts` "moves back to its own
+address whose hold has run out, first time" (fails only under
+`TEST_RLS=on`).
+**Category**: organizations · RLS · transactions
+
+## Web address — one change could leave three old addresses held (release review)
+
+**Symptom**: found in the production release review, behind
+`WEB_ADDRESS_CHANGE`. A business whose site sits on a variant of its setup
+address (`rye` and `rye-site`), already holding one old address, changes
+again and ends up holding three: more than `MAX_HELD_ADDRESSES` (KTD-9)
+keeps away from every other business.
+**Cause**: the limit counted only the holds that already existed
+(`held.length >= MAX_HELD_ADDRESSES`), assuming each change adds one. A
+change holds the site's address and, when it differs, the setup address
+too: two.
+**Fix**: `WebAddressService.move` counts what this change adds (the site's
+subdomain, and `org.slug` unless it is the new address; less any already
+held) and refuses when `held.length + added > MAX_HELD_ADDRESSES`, naming
+the day enough holds have run out.
+**Rule**: a cap is checked against the state after the write, not before
+it; count what the write adds. Pinned by `web-address.service.db.spec.ts`
+"counts both holds a change would add".
+**Category**: organizations · limits

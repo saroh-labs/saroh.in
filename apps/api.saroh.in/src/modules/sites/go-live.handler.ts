@@ -5,7 +5,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { businessTimezone } from "../bookings/staff-availability";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { resolveCapabilities } from "../organizations/organization-policy";
-import { readVerdicts } from "./live-pointer";
+import { lockSite, readVerdicts } from "./live-pointer";
 import { goLiveWithRelease } from "./test-release-go-live";
 import { releaseApproved } from "./test-release-review";
 import type { SiteGoLivePayload } from "./test-release-schedule";
@@ -30,7 +30,8 @@ export type GoLiveRun =
  * go-live, when its time comes.
  *
  * On one transaction, in the business's RLS context, under a lock on the
- * release row (KTD-13):
+ * release row (KTD-13) and then the site's (`lockSite`), so no publish or
+ * restore commits between the re-check and the write:
  *  1. **Re-read.** A release cancelled, moved to another time, already live
  *     or discarded since the job was queued is left alone: this run is not
  *     its schedule any more.
@@ -98,6 +99,11 @@ export async function runScheduledGoLive(
     }
     const schedulerId = release.scheduledByUserId;
 
+    // The site's lock before its live pointer is read: a publish or restore
+    // in flight commits first and is seen as "published since", or waits
+    // for this run. Without it a publish could commit between the check
+    // and `putLive`, and the older release would replace the fix (KTD-14).
+    await lockSite(tx, release.siteId);
     const check = await mayGoLive(tx, organizationId, release, now);
     if (!check.go) {
         const { reason } = check;

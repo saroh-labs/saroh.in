@@ -310,6 +310,27 @@ describe("Contacts, Bookings and what needs what", () => {
         expect((await view(ctx, "APPOINTMENTS")).readiness).toBe("ACTIVE");
     });
 
+    it("prices the first service in the business's currency, not INR", async () => {
+        const ctx = await business("Rye London");
+        await prisma.store.create({
+            data: {
+                name: "Rye Counter",
+                slug: `m1-gbp-${tag}-${seq}`,
+                organizationId: ctx.organizationId,
+                settings: { create: { currency: "GBP" } },
+            },
+        });
+        await setup.enable(ctx, "CRM", {});
+        const out = await setup.enable(ctx, "APPOINTMENTS", {
+            hours: HOURS,
+            service: { name: "Haircut", durationMinutes: 45, price: "35" },
+        });
+        const service = await prisma.service.findUniqueOrThrow({
+            where: { id: out.created.serviceId },
+        });
+        expect(service).toMatchObject({ priceCents: 3500, currency: "GBP" });
+    });
+
     it("keeps what a business had: no second pipeline or service, a blank price is none", async () => {
         const ctx = await business();
         await prisma.businessProfile.create({

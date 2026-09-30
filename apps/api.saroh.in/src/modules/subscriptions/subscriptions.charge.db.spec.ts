@@ -527,6 +527,39 @@ describe("a decline", () => {
         );
     });
 
+    it("Retry by autopay is refused while the customer's pay-link checkout is open", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        const { orderId } = await chargeToBank(invoice.id);
+        fake.answerCharge(orderId, "FAILED");
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: orderId,
+        });
+
+        // The customer opens the pay link's checkout, and hasn't paid yet.
+        const { token } = await invoices.createPayLink(owner, invoice.id);
+        await publicInvoices.createIntent(token, {});
+        const checkout = await prisma.paymentIntent.findFirstOrThrow({
+            where: { invoiceId: invoice.id, viaMandateId: null },
+        });
+        expect(["CREATED", "REQUIRES_PAYMENT"]).toContain(checkout.status);
+
+        // Retry by autopay would debit them as well: refused, nothing queued.
+        await expect(
+            subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
+        ).rejects.toThrow(
+            "The customer is paying this by link. Wait for that payment, or make a new pay link.",
+        );
+        expect(await intentsOf(invoice.id)).toHaveLength(1);
+        expect(
+            (await chargeJobs(invoice.id)).map(
+                (j) => (j.payload as { step: string }).step,
+            ),
+        ).not.toContain("PREPARE");
+    });
+
     it("a notice that fails: no debit, RENEWAL_FAILED (NOTICE_FAILED), the pay link opens", async () => {
         const who = await autopayMember();
         const invoice = await renew(who.subscriptionId);

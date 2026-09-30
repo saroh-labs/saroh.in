@@ -141,6 +141,7 @@ export async function cancelMandatesInTx(
             },
         });
         if (count === 0) continue;
+        await cancelOpenCharges(tx, scope.organizationId, mandate.id);
         marked.cancelled += 1;
         if (atProvider) marked.awaitingProvider += 1;
         ended.add(mandate.subscriptionId);
@@ -159,6 +160,29 @@ export async function cancelMandatesInTx(
         await enqueueMandateCancelInTx(tx, scope);
     }
     return marked;
+}
+
+/**
+ * Close a cancelled mandate's charges that haven't been asked for yet
+ * (REQUIRES_PAYMENT → CANCELLED), in the cancel's transaction, so none is
+ * debited after it: `MandateChargesService.charge` claims only a
+ * REQUIRES_PAYMENT charge on an ACTIVE mandate. A charge already claimed
+ * (PROCESSING) was asked for before the cancel, and its webhook settles it.
+ * The invoice's pay link is the way to pay from here.
+ */
+export async function cancelOpenCharges(
+    tx: Pick<Prisma.TransactionClient, "paymentIntent">,
+    organizationId: string,
+    mandateId: string,
+): Promise<void> {
+    await tx.paymentIntent.updateMany({
+        where: {
+            organizationId,
+            viaMandateId: mandateId,
+            status: "REQUIRES_PAYMENT",
+        },
+        data: { status: "CANCELLED" },
+    });
 }
 
 /** Write the job that asks the provider to confirm the scope's cancels. */

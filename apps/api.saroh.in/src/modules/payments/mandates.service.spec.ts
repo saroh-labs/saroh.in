@@ -4,6 +4,10 @@
 jest.mock("@saroh/database", () => {
     const tx = {
         paymentMandate: { findMany: jest.fn(), updateMany: jest.fn() },
+        // A cancelled mandate's open charges close with it.
+        paymentIntent: {
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
         subscriptionEvent: { create: jest.fn() },
         job: { create: jest.fn() },
     };

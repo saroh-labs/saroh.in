@@ -157,8 +157,9 @@ export class WebAddressService {
      * changes of one business queue up:
      * 1. the new address is checked, and a hold on it that has run out is
      *    cleared; taken → 409 with a suggestion;
-     * 2. a business already holding two old addresses → 409 naming the day
-     *    the first is released;
+     * 2. a change that would leave the business holding more than two old
+     *    addresses (it holds the site's and, when it differs, the setup
+     *    address) → 409 naming the day it fits;
      * 3. the old site address is held for 90 days and forwards to the site;
      *    an old setup address that differs is held too, forwarding nowhere;
      * 4. the business's own hold on the new address (a change back) goes;
@@ -187,6 +188,13 @@ export class WebAddressService {
             });
         }
 
+        // A hold on the new address that has run out goes first, before the
+        // serializable snapshot is taken. Under RLS `releaseExpired` deletes
+        // on another connection (it reads across businesses); inside the
+        // transaction, a row it removed after the snapshot would still be
+        // seen, and the business's own delete of it would fail as a lost
+        // race: "is taken", once, on a change back to its own old address.
+        await releaseExpired(prisma, address);
         try {
             await prisma.$transaction((tx) => this.move(tx, ctx, address), {
                 isolationLevel: "Serializable",
@@ -229,11 +237,20 @@ export class WebAddressService {
                 address: { not: address },
             },
             orderBy: { reservedUntil: "asc" },
-            select: { reservedUntil: true },
+            select: { address: true, reservedUntil: true },
         });
-        if (held.length >= MAX_HELD_ADDRESSES) {
-            // The soonest released: the day a third change becomes possible.
-            const first = held[0];
+        // What this change holds: the site's address, and the setup address
+        // when it differs from it (a site on a variant, or no site). Both
+        // count, so one change never takes the business past the limit.
+        const adding = new Set<string>();
+        if (site?.subdomain) adding.add(site.subdomain);
+        if (org.slug !== address) adding.add(org.slug);
+        for (const h of held) adding.delete(h.address);
+        const over = held.length + adding.size - MAX_HELD_ADDRESSES;
+        if (over > 0) {
+            // The day enough holds have run out for this change to fit.
+            // At most two are added, so `over` never exceeds `held.length`.
+            const first = held[over - 1];
             const zone = await businessTimezone(tx, organizationId);
             const on = DateTime.fromJSDate(first.reservedUntil)
                 .setZone(zone)
@@ -250,9 +267,11 @@ export class WebAddressService {
 
         const until = new Date(now.getTime() + ADDRESS_HOLD_DAYS * DAY_MS);
         // A change back to an address the business still holds: the hold
-        // goes, so the address never forwards to itself.
+        // goes, so the address never forwards to itself. Only a live one:
+        // one that ran out is `releaseExpired`'s, which may have removed it
+        // on another connection since this transaction's snapshot.
         await tx.addressReservation.deleteMany({
-            where: { organizationId, address },
+            where: { organizationId, address, reservedUntil: { gt: now } },
         });
         if (site?.subdomain) {
             await this.hold(tx, organizationId, site.subdomain, {
@@ -309,8 +328,14 @@ export class WebAddressService {
         // A hold of another business's that ran out before this business
         // took the address would stand in the way of the unique column.
         await releaseExpired(tx, address);
+        // Only a live hold: an expired one went with `releaseExpired`, maybe
+        // on another connection (above).
         await tx.addressReservation.deleteMany({
-            where: { organizationId, address },
+            where: {
+                organizationId,
+                address,
+                reservedUntil: { gt: new Date() },
+            },
         });
         await tx.addressReservation.create({
             data: { organizationId, address, ...row },
