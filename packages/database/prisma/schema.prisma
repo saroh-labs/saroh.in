@@ -164,6 +164,9 @@ model Organization {
   siteApprovals    SiteApproval[]
   sitePreviewLinks SitePreviewLink[]
   publications     Publication[]
+  // Frozen candidates of a site and their links (DEC-071).
+  siteTestReleases     SiteTestRelease[]
+  siteTestReleaseLinks SiteTestReleaseLink[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -2921,6 +2924,15 @@ model Site {
   approvals      SiteApproval[]
   previewLinks   SitePreviewLink[]
   publications   Publication[]     @relation("SitePublications")
+  // Frozen candidates of this site, served on its test host (DEC-071).
+  testReleases     SiteTestRelease[]
+  testReleaseLinks SiteTestReleaseLink[]
+
+  // "Publishing needs approval" (DEC-071, amends DEC-047). Off: approval is
+  // advisory and a bypass is recorded. On: Publish, restore and Go live
+  // succeed only for an approved test release, unless an owner overrides,
+  // and the override is recorded. Only an owner turns it on or off.
+  publishNeedsApproval Boolean @default(false)
   // Who may review this site (#276).
   reviewers      SiteReviewer[]
 
@@ -3067,12 +3079,19 @@ model SiteComment {
   resolvedAt       DateTime?
   resolvedByUserId String?
 
+  // The test release the note was written while viewing (DEC-071), so the
+  // release view lists its own notes. Null on a note about the draft. The
+  // note is still pinned to a page and a section key, as every note is.
+  testReleaseId String?
+  testRelease   SiteTestRelease? @relation(fields: [testReleaseId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([siteId, resolvedAt])
   @@index([pageId, sectionKey])
   @@index([organizationId])
+  @@index([testReleaseId])
 }
 
 /**
@@ -3091,7 +3110,7 @@ model SiteApproval {
   byUserId String
   by       User   @relation(fields: [byUserId], references: [id], onDelete: Cascade)
 
-  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED.
+  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED | OVERRIDDEN.
   //
   // REQUESTED is the merchant asking for a review (#278) — the act that makes a
   // review pending, which the model previously had no way to express: a review
@@ -3103,6 +3122,10 @@ model SiteApproval {
   // site goes live while a review is still outstanding, the fact is appended
   // here — who, when, and which publication — because the epic's rule is that
   // bypassing is recorded, not prevented.
+  //
+  // OVERRIDDEN is written by an owner going live past "Publishing needs
+  // approval" (DEC-071): the rule was on, nothing was approved, and the owner
+  // went live anyway. Like BYPASSED it names its publication.
   outcome String
 
   // Which draft this row is about (#278): a hash of the snapshot publishing
@@ -3119,11 +3142,19 @@ model SiteApproval {
   publicationId String?
   publication   Publication? @relation(fields: [publicationId], references: [id], onDelete: SetNull)
 
+  // The test release a request or verdict is about (DEC-071). Its
+  // `draftFingerprint` is then the release's fingerprint, not the moving
+  // draft's, so the verdict holds for that frozen version. Null on a review
+  // of the draft.
+  testReleaseId String?
+  testRelease   SiteTestRelease? @relation(fields: [testReleaseId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([siteId, createdAt])
   @@index([organizationId])
   @@index([publicationId])
+  @@index([testReleaseId])
 }
 
 /**
@@ -3284,18 +3315,154 @@ model Publication {
   // this" and "nobody was ever asked" read identically in version history.
   // Null on rows published before this column existed, which is honest: we do
   // not know which route they took.
+  //
+  // OVERRIDDEN too (DEC-071): an owner went live past "Publishing needs
+  // approval".
   reviewRoute String?
 
+  // LIVE | TEST (DEC-071, CHECKed in the migration). A LIVE row is a version
+  // the public has been served. A TEST row is a test release's frozen
+  // snapshot: built and stored exactly as a publish stores it, and never
+  // pointed at by a site. Going live appends a LIVE copy of it, so
+  // `Site.currentPublication` is always LIVE, and every reader that means
+  // "published" filters on `kind: 'LIVE'`.
+  kind String @default("LIVE")
+
+  // The row this one was copied from: the TEST row a go-live put live
+  // (DEC-071). Null on an ordinary publish.
+  sourcePublicationId String?
+  sourcePublication   Publication?  @relation("PublicationSource", fields: [sourcePublicationId], references: [id], onDelete: SetNull)
+  copies              Publication[] @relation("PublicationSource")
+
   // Back-relation for Site.currentPublication (the live pointer above).
-  currentForSite Site?          @relation("SiteCurrentPublication")
+  currentForSite Site?            @relation("SiteCurrentPublication")
   // The same, for a post (#232).
-  currentForPost Post?          @relation("PostCurrentPublication")
+  currentForPost Post?            @relation("PostCurrentPublication")
   // Bypass records naming this publication (#199).
   approvals      SiteApproval[]
+  // The test release this TEST row freezes, and the one this LIVE copy put
+  // live (DEC-071).
+  testRelease    SiteTestRelease? @relation("TestReleaseSnapshot")
+  wentLiveFor    SiteTestRelease? @relation("TestReleaseLiveCopy")
 
   @@index([siteId, publishedAt])
+  @@index([siteId, kind, publishedAt])
   @@index([organizationId])
   @@index([postId])
+  @@index([sourcePublicationId])
+}
+
+/**
+ * A test release (DEC-071): a named, non-live candidate of a site, served
+ * whole at `test--<address>.saroh.app` to whoever holds one of its links.
+ *
+ * The frozen snapshot is an ordinary `Publication` with `kind = 'TEST'`, so
+ * publications stay append-only. Everything about the release that changes
+ * (its name and note, a schedule, going live, being discarded) lives here.
+ * Going live appends a LIVE copy of the snapshot (`livePublicationId`); the
+ * site never points at the TEST row.
+ *
+ * User ids are plain columns, as `Publication.publishedByUserId` is: removing
+ * a person from Saroh never takes a release, or its record, with them.
+ */
+model SiteTestRelease {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The frozen TEST publication.
+  publicationId String      @unique
+  publication   Publication @relation("TestReleaseSnapshot", fields: [publicationId], references: [id], onDelete: Cascade)
+
+  // 1, 2, 3 ... per site, for "Test release 2".
+  number Int
+  name   String
+  note   String?
+
+  // `draftFingerprint` of the frozen snapshot. A review of the release is
+  // bound to it, and a go-live checks approval against it.
+  fingerprint String
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  // Lifecycle: facts with a time. Neither set means the release is ready.
+  discardedAt       DateTime?
+  wentLiveAt        DateTime?
+  // The LIVE copy going live appended.
+  livePublicationId String?      @unique
+  livePublication   Publication? @relation("TestReleaseLiveCopy", fields: [livePublicationId], references: [id], onDelete: SetNull)
+
+  // A scheduled go-live. `goLiveAt` is the instant (UTC); `goLiveZone` is the
+  // business's zone it was chosen in, for saying it back in local time.
+  goLiveAt                   DateTime?
+  goLiveZone                 String?
+  scheduledByUserId          String?
+  // The live publication when it was scheduled. If the site has been
+  // published since, the scheduled go-live does not run (KTD-14).
+  scheduledOverPublicationId String?
+  // An owner scheduled it past "Publishing needs approval".
+  scheduleOverride           Boolean   @default(false)
+  // The PENDING `site.go_live` Job, deleted on cancel.
+  goLiveJobId                String?
+  // What the last scheduled attempt did (LIVE | NOT_LIVE), and why not.
+  lastGoLiveOutcome          String?
+  lastGoLiveReason           String?
+
+  links     SiteTestReleaseLink[]
+  approvals SiteApproval[]
+  comments  SiteComment[]
+
+  @@unique([siteId, number])
+  // The target of (testReleaseId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  // One live schedule per site: a release waiting to go live that has
+  // neither gone live nor been discarded.
+  @@unique([siteId], map: "SiteTestRelease_one_schedule_per_site", where: raw("\"goLiveAt\" IS NOT NULL AND \"wentLiveAt\" IS NULL AND \"discardedAt\" IS NULL"))
+  @@index([organizationId])
+}
+
+/**
+ * A link that opens one test release on its test host (DEC-071), with the
+ * token scheme of `SitePreviewLink` (#284): 32 random bytes, only the SHA-256
+ * hex stored, the raw token returned once. Its own table, so a draft preview
+ * token can never open a test host and a test token can never open
+ * `/preview/<token>`.
+ *
+ * SHARE is a link someone made to send; OPEN is a short one minted for the
+ * person opening the release from the workspace. A link stops working when it
+ * expires, is revoked, or its release is discarded or has gone live.
+ */
+model SiteTestReleaseLink {
+  id            String          @id @default(cuid())
+  testReleaseId String
+  testRelease   SiteTestRelease @relation(fields: [testReleaseId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // SHA-256 (hex) of the link's secret, never the secret itself.
+  tokenHash String @unique
+
+  // SHARE | OPEN (CHECKed in the migration).
+  purpose String
+
+  createdByUserId String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  lastUsedAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([testReleaseId, revokedAt])
+  @@index([siteId])
+  @@index([organizationId])
 }
 
 // ============================================================================
