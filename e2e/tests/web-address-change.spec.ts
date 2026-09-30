@@ -27,6 +27,7 @@ import { urls } from "../playwright.config";
 
 interface WebAddressView {
     address: string;
+    platformOrigin: string;
     previous: {
         address: string;
         redirectUntil: string | null;
@@ -38,6 +39,25 @@ interface WebAddressView {
 const card = (page: Page) =>
     page.getByRole("region", { name: "Web address" }).filter({ visible: true });
 
+/** The business's web address, as the API reads it. */
+async function viewOf(page: Page, org: string): Promise<WebAddressView> {
+    const res = await page.request.get(
+        `${urls.API_URL}/organizations/${org}/web-address`,
+        { headers: { "x-organization-id": org } },
+    );
+    expect(res.ok()).toBe(true);
+    return (await res.json()) as WebAddressView;
+}
+
+/**
+ * What follows an address on this stack: `.saroh.app`, or the renderer's
+ * own host where it runs on a bare port (CI).
+ */
+const suffixOf = (view: WebAddressView) =>
+    new URL(view.platformOrigin).host.slice(view.address.length);
+
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /** "28 Dec" (or "28 Dec 2027"): a day, as the row names one. */
 const DAY = String.raw`\d{1,2} [A-Z][a-z]{2}( \d{4})?`;
 
@@ -46,11 +66,13 @@ test("the owner changes the web address, and the old one is kept for them", asyn
 }, testInfo) => {
     const business = await makeBusiness(page, testInfo, "wa");
     const next = `${business.address}-new`;
+    const suffix = suffixOf(await viewOf(page, business.id));
+    const oldHost = escape(`${business.address}${suffix}`);
 
     await page.goto(`/open/${business.id}`);
     await page.goto("/settings/organization");
     const row = card(page);
-    await expect(row).toContainText(`${business.address}.saroh.app`);
+    await expect(row).toContainText(`${business.address}${suffix}`);
     // No website yet, so nothing to open.
     await expect(row.getByRole("link", { name: /Open/ })).toHaveCount(0);
 
@@ -59,9 +81,7 @@ test("the owner changes the web address, and the old one is kept for them", asyn
     await expect(dialog).toBeVisible();
     // What changing does is said before the button.
     await expect(dialog).toContainText(
-        new RegExp(
-            `${business.address}\\.saroh\\.app\\S* stays yours until ${DAY}, then it's released`,
-        ),
+        new RegExp(`${oldHost} stays yours until ${DAY}, then it's released`),
     );
 
     const field = dialog.getByLabel("New web address");
@@ -80,26 +100,17 @@ test("the owner changes the web address, and the old one is kept for them", asyn
 
     await expect(
         page
-            .getByText(
-                new RegExp(`Your web address is now ${next}\\.saroh\\.app`),
-            )
+            .getByText(`Your web address is now ${next}${suffix}`)
             .filter({ visible: true }),
     ).toBeVisible();
     await expect(dialog).toBeHidden();
-    await expect(row).toContainText(`${next}.saroh.app`);
+    await expect(row).toContainText(`${next}${suffix}`);
     await expect(row).toContainText(
-        new RegExp(
-            `${business.address}\\.saroh\\.app\\S* is kept for you until ${DAY}`,
-        ),
+        new RegExp(`${oldHost} is kept for you until ${DAY}`),
     );
 
     // The API agrees: the new address, and the old one held for 90 days.
-    const view = (await (
-        await page.request.get(
-            `${urls.API_URL}/organizations/${business.id}/web-address`,
-            { headers: { "x-organization-id": business.id } },
-        )
-    ).json()) as WebAddressView;
+    const view = await viewOf(page, business.id);
     expect(view.address).toBe(next);
     expect(view.previous.map((p) => p.address)).toEqual([business.address]);
     const days =
@@ -128,7 +139,8 @@ test("an admin reads the web address, and has no Change", async ({ page }) => {
     await page.goto(`/open/${prana?.id}`);
     await page.goto("/settings/organization");
     const row = card(page);
-    await expect(row).toContainText(".saroh.app");
+    const view = await viewOf(page, prana?.id ?? "");
+    await expect(row).toContainText(`${view.address}${suffixOf(view)}`);
     await expect(row).toContainText("Only the owner can change this.");
     await expect(row.getByRole("button", { name: "Change" })).toHaveCount(0);
 });
