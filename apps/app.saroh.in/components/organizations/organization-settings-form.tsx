@@ -652,12 +652,9 @@ export function OrganizationSettingsForm({
                 mono: true,
                 tag: "From your first order",
             },
-            {
-                label: "Workspace address",
-                value: settings.slug,
-                mono: true,
-                tag: "Can't be changed",
-            },
+            // No address row: the Web address card under this one shows it
+            // whole and changes it (DEC-069, L4), so a second "can't be
+            // changed" line would contradict it.
         ],
         contact: [
             { label: "Contact email", value: saved.contactEmail ?? "" },
@@ -718,7 +715,7 @@ export function OrganizationSettingsForm({
               ],
         address: [
             {
-                label: "Address",
+                label: "Registered address",
                 value: addressText(saved),
                 empty: "No registered address yet",
             },

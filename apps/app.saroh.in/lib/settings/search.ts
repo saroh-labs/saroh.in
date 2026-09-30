@@ -105,7 +105,12 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     business("Time zone", "identity"),
     business("Trading since", "identity"),
-    business("Workspace address", "identity"),
+    {
+        ...business("Web address", "identity"),
+        // The four addresses are named apart (DEC-069); the words it went
+        // by before still find it.
+        words: ["Workspace address", "Saroh address", "Subdomain", "saroh.app"],
+    },
     business("Contact email", "contact"),
     business("Phone on your website", "contact"),
     business("Website", "contact"),
@@ -117,7 +122,12 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("GST on delivery", "tax"),
     business("Delivery SAC", "tax"),
     business("Opening hours", "hours"),
-    business("Registered address", "address"),
+    {
+        ...business("Registered address", "address"),
+        // The tab and its row were once a bare "Address"; it is the one
+        // invoices print.
+        words: ["Address on invoices"],
+    },
     business("PIN code", "address"),
     business("State", "address"),
     business("Country", "address"),
