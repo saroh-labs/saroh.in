@@ -32,7 +32,7 @@ import { EntitlementService } from "../../billing/entitlement.service";
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { storefrontTypesOf } from "../../orders/fulfilment";
 import { authorize } from "../../organizations/organization-policy";
-import { freeAddress } from "../../sites/site-address";
+import { siteDefaults } from "../../sites/site-address";
 import { ModuleLifecycleService } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
 import { MODULE_BY_KEY, moduleRolledOut } from "../module-registry";
@@ -152,7 +152,7 @@ export class ModuleSetupService {
         const [org, rolledOut] = await Promise.all([
             prisma.organization.findUniqueOrThrow({
                 where: { id: organizationId },
-                select: { name: true, slug: true },
+                select: { name: true },
             }),
             moduleRolledOut(this.flags, moduleKey, organizationId),
         ]);
@@ -224,12 +224,11 @@ export class ModuleSetupService {
                         existing: { siteId: site.id, address: site.subdomain },
                     };
                 }
-                // The address chosen at setup, or a free one like it.
-                const address =
-                    (await freeAddress(prisma, org.slug, organizationId)) ?? "";
+                // The address chosen at setup, or a free one like it: the
+                // same start `/sites/new` has (`GET …/sites/new-defaults`).
                 return {
                     ...base,
-                    setup: { siteName: org.name.slice(0, 120), address },
+                    setup: { ...(await siteDefaults(prisma, organizationId)) },
                     existing: null,
                 };
             }

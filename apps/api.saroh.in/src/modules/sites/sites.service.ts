@@ -72,6 +72,8 @@ import {
     getOrCreateDraftVersion,
     reviewerScope,
 } from "./site-access";
+import type { SiteDefaults } from "./site-address";
+import { siteDefaults } from "./site-address";
 import type { CreatedSite } from "./site-create";
 import {
     newSectionKey,
@@ -79,7 +81,13 @@ import {
     writeSiteFromTemplate,
 } from "./site-create";
 import type { Flag, FlagType } from "./site-flags";
-import { checkShop, checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
+import {
+    ADDRESS_MISSING_MESSAGE,
+    checkAddress,
+    checkShop,
+    checkSite,
+    FLAGS_AWAITING_NAVIGATION,
+} from "./site-flags";
 import type { SiteFooter } from "./site-footer";
 import { parseSiteFooter } from "./site-footer";
 import type { SiteNavigation } from "./site-navigation";
@@ -588,6 +596,16 @@ export class SitesService {
         return prisma.$transaction((tx) =>
             writeSiteFromTemplate(tx, ctx, plan, { subdomain: dto.subdomain }),
         );
+    }
+
+    /**
+     * What `/sites/new` prefills: the business's name and its address, or a
+     * free one like it (DEC-069, L5) — the same start the Turn on sheet's
+     * Website step has. Requires `site:create`: it is the creation form's.
+     */
+    async newSiteDefaults(ctx: OrganizationContext): Promise<SiteDefaults> {
+        authorize(ctx, "site:create");
+        return siteDefaults(prisma, ctx.organizationId);
     }
 
     /**
@@ -1763,6 +1781,22 @@ export class SitesService {
         // template's identity/version.
         return prisma.$transaction(async (tx) => {
             /*
+             * No web address, no publish (DEC-069, L5): the one pre-publish
+             * flag that blocks (`checkAddress`). Asked here, beside the
+             * write, so an address removed mid-publish is not missed.
+             */
+            const addressed = await tx.site.findUniqueOrThrow({
+                where: { id: site.id },
+                select: { subdomain: true },
+            });
+            if (!addressed.subdomain) {
+                throw new ConflictException({
+                    message: ADDRESS_MISSING_MESSAGE,
+                    details: { field: "subdomain", reason: "addressMissing" },
+                });
+            }
+
+            /*
              * Asked INSIDE the transaction (#278). It used to be read before
              * one, so a verdict posted while a publish was in flight was
              * missed — the narrow window in which the record would have been
@@ -2452,6 +2486,7 @@ export class SitesService {
                 currentPublication: { select: { publishedAt: true } },
                 navigation: true,
                 storefrontId: true,
+                subdomain: true,
                 pages: {
                     select: {
                         id: true,
@@ -2582,6 +2617,9 @@ export class SitesService {
                 }),
             );
         }
+
+        // No web address (L5): the one flag that blocks, so it comes first.
+        flags.unshift(...checkAddress(site.subdomain));
 
         // The two unimplementable types travel with the result so the editor
         // can say what is NOT being checked rather than implying nine.

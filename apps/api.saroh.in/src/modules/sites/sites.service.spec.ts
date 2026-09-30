@@ -14,6 +14,7 @@ jest.mock("@saroh/database", () => {
     const client = {
         organization: {
             findUnique: jest.fn(),
+            findUniqueOrThrow: jest.fn(),
         },
         site: {
             findFirst: jest.fn(),
@@ -28,6 +29,7 @@ jest.mock("@saroh/database", () => {
         // Addresses held after a change (DEC-069, L1): none here.
         addressReservation: {
             findUnique: jest.fn(async () => null),
+            deleteMany: jest.fn(async () => ({ count: 0 })),
         },
         // Where a new site sells from (G11): no storefront by default.
         store: {
@@ -59,6 +61,31 @@ import type { CreateSiteFromTemplateDto } from "./dto";
 import { SitesService } from "./sites.service";
 
 const orgFindUnique = prisma.organization.findUnique as jest.Mock;
+const orgFindUniqueOrThrow = prisma.organization.findUniqueOrThrow as jest.Mock;
+
+/**
+ * The organizations the mock knows: this business by id (its name, profile
+ * and setup address), and by address only the `others` — businesses that
+ * reserved an address at setup.
+ */
+function orgs({
+    name = "Acme",
+    slug = "acme",
+    businessProfile = null as unknown,
+    others = {} as Record<string, string>,
+} = {}) {
+    orgFindUnique.mockImplementation(
+        async ({ where }: { where: { id?: string; slug?: string } }) => {
+            if (where.slug !== undefined) {
+                if (where.slug === slug) return { id: "org_1" };
+                const other = others[where.slug];
+                return other ? { id: other } : null;
+            }
+            return { name, slug, businessProfile };
+        },
+    );
+    orgFindUniqueOrThrow.mockResolvedValue({ name, slug });
+}
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
 const siteFindUnique = prisma.site.findUnique as jest.Mock;
 const siteCount = prisma.site.count as jest.Mock;
@@ -89,10 +116,7 @@ describe("SitesService.createFromTemplate", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         // Happy-path stubs; individual tests override as needed.
-        orgFindUnique.mockResolvedValue({
-            name: "Acme",
-            businessProfile: null,
-        });
+        orgs();
         siteFindFirst.mockResolvedValue(null);
         siteFindUnique.mockResolvedValue(null);
         siteCount.mockResolvedValue(0);
@@ -146,44 +170,49 @@ describe("SitesService.createFromTemplate", () => {
 
     describe("where a new site is served", () => {
         it("takes the address its business reserved at setup when none is asked for", async () => {
-            orgFindUnique.mockResolvedValue({
-                name: "Rye",
-                slug: "ryeandco",
-                businessProfile: null,
-            });
+            orgs({ name: "Rye", slug: "ryeandco" });
             await service.createFromTemplate(ctx(), { name: "Rye" });
             expect(siteCreate.mock.calls[0][0].data.subdomain).toBe("ryeandco");
         });
 
-        it("leaves the address empty when a site already uses the reserved one", async () => {
-            orgFindUnique.mockResolvedValue({
-                name: "Rye",
-                slug: "ryeandco",
-                businessProfile: null,
+        it("refuses, with a free address, when a site already uses the reserved one (L5: never no address)", async () => {
+            orgs({ name: "Rye", slug: "ryeandco" });
+            siteFindUnique.mockImplementation(
+                async ({ where }: { where: { subdomain: string } }) =>
+                    where.subdomain === "ryeandco"
+                        ? { id: "site_old", organizationId: "org_1" }
+                        : null,
+            );
+            await expect(
+                service.createFromTemplate(ctx(), { name: "Rye 2" }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    details: {
+                        field: "subdomain",
+                        reason: "taken",
+                        suggestion: "ryeandco-2",
+                    },
+                },
             });
-            siteFindUnique.mockResolvedValue({
-                id: "site_old",
-                organizationId: "org_1",
-            });
-            await service.createFromTemplate(ctx(), { name: "Rye 2" });
-            expect(siteCreate.mock.calls[0][0].data.subdomain).toBeUndefined();
+            expect(siteCreate).not.toHaveBeenCalled();
         });
 
         it("refuses an address another business reserved", async () => {
-            orgFindUnique.mockImplementation(({ where }) =>
-                Promise.resolve(
-                    where.slug === "kiln"
-                        ? { id: "org_other" }
-                        : { name: "Rye", businessProfile: null },
-                ),
-            );
+            orgs({
+                name: "Rye",
+                slug: "ryeandco",
+                others: { kiln: "org_other" },
+            });
             await expect(
                 service.createFromTemplate(ctx(), {
                     name: "Rye",
                     subdomain: "kiln",
                 }),
             ).rejects.toMatchObject({
-                response: { details: { field: "subdomain" } },
+                response: {
+                    details: { field: "subdomain", suggestion: "kiln-2" },
+                },
             });
             expect(siteCreate).not.toHaveBeenCalled();
         });
@@ -204,6 +233,35 @@ describe("SitesService.createFromTemplate", () => {
                 response: { details: { field: "subdomain", reason: "taken" } },
             });
             expect(siteCreate).not.toHaveBeenCalled();
+        });
+
+        it("refuses a setup address today's rules don't allow, offering one they do", async () => {
+            orgs({ name: "Rye", slug: "rye--co" });
+            await expect(
+                service.createFromTemplate(ctx(), { name: "Rye" }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    details: {
+                        field: "subdomain",
+                        reason: "unusable",
+                        suggestion: "rye-co",
+                    },
+                },
+            });
+            expect(siteCreate).not.toHaveBeenCalled();
+        });
+
+        it("refuses an address with two hyphens in a row (DEC-071)", async () => {
+            await expect(
+                service.createFromTemplate(ctx(), {
+                    name: "Rye",
+                    subdomain: "rye--co",
+                }),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { details: { field: "subdomain" } },
+            });
         });
 
         it("refuses an address kept for Saroh", async () => {
@@ -234,7 +292,8 @@ describe("SitesService.createFromTemplate", () => {
                 organizationId: "org_1",
                 name: "Acme",
                 slug: "acme",
-                subdomain: undefined,
+                // Never without an address (L5): the business's own.
+                subdomain: "acme",
                 storefrontId: null,
             },
             select: { id: true, slug: true },
@@ -303,8 +362,7 @@ describe("SitesService.createFromTemplate", () => {
     });
 
     it("seeds the TemplateContext from the org's business profile", async () => {
-        orgFindUnique.mockResolvedValue({
-            name: "Acme",
+        orgs({
             businessProfile: {
                 legalName: "Acme Incorporated",
                 contactEmail: "hello@acme.test",

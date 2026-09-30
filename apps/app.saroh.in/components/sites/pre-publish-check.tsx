@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import Link from "next/link";
 import { useEffect } from "react";
 
 import { shortDate } from "@/lib/sites/format-date";
@@ -21,10 +22,15 @@ import type {
  *
  * A takeover rather than a dialog on purpose: this is the last look at the
  * whole site before it becomes public, and a panel over the editor invites
- * skimming past it. Nothing here blocks publishing — every flag is advisory,
- * so the primary action stays live at all times and never argues with the
- * merchant about whether they are ready.
+ * skimming past it. Flags are advisory, so the primary action stays live and
+ * never argues with the merchant about whether they are ready — with one
+ * exception (DEC-069, L5): a site with no web address would go live at no
+ * address, so its `blocking` flag holds the button and links to where the
+ * address is chosen.
  */
+
+/** Where the business's web address is chosen (Settings › Business, L4). */
+export const WEB_ADDRESS_SETTINGS_HREF = "/settings/organization";
 
 /** The spec's voice: warm, a little human. Group headings, not error codes. */
 const TYPE_LABEL: Record<FlagType, string> = {
@@ -41,6 +47,7 @@ const TYPE_LABEL: Record<FlagType, string> = {
     reservedAddress: "Change address",
     shopCantTakeOrders: "Can't take orders online",
     productsNotOnSale: "Products not on sale",
+    addressMissing: "No web address",
 };
 
 /**
@@ -159,6 +166,8 @@ export function PrePublishCheck({
         .filter((g) => g.flags.length > 0);
 
     const total = flags.length;
+    // What the API will refuse to publish past (L5): the button waits.
+    const blocked = flags.some((f) => f.blocking);
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -188,11 +197,13 @@ export function PrePublishCheck({
                     <Button
                         type="button"
                         size="sm"
-                        disabled={publishing || unsaved}
+                        disabled={publishing || unsaved || blocked}
                         title={
-                            unsaved
-                                ? "Saving your changes — publish is available in a moment"
-                                : undefined
+                            blocked
+                                ? "Choose a web address first"
+                                : unsaved
+                                  ? "Saving your changes — publish is available in a moment"
+                                  : undefined
                         }
                         onClick={onPublish}
                         className="h-8 px-3"
@@ -362,6 +373,30 @@ function Row({
     page?: SitePage;
     onJump: (pageId: string | null, sectionIndex: number | null) => void;
 }) {
+    if (flag.type === "addressMissing") {
+        // Nothing in the editor fixes this: the address is the business's,
+        // chosen in Settings › Business, so the row goes there.
+        return (
+            <li>
+                <Link
+                    href={WEB_ADDRESS_SETTINGS_HREF}
+                    className="flex w-full cursor-pointer items-start gap-3 p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
+                >
+                    <span
+                        aria-hidden="true"
+                        className="mt-1.5 size-1 shrink-0 rounded-full bg-destructive"
+                    />
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-sm">{flag.message}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {TYPE_LABEL[flag.type]} · Choose one in Settings ›
+                            Business
+                        </span>
+                    </span>
+                </Link>
+            </li>
+        );
+    }
     return (
         <li>
             <button

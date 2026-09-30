@@ -258,3 +258,35 @@ export async function freeAddress(
     }
     return null;
 }
+
+/** What a new website starts with, before the merchant changes anything. */
+export interface SiteDefaults {
+    /** The business's name, cut to what a site name may hold. */
+    siteName: string;
+    /**
+     * The address the business chose at setup when it is free to them, else
+     * a free one like it. Empty only when {@link freeAddress} found none.
+     */
+    address: string;
+}
+
+/**
+ * The name and address a new website is offered (DEC-069): what the Turn on
+ * sheet's Website step (`…/modules/WEBSITE/setup-defaults`) and `/sites/new`
+ * (`GET …/sites/new-defaults`) both prefill, so the two ways of making a
+ * site start from the same address, and a merchant normally never meets a
+ * refusal for one in use.
+ */
+export async function siteDefaults(
+    db: Reader,
+    organizationId: string,
+): Promise<SiteDefaults> {
+    const org = await db.organization.findUniqueOrThrow({
+        where: { id: organizationId },
+        select: { name: true, slug: true },
+    });
+    return {
+        siteName: org.name.slice(0, 120),
+        address: (await freeAddress(db, org.slug, organizationId)) ?? "",
+    };
+}

@@ -16,6 +16,10 @@ jest.mock("@saroh/database", () => {
             // "nothing to compare" — these tests are about the write.
             findMany: jest.fn().mockResolvedValue([]),
             update: jest.fn(),
+            // Publish's address check (L5): every site here has one.
+            findUniqueOrThrow: jest.fn().mockResolvedValue({
+                subdomain: "acme",
+            }),
         },
         page: {
             findFirst: jest.fn(),
@@ -692,6 +696,25 @@ describe("SitesService.publishSite", () => {
         expect(select.pages.select.versions.select.sections.where).toEqual({
             hidden: false,
         });
+    });
+
+    it("refuses to publish a site with no web address, and writes nothing (L5)", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+        (prisma.site.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+            subdomain: null,
+        });
+
+        await expect(
+            service.publishSite(ctx(), "site_1"),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message: expect.stringMatching(/^Choose a web address/),
+                details: { field: "subdomain", reason: "addressMissing" },
+            },
+        });
+        expect(publicationCreate).not.toHaveBeenCalled();
+        expect(siteUpdate).not.toHaveBeenCalled();
     });
 
     it("SANITIZES the footer into the snapshot, on the same boundary as richText", async () => {

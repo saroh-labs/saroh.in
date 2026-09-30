@@ -1,4 +1,6 @@
 import {
+    ADDRESS_MISSING_MESSAGE,
+    checkAddress,
     checkPage,
     checkShop,
     checkSite,
@@ -844,5 +846,41 @@ describe("module pages and reserved addresses (G14)", () => {
             ],
         });
         expect(flags.map((f) => f.pageId)).toEqual(["range"]);
+    });
+});
+
+describe("checkAddress (DEC-069, L5)", () => {
+    it("raises nothing for a site with a web address", () => {
+        expect(checkAddress("rye")).toEqual([]);
+    });
+
+    it("blocks publishing a site with no web address", () => {
+        expect(checkAddress(null)).toEqual([
+            {
+                type: "addressMissing",
+                message: ADDRESS_MISSING_MESSAGE,
+                pageId: null,
+                sectionIndex: null,
+                field: "subdomain",
+                blocking: true,
+            },
+        ]);
+        expect(ADDRESS_MISSING_MESSAGE).toMatch(
+            /^Choose a web address before publishing/,
+        );
+    });
+
+    it("leaves every other flag advisory", () => {
+        const flags = [
+            ...checkSite(site({ seoDescription: null, pages: [page([])] })),
+            ...checkShop({
+                storefrontChosen: false,
+                candidates: 2,
+                isShopPath: () => false,
+                pages: [],
+            }),
+        ];
+        expect(flags.length).toBeGreaterThan(0);
+        expect(flags.some((f) => f.blocking)).toBe(false);
     });
 });

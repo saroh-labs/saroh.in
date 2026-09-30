@@ -703,6 +703,35 @@ export async function listSites(): Promise<SiteSummary[]> {
     return getList<SiteSummary>(base);
 }
 
+/** What `/sites/new` starts from (DEC-069, L5). */
+export interface NewSiteDefaults {
+    siteName: string;
+    /** The business's own address, or a free one like it; may be empty. */
+    address: string;
+}
+
+/**
+ * The name and address a new site is offered (`GET …/sites/new-defaults`).
+ * Null when it can't be read (an API from before it, or a failure): the form
+ * then starts empty, and the API still gives the site the business's own
+ * address or says which one to use.
+ */
+export async function getNewSiteDefaults(): Promise<NewSiteDefaults | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/new-defaults`);
+        if (!res.ok) return null;
+        const data = (await res.json()) as Partial<NewSiteDefaults> | null;
+        return {
+            siteName: typeof data?.siteName === "string" ? data.siteName : "",
+            address: typeof data?.address === "string" ? data.address : "",
+        };
+    } catch {
+        return null;
+    }
+}
+
 /** A site + its pages, or null when missing / no active org (throws on a real
  * failure). */
 export async function getSite(siteId: string): Promise<SiteDetail | null> {
@@ -747,6 +776,7 @@ export async function createSite(
         };
     }
     const failure = toFailure(data, "Could not create the site");
+    const suggestion = addressSuggestionOf(data);
     return {
         ok: false,
         error: failure.error,
@@ -754,7 +784,29 @@ export async function createSite(
             failure.field === "name" || failure.field === "subdomain"
                 ? failure.field
                 : undefined,
+        // A free address offered for one in use (DEC-069, L5).
+        ...(suggestion ? { suggestion } : {}),
     };
+}
+
+/**
+ * The free web address a refusal offers (`details.suggestion` on the 409
+ * for an address in use), or null. Unlike a page's suggested path it has no
+ * leading `/`.
+ */
+export function addressSuggestionOf(body: unknown): string | null {
+    const b = (typeof body === "object" && body !== null ? body : {}) as {
+        error?: unknown;
+        details?: unknown;
+    };
+    const inner =
+        typeof b.error === "object" && b.error !== null
+            ? (b.error as { details?: unknown })
+            : b;
+    const details = inner.details;
+    if (typeof details !== "object" || details === null) return null;
+    const said = (details as { suggestion?: unknown }).suggestion;
+    return typeof said === "string" && /^[a-z0-9-]+$/.test(said) ? said : null;
 }
 
 /**
@@ -1247,7 +1299,9 @@ export type FlagType =
     // The checkout (G13): the shop can't take an online order now.
     | "shopCantTakeOrders"
     // A Product grid (G12) naming products that aren't on sale there.
-    | "productsNotOnSale";
+    | "productsNotOnSale"
+    // The site has no web address (DEC-069, L5): the one flag that blocks.
+    | "addressMissing";
 
 export interface Flag {
     type: FlagType;
@@ -1255,6 +1309,8 @@ export interface Flag {
     pageId: string | null;
     sectionIndex: number | null;
     field: string | null;
+    /** The API refuses to publish until this is fixed (only `addressMissing`). */
+    blocking?: boolean;
 }
 
 export interface SiteFlags {
