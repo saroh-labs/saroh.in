@@ -2,6 +2,12 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 
 import { TENANT_HOST_HEADER } from "./lib/pay-host";
+import {
+    TEST_GATE_HEADER,
+    TEST_GATE_PATH,
+    TEST_RELEASE_COOKIE,
+    TEST_RELEASE_HEADER,
+} from "./lib/test-host";
 import middleware from "./middleware";
 
 /**
@@ -79,5 +85,99 @@ describe("middleware: pay links on a business's address", () => {
             "https://northwind.saroh.app/northwind.saroh.app/shop?page=2",
         );
         expect(passedOn(shop, TENANT_HOST_HEADER)).toBeNull();
+    });
+});
+
+describe("middleware: a test release's host (DEC-071, T5)", () => {
+    const HOST = "https://test--northwind.saroh.app";
+    const TOKEN = "abcdefghijklmnopqrstuvwxyz012345";
+
+    it("moves ?release= into the host-only cookie and redirects without it", () => {
+        const res = middleware(request(`${HOST}/shop?release=${TOKEN}&page=2`));
+        expect(res.status).toBe(303);
+        expect(res.headers.get("location")).toBe("/shop?page=2");
+        const cookie = res.headers.get("set-cookie") ?? "";
+        expect(cookie).toContain(`${TEST_RELEASE_COOKIE}=${TOKEN}`);
+        expect(cookie).toMatch(/HttpOnly/i);
+        expect(cookie).toMatch(/Secure/i);
+        expect(cookie).toMatch(/SameSite=Lax/i);
+        expect(cookie).toMatch(/Path=\//i);
+        expect(cookie).not.toMatch(/Domain=/i);
+        expect(res.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+        expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+    });
+
+    it("sets no cookie for a token that isn't shaped like one", () => {
+        const res = middleware(request(`${HOST}/?release=%3Cscript%3E`));
+        expect(res.status).toBe(303);
+        expect(res.headers.get("location")).toBe("/");
+        expect(res.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("passes the cookie's token on to the site, and strips a forged header", () => {
+        const res = middleware(
+            request(`${HOST}/book`, {
+                cookie: `${TEST_RELEASE_COOKIE}=${TOKEN}`,
+                [TEST_RELEASE_HEADER]: "forged-token-forged-token-forged",
+            }),
+        );
+        expect(rewrittenTo(res)).toBe(`${HOST}/test--northwind.saroh.app/book`);
+        expect(passedOn(res, TEST_RELEASE_HEADER)).toBe(TOKEN);
+        expect(res.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    });
+
+    it("rewrites to the gate without a cookie, whatever header was sent", () => {
+        const res = middleware(
+            request(`${HOST}/about`, { [TEST_RELEASE_HEADER]: TOKEN }),
+        );
+        expect(new URL(rewrittenTo(res) ?? "").pathname).toBe(TEST_GATE_PATH);
+        expect(passedOn(res, TEST_RELEASE_HEADER)).toBeNull();
+        expect(passedOn(res, TEST_GATE_HEADER)).toBe("1");
+        expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+    });
+
+    it("has no pay pages", () => {
+        const res = middleware(
+            request(`${HOST}/pay/abc`, {
+                cookie: `${TEST_RELEASE_COOKIE}=${TOKEN}`,
+            }),
+        );
+        expect(res.status).toBe(404);
+        expect(rewrittenTo(res)).toBeNull();
+    });
+
+    it("strips a forged test header on a live host and on the apex", () => {
+        const live = middleware(
+            request("https://northwind.saroh.app/", {
+                [TEST_RELEASE_HEADER]: TOKEN,
+                [TEST_GATE_HEADER]: "1",
+            }),
+        );
+        expect(rewrittenTo(live)).toBe(
+            "https://northwind.saroh.app/northwind.saroh.app/",
+        );
+        expect(passedOn(live, TEST_RELEASE_HEADER)).toBeNull();
+        expect(passedOn(live, TEST_GATE_HEADER)).toBeNull();
+        expect(live.headers.get("x-robots-tag")).toBeNull();
+
+        const apex = middleware(
+            request("https://saroh.app/test-release-gate", {
+                [TEST_GATE_HEADER]: "1",
+            }),
+        );
+        expect(passedOn(apex, TEST_GATE_HEADER)).toBeNull();
+        expect(
+            apex.headers.get("x-middleware-override-headers") ?? "",
+        ).not.toContain(TEST_GATE_HEADER);
+    });
+
+    it("never sets a test cookie on a live host", () => {
+        const res = middleware(
+            request(`https://northwind.saroh.app/?release=${TOKEN}`),
+        );
+        expect(res.headers.get("set-cookie")).toBeNull();
+        expect(rewrittenTo(res)).toBe(
+            `https://northwind.saroh.app/northwind.saroh.app/?release=${TOKEN}`,
+        );
     });
 });
