@@ -4,8 +4,9 @@ import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { PageContainer } from "@/components/shared/page-container";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
+import { payLinkPossible } from "@/lib/invoices/payments-on";
 import { getInvoice } from "@/lib/invoices/service";
-import { getInvoiceBusiness, hasPaymentProvider } from "@/lib/invoices/tax";
+import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
@@ -24,7 +25,8 @@ export default async function EditInvoicePage({
             getInvoice(invoiceId),
             contactPickerOptions(),
             getInvoiceBusiness(),
-            hasPaymentProvider(),
+            // A pay link needs Payments on too (DEC-070).
+            payLinkPossible(),
             resolveActiveOrganization(),
         ]);
     if (!invoice) notFound();

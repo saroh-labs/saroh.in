@@ -29,6 +29,9 @@ import type { InvoiceSend } from "@/lib/invoices/service";
  * told, where, and that a link shared before stops working, before it
  * happens. From a draft, "Send with pay link" issues it first, as the
  * design's draft action does: it takes its number, then goes.
+ *
+ * Without online payment (`send.payOnline` false, DEC-070) the link only
+ * shows the invoice, and the words say so: no pay link is promised.
  */
 export function SendDialog({
     open,
@@ -81,7 +84,12 @@ export function SendDialog({
                     : res.error,
             );
         }
-        const out = sendOutcome(res.data, first, reminder);
+        const out = sendOutcome(
+            res.data,
+            first,
+            reminder,
+            send.payOnline ?? true,
+        );
         if (out.ok) showSuccess(out.message);
         else showError(out.message);
     }
