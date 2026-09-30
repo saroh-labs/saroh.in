@@ -614,6 +614,8 @@ describe("SitesService.restorePublication (#279)", () => {
                     // A post publish is not a version of the site (#283), so
                     // restore cannot resurrect one as the live site.
                     postId: null,
+                    // Nor is a test release's snapshot (DEC-071).
+                    kind: "LIVE",
                 },
             }),
         );
@@ -1030,8 +1032,14 @@ describe("SitesService public read (drafts never leak)", () => {
         // own id — no draft tables. The id is not content: the renderer
         // resolves a host once and then asks for that site's posts by it
         // (#232), rather than repeating the host resolution per post route.
+        // Only a LIVE row is ever served on a real host (DEC-071).
         expect(siteFindFirst).toHaveBeenCalledWith({
-            where: { subdomain: "acme", deletedAt: null },
+            where: {
+                AND: [
+                    { subdomain: "acme", deletedAt: null },
+                    { currentPublication: { kind: "LIVE" } },
+                ],
+            },
             select: {
                 id: true,
                 organizationId: true,
