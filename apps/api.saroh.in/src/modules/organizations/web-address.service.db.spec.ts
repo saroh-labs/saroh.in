@@ -268,6 +268,35 @@ describe("changing the web address (DEC-069, L2)", () => {
         expect(org?.slug).toBe(`${a}-c`);
     });
 
+    it("counts both holds a change would add: never more than two held", async () => {
+        const slug = fresh("rye");
+        const served = `${slug}-site`;
+        // A site on a variant, so the next change holds two addresses.
+        const b = await business(slug, { siteAt: served });
+        await prisma.addressReservation.create({
+            data: {
+                organizationId: b.id,
+                address: `${slug}-older`,
+                reservedUntil: new Date(Date.now() + 10 * DAY),
+            },
+        });
+
+        const body = await conflict(service.change(b.owner, `${slug}-new`));
+
+        expect(body.details).toMatchObject({
+            field: "address",
+            reason: "limit",
+        });
+        expect((await holds(b.id)).map((r) => r.address)).toEqual([
+            `${slug}-older`,
+        ]);
+        const org = await prisma.organization.findUnique({
+            where: { id: b.id },
+            select: { slug: true },
+        });
+        expect(org?.slug).toBe(slug);
+    });
+
     it("takes another business's hold once it has run out, replacing the row", async () => {
         const wanted = fresh("rye");
         const old = await business(fresh("old"));

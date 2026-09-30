@@ -1978,3 +1978,23 @@ owns. Pinned by `web-address.service.db.spec.ts` "moves back to its own
 address whose hold has run out, first time" (fails only under
 `TEST_RLS=on`).
 **Category**: organizations · RLS · transactions
+
+## Web address — one change could leave three old addresses held (release review)
+
+**Symptom**: found in the production release review, behind
+`WEB_ADDRESS_CHANGE`. A business whose site sits on a variant of its setup
+address (`rye` and `rye-site`), already holding one old address, changes
+again and ends up holding three: more than `MAX_HELD_ADDRESSES` (KTD-9)
+keeps away from every other business.
+**Cause**: the limit counted only the holds that already existed
+(`held.length >= MAX_HELD_ADDRESSES`), assuming each change adds one. A
+change holds the site's address and, when it differs, the setup address
+too: two.
+**Fix**: `WebAddressService.move` counts what this change adds (the site's
+subdomain, and `org.slug` unless it is the new address; less any already
+held) and refuses when `held.length + added > MAX_HELD_ADDRESSES`, naming
+the day enough holds have run out.
+**Rule**: a cap is checked against the state after the write, not before
+it; count what the write adds. Pinned by `web-address.service.db.spec.ts`
+"counts both holds a change would add".
+**Category**: organizations · limits

@@ -157,8 +157,9 @@ export class WebAddressService {
      * changes of one business queue up:
      * 1. the new address is checked, and a hold on it that has run out is
      *    cleared; taken → 409 with a suggestion;
-     * 2. a business already holding two old addresses → 409 naming the day
-     *    the first is released;
+     * 2. a change that would leave the business holding more than two old
+     *    addresses (it holds the site's and, when it differs, the setup
+     *    address) → 409 naming the day it fits;
      * 3. the old site address is held for 90 days and forwards to the site;
      *    an old setup address that differs is held too, forwarding nowhere;
      * 4. the business's own hold on the new address (a change back) goes;
@@ -236,11 +237,20 @@ export class WebAddressService {
                 address: { not: address },
             },
             orderBy: { reservedUntil: "asc" },
-            select: { reservedUntil: true },
+            select: { address: true, reservedUntil: true },
         });
-        if (held.length >= MAX_HELD_ADDRESSES) {
-            // The soonest released: the day a third change becomes possible.
-            const first = held[0];
+        // What this change holds: the site's address, and the setup address
+        // when it differs from it (a site on a variant, or no site). Both
+        // count, so one change never takes the business past the limit.
+        const adding = new Set<string>();
+        if (site?.subdomain) adding.add(site.subdomain);
+        if (org.slug !== address) adding.add(org.slug);
+        for (const h of held) adding.delete(h.address);
+        const over = held.length + adding.size - MAX_HELD_ADDRESSES;
+        if (over > 0) {
+            // The day enough holds have run out for this change to fit.
+            // At most two are added, so `over` never exceeds `held.length`.
+            const first = held[over - 1];
             const zone = await businessTimezone(tx, organizationId);
             const on = DateTime.fromJSDate(first.reservedUntil)
                 .setZone(zone)
