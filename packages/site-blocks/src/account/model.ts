@@ -3,6 +3,7 @@ import type {
     AutopayMethod,
     AutopayState,
 } from "../autopay/api";
+import { siteMoney } from "../lib/money";
 
 /**
  * The customer account area's data, as the site's server hands it to the
@@ -255,19 +256,9 @@ export function initials(name: string | null, email: string): string {
 
 /** "₹450" — whole rupees drop the paise; anything else keeps them. */
 export function accountMoney(amount: string, currency: string): string {
-    const value = Number(amount);
-    if (!Number.isFinite(value)) return `${currency} ${amount}`;
-    const whole = Number.isInteger(value);
-    try {
-        return new Intl.NumberFormat("en-IN", {
-            style: "currency",
-            currency,
-            minimumFractionDigits: whole ? 0 : 2,
-            maximumFractionDigits: 2,
-        }).format(value);
-    } catch {
-        return `${currency} ${amount}`;
-    }
+    return (
+        siteMoney(Number(amount), currency, "en-IN") ?? `${currency} ${amount}`
+    );
 }
 
 /** "Mon 5 Oct, 10:00", in the zone the booking was made in. */

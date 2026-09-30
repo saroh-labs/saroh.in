@@ -293,6 +293,15 @@ export type {
 } from "./account/packs-api";
 // G20: joining a plan and buying a pack from the site's Prices page.
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
+// The account's compact header, and the site's chrome stepping aside for it
+// (DEC-073 #10).
+export {
+    AccountHeader,
+    SiteChromeFrame,
+    accountTitle,
+    businessInitial,
+    isAccountPath,
+} from "./account/account-header";
 export type { TrackLookup } from "./account/track-sheet";
 export { PRICES_OFFLINE, joinedMessage } from "./prices/api";
 export type {
@@ -359,5 +368,8 @@ export {
 export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
+// A module page's title and lead (DEC-073 #9).
+export { ModulePageTop, modulePageTopOf } from "./module-page-top";
+export type { ModulePageTopContent } from "./module-page-top";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";

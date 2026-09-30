@@ -104,9 +104,6 @@ export function AccountMessages({
 
     return (
         <div className="grid gap-3.5">
-            <h1 className="font-site-heading text-site-fg m-0 text-[26px] font-semibold tracking-[-0.02em]">
-                Messages
-            </h1>
             <section
                 aria-labelledby={`${id}-title`}
                 className="bg-site-surface border-site-border grid gap-2 rounded-[calc(var(--site-radius)+14px)] border p-3.5"

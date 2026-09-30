@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
+import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
 
 /**
@@ -109,16 +110,8 @@ export function formatAmount(
     currency: string,
     locale = "en-IN",
 ): string {
-    const value = Number(amount);
-    try {
-        return new Intl.NumberFormat(locale, {
-            style: "currency",
-            currency,
-            maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
-        }).format(value);
-    } catch {
-        return amount;
-    }
+    // "₹2,499", "₹24.50" (DEC-073 #11): never "₹24.5".
+    return siteMoney(Number(amount), currency, locale) ?? amount;
 }
 
 /** Whole percent off, rounded down, or null when nothing is off. */

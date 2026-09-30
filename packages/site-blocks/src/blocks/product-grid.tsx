@@ -12,6 +12,7 @@ import {
     productGridQuery,
 } from "../lib/product-grid-read";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
 import { cardLink, listCard, listPhoto } from "./list-layout";
@@ -443,7 +444,7 @@ function CardWords({
     show: CardShow;
 }) {
     const line = show.line ? cardLine(p.blurb) : null;
-    const eyebrow = p.variantTitles.join(" · ");
+    const eyebrow = optionSummary(p.variantTitles, p.optionName);
     const amount = formatAmount(p.price, p.currency);
     return (
         <>

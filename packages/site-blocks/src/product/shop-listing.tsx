@@ -5,6 +5,7 @@ import { useState } from "react";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { addToBag, openBag } from "../shop/bag-store";
+import { optionSummary } from "./option-summary";
 import { formatAmount, percentOff } from "./product-page";
 
 /**
@@ -35,6 +36,11 @@ export interface ShopListingCard {
     priceFrom: boolean;
     image: { url: string; alt: string } | null;
     variantTitles: string[];
+    /**
+     * What the options are ("Size", DEC-073 #12). Absent from an API before
+     * it; the card then says "2 options".
+     */
+    optionName?: string | null;
     blurb: string | null;
     soldOut: boolean;
     /** The listing at the site's storefront: what the bag holds (G13). */
@@ -131,7 +137,10 @@ export default function ShopListing({
                                 <span className="flex min-w-0 flex-col gap-1.5 p-4">
                                     <span className="flex items-center gap-2">
                                         <span className="text-site-muted flex-1 truncate text-[11.5px] font-bold uppercase tracking-[0.08em]">
-                                            {p.variantTitles.join(" · ")}
+                                            {optionSummary(
+                                                p.variantTitles,
+                                                p.optionName,
+                                            )}
                                         </span>
                                         {p.soldOut ? (
                                             <span className="bg-site-fg text-site-bg rounded-full px-2 py-0.5 text-[11px] font-bold">

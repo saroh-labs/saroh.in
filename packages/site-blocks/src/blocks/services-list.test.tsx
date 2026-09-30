@@ -99,17 +99,20 @@ describe("servicesList (#255)", () => {
         expect(container.textContent).not.toContain("38");
     });
 
-    it("formats durations and prices by the currency's own decimals", () => {
+    it("formats durations, and prices whole without decimals (DEC-073 #11)", () => {
         expect(formatDuration(30)).toBe("30 min");
         expect(formatDuration(60)).toBe("1 hr");
         expect(formatDuration(90)).toBe("1 hr 30 min");
-        expect(formatPrice(3800, "GBP", "en-GB")).toBe("£38.00");
+        expect(formatPrice(3800, "GBP", "en-GB")).toBe("£38");
+        expect(formatPrice(3850, "GBP", "en-GB")).toBe("£38.50");
         // Stored as amount x 100 for every currency, like the service form
         // writes it: 150000 is ¥1,500, shown without decimals.
         const yen = formatPrice(150000, "JPY", "en-GB");
         expect(yen).toMatch(/¥1,500$/);
         expect(yen).not.toContain("150,000");
-        expect(formatPrice(250000, "INR", "en-IN")).toBe("₹2,500.00");
+        expect(formatPrice(50000, "INR", "en-IN")).toBe("₹500");
+        expect(formatPrice(109900, "INR", "en-IN")).toBe("₹1,099");
+        expect(formatPrice(49950, "INR", "en-IN")).toBe("₹499.50");
         expect(formatPrice(null, "GBP")).toBeNull();
         expect(formatPrice(100, "NOT-A-CODE")).toBeNull();
     });

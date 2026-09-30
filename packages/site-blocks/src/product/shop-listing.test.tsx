@@ -14,6 +14,7 @@ const sourdough: ShopListingCard = {
     priceFrom: true,
     image: { url: "https://img.test/loaf.jpg", alt: "A dark rye loaf" },
     variantTitles: ["Small", "Large"],
+    optionName: "Size",
     blurb: "Slow rye. Baked at dawn.",
     soldOut: false,
 };
@@ -26,7 +27,7 @@ describe("ShopListing (G11)", () => {
         ).toBeInTheDocument();
         const link = screen.getByRole("link", { name: /Sourdough/ });
         expect(link).toHaveAttribute("href", "/shop/sourdough");
-        expect(link).toHaveTextContent("Small · Large");
+        expect(link).toHaveTextContent("2 sizes");
         expect(link).toHaveTextContent("From ₹250");
         expect(screen.getByAltText("A dark rye loaf")).toBeInTheDocument();
     });
