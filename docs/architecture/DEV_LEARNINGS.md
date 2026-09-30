@@ -1396,3 +1396,18 @@ for a module's page while it is off (`unlessModule`), which
 "with Payments") as well as the code, and let the workspace read the API's
 flag rather than rebuild the rule from a provider list.
 **Category**: copy · invoices · nav
+
+## e2e — a @serial test on the phone is project "phone-serial", not "phone"
+
+**Problem**: K7's @serial spec took the desk path on the phone and failed
+looking for the desk rail ("Primary") at Pixel width.
+**Root cause**: `e2e/run.mjs` runs @serial tests in their own projects,
+`desk-serial` and `phone-serial`. `testInfo.project.name === "phone"` is
+false there, so a phone branch in a @serial spec never runs — and where the
+phone branch only adds checks (`module-turn-on.spec.ts`'s sheet and 44px
+asserts), it passes without checking them.
+**Fix**: `project.name.startsWith("phone")` in the spec.
+**Rule**: in a spec that can be @serial, test the project with
+`startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
+worth the same change.
+**Category**: e2e · tests

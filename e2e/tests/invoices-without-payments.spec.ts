@@ -104,7 +104,8 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
 
             // The rail (or the phone's More) has Invoices of its own.
             await page.goto("/");
-            if (testInfo.project.name === "phone") {
+            // A @serial test runs as "phone-serial" on the phone.
+            if (testInfo.project.name.startsWith("phone")) {
                 const more = page
                     .getByRole("navigation", { name: "Main" })
                     .getByRole("button", { name: /^More/ });
