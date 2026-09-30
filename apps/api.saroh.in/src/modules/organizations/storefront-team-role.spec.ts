@@ -8,11 +8,12 @@ import {
 
 /**
  * The "Storefront team" role (F16, DEC-048 amended 2026-09-27): enough to
- * appear on Team and open the storefronts, and nothing about customers,
- * bookings, orders or money — narrower than Member and the read-only floor.
+ * appear on Team and open the storefronts, the kitchen's view of their
+ * storefronts' orders (DEC-074), and nothing about customers, bookings or
+ * money — narrower than Member and the read-only floor.
  */
 describe("the Storefront team role", () => {
-    it("holds exactly the six reads the matrix names", () => {
+    it("holds exactly the six reads the matrix names, and order:stage", () => {
         expect([...STOREFRONT_TEAM_ACTIONS].sort()).toEqual(
             [
                 "org:read",
@@ -21,6 +22,7 @@ describe("the Storefront team role", () => {
                 "media:read",
                 "store:read",
                 "product-review:read",
+                "order:stage",
             ].sort(),
         );
     });
@@ -32,9 +34,10 @@ describe("the Storefront team role", () => {
         }
     });
 
-    it("reads no customers, bookings, orders or money", () => {
+    it("reads no customers, bookings or money, and of orders only the kitchen's view", () => {
         const holds = storefrontTeamCapabilities(null);
         for (const action of ORG_ACTIONS) {
+            if (action === "order:stage") continue;
             if (
                 /^(contact|booking|service|order|payment|invoice|subscription|pack|lead|pipeline|customer|message|audit):/.test(
                     action,
@@ -43,6 +46,9 @@ describe("the Storefront team role", () => {
                 expect([action, holds.has(action)]).toEqual([action, false]);
             }
         }
+        // DEC-074: moving its storefronts' orders, with no money.
+        expect(holds.has("order:stage")).toBe(true);
+        expect(holds.has("order:read")).toBe(false);
     });
 
     it("is narrower than Member: everything it holds, a Member holds", () => {
@@ -55,8 +61,9 @@ describe("the Storefront team role", () => {
         );
     });
 
-    it("writes nothing", () => {
+    it("writes nothing but an order's stage", () => {
         for (const action of storefrontTeamCapabilities(null)) {
+            if (action === "order:stage") continue;
             expect(action.endsWith(":read")).toBe(true);
         }
     });

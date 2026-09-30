@@ -190,7 +190,9 @@ async function emailTeam(
             m.role,
             roles.find((r) => r.key === m.role)?.actions ?? null,
         );
-        if (!mayHearAbout(alert.event, (a) => actions.has(a))) return false;
+        if (!mayHearAbout(alert.event, (a) => actions.has(a), m.role)) {
+            return false;
+        }
         return alertOn(
             choices.filter((c) => c.userId === m.userId),
             alert.event,

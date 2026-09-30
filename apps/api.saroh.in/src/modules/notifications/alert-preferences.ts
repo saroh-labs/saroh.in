@@ -1,3 +1,4 @@
+import { isLocationScoped } from "../orders/order-location";
 import type { OrgAction } from "../organizations/organization-actions";
 
 /**
@@ -87,11 +88,20 @@ export function alertEventOfType(type: string): AlertEvent | null {
     return null;
 }
 
-/** Whether someone holding `has` may be offered `event`. */
+/**
+ * Whether someone holding `has` may be offered `event`.
+ *
+ * A location's team (`roleKey`, DEC-074) reads only its own storefronts'
+ * orders, and a New order alert goes to the whole business, whichever
+ * storefront it came in at — so it isn't offered to them, and their
+ * orders reach them on Orders and Home instead.
+ */
 export function mayHearAbout(
     event: AlertEvent,
     has: (action: OrgAction) => boolean,
+    roleKey?: string | null,
 ): boolean {
+    if (event === "order" && isLocationScoped(roleKey)) return false;
     return ALERT_READS[event].some(has);
 }
 
@@ -154,8 +164,11 @@ export function channelState(input: {
 export function hiddenNotificationTypes(
     stored: readonly StoredPreference[],
     has: (action: OrgAction) => boolean,
+    roleKey?: string | null,
 ): string[] {
     return ALERT_EVENTS.filter(
-        (event) => !mayHearAbout(event, has) || !alertOn(stored, event, "bell"),
+        (event) =>
+            !mayHearAbout(event, has, roleKey) ||
+            !alertOn(stored, event, "bell"),
     ).flatMap((event) => [...ALERT_NOTIFICATION_TYPES[event]]);
 }

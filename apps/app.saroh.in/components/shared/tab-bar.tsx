@@ -29,11 +29,14 @@ export function TabBar({
     unread = 0,
     moduleKeys = null,
     role = null,
+    roleKey = null,
     actions = null,
     counts,
     storefronts = null,
     stockTracked = null,
 }: {
+    /** The role as stored; see `navFor`. */
+    roleKey?: string | null;
     /** How many storefronts; with several the row reads "Storefronts". */
     storefronts?: number | null;
     /** The business tracks stock; off, Sell › Stock is not offered. */
@@ -50,6 +53,7 @@ export function TabBar({
 }) {
     const groups = navFor({
         role,
+        roleKey,
         actions,
         moduleKeys,
         storefronts,

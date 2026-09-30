@@ -227,8 +227,11 @@ export function CommandMenu({
     sites = [],
     storefronts = null,
     stockTracked = null,
+    roleKey = null,
 }: {
     moduleKeys?: string[] | null;
+    /** The role as stored; see `navFor`. */
+    roleKey?: string | null;
     /** The actor's role here; `null` = unknown, and the palette fails open. */
     role?: NavRole | null;
     /**
@@ -257,6 +260,7 @@ export function CommandMenu({
     const [searching, setSearching] = useState(false);
     const groups = navFor({
         role,
+        roleKey,
         actions: permissions,
         moduleKeys,
         sites,

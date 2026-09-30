@@ -65,12 +65,15 @@ export function AppSidebar({
     unread = 0,
     moduleKeys = null,
     role = null,
+    roleKey = null,
     actions = null,
     counts,
     storefronts = null,
     stockTracked = null,
     collapsed: collapsedAtLoad = false,
 }: {
+    /** The role as stored; see `navFor`. */
+    roleKey?: string | null;
     /** How many storefronts; with several the row reads "Storefronts". */
     storefronts?: number | null;
     /** The business tracks stock; off, Sell › Stock is not offered. */
@@ -92,6 +95,7 @@ export function AppSidebar({
 }) {
     const groups = navFor({
         role,
+        roleKey,
         actions,
         moduleKeys,
         storefronts,
