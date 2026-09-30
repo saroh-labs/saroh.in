@@ -1680,6 +1680,7 @@ app's own client modules.
 **Rule**: a value both a server file and a client component need lives in a
 module with no "use client".
 **Category**: renderer · RSC · DEC-071
+
 ## e2e — a business made in a spec has every module dark
 
 **Problem**: K3's first-run spec set up a business through the API and
@@ -1697,6 +1698,7 @@ reads them without saving.
 business; one it makes itself can only check what needs no module (setup,
 the kind, invoices).
 **Category**: e2e · seed · modules
+
 ## e2e — a business a test sets up can still write contacts and invoices (K4)
 
 **Problem**: K4 needed a "site for my work" with nothing that takes money
@@ -1714,3 +1716,22 @@ through the API, then reads Settings and Home.
 e2e. Plan on turning one on only where the spec needs the module to read as
 on (Home, the rail, the checklist's module steps).
 **Category**: e2e · tests · modules
+
+## Templates — a template's enquiry form has no Form until the editor saves (K13)
+
+**Problem**: `writing@1` (and K12's portfolio) give Contact an enquiry
+section, but a template can only lay down its content: the `formId` the
+public submit endpoint needs is missing.
+**Root cause**: `instantiateTemplate` is pure (no Prisma), and
+`site-create.ts` writes the sections as they are. Only two paths make a
+Form: the module pages (`module-page-sections.ts`, `contact`) and the
+editor's `syncEnquiryForms` on save. The enquiry block draws nothing without
+a `formId`, so a site published without an editor save has a blank form.
+**Fix**: not yet. The template leaves `formId` out (the contract allows
+it), and its Home link falls back to the email when there is one. K15,
+which owns `site-create.ts`, should make the Form for any template enquiry
+section as `module-page-sections.ts` does.
+**Rule**: a template section that needs a record behind it (a Form, a
+service, a storefront) is only half-made by the template. Name who makes
+the record before the template ships.
+**Category**: templates · sites · enquiry
