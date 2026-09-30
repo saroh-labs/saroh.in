@@ -293,11 +293,6 @@ test.describe("a reviewer and a test release", () => {
             expect(siteId, "Northwind has its site at northwind").toBeTruthy();
 
             const name = `E2E review ${ownStamp(testInfo)}`;
-            const made = await nw.post<{ release: { id: string } }>(
-                `/sites/${siteId}/test-releases`,
-                { name },
-            );
-            const releaseId = made.release.id;
 
             interface Review {
                 latestApproval: { outcome: string; at: string } | null;
@@ -331,9 +326,35 @@ test.describe("a reviewer and a test release", () => {
                     key,
                 }),
             );
-            let edited = false;
+            let releaseId: string | null = null;
+
+            /** The home draft with a stamped heading of this test's on top. */
+            const withHeading = async (heading: string) => {
+                const now = await nw.get<{ revision: number }>(draftPath);
+                await nw.put(`${draftPath}/sections`, {
+                    revision: now.revision,
+                    sections: [
+                        {
+                            type: "hero",
+                            contractVersion: 1,
+                            content: { heading },
+                        },
+                        ...original,
+                    ],
+                });
+            };
 
             try {
+                // A release of this test's own bytes. A verdict is bound to
+                // a release's fingerprint (KTD-10), so a release of the seed's
+                // draft would already carry an earlier run's approval.
+                await withHeading(`Under review ${name}`);
+                const made = await nw.post<{ release: { id: string } }>(
+                    `/sites/${siteId}/test-releases`,
+                    { name },
+                );
+                releaseId = made.release.id;
+
                 // The reviewer finds it on Review, opens it, and approves it.
                 await useSession(page, "reviewer");
                 await openTheReviewedSite(page);
@@ -351,7 +372,7 @@ test.describe("a reviewer and a test release", () => {
                 ).toContainText(name);
                 // The release as it was frozen, drawn from its snapshot.
                 await expect(
-                    page.getByText("Packaging, storage and safety supplies"),
+                    page.getByText(`Under review ${name}`),
                 ).toBeVisible();
 
                 await page
@@ -363,19 +384,7 @@ test.describe("a reviewer and a test release", () => {
                 ).toContainText("approved this test release.");
 
                 // The draft moves on after the verdict.
-                const now = await nw.get<{ revision: number }>(draftPath);
-                await nw.put(`${draftPath}/sections`, {
-                    revision: now.revision,
-                    sections: [
-                        {
-                            type: "hero",
-                            contractVersion: 1,
-                            content: { heading: `After review ${name}` },
-                        },
-                        ...original,
-                    ],
-                });
-                edited = true;
+                await withHeading(`After review ${name}`);
 
                 // The release still reads Approved, in the editor's panel.
                 await owner.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
@@ -398,16 +407,17 @@ test.describe("a reviewer and a test release", () => {
                 expect(after.outstanding).toBe(before.outstanding);
                 expect(after.pending).toBe(before.pending);
             } finally {
-                if (edited) {
-                    const now = await nw.get<{ revision: number }>(draftPath);
-                    await nw.put(`${draftPath}/sections`, {
-                        revision: now.revision,
-                        sections: original,
-                    });
+                // Put the home draft back as it was.
+                const now = await nw.get<{ revision: number }>(draftPath);
+                await nw.put(`${draftPath}/sections`, {
+                    revision: now.revision,
+                    sections: original,
+                });
+                if (releaseId) {
+                    await nw.post(
+                        `/sites/${siteId}/test-releases/${releaseId}/discard`,
+                    );
                 }
-                await nw.post(
-                    `/sites/${siteId}/test-releases/${releaseId}/discard`,
-                );
                 await ownerContext.close();
             }
         },
