@@ -12,6 +12,7 @@ jest.mock("../../env", () => ({ env: { NODE_ENV: "test" } }));
 
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { DateTime } from "luxon";
 
 import { isRlsTestMode } from "../../../test/rls-mode";
 import type {
@@ -295,6 +296,96 @@ describe("changing the web address (DEC-069, L2)", () => {
             select: { slug: true },
         });
         expect(org?.slug).toBe(slug);
+    });
+
+    it("lets a business holding one address make a change that holds one more", async () => {
+        const a = fresh("rye");
+        const b = await business(a);
+        await prisma.addressReservation.create({
+            data: {
+                organizationId: b.id,
+                address: `${a}-older`,
+                reservedUntil: new Date(Date.now() + 10 * DAY),
+            },
+        });
+
+        const view = await service.change(b.owner, `${a}-new`);
+
+        // One held, one added: exactly the limit, which is allowed.
+        expect(view.address).toBe(`${a}-new`);
+        expect((await holds(b.id)).map((r) => r.address).sort()).toEqual(
+            [a, `${a}-older`].sort(),
+        );
+    });
+
+    it("doesn't count an address already held twice: a change that adds none goes through at two held", async () => {
+        const a = fresh("rye");
+        const b = await business(a);
+        // Two held, and one of them is the address being left, so the
+        // change only renews that hold and adds nothing.
+        for (const [address, days] of [
+            [a, 5],
+            [`${a}-older`, 10],
+        ] as const) {
+            await prisma.addressReservation.create({
+                data: {
+                    organizationId: b.id,
+                    address,
+                    reservedUntil: new Date(Date.now() + days * DAY),
+                },
+            });
+        }
+
+        const view = await service.change(b.owner, `${a}-new`);
+
+        expect(view.address).toBe(`${a}-new`);
+        const after = await holds(b.id);
+        expect(after.map((r) => r.address).sort()).toEqual(
+            [a, `${a}-older`].sort(),
+        );
+        // The left address is held from now, for the full window.
+        const left = after.find((r) => r.address === a);
+        expect(left!.reservedUntil.getTime()).toBeGreaterThan(
+            Date.now() + 80 * DAY,
+        );
+    });
+
+    it("names the day enough holds have run out, when a change would add two", async () => {
+        const slug = fresh("rye");
+        // A site on a variant: the change would hold both addresses.
+        const b = await business(slug, { siteAt: `${slug}-site` });
+        await prisma.businessProfile.create({
+            data: { organizationId: b.id, timezone: "Pacific/Auckland" },
+        });
+        const sooner = new Date(Date.now() + 10 * DAY);
+        // 11:30pm UTC: already the next day in Auckland.
+        const later = DateTime.fromJSDate(new Date(Date.now() + 20 * DAY))
+            .toUTC()
+            .set({ hour: 23, minute: 30, second: 0, millisecond: 0 })
+            .toJSDate();
+        for (const [address, until] of [
+            [`${slug}-one`, sooner],
+            [`${slug}-two`, later],
+        ] as const) {
+            await prisma.addressReservation.create({
+                data: { organizationId: b.id, address, reservedUntil: until },
+            });
+        }
+
+        const body = await conflict(service.change(b.owner, `${slug}-new`));
+
+        // Two held, two to add: both must run out, so it is the later one,
+        // and its day in the business's zone.
+        const day = DateTime.fromJSDate(later)
+            .setZone("Pacific/Auckland")
+            .toFormat("d LLL yyyy");
+        expect(body.message).toBe(
+            `You can change your address again on ${day}`,
+        );
+        expect(body.details).toMatchObject({
+            reason: "limit",
+            availableOn: later.toISOString(),
+        });
     });
 
     it("takes another business's hold once it has run out, replacing the row", async () => {
