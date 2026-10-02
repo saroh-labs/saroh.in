@@ -18,7 +18,7 @@ catalog:
     postcss: ^8
     typescript: ^5
     "react-icons": ^5.2.1
-    eslint-config-next: ^16.3.4
+    eslint-config-next: ^16.3.6
     # v5, not v3. `app.saroh.in` and `packages/ui` both moved off this catalog
     # entry to ^5.4.0 and left it stale, so `saroh.in` — the only consumer still
     # on `catalog:` — was resolving 3.10.0. That version declares no `zod`
@@ -49,7 +49,7 @@ catalogs:
         next: 15.5.24
 
     next16:
-        next: 16.3.4
+        next: 16.3.6
 
     prisma:
         prisma: 7.9.1

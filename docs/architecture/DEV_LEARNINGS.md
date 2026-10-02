@@ -2209,6 +2209,7 @@ from today's month, and the specs pinned the month they were written in.
 **Rule**: a spec that reads the real clock asserts only what holds every
 day, or passes a fixed date in.
 **Category**: tests · invoices
+
 ## Sites — a site lock that the publish's own UPDATE upgraded could deadlock (release review)
 
 **Symptom**: found in the review of the release-review fixes, before it
@@ -2258,3 +2259,17 @@ go; run it five times, and five times with the fix removed
 fails on a new `setTimeout` in a `*.db.spec.ts`; the specs that slept before
 are listed there and come off as they move.
 **Category**: tests · concurrency
+
+## Deps — a critical Next.js advisory failed CI on a tree the local gate had passed
+
+**Problem**: #771's CI failed "Dependency audit (critical only)": GHSA-vcvr-r3jv-pc5j, remote code
+execution in `next/og` ImageResponse, Next.js `>=16.2.0 <16.3.6`; we were on 16.3.4. The local gate
+had passed the same tree an hour earlier.
+**Root cause**: the advisory was published after the tree passed, and `scripts/prepush.sh` had no
+audit at all; only CI ran one.
+**Fix**: Next 16 → 16.3.6 (the `next16` catalog, the three apps pinning `^16.3.4`, and
+`eslint-config-next` / `@next/eslint-plugin-next`). `prepush` gains an `audit` step, the same rule as
+CI's (critical fails, an unreachable registry warns), and never cached.
+**Rule**: a check whose answer changes with the outside world (advisories, leaks) is never cached
+by tree.
+**Category**: deps · security · gate

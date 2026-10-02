@@ -141,15 +141,16 @@ FAILED=""
 cached() {
     local s t
     [ "$USE_CACHE" = 1 ] && [ -n "$TREE" ] || return 1
-    # Never cached: a leak lives in history, and a build is a means.
-    case "$1" in secrets | int-build | deps) return 1 ;; esac
+    # Never cached: a leak lives in history, an advisory is published after
+    # the tree passed, and a build is a means.
+    case "$1" in secrets | audit | int-build | deps) return 1 ;; esac
     for t in $SAME_CODE; do
         for s in "$@"; do [ -f "$PASSES/$t-$s" ] && return 0; done
     done
     return 1
 }
 record() {
-    case "$1" in secrets | int-build | deps) return 0 ;; esac
+    case "$1" in secrets | audit | int-build | deps) return 0 ;; esac
     [ -n "$TREE" ] && date +%s >"$PASSES/$TREE-$1"; return 0
 }
 say() { printf '=== %-16s %s\n' "$1" "$2"; }
@@ -692,6 +693,24 @@ if command -v gitleaks >/dev/null 2>&1; then
 else
     echo "=== secrets          SKIP — install gitleaks (brew install gitleaks); CI runs it"
 fi
+
+# CI's dependency audit (critical only), the same rule: a critical advisory
+# fails; an unreachable registry is a warning. Never cached, because a new
+# advisory fails a tree that passed yesterday (#771, Next.js next/og RCE).
+audit_critical() {
+    local out attempt
+    for attempt in 1 2 3; do
+        if out=$(pnpm audit --audit-level critical 2>&1); then return 0; fi
+        if ! printf '%s' "$out" | grep -qE 'ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND|FetchError'; then
+            printf '%s\n' "$out" | grep -E '│ (critical|Package|Vulnerable|Patched)|More info|Severity'
+            return 1
+        fi
+        sleep 10
+    done
+    echo "audit: registry unreachable; CI will run it"
+    return 0
+}
+step audit audit_critical
 
 E2E_DIR=${PREPUSH_E2E_DIR:-${TMPDIR:-/tmp}/saroh-prepush-e2e}
 if [ "$E2E" = 1 ]; then
