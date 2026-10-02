@@ -2190,3 +2190,14 @@ PROCESSING (`subscriptions.charge.db.spec.ts`, `mandate-charges.db.spec.ts`).
 **Rule**: once money may have moved, finding out comes before every other
 gate. A "may we still charge?" check never decides whether to look.
 **Category**: payments · autopay · jobs
+
+## Invoices — number-format specs failed on 1 October
+
+**Problem**: `numbering.spec.ts` and `invoice-number.test.ts` began failing
+on 2026-10-01 with no code change: "RC/26-27/10/…" where "09" was expected.
+**Root cause**: `numberFormatProblem` and `longestNumber` build their example
+from today's month, and the specs pinned the month they were written in.
+**Fix**: those assertions match any month (`\d{2}`).
+**Rule**: a spec that reads the real clock asserts only what holds every
+day, or passes a fixed date in.
+**Category**: tests · invoices
