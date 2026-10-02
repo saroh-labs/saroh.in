@@ -35,7 +35,9 @@ describe("SellsFromRow (P4)", () => {
         const html = row({ storefront: null, choices: [online, hill] }, true);
         expect(html).toContain('id="sells-from"');
         expect(html).toContain("Not live");
-        expect(html).toContain(SHOP_AWAITS_SELLS_FROM.replace("'", "&#x27;"));
+        expect(html).toContain(
+            SHOP_AWAITS_SELLS_FROM.replaceAll("'", "&#x27;"),
+        );
         // The question is still there to answer.
         expect(html).toContain(
             "Which location does your online shop sell from?",

@@ -12,7 +12,8 @@
     "exports": {
         ".": "./src/index.ts",
         "./tailwind-preset": "./src/tailwind-preset.ts",
-        "./test-release-words": "./src/test-release-words.ts"
+        "./test-release-words": "./src/test-release-words.ts",
+        "./url-path": "./src/url-path.ts"
     },
     "scripts": {
         "lint": "eslint src/",

@@ -23,6 +23,9 @@ import { SitesService } from "./sites.service";
 import { hashTestReleaseToken } from "./test-release-links";
 import { TestReleasesService } from "./test-releases.service";
 
+/** Every character a RegExp reads specially, escaped. */
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const sites = new SitesService({
     check: jest.fn().mockResolvedValue(true),
     can: jest.fn().mockResolvedValue(true),
@@ -219,7 +222,7 @@ describe("making a test release (DEC-071, T2)", () => {
         expect(made.link.state).toBe("active");
         expect(made.link.url).toMatch(
             new RegExp(
-                `^https://test--${b.site.subdomain}\\.${rendererHost().replace(/\./g, "\\.")}/\\?release=`,
+                `^https://test--${b.site.subdomain}\\.${escapeRegExp(rendererHost())}/\\?release=`,
             ),
         );
         expect(made.link.urls).toEqual([made.link.url]);

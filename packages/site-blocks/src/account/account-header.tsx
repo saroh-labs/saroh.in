@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
+import { trimTrailingSlashes } from "../url-path";
 import type { AccountTab } from "./model";
 import { firstName } from "./model";
 import { currentTab } from "./tab-bar";
@@ -30,7 +31,7 @@ export function accountTitle(
     tabs: AccountTab[],
     name: string | null,
 ): string {
-    const path = (pathname ?? "").replace(/\/+$/, "");
+    const path = trimTrailingSlashes(pathname ?? "");
     if (path.startsWith("/account/receipts/")) return "Receipt";
     const tab = currentTab(path === "" ? null : path, tabs);
     if (tab === "home") {

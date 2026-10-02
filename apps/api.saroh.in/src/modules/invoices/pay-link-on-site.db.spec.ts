@@ -70,6 +70,9 @@ import { InvoicesController } from "./invoices.controller";
 import { InvoicesService } from "./invoices.service";
 import { hashPayToken } from "./pay-token";
 
+/** Every character a RegExp reads specially, escaped. */
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const tag = `${process.pid}x${Date.now() % 100000}`;
 
 const comms = new CommunicationsService();
@@ -294,9 +297,7 @@ describe("pay links on the business's address (DEC-069, L7)", () => {
             await issued(owner, contactId),
         );
         expect(copied.url).toMatch(
-            new RegExp(
-                `^${origin.replace(/\./g, "\\.")}/pay/[A-Za-z0-9_-]{43}$`,
-            ),
+            new RegExp(`^${escapeRegExp(origin)}/pay/[A-Za-z0-9_-]{43}$`),
         );
 
         // A booking's "Send a pay link".
