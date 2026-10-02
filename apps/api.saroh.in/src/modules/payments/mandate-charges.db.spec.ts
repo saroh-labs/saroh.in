@@ -34,6 +34,7 @@ import {
     earliestDebitAt,
     MandateChargesService,
 } from "./mandate-charges.service";
+import { applyMandateChangeInTx } from "./mandate-events";
 import { MandateSetupService } from "./mandate-setup.service";
 import { MandatesService } from "./mandates.service";
 import { PaymentsService } from "./payments.service";
@@ -634,6 +635,68 @@ describe("what is never charged", () => {
             ),
         );
 
+        expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
+    });
+
+    it("a cancel the provider reports closes the mandate's prepared charges (code review)", async () => {
+        const who = await autopayMember();
+        const invoice = await invoiceFor(who);
+        const prepared = await prepare(who.mandateId, invoice.id);
+        if (prepared.status !== "PREPARED") throw new Error("not prepared");
+        const mandate = await prisma.paymentMandate.findUniqueOrThrow({
+            where: { id: who.mandateId },
+        });
+
+        await prisma.$transaction((tx) =>
+            applyMandateChangeInTx(tx, owner.organizationId, "RAZORPAY", {
+                status: "CANCELLED",
+                providerMandateId: mandate.providerMandateId ?? undefined,
+            }),
+        );
+
+        expect(
+            await prisma.paymentMandate.findUniqueOrThrow({
+                where: { id: who.mandateId },
+            }),
+        ).toMatchObject({ status: "CANCELLED", cancelReason: "PROVIDER" });
+        expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
+    });
+
+    it("a new mandate made active closes the old one's prepared charges (code review)", async () => {
+        const who = await autopayMember();
+        const invoice = await invoiceFor(who);
+        const prepared = await prepare(who.mandateId, invoice.id);
+        if (prepared.status !== "PREPARED") throw new Error("not prepared");
+
+        // The customer authorises a new mandate in place of the old one.
+        const view = await setups.createSetup({
+            organizationId: owner.organizationId,
+            subscriptionId: who.subscriptionId,
+            method: "UPI",
+            maxAmountCents: 180_000,
+        });
+        const setup = fake.authorise(`fake_setup_${view.mandateId}`);
+        await prisma.$transaction((tx) =>
+            applyMandateChangeInTx(tx, owner.organizationId, "RAZORPAY", {
+                status: "ACTIVE",
+                setupReference: setup.setupReference,
+                providerMandateId: setup.providerMandateId,
+                method: "UPI",
+            }),
+        );
+
+        expect(
+            await prisma.paymentMandate.findUniqueOrThrow({
+                where: { id: who.mandateId },
+            }),
+        ).toMatchObject({ status: "CANCELLED", cancelReason: "REPLACED" });
+        expect(
+            (
+                await prisma.paymentMandate.findUniqueOrThrow({
+                    where: { id: view.mandateId },
+                })
+            ).status,
+        ).toBe("ACTIVE");
         expect((await intentOf(prepared.intentId)).status).toBe("CANCELLED");
     });
 
