@@ -14,6 +14,9 @@ describe("mediaSrc", () => {
             "blob:https://app.saroh.in/1234",
         );
         expect(mediaSrc("/uploads/a.jpg")).toBe("/uploads/a.jpg");
+        expect(mediaSrc("https://cdn.example.com/a.jpg?w=200#x")).toBe(
+            "https://cdn.example.com/a.jpg?w=200#x",
+        );
     });
 
     it("draws nothing for script, data, a protocol-relative host or nonsense", () => {

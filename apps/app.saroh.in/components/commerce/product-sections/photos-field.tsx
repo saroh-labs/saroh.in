@@ -11,6 +11,7 @@ import { useEffect, useId, useState } from "react";
 import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { listLibrary } from "@/lib/media/actions";
+import { mediaSrc } from "@/lib/media/media-src";
 import type { LibraryItem } from "@/lib/media/service";
 import type { PhotoDraft } from "@/lib/products/editor-sections";
 import {
@@ -430,7 +431,13 @@ export function AddressPanel({
                     type="button"
                     size="sm"
                     disabled={!valid}
-                    onClick={() => onAdd(url.trim(), alt.trim())}
+                    onClick={() => {
+                        // What's stored is the address rebuilt behind https://,
+                        // never the text as typed (release #772).
+                        const safe = mediaSrc(url);
+                        if (safe?.startsWith("https://"))
+                            onAdd(safe, alt.trim());
+                    }}
                 >
                     Add photo
                 </Button>

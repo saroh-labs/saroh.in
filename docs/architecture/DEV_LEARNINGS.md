@@ -2307,4 +2307,11 @@ app). `MediaThumb` loads only from `mediaSrc()`: `https:`, `http:`, `blob:` or a
 otherwise nothing (`lib/products/media-src.ts`, with a test).
 **Rule**: a URL from a merchant or the DOM goes through an allow-list before it reaches `src` or
 `href`; a guard that protects a sink lives next to the sink, not only in a helper upstream.
+**Follow-up (#774 → #772)**: CodeQL still flagged both lines, and a third (`media-picker.tsx`, a
+picked file's `blob:` address). An allow-list that returns the value it checked is not a sanitiser to
+CodeQL; a value rebuilt behind a constant scheme is. `mediaSrc` (now `lib/media/media-src.ts`) returns
+`https://…`, `http://…`, `blob:…` or `/…` built from fixed prefixes, the photo field stores that
+rebuilt address rather than the text typed, and the picker's probe reads through it. The SARIF code
+flow (`gh api -H "Accept: application/sarif+json" …/code-scanning/analyses/<id>`) names the real
+source, which the alert page doesn't.
 **Category**: security · CodeQL
