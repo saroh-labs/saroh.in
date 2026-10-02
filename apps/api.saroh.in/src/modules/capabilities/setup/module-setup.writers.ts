@@ -229,13 +229,18 @@ async function writeAppointments(
         select: { timezone: true },
     });
     const priced = setup.service.price !== "";
+    // Priced in the business's currency, as Sell's storefront is: a
+    // business that sells in pounds takes bookings in pounds.
+    const currency = priced
+        ? ((await businessCurrency(tx, organizationId)) ?? DEFAULT_CURRENCY)
+        : null;
     const service = await tx.service.create({
         data: {
             organizationId,
             name: setup.service.name,
             durationMinutes: setup.service.durationMinutes,
             priceCents: priced ? toMinor(setup.service.price) : null,
-            currency: priced ? DEFAULT_CURRENCY : null,
+            currency,
             timezone: profile?.timezone ?? DEFAULT_TIMEZONE,
             status: "ACTIVE",
         },

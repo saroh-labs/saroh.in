@@ -31,7 +31,10 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { failedRenewals } from "../home/home-money-sources";
 import { InvoicesService } from "../invoices/invoices.service";
-import { chargeUnderWayOn } from "../payments/charge-under-way";
+import {
+    CHECKOUT_LIFE_MS,
+    chargeUnderWayOn,
+} from "../payments/charge-under-way";
 import { MandateChargesService } from "../payments/mandate-charges.service";
 import { MandateSetupService } from "../payments/mandate-setup.service";
 import { PaymentsService } from "../payments/payments.service";
@@ -233,6 +236,16 @@ const eventsOf = async (subscriptionId: string) =>
     ).map((e) => e.kind);
 
 const calls = (op: string) => fake.mandateCalls.filter((c) => c.op === op);
+
+/**
+ * Paid by hand, so this renewal leaves Home's failed renewals: Home shows
+ * only the first few, and later specs read it.
+ */
+const offHome = (invoiceId: string) =>
+    prisma.invoice.update({
+        where: { id: invoiceId },
+        data: { status: "PAID", paidAt: new Date() },
+    });
 
 /** Prepare, deliver the notice, debit: the charge as far as the bank. */
 async function chargeToBank(invoiceId: string) {
@@ -527,6 +540,161 @@ describe("a decline", () => {
         );
     });
 
+    it("Retry by autopay is refused while the customer's pay-link checkout is open", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        const { orderId } = await chargeToBank(invoice.id);
+        fake.answerCharge(orderId, "FAILED");
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: orderId,
+        });
+
+        // The customer opens the pay link's checkout, and hasn't paid yet.
+        const { token } = await invoices.createPayLink(owner, invoice.id);
+        await publicInvoices.createIntent(token, {});
+        const checkout = await prisma.paymentIntent.findFirstOrThrow({
+            where: { invoiceId: invoice.id, viaMandateId: null },
+        });
+        expect(["CREATED", "REQUIRES_PAYMENT"]).toContain(checkout.status);
+
+        // The screen offers the link, not a Retry that would be refused.
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("PAY_LINK");
+
+        // Retry by autopay would debit them as well: refused, nothing queued.
+        await expect(
+            subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
+        ).rejects.toThrow(
+            "The customer is paying this by link. Wait for that payment, or make a new pay link.",
+        );
+        expect(await intentsOf(invoice.id)).toHaveLength(1);
+        expect(
+            (await chargeJobs(invoice.id)).map(
+                (j) => (j.payload as { step: string }).step,
+            ),
+        ).not.toContain("PREPARE");
+    });
+
+    it("a checkout abandoned past its life no longer keeps autopay off the invoice (code review)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        const { orderId } = await chargeToBank(invoice.id);
+        fake.answerCharge(orderId, "FAILED");
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: orderId,
+        });
+        // The customer opened the pay link's checkout and walked away.
+        const { token } = await invoices.createPayLink(owner, invoice.id);
+        await publicInvoices.createIntent(token, {});
+        const checkout = await prisma.paymentIntent.findFirstOrThrow({
+            where: { invoiceId: invoice.id, viaMandateId: null },
+        });
+        expect(checkout.status).toBe("REQUIRES_PAYMENT");
+        await prisma.paymentIntent.update({
+            where: { id: checkout.id },
+            data: { createdAt: new Date(Date.now() - CHECKOUT_LIFE_MS - HOUR) },
+        });
+
+        // Autopay is offered again, and Retry by autopay queues a charge.
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("MANDATE");
+        await expect(
+            subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
+        ).resolves.toEqual({
+            invoiceId: invoice.id,
+            via: "MANDATE",
+            token: null,
+        });
+        expect(await intentsOf(invoice.id)).toHaveLength(2);
+        await offHome(invoice.id);
+    });
+
+    it("a checkout whose first attempt failed still blocks a card's Retry by autopay: its order takes another (code review)", async () => {
+        // A card: no notice, so a Retry would be debited at once.
+        fake.preDebitMethods.clear();
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        const [charged] = await intentsOf(invoice.id);
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: charged.providerIntentId,
+        });
+        expect((await intentsOf(invoice.id))[0].status).toBe("FAILED");
+
+        // The customer's first try in the pay link's checkout fails; the
+        // checkout stays open on the same Razorpay order.
+        const { token } = await invoices.createPayLink(owner, invoice.id);
+        await publicInvoices.createIntent(token, {});
+        const checkout = await prisma.paymentIntent.findFirstOrThrow({
+            where: { invoiceId: invoice.id, viaMandateId: null },
+        });
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: checkout.providerIntentId,
+        });
+        expect(
+            (
+                await prisma.paymentIntent.findUniqueOrThrow({
+                    where: { id: checkout.id },
+                })
+            ).status,
+        ).toBe("FAILED");
+
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("PAY_LINK");
+        const debits = calls("charge").length;
+        await expect(
+            subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
+        ).rejects.toThrow("The customer is paying this by link.");
+        expect(await intentsOf(invoice.id)).toHaveLength(1);
+        expect(calls("charge")).toHaveLength(debits);
+        await offHome(invoice.id);
+    });
+
+    it("a charge that stands aside for an open checkout says so (code review)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        // A checkout open on the invoice, made in the moment before the
+        // charge was queued.
+        await prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                invoiceId: invoice.id,
+                provider: "RAZORPAY",
+                amountCents: 120_000,
+                currency: "INR",
+                status: "REQUIRES_PAYMENT",
+                providerIntentId: `order_link_${next()}`,
+            },
+        });
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        expect(calls("prepareCharge")).toHaveLength(0);
+        expect((await intentsOf(invoice.id))[0].status).toBe("CANCELLED");
+        expect(
+            await prisma.subscriptionEvent.findFirst({
+                where: {
+                    subscriptionId: who.subscriptionId,
+                    kind: "RENEWAL_FAILED",
+                },
+            }),
+        ).toMatchObject({
+            invoiceId: invoice.id,
+            data: { reason: "CHECKOUT_OPEN" },
+        });
+        await offHome(invoice.id);
+    });
+
     it("a notice that fails: no debit, RENEWAL_FAILED (NOTICE_FAILED), the pay link opens", async () => {
         const who = await autopayMember();
         const invoice = await renew(who.subscriptionId);
@@ -629,6 +797,79 @@ describe("an unsure answer", () => {
         expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
         expect(calls("charge")).toHaveLength(2);
         expect((await intentsOf(invoice.id))[0].status).toBe("PROCESSING");
+    });
+
+    it("a debit retried after a crash mid-claim schedules its look-up (release review)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        await runDue(invoice.id);
+        const [intent] = await intentsOf(invoice.id);
+        fake.settlePreDebit(intent.providerIntentId ?? "", "DELIVERED");
+        clock = new Date(clock.getTime() + 27 * HOUR);
+        // The first delivery claimed the debit (PROCESSING) and the worker
+        // died before asking the provider or writing its LOOK; the job is
+        // delivered again.
+        await prisma.paymentIntent.update({
+            where: { id: intent.id },
+            data: { status: "PROCESSING" },
+        });
+        const before = calls("charge").length;
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(before);
+        const waiting = (await chargeJobs(invoice.id)).map(
+            (j) => (j.payload as { step: string }).step,
+        );
+        expect(waiting).toEqual(["LOOK"]);
+
+        // The look-up finds no debit, so it is asked for, once.
+        clock = new Date(clock.getTime() + 2 * HOUR);
+        expect(await runDue(invoice.id)).toEqual(["LOOK"]);
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(before + 1);
+        expect((await intentsOf(invoice.id))[0].status).toBe("PROCESSING");
+    });
+    it("a debit claimed before a crash is still looked up once its mandate is cancelled (code review)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        await runDue(invoice.id);
+        const [intent] = await intentsOf(invoice.id);
+        fake.settlePreDebit(intent.providerIntentId ?? "", "DELIVERED");
+        clock = new Date(clock.getTime() + 27 * HOUR);
+        // Claimed (PROCESSING), and the worker died before asking the
+        // provider or writing its LOOK.
+        await prisma.paymentIntent.update({
+            where: { id: intent.id },
+            data: { status: "PROCESSING" },
+        });
+        // Before the job comes again, the customer cancels autopay.
+        const mandate = await prisma.paymentMandate.findUniqueOrThrow({
+            where: { id: who.mandateId },
+        });
+        await webhook({
+            eventType: "token.cancelled",
+            outcome: "MANDATE",
+            mandate: {
+                status: "CANCELLED",
+                providerMandateId: mandate.providerMandateId,
+            },
+        });
+        expect((await intentsOf(invoice.id))[0].status).toBe("PROCESSING");
+
+        const before = calls("charge").length;
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(before);
+        expect(
+            (await chargeJobs(invoice.id)).map(
+                (j) => (j.payload as { step: string }).step,
+            ),
+        ).toEqual(["LOOK"]);
+
+        // The look-up finds no debit; the charge is let go, never debited.
+        clock = new Date(clock.getTime() + 2 * HOUR);
+        expect(await runDue(invoice.id)).toEqual(["LOOK"]);
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(before);
+        expect((await intentsOf(invoice.id))[0].status).toBe("CANCELLED");
     });
 });
 

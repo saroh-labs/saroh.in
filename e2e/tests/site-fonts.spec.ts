@@ -111,7 +111,7 @@ test.describe("merchant sites load no Saroh font", () => {
         page,
     }, testInfo) => {
         test.skip(
-            testInfo.project.name === "phone",
+            testInfo.project.name.startsWith("phone"),
             "The site editor is a desk screen; one run is enough.",
         );
         await useSession(page);

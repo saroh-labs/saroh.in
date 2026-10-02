@@ -49,8 +49,38 @@ export type LiveSource = "publish" | "restore" | "go-live";
 /** What `putLive` needs of a transaction client, and nothing more. */
 export type LiveTx = Pick<
     Prisma.TransactionClient,
-    "publication" | "site" | "siteApproval" | "auditEvent"
+    "publication" | "site" | "siteApproval" | "auditEvent" | "$queryRaw"
 >;
+
+/**
+ * Lock the site's row for the rest of the transaction, so publish, restore
+ * and go-live (by hand or scheduled) put a version live one at a time.
+ *
+ * `putLive` takes it first. A caller that decides from the live pointer
+ * whether to go live at all (the scheduled go-live, KTD-14) takes it before
+ * it reads the pointer, so a publish can't commit between its check and its
+ * write. Under READ COMMITTED, a read after the lock sees whatever the
+ * previous holder committed.
+ *
+ * FOR UPDATE, at the strength of the write it guards. `putLive` ends by
+ * setting `currentPublicationId`, which is `@unique`
+ * (`Site_currentPublicationId_key`), so Postgres takes that UPDATE as a key
+ * update, which needs FOR UPDATE. A weaker lock here (FOR NO KEY UPDATE)
+ * would be upgraded mid-transaction, and the upgrade deadlocks (40P01) with
+ * a transaction that inserted a row naming the site (FOR KEY SHARE, for the
+ * foreign key) and then writes the Site: a web-address change does exactly
+ * that. Taken at full strength from the start, the publish waits for such a
+ * transaction before holding anything it needs, and the two queue. An
+ * insert naming the site waits while a version goes live, which the UPDATE
+ * would make it do anyway (`backend-data-and-money.md`, locks;
+ * `live-pointer.db.spec.ts`).
+ */
+export async function lockSite(
+    tx: Pick<Prisma.TransactionClient, "$queryRaw">,
+    siteId: string,
+): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "Site" WHERE id = ${siteId} FOR UPDATE`;
+}
 
 /**
  * Which rule "Publishing needs approval" applies (R10): a publish or a
@@ -142,6 +172,9 @@ export async function putLive(
         throw new ForbiddenException(OVERRIDE_OWNER_ONLY_MESSAGE);
     }
     const gate = gateOf(input.source);
+    // One version goes live at a time, and every read below is of what the
+    // previous one left.
+    await lockSite(tx, site.id);
 
     const [settings, verdicts] = await Promise.all([
         tx.site.findUniqueOrThrow({

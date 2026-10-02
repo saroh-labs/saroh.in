@@ -1493,7 +1493,8 @@ asserts), it passes without checking them.
 **Fix**: `project.name.startsWith("phone")` in the spec.
 **Rule**: in a spec that can be @serial, test the project with
 `startsWith("phone")`. The other `=== "phone"` checks in @serial specs are
-worth the same change.
+worth the same change. (Now a lint rule: see "the rule written down, not
+enforced", below.)
 **Category**: e2e · tests
 
 ## E2E — a business a test sets up has no modules and no rollout flags (L4)
@@ -1842,6 +1843,7 @@ it the body the controller returns, envelope and all.
 **Rule**: a lenient decoder's test uses the producer's real body (copy it
 from the controller spec), never a shape written from the consumer's side.
 **Category**: contract · app↔api · tests
+
 ## e2e — a new test release already reads Approved (T12)
 
 **Problem**: `site-review.spec.ts`'s new test passed on desk-serial and
@@ -1856,3 +1858,418 @@ release has bytes no other run has, and puts the draft back.
 **Rule**: a spec that reviews a test release makes the release's content
 its own (a stamped section), never a release of the seed's draft as it is.
 **Category**: e2e · test releases · own data
+
+## Sites — a scheduled go-live could replace a fix published while it ran (release review)
+
+**Symptom**: found in the production release review, not in use (behind
+`SITE_TEST_RELEASES`). A merchant publishes a price fix at the moment a
+scheduled older test release goes live; the job's "published since?"
+check passed, and the release then repointed the site over the fix.
+**Cause**: check-then-act without a shared lock. The job locked only its
+`SiteTestRelease` row and read `Site.currentPublicationId` unlocked; publish
+and restore never touch that row, and `putLive` didn't lock the site. A
+publish that committed between the job's read and its `putLive` was
+overwritten, which KTD-14 says must never happen.
+**Fix**: `lockSite` (`sites/live-pointer.ts`) takes the Site row FOR NO KEY
+UPDATE; `putLive` takes it first, so every way of going live is serialised
+per site, and the job takes it before it reads the pointer, so a publish in
+flight is either committed and seen ("The site was published at …") or
+waits. (It first took FOR NO KEY UPDATE, so inserts naming the site would
+not wait on a publish; that deadlocked, and it is FOR UPDATE now: see
+"a site lock that the publish's own UPDATE upgraded" below.)
+**Rule**: a job that decides from a row whether to write must take the lock
+the competing writers take, before it reads. Pinned by
+`test-release-schedule.db.spec.ts` "doesn't go live over a publish that
+commits while it runs".
+**Category**: sites · jobs · concurrency
+
+## Autopay — a debit could be asked for after the mandate was cancelled (release review)
+
+**Symptom**: found in the production release review, behind
+`RAZORPAY_AUTOPAY`. A customer cancels autopay while the charge job is
+asking the provider whether the pre-debit notice was delivered; the job
+then claims the charge and the bank is asked for the money anyway.
+**Cause**: `MandateChargesService.charge` checked "mandate ACTIVE" and
+"invoice ISSUED" on its first read, made a provider round trip
+(`getPreDebit`), and then claimed REQUIRES_PAYMENT → PROCESSING on the
+intent's status alone. The cancel paths moved the mandate to CANCELLED but
+left its prepared charge REQUIRES_PAYMENT, so nothing stopped the claim.
+**Fix**: the claim's `updateMany` WHERE carries both guards
+(`viaMandate: { is: { status: "ACTIVE" } }`, `invoice: { is: { status:
+"ISSUED" } }`); a refused claim is re-read and answered REFUSED with the
+reason. Every in-transaction cancel (`cancelMandatesInTx`, which the cancel
+job, `cancelFor` and the subscription paths use; REPLACED and a provider's
+own cancel in `mandate-events.ts`) calls `cancelOpenCharges`, which moves
+the mandate's REQUIRES_PAYMENT charges to CANCELLED, so the claim and the
+cancel meet on the intent's row lock.
+**Rule**: a guard read before a provider call is re-asked in the WHERE of
+the conditional write that commits to money. Pinned by
+`mandate-charges.db.spec.ts` "a mandate cancelled after the checks, before
+the claim" and "an invoice voided after the checks".
+**Category**: payments · autopay · concurrency
+
+## Autopay — Retry by autopay while the customer's pay-link checkout was open (release review)
+
+**Symptom**: found in the production release review, behind
+`RAZORPAY_AUTOPAY`. After a failed renewal the customer opens the pay
+link's checkout; staff then click Retry by autopay. A card mandate is
+debited at once, the customer finishes the checkout too, and the second
+capture is only recorded as owed back.
+**Cause**: "one charge at a time" (`charge-under-way.ts`) ran one way:
+an open autopay charge refused new pay-link intents, but nothing asked
+whether a pay-link intent was already open before queueing, preparing or
+debiting an autopay charge. `queueInTx` looked only for open mandate
+intents.
+**Fix**: the smallest safe version — refuse, don't retire. `checkoutOpenOn`
+/ `OPEN_CHECKOUT_WHERE` (a non-mandate, non-`purpose` intent still CREATED,
+REQUIRES_PAYMENT or PROCESSING) makes `queueInTx` answer `CHECKOUT_OPEN`
+(Retry: 409 "The customer is paying this by link…"), `prepareCharge`
+refuse before the provider order, and `charge()`'s PROCESSING claim carry
+`invoice.paymentIntents: { none: OPEN_CHECKOUT_WHERE }` in its WHERE, so a
+checkout opened in a race is caught at the claim. Retiring the pay link
+was left out: a checkout already open holds its provider order, so a
+retired token wouldn't stop it, and new pay-link intents are already
+refused while a charge is under way. The cost: a checkout the customer
+abandoned stays open and keeps autopay off that invoice; the pay link is
+the way, as before autopay.
+**Rule**: "one at a time" between two ways to pay is checked from both
+sides, and on the side that moves money, in the claim's WHERE. Pinned by
+`subscriptions.charge.db.spec.ts` "Retry by autopay is refused while the
+customer's pay-link checkout is open" and `mandate-charges.db.spec.ts`
+"a pay-link checkout …".
+**Category**: payments · autopay · subscriptions
+
+## Turn on — Bookings priced the first service in INR for every business (release review)
+
+**Symptom**: found in the production release review. A business that sells
+in pounds turns Bookings on with a price in the sheet; its first service is
+stored in INR, and its booking page shows (and would charge) rupees.
+**Cause**: `writeAppointments` (`capabilities/setup/module-setup.writers.ts`)
+wrote the file's `DEFAULT_CURRENCY` constant. `writeCommerce`, a screen
+above it in the same file, already read `businessCurrency` first; the
+second writer copied the fallback, not the rule.
+**Fix**: `(await businessCurrency(tx, organizationId)) ?? DEFAULT_CURRENCY`,
+read only when the service is priced.
+**Rule**: a default currency is the last fallback after the business's own
+(`stores/currency.ts`), never the value. Pinned by `module-setup.db.spec.ts`
+"prices the first service in the business's currency, not INR".
+**Category**: capabilities · money
+
+## Web address — moving back to an own expired address said "is taken" once, under RLS (release review)
+
+**Symptom**: found in the production release review, behind
+`WEB_ADDRESS_CHANGE`. With RLS enforced, a business moving back to an
+address it held more than 90 days ago got "<address>.saroh.app is taken"
+on the first try, and succeeded on the second.
+**Cause**: `releaseExpired` reads and deletes across businesses, so under
+RLS it runs on another connection (`acrossBusinesses`), outside the
+change's serializable transaction. It committed the delete of the expired
+hold after the transaction's snapshot; the transaction's own
+`deleteMany({ organizationId, address })` then touched that row again, and
+Postgres failed it as a concurrent delete (40001), which `isRaceLost`
+turns into "is taken". A plain run shares one connection, so only the RLS
+suite could see it.
+**Fix**: `WebAddressService.change` calls `releaseExpired` before it opens
+the transaction, and the own-row deletes (the change back, and `hold`)
+match only live holds (`reservedUntil > now`), leaving expired ones to
+`releaseExpired`.
+**Rule**: inside a serializable transaction, never write a row another
+connection may have just deleted: clear across businesses before the
+transaction, and scope in-transaction writes away from what that clearing
+owns. Pinned by `web-address.service.db.spec.ts` "moves back to its own
+address whose hold has run out, first time" (fails only under
+`TEST_RLS=on`).
+**Category**: organizations · RLS · transactions
+
+## Web address — one change could leave three old addresses held (release review)
+
+**Symptom**: found in the production release review, behind
+`WEB_ADDRESS_CHANGE`. A business whose site sits on a variant of its setup
+address (`rye` and `rye-site`), already holding one old address, changes
+again and ends up holding three: more than `MAX_HELD_ADDRESSES` (KTD-9)
+keeps away from every other business.
+**Cause**: the limit counted only the holds that already existed
+(`held.length >= MAX_HELD_ADDRESSES`), assuming each change adds one. A
+change holds the site's address and, when it differs, the setup address
+too: two.
+**Fix**: `WebAddressService.move` counts what this change adds (the site's
+subdomain, and `org.slug` unless it is the new address; less any already
+held) and refuses when `held.length + added > MAX_HELD_ADDRESSES`, naming
+the day enough holds have run out.
+**Rule**: a cap is checked against the state after the write, not before
+it; count what the write adds. Pinned by `web-address.service.db.spec.ts`
+"counts both holds a change would add".
+**Category**: organizations · limits
+
+## App — a test-release sheet stuck on "Going live…" when the API was down
+
+**Problem**: the release review found that the go-live, schedule, cancel and
+discard actions in the editor's test-release panel left their sheet busy,
+with both buttons disabled, if the API couldn't be reached.
+**Root cause**: `send()` in `lib/sites/test-releases-api.ts` awaited
+`apiFetch` bare. A dropped connection rejects instead of answering, so the
+server action threw and the sheet's `confirm()` never reset `busy`.
+**Fix**: `send()` catches the rejection and returns `{ ok: false }` with
+`SEND_UNREACHABLE`, like the read beside it already did
+(`test-releases-api.test.ts`).
+**Rule**: a server action's API call returns a result for every outcome,
+the unreachable one included; a sheet never depends on a throw to leave its
+busy state.
+**Category**: frontend · error feedback
+
+## Payments — the pending sweep asks the same failing intents every minute
+
+**Problem**: (release review) an intent whose lookup threw — its business's
+credentials no longer decrypted, or a reconcile refused — was counted as an
+ERROR and asked again on the very next run, every 60 seconds. Enough of them
+filled `SWEEP_BATCH`, so the sweep re-ran at once and never reached the
+healthy intents behind them.
+**Root cause**: `lookUpAll` caught the throw but never stamped
+`lastLookupAt`. The sweep orders by `lastLookupAt` nulls first, so an
+unstamped intent is always first in line. The provider's own failure
+(ERROR from `lookUp`) was stamped; only the throw path wasn't.
+**Fix**: the catch stamps `lastLookupAt` best-effort (its own error
+swallowed), so a throwing intent waits for its tier's next turn.
+**Rule**: every outcome of a scheduled per-row attempt, a throw included,
+moves the row's "last tried" marker; a query that orders by it can
+otherwise be monopolised. Test: `payment-lookup.db.spec.ts` ("an intent
+whose ask throws takes its turn").
+**Category**: jobs · payments · starvation
+
+## Payments — a provider that never answers holds the sweep forever
+
+**Problem**: (release review) the pending-payment sweep, a hold's release
+and the autopay steps call Razorpay and Cashfree with a bare `fetch`. A
+provider that accepted the connection and never answered would have held
+the job for as long as the socket lived: the sweep's next run never came,
+and a hold waited on an ask that never finished.
+**Root cause**: Node's `fetch` has no timeout by default, and none of the
+lookup or mandate calls passed a signal.
+**Fix**: `findOrderPayments` (Razorpay and Cashfree) and the Razorpay
+mandate `call()` pass `signal: providerCallSignal()` (15 s,
+`payments/providers/provider-call.ts`). The abort rejects like a dropped
+connection, so the existing network-error path handles it: a lookup's ERROR,
+a mandate call's UNKNOWN. There is no Cashfree mandate adapter yet.
+**Rule**: `backend-integrations.md` — "A provider call has a deadline".
+Tests: `order-payments.spec.ts` and `razorpay-mandates.spec.ts`, with a
+fetch that settles only when its signal aborts.
+**Category**: integrations · payments · timeouts
+
+## Autopay — a debit retried after a crash is never looked up
+
+**Problem**: (release review) a renewal's autopay charge could sit in
+PROCESSING for good. The DEBIT step claims the intent (REQUIRES_PAYMENT →
+PROCESSING) before asking the provider; a worker that died after the claim
+and before writing the LOOK step left the job to be delivered again, and
+that delivery did nothing.
+**Root cause**: on the retry `charge()` finds the intent already claimed
+and answers ALREADY (`intentStatus: PROCESSING`); the handler's ALREADY
+case returned without a next step. No LOOK, so nothing ever asked the
+provider, and the pay link stayed shut behind "Autopay charge in progress".
+**Fix**: `subscription-charge.handler.ts` — ALREADY with PROCESSING
+enqueues the LOOK step, as UNKNOWN does (`enqueueChargeStepInTx` keeps a
+LOOK already waiting). The look-up finds no debit, puts the intent back to
+REQUIRES_PAYMENT and asks for it once.
+**Rule**: a step that claims a row before a side effect must leave a way
+back from every state its crash can leave behind; the redelivery's "already
+claimed" answer schedules the recovery step. `backend-jobs.md` → Autopay
+charges. Test: `subscriptions.charge.db.spec.ts` ("a debit retried after
+a crash mid-claim").
+**Category**: jobs · autopay · crash recovery
+
+## Test releases — the API's write guard was tested everywhere but where it is wired
+
+**Problem**: (release review) `TestHostWriteGuard` had unit specs and a
+route inventory (`test-host.guard.spec.ts`, `test-host-routes.spec.ts`),
+and the browser specs showed the renderer stopping every flow. Nothing
+failed if `main.ts` stopped installing the guard: the renderer's own stops
+never let a browser post from a test host, so the API's refusal was never
+reached in any test.
+**Root cause**: global guards are installed in `bootstrap()`, which only
+the real stack runs; the unit specs construct the guard themselves.
+**Fix**: `e2e/tests/site-test-release.spec.ts` ("the API refuses a test
+host's public write") posts an enquiry straight to the API with
+`Origin: test--northwind.<renderer>` and expects 409 `TEST_RELEASE`, and
+from the live host expects the route's own 404. With the guard removed
+from `main.ts` it fails (404 instead of 409).
+**Rule**: a guard, pipe or filter installed in `main.ts` gets one check
+through the real bootstrap (the e2e stack), besides its unit spec.
+**Category**: e2e · test releases · bootstrap wiring
+
+## e2e — the "phone-serial" rule was written down, and not enforced
+
+**Problem**: (release review) `module-turn-on.spec.ts`, a @serial spec,
+still tested `project.name === "phone"` at its two phone checks (the sheet
+rising full height, the 44px Turn on button), so on `phone-serial` they
+never ran. The entry above named this very file and rule; the prose did
+not stop it.
+**Root cause**: a rule that lives only in DEV_LEARNINGS is read after the
+fact. Nothing failed on an exact project-name comparison.
+**Fix**: every `=== "phone"`, `!== "phone"` and `=== "desk"` in
+`e2e/tests` is now `startsWith(…)` (only module-turn-on was @serial; the
+rest change nothing today but can't go wrong when a spec turns @serial),
+and `e2e/eslint.config.mjs` has a `no-restricted-syntax` rule that fails an
+equality comparison with the literal `"phone"` or `"desk"`. Lint runs on
+`@saroh/e2e` whenever a spec changes (prepush's lint step, CI's static job).
+Once they ran, the phone checks failed at once: the sheet's box was read
+the moment it was visible, mid-way through its slide up (bottom at 1565 on
+an 839px screen). They had never passed, only never run. The spec now
+polls until the sheet's bottom meets the screen's.
+**Rule**: compare a Playwright project by prefix; the lint rule says so. A
+geometry check on an animated sheet polls until it settles.
+**Later** (review of the release-review fixes): the rule matched only a
+quoted literal, so `` === `phone` ``, `"phone" as string`,
+`["phone"].includes(project.name)` and `switch (project.name)` got past it.
+It now matches the expression ending in `project.name` in a comparison with
+anything but a plain literal, in `includes`/`indexOf`, and as a switch's
+subject, besides the desk/phone literal (bare or cast). A plain
+`"phone-serial"` stays allowed.
+**Category**: e2e · tests · lint
+
+## Sites — a scheduled go-live that gave up could hide why
+
+**Problem**: the release review found that on a scheduled go-live's last
+attempt, `recordGaveUp` runs in a fresh transaction inside the catch. When
+the same outage failed that write too, its error replaced the run's own, and
+nothing logged which release was left reading "scheduled".
+**Fix**: `go-live.handler.ts` wraps the record in its own try/catch, logs at
+ERROR with the release id, and rethrows the run's original error
+(`go-live.handler.spec.ts`).
+**Still open**: a backstop that marks a past-due schedule with no live
+`site.go_live` job as NOT_LIVE (a sweep or a read-time check). Behind
+`SITE_TEST_RELEASES`; needed before that flag goes on for everyone.
+**Rule**: a "record the failure" step in a catch never replaces the failure
+it records.
+**Category**: jobs · reliability
+
+## Autopay — an abandoned pay-link checkout kept autopay off the invoice for good
+
+**Problem**: the batch-10 code review found that once a customer opened an
+invoice's pay-link checkout (or a "pay and authorise" one) and walked away,
+autopay could never charge that invoice again. Retry by autopay answered
+409 "The customer is paying this by link" forever, the screen kept offering
+that Retry, and a renewal charge refused for it ended silently.
+**Root cause**: `OPEN_CHECKOUT_WHERE` counted any CREATED, REQUIRES_PAYMENT
+or PROCESSING pay-link intent as open, and nothing ever closes an abandoned
+one: the pending sweep stops asking after `LOOKUP_WINDOW_MS` and never moves
+it. `mandateRetryable` didn't ask about checkouts at all, and the charge
+job's CHECKOUT_OPEN refusal fell into "nothing to say".
+**Fix**: `charge-under-way.ts` now has `openCheckoutWhere()`: open only
+within `CHECKOUT_LIFE_MS` of its creation, which is `LOOKUP_WINDOW_MS` (a
+pay link's Razorpay order has no expiry of its own; the authorise order's
+is a day). `mandateRetryable` answers no while one is open, so Retry offers
+the pay link. The charge job writes RENEWAL_FAILED (`CHECKOUT_OPEN`) when it
+stands aside, so Home and the history say autopay didn't charge
+(`subscriptions.charge.db.spec.ts`).
+**Rule**: a state that blocks money must have a way to end. Bound "open" by
+the provider object's life, and make the screen's offer use the same rule
+as the action it offers.
+**Category**: payments · autopay
+
+## Autopay — a pay-link checkout whose first try failed could still be paid
+
+**Problem**: the batch-10 code review found that a card autopay Retry could
+debit an invoice while the customer was still paying it in the pay link's
+checkout: their first UPI try had failed, so the checkout counted as closed.
+**Root cause**: `payment.failed` moves a pay-link intent to FAILED, but a
+Razorpay checkout retries on the same order, and the customer can still pay
+it. "Open" listed only CREATED, REQUIRES_PAYMENT and PROCESSING.
+**Fix**: `openCheckoutWhere()` counts a FAILED pay-link intent within the
+checkout's life as open too. Nothing looks a FAILED intent up, so the life
+(`CHECKOUT_LIFE_MS`) is what ends it (`subscriptions.charge.db.spec.ts`).
+**Rule**: an intent's status is Saroh's last word on one attempt, not on
+the provider order. Ask whether the order can still take money.
+**Category**: payments · autopay
+
+## Autopay — a crashed debit was never looked up once autopay was cancelled
+
+**Problem**: the batch-10 code review found that a debit claimed
+(PROCESSING) by a run that died before it asked the provider or wrote its
+look-up stayed "Autopay charge in progress" for good if the customer
+cancelled autopay, or the subscription ended, before the job came again.
+**Root cause**: the release-review fix looked such a charge up only when
+`charge()` answered ALREADY. But `debit()` first asked `stillCharging`, which
+lets the charge go when the mandate is no longer chargeable — and `letGo`
+leaves a PROCESSING intent as it is. `charge()`'s claim fallback likewise
+refused (a no-op on PROCESSING) instead of answering ALREADY.
+**Fix**: `debit()` schedules the LOOK for a PROCESSING intent before the
+gate, and the claim fallback answers ALREADY whenever the intent is
+PROCESSING (`subscriptions.charge.db.spec.ts`, `mandate-charges.db.spec.ts`).
+**Rule**: once money may have moved, finding out comes before every other
+gate. A "may we still charge?" check never decides whether to look.
+**Category**: payments · autopay · jobs
+
+## Invoices — number-format specs failed on 1 October
+
+**Problem**: `numbering.spec.ts` and `invoice-number.test.ts` began failing
+on 2026-10-01 with no code change: "RC/26-27/10/…" where "09" was expected.
+**Root cause**: `numberFormatProblem` and `longestNumber` build their example
+from today's month, and the specs pinned the month they were written in.
+**Fix**: those assertions match any month (`\d{2}`).
+**Rule**: a spec that reads the real clock asserts only what holds every
+day, or passes a fixed date in.
+**Category**: tests · invoices
+
+## Sites — a site lock that the publish's own UPDATE upgraded could deadlock (release review)
+
+**Symptom**: found in the review of the release-review fixes, before it
+shipped. A publish (or restore, or go-live) at the moment the business
+changes its web address could fail with `deadlock detected` (40P01), as a
+500 on one side or the other.
+**Cause**: `lockSite` took the Site row FOR NO KEY UPDATE, so inserts naming
+the site (FOR KEY SHARE, for the foreign key) would not wait on a publish.
+But `putLive` then sets `Site.currentPublicationId`, which is `@unique`, and
+Postgres takes an UPDATE of a column in a unique index as a key update,
+which needs FOR UPDATE. The lock was upgraded mid-transaction. A web-address
+change inserts an `AddressReservation` naming the site (KEY SHARE) and then
+sets `Site.subdomain`: the publish, holding NO KEY UPDATE, waited for the
+change's KEY SHARE to upgrade, and the change waited for the publish's NO
+KEY UPDATE to write the Site. Neither could go on.
+**Fix**: `lockSite` takes FOR UPDATE from the start, so a publish waits for
+the change before it holds anything the change needs, and the two queue.
+Pinned by `live-pointer.db.spec.ts` "queues behind a web-address change
+rather than deadlocking with it", which deadlocks every run on the old lock.
+**Rule**: a lock that a later UPDATE in the same transaction will upgrade
+must be taken at the strength of that UPDATE: FOR UPDATE when the
+transaction sets a key column (the primary key or any unique column), FOR
+NO KEY UPDATE only when none of its writes to the row does
+(`backend-data-and-money.md`, "A row lock is taken at the strength of the
+write that follows it").
+**Category**: sites · locks · concurrency
+
+## Tests — a race test that slept could pass with its lock removed (release review)
+
+**Symptom**: the testing review of the release-review fixes ran the KTD-14
+spec ("doesn't go live over a publish that commits while it runs") in its
+head with the lock gone: it would still pass whenever the job was slow.
+**Cause**: the spec held a publish open, started the scheduled go-live, and
+slept 750ms "long enough for the job to read the site and reach its write"
+before committing. If the job had not reached its lock by then (a loaded
+machine, a cold ts-jest, claim latency) it ran after the commit, saw the fix
+as "published since", and the spec passed without the race ever running.
+**Fix**: the spec takes the publish's backend pid and waits until
+`pg_locks` shows a connection waiting on it (`test/lock-wait.ts`,
+`waitUntilBlockedBy`), then commits. It now fails every run with
+`lockSite` removed from the handler. The new `live-pointer.db.spec.ts`
+races are written the same way.
+**Rule**: race tests wait on `pg_locks`, never sleep: hold one side at a
+known point, wait until Postgres shows the other blocked on it, then let
+go; run it five times, and five times with the fix removed
+(`devops-tooling-and-deploy.md`, Tests). `src/common/db-spec-sleeps.spec.ts`
+fails on a new `setTimeout` in a `*.db.spec.ts`; the specs that slept before
+are listed there and come off as they move.
+**Category**: tests · concurrency
+
+## Deps — a critical Next.js advisory failed CI on a tree the local gate had passed
+
+**Problem**: #771's CI failed "Dependency audit (critical only)": GHSA-vcvr-r3jv-pc5j, remote code
+execution in `next/og` ImageResponse, Next.js `>=16.2.0 <16.3.6`; we were on 16.3.4. The local gate
+had passed the same tree an hour earlier.
+**Root cause**: the advisory was published after the tree passed, and `scripts/prepush.sh` had no
+audit at all; only CI ran one.
+**Fix**: Next 16 → 16.3.6 (the `next16` catalog, the three apps pinning `^16.3.4`, and
+`eslint-config-next` / `@next/eslint-plugin-next`). `prepush` gains an `audit` step, the same rule as
+CI's (critical fails, an unreachable registry warns), and never cached.
+**Rule**: a check whose answer changes with the outside world (advisories, leaks) is never cached
+by tree.
+**Category**: deps · security · gate

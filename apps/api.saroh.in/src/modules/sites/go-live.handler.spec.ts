@@ -205,4 +205,14 @@ describe("GoLiveHandler", () => {
         ).rejects.toThrow("connection reset");
         expect(transaction).toHaveBeenCalledTimes(2);
     });
+
+    it("gives up with the run's own error when recording it fails too", async () => {
+        transaction
+            .mockRejectedValueOnce(new Error("connection reset"))
+            .mockRejectedValueOnce(new Error("still down"));
+        await expect(
+            new GoLiveHandler().handle(job({ attempts: 4 })),
+        ).rejects.toThrow("connection reset");
+        expect(transaction).toHaveBeenCalledTimes(2);
+    });
 });

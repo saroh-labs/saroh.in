@@ -147,7 +147,7 @@ test.describe("class packs list", () => {
             await expect(
                 page.getByRole("main").getByText(who).first(),
             ).toBeVisible();
-            if (test.info().project.name === "desk") {
+            if (test.info().project.name.startsWith("desk")) {
                 // "Paid by" is a detail column: a phone's list leaves it out.
                 const row = page.getByRole("row").filter({ hasText: live });
                 await expect(

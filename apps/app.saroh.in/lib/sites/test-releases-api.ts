@@ -66,6 +66,10 @@ export async function readTestRelease(
     );
 }
 
+/** What a write says when the API couldn't be reached at all. */
+export const SEND_UNREACHABLE =
+    "Couldn't reach Saroh. Check the release list, then try again.";
+
 async function send<T>(
     siteId: string,
     path: string,
@@ -75,10 +79,18 @@ async function send<T>(
 ): Promise<SitesResult<T>> {
     const root = await base(siteId);
     if (!root) return { ok: false, error: "No active organization." };
-    const res = await apiFetch(`${root}${path}`, {
-        method,
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
+    let res: Response;
+    try {
+        res = await apiFetch(`${root}${path}`, {
+            method,
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        });
+    } catch {
+        // An outage or a dropped connection rejects rather than answering. A
+        // result, not a throw, so the sheet shows it and frees its buttons
+        // instead of staying on "Going live…" (release review).
+        return { ok: false, error: SEND_UNREACHABLE };
+    }
     const data = (await res.json().catch(() => null)) as unknown;
     if (res.ok) return { ok: true, data: data as T };
     const failure = toFailure(data, fallback);

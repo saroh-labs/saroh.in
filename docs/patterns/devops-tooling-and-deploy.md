@@ -148,6 +148,15 @@ seconds). Shared setup is `.github/actions/setup`.
 - **Current** — all five layers exist.
 - **Adopted** — **Show that a structural spec can fail:** remove what it pins and
   watch it name the break.
+- **Current** — **A race test waits on `pg_locks`, never on a sleep.** Hold
+  one transaction open at a known point, start the other, and
+  `waitUntilBlockedBy(pid)` (`apps/api.saroh.in/test/lock-wait.ts`) until
+  Postgres shows it waiting on the first; only then let the first go on. A
+  sleep only guesses the overlap, so on a slow run the race never happens
+  and the test passes with its lock removed. Prove it: run it five times,
+  then five times with the lock removed, and it must fail every time.
+  `src/common/db-spec-sleeps.spec.ts` fails on a new `setTimeout` in a
+  `*.db.spec.ts`.
 - **Adopted** — **Production confidence is more than unit tests** — critical
   journeys get browser coverage (PRODUCT_STRATEGY §27, `frontend-verification.md`).
 
@@ -400,5 +409,12 @@ On each unit's GitHub issue, comment when the unit lands on development.
   needs one. D22 (CP-1): run the Razorpay public key backfill **before** the
   new API serves — that API takes no online payment through a Razorpay
   connection without one — and again after.
+- **Current** — **The launch-readiness release** (everything after #708:
+  round-2 follow-ups, DEC-069, DEC-070, DEC-071) is
+  `docs/architecture/LAUNCH_READINESS_ROLLOUT.md`: pre-flight checks and the
+  Z1/Z2a gates, build the image by hand, back up, migrate, order-number
+  backfill, roll the API out at once (DEC-074's role update), then the
+  `pvt` backfill; the release PR's merge ships the frontends last. Its four
+  new flags stay off in production until their conditions are met.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.

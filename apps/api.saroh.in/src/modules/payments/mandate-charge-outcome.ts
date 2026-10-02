@@ -39,7 +39,12 @@ export type ChargeFailure =
     /** The notice never came back delivered, so no debit could be asked. */
     | "NOTICE_NOT_DELIVERED"
     /** The provider refused to prepare or take the charge. */
-    | "PROVIDER_REFUSED";
+    | "PROVIDER_REFUSED"
+    /**
+     * Not asked: the customer had a pay-link checkout open on the invoice
+     * (`checkoutOpenOn`), so autopay stood aside. Nothing was declined.
+     */
+    | "CHECKOUT_OPEN";
 
 /** Write one charge event on the invoice's subscription; false when it has none. */
 export async function recordChargeEventInTx(

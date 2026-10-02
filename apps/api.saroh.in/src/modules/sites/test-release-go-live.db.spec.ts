@@ -10,11 +10,13 @@ import {
     ForbiddenException,
     NotFoundException,
 } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import { prisma, runInOrgContext } from "@saroh/database";
 
+import { backendPid, gate, waitUntilBlockedBy } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { putLive } from "./live-pointer";
 import { draftFingerprint } from "./review-route";
 import { SitesService } from "./sites.service";
 import { TestReleasesService } from "./test-releases.service";
@@ -363,6 +365,54 @@ describe("going live with a test release (DEC-071, T7)", () => {
                 where: { siteId: b.site.id, kind: "LIVE" },
             }),
         ).toBe(1);
+    });
+
+    it("names the version it replaced as the one live when it took the site's lock", async () => {
+        const b = await business();
+        const first = await sites.publishSite(b.ctx, b.site.id);
+        const made = await releases.create(b.ctx, b.site.id, {});
+        const published = await prisma.publication.findUniqueOrThrow({
+            where: { id: first.publicationId },
+            select: { snapshot: true, templateId: true, templateVersion: true },
+        });
+
+        // A publish has put its version live and not yet committed when
+        // the merchant presses Go live.
+        const wrote = gate<{ pid: number; publicationId: string }>();
+        const commit = gate();
+        const publish = runInOrgContext(b.org.id, () =>
+            prisma.$transaction(
+                async (tx) => {
+                    const pid = await backendPid(tx);
+                    const live = await putLive(tx, {
+                        site: { id: b.site.id, organizationId: b.org.id },
+                        snapshot: published.snapshot,
+                        source: "publish",
+                        actor: { userId: b.owner.id, owner: true },
+                        fingerprint: draftFingerprint(published.snapshot),
+                        template: {
+                            id: published.templateId,
+                            version: published.templateVersion,
+                        },
+                    });
+                    wrote.release({ pid, publicationId: live.publicationId });
+                    await commit.wait;
+                },
+                { timeout: 20_000 },
+            ),
+        );
+        const fix = await wrote.wait;
+
+        const goLive = releases.goLive(b.ctx, b.site.id, made.release.id);
+        await waitUntilBlockedBy(fix.pid);
+        commit.release();
+        await publish;
+        const result = await goLive;
+
+        // What it replaced is the publish that went live first, not the
+        // version live before it.
+        expect(result.replaced?.publicationId).toBe(fix.publicationId);
+        expect((await liveOf(b.site.id)).id).toBe(result.publicationId);
     });
 
     it("refuses a discarded release", async () => {

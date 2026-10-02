@@ -473,7 +473,8 @@ describe("a chosen format", () => {
         expect(make(plain).format(1)).toBe("RC26090001");
         expect(make(plain, "CREDIT_NOTE").format(1)).toBe("RCCN26090001");
         expect(make(plain).key).toBe("RC/2026-09");
-        expect(longestNumber(plain, "RC")).toBe("RCCN260999999");
+        // Today's month: the longest number is this month's.
+        expect(longestNumber(plain, "RC")).toMatch(/^RCCN26\d{2}99999$/);
         expect(
             make(
                 { ...plain, parts: ["FY_SHORT", "MONTH"] },
@@ -626,7 +627,7 @@ describe("format rules", () => {
         expect(problem(MONTHLY)).toMatchObject({
             field: "invoiceNumberDigits",
             message: expect.stringMatching(
-                /Once the count passes 9999, numbers like RC\/26-27\/09\/99999 are 17 characters/,
+                /Once the count passes 9999, numbers like RC\/26-27\/\d{2}\/99999 are 17 characters/,
             ),
         });
         // Three digits leave the room: RC/26-27/09/9999 is 16.
@@ -750,14 +751,14 @@ describe("format rules", () => {
         // RC/26-27/09/999999: 18.
         expect(problem({ ...MONTHLY, digits: 5 })).toMatchObject({
             field: "invoiceNumberDigits",
-            message: expect.stringMatching(/RC\/26-27\/09\/999999 are 18/),
+            message: expect.stringMatching(/RC\/26-27\/\d{2}\/999999 are 18/),
         });
         // No prefix: CN/26-27/09/9999999 is the long one, 19.
         expect(
             problem({ ...MONTHLY, parts: ["FY", "MONTH"], digits: 6 }),
         ).toMatchObject({
             field: "invoiceNumberDigits",
-            message: expect.stringMatching(/CN\/26-27\/09\/9999999 are 19/),
+            message: expect.stringMatching(/CN\/26-27\/\d{2}\/9999999 are 19/),
         });
         expect(
             problem({

@@ -45,6 +45,12 @@ a note saying so.
   `payments/crypto.ts`) and never returned; reads are redacted views.
 - **Current** — **Adapters sanitise errors:** never surface an auth header, a
   credential or the raw provider body (`CommsProvider` contract).
+- **Current** — **A provider call has a deadline.** Node's `fetch` never
+  times out on its own, so a payment provider's lookups and mandate calls
+  pass `signal: providerCallSignal()` (`payments/providers/provider-call.ts`,
+  15 s); the abort lands in the adapter's network-error path (UNKNOWN, or a
+  lookup's ERROR). A new call to a provider a job or a sweep waits on does
+  the same.
 - **Current** — **Verify before you parse.** A webhook's signature is checked
   against the raw body before anything in it is trusted; a missing secret or a
   bad signature is a 401 and writes nothing.

@@ -265,6 +265,11 @@ export class PaymentLookupService {
                     `Payment lookup for intent ${intent.id} failed: ${String(error)}`,
                 );
                 outcome = "ERROR";
+                // Stamp it all the same, so it waits for its tier's next
+                // turn as any other failed ask does. Left unstamped it sorts
+                // first on every run (nulls first), and enough of them fill
+                // the batch each minute and starve every other intent.
+                await this.stamp(intent, "ERROR").catch(() => undefined);
             }
             counts[outcome] += 1;
         }

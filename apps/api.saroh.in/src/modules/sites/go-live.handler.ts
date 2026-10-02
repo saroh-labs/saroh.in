@@ -5,7 +5,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { businessTimezone } from "../bookings/staff-availability";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { resolveCapabilities } from "../organizations/organization-policy";
-import { readVerdicts } from "./live-pointer";
+import { lockSite, readVerdicts } from "./live-pointer";
 import { goLiveWithRelease } from "./test-release-go-live";
 import { releaseApproved } from "./test-release-review";
 import type { SiteGoLivePayload } from "./test-release-schedule";
@@ -30,7 +30,8 @@ export type GoLiveRun =
  * go-live, when its time comes.
  *
  * On one transaction, in the business's RLS context, under a lock on the
- * release row (KTD-13):
+ * release row (KTD-13) and then the site's (`lockSite`), so no publish or
+ * restore commits between the re-check and the write:
  *  1. **Re-read.** A release cancelled, moved to another time, already live
  *     or discarded since the job was queued is left alone: this run is not
  *     its schedule any more.
@@ -74,12 +75,24 @@ export class GoLiveHandler {
             );
         } catch (err) {
             if (job.attempts + 1 < job.maxAttempts) throw err;
-            // The last try: say it didn't go live before giving up.
-            await runInOrgContext(organizationId, () =>
-                prisma.$transaction((tx) =>
-                    recordGaveUp(tx, organizationId, payload),
-                ),
-            );
+            // The last try: say it didn't go live before giving up. The same
+            // outage can fail this write too; then the run's own error is
+            // what the job dies with, and the release is named in the log so
+            // an operator can clear the schedule (release review).
+            try {
+                await runInOrgContext(organizationId, () =>
+                    prisma.$transaction((tx) =>
+                        recordGaveUp(tx, organizationId, payload),
+                    ),
+                );
+            } catch (recordErr) {
+                this.logger.error(
+                    `${SITE_GO_LIVE_TYPE} ${payload.testReleaseId}: gave up, and couldn't record it; the release still reads as scheduled`,
+                    recordErr instanceof Error
+                        ? recordErr.stack
+                        : String(recordErr),
+                );
+            }
             throw err;
         }
     };
@@ -98,6 +111,11 @@ export async function runScheduledGoLive(
     }
     const schedulerId = release.scheduledByUserId;
 
+    // The site's lock before its live pointer is read: a publish or restore
+    // in flight commits first and is seen as "published since", or waits
+    // for this run. Without it a publish could commit between the check
+    // and `putLive`, and the older release would replace the fix (KTD-14).
+    await lockSite(tx, release.siteId);
     const check = await mayGoLive(tx, organizationId, release, now);
     if (!check.go) {
         const { reason } = check;

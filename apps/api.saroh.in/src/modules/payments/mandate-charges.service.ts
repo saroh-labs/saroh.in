@@ -6,7 +6,11 @@ import { fromMinor, toMinor } from "../../common/money";
 import type { AutopayChargeTiming } from "../subscriptions/autopay-timing";
 import { chargePlan } from "../subscriptions/autopay-timing";
 import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
-import { OPEN_MANDATE_CHARGE } from "./charge-under-way";
+import {
+    checkoutOpenOn,
+    OPEN_MANDATE_CHARGE,
+    openCheckoutWhere,
+} from "./charge-under-way";
 import { mandateChargingOn } from "./mandate-charge-gate";
 import {
     failMandateChargeInTx,
@@ -67,7 +71,12 @@ export type ChargeRefusal =
     /** The provider can't be asked (no connection, or no autopay there). */
     | "NO_PROVIDER"
     /** The provider refused, and would again. */
-    | "PROVIDER_REFUSED";
+    | "PROVIDER_REFUSED"
+    /**
+     * The customer has a pay-link checkout open on the invoice
+     * (`checkoutOpenOn`): a debit could take the money twice.
+     */
+    | "CHECKOUT_OPEN";
 
 export type PrepareChargeResult =
     | {
@@ -125,7 +134,12 @@ export type QueueChargeResult =
     /** Above the mandate's limit: MANDATE_LIMIT_LOW, nothing charged. */
     | { status: "LIMIT_LOW" }
     /** No mandate to charge, or charging is off: the pay link, as before. */
-    | { status: "NONE" };
+    | { status: "NONE" }
+    /**
+     * The customer has a pay-link checkout open on the invoice
+     * (`checkoutOpenOn`): nothing is queued, so they are never charged twice.
+     */
+    | { status: "CHECKOUT_OPEN" };
 
 /** What a look-up found and did (D13; Retry asks the provider first). */
 export type LookUpResult =
@@ -238,6 +252,15 @@ export class MandateChargesService {
                     intentId: other.id,
                 };
             }
+        }
+        if (await checkoutOpenOn(prisma, organizationId, invoiceId)) {
+            return made
+                ? {
+                      status: "REFUSED",
+                      reason: "CHECKOUT_OPEN",
+                      intentId: made.id,
+                  }
+                : { status: "REFUSED", reason: "CHECKOUT_OPEN" };
         }
 
         const connection = await this.connection(
@@ -425,12 +448,73 @@ export class MandateChargesService {
             };
         }
 
+        /*
+         * The claim re-asks the checks above in its own WHERE: the notice
+         * call is a provider round trip, and a mandate cancelled, an
+         * invoice voided or a pay-link checkout opened while it ran must
+         * not be debited. A cancel moves
+         * the mandate's open charges to CANCELLED in its transaction
+         * (`cancelMandatesInTx`), so a claim either lands first, or waits
+         * for that and finds nothing to claim.
+         */
         const claimed = await prisma.paymentIntent.updateMany({
-            where: { id: intentId, status: "REQUIRES_PAYMENT" },
+            where: {
+                id: intentId,
+                status: "REQUIRES_PAYMENT",
+                viaMandate: {
+                    is: {
+                        status: "ACTIVE",
+                        providerMandateId: { not: null },
+                    },
+                },
+                invoice: {
+                    is: {
+                        status: "ISSUED",
+                        paymentIntents: { none: openCheckoutWhere() },
+                    },
+                },
+            },
             data: { status: "PROCESSING" },
         });
         if (claimed.count === 0) {
-            return { status: "ALREADY", intentId, intentStatus: "PROCESSING" };
+            const current = await prisma.paymentIntent.findFirst({
+                where: { id: intentId, organizationId },
+                select: {
+                    status: true,
+                    viaMandate: { select: { status: true } },
+                    invoice: { select: { status: true } },
+                },
+            });
+            // Claimed by another run: money may be moving, whatever has
+            // changed since. ALREADY, so the caller looks it up; refusing
+            // would leave it PROCESSING with nothing to ask.
+            if (current?.status === "PROCESSING") {
+                return {
+                    status: "ALREADY",
+                    intentId,
+                    intentStatus: "PROCESSING",
+                };
+            }
+            if (current?.viaMandate?.status !== "ACTIVE") {
+                return refuse("MANDATE_NOT_ACTIVE");
+            }
+            if (current.invoice?.status !== "ISSUED") {
+                return refuse("INVOICE_NOT_PAYABLE");
+            }
+            if (
+                await checkoutOpenOn(
+                    prisma,
+                    organizationId,
+                    intent.invoiceId ?? "",
+                )
+            ) {
+                return refuse("CHECKOUT_OPEN");
+            }
+            return {
+                status: "ALREADY",
+                intentId,
+                intentStatus: current.status,
+            };
         }
 
         try {
@@ -587,6 +671,9 @@ export class MandateChargesService {
         ) {
             return { status: "NONE" };
         }
+        if (await checkoutOpenOn(tx, organizationId, invoiceId)) {
+            return { status: "CHECKOUT_OPEN" };
+        }
         if (
             mandate.maxAmountCents === null ||
             amountCents > mandate.maxAmountCents
@@ -678,8 +765,10 @@ export class MandateChargesService {
     /**
      * Whether each subscription's unpaid renewal can be retried through
      * its autopay (D13, default 35): `MANDATE` when it has a chargeable
-     * mandate and its latest unpaid invoice is within the limit. Anything
-     * else is a pay link. Callers check "a charge is under way" apart.
+     * mandate and its latest unpaid invoice is within the limit, with no
+     * pay-link checkout open on it (`checkoutOpenOn`: Retry by autopay would
+     * be refused, so the screen offers the link). Anything else is a pay
+     * link. Callers check "a charge is under way" apart.
      */
     async mandateRetryable(
         organizationId: string,
@@ -698,11 +787,12 @@ export class MandateChargesService {
                     { issuedAt: { sort: "desc", nulls: "last" } },
                     { id: "desc" },
                 ],
-                select: { total: true, currency: true },
+                select: { id: true, total: true, currency: true },
             });
             if (
                 invoice?.currency === mandate.currency &&
-                toMinor(invoice.total) <= mandate.maxAmountCents
+                toMinor(invoice.total) <= mandate.maxAmountCents &&
+                !(await checkoutOpenOn(prisma, organizationId, invoice.id))
             ) {
                 retryable.add(subscriptionId);
             }

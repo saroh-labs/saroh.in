@@ -49,8 +49,12 @@ jest.mock("@saroh/database", () => {
             // D13: autopay's failures, read with a subscription's invoices.
             findMany: jest.fn(),
         },
-        // D13: an autopay charge under way on an invoice.
-        paymentIntent: { findMany: jest.fn() },
+        // D13: an autopay charge under way on an invoice. A cancelled
+        // mandate's open charges close with it.
+        paymentIntent: {
+            findMany: jest.fn(),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
         subscriptionSkip: {
             findFirst: jest.fn(),
             findMany: jest.fn(),

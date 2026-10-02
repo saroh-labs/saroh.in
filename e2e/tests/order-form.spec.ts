@@ -110,10 +110,9 @@ test.describe("a walk-in who gives a phone, paid in cash", () => {
         const bread = `E2E Counter Bread ${testInfo.project.name}`;
         const cake = `E2E Counter Cake ${testInfo.project.name}`;
         const name = `Asha ${testInfo.project.name}`;
-        const phone =
-            testInfo.project.name === "phone"
-                ? "+91 90000 22202"
-                : "+91 90000 22201";
+        const phone = testInfo.project.name.startsWith("phone")
+            ? "+91 90000 22202"
+            : "+91 90000 22201";
         await signIn(page);
         await page.goto(`/open/${NW.organizationId}`);
         try {

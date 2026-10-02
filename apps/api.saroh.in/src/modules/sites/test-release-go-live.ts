@@ -2,7 +2,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import type { LiveTx, PutLiveResult } from "./live-pointer";
-import { putLive } from "./live-pointer";
+import { lockSite, putLive } from "./live-pointer";
 import { checkRenderability } from "./publication-renderability";
 import { ADDRESS_MISSING_MESSAGE } from "./site-flags";
 
@@ -81,6 +81,12 @@ export async function goLiveWithRelease(
     if (locked.length === 0) {
         throw new NotFoundException(`Test release "${releaseId}" not found`);
     }
+    // Then the site's, before anything below reads it: the version this
+    // replaces, and the address, are then what the previous holder (a
+    // publish, a restore) committed, not what was live before it. Release
+    // first, then site, as the scheduled run takes them; nothing takes them
+    // the other way round. `putLive` takes it again, at no cost.
+    await lockSite(tx, siteId);
 
     const release = await tx.siteTestRelease.findUniqueOrThrow({
         where: { id: releaseId },

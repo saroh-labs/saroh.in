@@ -36,7 +36,7 @@ import {
     FakeProviderFactory,
 } from "../payments/providers/fake.provider";
 import { PublicInvoicesService } from "../payments/public-invoices.service";
-import { PaymentLookupService } from "./payment-lookup.service";
+import { PaymentLookupService, SWEEP_BATCH } from "./payment-lookup.service";
 import {
     FakeWebhookProvider,
     FakeWebhookProviderFactory,
@@ -448,6 +448,66 @@ describe("the pending sweep (P1)", () => {
         // Three minutes on, it is due again.
         await lookup.sweep(new Date(Date.now() + 3 * MINUTE + 1_000));
         expect(count()).toBe(2);
+    });
+
+    it("an intent whose ask throws takes its turn, and never starves the rest", async () => {
+        // A business whose sealed credentials no longer open: every ask for
+        // its intents throws before reaching the provider. More of them than
+        // one sweep takes, all never asked, so all sort first.
+        const broken = await prisma.organization.create({
+            data: { name: "Broken Keys", slug: `lookup-broken-${process.pid}` },
+        });
+        await prisma.merchantPaymentProvider.create({
+            data: {
+                organizationId: broken.id,
+                provider: "RAZORPAY",
+                encryptedCredentials: "not-a-ciphertext",
+                credentialsIv: "not-an-iv",
+                credentialsAuthTag: "not-a-tag",
+            },
+        });
+        const fiveMinutesAgo = new Date(Date.now() - 5 * MINUTE);
+        await prisma.paymentIntent.createMany({
+            data: Array.from({ length: SWEEP_BATCH + 1 }, (_, i) => ({
+                organizationId: broken.id,
+                provider: "RAZORPAY",
+                providerIntentId: `order_broken_${i}`,
+                amountCents: PRICE,
+                currency: "INR",
+                status: "REQUIRES_PAYMENT",
+                createdAt: fiveMinutesAgo,
+                // On no order or invoice: the one kind of intent the
+                // `PaymentIntent_one_target` check lets stand alone.
+                purpose: "AUTHORISATION",
+            })),
+        });
+        // A healthy intent, asked four minutes ago: due again, but behind
+        // every intent never asked.
+        const { intent, orderId } = await hold("starved@example.in");
+        await age(intent.paymentIntentId, 5);
+        await prisma.paymentIntent.update({
+            where: { id: intent.paymentIntentId },
+            data: { lastLookupAt: new Date(Date.now() - 4 * MINUTE) },
+        });
+        const asked = () =>
+            fake.orderPaymentCalls.filter((c) => c.providerIntentId === orderId)
+                .length;
+        jest.spyOn(Logger.prototype, "error").mockImplementation(() => {});
+
+        try {
+            const first = await lookup.sweep(new Date());
+            expect(first.ERROR).toBe(SWEEP_BATCH);
+            const second = await lookup.sweep(new Date());
+            expect(second.full).toBe(false);
+            expect(asked()).toBe(1);
+            // The throwing intents were stamped: their tier's pause applies.
+            const unstamped = await prisma.paymentIntent.count({
+                where: { organizationId: broken.id, lastLookupAt: null },
+            });
+            expect(unstamped).toBe(0);
+        } finally {
+            await prisma.organization.delete({ where: { id: broken.id } });
+        }
     });
 });
 

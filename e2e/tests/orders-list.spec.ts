@@ -604,7 +604,7 @@ test.describe("orders list filters (B4)", () => {
 test.describe("orders quick view and row menu (B5)", () => {
     test.beforeEach(async ({ page }, testInfo) => {
         test.skip(
-            testInfo.project.name === "phone",
+            testInfo.project.name.startsWith("phone"),
             "The row menu is drawn from 760px only; a phone's card opens the same quick view as a sheet, tested above.",
         );
         await page.setViewportSize({ width: 1440, height: 900 });
@@ -833,7 +833,7 @@ test.describe("orders quick view and row menu (B5)", () => {
 test.describe("orders bulk kitchen moves (B6)", () => {
     test.beforeEach(async ({ page }, testInfo) => {
         test.skip(
-            testInfo.project.name === "phone",
+            testInfo.project.name.startsWith("phone"),
             "Drawn at the desk here; the phone's cards carry the same box.",
         );
         await page.setViewportSize({ width: 1440, height: 900 });

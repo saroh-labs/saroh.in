@@ -26,6 +26,32 @@ beforeEach(() => {
     global.fetch = fetchMock as unknown as typeof fetch;
 });
 
+/**
+ * A fetch that never answers on its own, as a provider that hangs does: it
+ * gives up only when the call's own signal aborts, as the real fetch does.
+ * `AbortSignal.timeout` is shortened so the test needn't wait 15 seconds,
+ * and asked what it was given.
+ */
+function hangUntilAborted() {
+    const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+    const timeout = jest
+        .spyOn(AbortSignal, "timeout")
+        .mockImplementation(() => realTimeout(20));
+    fetchMock.mockImplementation(
+        (_url: string, init?: RequestInit) =>
+            new Promise((_resolve, reject) => {
+                init?.signal?.addEventListener("abort", () =>
+                    reject(init.signal?.reason),
+                );
+            }),
+    );
+    return timeout;
+}
+
+afterEach(() => {
+    jest.restoreAllMocks();
+});
+
 function answer(status: number, body: unknown = {}) {
     return Promise.resolve(
         new Response(JSON.stringify(body), {
@@ -727,6 +753,48 @@ describe("charge", () => {
             "UNKNOWN",
         );
     });
+});
+
+describe("a mandate call Razorpay never answers (release review)", () => {
+    it("gives up after 15 seconds and says UNKNOWN", async () => {
+        const timeout = hangUntilAborted();
+        const err = await outcome(
+            mandates.getPreDebit({
+                providerIntentId: "order_hangs",
+                credentials: CREDS,
+            }),
+        );
+        expect(err.outcome).toBe("UNKNOWN");
+        expect(err.message).toBe("Razorpay notice failed: network error");
+        expect(timeout).toHaveBeenCalledWith(15_000);
+    }, 2_000);
+
+    it("a debit that never answers is UNKNOWN, asked once and never re-sent (code review)", async () => {
+        const timeout = hangUntilAborted();
+        // The order has no debit yet and the customer is found; then the
+        // debit itself hangs.
+        fetchMock
+            .mockReturnValueOnce(answer(200, { items: [] }))
+            .mockReturnValueOnce(answer(200, { id: RZP.customerId }));
+        const CHARGE = {
+            reference: "inv_cminvoice000000000001_1",
+            providerIntentId: RZP.chargeOrderId,
+            providerMandateId: RZP.tokenId,
+            providerCustomerId: RZP.customerId,
+            amountCents: 120000,
+            currency: "INR",
+            credentials: CREDS,
+        };
+        const err = await outcome(mandates.charge(CHARGE));
+        // Unsure, so looked up later: never REFUSED, which would fail it.
+        expect(err.outcome).toBe("UNKNOWN");
+        const debits = fetchMock.mock.calls.filter(([url]) =>
+            String(url).endsWith("/payments/create/recurring"),
+        );
+        expect(debits).toHaveLength(1);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+        expect(timeout).toHaveBeenCalledWith(15_000);
+    }, 2_000);
 });
 
 describe("cancel", () => {

@@ -140,6 +140,9 @@ describe("changeWhat", () => {
 
     it("has words for the kinds later units write, and for one it doesn't know", () => {
         expect(what({ kind: "RENEWAL_FAILED" })).toBe("Renewal payment failed");
+        expect(
+            what({ kind: "RENEWAL_FAILED", data: { reason: "CHECKOUT_OPEN" } }),
+        ).toBe("Autopay didn't charge — the customer was paying by link");
         expect(what({ kind: "MANDATE_LIMIT_LOW" })).toBe(
             "Not charged — above the autopay limit",
         );

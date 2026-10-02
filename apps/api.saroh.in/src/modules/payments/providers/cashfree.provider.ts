@@ -1,5 +1,6 @@
 import { Logger } from "@nestjs/common";
 
+import { providerCallSignal } from "./provider-call";
 import type {
     CreateOrderIntentInput,
     CreateOrderIntentResult,
@@ -207,9 +208,13 @@ export class CashfreeProvider implements MerchantProvider {
         try {
             res = await fetch(
                 `${this.baseUrl}/orders/${encodeURIComponent(merchantRef)}/payments`,
-                { headers: this.headers(credentials) },
+                {
+                    headers: this.headers(credentials),
+                    signal: providerCallSignal(),
+                },
             );
         } catch {
+            // A dropped connection, or no answer in time.
             throw new Error("Cashfree payment lookup failed: network error");
         }
         if (res.status === 404) return [];
