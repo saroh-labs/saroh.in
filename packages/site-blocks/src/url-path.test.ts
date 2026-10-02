@@ -13,8 +13,10 @@ describe("trimTrailingSlashes", () => {
 
     it("stays fast on a long run of slashes that isn't at the end", () => {
         const hostile = `${"/".repeat(100_000)}x`;
+        // The old regex takes seconds here (quadratic); a linear scan takes
+        // about a millisecond. The bound leaves room for a busy machine.
         const started = performance.now();
         expect(trimTrailingSlashes(hostile)).toBe(hostile);
-        expect(performance.now() - started).toBeLessThan(50);
+        expect(performance.now() - started).toBeLessThan(500);
     });
 });

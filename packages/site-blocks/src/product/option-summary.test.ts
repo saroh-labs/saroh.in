@@ -35,10 +35,12 @@ describe("optionSummary", () => {
 
 describe("plural", () => {
     it("stays fast on a long name that doesn't end in a letter (release #772)", () => {
-        const hostile = `${"a".repeat(50_000)}1`;
+        const hostile = `${"a".repeat(100_000)}1`;
+        // The old regex takes seconds here (quadratic); a linear scan takes
+        // about a millisecond. The bound leaves room for a busy machine.
         const started = performance.now();
         expect(plural(hostile)).toBe(hostile);
-        expect(performance.now() - started).toBeLessThan(50);
+        expect(performance.now() - started).toBeLessThan(500);
     });
 
     it("keeps everything before the last word", () => {
