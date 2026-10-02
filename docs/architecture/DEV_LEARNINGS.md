@@ -2117,6 +2117,13 @@ an 839px screen). They had never passed, only never run. The spec now
 polls until the sheet's bottom meets the screen's.
 **Rule**: compare a Playwright project by prefix; the lint rule says so. A
 geometry check on an animated sheet polls until it settles.
+**Later** (review of the release-review fixes): the rule matched only a
+quoted literal, so `` === `phone` ``, `"phone" as string`,
+`["phone"].includes(project.name)` and `switch (project.name)` got past it.
+It now matches the expression ending in `project.name` in a comparison with
+anything but a plain literal, in `includes`/`indexOf`, and as a switch's
+subject, besides the desk/phone literal (bare or cast). A plain
+`"phone-serial"` stays allowed.
 **Category**: e2e · tests · lint
 
 ## Sites — a scheduled go-live that gave up could hide why
