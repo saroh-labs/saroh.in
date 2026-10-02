@@ -485,6 +485,16 @@ export class MandateChargesService {
                     invoice: { select: { status: true } },
                 },
             });
+            // Claimed by another run: money may be moving, whatever has
+            // changed since. ALREADY, so the caller looks it up; refusing
+            // would leave it PROCESSING with nothing to ask.
+            if (current?.status === "PROCESSING") {
+                return {
+                    status: "ALREADY",
+                    intentId,
+                    intentStatus: "PROCESSING",
+                };
+            }
             if (current?.viaMandate?.status !== "ACTIVE") {
                 return refuse("MANDATE_NOT_ACTIVE");
             }

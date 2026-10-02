@@ -2172,3 +2172,21 @@ checkout's life as open too. Nothing looks a FAILED intent up, so the life
 **Rule**: an intent's status is Saroh's last word on one attempt, not on
 the provider order. Ask whether the order can still take money.
 **Category**: payments · autopay
+
+## Autopay — a crashed debit was never looked up once autopay was cancelled
+
+**Problem**: the batch-10 code review found that a debit claimed
+(PROCESSING) by a run that died before it asked the provider or wrote its
+look-up stayed "Autopay charge in progress" for good if the customer
+cancelled autopay, or the subscription ended, before the job came again.
+**Root cause**: the release-review fix looked such a charge up only when
+`charge()` answered ALREADY. But `debit()` first asked `stillCharging`, which
+lets the charge go when the mandate is no longer chargeable — and `letGo`
+leaves a PROCESSING intent as it is. `charge()`'s claim fallback likewise
+refused (a no-op on PROCESSING) instead of answering ALREADY.
+**Fix**: `debit()` schedules the LOOK for a PROCESSING intent before the
+gate, and the claim fallback answers ALREADY whenever the intent is
+PROCESSING (`subscriptions.charge.db.spec.ts`, `mandate-charges.db.spec.ts`).
+**Rule**: once money may have moved, finding out comes before every other
+gate. A "may we still charge?" check never decides whether to look.
+**Category**: payments · autopay · jobs

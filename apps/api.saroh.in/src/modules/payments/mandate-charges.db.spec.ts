@@ -567,6 +567,38 @@ describe("what is never charged", () => {
         expect((await intentOf(intentId)).status).toBe("CANCELLED");
     });
 
+    it("claimed by another run, then its mandate cancelled: ALREADY, so it is looked up (code review)", async () => {
+        const { result, intentId } = await chargeWith(async (who) => {
+            // Another delivery claims the debit while this one asks
+            // about the notice; then autopay is cancelled.
+            await prisma.paymentIntent.updateMany({
+                where: {
+                    invoiceId: who.invoiceId,
+                    viaMandateId: who.mandateId,
+                },
+                data: { status: "PROCESSING" },
+            });
+            await prisma.$transaction((tx) =>
+                cancelMandatesInTx(
+                    tx,
+                    {
+                        organizationId: owner.organizationId,
+                        subscriptionId: who.subscriptionId,
+                    },
+                    "CUSTOMER",
+                    { queue: false },
+                ),
+            );
+        });
+        expect(result).toEqual({
+            status: "ALREADY",
+            intentId,
+            intentStatus: "PROCESSING",
+        });
+        expect(debitCalls()).toHaveLength(0);
+        expect((await intentOf(intentId)).status).toBe("PROCESSING");
+    });
+
     it("an invoice voided after the checks, before the claim: never debited", async () => {
         const { result, intentId } = await chargeWith((who) =>
             prisma.invoice

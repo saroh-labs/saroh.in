@@ -828,6 +828,49 @@ describe("an unsure answer", () => {
         expect(calls("charge")).toHaveLength(before + 1);
         expect((await intentsOf(invoice.id))[0].status).toBe("PROCESSING");
     });
+    it("a debit claimed before a crash is still looked up once its mandate is cancelled (code review)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        await runDue(invoice.id);
+        const [intent] = await intentsOf(invoice.id);
+        fake.settlePreDebit(intent.providerIntentId ?? "", "DELIVERED");
+        clock = new Date(clock.getTime() + 27 * HOUR);
+        // Claimed (PROCESSING), and the worker died before asking the
+        // provider or writing its LOOK.
+        await prisma.paymentIntent.update({
+            where: { id: intent.id },
+            data: { status: "PROCESSING" },
+        });
+        // Before the job comes again, the customer cancels autopay.
+        const mandate = await prisma.paymentMandate.findUniqueOrThrow({
+            where: { id: who.mandateId },
+        });
+        await webhook({
+            eventType: "token.cancelled",
+            outcome: "MANDATE",
+            mandate: {
+                status: "CANCELLED",
+                providerMandateId: mandate.providerMandateId,
+            },
+        });
+        expect((await intentsOf(invoice.id))[0].status).toBe("PROCESSING");
+
+        const before = calls("charge").length;
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(before);
+        expect(
+            (await chargeJobs(invoice.id)).map(
+                (j) => (j.payload as { step: string }).step,
+            ),
+        ).toEqual(["LOOK"]);
+
+        // The look-up finds no debit; the charge is let go, never debited.
+        clock = new Date(clock.getTime() + 2 * HOUR);
+        expect(await runDue(invoice.id)).toEqual(["LOOK"]);
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(before);
+        expect((await intentsOf(invoice.id))[0].status).toBe("CANCELLED");
+    });
 });
 
 describe("the limit", () => {
