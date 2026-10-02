@@ -66,6 +66,13 @@ export function clashProblem(pattern: string, suggestions: string[]): string {
     for (const s of suggestions) seen[s] = (seen[s] ?? 0) + 1;
     const shared = suggestions.filter((s) => (seen[s] ?? 0) > 1);
     if (shared.length === 0) return "";
-    const fix = pattern.includes("{N}") ? "{VALUE}" : "{N}";
+    // A string by type, and checked again here: every route passes the
+    // query through `single()`, which refuses an array, but this is where an
+    // array would change what `includes` means (CodeQL
+    // js/type-confusion-through-parameter-tampering, release #772).
+    const fix =
+        typeof pattern === "string" && pattern.includes("{N}")
+            ? "{VALUE}"
+            : "{N}";
     return `${shared.length} variants would share ${shared[0]}. Add ${fix} so each one differs.`;
 }
