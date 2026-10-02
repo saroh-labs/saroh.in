@@ -2292,3 +2292,19 @@ tests escape whole strings for RegExp, use `replaceAll`, and strip tags until st
 code-scanning alerts on `refs/pull/<n>/merge` as soon as the release PR opens, and fix new ones in
 the same release.
 **Category**: security · CodeQL · ReDoS
+
+## Security — the three older CodeQL alerts on main (#16–#18)
+
+**Problem**: three alerts were open on `main` before the launch release:
+`js/type-confusion-through-parameter-tampering` at `catalogue/sku-pattern.ts` (`pattern.includes`),
+and `js/xss-through-dom` twice in `media-thumb.tsx` (an `<img>`/`<video>` `src`).
+**Root cause / exploitable?** Neither was a live hole. The SKU preview routes already pass the
+query through `single()`, which refuses an array with a 400; CodeQL can't follow that across the
+helper. React sets `src` as an attribute, and browsers don't run `javascript:` from an image or
+video source.
+**Fix**: `clashProblem` checks `typeof pattern === "string"` where it uses it (both copies, API and
+app). `MediaThumb` loads only from `mediaSrc()`: `https:`, `http:`, `blob:` or a same-site path,
+otherwise nothing (`lib/products/media-src.ts`, with a test).
+**Rule**: a URL from a merchant or the DOM goes through an allow-list before it reaches `src` or
+`href`; a guard that protects a sink lives next to the sink, not only in a helper upstream.
+**Category**: security · CodeQL

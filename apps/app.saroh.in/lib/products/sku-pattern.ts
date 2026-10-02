@@ -67,6 +67,10 @@ export function clashProblem(pattern: string, suggestions: string[]): string {
     for (const s of suggestions) seen[s] = (seen[s] ?? 0) + 1;
     const shared = suggestions.filter((s) => (seen[s] ?? 0) > 1);
     if (shared.length === 0) return "";
-    const fix = pattern.includes("{N}") ? "{VALUE}" : "{N}";
+    // Checked again here, as the API's copy does (release #772).
+    const fix =
+        typeof pattern === "string" && pattern.includes("{N}")
+            ? "{VALUE}"
+            : "{N}";
     return `${shared.length} variants would share ${shared[0]}. Add ${fix} so each one differs.`;
 }
