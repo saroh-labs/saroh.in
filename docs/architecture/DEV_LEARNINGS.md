@@ -2161,3 +2161,26 @@ NO KEY UPDATE only when none of its writes to the row does
 (`backend-data-and-money.md`, "A row lock is taken at the strength of the
 write that follows it").
 **Category**: sites · locks · concurrency
+
+## Tests — a race test that slept could pass with its lock removed (release review)
+
+**Symptom**: the testing review of the release-review fixes ran the KTD-14
+spec ("doesn't go live over a publish that commits while it runs") in its
+head with the lock gone: it would still pass whenever the job was slow.
+**Cause**: the spec held a publish open, started the scheduled go-live, and
+slept 750ms "long enough for the job to read the site and reach its write"
+before committing. If the job had not reached its lock by then (a loaded
+machine, a cold ts-jest, claim latency) it ran after the commit, saw the fix
+as "published since", and the spec passed without the race ever running.
+**Fix**: the spec takes the publish's backend pid and waits until
+`pg_locks` shows a connection waiting on it (`test/lock-wait.ts`,
+`waitUntilBlockedBy`), then commits. It now fails every run with
+`lockSite` removed from the handler. The new `live-pointer.db.spec.ts`
+races are written the same way.
+**Rule**: race tests wait on `pg_locks`, never sleep: hold one side at a
+known point, wait until Postgres shows the other blocked on it, then let
+go; run it five times, and five times with the fix removed
+(`devops-tooling-and-deploy.md`, Tests). `src/common/db-spec-sleeps.spec.ts`
+fails on a new `setTimeout` in a `*.db.spec.ts`; the specs that slept before
+are listed there and come off as they move.
+**Category**: tests · concurrency

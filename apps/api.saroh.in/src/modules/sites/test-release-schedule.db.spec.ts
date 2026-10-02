@@ -15,6 +15,7 @@ import type { Job } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { backendPid, waitUntilBlockedBy } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { CommunicationsService } from "../communications/communications.service";
@@ -636,13 +637,14 @@ describe("the site.go_live job (T10)", () => {
         const held = new Promise<void>((resolve) => {
             commit = resolve;
         });
-        let written = (_id: string) => {};
-        const wrote = new Promise<string>((resolve) => {
+        let written = (_pid: number) => {};
+        const wrote = new Promise<number>((resolve) => {
             written = resolve;
         });
         const publish = runInOrgContext(b.org.id, () =>
             prisma.$transaction(
                 async (tx) => {
+                    const pid = await backendPid(tx);
                     const live = await putLive(tx, {
                         site: { id: b.site.id, organizationId: b.org.id },
                         snapshot: now.snapshot,
@@ -654,18 +656,19 @@ describe("the site.go_live job (T10)", () => {
                             version: now.templateVersion,
                         },
                     });
-                    written(live.publicationId);
+                    written(pid);
                     await held;
                     return live.publicationId;
                 },
                 { timeout: 20_000 },
             ),
         );
-        await wrote;
+        const publisher = await wrote;
 
         const run = handler.handle(job);
-        // Long enough for the job to read the site and reach its write.
-        await new Promise((resolve) => setTimeout(resolve, 750));
+        // The job has reached the site's lock and waits on the publish:
+        // Postgres says so, rather than a sleep guessing it.
+        await waitUntilBlockedBy(publisher);
         commit();
         const fix = await publish;
         await run;
