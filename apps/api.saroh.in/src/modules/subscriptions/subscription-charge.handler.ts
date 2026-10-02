@@ -159,6 +159,8 @@ export class SubscriptionChargeHandler {
                         intent.id,
                         "PROVIDER_REFUSED",
                     );
+                } else if (result.reason === "CHECKOUT_OPEN") {
+                    await this.stoodAside(organizationId, p.invoiceId);
                 }
                 return;
         }
@@ -171,6 +173,14 @@ export class SubscriptionChargeHandler {
     ): Promise<void> {
         const intent = await this.intentOf(organizationId, p);
         if (!intent || !OPEN_MANDATE_CHARGE.includes(intent.status)) return;
+        // Claimed already: a delivery before this one may have died between
+        // the claim and writing its look-up, and money may have moved. Look
+        // it up whatever has happened since — a mandate or subscription
+        // cancelled meanwhile doesn't close a PROCESSING charge (`letGo`
+        // leaves it), so the gate below would leave it unasked for good.
+        if (intent.status === "PROCESSING") {
+            return this.lookSoon(organizationId, p, now);
+        }
         if (!(await this.stillCharging(organizationId, p, intent.id, now))) {
             return;
         }
@@ -241,6 +251,9 @@ export class SubscriptionChargeHandler {
                         "PROVIDER_REFUSED",
                     );
                 }
+                if (result.reason === "CHECKOUT_OPEN") {
+                    return this.stoodAside(organizationId, p.invoiceId);
+                }
                 // Paid another way, the mandate ended, or another
                 // subscription's: nothing to say; the pay link stands.
                 return;
@@ -250,11 +263,7 @@ export class SubscriptionChargeHandler {
                 // so nothing would ever ask. Unsure, as UNKNOWN is: look it
                 // up (a look-up already waiting is kept, not doubled).
                 if (result.intentStatus === "PROCESSING") {
-                    return this.next(
-                        organizationId,
-                        { ...p, step: "LOOK", tries: 0 },
-                        new Date(now.getTime() + DEBIT_RETRY_MS),
-                    );
+                    return this.lookSoon(organizationId, p, now);
                 }
                 return;
         }
@@ -409,6 +418,19 @@ export class SubscriptionChargeHandler {
         });
     }
 
+    /** A look-up soon, for a claimed debit nothing else will ask about. */
+    private lookSoon(
+        organizationId: string,
+        p: ChargeJobPayload,
+        now: Date,
+    ): Promise<void> {
+        return this.next(
+            organizationId,
+            { ...p, step: "LOOK", tries: 0 },
+            new Date(now.getTime() + DEBIT_RETRY_MS),
+        );
+    }
+
     private next(
         organizationId: string,
         payload: ChargeJobPayload,
@@ -454,6 +476,30 @@ export class SubscriptionChargeHandler {
                 paymentIntentId: intentId,
             });
         });
+    }
+
+    /**
+     * Autopay stood aside for a pay-link checkout the customer had open on
+     * the invoice (its charge is already CANCELLED): RENEWAL_FAILED
+     * (CHECKOUT_OPEN), so the renewal reads as not charged on Home and the
+     * subscription's history, and Retry is offered — by the pay link while
+     * the checkout is open, by autopay once it lapses. Not the team's
+     * "Payment failed" alert: nothing was declined, and that alert words
+     * only a FAILED intent.
+     */
+    private async stoodAside(
+        organizationId: string,
+        invoiceId: string,
+    ): Promise<void> {
+        await prisma.$transaction((tx) =>
+            recordChargeEventInTx(
+                tx,
+                organizationId,
+                invoiceId,
+                "RENEWAL_FAILED",
+                { reason: "CHECKOUT_OPEN" },
+            ),
+        );
     }
 
     /** Above the limit at the debit: MANDATE_LIMIT_LOW, nothing charged. */

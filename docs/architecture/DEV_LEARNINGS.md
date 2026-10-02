@@ -2133,3 +2133,71 @@ ERROR with the release id, and rethrows the run's original error
 **Rule**: a "record the failure" step in a catch never replaces the failure
 it records.
 **Category**: jobs · reliability
+
+## Autopay — an abandoned pay-link checkout kept autopay off the invoice for good
+
+**Problem**: the batch-10 code review found that once a customer opened an
+invoice's pay-link checkout (or a "pay and authorise" one) and walked away,
+autopay could never charge that invoice again. Retry by autopay answered
+409 "The customer is paying this by link" forever, the screen kept offering
+that Retry, and a renewal charge refused for it ended silently.
+**Root cause**: `OPEN_CHECKOUT_WHERE` counted any CREATED, REQUIRES_PAYMENT
+or PROCESSING pay-link intent as open, and nothing ever closes an abandoned
+one: the pending sweep stops asking after `LOOKUP_WINDOW_MS` and never moves
+it. `mandateRetryable` didn't ask about checkouts at all, and the charge
+job's CHECKOUT_OPEN refusal fell into "nothing to say".
+**Fix**: `charge-under-way.ts` now has `openCheckoutWhere()`: open only
+within `CHECKOUT_LIFE_MS` of its creation, which is `LOOKUP_WINDOW_MS` (a
+pay link's Razorpay order has no expiry of its own; the authorise order's
+is a day). `mandateRetryable` answers no while one is open, so Retry offers
+the pay link. The charge job writes RENEWAL_FAILED (`CHECKOUT_OPEN`) when it
+stands aside, so Home and the history say autopay didn't charge
+(`subscriptions.charge.db.spec.ts`).
+**Rule**: a state that blocks money must have a way to end. Bound "open" by
+the provider object's life, and make the screen's offer use the same rule
+as the action it offers.
+**Category**: payments · autopay
+
+## Autopay — a pay-link checkout whose first try failed could still be paid
+
+**Problem**: the batch-10 code review found that a card autopay Retry could
+debit an invoice while the customer was still paying it in the pay link's
+checkout: their first UPI try had failed, so the checkout counted as closed.
+**Root cause**: `payment.failed` moves a pay-link intent to FAILED, but a
+Razorpay checkout retries on the same order, and the customer can still pay
+it. "Open" listed only CREATED, REQUIRES_PAYMENT and PROCESSING.
+**Fix**: `openCheckoutWhere()` counts a FAILED pay-link intent within the
+checkout's life as open too. Nothing looks a FAILED intent up, so the life
+(`CHECKOUT_LIFE_MS`) is what ends it (`subscriptions.charge.db.spec.ts`).
+**Rule**: an intent's status is Saroh's last word on one attempt, not on
+the provider order. Ask whether the order can still take money.
+**Category**: payments · autopay
+
+## Autopay — a crashed debit was never looked up once autopay was cancelled
+
+**Problem**: the batch-10 code review found that a debit claimed
+(PROCESSING) by a run that died before it asked the provider or wrote its
+look-up stayed "Autopay charge in progress" for good if the customer
+cancelled autopay, or the subscription ended, before the job came again.
+**Root cause**: the release-review fix looked such a charge up only when
+`charge()` answered ALREADY. But `debit()` first asked `stillCharging`, which
+lets the charge go when the mandate is no longer chargeable — and `letGo`
+leaves a PROCESSING intent as it is. `charge()`'s claim fallback likewise
+refused (a no-op on PROCESSING) instead of answering ALREADY.
+**Fix**: `debit()` schedules the LOOK for a PROCESSING intent before the
+gate, and the claim fallback answers ALREADY whenever the intent is
+PROCESSING (`subscriptions.charge.db.spec.ts`, `mandate-charges.db.spec.ts`).
+**Rule**: once money may have moved, finding out comes before every other
+gate. A "may we still charge?" check never decides whether to look.
+**Category**: payments · autopay · jobs
+
+## Invoices — number-format specs failed on 1 October
+
+**Problem**: `numbering.spec.ts` and `invoice-number.test.ts` began failing
+on 2026-10-01 with no code change: "RC/26-27/10/…" where "09" was expected.
+**Root cause**: `numberFormatProblem` and `longestNumber` build their example
+from today's month, and the specs pinned the month they were written in.
+**Fix**: those assertions match any month (`\d{2}`).
+**Rule**: a spec that reads the real clock asserts only what holds every
+day, or passes a fixed date in.
+**Category**: tests · invoices

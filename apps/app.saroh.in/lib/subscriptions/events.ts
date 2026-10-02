@@ -147,7 +147,10 @@ export function changeWhat(
         case "RESUME_REFUSED":
             return "Couldn't resume on its own — Payments is off";
         case "RENEWAL_FAILED":
-            return `Renewal payment failed${invoice}`;
+            // Autopay stood aside: the customer was paying by link.
+            return data.reason === "CHECKOUT_OPEN"
+                ? `Autopay didn't charge — the customer was paying by link${invoice}`
+                : `Renewal payment failed${invoice}`;
         case "MANDATE_LIMIT_LOW":
             return "Not charged — above the autopay limit";
         case "MANDATE_SET_UP": {

@@ -1,6 +1,8 @@
 import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { LOOKUP_WINDOW_MS } from "../webhooks/payment-lookup-schedule";
+
 /**
  * One charge at a time per invoice (round-2 D13, DEC-038). While an
  * autopay charge is under way on an invoice, nothing else may take money
@@ -139,19 +141,43 @@ export async function subscriptionChargesUnderWay(
 /**
  * The other half of "one charge at a time": a pay-link checkout the
  * customer has open on the invoice. A sale's intent that isn't autopay's
- * (no mandate, no `purpose`, so never D12B's ₹1 check), still open. Retiring
+ * (no mandate, no `purpose`, so never D12B's ₹1 check), not yet paid. Retiring
  * the link wouldn't stop it: the checkout already holds its provider order,
  * and the customer can finish it. So while one is open, autopay neither
- * queues, prepares nor debits a charge on the invoice.
+ * queues, prepares nor debits a charge on the invoice, and Retry offers the
+ * pay link, not autopay (`mandateRetryable`).
  *
- * A checkout the customer walked away from stays open, and keeps autopay
- * off this invoice; the pay link, as before autopay, is the way to be paid.
+ * A checkout is open only within its life, {@link CHECKOUT_LIFE_MS} from
+ * when it was made. A pay link's Razorpay order carries no expiry of its own
+ * (`createOrderIntent` sends none), and a "pay and authorise" order's
+ * expires with its set-up (`SETUP_TTL_MS`, a day), inside it. So the life is
+ * the pending sweep's window (`LOOKUP_WINDOW_MS`): the time Saroh still asks
+ * the provider about the order, and settles a late capture. One abandoned
+ * longer no longer keeps autopay off the invoice for good; a payment on it
+ * after that is settled by its webhook, as owed back if autopay took the
+ * invoice first.
+ *
+ * A checkout whose attempt FAILED counts too, within the same life: a
+ * Razorpay checkout retries on the same order, and the customer can still
+ * pay it. Nothing looks a FAILED intent up (the sweep asks open ones only),
+ * so no "no capture" answer can close it sooner; its life does.
+ *
+ * Measured against the wall clock, not a caller's `now`: `createdAt` is the
+ * database's.
  */
-export const OPEN_CHECKOUT_WHERE = {
-    viaMandateId: null,
-    purpose: null,
-    status: { in: OPEN_MANDATE_CHARGE },
-} satisfies Prisma.PaymentIntentWhereInput;
+export const CHECKOUT_LIFE_MS = LOOKUP_WINDOW_MS;
+
+/** The where of a pay-link checkout open now (above). */
+export function openCheckoutWhere(
+    now: Date = new Date(),
+): Prisma.PaymentIntentWhereInput {
+    return {
+        viaMandateId: null,
+        purpose: null,
+        status: { in: [...OPEN_MANDATE_CHARGE, "FAILED"] },
+        createdAt: { gt: new Date(now.getTime() - CHECKOUT_LIFE_MS) },
+    };
+}
 
 /** Whether a pay-link checkout is open on the invoice (above). */
 export async function checkoutOpenOn(
@@ -160,7 +186,7 @@ export async function checkoutOpenOn(
     invoiceId: string,
 ): Promise<boolean> {
     const open = await db.paymentIntent.findFirst({
-        where: { organizationId, invoiceId, ...OPEN_CHECKOUT_WHERE },
+        where: { organizationId, invoiceId, ...openCheckoutWhere() },
         select: { id: true },
     });
     return open !== null;

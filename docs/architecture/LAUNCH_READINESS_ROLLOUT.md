@@ -513,6 +513,13 @@ notes (P1, P3, Z2a, D13B, WHSECRET, F10b) are in
 - **Provider deadlines on the other calls** (release review): create order,
   refunds, billing subscriptions, WhatsApp and email still have no timeout.
   Give them `providerCallSignal()` as the lookups and mandate calls have.
+    - A sweep or hold-release run can outlive its job lease when a provider
+      hangs: lookups go one at a time, so 15 s × a 50-intent batch is about
+      750 s against `JOB_VISIBILITY_MS` (300 s), and a second run starts
+      beside the first. Settlement is idempotent, so it costs calls and
+      WARN noise, not money. Before `RAZORPAY_AUTOPAY` goes on, give
+      `lookUpAll` and `confirmHoldPayment` a wall-clock budget under the
+      lease, or look up a few at a time (code review, batch 10).
 - Optional: delete `components/invoices/payments-denied.tsx` once no route
   uses it (DEC-070 plan).
 

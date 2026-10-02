@@ -768,6 +768,33 @@ describe("a mandate call Razorpay never answers (release review)", () => {
         expect(err.message).toBe("Razorpay notice failed: network error");
         expect(timeout).toHaveBeenCalledWith(15_000);
     }, 2_000);
+
+    it("a debit that never answers is UNKNOWN, asked once and never re-sent (code review)", async () => {
+        const timeout = hangUntilAborted();
+        // The order has no debit yet and the customer is found; then the
+        // debit itself hangs.
+        fetchMock
+            .mockReturnValueOnce(answer(200, { items: [] }))
+            .mockReturnValueOnce(answer(200, { id: RZP.customerId }));
+        const CHARGE = {
+            reference: "inv_cminvoice000000000001_1",
+            providerIntentId: RZP.chargeOrderId,
+            providerMandateId: RZP.tokenId,
+            providerCustomerId: RZP.customerId,
+            amountCents: 120000,
+            currency: "INR",
+            credentials: CREDS,
+        };
+        const err = await outcome(mandates.charge(CHARGE));
+        // Unsure, so looked up later: never REFUSED, which would fail it.
+        expect(err.outcome).toBe("UNKNOWN");
+        const debits = fetchMock.mock.calls.filter(([url]) =>
+            String(url).endsWith("/payments/create/recurring"),
+        );
+        expect(debits).toHaveLength(1);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+        expect(timeout).toHaveBeenCalledWith(15_000);
+    }, 2_000);
 });
 
 describe("cancel", () => {
