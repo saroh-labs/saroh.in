@@ -2157,3 +2157,18 @@ stands aside, so Home and the history say autopay didn't charge
 the provider object's life, and make the screen's offer use the same rule
 as the action it offers.
 **Category**: payments · autopay
+
+## Autopay — a pay-link checkout whose first try failed could still be paid
+
+**Problem**: the batch-10 code review found that a card autopay Retry could
+debit an invoice while the customer was still paying it in the pay link's
+checkout: their first UPI try had failed, so the checkout counted as closed.
+**Root cause**: `payment.failed` moves a pay-link intent to FAILED, but a
+Razorpay checkout retries on the same order, and the customer can still pay
+it. "Open" listed only CREATED, REQUIRES_PAYMENT and PROCESSING.
+**Fix**: `openCheckoutWhere()` counts a FAILED pay-link intent within the
+checkout's life as open too. Nothing looks a FAILED intent up, so the life
+(`CHECKOUT_LIFE_MS`) is what ends it (`subscriptions.charge.db.spec.ts`).
+**Rule**: an intent's status is Saroh's last word on one attempt, not on
+the provider order. Ask whether the order can still take money.
+**Category**: payments · autopay

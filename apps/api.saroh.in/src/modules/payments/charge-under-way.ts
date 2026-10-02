@@ -141,7 +141,7 @@ export async function subscriptionChargesUnderWay(
 /**
  * The other half of "one charge at a time": a pay-link checkout the
  * customer has open on the invoice. A sale's intent that isn't autopay's
- * (no mandate, no `purpose`, so never D12B's ₹1 check), still open. Retiring
+ * (no mandate, no `purpose`, so never D12B's ₹1 check), not yet paid. Retiring
  * the link wouldn't stop it: the checkout already holds its provider order,
  * and the customer can finish it. So while one is open, autopay neither
  * queues, prepares nor debits a charge on the invoice, and Retry offers the
@@ -157,6 +157,11 @@ export async function subscriptionChargesUnderWay(
  * after that is settled by its webhook, as owed back if autopay took the
  * invoice first.
  *
+ * A checkout whose attempt FAILED counts too, within the same life: a
+ * Razorpay checkout retries on the same order, and the customer can still
+ * pay it. Nothing looks a FAILED intent up (the sweep asks open ones only),
+ * so no "no capture" answer can close it sooner; its life does.
+ *
  * Measured against the wall clock, not a caller's `now`: `createdAt` is the
  * database's.
  */
@@ -169,7 +174,7 @@ export function openCheckoutWhere(
     return {
         viaMandateId: null,
         purpose: null,
-        status: { in: OPEN_MANDATE_CHARGE },
+        status: { in: [...OPEN_MANDATE_CHARGE, "FAILED"] },
         createdAt: { gt: new Date(now.getTime() - CHECKOUT_LIFE_MS) },
     };
 }

@@ -615,6 +615,53 @@ describe("a decline", () => {
         await offHome(invoice.id);
     });
 
+    it("a checkout whose first attempt failed still blocks a card's Retry by autopay: its order takes another (code review)", async () => {
+        // A card: no notice, so a Retry would be debited at once.
+        fake.preDebitMethods.clear();
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        const [charged] = await intentsOf(invoice.id);
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: charged.providerIntentId,
+        });
+        expect((await intentsOf(invoice.id))[0].status).toBe("FAILED");
+
+        // The customer's first try in the pay link's checkout fails; the
+        // checkout stays open on the same Razorpay order.
+        const { token } = await invoices.createPayLink(owner, invoice.id);
+        await publicInvoices.createIntent(token, {});
+        const checkout = await prisma.paymentIntent.findFirstOrThrow({
+            where: { invoiceId: invoice.id, viaMandateId: null },
+        });
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: checkout.providerIntentId,
+        });
+        expect(
+            (
+                await prisma.paymentIntent.findUniqueOrThrow({
+                    where: { id: checkout.id },
+                })
+            ).status,
+        ).toBe("FAILED");
+
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("PAY_LINK");
+        const debits = calls("charge").length;
+        await expect(
+            subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
+        ).rejects.toThrow("The customer is paying this by link.");
+        expect(await intentsOf(invoice.id)).toHaveLength(1);
+        expect(calls("charge")).toHaveLength(debits);
+        await offHome(invoice.id);
+    });
+
     it("a charge that stands aside for an open checkout says so (code review)", async () => {
         const who = await autopayMember();
         const invoice = await renew(who.subscriptionId);
