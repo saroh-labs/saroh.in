@@ -8,8 +8,8 @@ import { chargePlan } from "../subscriptions/autopay-timing";
 import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
 import {
     checkoutOpenOn,
-    OPEN_CHECKOUT_WHERE,
     OPEN_MANDATE_CHARGE,
+    openCheckoutWhere,
 } from "./charge-under-way";
 import { mandateChargingOn } from "./mandate-charge-gate";
 import {
@@ -470,7 +470,7 @@ export class MandateChargesService {
                 invoice: {
                     is: {
                         status: "ISSUED",
-                        paymentIntents: { none: OPEN_CHECKOUT_WHERE },
+                        paymentIntents: { none: openCheckoutWhere() },
                     },
                 },
             },
@@ -755,8 +755,10 @@ export class MandateChargesService {
     /**
      * Whether each subscription's unpaid renewal can be retried through
      * its autopay (D13, default 35): `MANDATE` when it has a chargeable
-     * mandate and its latest unpaid invoice is within the limit. Anything
-     * else is a pay link. Callers check "a charge is under way" apart.
+     * mandate and its latest unpaid invoice is within the limit, with no
+     * pay-link checkout open on it (`checkoutOpenOn`: Retry by autopay would
+     * be refused, so the screen offers the link). Anything else is a pay
+     * link. Callers check "a charge is under way" apart.
      */
     async mandateRetryable(
         organizationId: string,
@@ -775,11 +777,12 @@ export class MandateChargesService {
                     { issuedAt: { sort: "desc", nulls: "last" } },
                     { id: "desc" },
                 ],
-                select: { total: true, currency: true },
+                select: { id: true, total: true, currency: true },
             });
             if (
                 invoice?.currency === mandate.currency &&
-                toMinor(invoice.total) <= mandate.maxAmountCents
+                toMinor(invoice.total) <= mandate.maxAmountCents &&
+                !(await checkoutOpenOn(prisma, organizationId, invoice.id))
             ) {
                 retryable.add(subscriptionId);
             }

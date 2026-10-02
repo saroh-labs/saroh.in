@@ -159,6 +159,8 @@ export class SubscriptionChargeHandler {
                         intent.id,
                         "PROVIDER_REFUSED",
                     );
+                } else if (result.reason === "CHECKOUT_OPEN") {
+                    await this.stoodAside(organizationId, p.invoiceId);
                 }
                 return;
         }
@@ -240,6 +242,9 @@ export class SubscriptionChargeHandler {
                         intent.id,
                         "PROVIDER_REFUSED",
                     );
+                }
+                if (result.reason === "CHECKOUT_OPEN") {
+                    return this.stoodAside(organizationId, p.invoiceId);
                 }
                 // Paid another way, the mandate ended, or another
                 // subscription's: nothing to say; the pay link stands.
@@ -454,6 +459,30 @@ export class SubscriptionChargeHandler {
                 paymentIntentId: intentId,
             });
         });
+    }
+
+    /**
+     * Autopay stood aside for a pay-link checkout the customer had open on
+     * the invoice (its charge is already CANCELLED): RENEWAL_FAILED
+     * (CHECKOUT_OPEN), so the renewal reads as not charged on Home and the
+     * subscription's history, and Retry is offered — by the pay link while
+     * the checkout is open, by autopay once it lapses. Not the team's
+     * "Payment failed" alert: nothing was declined, and that alert words
+     * only a FAILED intent.
+     */
+    private async stoodAside(
+        organizationId: string,
+        invoiceId: string,
+    ): Promise<void> {
+        await prisma.$transaction((tx) =>
+            recordChargeEventInTx(
+                tx,
+                organizationId,
+                invoiceId,
+                "RENEWAL_FAILED",
+                { reason: "CHECKOUT_OPEN" },
+            ),
+        );
     }
 
     /** Above the limit at the debit: MANDATE_LIMIT_LOW, nothing charged. */

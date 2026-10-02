@@ -2133,3 +2133,27 @@ ERROR with the release id, and rethrows the run's original error
 **Rule**: a "record the failure" step in a catch never replaces the failure
 it records.
 **Category**: jobs · reliability
+
+## Autopay — an abandoned pay-link checkout kept autopay off the invoice for good
+
+**Problem**: the batch-10 code review found that once a customer opened an
+invoice's pay-link checkout (or a "pay and authorise" one) and walked away,
+autopay could never charge that invoice again. Retry by autopay answered
+409 "The customer is paying this by link" forever, the screen kept offering
+that Retry, and a renewal charge refused for it ended silently.
+**Root cause**: `OPEN_CHECKOUT_WHERE` counted any CREATED, REQUIRES_PAYMENT
+or PROCESSING pay-link intent as open, and nothing ever closes an abandoned
+one: the pending sweep stops asking after `LOOKUP_WINDOW_MS` and never moves
+it. `mandateRetryable` didn't ask about checkouts at all, and the charge
+job's CHECKOUT_OPEN refusal fell into "nothing to say".
+**Fix**: `charge-under-way.ts` now has `openCheckoutWhere()`: open only
+within `CHECKOUT_LIFE_MS` of its creation, which is `LOOKUP_WINDOW_MS` (a
+pay link's Razorpay order has no expiry of its own; the authorise order's
+is a day). `mandateRetryable` answers no while one is open, so Retry offers
+the pay link. The charge job writes RENEWAL_FAILED (`CHECKOUT_OPEN`) when it
+stands aside, so Home and the history say autopay didn't charge
+(`subscriptions.charge.db.spec.ts`).
+**Rule**: a state that blocks money must have a way to end. Bound "open" by
+the provider object's life, and make the screen's offer use the same rule
+as the action it offers.
+**Category**: payments · autopay

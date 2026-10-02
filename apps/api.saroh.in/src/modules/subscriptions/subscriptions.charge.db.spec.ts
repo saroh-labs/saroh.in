@@ -31,7 +31,10 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { failedRenewals } from "../home/home-money-sources";
 import { InvoicesService } from "../invoices/invoices.service";
-import { chargeUnderWayOn } from "../payments/charge-under-way";
+import {
+    CHECKOUT_LIFE_MS,
+    chargeUnderWayOn,
+} from "../payments/charge-under-way";
 import { MandateChargesService } from "../payments/mandate-charges.service";
 import { MandateSetupService } from "../payments/mandate-setup.service";
 import { PaymentsService } from "../payments/payments.service";
@@ -233,6 +236,16 @@ const eventsOf = async (subscriptionId: string) =>
     ).map((e) => e.kind);
 
 const calls = (op: string) => fake.mandateCalls.filter((c) => c.op === op);
+
+/**
+ * Paid by hand, so this renewal leaves Home's failed renewals: Home shows
+ * only the first few, and later specs read it.
+ */
+const offHome = (invoiceId: string) =>
+    prisma.invoice.update({
+        where: { id: invoiceId },
+        data: { status: "PAID", paidAt: new Date() },
+    });
 
 /** Prepare, deliver the notice, debit: the charge as far as the bank. */
 async function chargeToBank(invoiceId: string) {
@@ -546,6 +559,11 @@ describe("a decline", () => {
         });
         expect(["CREATED", "REQUIRES_PAYMENT"]).toContain(checkout.status);
 
+        // The screen offers the link, not a Retry that would be refused.
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("PAY_LINK");
+
         // Retry by autopay would debit them as well: refused, nothing queued.
         await expect(
             subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
@@ -558,6 +576,76 @@ describe("a decline", () => {
                 (j) => (j.payload as { step: string }).step,
             ),
         ).not.toContain("PREPARE");
+    });
+
+    it("a checkout abandoned past its life no longer keeps autopay off the invoice (code review)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        const { orderId } = await chargeToBank(invoice.id);
+        fake.answerCharge(orderId, "FAILED");
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: orderId,
+        });
+        // The customer opened the pay link's checkout and walked away.
+        const { token } = await invoices.createPayLink(owner, invoice.id);
+        await publicInvoices.createIntent(token, {});
+        const checkout = await prisma.paymentIntent.findFirstOrThrow({
+            where: { invoiceId: invoice.id, viaMandateId: null },
+        });
+        expect(checkout.status).toBe("REQUIRES_PAYMENT");
+        await prisma.paymentIntent.update({
+            where: { id: checkout.id },
+            data: { createdAt: new Date(Date.now() - CHECKOUT_LIFE_MS - HOUR) },
+        });
+
+        // Autopay is offered again, and Retry by autopay queues a charge.
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("MANDATE");
+        await expect(
+            subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
+        ).resolves.toEqual({
+            invoiceId: invoice.id,
+            via: "MANDATE",
+            token: null,
+        });
+        expect(await intentsOf(invoice.id)).toHaveLength(2);
+        await offHome(invoice.id);
+    });
+
+    it("a charge that stands aside for an open checkout says so (code review)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        // A checkout open on the invoice, made in the moment before the
+        // charge was queued.
+        await prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                invoiceId: invoice.id,
+                provider: "RAZORPAY",
+                amountCents: 120_000,
+                currency: "INR",
+                status: "REQUIRES_PAYMENT",
+                providerIntentId: `order_link_${next()}`,
+            },
+        });
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        expect(calls("prepareCharge")).toHaveLength(0);
+        expect((await intentsOf(invoice.id))[0].status).toBe("CANCELLED");
+        expect(
+            await prisma.subscriptionEvent.findFirst({
+                where: {
+                    subscriptionId: who.subscriptionId,
+                    kind: "RENEWAL_FAILED",
+                },
+            }),
+        ).toMatchObject({
+            invoiceId: invoice.id,
+            data: { reason: "CHECKOUT_OPEN" },
+        });
+        await offHome(invoice.id);
     });
 
     it("a notice that fails: no debit, RENEWAL_FAILED (NOTICE_FAILED), the pay link opens", async () => {
