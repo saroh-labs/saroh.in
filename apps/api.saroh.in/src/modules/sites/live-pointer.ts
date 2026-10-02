@@ -62,17 +62,24 @@ export type LiveTx = Pick<
  * write. Under READ COMMITTED, a read after the lock sees whatever the
  * previous holder committed.
  *
- * FOR NO KEY UPDATE, not FOR UPDATE: it conflicts with every other putLive
- * and every write to the site, but not with the FOR KEY SHARE an insert
- * naming the site takes (a Publication, an approval, a page), so edits and
- * test releases made while a version goes live wait for nothing
- * (`backend-data-and-money.md`, locks).
+ * FOR UPDATE, at the strength of the write it guards. `putLive` ends by
+ * setting `currentPublicationId`, which is `@unique`
+ * (`Site_currentPublicationId_key`), so Postgres takes that UPDATE as a key
+ * update, which needs FOR UPDATE. A weaker lock here (FOR NO KEY UPDATE)
+ * would be upgraded mid-transaction, and the upgrade deadlocks (40P01) with
+ * a transaction that inserted a row naming the site (FOR KEY SHARE, for the
+ * foreign key) and then writes the Site: a web-address change does exactly
+ * that. Taken at full strength from the start, the publish waits for such a
+ * transaction before holding anything it needs, and the two queue. An
+ * insert naming the site waits while a version goes live, which the UPDATE
+ * would make it do anyway (`backend-data-and-money.md`, locks;
+ * `live-pointer.db.spec.ts`).
  */
 export async function lockSite(
     tx: Pick<Prisma.TransactionClient, "$queryRaw">,
     siteId: string,
 ): Promise<void> {
-    await tx.$queryRaw`SELECT id FROM "Site" WHERE id = ${siteId} FOR NO KEY UPDATE`;
+    await tx.$queryRaw`SELECT id FROM "Site" WHERE id = ${siteId} FOR UPDATE`;
 }
 
 /**

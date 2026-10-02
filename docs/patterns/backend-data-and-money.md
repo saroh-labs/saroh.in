@@ -82,6 +82,8 @@
   collection memberships, listings and shelves deleted explicitly, and the
   product last (a lock conflict left over is a 409 to try again). Only the
   merge's loser, deleted with the API stopped, takes FOR UPDATE first.
+  NO KEY UPDATE holds only while nothing the transaction writes to the
+  product touches a key column (next rule).
   Whether a product counts stock is `Product.stockTracked` and the
   business's `BusinessProfile.stockTracking` (#515), not whether it has a
   row: an untracked product keeps its rows at 0 for the log, so every
@@ -94,6 +96,20 @@
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row
   mixing two businesses.
+- **Current** — **A row lock is taken at the strength of the write that
+  follows it** (release review of DEC-071, `sites/live-pointer.ts`).
+  Postgres takes an UPDATE that sets a key column — the primary key or any
+  column in a unique index, such as `Site.currentPublicationId` or
+  `Site.subdomain` — as a key update, which needs FOR UPDATE; any other
+  UPDATE needs only FOR NO KEY UPDATE. Lock FOR NO KEY UPDATE first and then
+  write a key column, and the lock is upgraded mid-transaction: it waits on
+  every FOR KEY SHARE (an insert naming the row, for its foreign key) while
+  already holding a lock, and deadlocks (40P01) with a transaction that
+  inserted a child and then writes the row, as a web-address change does.
+  So: FOR UPDATE when the transaction will set a key column of the row;
+  FOR NO KEY UPDATE (which lets those inserts through) only when none of
+  its writes to the row does. Pinned for the site by
+  `live-pointer.db.spec.ts`.
 - **Current** — **An order's number comes from `nextOrderNumberInTx`, in the
   order's transaction** (DEC-066, P3). One `ORD-` series per business across
   its storefronts, counted in `OrderNumberSequence`; never `count + 1`, which

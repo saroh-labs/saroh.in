@@ -1874,8 +1874,9 @@ overwritten, which KTD-14 says must never happen.
 UPDATE; `putLive` takes it first, so every way of going live is serialised
 per site, and the job takes it before it reads the pointer, so a publish in
 flight is either committed and seen ("The site was published at …") or
-waits. FOR NO KEY UPDATE rather than FOR UPDATE, so inserts naming the site
-(its FK's KEY SHARE) don't wait on a publish.
+waits. (It first took FOR NO KEY UPDATE, so inserts naming the site would
+not wait on a publish; that deadlocked, and it is FOR UPDATE now: see
+"a site lock that the publish's own UPDATE upgraded" below.)
 **Rule**: a job that decides from a row whether to write must take the lock
 the competing writers take, before it reads. Pinned by
 `test-release-schedule.db.spec.ts` "doesn't go live over a publish that
@@ -2133,3 +2134,30 @@ ERROR with the release id, and rethrows the run's original error
 **Rule**: a "record the failure" step in a catch never replaces the failure
 it records.
 **Category**: jobs · reliability
+
+## Sites — a site lock that the publish's own UPDATE upgraded could deadlock (release review)
+
+**Symptom**: found in the review of the release-review fixes, before it
+shipped. A publish (or restore, or go-live) at the moment the business
+changes its web address could fail with `deadlock detected` (40P01), as a
+500 on one side or the other.
+**Cause**: `lockSite` took the Site row FOR NO KEY UPDATE, so inserts naming
+the site (FOR KEY SHARE, for the foreign key) would not wait on a publish.
+But `putLive` then sets `Site.currentPublicationId`, which is `@unique`, and
+Postgres takes an UPDATE of a column in a unique index as a key update,
+which needs FOR UPDATE. The lock was upgraded mid-transaction. A web-address
+change inserts an `AddressReservation` naming the site (KEY SHARE) and then
+sets `Site.subdomain`: the publish, holding NO KEY UPDATE, waited for the
+change's KEY SHARE to upgrade, and the change waited for the publish's NO
+KEY UPDATE to write the Site. Neither could go on.
+**Fix**: `lockSite` takes FOR UPDATE from the start, so a publish waits for
+the change before it holds anything the change needs, and the two queue.
+Pinned by `live-pointer.db.spec.ts` "queues behind a web-address change
+rather than deadlocking with it", which deadlocks every run on the old lock.
+**Rule**: a lock that a later UPDATE in the same transaction will upgrade
+must be taken at the strength of that UPDATE: FOR UPDATE when the
+transaction sets a key column (the primary key or any unique column), FOR
+NO KEY UPDATE only when none of its writes to the row does
+(`backend-data-and-money.md`, "A row lock is taken at the strength of the
+write that follows it").
+**Category**: sites · locks · concurrency
