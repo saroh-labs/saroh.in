@@ -2314,4 +2314,8 @@ CodeQL; a value rebuilt behind a constant scheme is. `mediaSrc` (now `lib/media/
 rebuilt address rather than the text typed, and the picker's probe reads through it. The SARIF code
 flow (`gh api -H "Accept: application/sarif+json" …/code-scanning/analyses/<id>`) names the real
 source, which the alert page doesn't.
+**Second follow-up (#775 → #772)**: the remaining flow ran only through the bare-path branch
+(`/${value.slice(1)}`). A leading `/` is not a safe prefix to CodeQL (`/\evil.com` reads as another
+host in some browsers), and storage never returns a bare path (R2 and the memory adapter both give an
+absolute `https://` address), so `mediaSrc` no longer accepts one.
 **Category**: security · CodeQL
