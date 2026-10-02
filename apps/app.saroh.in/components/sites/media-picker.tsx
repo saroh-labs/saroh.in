@@ -6,6 +6,7 @@ import { ImagePlus } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { completeUpload, createUpload } from "@/lib/media/actions";
+import { mediaSrc } from "@/lib/media/media-src";
 
 /** What a picked image hands back — the shape the section contract accepts. */
 export interface PickedImage {
@@ -328,7 +329,9 @@ function readVideo(file: File): Promise<{
             // A frame a little way in: the very first is often black.
             video.currentTime = Math.min(0.5, (video.duration || 1) / 2);
         };
-        video.src = url;
+        // Always a blob: address for the picked file; read through the one
+        // allow-list so nothing else can reach a media source.
+        video.src = mediaSrc(url) ?? "";
     });
 }
 

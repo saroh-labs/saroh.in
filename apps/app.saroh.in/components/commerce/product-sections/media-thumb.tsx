@@ -1,8 +1,8 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Play } from "lucide-react";
 
+import { mediaSrc } from "@/lib/media/media-src";
 import { formatDuration } from "@/lib/products/editor-sections";
-import { mediaSrc } from "@/lib/products/media-src";
 
 /**
  * One photo or video of a product, as a still (#517). A photo is itself; a
