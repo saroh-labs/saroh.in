@@ -55,7 +55,15 @@ describe("Business Calendar month (DB)", () => {
             })
         ).id;
         const org = await prisma.organization.create({
-            data: { name: "Rye & Co.", slug: `calendar-org-${tag}` },
+            data: {
+                name: "Rye & Co.",
+                slug: `calendar-org-${tag}`,
+                // Joined before the month the spec reads (NOW is fixed):
+                // left to the clock, it passed only until the calendar
+                // reached October, and then refused September as before
+                // the business joined.
+                createdAt: new Date("2026-08-01T06:00:00Z"),
+            },
         });
         ctx = { organizationId: org.id, userId: ownerId, role: "OWNER" };
         otherOrgId = (

@@ -148,6 +148,15 @@ seconds). Shared setup is `.github/actions/setup`.
 - **Current** — all five layers exist.
 - **Adopted** — **Show that a structural spec can fail:** remove what it pins and
   watch it name the break.
+- **Current** — **A race test waits on `pg_locks`, never on a sleep.** Hold
+  one transaction open at a known point, start the other, and
+  `waitUntilBlockedBy(pid)` (`apps/api.saroh.in/test/lock-wait.ts`) until
+  Postgres shows it waiting on the first; only then let the first go on. A
+  sleep only guesses the overlap, so on a slow run the race never happens
+  and the test passes with its lock removed. Prove it: run it five times,
+  then five times with the lock removed, and it must fail every time.
+  `src/common/db-spec-sleeps.spec.ts` fails on a new `setTimeout` in a
+  `*.db.spec.ts`.
 - **Adopted** — **Production confidence is more than unit tests** — critical
   journeys get browser coverage (PRODUCT_STRATEGY §27, `frontend-verification.md`).
 
