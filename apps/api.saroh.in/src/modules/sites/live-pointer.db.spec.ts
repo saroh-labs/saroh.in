@@ -172,4 +172,50 @@ describe("putLive's site lock (KTD-3)", () => {
             currentPublicationId: live.publicationId,
         });
     });
+
+    it("puts versions live one at a time: a restore waits for a publish, then reads what it committed", async () => {
+        const b = await business();
+
+        // A publish that has put its version live and not yet committed.
+        // Before it commits it also turns "Publishing needs approval" on,
+        // something putLive reads: a restore that waited for it sees the
+        // setting and is refused; one that read beside it would not.
+        const wrote = gate<{ pid: number; publicationId: string }>();
+        const commit = gate();
+        const publish = inTx(b, async (tx) => {
+            const pid = await backendPid(tx);
+            const live = await putLiveAgain(tx, b, "publish");
+            await tx.site.update({
+                where: { id: b.site.id },
+                data: { publishNeedsApproval: true },
+                select: { id: true },
+            });
+            wrote.release({ pid, publicationId: live.publicationId });
+            await commit.wait;
+            return live;
+        });
+        const first = await wrote.wait;
+
+        const restore = inTx(b, (tx) => putLiveAgain(tx, b, "restore"));
+        // Not a guess: Postgres shows the restore waiting on the publish.
+        await waitUntilBlockedBy(first.pid);
+
+        commit.release();
+        await publish;
+        await expect(restore).rejects.toMatchObject({
+            response: { details: { code: "APPROVAL_REQUIRED" } },
+        });
+
+        // The publish's version stays live, and the restore wrote nothing.
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: b.site.id },
+            select: { currentPublicationId: true },
+        });
+        expect(site.currentPublicationId).toBe(first.publicationId);
+        expect(
+            await prisma.publication.count({
+                where: { siteId: b.site.id, kind: "LIVE" },
+            }),
+        ).toBe(2);
+    });
 });
