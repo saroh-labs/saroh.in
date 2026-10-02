@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useId, useState, useSyncExternalStore } from "react";
+import { trimTrailingSlashes } from "./url-path";
 
 /**
  * The two parts of the site header that need the browser (G17): which menu
@@ -50,7 +51,7 @@ function useCurrentPath(): string | null {
 
 /** "/about/" and "/about" are the same page; "" is home. */
 function samePath(a: string, b: string): boolean {
-    const norm = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
+    const norm = (p: string) => (p.length > 1 ? trimTrailingSlashes(p) : p);
     return norm(a || "/") === norm(b || "/");
 }
 

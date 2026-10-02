@@ -33,9 +33,19 @@ const site = (
     },
 });
 
+/** Tags removed until none is left: one pass can leave a tag that two halves
+ * make (CodeQL js/incomplete-multi-character-sanitization). */
+function stripTags(html: string): string {
+    let out = html;
+    for (let before = ""; before !== out;) {
+        before = out;
+        out = out.replace(/<[^>]+>/g, "");
+    }
+    return out;
+}
+
 const text = (html: string) =>
-    html
-        .replace(/<[^>]+>/g, "")
+    stripTags(html)
         .replace(/&#x27;/g, "'")
         .replace(/&amp;/g, "&");
 

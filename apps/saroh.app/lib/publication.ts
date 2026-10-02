@@ -8,6 +8,7 @@ import { classifySiteHost } from "@/lib/site-host-mode";
 import { SITE_RELAY_HEADER } from "@/lib/site-relay";
 import type { TestReleaseInfo } from "@/lib/test-release";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
+import { trimTrailingSlashes } from "@saroh/site-blocks/url-path";
 
 /**
  * Public publication client for the multi-tenant renderer (S2-006).
@@ -279,7 +280,7 @@ export async function getPublicationByHostname(
 function normalizePath(path: string): string {
     if (!path || path === "/") return "/";
     // Strip a trailing slash (but keep the leading one).
-    const trimmed = path.replace(/\/+$/, "");
+    const trimmed = trimTrailingSlashes(path);
     return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 

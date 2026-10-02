@@ -48,9 +48,18 @@ const render = (attention: OrderAttention | null | undefined): string =>
 
 /** The card's words as they read on screen, without what only a screen reader hears. */
 function seen(html: string): string {
-    return html
-        .replace(/<span class="sr-only">[^<]*<\/span>/g, "")
-        .replace(/<[^>]+>/g, "");
+    return stripTags(html.replace(/<span class="sr-only">[^<]*<\/span>/g, ""));
+}
+
+/** Tags removed until none is left: one pass can leave a tag that two halves
+ * make (CodeQL js/incomplete-multi-character-sanitization). */
+function stripTags(html: string): string {
+    let out = html;
+    for (let before = ""; before !== out;) {
+        before = out;
+        out = out.replace(/<[^>]+>/g, "");
+    }
+    return out;
 }
 
 describe("CustomerCard — Needs attention (DEC-073)", () => {

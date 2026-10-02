@@ -2273,3 +2273,22 @@ CI's (critical fails, an unreachable registry warns), and never cached.
 **Rule**: a check whose answer changes with the outside world (advisories, leaks) is never cached
 by tree.
 **Category**: deps · security · gate
+
+## Security — CodeQL on the release PR (#772): trailing-slash and last-word regexes
+
+**Problem**: the release PR's CodeQL check failed on 8 new alerts: `js/polynomial-redos` in
+`site-chrome.tsx`, `account-header.tsx` and `option-summary.ts`, and incomplete sanitisation in five
+test files. Every batch had passed CI into `development`, where CodeQL doesn't run.
+**Root cause**: `s.replace(/\/+$/, "")` and `/^(.*?)([A-Za-z]+)$/` are quadratic on a long run that
+isn't at the end (benchmarked: 26 ms at 8 KB, 1.4 s at 64 KB). Who reaches them, following the method
+above: the renderer's request path (`saroh.app/lib/publication.ts`, not flagged but the most exposed,
+and the account header) is a visitor's URL, capped near 16 KB, so about 100 ms of server CPU per
+hostile request: a slowdown, not a hole. The nav href and option name are merchant fields under a
+contract cap: cleanup. The test-file alerts can't be reached by anyone.
+**Fix**: `trimTrailingSlashes` in `@saroh/site-blocks/url-path` (an index scan) replaces all seven
+`/\/+$/` uses; `plural` walks back for its last word; both have a timed test on hostile input. The
+tests escape whole strings for RegExp, use `replaceAll`, and strip tags until stable.
+**Rule**: CodeQL runs only on PRs to `main`, so the release PR is the first to see it. Read the
+code-scanning alerts on `refs/pull/<n>/merge` as soon as the release PR opens, and fix new ones in
+the same release.
+**Category**: security · CodeQL · ReDoS

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
+import { trimTrailingSlashes } from "./url-path";
 
 /**
  * The parts of a site that are not its pages: header and footer. Shared by
@@ -199,7 +200,7 @@ export function withShopLink(
     if (!shopServes) return [...menu];
     const opensShop = (item: SiteNavItem) =>
         item.kind === "SHOP" ||
-        item.href.replace(/\/+$/, "").toLowerCase() === SHOP_HREF;
+        trimTrailingSlashes(item.href).toLowerCase() === SHOP_HREF;
     if (menu.some(opensShop)) return [...menu];
     const shop: SiteNavItem = { label: "Shop", href: SHOP_HREF, kind: "SHOP" };
     if (menu.length === 0) return [{ label: "Home", href: "/" }, shop];

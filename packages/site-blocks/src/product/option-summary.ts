@@ -37,9 +37,14 @@ function lowerFirst(word: string): string {
  * A name already plural ("Kids sizes") or with no letters is kept.
  */
 export function plural(name: string): string {
-    const match = /^(.*?)([A-Za-z]+)$/.exec(name);
-    if (!match) return name;
-    const [, head = "", word = ""] = match;
+    // The last run of letters, found by walking back: the regex that read
+    // the same (/^(.*?)([A-Za-z]+)$/) was quadratic on a long name (CodeQL
+    // js/polynomial-redos, release #772).
+    let start = name.length;
+    while (start > 0 && /[A-Za-z]/.test(name.charAt(start - 1))) start--;
+    if (start === name.length) return name;
+    const head = name.slice(0, start);
+    const word = name.slice(start);
     const lower = word.toLowerCase();
     let out: string;
     if (/(?:s|x|z|ch|sh)$/.test(lower)) {
