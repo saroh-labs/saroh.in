@@ -78,7 +78,10 @@ async function subscribe(
             organizationId,
             planId: plan.id,
             status: "ACTIVE",
+            // A pending move is whole or absent (CHECK
+            // Subscription_pending_move_whole): plan and date together.
             pendingPlanId: pendingPlan?.id ?? null,
+            pendingFrom: pendingPlan ? new Date(Date.now() + 2 * DAY) : null,
         },
     });
 }
