@@ -1,10 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Job } from "@saroh/database";
+import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMoneyString } from "../../common/money";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
-import { OPEN_MANDATE_CHARGE } from "../payments/charge-under-way";
+import {
+    chargeUnderWayOn,
+    checkoutOpenUntil,
+    OPEN_MANDATE_CHARGE,
+} from "../payments/charge-under-way";
 import type { ChargeFailure } from "../payments/mandate-charge-outcome";
 import {
     failMandateChargeInTx,
@@ -16,6 +20,7 @@ import {
 } from "../payments/mandate-charges.service";
 import type { ChargeJobPayload } from "./charge-job";
 import {
+    chargeKey,
     chargePayloadOf,
     DEBIT_RETRY_MS,
     DEBIT_TRIES,
@@ -93,6 +98,8 @@ export class SubscriptionChargeHandler {
         now: Date,
     ): Promise<void> {
         const intent = await this.intentOf(organizationId, p);
+        // A charge that stood aside, due again now its checkout has closed.
+        if (!intent && p.resume) return this.resume(organizationId, p, now);
         if (!intent || !OPEN_MANDATE_CHARGE.includes(intent.status)) return;
         if (!(await this.stillCharging(organizationId, p, intent.id, now))) {
             return;
@@ -109,6 +116,7 @@ export class SubscriptionChargeHandler {
             key: p.key,
             debitAt: planned && planned > soonest ? planned : soonest,
             notBefore: planned,
+            now,
         });
         switch (result.status) {
             case "PREPARED": {
@@ -160,7 +168,7 @@ export class SubscriptionChargeHandler {
                         "PROVIDER_REFUSED",
                     );
                 } else if (result.reason === "CHECKOUT_OPEN") {
-                    await this.stoodAside(organizationId, p.invoiceId);
+                    await this.stoodAside(organizationId, p, now);
                 }
                 return;
         }
@@ -252,7 +260,7 @@ export class SubscriptionChargeHandler {
                     );
                 }
                 if (result.reason === "CHECKOUT_OPEN") {
-                    return this.stoodAside(organizationId, p.invoiceId);
+                    return this.stoodAside(organizationId, p, now);
                 }
                 // Paid another way, the mandate ended, or another
                 // subscription's: nothing to say; the pay link stands.
@@ -482,24 +490,135 @@ export class SubscriptionChargeHandler {
      * Autopay stood aside for a pay-link checkout the customer had open on
      * the invoice (its charge is already CANCELLED): RENEWAL_FAILED
      * (CHECKOUT_OPEN), so the renewal reads as not charged on Home and the
-     * subscription's history, and Retry is offered — by the pay link while
-     * the checkout is open, by autopay once it lapses. Not the team's
-     * "Payment failed" alert: nothing was declined, and that alert words
-     * only a FAILED intent.
+     * subscription's history. Not the team's "Payment failed" alert:
+     * nothing was declined, and that alert words only a FAILED intent.
+     *
+     * And autopay comes back on its own: a PREPARE under a new key is
+     * written, on the same transaction, for the moment that checkout stops
+     * counting as open (`checkoutOpenUntil`). Until then Retry offers the
+     * pay link; from then, the charge is queued again (`resume`) without
+     * the merchant pressing anything. It can't charge twice: every step
+     * still re-asks for an open checkout, and the debit's claim does too.
      */
     private async stoodAside(
         organizationId: string,
-        invoiceId: string,
+        p: ChargeJobPayload,
+        now: Date,
     ): Promise<void> {
-        await prisma.$transaction((tx) =>
-            recordChargeEventInTx(
+        await prisma.$transaction(async (tx) => {
+            await recordChargeEventInTx(
                 tx,
                 organizationId,
-                invoiceId,
+                p.invoiceId,
                 "RENEWAL_FAILED",
                 { reason: "CHECKOUT_OPEN" },
-            ),
+            );
+            await this.resumeWhenClosed(tx, organizationId, p, now);
+        });
+    }
+
+    /**
+     * The resume step, at the moment the checkout open on the invoice now
+     * closes (or now, should it have closed meanwhile). A new key: the
+     * charge that stood aside keeps its own, CANCELLED.
+     */
+    private async resumeWhenClosed(
+        tx: Prisma.TransactionClient,
+        organizationId: string,
+        p: ChargeJobPayload,
+        now: Date,
+    ): Promise<void> {
+        const until = await checkoutOpenUntil(
+            tx,
+            organizationId,
+            p.invoiceId,
+            now,
         );
+        const earlier = await tx.paymentIntent.count({
+            where: {
+                organizationId,
+                invoiceId: p.invoiceId,
+                viaMandateId: { not: null },
+                purpose: null,
+            },
+        });
+        await enqueueChargeStepInTx(
+            tx,
+            organizationId,
+            {
+                invoiceId: p.invoiceId,
+                mandateId: p.mandateId,
+                key: chargeKey(p.invoiceId, earlier + 1),
+                step: "PREPARE",
+                tries: 0,
+                resume: true,
+            },
+            until && until > now ? until : now,
+        );
+    }
+
+    /**
+     * The checkout a charge stood aside for has closed: queue the charge
+     * again, as the renewal did (`queueInTx`: the mandate still chargeable,
+     * the invoice ISSUED and within its limit, else MANDATE_LIMIT_LOW or
+     * nothing), under the subscription's lock that Retry takes, so the two
+     * never both queue one. A charge already under way (Retry got there
+     * first) is left alone; a checkout opened since puts it off again. The
+     * planned debit of the charge that stood aside (D13B) still holds.
+     */
+    private async resume(
+        organizationId: string,
+        p: ChargeJobPayload,
+        now: Date,
+    ): Promise<void> {
+        await prisma.$transaction(async (tx) => {
+            const owner = await tx.invoice.findFirst({
+                where: { id: p.invoiceId, organizationId },
+                select: { subscriptionId: true },
+            });
+            const subscriptionId = owner?.subscriptionId;
+            if (!subscriptionId) return;
+            await tx.$queryRaw`SELECT id FROM "CustomerSubscription" WHERE id = ${subscriptionId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+            const invoice = await tx.invoice.findFirst({
+                where: { id: p.invoiceId, organizationId },
+                select: {
+                    status: true,
+                    subscription: { select: { status: true } },
+                },
+            });
+            if (
+                invoice?.status !== "ISSUED" ||
+                invoice.subscription?.status === "CANCELLED"
+            ) {
+                return;
+            }
+            if (await chargeUnderWayOn(tx, organizationId, p.invoiceId)) {
+                return;
+            }
+            if (await checkoutOpenUntil(tx, organizationId, p.invoiceId, now)) {
+                return this.resumeWhenClosed(tx, organizationId, p, now);
+            }
+            const last = await tx.paymentIntent.findFirst({
+                where: {
+                    organizationId,
+                    invoiceId: p.invoiceId,
+                    viaMandateId: { not: null },
+                    purpose: null,
+                },
+                orderBy: { createdAt: "desc" },
+                select: { debitAfter: true },
+            });
+            await this.charges.queueInTx(tx, {
+                organizationId,
+                subscriptionId,
+                invoiceId: p.invoiceId,
+                now,
+                plannedDebitAt:
+                    last?.debitAfter && last.debitAfter > now
+                        ? last.debitAfter
+                        : null,
+            });
+        });
     }
 
     /** Above the limit at the debit: MANDATE_LIMIT_LOW, nothing charged. */

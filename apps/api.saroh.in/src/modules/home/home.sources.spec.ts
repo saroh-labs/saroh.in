@@ -105,6 +105,30 @@ describe("renewalTag", () => {
         ).toBe("Payment failed");
     });
 
+    it("says autopay didn't charge, not Payment failed, when it stood aside for a pay-link checkout (review 3)", () => {
+        expect(
+            renewalTag(
+                invoice,
+                "sub_1",
+                [
+                    {
+                        ...signal("RENEWAL_FAILED", ago(DAY)),
+                        reason: "CHECKOUT_OPEN",
+                    },
+                ],
+                NOW,
+            ),
+        ).toBe("Autopay didn't charge — paying by link");
+        expect(
+            renewalTag(
+                invoice,
+                "sub_1",
+                [{ ...signal("RENEWAL_FAILED", ago(DAY)), reason: "DECLINED" }],
+                NOW,
+            ),
+        ).toBe("Payment failed");
+    });
+
     it("says the autopay limit is too low after MANDATE_LIMIT_LOW", () => {
         expect(
             renewalTag(

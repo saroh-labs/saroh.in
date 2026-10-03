@@ -5,6 +5,7 @@ import {
     earliestDebit,
     earlyIssueAt,
     isAutopayChargeTiming,
+    keptPlan,
     needsNotice,
     projectedCharge,
     timingOf,
@@ -94,6 +95,15 @@ describe("autopay timing", () => {
         // Issued 29 Sep (Kolkata), due 6 Oct.
         expect(plan?.debitAt.toISOString()).toBe("2026-10-05T18:30:00.000Z");
         expect(plan?.prepareAt.toISOString()).toBe("2026-10-03T18:30:00.000Z");
+    });
+
+    it("a charge queued again keeps its planned debit; its notice goes two days before, or now (review 3)", () => {
+        const debitAt = new Date("2026-10-05T18:30:00Z");
+        const early = keptPlan(debitAt, new Date("2026-10-01T00:00:00Z"));
+        expect(early.debitAt).toBe(debitAt);
+        expect(early.prepareAt.toISOString()).toBe("2026-10-03T18:30:00.000Z");
+        const late = new Date("2026-10-04T12:00:00Z");
+        expect(keptPlan(debitAt, late).prepareAt).toBe(late);
     });
 
     it("projects the next renewal's charge for the customer", () => {

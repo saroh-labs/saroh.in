@@ -90,6 +90,40 @@ function fakeSequencer(issued: string[] = []) {
     return { tx, upsert, update, rows, issue, numbers };
 }
 
+/**
+ * Pin "today" for the code that reads the clock (`longestNumber`,
+ * `numberFormatProblem`, `creditMark`), so a spec asserts exact numbers on
+ * any day it runs: FY 26-27 and month 09 hard-coded against the real clock
+ * break on 1 April 2027 (DEV_LEARNINGS, "number-format specs failed on 1
+ * October"). Only `Date` is faked.
+ */
+function onDay(day: Date) {
+    beforeEach(() => {
+        jest.useFakeTimers({
+            now: day,
+            doNotFake: [
+                "hrtime",
+                "nextTick",
+                "performance",
+                "queueMicrotask",
+                "requestAnimationFrame",
+                "cancelAnimationFrame",
+                "requestIdleCallback",
+                "cancelIdleCallback",
+                "setImmediate",
+                "clearImmediate",
+                "setInterval",
+                "clearInterval",
+                "setTimeout",
+                "clearTimeout",
+            ],
+        });
+    });
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+}
+
 describe("invoice numbering", () => {
     it("keeps the legacy INV series: pads to four digits and then grows", () => {
         expect(formatInvoiceNumber(1)).toBe("INV-0001");
@@ -386,6 +420,7 @@ describe("defaults: a business that never chose a format keeps its numbers", () 
 
 describe("a chosen format", () => {
     const at = new Date("2026-09-23T10:00:00Z");
+    onDay(at);
     const make = (
         format: NumberFormat,
         kind: "INVOICE" | "CREDIT_NOTE" = "INVOICE",
@@ -473,8 +508,8 @@ describe("a chosen format", () => {
         expect(make(plain).format(1)).toBe("RC26090001");
         expect(make(plain, "CREDIT_NOTE").format(1)).toBe("RCCN26090001");
         expect(make(plain).key).toBe("RC/2026-09");
-        // Today's month: the longest number is this month's.
-        expect(longestNumber(plain, "RC")).toMatch(/^RCCN26\d{2}99999$/);
+        // Today's month (pinned): the longest number is this month's.
+        expect(longestNumber(plain, "RC")).toBe("RCCN260999999");
         expect(
             make(
                 { ...plain, parts: ["FY_SHORT", "MONTH"] },
@@ -603,6 +638,7 @@ describe("a chosen format", () => {
 });
 
 describe("format rules", () => {
+    onDay(new Date("2026-09-23T10:00:00Z"));
     const problem = (
         format: NumberFormat,
         registered = true,
@@ -627,7 +663,7 @@ describe("format rules", () => {
         expect(problem(MONTHLY)).toMatchObject({
             field: "invoiceNumberDigits",
             message: expect.stringMatching(
-                /Once the count passes 9999, numbers like RC\/26-27\/\d{2}\/99999 are 17 characters/,
+                /Once the count passes 9999, numbers like RC\/26-27\/09\/99999 are 17 characters/,
             ),
         });
         // Three digits leave the room: RC/26-27/09/9999 is 16.
@@ -751,14 +787,14 @@ describe("format rules", () => {
         // RC/26-27/09/999999: 18.
         expect(problem({ ...MONTHLY, digits: 5 })).toMatchObject({
             field: "invoiceNumberDigits",
-            message: expect.stringMatching(/RC\/26-27\/\d{2}\/999999 are 18/),
+            message: expect.stringMatching(/RC\/26-27\/09\/999999 are 18/),
         });
         // No prefix: CN/26-27/09/9999999 is the long one, 19.
         expect(
             problem({ ...MONTHLY, parts: ["FY", "MONTH"], digits: 6 }),
         ).toMatchObject({
             field: "invoiceNumberDigits",
-            message: expect.stringMatching(/CN\/26-27\/\d{2}\/9999999 are 19/),
+            message: expect.stringMatching(/CN\/26-27\/09\/9999999 are 19/),
         });
         expect(
             problem({

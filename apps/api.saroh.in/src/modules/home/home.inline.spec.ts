@@ -270,6 +270,12 @@ describe("retryVia", () => {
         expect(retryVia({ at: ahead, tag: "Autopay limit too low" }, NOW)).toBe(
             "PAY_LINK",
         );
+        expect(
+            retryVia(
+                { at: ahead, tag: "Autopay didn't charge — paying by link" },
+                NOW,
+            ),
+        ).toBe("PAY_LINK");
     });
 
     it("charges autopay again when the mandate can take it, else a link only for someone who may make one", () => {

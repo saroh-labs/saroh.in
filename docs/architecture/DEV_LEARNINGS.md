@@ -2199,6 +2199,38 @@ PROCESSING (`subscriptions.charge.db.spec.ts`, `mandate-charges.db.spec.ts`).
 gate. A "may we still charge?" check never decides whether to look.
 **Category**: payments · autopay · jobs
 
+## Autopay — a declined pay-link try stopped autopay, and nothing started it again
+
+**Problem**: review 3 found that one declined card on an invoice's pay link
+stopped autopay for that renewal. The queued charge stood aside
+(RENEWAL_FAILED, CHECKOUT_OPEN) because the FAILED pay-link intent counted
+as an open checkout for three days from its `createdAt`; Retry by autopay
+was refused for those days; and once they passed nothing queued the charge
+again, so the renewal stayed unpaid until the merchant pressed Retry.
+**Root cause**: two halves. `openCheckoutWhere()` gave a FAILED try the
+same three-day life as a checkout still waiting, though Razorpay's retry
+happens in the open window, minutes after. And a stand-aside was terminal:
+the charge was CANCELLED with no step written to come back, so the rule that
+let the checkout lapse had nobody to tell.
+**Fix**: `charge-under-way.ts` measures every window from the checkout's
+last activity — made, or its newest PaymentAttempt, and for a FAILED one
+when it failed (`updatedAt`; an open intent's `updatedAt` is not used, the
+pending sweep's `lastLookupAt` bumps it). A FAILED try keeps the checkout
+open for `FAILED_CHECKOUT_MS` (an hour); an open one for `CHECKOUT_LIFE_MS`.
+The query takes the caller's `now`, so the charge job's clock reaches it.
+When a charge stands aside, `stoodAside` writes a `PREPARE` with `resume`
+and a new key for `checkoutOpenUntil()`, the moment the checkout closes;
+that run queues the charge again under the subscription's lock
+(`queueInTx`, keeping a planned D13B debit), or puts it off again if a new
+checkout opened. Every step and the debit's claim still re-ask for an open
+checkout, so it can't charge twice (`subscriptions.charge.db.spec.ts`,
+"a pay-link checkout's window").
+**Rule**: a refusal that waits on something lapsing must schedule its own
+retry for the moment it lapses — "the screen will offer Retry" is not a way
+back. And a window on customer activity is measured from their last
+activity, never from when the object was made.
+**Category**: payments · autopay · jobs
+
 ## Invoices — number-format specs failed on 1 October
 
 **Problem**: `numbering.spec.ts` and `invoice-number.test.ts` began failing
@@ -2208,6 +2240,11 @@ from today's month, and the specs pinned the month they were written in.
 **Fix**: those assertions match any month (`\d{2}`).
 **Rule**: a spec that reads the real clock asserts only what holds every
 day, or passes a fixed date in.
+**Follow-up (code review 3)**: `\d{2}` fixed the month but left the year:
+"26-27" against the real clock would fail on 1 April 2027. Both files now
+pin the clock (`jest.useFakeTimers`/`vi.useFakeTimers`, `Date` only) where
+the code reads it, and assert the exact numbers again; checked with the
+clock faked to 2 April 2027, 15 January 2027 and 31 December 2031.
 **Category**: tests · invoices
 
 ## Sites — a site lock that the publish's own UPDATE upgraded could deadlock (release review)
@@ -2319,3 +2356,52 @@ source, which the alert page doesn't.
 host in some browsers), and storage never returns a bare path (R2 and the memory adapter both give an
 absolute `https://` address), so `mediaSrc` no longer accepts one.
 **Category**: security · CodeQL
+
+## Sites — a web-address change and a publish deadlocked in the other order (code review 3)
+
+**Symptom**: found in review. A publish (or restore, or go-live) that had
+taken the site's lock just before the owner changed the web address could
+end the change with `deadlock detected` (40P01), which the change reports as
+"<address>.saroh.app is taken".
+**Cause**: the two took the same rows in opposite orders. `move` locks the
+Organization FOR UPDATE, then inserts an `AddressReservation` naming the
+site (FOR KEY SHARE on the Site). `putLive` locked the Site FOR UPDATE, then
+inserted the Publication, whose foreign key needs FOR KEY SHARE on the
+Organization. The earlier fix ("a site lock that the publish's own UPDATE
+upgraded") was pinned by a spec that modelled the change without its
+Organization lock and in READ COMMITTED, so it ran only the order that
+already worked and could not see this one.
+**Fix**: one order, Organization then Site. `lockSite` takes the business's
+row FOR KEY SHARE before the Site FOR UPDATE (and test-release creation now
+locks through `lockSite`). A change that waited behind a publish then fails
+its serializable snapshot (40001) without anyone having taken the address,
+so `change` runs again (three tries) and only then reports "taken".
+`live-pointer.db.spec.ts` now models the change as it is (Serializable,
+Organization FOR UPDATE first) and adds the publish-first order through the
+real `WebAddressService.change`; `waitUntilBlockedBy` names the table the
+waiter must be blocked on, so a test can't pass on the wrong wait.
+**Rule**: a test that models a concurrent transaction takes the real one's
+locks, in the real one's order and isolation level, or calls the real code;
+and every pair of transactions that lock the same rows is run in both
+orders (`backend-data-and-money.md`, lock order for a site).
+**Category**: sites · locks · concurrency · tests
+
+## Products — "Add photo" was on for an address its click then dropped (code review 3)
+
+**Symptom**: found in review. In the photo field's "From an address" panel,
+an address such as `https://[bad]/a.jpg` turned "Add photo" on, and the
+click did nothing: no photo, no message. `HTTPS://…` did the opposite: the
+button stayed off for an address the click would have added.
+**Cause**: the button's state came from one rule (a `^https://\S+$` regex)
+and the click from another (`mediaSrc`, which #774 made the only way an
+address is stored). The two disagreed at the edges, and the click's refusal
+was silent.
+**Fix**: `AddressPanel` derives "Add photo" from `mediaSrc(url)` starting
+with `https://`, the same value it stores, and `photoAddressProblem` says
+what's wrong beside the field (`Use the https:// address`, `An address
+starts with https://`, `That isn't an address a photo can load from`), with
+`aria-invalid` and `aria-describedby`. `address-panel.test.tsx` pins it.
+**Rule**: a control's enabled state is computed by the same function its
+action uses, never a second rule that should agree with it; and an action
+that refuses says so (`frontend-error-feedback.md`).
+**Category**: products · forms · feedback

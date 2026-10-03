@@ -404,7 +404,7 @@ describe("going live with a test release (DEC-071, T7)", () => {
         const fix = await wrote.wait;
 
         const goLive = releases.goLive(b.ctx, b.site.id, made.release.id);
-        await waitUntilBlockedBy(fix.pid);
+        await waitUntilBlockedBy(fix.pid, "Site");
         commit.release();
         await publish;
         const result = await goLive;

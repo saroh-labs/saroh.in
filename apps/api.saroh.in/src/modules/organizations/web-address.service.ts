@@ -56,6 +56,13 @@ export const CHANGE_UNAVAILABLE_MESSAGE =
 
 const DAY_MS = 86_400_000;
 
+/**
+ * How many times a change runs before a serialization failure is read as
+ * the address being taken: a write to the site or the business that
+ * committed while it waited fails its snapshot without taking anything.
+ */
+const CHANGE_ATTEMPTS = 3;
+
 // Stateless (it reads the flag rows on every call), as in `sells-from.ts`.
 const flags = new FeatureFlagService();
 
@@ -167,8 +174,11 @@ export class WebAddressService {
      * 6. the audit row says `{ from, to }`.
      *
      * The same address again is a no-op. Two businesses racing for one
-     * address: one wins, the other gets the 409 (the unique columns, or
-     * Postgres's serialization check, refuse the second).
+     * address: one wins, the other gets the 409 (the unique columns refuse
+     * the second, or Postgres's serialization check does and the run
+     * again finds the address taken). Locks are taken Organization, then
+     * Site, the order going live takes them (`sites/live-pointer.ts`
+     * `lockSite`).
      */
     async change(
         ctx: OrganizationContext,
@@ -195,15 +205,29 @@ export class WebAddressService {
         // seen, and the business's own delete of it would fail as a lost
         // race: "is taken", once, on a change back to its own old address.
         await releaseExpired(prisma, address);
-        try {
-            await prisma.$transaction((tx) => this.move(tx, ctx, address), {
-                isolationLevel: "Serializable",
-            });
-        } catch (error) {
-            if (isRaceLost(error)) {
-                throw await this.takenError(address, organizationId);
+        for (let attempt = 1; ; attempt++) {
+            try {
+                await prisma.$transaction((tx) => this.move(tx, ctx, address), {
+                    isolationLevel: "Serializable",
+                });
+                break;
+            } catch (error) {
+                // A serialization failure is not always another business
+                // taking the address: a publish that wrote the site while
+                // this waited for the business's row (`lockSite`) fails the
+                // snapshot too. Run again, and the check inside says whether
+                // the address really went; only then is it "taken".
+                if (
+                    isSerializationFailure(error) &&
+                    attempt < CHANGE_ATTEMPTS
+                ) {
+                    continue;
+                }
+                if (isRaceLost(error)) {
+                    throw await this.takenError(address, organizationId);
+                }
+                throw error;
             }
-            throw error;
         }
         return this.view(ctx);
     }

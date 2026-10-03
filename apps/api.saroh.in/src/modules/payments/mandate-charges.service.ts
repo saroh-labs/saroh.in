@@ -4,10 +4,11 @@ import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
 import type { AutopayChargeTiming } from "../subscriptions/autopay-timing";
-import { chargePlan } from "../subscriptions/autopay-timing";
+import { chargePlan, keptPlan } from "../subscriptions/autopay-timing";
 import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
 import {
     checkoutOpenOn,
+    checkoutsOpenOn,
     OPEN_MANDATE_CHARGE,
     openCheckoutWhere,
 } from "./charge-under-way";
@@ -123,6 +124,8 @@ export interface PrepareChargeInput {
      * method that needs no notice. Absent: as soon as the provider allows.
      */
     notBefore?: Date | null;
+    /** The caller's clock, for the open-checkout check (the job's run). */
+    now?: Date;
 }
 
 const OPEN_CHARGE = OPEN_MANDATE_CHARGE;
@@ -253,7 +256,9 @@ export class MandateChargesService {
                 };
             }
         }
-        if (await checkoutOpenOn(prisma, organizationId, invoiceId)) {
+        if (
+            await checkoutOpenOn(prisma, organizationId, invoiceId, input.now)
+        ) {
             return made
                 ? {
                       status: "REFUSED",
@@ -456,11 +461,18 @@ export class MandateChargesService {
          * the mandate's open charges to CANCELLED in its transaction
          * (`cancelMandatesInTx`), so a claim either lands first, or waits
          * for that and finds nothing to claim.
+         *
+         * And the provider order, read above: a PROCESSING charge always
+         * has one. This claim is the only write to PROCESSING, so
+         * `lookUp`'s "no order, no debit" (NONE) never meets a claimed
+         * charge — one would be asked for, refused and looked up again,
+         * hourly, for good.
          */
         const claimed = await prisma.paymentIntent.updateMany({
             where: {
                 id: intentId,
                 status: "REQUIRES_PAYMENT",
+                providerIntentId: { not: null },
                 viaMandate: {
                     is: {
                         status: "ACTIVE",
@@ -470,7 +482,7 @@ export class MandateChargesService {
                 invoice: {
                     is: {
                         status: "ISSUED",
-                        paymentIntents: { none: openCheckoutWhere() },
+                        paymentIntents: { none: openCheckoutWhere(now) },
                     },
                 },
             },
@@ -506,6 +518,7 @@ export class MandateChargesService {
                     prisma,
                     organizationId,
                     intent.invoiceId ?? "",
+                    now,
                 )
             ) {
                 return refuse("CHECKOUT_OPEN");
@@ -650,9 +663,16 @@ export class MandateChargesService {
                 periodStart: Date;
                 timezone: string;
             };
+            /**
+             * A charge queued again after it stood aside for a pay-link
+             * checkout (the charge job's resume): the debit it had planned
+             * (D13B), kept. Null or absent: as Retry, at once.
+             */
+            plannedDebitAt?: Date | null;
         },
     ): Promise<QueueChargeResult> {
         const { organizationId, subscriptionId, invoiceId } = input;
+        const now = input.now ?? new Date();
         const mandate = await this.chargeableMandate(
             organizationId,
             subscriptionId,
@@ -671,7 +691,7 @@ export class MandateChargesService {
         ) {
             return { status: "NONE" };
         }
-        if (await checkoutOpenOn(tx, organizationId, invoiceId)) {
+        if (await checkoutOpenOn(tx, organizationId, invoiceId, now)) {
             return { status: "CHECKOUT_OPEN" };
         }
         if (
@@ -703,7 +723,6 @@ export class MandateChargesService {
             },
         });
         const key = chargeKey(invoiceId, earlier + 1);
-        const now = input.now ?? new Date();
         const plan = input.schedule
             ? chargePlan(input.schedule.timing, {
                   now,
@@ -711,7 +730,9 @@ export class MandateChargesService {
                   timezone: input.schedule.timezone,
                   method: mandate.method,
               })
-            : null;
+            : input.plannedDebitAt
+              ? keptPlan(input.plannedDebitAt, now)
+              : null;
         const intent = await tx.paymentIntent.create({
             data: {
                 organizationId,
@@ -766,15 +787,19 @@ export class MandateChargesService {
      * Whether each subscription's unpaid renewal can be retried through
      * its autopay (D13, default 35): `MANDATE` when it has a chargeable
      * mandate and its latest unpaid invoice is within the limit, with no
-     * pay-link checkout open on it (`checkoutOpenOn`: Retry by autopay would
-     * be refused, so the screen offers the link). Anything else is a pay
-     * link. Callers check "a charge is under way" apart.
+     * pay-link checkout open on it (`checkoutsOpenOn`: Retry by autopay
+     * would be refused, so the screen offers the link). Anything else is a
+     * pay link. Callers check "a charge is under way" apart. The checkouts
+     * are asked about once for every candidate invoice, not per
+     * subscription (Home and the list ask for many).
      */
     async mandateRetryable(
         organizationId: string,
         subscriptionIds: readonly string[],
+        now: Date = new Date(),
     ): Promise<Set<string>> {
-        const retryable = new Set<string>();
+        /** Subscription id → the invoice autopay could take. */
+        const candidates = new Map<string, string>();
         for (const subscriptionId of new Set(subscriptionIds)) {
             const mandate = await this.chargeableMandate(
                 organizationId,
@@ -791,11 +816,20 @@ export class MandateChargesService {
             });
             if (
                 invoice?.currency === mandate.currency &&
-                toMinor(invoice.total) <= mandate.maxAmountCents &&
-                !(await checkoutOpenOn(prisma, organizationId, invoice.id))
+                toMinor(invoice.total) <= mandate.maxAmountCents
             ) {
-                retryable.add(subscriptionId);
+                candidates.set(subscriptionId, invoice.id);
             }
+        }
+        const open = await checkoutsOpenOn(
+            prisma,
+            organizationId,
+            [...candidates.values()],
+            now,
+        );
+        const retryable = new Set<string>();
+        for (const [subscriptionId, invoiceId] of candidates) {
+            if (!open.has(invoiceId)) retryable.add(subscriptionId);
         }
         return retryable;
     }
@@ -827,7 +861,8 @@ export class MandateChargesService {
             },
         });
         if (!intent || !OPEN_CHARGE.includes(intent.status)) return "ALREADY";
-        // No order yet: nothing can have been debited on it.
+        // No order yet: nothing can have been debited on it. Never a
+        // PROCESSING charge: the claim (`charge`) needs the order.
         if (!intent.providerIntentId) return "NONE";
         const connection = await openMandateConnection(
             this.providers,

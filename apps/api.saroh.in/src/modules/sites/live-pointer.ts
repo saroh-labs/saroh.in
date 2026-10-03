@@ -74,11 +74,25 @@ export type LiveTx = Pick<
  * insert naming the site waits while a version goes live, which the UPDATE
  * would make it do anyway (`backend-data-and-money.md`, locks;
  * `live-pointer.db.spec.ts`).
+ *
+ * The business's Organization row first, FOR KEY SHARE: locks are taken
+ * Organization, then Site. Going live inserts a Publication, whose foreign
+ * key takes FOR KEY SHARE on the Organization anyway; a web-address change
+ * locks the Organization FOR UPDATE and then needs the Site. Taken in the
+ * other order, a publish holding the Site waited on the change's
+ * Organization while the change waited on the Site (40P01, reported as "is
+ * taken"). Asked for here, before the Site, a publish waits for an address
+ * change at the business's row while holding nothing the change needs.
  */
 export async function lockSite(
     tx: Pick<Prisma.TransactionClient, "$queryRaw">,
     siteId: string,
 ): Promise<void> {
+    await tx.$queryRaw`
+        SELECT o.id FROM "Organization" o
+        JOIN "Site" s ON s."organizationId" = o.id
+        WHERE s.id = ${siteId}
+        FOR KEY SHARE OF o`;
     await tx.$queryRaw`SELECT id FROM "Site" WHERE id = ${siteId} FOR UPDATE`;
 }
 
