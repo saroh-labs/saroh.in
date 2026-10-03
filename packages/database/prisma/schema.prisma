@@ -324,6 +324,7 @@ model Organization {
   pricingCouponRedemptions PricingCouponRedemption[]
   // Saroh billing: checkouts for a plan change (pricing catalogue U15).
   billingCheckouts         BillingCheckout[]
+  sarohInvoices            SarohInvoice[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -6714,6 +6715,12 @@ model BillingCheckout {
   completedAt DateTime?
   endedReason String?
 
+  // Who Saroh's invoice is billed to (U17), as given at checkout: the GST
+  // state code ("29") that sets the place of supply, and the business's
+  // GSTIN when it has one. Null: the business profile's at invoice time.
+  billToState String?
+  billToGstin String?
+
   createdByUserId String?
 
   createdAt DateTime @default(now())
@@ -6724,4 +6731,113 @@ model BillingCheckout {
   @@index([organizationId])
   @@index([planId])
   @@index([status, expiresAt])
+}
+
+// Saroh's own GST invoice to a business, for a charge Saroh took for its
+// plan (pricing catalogue U17). Written by the billing webhook in the same
+// transaction as the charge it records, once per charge (`chargeKey`), and
+// never changed. Seller and buyer are copied onto it: the paper reads the
+// same whatever the settings say later. Plan and checkout ids are kept as
+// plain columns, not keys: the invoice outlives the rows it names.
+model SarohInvoice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // "SRH/26-27/00001": the series (prefix and financial year) and its count.
+  number    String @unique
+  series    String
+  // One invoice per charge: "period:<provider>:<subscription>:<end>" for a
+  // plan period, "upgrade:<checkout>" for an upgrade's difference.
+  chargeKey String @unique
+  // NEW | UPGRADE | SCHEDULED | RENEWAL: what was charged.
+  source    String
+
+  provider               String
+  providerSubscriptionId String?
+  providerEventId        String
+  providerPaymentId      String?
+  checkoutId             String?
+  planId                 String?
+  planName               String
+  cycle                  String // "month" | "year"
+  periodStart            DateTime?
+  periodEnd              DateTime?
+
+  issuedAt DateTime
+  currency String   @default("INR")
+
+  sellerName      String
+  sellerLegalName String?
+  sellerGstin     String?
+  sellerState     String?
+  sellerAddress   String?
+  sellerEmail     String?
+
+  billToName    String
+  billToEmail   String?
+  billToAddress String?
+  billToState   String?
+  billToGstin   String?
+
+  // GST state code; INTRA (CGST + SGST) or INTER (IGST).
+  placeOfSupply String?
+  taxType       String
+
+  // Integer paise (KTD-18). Before discount, the discount, what is taxed,
+  // its GST and what was charged.
+  subtotalPaise Int
+  discountPaise Int @default(0)
+  taxablePaise  Int
+  cgstPaise     Int
+  sgstPaise     Int
+  igstPaise     Int
+  taxPaise      Int
+  totalPaise    Int
+
+  // When its email left; null until then (the `billing.email` job).
+  emailedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  lines SarohInvoiceLine[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, issuedAt])
+}
+
+// One line of a Saroh invoice (U17): the plan's period, an upgrade's
+// difference, and later an add-on (U16). GST is worked out per line, on the
+// line's amount after its discount, rounded half-up once (KTD-18).
+model SarohInvoiceLine {
+  id             String       @id @default(cuid())
+  invoiceId      String
+  organizationId String
+  invoice        SarohInvoice @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  position      Int
+  description   String
+  sac           String?
+  quantity      Int     @default(1)
+  unitPaise     Int
+  discountPaise Int     @default(0)
+  taxablePaise  Int
+  gstRateBps    Int
+  cgstPaise     Int
+  sgstPaise     Int
+  igstPaise     Int
+  taxPaise      Int
+  amountPaise   Int
+
+  @@unique([invoiceId, position])
+  @@index([organizationId])
+}
+
+// The count behind each Saroh invoice series (U17): one row per prefix and
+// financial year, taken in the invoice's own transaction, so a rolled-back
+// charge leaves no gap. Saroh's, not a business's.
+model SarohInvoiceSequence {
+  series    String   @id
+  last      Int
+  updatedAt DateTime @updatedAt
 }

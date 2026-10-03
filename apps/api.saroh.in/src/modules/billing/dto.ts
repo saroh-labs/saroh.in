@@ -4,6 +4,7 @@ import {
     IsIn,
     IsOptional,
     IsString,
+    Matches,
     MaxLength,
     MinLength,
 } from "class-validator";
@@ -65,6 +66,24 @@ export class ChangePlanDto {
 
     @IsIn(["month", "year"], { message: "cycle must be month or year" })
     cycle!: "month" | "year";
+
+    /**
+     * Who Saroh's invoice is billed to (U17): the state the business is
+     * registered in (a GST state code or name), which sets the place of
+     * supply. Optional: unset, the business profile's.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(64)
+    billingState?: string;
+
+    /** The business's GSTIN for Saroh's invoice, when it has one (U17). */
+    @IsOptional()
+    @Transform(upper)
+    @IsString()
+    @Matches(/^[0-9A-Z]{15}$/, { message: "A GSTIN is 15 characters." })
+    gstin?: string;
 }
 
 /** `GET …/billing/change-plan?plan=&cycle=`: the same two, to quote. */

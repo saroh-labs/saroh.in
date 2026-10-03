@@ -34,6 +34,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "A Saroh billing coupon code, global; who redeemed it is PricingCouponRedemption, which has its own policy.",
     PricingProviderPlan:
         "The billing provider's plan id for one global Plan row; no organization.",
+    SarohInvoiceSequence:
+        "The count behind Saroh's own invoice series (U17); Saroh's, shared by every organization it bills.",
     PlatformAdmin: "Saroh staff, not a business.",
     PlatformAdminRoleAssignment: "Saroh staff roles, not a business.",
     AdminOperation:

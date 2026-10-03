@@ -444,6 +444,65 @@ export async function sendWaitlistInvitationEmail(
 }
 
 // ---------------------------------------------------------------------------
+// Saroh's own billing mail (pricing catalogue U17)
+// ---------------------------------------------------------------------------
+
+/** One Saroh billing email: an invoice, a failed payment, a trial ending. */
+export interface SarohBillingEmail {
+    to: string[];
+    subject: string;
+    html: string;
+    /** Where a reply goes (`SAROH_BILLING_EMAIL`), when set. */
+    replyTo?: string | null;
+    attachments?: { filename: string; content: Buffer }[];
+}
+
+/**
+ * Send Saroh's own billing mail to a business (U17): Saroh billing the
+ * business for its plan, from Saroh's identity transport. Awaited, and it
+ * says how it went, because the `billing.email` job retries a failure and
+ * records a send.
+ *
+ * With no SMTP it never reaches the network: the fake transport the code
+ * email uses (`SITE_CODES_EMAIL_FAKE`, development by default) logs the
+ * subject and how many it was for — never the addresses or the body — or
+ * fails every send with `fail`. Anywhere else with no SMTP, nothing left.
+ */
+export async function sendSarohBillingEmail(
+    email: SarohBillingEmail,
+): Promise<EmailOutcome> {
+    if (email.to.length === 0) return "not-configured";
+    if (!transporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            const files = email.attachments?.length ?? 0;
+            console.info(
+                `[Saroh billing] (no SMTP) ${email.subject} to ${email.to.length} recipient(s)${files ? `, ${files} attachment(s)` : ""}`,
+            );
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to: email.to,
+            ...(email.replyTo ? { replyTo: email.replyTo } : {}),
+            subject: email.subject,
+            html: email.html,
+            attachments: email.attachments?.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                contentType: "application/pdf",
+            })),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Site sign-in codes (ADR-011; round-2 plan A, A2)
 // ---------------------------------------------------------------------------
 

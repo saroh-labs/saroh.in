@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import {
+    Body,
+    Controller,
+    Get,
+    Header,
+    Param,
+    Post,
+    Query,
+    StreamableFile,
+    UseGuards,
+} from "@nestjs/common";
 import type { Plan } from "@saroh/database";
 
 import { OrgContext } from "../../common/decorators/org-context.decorator";
@@ -20,6 +30,8 @@ import {
     SubscribeDto,
 } from "./dto";
 import { PlansService } from "./plans.service";
+import type { SarohInvoiceView } from "./saroh-invoices.service";
+import { SarohInvoicesService } from "./saroh-invoices.service";
 import type { SubscriptionWithPlan } from "./subscriptions.service";
 import { SubscriptionsService } from "./subscriptions.service";
 
@@ -61,7 +73,31 @@ export class BillingController {
         private readonly subscriptions: SubscriptionsService,
         private readonly access: CatalogueAccessService,
         private readonly checkouts: CheckoutService,
+        private readonly invoices: SarohInvoicesService,
     ) {}
+
+    /** Saroh's invoices to the business for its plan, newest first (U17). */
+    @Get("invoices")
+    listInvoices(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<SarohInvoiceView[]> {
+        return this.invoices.list(ctx);
+    }
+
+    /** One of them as a PDF, named for its number; never stored (U17). */
+    @Get("invoices/:invoiceId/pdf")
+    @Header("Cache-Control", "no-store")
+    async invoicePdf(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") invoiceId: string,
+    ): Promise<StreamableFile> {
+        const { file, fileName } = await this.invoices.pdf(ctx, invoiceId);
+        return new StreamableFile(file, {
+            type: "application/pdf",
+            disposition: `attachment; filename="${fileName}"`,
+            length: file.length,
+        });
+    }
 
     /**
      * What changing to a catalogue plan would be and cost (U15): the kind of

@@ -174,6 +174,7 @@ export class RazorpayBillingProvider implements BillingProvider {
                         current_end?: number | null;
                     };
                 };
+                payment?: { entity?: { id?: string } };
             };
         };
 
@@ -195,6 +196,9 @@ export class RazorpayBillingProvider implements BillingProvider {
             eventAt: unixDate(body.created_at),
             ...(entity && "current_end" in entity
                 ? { currentPeriodEnd: unixDate(entity.current_end) }
+                : {}),
+            ...(body.payload?.payment?.entity?.id
+                ? { providerPaymentId: body.payload.payment.entity.id }
                 : {}),
         };
     }

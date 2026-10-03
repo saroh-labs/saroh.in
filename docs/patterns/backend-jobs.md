@@ -243,6 +243,15 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 - **`billing.provider.cancel`** cancels a provider subscription (now, or at
   the cycle's end) after a plan change commits: the change never waits on the
   provider, and a refusal (already cancelled) isn't retried.
+- **`billing.email`** (U17) is Saroh's own mail to a business: an
+  invoice with its PDF (queued with the invoice), a failed charge (queued by
+  the webhook on `pending` or `halted`) and a trial ending (U16 queues it,
+  `enqueueBillingEmail`). To everyone whose role has `billing:manage`, in
+  one message. Re-read, then decide: an invoice already emailed
+  (`emailedAt`), a failed charge paid since, a subscription no longer
+  trialing say nothing; a notice is claimed as a `CustomerNotice`
+  (`SAROH_BILLING_EMAIL`) once it has left. A send that fails throws and is
+  retried; no recipient or no mail set up ends the job with a log line.
 - **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
   PENDING run, a partial unique index): due pending moves that are ready
   (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid
