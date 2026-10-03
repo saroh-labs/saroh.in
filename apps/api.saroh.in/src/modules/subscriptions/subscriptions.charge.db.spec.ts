@@ -52,7 +52,7 @@ import {
     FakeWebhookProviderFactory,
 } from "../webhooks/providers/fake.webhook";
 import { WebhooksService } from "../webhooks/webhooks.service";
-import { SUBSCRIPTION_CHARGE_TYPE } from "./charge-job";
+import { enqueueChargeStepInTx, SUBSCRIPTION_CHARGE_TYPE } from "./charge-job";
 import { SubscriptionChargeHandler } from "./subscription-charge.handler";
 import { SubscriptionsService } from "./subscriptions.service";
 
@@ -980,6 +980,31 @@ describe("a pay-link checkout's window (review 3)", () => {
         }
         await offHome(payingInvoice.id);
         await offHome(idleInvoice.id);
+    });
+
+    it("a waiting resume step never stands in for a charge on another mandate", async () => {
+        const invoiceId = `inv_resume_${next()}`;
+        const key = `inv_${invoiceId}_2`;
+        const step = (mandateId: string, resume?: true) =>
+            prisma.$transaction((tx) =>
+                enqueueChargeStepInTx(
+                    tx,
+                    owner.organizationId,
+                    { invoiceId, mandateId, key, step: "PREPARE", resume },
+                    clock,
+                ),
+            );
+        await step("mandate_old", true);
+        // Retry on the same mandate and key: the waiting step serves it.
+        await step("mandate_old");
+        expect(await chargeJobs(invoiceId)).toHaveLength(1);
+        // Retry on a mandate set up since: its own PREPARE is written.
+        await step("mandate_new");
+        expect(
+            (await chargeJobs(invoiceId)).map(
+                (j) => (j.payload as { mandateId: string }).mandateId,
+            ),
+        ).toEqual(["mandate_old", "mandate_new"]);
     });
 
     it("a checkout opened again before the charge comes back puts it off again", async () => {

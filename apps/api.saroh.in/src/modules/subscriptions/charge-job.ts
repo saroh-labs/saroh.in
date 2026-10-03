@@ -111,6 +111,12 @@ export function chargePayloadOf(payload: unknown): ChargeJobPayload | null {
  * Write a step's job, unless that step of this charge is already waiting
  * (a job run twice must not fork the chain). Always a new row: the worker
  * completes the run that wrote it.
+ *
+ * "This charge" is its key and its mandate: a resume step (`stoodAside`)
+ * holds the next key before any intent has it, and Retry by autopay mints
+ * that same key. On the same mandate the waiting step serves Retry's
+ * charge; on a mandate set up since, it isn't Retry's, so Retry's own
+ * PREPARE is written.
  */
 export async function enqueueChargeStepInTx(
     tx: Pick<Prisma.TransactionClient, "job">,
@@ -126,6 +132,12 @@ export async function enqueueChargeStepInTx(
             AND: [
                 { payload: { path: ["key"], equals: payload.key } },
                 { payload: { path: ["step"], equals: payload.step } },
+                {
+                    payload: {
+                        path: ["mandateId"],
+                        equals: payload.mandateId,
+                    },
+                },
             ],
         },
         select: { id: true },
