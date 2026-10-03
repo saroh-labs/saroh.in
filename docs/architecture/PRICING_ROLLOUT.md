@@ -332,7 +332,26 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   PDF, a failed payment (retrying, or now on Free) and a trial ending (U16
   queues it), to everyone whose role has `billing:manage`.
 
-### Razorpay test-mode spike (OQ-6) — **unverified**
+### Razorpay test-mode spike (OQ-6)
+
+**Checked against Saroh's Razorpay test account on 2026-10-03** (made-up
+amounts, test mode; the subscriptions made were cancelled):
+
+| #    | Assumption                                                                                                       | Result                                                                                                                                                                                                |
+| ---- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Plans can't be edited; one per row × cycle, found by `notes.saroh_ref`                                           | **Confirmed.** No edit endpoint for plans (404); `GET /plans` returns `notes`, so paging finds a plan by `saroh_ref`. Plans can't be deleted either.                                                  |
+| 2    | An upgrade/trial is a new subscription with `start_at` later, plus an upfront `addons` item for anything due now | **Confirmed.** Razorpay's checkout says "a payment of ₹X will be charged now … then ₹Y every month" from `start_at`; the upfront item is invoiced at once, the recurring amount starts at `start_at`. |
+| 3    | No change of amount in place                                                                                     | **Confirmed for our use.** `PATCH /subscriptions/:id` refuses anything not Authenticated/Active; Saroh always makes a new subscription instead.                                                       |
+| 6    | `total_count` 120 monthly / 10 yearly                                                                            | **Confirmed.** Accepted (up to 1,200 monthly and 100 yearly were accepted too).                                                                                                                       |
+| 7    | Coupons need a Razorpay Offer                                                                                    | **Confirmed.** Offers can be listed (`GET /offers`) and passed as `offer_id` when a subscription is made, but **can't be created through the API** (405). They're made in the Dashboard.              |
+| 9    | `POST /subscriptions/:id/addons`                                                                                 | **Confirmed** it's accepted on a subscription not yet authorised. Charging with the next invoice is still unverified.                                                                                 |
+| —    | Cancel at cycle end                                                                                              | Refused on a subscription with no running cycle ("created"); cancel such a one immediately.                                                                                                           |
+| 5, 8 | Event order (`authenticated`, `activated`, `charged`), `halted`                                                  | **Still unverified**: needs a completed test payment and a webhook reachable from Razorpay (a tunnel to the local API).                                                                               |
+
+Note: Razorpay's checkout shows the account's business name. Set it to Saroh
+in the Razorpay Dashboard before launch.
+
+The original assumptions as written when U15/U16 were built:
 
 No test key was available when U15 was built, so the adapter follows
 Razorpay's published Subscriptions API and every answer below is
