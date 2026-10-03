@@ -137,6 +137,21 @@ export class FakeBillingProvider implements BillingProvider {
             this.failNextCreate = null;
             return Promise.reject(error);
         }
+        // Like Razorpay: a coupon goes through only with its Razorpay Offer,
+        // and is refused, asking nothing, without one.
+        if (
+            this.name === "RAZORPAY" &&
+            input.discount &&
+            input.discount.amountPaise > 0 &&
+            !input.discount.razorpayOfferId
+        ) {
+            return Promise.reject(
+                new BillingProviderError(
+                    "REFUSED",
+                    "fake subscription refused: the coupon has no Razorpay offer",
+                ),
+            );
+        }
         this.createCalls.push(input);
         const id = input.reference
             ? `fake_sub_${input.reference}`

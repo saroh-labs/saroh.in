@@ -180,6 +180,88 @@ describe("coupons (DB, U4)", () => {
         ).rejects.toMatchObject({ status: 400 });
     });
 
+    it("takes, returns, changes and clears a Razorpay offer id, auditing each change", async () => {
+        const c = await create({ razorpayOfferId: "offer_ABCDEFGHIJKLMN" });
+        expect(c.razorpayOfferId).toBe("offer_ABCDEFGHIJKLMN");
+        expect(
+            await prisma.adminAuditEvent.findFirstOrThrow({
+                where: { action: "pricing.coupon.create" },
+            }),
+        ).toMatchObject({
+            metadata: expect.objectContaining({
+                razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+            }),
+        });
+        expect((await controller.listCoupons())[0]).toMatchObject({
+            razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+        });
+
+        const changed = await controller.updateCoupon(me(), c.id, {
+            razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
+            reason: "fake new offer",
+            idempotencyKey: key(),
+        } as never);
+        expect(changed).toMatchObject({
+            code: "FAKE-111",
+            razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
+        });
+
+        // A change to something else leaves it as it was.
+        await expect(
+            controller.updateCoupon(me(), c.id, {
+                months: 3,
+                reason: "fake months",
+                idempotencyKey: key(),
+            } as never),
+        ).resolves.toMatchObject({ razorpayOfferId: "offer_NOPQRSTUVWXYZ1" });
+
+        const cleared = await controller.updateCoupon(me(), c.id, {
+            razorpayOfferId: null,
+            reason: "fake unlink",
+            idempotencyKey: key(),
+        } as never);
+        expect(cleared.razorpayOfferId).toBeNull();
+
+        const updates = await prisma.adminAuditEvent.findMany({
+            where: { action: "pricing.coupon.update", targetId: c.id },
+            orderBy: { createdAt: "asc" },
+        });
+        const metadata = updates.map((u) => u.metadata);
+        expect(metadata).toHaveLength(3);
+        expect(metadata).toEqual(
+            expect.arrayContaining([
+                { code: "FAKE-111", razorpayOfferId: "offer_NOPQRSTUVWXYZ1" },
+                { code: "FAKE-111", months: 3 },
+                { code: "FAKE-111", razorpayOfferId: null },
+            ]),
+        );
+    });
+
+    it("refuses a Razorpay offer id in another shape, on create and on update", async () => {
+        await expect(
+            create({ razorpayOfferId: "offer_short" }),
+        ).rejects.toMatchObject({
+            status: 400,
+            response: { details: { field: "razorpayOfferId" } },
+        });
+        expect(await prisma.pricingCoupon.count()).toBe(0);
+        const c = await create();
+        await expect(
+            controller.updateCoupon(me(), c.id, {
+                razorpayOfferId: "plan_ABCDEFGHIJKLMNO",
+                reason: "fake",
+                idempotencyKey: key(),
+            } as never),
+        ).rejects.toMatchObject({ status: 400 });
+        expect(
+            (
+                await prisma.pricingCoupon.findUniqueOrThrow({
+                    where: { id: c.id },
+                })
+            ).razorpayOfferId,
+        ).toBeNull();
+    });
+
     it("deletes an unused coupon, and archives a used one keeping its redemptions", async () => {
         const unused = await create({ code: "UNUSED-1" });
         await expect(

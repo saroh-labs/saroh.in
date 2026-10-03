@@ -200,6 +200,7 @@ describe("coupons", () => {
             discountPaise: 100,
             months: 1,
             planIds: ["b"],
+            razorpayOfferId: null,
             active: true,
             maxRedemptions: 5,
             expiresAt: "2026-09-01T00:00:00.000Z",
@@ -214,6 +215,7 @@ describe("coupons", () => {
             planIds: ["b"],
             maxUses: "2",
             expires: new Date(coupon.expiresAt),
+            offerId: "",
         };
         const r = checkCoupon(form, {
             isNew: false,
@@ -238,7 +240,78 @@ describe("coupons", () => {
         expect(couponChanges(coupon, ok.input)).toEqual({ maxRedemptions: 9 });
     });
 
+    it("takes a Razorpay offer id in Razorpay's shape, or none", () => {
+        const form = {
+            ...blankCoupon(plans),
+            code: "OFFER-1",
+            off: "1",
+            maxUses: "5",
+        };
+        const none = checkCoupon(form, { isNew: true, plans, now });
+        expect(none.input?.razorpayOfferId).toBeNull();
+        const linked = checkCoupon(
+            { ...form, offerId: " offer_ABCDEFGHIJKLMN " },
+            { isNew: true, plans, now },
+        );
+        expect(linked.input?.razorpayOfferId).toBe("offer_ABCDEFGHIJKLMN");
+        for (const bad of [
+            "offer_ABCDEFGHIJKLM",
+            "offer_ABCDEFGHIJKLMNO",
+            "plan_ABCDEFGHIJKLMNO",
+        ]) {
+            const r = checkCoupon(
+                { ...form, offerId: bad },
+                { isNew: true, plans, now },
+            );
+            expect(r.input).toBeNull();
+            expect(r.errors.razorpayOfferId).toMatch(/offer_ and 14/);
+        }
+    });
+
+    it("sends a changed or cleared Razorpay offer id, and nothing when it stays", () => {
+        const coupon = {
+            id: "c1",
+            code: "OLD",
+            discountPaise: 100,
+            months: 1,
+            planIds: ["b"],
+            razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+            active: true,
+            maxRedemptions: 5,
+            expiresAt: null,
+            uses: 0,
+            createdAt: "",
+            updatedAt: "",
+        };
+        const input = {
+            code: "OLD",
+            discountPaise: 100,
+            months: 1,
+            planIds: ["b"],
+            maxRedemptions: 5,
+            expiresAt: null,
+        };
+        expect(
+            couponChanges(coupon, {
+                ...input,
+                razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+            }),
+        ).toEqual({});
+        expect(
+            couponChanges(coupon, {
+                ...input,
+                razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
+            }),
+        ).toEqual({ razorpayOfferId: "offer_NOPQRSTUVWXYZ1" });
+        expect(
+            couponChanges(coupon, { ...input, razorpayOfferId: null }),
+        ).toEqual({ razorpayOfferId: null });
+    });
+
     it("reads the field a refusal names", () => {
+        expect(refusedField({ field: "razorpayOfferId" })).toBe(
+            "razorpayOfferId",
+        );
         expect(refusedField({ field: "code" })).toBe("code");
         expect(refusedField({ field: "nope" })).toBeNull();
         expect(refusedField(["Validation failed"])).toBeNull();

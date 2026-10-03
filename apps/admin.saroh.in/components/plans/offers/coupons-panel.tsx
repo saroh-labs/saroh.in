@@ -212,6 +212,8 @@ function NewCoupon({ plans, onDone }: { plans: Plan[]; onDone: () => void }) {
                         const r = await createCouponAction({
                             ...check.input,
                             expiresAt: check.input.expiresAt ?? undefined,
+                            razorpayOfferId:
+                                check.input.razorpayOfferId ?? undefined,
                             reason,
                             idempotencyKey,
                         });
@@ -655,6 +657,37 @@ function CouponFields({
                     )}
                 </span>
             </Field>
+            <Field
+                label="Razorpay offer ID"
+                htmlFor={`${id}-offer`}
+                error={errors.razorpayOfferId}
+                errorId={err("razorpayOfferId")}
+                hint="Make the offer in your Razorpay Dashboard, then paste its ID here."
+                hintId={`${id}-offer-hint`}
+                className="w-[13.5rem]"
+            >
+                <input
+                    id={`${id}-offer`}
+                    value={form.offerId}
+                    disabled={disabled}
+                    placeholder="offer_…"
+                    aria-invalid={!!errors.razorpayOfferId}
+                    aria-describedby={
+                        [`${id}-offer-hint`, err("razorpayOfferId")]
+                            .filter(Boolean)
+                            .join(" ") || undefined
+                    }
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(e) =>
+                        set({ offerId: e.target.value.replace(/\s/g, "") })
+                    }
+                    className={cn(
+                        fieldClass,
+                        "h-8 w-full min-w-0 px-[9px] font-mono text-[12.5px]",
+                    )}
+                />
+            </Field>
         </>
     );
 }
@@ -664,6 +697,8 @@ function Field({
     htmlFor,
     error,
     errorId,
+    hint,
+    hintId,
     className,
     children,
 }: {
@@ -671,6 +706,9 @@ function Field({
     htmlFor: string;
     error?: string;
     errorId?: string;
+    /** A line of help under the field, kept while an error shows. */
+    hint?: string;
+    hintId?: string;
     className?: string;
     children: ReactNode;
 }) {
@@ -680,6 +718,14 @@ function Field({
                 {label}
             </label>
             {children}
+            {hint && (
+                <span
+                    id={hintId}
+                    className="text-[11.5px] text-muted-foreground"
+                >
+                    {hint}
+                </span>
+            )}
             {error && (
                 <span
                     id={errorId}

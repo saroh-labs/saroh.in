@@ -127,6 +127,24 @@ export class RollbackDto extends ReasonedWriteDto {
     note?: string;
 }
 
+/**
+ * A Razorpay offer id: `offer_` and 14 letters or digits, 20 in all
+ * (Razorpay's docs; the column's CHECK `PricingCoupon_razorpay_offer_shape`).
+ */
+export const RAZORPAY_OFFER_ID = /^offer_[A-Za-z0-9]{14}$/;
+
+/**
+ * A Razorpay offer id as pasted: trimmed, and an empty field read as none
+ * (null clears it on an update).
+ */
+const offerId = ({ value }: { value: unknown }) => {
+    if (typeof value !== "string") return value;
+    const v = value.trim();
+    return v === "" ? null : v;
+};
+const RAZORPAY_OFFER_MESSAGE =
+    "Use the offer's ID from the Razorpay Dashboard: offer_ and 14 letters or digits";
+
 /** Codes people type at checkout: letters, digits and dashes. */
 const COUPON_CODE = /^[A-Z0-9][A-Z0-9-]{2,31}$/;
 const COUPON_CODE_MESSAGE =
@@ -165,6 +183,13 @@ export class CreateCouponDto extends ReasonedWriteDto {
     @IsISO8601({ strict: true })
     expiresAt?: string;
 
+    /** The Razorpay Offer made in its Dashboard; absent or null: none. */
+    @IsOptional()
+    @Transform(offerId)
+    @IsString()
+    @Matches(RAZORPAY_OFFER_ID, { message: RAZORPAY_OFFER_MESSAGE })
+    razorpayOfferId?: string | null;
+
     /** New coupons start paused unless asked otherwise (the design). */
     @IsOptional()
     @IsBoolean()
@@ -201,6 +226,13 @@ export class UpdateCouponDto extends ReasonedWriteDto {
     @IsOptional()
     @IsISO8601({ strict: true })
     expiresAt?: string | null;
+
+    /** The Razorpay Offer's id, or null to unlink it. */
+    @IsOptional()
+    @Transform(offerId)
+    @IsString()
+    @Matches(RAZORPAY_OFFER_ID, { message: RAZORPAY_OFFER_MESSAGE })
+    razorpayOfferId?: string | null;
 
     @IsOptional()
     @IsBoolean()

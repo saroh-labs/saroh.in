@@ -260,6 +260,7 @@ export class AdminPricingController {
             planIds: dto.planIds,
             maxRedemptions: dto.maxRedemptions,
             expiresAt: dto.expiresAt ?? null,
+            razorpayOfferId: dto.razorpayOfferId ?? null,
             active: dto.active ?? false,
         };
         return this.idempotency.run(
@@ -317,6 +318,7 @@ export class AdminPricingController {
                                 : dto.expiresAt === null
                                   ? null
                                   : new Date(dto.expiresAt),
+                        razorpayOfferId: dto.razorpayOfferId,
                         active: dto.active,
                         reason: dto.reason,
                         idempotencyKey: dto.idempotencyKey,

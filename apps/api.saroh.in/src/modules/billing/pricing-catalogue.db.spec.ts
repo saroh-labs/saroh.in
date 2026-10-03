@@ -30,14 +30,20 @@ import { EntitlementService } from "./entitlement.service";
 import { PlansService } from "./plans.service";
 
 const tag = `${process.pid}-${Date.now()}`;
-const MIGRATION = path.resolve(
-    __dirname,
-    "../../../../../packages/database/prisma/migrations/20261021100000_pricing_catalogue/migration.sql",
+const MIGRATIONS = [
+    "20261021100000_pricing_catalogue",
+    "20261021170000_coupon_razorpay_offer",
+].map((name) =>
+    path.resolve(
+        __dirname,
+        `../../../../../packages/database/prisma/migrations/${name}/migration.sql`,
+    ),
 );
 
-/** Add each of the migration's CHECK constraints the database doesn't have. */
+/** Add each of the migrations' CHECK constraints the database doesn't have. */
 async function ensureMigrationChecks(): Promise<number> {
-    const statements = readFileSync(MIGRATION, "utf8")
+    const statements = MIGRATIONS.map((file) => readFileSync(file, "utf8"))
+        .join(";\n")
         .replace(/--[^\n]*/g, "")
         .split(";")
         .map((s) => s.trim())
@@ -464,6 +470,33 @@ describe("pricing catalogue tables (DB, U1)", () => {
                     maxRedemptions: 3,
                 },
             });
+
+        it("takes a Razorpay offer id only in Razorpay's shape", async () => {
+            const ok = await coupon("FAKE333");
+            await expect(
+                prisma.pricingCoupon.update({
+                    where: { id: ok.id },
+                    data: { razorpayOfferId: "offer_ABCDEFGHIJKLMN" },
+                }),
+            ).resolves.toMatchObject({
+                razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+            });
+            for (const bad of [
+                "offer_ABCDEFGHIJKLM",
+                "offer_ABCDEFGHIJKLMNO",
+                "offer_ABCDEFGHIJK-MN",
+                "",
+            ]) {
+                expect(
+                    await refused(
+                        prisma.pricingCoupon.update({
+                            where: { id: ok.id },
+                            data: { razorpayOfferId: bad },
+                        }),
+                    ),
+                ).toMatch(/PricingCoupon_razorpay_offer_shape/);
+            }
+        });
 
         it("stores codes upper-cased, so the same code in two cases is refused", async () => {
             await coupon("FAKE111");

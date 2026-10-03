@@ -15,6 +15,11 @@ import { paiseToRupees, rupeesToPaise } from "./money";
 export const COUPON_CODE = /^[A-Z0-9][A-Z0-9-]{2,31}$/;
 export const COUPON_MONTHS_MAX = 36;
 export const COUPON_USES_MAX = 1_000_000;
+/**
+ * The API's rule for a Razorpay offer id: `offer_` and 14 letters or
+ * digits, 20 in all, as the Razorpay Dashboard shows it.
+ */
+export const RAZORPAY_OFFER_ID = /^offer_[A-Za-z0-9]{14}$/;
 
 export type CouponField =
     | "code"
@@ -22,7 +27,8 @@ export type CouponField =
     | "months"
     | "planIds"
     | "maxRedemptions"
-    | "expiresAt";
+    | "expiresAt"
+    | "razorpayOfferId";
 
 const FIELDS: readonly CouponField[] = [
     "code",
@@ -31,6 +37,7 @@ const FIELDS: readonly CouponField[] = [
     "planIds",
     "maxRedemptions",
     "expiresAt",
+    "razorpayOfferId",
 ];
 
 export interface CouponForm {
@@ -42,6 +49,8 @@ export interface CouponForm {
     maxUses: string;
     /** The last day it works, or null for no expiry. */
     expires: Date | null;
+    /** The Razorpay offer's id as pasted; empty for none. */
+    offerId: string;
 }
 
 export type CouponErrors = Partial<Record<CouponField, string>>;
@@ -55,6 +64,7 @@ export function blankCoupon(plans: readonly Plan[]): CouponForm {
         planIds: plans.map((p) => p.id),
         maxUses: "",
         expires: null,
+        offerId: "",
     };
 }
 
@@ -66,6 +76,7 @@ export function formOf(coupon: AdminCoupon): CouponForm {
         planIds: [...coupon.planIds],
         maxUses: String(coupon.maxRedemptions),
         expires: coupon.expiresAt ? new Date(coupon.expiresAt) : null,
+        offerId: coupon.razorpayOfferId ?? "",
     };
 }
 
@@ -148,6 +159,11 @@ export function checkCoupon(
     ) {
         errors.expiresAt = "Pick an expiry date that hasn't passed.";
     }
+    const razorpayOfferId = form.offerId.trim() || null;
+    if (razorpayOfferId !== null && !RAZORPAY_OFFER_ID.test(razorpayOfferId)) {
+        errors.razorpayOfferId =
+            "Use the offer's ID from the Razorpay Dashboard: offer_ and 14 letters or digits";
+    }
     if (
         Object.keys(errors).length > 0 ||
         discountPaise === null ||
@@ -164,6 +180,7 @@ export function checkCoupon(
             planIds: form.planIds,
             maxRedemptions,
             expiresAt,
+            razorpayOfferId,
         },
         errors,
     };
@@ -190,6 +207,8 @@ export function couponChanges(
     const was = coupon.expiresAt?.slice(0, 10) ?? null;
     const now = input.expiresAt?.slice(0, 10) ?? null;
     if (was !== now) out.expiresAt = input.expiresAt ?? null;
+    const offer = input.razorpayOfferId ?? null;
+    if (offer !== coupon.razorpayOfferId) out.razorpayOfferId = offer;
     return out;
 }
 

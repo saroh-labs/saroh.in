@@ -81,14 +81,22 @@ export class RazorpayBillingProvider implements BillingProvider {
     async createSubscription(
         input: CreateSubscriptionInput,
     ): Promise<CreateSubscriptionResult> {
-        // A coupon (U16). Assumed Razorpay takes money off a subscription
-        // only through an Offer made in its Dashboard and linked by
-        // `offer_id`, and Saroh's coupons have none: refuse, never charge
-        // the full amount for a discounted plan. Unverified (U16).
-        if (input.discount && input.discount.amountPaise > 0) {
+        // A coupon (U16). Razorpay takes money off a subscription only
+        // through an Offer made in its Dashboard and passed as `offer_id`
+        // (confirmed in test mode; Offers can't be made through the API).
+        // A coupon without one is refused, asking nothing: never charge the
+        // full amount for a discounted plan. Razorpay applies the Offer's
+        // own discount, so it must match the coupon's; there is no
+        // documented way to read an Offer's terms back to check
+        // (`PRICING_ROLLOUT.md`).
+        const offerId =
+            input.discount && input.discount.amountPaise > 0
+                ? (input.discount.razorpayOfferId ?? null)
+                : undefined;
+        if (offerId === null) {
             throw new BillingProviderError(
                 "REFUSED",
-                "Razorpay subscription creation refused: coupons aren't supported yet",
+                "Razorpay subscription creation refused: the coupon has no Razorpay offer",
             );
         }
         const body: Record<string, unknown> = {
@@ -104,6 +112,7 @@ export class RazorpayBillingProvider implements BillingProvider {
             },
         };
         if (input.providerPlanId) body.plan_id = input.providerPlanId;
+        if (offerId) body.offer_id = offerId;
         if (input.startAt) {
             body.start_at = Math.floor(input.startAt.getTime() / 1000);
         }

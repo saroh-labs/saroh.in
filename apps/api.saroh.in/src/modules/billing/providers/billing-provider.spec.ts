@@ -8,6 +8,7 @@ import { NotFoundException } from "@nestjs/common";
 
 import { BillingProviderError } from "./billing-provider.port";
 import { CashfreeBillingProvider } from "./cashfree.provider";
+import { FakeBillingProvider } from "./fake.provider";
 import { DefaultBillingProviderFactory } from "./provider.factory";
 import { RazorpayBillingProvider } from "./razorpay.provider";
 
@@ -371,7 +372,7 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         }
     });
 
-    it("refuses a coupon rather than charge the full amount, asking nothing (U16, unverified)", async () => {
+    it("refuses a coupon without a Razorpay offer rather than charge the full amount, asking nothing", async () => {
         const { provider, calls } = recorded([]);
         const error = await provider
             .createSubscription({
@@ -388,6 +389,50 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         expect(error).toBeInstanceOf(BillingProviderError);
         expect((error as BillingProviderError).kind).toBe("REFUSED");
         expect(calls).toHaveLength(0);
+    });
+
+    it("passes a coupon's Razorpay offer as offer_id when making the subscription", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "sub_10", status: "created" } },
+        ]);
+        await provider.createSubscription({
+            planKey: "catalog.b",
+            planId: "row_b",
+            priceCents: 22_200,
+            currency: "INR",
+            interval: "month",
+            organizationId: "org_1",
+            providerPlanId: "plan_b",
+            discount: {
+                code: "TEST-OFF",
+                amountPaise: 131,
+                charges: 2,
+                razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+            },
+            reference: "chk_2",
+        });
+        expect(calls).toHaveLength(1);
+        expect(calls[0]?.body).toMatchObject({
+            plan_id: "plan_b",
+            offer_id: "offer_ABCDEFGHIJKLMN",
+        });
+    });
+
+    it("sends no offer_id without a coupon", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "sub_11", status: "created" } },
+        ]);
+        await provider.createSubscription({
+            planKey: "catalog.b",
+            planId: "row_b",
+            priceCents: 22_200,
+            currency: "INR",
+            interval: "month",
+            organizationId: "org_1",
+            providerPlanId: "plan_b",
+            discount: null,
+        });
+        expect(calls[0]?.body).not.toHaveProperty("offer_id");
     });
 
     it("puts an item on a subscription's next charge, GST included, with Saroh's reference (U16)", async () => {
@@ -434,5 +479,52 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             eventAt: new Date(1_775_000_000 * 1000),
             currentPeriodEnd: new Date(1_777_600_000 * 1000),
         });
+    });
+});
+
+describe("coupons and Razorpay Offers", () => {
+    const input = (razorpayOfferId?: string | null) => ({
+        planKey: "catalog.b",
+        planId: "row_b",
+        priceCents: 22_200,
+        currency: "INR",
+        interval: "month",
+        organizationId: "org_1",
+        providerPlanId: "plan_b",
+        discount: {
+            code: "TEST-OFF",
+            amountPaise: 131,
+            charges: 2,
+            razorpayOfferId,
+        },
+        reference: "chk_3",
+    });
+
+    it("the fake, like Razorpay, refuses a coupon without an offer and keeps the offer it is given", async () => {
+        const fake = new FakeBillingProvider();
+        const error = await fake
+            .createSubscription(input(null))
+            .catch((e: unknown) => e);
+        expect((error as BillingProviderError).kind).toBe("REFUSED");
+        expect(fake.createCalls).toHaveLength(0);
+
+        await fake.createSubscription(input("offer_ABCDEFGHIJKLMN"));
+        expect(fake.createCalls[0]?.discount?.razorpayOfferId).toBe(
+            "offer_ABCDEFGHIJKLMN",
+        );
+    });
+
+    it("Cashfree refuses a coupon, asking nothing, even with an offer", async () => {
+        const fetchSpy = jest.spyOn(globalThis, "fetch");
+        try {
+            const error = await new CashfreeBillingProvider()
+                .createSubscription(input("offer_ABCDEFGHIJKLMN"))
+                .catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(BillingProviderError);
+            expect((error as BillingProviderError).kind).toBe("REFUSED");
+            expect(fetchSpy).not.toHaveBeenCalled();
+        } finally {
+            fetchSpy.mockRestore();
+        }
     });
 });
