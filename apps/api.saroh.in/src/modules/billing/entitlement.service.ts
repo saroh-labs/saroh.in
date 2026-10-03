@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type { RegistryModuleKey } from "@saroh/pricing-catalog";
 
-import type { EntitlementMap, OverrideRow } from "./catalogue-access";
+import type { EntitlementMap } from "./catalogue-access";
 import { liveRaises } from "./catalogue-access";
 import type { LivePlanOverride } from "./catalogue-access.service";
 import {
@@ -96,7 +96,7 @@ export class EntitlementService {
                 revokedAt: true,
             },
         });
-        return newestPlanOverride(rows as OverrideRow[], now);
+        return newestPlanOverride(rows, now);
     }
 
     /**
@@ -125,7 +125,7 @@ export class EntitlementService {
                 revokedAt: true,
             },
         });
-        return liveRaises(rows as OverrideRow[]);
+        return liveRaises(rows);
     }
 
     /**

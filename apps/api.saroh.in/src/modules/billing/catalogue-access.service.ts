@@ -52,7 +52,7 @@ export const FREE_ENTITLEMENTS: EntitlementMap = {
 };
 
 /** The catalogue plan a business with no plan of its own is on. */
-export const FREE_PLAN_ID = LEGACY_PLAN_KEYS.free ?? "free";
+export const FREE_PLAN_ID: string = LEGACY_PLAN_KEYS.free;
 
 /** The live `plan` override a business is on (U5). */
 export interface LivePlanOverride {
@@ -149,8 +149,9 @@ export function newestPlanOverride(
                 !(r.expiresAt && r.expiresAt.getTime() <= t),
         )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    if (live.length === 0) return null;
     const newest = live[live.length - 1];
-    return newest?.planKey
+    return newest.planKey
         ? {
               id: newest.id,
               planKey: newest.planKey,

@@ -23,11 +23,19 @@
 import type {
     Catalog,
     ModuleAccess,
+    ModuleMapEntry,
     Override,
     OverrideKind,
     RegistryModuleKey,
 } from "@saroh/pricing-catalog";
 import { MODULE_MAP, OVERRIDE_KINDS } from "@saroh/pricing-catalog";
+
+/** A row's `MODULE_MAP` entry; a row the map doesn't know governs nothing. */
+function mapEntry(moduleId: string): ModuleMapEntry | undefined {
+    return Object.prototype.hasOwnProperty.call(MODULE_MAP, moduleId)
+        ? MODULE_MAP[moduleId]
+        : undefined;
+}
 
 /**
  * A plan's typed limit map: numeric caps (e.g. `sites: 3`) and feature flags
@@ -116,7 +124,7 @@ export function entitlementMapFor(input: {
     for (const a of input.access) {
         const on = a.state === "on";
         out[a.moduleId] = on ? (a.limit ?? true) : false;
-        const legacyKey = MODULE_MAP[a.moduleId]?.legacyEntitlementKey;
+        const legacyKey = mapEntry(a.moduleId)?.legacyEntitlementKey;
         if (!legacyKey) continue;
         if (!on) out[legacyKey] = 0;
         else if (a.limit === null) delete out[legacyKey];
@@ -138,7 +146,7 @@ export function registryModuleIncluded(
 ): boolean {
     const rows = catalog.modules
         .map((m) => m.id)
-        .filter((id) => MODULE_MAP[id]?.registry === registry);
+        .filter((id) => mapEntry(id)?.registry === registry);
     if (rows.length === 0) return true;
     return access.some((a) => rows.includes(a.moduleId) && a.state === "on");
 }

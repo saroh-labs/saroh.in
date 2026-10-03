@@ -40,7 +40,8 @@ const overrides = prisma.entitlementOverride.findMany as jest.Mock;
 const onPlan = (entitlements: Record<string, number | boolean>) =>
     subFindUnique.mockResolvedValue({
         status: "ACTIVE",
-        plan: { entitlements },
+        // A plan key no catalogue plan maps: its own row decides (U12).
+        plan: { key: "custom", entitlements },
     });
 
 describe("StoresService.createForUser — storefronts up to the plan", () => {
