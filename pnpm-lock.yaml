@@ -851,6 +851,9 @@ importers:
       '@t3-oss/env-nextjs':
         specifier: ^0.13.11
         version: 0.13.11(typescript@5.9.3)(valibot@1.4.2(typescript@5.9.3))(zod@3.25.76)
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       lucide-react:
         specifier: 'catalog:'
         version: 0.394.0(react@19.2.8)
@@ -872,6 +875,9 @@ importers:
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      tailwind-merge:
+        specifier: ^3.6.0
+        version: 3.6.0
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -888,6 +894,9 @@ importers:
       '@saroh/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/tsconfig
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/node':
         specifier: 'catalog:'
         version: 20.19.33
@@ -903,6 +912,9 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 10.0.0(jiti@2.7.0)
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       postcss:
         specifier: ^8.5.26
         version: 8.5.26
@@ -912,6 +924,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@20.19.33)(jsdom@25.0.1)(vite@7.3.6(@types/node@20.19.33)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.0))
 
   apps/templates.saroh.in:
     dependencies:

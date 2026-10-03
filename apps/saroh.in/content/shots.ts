@@ -1,221 +1,141 @@
 /**
- * Product screenshots for the marketing site, captured from the real app's
- * demo businesses by `e2e/marketing-shots/capture.ts` (plan U20). Generated:
- * edit `e2e/marketing-shots/shots.config.ts` and re-run the capture instead.
- * `width` and `height` are the image's pixels (2× the CSS layout).
+ * The screenshot manifest (plan U20, KTD-11): one entry per shot key the
+ * designs use. The capture pipeline (U20) shoots each from the real app and
+ * writes `shots.captured.ts`; until a key is captured `src` is null and
+ * `<ScreenshotFrame>` draws a neutral frame of the same shape, so a page's
+ * layout already matches the design.
+ *
+ * `alt` is the shot's default caption. Where a page shows a shot with its own
+ * caption (a feature step, a solution segment), the content carries that alt.
+ * No amounts in captions: the shot shows the figures, the caption says what
+ * it is.
  */
-export const SHOTS: Record<
-    string,
-    { src: string; alt: string; width: number; height: number }
-> = {
-    "s-home": {
-        src: "/shots/v2/s-home.webp",
-        alt: "Home at Rye & Co.: what needs doing today, from late orders to a failed renewal",
-        width: 2880,
-        height: 1800,
-    },
-    "s-orders": {
-        src: "/shots/v2/s-orders.webp",
-        alt: "The Orders list at Rye & Co.: each order's step, how long it has waited, when it was placed and its total",
-        width: 2880,
-        height: 1800,
-    },
-    "r-order": {
-        src: "/shots/v2/r-order.webp",
-        alt: "An order at Rye & Co.: how long it has waited, a sesame allergy warning, items, customer and money",
-        width: 2880,
-        height: 1800,
-    },
-    "r-invoice": {
-        src: "/shots/v2/r-invoice.webp",
-        alt: "A GST tax invoice from Rye & Co. to a café, with the business's details and tax",
-        width: 2880,
-        height: 1800,
-    },
-    "r-customers": {
-        src: "/shots/v2/r-customers.webp",
-        alt: "The Customers list: each customer with tags, last order, orders and spend",
-        width: 2880,
-        height: 1800,
-    },
-    "s-customer": {
-        src: "/shots/v2/s-customer.webp",
-        alt: "Priya Raman's page: her orders and spend, a sesame allergy and what she usually buys",
-        width: 2880,
-        height: 1800,
-    },
-    "r-subdetail": {
-        src: "/shots/v2/r-subdetail.webp",
-        alt: "Priya Raman's weekly loaf: next charge, upcoming collections, plan and changes",
-        width: 2880,
-        height: 1800,
-    },
-    "s-subs": {
-        src: "/shots/v2/s-subs.webp",
-        alt: "Subscriptions at Rye & Co. with one failed renewal flagged",
-        width: 2880,
-        height: 1800,
-    },
-    "s-billing": {
-        src: "/shots/v2/s-billing.webp",
-        alt: "Invoices at Rye & Co.: each order's GST invoice, paid or due, with what's overdue flagged",
-        width: 2880,
-        height: 1800,
-    },
-    "r-calendar": {
-        src: "/shots/v2/r-calendar.webp",
-        alt: "This month on the calendar with each day's money and a strip of totals",
-        width: 2880,
-        height: 1800,
-    },
-    "p-products": {
-        src: "/shots/v2/p-products.webp",
-        alt: "The Products list at Rye & Co.: what needs restocking at the top, then every product with status, stock and price",
-        width: 2880,
-        height: 1800,
-    },
-    "p-editor": {
-        src: "/shots/v2/p-editor.webp",
-        alt: "The product editor: name, address on the shop, price and category beside visibility, variants and stock",
-        width: 2880,
-        height: 1800,
-    },
-    "p-site": {
-        src: "/shots/v2/p-site.webp",
-        alt: "Rye & Co.'s shop page for the Sourdough loaf: sizes, price and Add to basket",
-        width: 2228,
-        height: 2406,
-    },
-    "p-stock": {
-        src: "/shots/v2/p-stock.webp",
-        alt: "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
-        width: 2880,
-        height: 1800,
-    },
-    "p-detail": {
-        src: "/shots/v2/p-detail.webp",
-        alt: "Sourdough loaf's page: what can be sold now, with open orders, discounts, collections, the website and reviews",
-        width: 2880,
-        height: 1800,
-    },
-    "s-insights": {
-        src: "/shots/v2/s-insights.webp",
-        alt: "Insights: site views, visitors, enquiries and orders over the last 30 days, with views by day and top pages",
-        width: 2880,
-        height: 1800,
-    },
-    "i-compare": {
-        src: "/shots/v2/i-compare.webp",
-        alt: "Insights for 30 days: site views, unique visitors, enquiries and orders, views by day and the most-viewed pages",
-        width: 2340,
-        height: 1838,
-    },
-    "i-weeks": {
-        src: "/shots/v2/i-weeks.webp",
-        alt: "Ninety days of site views, a bar for each day",
-        width: 2340,
-        height: 632,
-    },
-    "i-store": {
-        src: "/shots/v2/i-store.webp",
-        alt: "Insights for the last seven days: site views, enquiries, orders and the most-viewed pages",
-        width: 2880,
-        height: 1800,
-    },
-    "g-home": {
-        src: "/shots/v2/g-home.webp",
-        alt: "Pulse Fitness's Home: overdue memberships, follow-ups and this week's takings",
-        width: 2880,
-        height: 1800,
-    },
-    "g-bookings": {
-        src: "/shots/v2/g-bookings.webp",
-        alt: "Pulse Fitness's week: personal training and classes, by the hour",
-        width: 2880,
-        height: 1800,
-    },
-    "g-book": {
-        src: "/shots/v2/g-book.webp",
-        alt: "Pulse Fitness's booking page with services, classes and a summary",
-        width: 2880,
-        height: 1800,
-    },
-    "g-courses": {
-        src: "/shots/v2/g-courses.webp",
-        alt: "Courses at Pulse: a four-week strength course with the places taken",
-        width: 2880,
-        height: 1800,
-    },
-    "g-packs": {
-        src: "/shots/v2/g-packs.webp",
-        alt: "Class packs: 5 and 10 classes with how many are sold and still to use",
-        width: 2880,
-        height: 1800,
-    },
-    "g-customer": {
-        src: "/shots/v2/g-customer.webp",
-        alt: "Asha Verma's page at Pulse: classes left on her membership and her next booking",
-        width: 2880,
-        height: 1800,
-    },
-    "g-subs": {
-        src: "/shots/v2/g-subs.webp",
-        alt: "Memberships at Pulse with their next charge",
-        width: 2880,
-        height: 1800,
-    },
-    "g-billing": {
-        src: "/shots/v2/g-billing.webp",
-        alt: "Pulse Fitness's invoices with the overdue ones flagged",
-        width: 2880,
-        height: 1800,
-    },
-    "g-site": {
-        src: "/shots/v2/g-site.webp",
-        alt: "Pulse Fitness's own site on Saroh: what's on today and Book a free trial",
-        width: 2880,
-        height: 1800,
-    },
-    "d-home": {
-        src: "/shots/v2/d-home.webp",
-        alt: "Kavi Dental's Home: a patient's note from the booking page, overdue bills and the week so far",
-        width: 2880,
-        height: 1800,
-    },
-    "d-order": {
-        src: "/shots/v2/d-order.webp",
-        alt: "A root canal at Kavi Dental: visit 1 attended, visit 2 booked, visit 3 still to book",
-        width: 2880,
-        height: 1800,
-    },
-    "d-customer": {
-        src: "/shots/v2/d-customer.webp",
-        alt: "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
-        width: 2880,
-        height: 1800,
-    },
-    "d-customers": {
-        src: "/shots/v2/d-customers.webp",
-        alt: "Kavi Dental's patients with medical and allergy tags",
-        width: 2880,
-        height: 1800,
-    },
-    "d-book": {
-        src: "/shots/v2/d-book.webp",
-        alt: "Kavi Dental's booking page with check-ups, a root canal over three visits and a video consult",
-        width: 2880,
-        height: 1800,
-    },
-    "d-billing": {
-        src: "/shots/v2/d-billing.webp",
-        alt: "Kavi Dental's bills of supply with the overdue ones flagged",
-        width: 2880,
-        height: 1800,
-    },
-    "d-site": {
-        src: "/shots/v2/d-site.webp",
-        alt: "Kavi Dental's own site on Saroh: free times today and Book an appointment",
-        width: 2880,
-        height: 1800,
-    },
-};
+import { CAPTURED } from "./shots.captured";
+
+export interface Shot {
+    /** Under /public, e.g. `/shots/v2/s-home.webp`; null until captured. */
+    src: string | null;
+    alt: string;
+    /** Intrinsic size of the captured image; the placeholder uses 16:10. */
+    width: number;
+    height: number;
+}
+
+const pending = (alt: string): Shot => ({
+    src: null,
+    alt,
+    width: 1600,
+    height: 1000,
+});
+
+const designed = {
+    "s-home": pending(
+        "The Saroh dashboard at Rye & Co.: late orders, a failed renewal and what's due today, most urgent first",
+    ),
+    "s-orders": pending(
+        "The Orders list at Rye & Co.: each order's step, how long it has waited, when it was placed and its total",
+    ),
+    "r-order": pending(
+        "Order #1020: waiting 16 minutes, a sesame allergy warning, items, customer and money",
+    ),
+    "d-order": pending(
+        "Order #D301, a root canal: visit 1 attended, visit 2 today, visit 3 still to book",
+    ),
+    "r-invoice": pending(
+        "A GST invoice made from an order, with the business's details and tax",
+    ),
+    "r-customers": pending(
+        "The Customers list: each customer with tags, last order, orders and spend",
+    ),
+    "s-customer": pending(
+        "Priya Raman's page: six orders, what she has spent, a sesame allergy and what she usually buys",
+    ),
+    "g-customer": pending(
+        "Farah Khan's page at Pulse: a six-week course, classes left and her next booking",
+    ),
+    "d-customer": pending(
+        "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
+    ),
+    "d-customers": pending(
+        "Kavi Dental's patients with medical and allergy tags",
+    ),
+    "g-bookings": pending(
+        "Pulse Fitness's week: personal training and classes for each trainer, by the hour",
+    ),
+    "g-book": pending(
+        "Pulse Fitness's booking page with services, courses and a summary",
+    ),
+    "g-courses": pending(
+        "Courses at Pulse: a six-week beginners' course and a 5K course with places filled",
+    ),
+    "g-packs": pending(
+        "Class packs: 5 and 10 classes with how many are sold and still to use",
+    ),
+    "d-book": pending(
+        "Kavi Dental's booking page with check-ups, a root canal over three visits and a video consult",
+    ),
+    "r-subdetail": pending(
+        "Priya Raman's weekly loaf: next charge, upcoming collections, plan and changes",
+    ),
+    "g-site": pending(
+        "Pulse Fitness's site with classes today and a link to memberships",
+    ),
+    "s-subs": pending(
+        "Subscriptions at Rye & Co. with one failed renewal flagged",
+    ),
+    "s-billing": pending(
+        "Invoices at Rye & Co.: each order's GST invoice, paid or due, with a bulk order in draft",
+    ),
+    "d-billing": pending("Kavi Dental's bills of supply with one overdue"),
+    "g-billing": pending("Pulse Fitness's invoices with four overdue"),
+    "s-insights": pending(
+        "Insights at Rye & Co.: four weeks of takings, twelve weeks of bars, and Hill Road against Online",
+    ),
+    "i-compare": pending(
+        "Insights at Rye & Co.: takings, orders, best week and average order for four weeks",
+    ),
+    "i-weeks": pending(
+        "Twelve weeks of takings, from 7 Jul to 22 Sep, with 15 Sep marked as the best week",
+    ),
+    "i-store": pending(
+        "Insights for Hill Road only: its takings and orders in four weeks",
+    ),
+    "p-products": pending(
+        "The Products list at Rye & Co.: what needs restocking at the top, then every product with status, stock and price",
+    ),
+    "p-editor": pending(
+        "The product editor: name, address on the shop, price and category beside visibility, variants and stock",
+    ),
+    "p-site": pending(
+        "Rye & Co.'s shop page showing each product with its sizes, price and an Add to bag button",
+    ),
+    "p-stock": pending(
+        "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
+    ),
+    "p-detail": pending(
+        "Sourdough loaf's page: 25 can be sold now, with open orders, discounts, collections, pages and reviews",
+    ),
+    "d-home": pending(
+        "Kavi Dental's Home: today's patients with their dentist, chair and flags",
+    ),
+    "g-home": pending(
+        "Pulse Fitness's Home: overdue memberships, a failed renewal and today's sessions",
+    ),
+    "r-calendar": pending(
+        "September on the calendar with each day's money and a strip of totals",
+    ),
+    "d-site": pending(
+        "Kavi Dental's own site on Saroh: free times today and Book an appointment",
+    ),
+    "g-subs": pending("Memberships at Pulse with their next charge"),
+} satisfies Record<string, Shot>;
+
+/** A captured shot (U20) replaces its placeholder, alt included: the
+ * captured alt describes what the image really shows. */
+export const shots = Object.fromEntries(
+    Object.entries(designed).map(([key, shot]) => [key, CAPTURED[key] ?? shot]),
+) as Record<keyof typeof designed, Shot>;
+
+export type ShotKey = keyof typeof designed;
+
+export const SHOT_KEYS = Object.keys(shots) as ShotKey[];

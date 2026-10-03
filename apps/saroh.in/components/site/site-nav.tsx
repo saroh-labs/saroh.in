@@ -8,8 +8,7 @@ import {
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
 import { Wordmark } from "@saroh/ui/wordmark";
-import { ChevronDown, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -47,7 +46,6 @@ const navLink =
     "group relative inline-flex h-[34px] shrink-0 items-center gap-[5px] whitespace-nowrap px-1 text-[13px] font-medium text-highlight-600 transition-colors hover:text-foreground aria-[current=page]:font-semibold aria-[current=page]:text-foreground dark:text-highlight-400";
 
 export function SiteNav() {
-    const { resolvedTheme, setTheme } = useTheme();
     const pathname = usePathname();
     const onJob = JOBS.some((job) => job.route === pathname);
     const row = useRef<HTMLDivElement>(null);
@@ -151,22 +149,6 @@ export function SiteNav() {
                 </nav>
 
                 <div className="ml-auto flex shrink-0 items-center gap-2.5 sm:gap-3">
-                    <button
-                        type="button"
-                        onClick={() =>
-                            setTheme(
-                                resolvedTheme === "dark" ? "light" : "dark",
-                            )
-                        }
-                        aria-label="Toggle theme"
-                        className="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        {/* Both icons render and CSS picks one: the theme
-                            class is on <html> before hydration, so this is
-                            right on first paint without a mounted flag. */}
-                        <Moon aria-hidden className="size-4 dark:hidden" />
-                        <Sun aria-hidden className="hidden size-4 dark:block" />
-                    </button>
                     <a
                         href={SIGN_IN_URL}
                         className="hidden text-[13px] text-highlight-600 hover:text-foreground dark:text-highlight-400 sm:inline"

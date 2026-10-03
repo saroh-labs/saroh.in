@@ -30,7 +30,7 @@ import { BUSINESSES, ROLES, SHOTS } from "./shots.config";
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const OUT_DIR = path.join(ROOT, "apps/saroh.in/public/shots/v2");
-const MANIFEST = path.join(ROOT, "apps/saroh.in/content/shots.ts");
+const MANIFEST = path.join(ROOT, "apps/saroh.in/content/shots.captured.ts");
 const AUTH_DIR = path.join(ROOT, "e2e/.auth");
 const PASSWORD = "demo-password-123";
 
@@ -180,8 +180,9 @@ async function writeManifest(sharp: Sharp) {
  * demo businesses by \`e2e/marketing-shots/capture.ts\` (plan U20). Generated:
  * edit \`e2e/marketing-shots/shots.config.ts\` and re-run the capture instead.
  * \`width\` and \`height\` are the image's pixels (2× the CSS layout).
+ * \`content/shots.ts\` reads this: a captured shot replaces the placeholder.
  */
-export const SHOTS: Record<
+export const CAPTURED: Record<
     string,
     { src: string; alt: string; width: number; height: number }
 > = {
