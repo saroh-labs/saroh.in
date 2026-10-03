@@ -2447,3 +2447,49 @@ as it wasn't in `globalEnv`.
 `turbo.json`. A `NEXT_PUBLIC_*` a build reads must be in `globalEnv` and in
 every stack that builds it.
 **Category**: e2e · rule in `scripts/prepush.sh`, `turbo.json`
+## Seed — the Customers list stood empty for every seeded business
+
+**Problem**: Sell → Customers read "0 customers" on Northwind and Leela &
+Loom, with "292 (84) paying customers aren't linked to a contact yet", and
+Review said none of them had a contact to link to. Found while filming the
+demo videos.
+**Root cause**: The Customers list is keyed on the contact (C2, DEC-041). A
+real business gets one per paying customer from the payment path
+(`ensureContactForPaidOrder`) or, for older data, the one-off backfill. The
+seed writes paid orders straight to the database, so neither ran; only the
+bakery and the clinic, which link a few customers by hand, had any.
+**Fix**: `linkSeededPayers` (`packages/database/src/seed/helpers.ts`) runs
+the one rule, `linkPayingCustomer`, for every seeded customer with a paid
+order, at the end of the base seed and the showcase. The rule takes optional
+fixed ids and a time, so what it makes carries the seed prefix (exact
+teardown) and dates to the first payment. A re-run relinks the seed's own
+contacts, since re-seeding a business re-creates its customers and their
+links go with them. Rye & Co. and Kavi Dental keep their hand-written links
+and their one possible match.
+**Rule**: Seed data that skips an API path (a payment, a booking) also skips
+what that path makes on the side. Run the same rule from the seed, with
+seed ids. `checkBoutique` now fails if a paying customer has no contact.
+**Category**: seed · customers · `packages/database/src/seed/helpers.ts`
+## Frontend — every new post fell into "Couldn't load your website"
+
+**Problem**: Writing a new post, the editor turned into the route's error
+page ("Couldn't load your website") about 2.5 seconds after typing stopped.
+Opening New post from the posts list did the same. Reloading the page
+brought the post back. Found while filming the demo videos.
+**Root cause**: The first autosave of a new post `router.replace`s to the
+post's own address (`components/sites/post-editor.tsx`), and the remount has
+Tiptap's `useEditor` destroy its editor and create another. `EditorSurface`'s
+sync effect in `components/sites/rich-text-editor.tsx` reconnected first,
+still holding the destroyed editor, and called `editor.commands.setContent`.
+Tiptap's `destroy()` sets `commandManager` to null, so the `commands` getter
+threw `Cannot read properties of null (reading 'commands')`. The product
+description editor had hit the same thing in its sheet and was fixed there
+(entry above), but the fix never reached the shared rich-text editor.
+**Fix**: The sync effect and the HTML toggle skip a destroyed editor, and the
+surface is keyed by editor instance, so the new editor gets a fresh surface
+and `useEditorState` store. `editorKey` moved to `lib/tiptap/editor-key.ts`
+so both editors share it.
+**Rule**: Any effect or handler that touches a Tiptap editor checks
+`editor.isDestroyed` first, and a surface built around one editor is keyed
+by `editorKey(editor)`. Pinned by `e2e/tests/post-editor.spec.ts`.
+**Category**: frontend · Tiptap · `apps/app.saroh.in/components/sites/rich-text-editor.tsx`
