@@ -35,6 +35,7 @@ import {
     UNSOLD_ENTITLEMENTS,
     withoutRaises,
 } from "./catalogue-access";
+import { usageByModule } from "./metering";
 
 /**
  * The floor for a business the catalogue doesn't reach yet: no subscription
@@ -371,7 +372,9 @@ export class CatalogueAccessService {
      * `GET organizations/:org/billing/access`: every row's state, limit and
      * upgrade, the plan and price, a plan override and a pending move — what
      * the merchant app's locks, upgrade panel and Settings › Plan read (U14).
-     * Needs `billing:read`, as the subscription read does.
+     * Needs `billing:read`, as the subscription read does. Each metered row
+     * that is on carries its `usage` (U13), whether or not
+     * `PLAN_ENFORCEMENT` is on: reads always answer.
      */
     async view(ctx: OrganizationContext): Promise<BillingAccessView> {
         authorize(ctx, "billing:read");
@@ -406,7 +409,17 @@ export class CatalogueAccessService {
                       from: a.pendingMove.from.toISOString(),
                   }
                 : null,
-            modules: moduleAccessViews(a.catalog, a.modules),
+            modules: moduleAccessViews(
+                a.catalog,
+                a.modules,
+                await usageByModule(
+                    prisma,
+                    ctx.organizationId,
+                    a.modules
+                        .filter((m) => m.state === "on")
+                        .map((m) => m.moduleId),
+                ),
+            ),
         };
     }
 

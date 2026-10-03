@@ -229,6 +229,26 @@ orgId)` (`organizations/organization-kind.ts`).
   plan override reads `FREE_ENTITLEMENTS` until the backfills reach it
   (`docs/architecture/PRICING_ROLLOUT.md`). Never read `Plan.entitlements`
   directly for access.
+- **Current** (plans catalogue U13) — **A plan limit is checked where the
+  write happens, behind the kill switch.** A write that adds a metered
+  thing calls `planMeter.roomInTx(tx, org, row)` on its own transaction
+  before writing (or `withRoom` when it had no transaction, `assertRoom`
+  when it can't share one), and a write a switch row governs calls
+  `planMeter.assertIncluded(org, row)` (`billing/metering.service.ts`).
+  Off (`PLAN_ENFORCEMENT`), neither reads anything nor opens a
+  transaction. On, a business off the catalogue is never refused, and a
+  plan that can't be read lets the write through (logged,
+  `plan_meter_unresolved`). The refusals are 403 with `details.code`
+  `PLAN_LIMIT_REACHED` (with the limit, the count, `upgradeTo` and the
+  design's notice) or `MODULE_LOCKED`; the booking page gets 409
+  `BOOKINGS_PAUSED`, which names no plan. What each limit counts is
+  `billing/metering.ts`, the one place: orders and bookings that stand
+  (never an unpaid online checkout or a pay-now hold), in the business's
+  month in its zone. The site's checkout is never refused (a soft cap,
+  OQ-8); a payment once captured never is (OQ-7). Over after a downgrade,
+  existing things stay readable and editable; only adding is refused. A
+  new write that adds a metered thing, or a new switch row, gets its call
+  and a row in `billing/plan-limits.db.spec.ts`.
 - **Current** (DEC-068) — **Turning a module on creates its minimum in the
   switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
   checks `module:manage` and then the action for each thing it creates

@@ -232,7 +232,11 @@ export interface ModuleAccessView {
     text: string;
     /** Why it differs from the plan, in the design's words; empty if not. */
     override: string;
-    /** Metered use against `limit`: null until metering (U13) counts it. */
+    /**
+     * Metered use against `limit` (U13, `metering.ts`): this month's count
+     * for a monthly row. Null for a row metering doesn't count (a switch) or
+     * that is off.
+     */
     usage: number | null;
     /** The rail entry it locks, if any. */
     menu: string | null;
@@ -255,10 +259,15 @@ export interface BillingAccessView {
     modules: ModuleAccessView[];
 }
 
-/** The catalogue rows of a resolved business, for the merchant app. */
+/**
+ * The catalogue rows of a resolved business, for the merchant app. `usage`
+ * is metering's count by row id (`usageByModule`); a row it leaves out reads
+ * null.
+ */
 export function moduleAccessViews(
     catalog: Catalog,
     access: readonly ModuleAccess[],
+    usage: Readonly<Record<string, number>> = {},
 ): ModuleAccessView[] {
     return access.map((a) => {
         const m = catalog.modules.find((x) => x.id === a.moduleId);
@@ -271,7 +280,11 @@ export function moduleAccessViews(
             per: a.per,
             text: a.text,
             override: a.override,
-            usage: null,
+            usage:
+                a.state === "on" &&
+                Object.prototype.hasOwnProperty.call(usage, a.moduleId)
+                    ? usage[a.moduleId]
+                    : null,
             menu: m?.menu ?? null,
             child: m?.child ?? null,
             upgradeTo: a.upgradePlanId

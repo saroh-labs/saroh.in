@@ -5,13 +5,13 @@ import {
     CATALOG_PLAN_KEY_PREFIX,
     catalogPlanIdForKey,
     effectivePlanId,
-    MODULE_MAP,
     monthlyEquivalentPaise,
     priceOverridePaise,
 } from "@saroh/pricing-catalog";
 
 import type { Catalog } from "@saroh/pricing-catalog";
 
+import { countUsageAcross, meteredModules } from "../billing/metering";
 import type { CatalogueBusiness, Impact } from "./impact";
 import { catalogueImpact } from "./impact";
 
@@ -19,22 +19,14 @@ import { catalogueImpact } from "./impact";
 const PAYING_STATUSES = new Set(["ACTIVE", "PAST_DUE"]);
 
 /**
- * The metered counts the API can take today, by `MODULE_MAP` limit key.
- * KTD-9's monthly windows (orders and bookings this month, in the business's
- * time zone), blog posts and integrations come with metering (U13); until
- * then those modules read as not counted, and the admin hides their line.
+ * The catalogue modules whose usage {@link ImpactService} counts: every row
+ * metering counts (U13, `billing/metering.ts`) — products, orders and
+ * bookings this month in each business's zone, blog posts, team members and
+ * integrations. The admin's usage lines, its impact and the merchant's
+ * `GET …/billing/access` count the same way.
  */
-const COUNTED_LIMIT_KEYS = ["products", "teamMembers"] as const;
-
-/** The catalogue modules whose usage {@link ImpactService} counts. */
 export const MEASURED_MODULES: ReadonlySet<string> = new Set(
-    Object.entries(MODULE_MAP)
-        .filter(([, e]) =>
-            (COUNTED_LIMIT_KEYS as readonly (string | null)[]).includes(
-                e.limitKey,
-            ),
-        )
-        .map(([id]) => id),
+    meteredModules().keys(),
 );
 
 export interface CatalogueBusinesses {
@@ -60,61 +52,50 @@ export class ImpactService {
         knownPlanIds: ReadonlySet<string>,
         now: Date,
     ): Promise<CatalogueBusinesses> {
-        const [orgs, subs, overrides, products, members, invites] =
-            await Promise.all([
-                prisma.organization.findMany({
-                    where: { lifecycleStatus: { not: "DELETED_RETAINED" } },
-                    select: { id: true, name: true },
-                    orderBy: { createdAt: "asc" },
-                }),
-                prisma.subscription.findMany({
-                    select: {
-                        organizationId: true,
-                        status: true,
-                        plan: {
-                            select: {
-                                key: true,
-                                version: true,
-                                interval: true,
-                                priceCents: true,
-                            },
+        const [orgs, subs, overrides] = await Promise.all([
+            prisma.organization.findMany({
+                where: { lifecycleStatus: { not: "DELETED_RETAINED" } },
+                select: { id: true, name: true },
+                orderBy: { createdAt: "asc" },
+            }),
+            prisma.subscription.findMany({
+                select: {
+                    organizationId: true,
+                    status: true,
+                    plan: {
+                        select: {
+                            key: true,
+                            version: true,
+                            interval: true,
+                            priceCents: true,
                         },
-                        pendingPlan: { select: { key: true, version: true } },
                     },
-                }),
-                prisma.entitlementOverride.findMany({
-                    where: {
-                        kind: { in: ["plan", "price"] },
-                        revokedAt: null,
-                        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-                    },
-                    select: {
-                        organizationId: true,
-                        kind: true,
-                        key: true,
-                        value: true,
-                        planKey: true,
-                        moduleKey: true,
-                        createdAt: true,
-                        expiresAt: true,
-                        revokedAt: true,
-                    },
-                }),
-                prisma.product.groupBy({
-                    by: ["organizationId"],
-                    where: { status: { not: "ARCHIVED" } },
-                    _count: { _all: true },
-                }),
-                prisma.membership.groupBy({
-                    by: ["organizationId"],
-                    _count: { _all: true },
-                }),
-                prisma.organizationInvitation.groupBy({
-                    by: ["organizationId"],
-                    where: { status: "PENDING", expiresAt: { gt: now } },
-                    _count: { _all: true },
-                }),
-            ]);
+                    pendingPlan: { select: { key: true, version: true } },
+                },
+            }),
+            prisma.entitlementOverride.findMany({
+                where: {
+                    kind: { in: ["plan", "price"] },
+                    revokedAt: null,
+                    OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+                },
+                select: {
+                    organizationId: true,
+                    kind: true,
+                    key: true,
+                    value: true,
+                    planKey: true,
+                    moduleKey: true,
+                    createdAt: true,
+                    expiresAt: true,
+                    revokedAt: true,
+                },
+            }),
+        ]);
+        const usageOf = await this.usage(
+            orgs.map((o) => o.id),
+            now,
+        );
 
         const subOf = new Map(subs.map((s) => [s.organizationId, s]));
         const overridesOf = new Map<string, Override[]>();
@@ -123,19 +104,6 @@ export class ImpactService {
             list.push({ ...o, kind: o.kind as OverrideKind });
             overridesOf.set(o.organizationId, list);
         }
-        const count = (
-            rows: { organizationId: string; _count: { _all: number } }[],
-        ) => new Map(rows.map((r) => [r.organizationId, r._count._all]));
-        const productsOf = count(products);
-        const membersOf = count(members);
-        const invitesOf = count(invites);
-        const usageKey = (limitKey: string): string | undefined =>
-            Object.entries(MODULE_MAP).find(
-                ([, e]) => e.limitKey === limitKey,
-            )?.[0];
-        const productsModule = usageKey("products");
-        const membersModule = usageKey("teamMembers");
-
         const fallbackPlanId = catalogPlanIdForKey("free") ?? "free";
         const businesses = orgs.map((org): CatalogueBusiness => {
             const sub = subOf.get(org.id);
@@ -155,11 +123,8 @@ export class ImpactService {
                     : sub.plan.priceCents
                 : 0;
             const usage: Record<string, number> = {};
-            if (productsModule)
-                usage[productsModule] = productsOf.get(org.id) ?? 0;
-            if (membersModule) {
-                usage[membersModule] =
-                    (membersOf.get(org.id) ?? 0) + (invitesOf.get(org.id) ?? 0);
+            for (const [moduleId, counts] of usageOf) {
+                usage[moduleId] = counts.get(org.id) ?? 0;
             }
             return {
                 id: org.id,
@@ -184,6 +149,23 @@ export class ImpactService {
         }
 
         return { businesses, measured: MEASURED_MODULES, movingTo };
+    }
+
+    /**
+     * Each measured row's count for every business (row id → business id →
+     * count). CROSS-TENANT READ, as {@link read} is.
+     */
+    private async usage(
+        organizationIds: readonly string[],
+        now: Date,
+    ): Promise<Map<string, Map<string, number>>> {
+        const rows = [...meteredModules()];
+        const counts = await Promise.all(
+            rows.map(([, key]) =>
+                countUsageAcross(prisma, key, organizationIds, now),
+            ),
+        );
+        return new Map(rows.map(([moduleId], i) => [moduleId, counts[i]]));
     }
 
     /** What publishing `next` over `live` would do, from today's businesses. */

@@ -16,6 +16,7 @@ import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
+import { planMeter } from "../billing/metering.service";
 import { parsePostsPrefix } from "../content/posts-prefix";
 import {
     checkoutReadiness,
@@ -1071,6 +1072,9 @@ export class SitesService {
         // Validate BEFORE writing: an unknown colour key or a non-numeric
         // slider must be a 400, not a site that renders wrong later.
         const style = parseSiteStyle(input);
+        // Changing the theme and fonts is a plan row (U13); a site keeps the
+        // look it has where the plan leaves it off.
+        await planMeter.assertIncluded(ctx.organizationId, "themes");
 
         await prisma.site.update({
             where: { id: siteId },

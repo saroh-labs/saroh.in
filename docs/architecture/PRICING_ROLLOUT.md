@@ -103,6 +103,35 @@ into access; `EntitlementService`, module availability and
   business off its own row (or the free floor) and logs
   `catalogue_access_unresolved`.
 
+## How limits are enforced (U13)
+
+`MeteringService` (`billing/metering.service.ts`) is the one place a write
+asks whether the business's plan has room; `billing/metering.ts` is the one
+place usage is counted, for enforcement, `GET …/billing/access`'s `usage`
+and the admin's usage lines and impact (`ImpactService`).
+
+- **Only behind `PLAN_ENFORCEMENT`.** Off, nothing is counted or refused
+  on a write, and no notice is sent; `usage` is still shown. The limits
+  `EntitlementService.check` has always enforced (`sites`, `storefronts`,
+  `customDomain`) are unchanged either way.
+- **What is counted:** products not archived; orders this month that
+  stand (not cancelled, not an online checkout nobody paid); bookings this
+  month that are confirmed (a course's sessions left out); posts live on
+  a site; people in the business plus open invitations; connected payment
+  and messaging providers. A month is the business's own, in its zone.
+- **Where it is refused:** making, copying, importing or un-archiving a
+  product; an order taken by hand; a booking, by hand or on the booking
+  page (which is told only that the business isn't taking bookings
+  online, before any payment); putting a post live; inviting someone;
+  connecting a new provider; making a custom role; changing the site's
+  theme; turning on "Publishing needs approval". The site's checkout is a
+  soft cap: never refused, the business is told.
+- **Who is never refused:** a business the catalogue doesn't reach yet
+  (no subscription row, no plan override); any business when its plan
+  can't be read (logged `plan_meter_unresolved`).
+- **Notices:** `plan.limit.notice` at 80%, at the limit and past a soft
+  cap, once each per limit and month (`backend-jobs.md`).
+
 ## Undoing it
 
 Revoke the overrides (`revokedAt`) rather than deleting them; the audit

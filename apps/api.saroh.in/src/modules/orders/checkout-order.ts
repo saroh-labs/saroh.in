@@ -1,6 +1,7 @@
 import { ConflictException, HttpException } from "@nestjs/common";
 import { nextOrderNumberInTx, prisma } from "@saroh/database";
 
+import { planMeter } from "../billing/metering.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
 import type { ShopScope } from "./checkout-bag";
@@ -82,6 +83,12 @@ export async function createCheckoutOrder(
     for (let attempt = 0; attempt < 5; attempt++) {
         try {
             return await prisma.$transaction(async (tx) => {
+                // The plan's monthly orders cap is soft here (U13, OQ-8):
+                // the site never turns a customer away; at the cap the
+                // business is told instead. It counts once paid (OQ-7).
+                await planMeter.roomInTx(tx, scope.organizationId, "orders", {
+                    soft: true,
+                });
                 // Found whatever case staff typed it in, as a treatment's
                 // customer is; made only when there is none.
                 const customer =

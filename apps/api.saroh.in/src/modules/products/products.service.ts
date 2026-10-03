@@ -10,6 +10,7 @@ import { prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
+import { planMeter } from "../billing/metering.service";
 import {
     checkProductAllergens,
     productAllergensFor,
@@ -416,6 +417,10 @@ export class ProductsService {
         try {
             // The business's product, sold at the storefront it is made at.
             createdId = await prisma.$transaction(async (tx) => {
+                // The plan's products cap (U13), before anything is written;
+                // an archived product counts toward nothing.
+                if (dto.status !== "ARCHIVED")
+                    await planMeter.roomInTx(tx, organizationId, "products");
                 // Left out: the storefront's currency, else the business's
                 // (DEC-030) — never a USD guess.
                 const currency =
@@ -537,6 +542,13 @@ export class ProductsService {
             organizationId,
             dto.categoryId ?? undefined,
         );
+        // Bringing an archived product back adds one to the plan's cap (U13).
+        if (
+            current.status === "ARCHIVED" &&
+            dto.status &&
+            dto.status !== "ARCHIVED"
+        )
+            await planMeter.assertRoom(organizationId, "products");
 
         try {
             await prisma.product.update({
@@ -680,6 +692,9 @@ export class ProductsService {
         if (has("hsnCode")) data.hsnCode = dto.hsnCode ?? null;
         if (has("mrp")) data.mrp = dto.mrp ?? null;
         if (has("status")) {
+            // Bringing an archived product back adds one to the plan's cap.
+            if (current.status === "ARCHIVED" && dto.status !== "ARCHIVED")
+                await planMeter.assertRoom(organizationId, "products");
             data.status = dto.status;
             // When it went, for the archived banner; cleared when it leaves.
             if (dto.status === "ARCHIVED" && current.status !== "ARCHIVED")
@@ -779,9 +794,15 @@ export class ProductsService {
         const { organizationId, storeId } = scope;
         let copyId: string;
         try {
-            copyId = await prisma.$transaction((tx) =>
-                duplicateProduct(tx, { organizationId, productId, storeId }),
-            );
+            copyId = await prisma.$transaction(async (tx) => {
+                // A copy is one more product on the plan's cap (U13).
+                await planMeter.roomInTx(tx, organizationId, "products");
+                return duplicateProduct(tx, {
+                    organizationId,
+                    productId,
+                    storeId,
+                });
+            });
         } catch (error) {
             // Another copy took the same suffix in the meantime.
             if (!isSlugClash(error)) throw error;
