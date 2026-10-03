@@ -51,6 +51,13 @@ paper view. Written by the billing webhook with the charge, once per
 charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
 invoices (U17)".
 
+Trials, coupons and add-ons (U16) ride the same path: a coupon is
+redeemed and its discount invoiced with the charge it comes off, never at
+checkout, and an add-on is a line on the charge after the period it covers
+(`SubscriptionAddonCharge`). The amount the provider charges and the
+invoice's lines are worked out by one rule each, so they agree. Rules in
+`PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
+
 ## Business details before money — **Current** (DEC-068, M3)
 
 Every invoice prints the business's registered address, and a

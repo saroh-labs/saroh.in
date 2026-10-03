@@ -205,9 +205,79 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
   plan; a SCHEDULED checkout to the new plan is how the business authorises
   it. A publish never overrides a change the business chose for its period's
   end.
-- **Not here:** trials, coupons, add-on purchases and yearly offers (U16),
-  limit enforcement (U13, behind `PLAN_ENFORCEMENT`), the merchant screens
-  (U14). Saroh's own invoices are below (U17).
+- **Not here:** limit enforcement (U13, behind `PLAN_ENFORCEMENT`), the
+  merchant screens (U14). Trials, yearly, coupons and add-ons are below
+  (U16); Saroh's own invoices too (U17).
+
+## Trials, yearly, coupons and add-ons (U16)
+
+Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
+`addons.service.ts`, `addon-charges.ts`, `pricing/coupons.service.ts`
+(`findUsableCoupon`). Needs the migration `20261021160000_billing_offers`.
+
+- **Trials.** A paid plan whose catalogue trial is on, where the change
+  would be NEW and the business never completed a trial checkout, is a
+  `TRIAL` checkout: a provider subscription starting at the trial's end, no
+  upfront charge. Authorised → on the plan, `TRIALING`, period end = the
+  trial's end, no invoice, and the trial-ending email queued a few days
+  ahead (`TRIAL_ENDING_NOTICE_DAYS`; it re-reads the checkout for a coupon).
+  The first charge makes it `ACTIVE` and is invoiced as a new plan's first
+  (`NEW`); a failed one is `pending` then `halted` → Free. Another paid plan
+  during a trial is a `TRIAL` to the same end; Free during a trial is at
+  once. One trial per business, ever.
+- **Yearly** is the plan's yearly row ("pay for N months, get 12", priced
+  at publish) on its yearly provider plan, sold only while yearly is on.
+- **Coupons** (`?coupon=` on the quote, `coupon` on the change) apply to a
+  checkout that starts a plan (`NEW`, `TRIAL`). Refused (400, field
+  `coupon`): unknown or archived, paused, expired, not for the plan, used by
+  this business, or used up — redemptions plus other businesses' OPEN
+  checkouts with it, counted across businesses (`outsideOrgContext`).
+  Monthly: its discount off each of its months; yearly: that many months'
+  worth once, off the first yearly charge, never more than the charge. The
+  checkout keeps `couponId`, `discountPaise`, `discountCharges`; the
+  provider is told the GST-inclusive difference per charge, so it charges
+  exactly what the invoice says. The redemption row is written by the
+  webhook with the first discounted charge (a NEW plan's completion, a
+  trial's first charge), never at checkout; an abandoned checkout redeems
+  nothing. Invoices take the discount off the plan line for the provider
+  subscription's first `discountCharges` charges. Coupon tries are limited
+  per business and per address (in-process, a speed bump). A coupon a
+  checkout was quoted with is archived on delete, never removed.
+- **Add-ons** — `GET …/billing/addons`, `PUT …/billing/addons/:id
+{quantity}` (zero removes; `billing:manage`). On a paid catalogue plan
+  billed through the provider, trialing or paid up; definitions from the
+  plan's own version; a module add-on only where the plan leaves the module
+  out, a pack only where the plan caps what it raises. Limits move at once.
+  Billed after the period, on the provider subscription's next charge
+  (`SubscriptionAddonCharge`): bought part-way, what's left of the period
+  (prorated); each later period, the whole of it for what's held at its
+  start. `billing.addons.sync` sends each row; the renewal invoice takes
+  the rows that charge carried as lines. A trial owes nothing for its days.
+  A plan change that moves billing to a new provider subscription takes
+  the rows along; Free (a move, at once, or a new plan from Free) drops the
+  add-ons and what they owed. Known gap: what the last period before
+  leaving for Free owes is never charged (no further charge exists).
+
+### Provider assumptions added by U16 — **unverified**
+
+7. **Coupons.** Assumed Razorpay takes money off a subscription only
+   through an Offer made in its Dashboard and linked by `offer_id`; Saroh's
+   coupons have none, so the adapter **refuses** a checkout with a coupon
+   (REFUSED → 409 "That coupon can't be used with payments just now"),
+   never charging the full price for a discounted plan. Settle before
+   coupons go live: Offers per coupon, or another way to discount the first
+   charges.
+8. **Trials.** A subscription with `start_at` at the trial's end and no
+   addons: assumed `subscription.authenticated` arrives once the mandate is
+   authorised (a token charge, refunded), and `activated`/`charged` at
+   `start_at`, with `current_end` the first paid period's end.
+9. **Add-on items.** `POST /subscriptions/:id/addons` (one-off item, GST
+   included) is assumed to be charged with the subscription's next invoice,
+   accepted while the subscription is only authenticated (a trial), and
+   dropped when the subscription is cancelled. Razorpay keeps no reference,
+   so a retry after a lost answer may add the item twice. An item added
+   after Razorpay has drawn up the next invoice is assumed to wait for the
+   one after; Saroh's invoice would then list it a charge early.
 
 ## Saroh's own invoices (U17)
 

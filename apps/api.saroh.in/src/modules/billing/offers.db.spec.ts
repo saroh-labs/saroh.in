@@ -559,11 +559,11 @@ describe("coupons", () => {
             message: "You've used coupon MINE already.",
         });
 
-        // On a change that doesn't start a plan (an upgrade).
+        // On a change that doesn't start a plan (a cheaper plan, scheduled).
         const third = await business();
-        await onPaidPlan(third, "b");
-        await coupon("UPGRADE-OFF");
-        await expect(tryIt("UPGRADE-OFF", "c", third)).rejects.toMatchObject({
+        await onPaidPlan(third, "c");
+        await coupon("LATER-OFF");
+        await expect(tryIt("LATER-OFF", "b", third)).rejects.toMatchObject({
             status: 400,
             message:
                 "A coupon can be used when you start a paid plan, not on this change.",
@@ -639,7 +639,12 @@ describe("coupons", () => {
 
 describe("add-ons", () => {
     it("buying raises the limit at once; what is owed goes on the next charge and onto its invoice", async () => {
-        await install();
+        // Plan B without its trial, so it is paid from the start.
+        await install(
+            OFFERS((c) => {
+                c.plans[1]!.trial = undefined;
+            }),
+        );
         const ctx = await business();
         const { providerSub, periodEnd } = await onPaidPlan(ctx, "b");
         const before = await access.resolve(ctx.organizationId);
@@ -737,7 +742,8 @@ describe("add-ons", () => {
             message: "Add-ons come with a paid plan.",
         });
         const view = await addons.list(ctx);
-        expect(view).toMatchObject({ canBuy: false, addons: [] });
+        expect(view.canBuy).toBe(false);
+        expect(view.addons.every((a) => !a.available)).toBe(true);
 
         await onPaidPlan(ctx, "c");
         await expect(addons.set(ctx, "things-pack", 1)).rejects.toMatchObject({
