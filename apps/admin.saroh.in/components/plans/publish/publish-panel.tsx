@@ -14,7 +14,7 @@ import type { PublishPolicy } from "@/lib/pricing-types";
 
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
-import { usePlansNav } from "../plans-tabs";
+import { usePlansNav } from "../plans-nav";
 import { useFlash } from "../toast";
 import type { When } from "./publish";
 import {
