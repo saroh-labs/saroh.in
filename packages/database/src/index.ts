@@ -47,3 +47,6 @@ export * from "./backfill/business-type-pvt";
 // The P3 order-number backfill (DEC-066), exported so the API's integration
 // suite can run it twice and check what it did.
 export * from "./backfill/order-numbers";
+// Pricing catalogue versions (plan 2026-09-29 U1): store a published
+// snapshot and its Plan rows, and read which one is live.
+export * from "./pricing-catalogue";

@@ -420,7 +420,13 @@ async function enableModules(
  */
 async function subscribe(ctx: Context, key: string, orgId: string) {
     const plan = await ctx.prisma.plan.findUniqueOrThrow({
-        where: { key_version: { key: PLAN.key, version: PLAN.version } },
+        where: {
+            key_version_interval: {
+                key: PLAN.key,
+                version: PLAN.version,
+                interval: PLAN.interval,
+            },
+        },
         select: { id: true },
     });
     await ctx.prisma.subscription.upsert({

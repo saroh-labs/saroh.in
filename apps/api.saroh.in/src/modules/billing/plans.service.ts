@@ -3,6 +3,15 @@ import type { Plan } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 /**
+ * Pricing catalogue `Plan` rows (`catalog.<plan>`, plan 2026-09-29 U1) are
+ * not offered through this legacy path: a merchant moves onto the catalogue
+ * through its own checkout (U15), which lifts this filter.
+ */
+export const NOT_CATALOGUE_PLAN = {
+    key: { not: { startsWith: "catalog." } },
+} as const;
+
+/**
  * The Saroh plan catalog (S7-005).
  *
  * `Plan` is a GLOBAL catalog (NOT org-owned): every tenant is offered the same
@@ -17,7 +26,7 @@ export class PlansService {
     /** All active plans, cheapest first — the offerable catalog. */
     listActive(): Promise<Plan[]> {
         return prisma.plan.findMany({
-            where: { active: true },
+            where: { active: true, ...NOT_CATALOGUE_PLAN },
             orderBy: [{ priceCents: "asc" }, { version: "desc" }],
         });
     }
@@ -29,7 +38,7 @@ export class PlansService {
      */
     async resolveActiveByKey(key: string): Promise<Plan> {
         const plan = await prisma.plan.findFirst({
-            where: { key, active: true },
+            where: { AND: [{ key }, NOT_CATALOGUE_PLAN], active: true },
             orderBy: { version: "desc" },
         });
         if (!plan) {

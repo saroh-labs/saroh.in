@@ -5,6 +5,7 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
+import { NOT_CATALOGUE_PLAN } from "../billing/plans.service";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
@@ -79,12 +80,16 @@ export class AdminOrganizationsController {
         return this.organizations.summary(organizationId);
     }
 
-    /** The plans an operator can move a business to. */
+    /**
+     * The plans an operator can move a business to. Catalogue rows
+     * (`catalog.<plan>`) are moved to from Plans & modules and the business
+     * page's catalogue actions (U11), not this legacy picker.
+     */
     @Get("plans")
     @RequireAdminPermission(AdminPermission.SubscriptionRead)
     plans() {
         return prisma.plan.findMany({
-            where: { active: true },
+            where: { active: true, ...NOT_CATALOGUE_PLAN },
             select: {
                 id: true,
                 key: true,
