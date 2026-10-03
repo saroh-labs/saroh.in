@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { Wordmark } from "@saroh/ui/wordmark";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { KeyboardEvent, RefObject } from "react";
@@ -198,9 +199,15 @@ function Menu({
                 )}
             >
                 {label}
-                <span aria-hidden className="text-[10px]">
-                    ▾
-                </span>
+                <ChevronDown
+                    aria-hidden
+                    data-chevron
+                    strokeWidth={2.25}
+                    className={cn(
+                        "size-3.5 transition-transform duration-fast ease-out motion-reduce:transition-none",
+                        open && "rotate-180",
+                    )}
+                />
             </button>
             {open ? (
                 <div

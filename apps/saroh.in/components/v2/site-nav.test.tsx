@@ -79,7 +79,11 @@ describe("SiteNav", () => {
 
     it("Features opens a menu of eight, focused on the first", () => {
         render(<SiteNav />);
+        const chevron = () =>
+            button("Features").querySelector("[data-chevron]")?.classList;
+        expect(chevron()?.contains("rotate-180")).toBe(false);
         fireEvent.click(button("Features"));
+        expect(chevron()?.contains("rotate-180")).toBe(true);
         expect(button("Features").getAttribute("aria-expanded")).toBe("true");
         const items = screen.getAllByRole("menuitem");
         expect(items).toHaveLength(8);
@@ -152,6 +156,13 @@ describe("MobileMenu (below 760px)", () => {
         expect(inSheet(/^Features/)?.getAttribute("aria-expanded")).toBe(
             "false",
         );
+        // D-9: the open row's chevron points up, the closed one's down.
+        const flipped = (name: RegExp) =>
+            inSheet(name)
+                ?.querySelector("[data-chevron]")
+                ?.classList.contains("rotate-180");
+        expect(flipped(/^Solutions/)).toBe(true);
+        expect(flipped(/^Features/)).toBe(false);
         const gyms = Array.from(sheet.querySelectorAll("a")).find(
             (a) => a.getAttribute("href") === "/solutions/gyms",
         );
