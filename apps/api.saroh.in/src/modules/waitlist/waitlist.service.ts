@@ -1,93 +1,154 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { prismaErrorCode } from "../../common/prisma-errors";
+import type { WaitlistKind, WaitlistPlan } from "./waitlist-keys";
+import {
+    businessKey,
+    cleanSource,
+    maskEmail,
+    newRefCode,
+    normaliseEmail,
+    REF_CODE_PATTERN,
+} from "./waitlist-keys";
+
 export interface JoinWaitlistInput {
     email: string;
+    /** The V2 form's fields; absent from the V1 form, which asks for an email only. */
+    business?: string;
+    kind?: WaitlistKind;
+    city?: string;
+    plan?: WaitlistPlan;
     source?: string;
+    /** The referral id from the visitor's link. */
+    ref?: string;
     ipHash?: string;
 }
 
-export interface JoinWaitlistResult {
-    /** False when this email was already on the list. */
-    created: boolean;
-}
+/**
+ * A new entry carries its place and its referral id; a repeat carries
+ * neither (plan D-8). Showing the place again would let anyone who knows an
+ * address look up its place and link.
+ */
+export type JoinWaitlistResult =
+    | { created: true; position: number; refCode: string | null }
+    | { created: false };
+
+/** How many times a clashing referral id is drawn again. */
+const REF_CODE_ATTEMPTS = 3;
 
 /**
- * Pre-launch waitlist capture.
+ * Pre-launch waitlist capture (U30, plan KTD-17).
  *
  * The surface is deliberately tiny and write-only: an anonymous caller can add
- * an email and learn nothing else. There is no read endpoint here — "who is
- * waiting" is an operator question, and exposing it unauthenticated on the same
- * controller is how a competitor gets your pipeline.
+ * an entry and learn its own place, nothing else. There is no read endpoint
+ * here — "who is waiting" is an operator question (`waitlist:read` in the
+ * console), and exposing it unauthenticated is how a competitor gets your
+ * pipeline.
+ *
+ * Nothing is emailed on join: the page promises one email, on opening day
+ * (U31 sends it).
  */
 @Injectable()
 export class WaitlistService {
     private readonly logger = new Logger(WaitlistService.name);
 
     /**
-     * Idempotent by email.
-     *
-     * A repeat submission must not 500 on the unique index, and must not tell
-     * the caller anything different from a first submission — the controller
-     * returns the same shape either way. `created` exists for logging and for
-     * the caller to decide on copy ("you're on the list" vs "you're already on
-     * it"), which is friendly rather than sensitive: anyone can already test an
-     * address by submitting it.
+     * Idempotent per normalised email and business (OQ-11: one owner may list
+     * a second business). A repeat must not 500 on the unique index, and must
+     * not hand back the existing entry's place or link.
      */
     async join(input: JoinWaitlistInput): Promise<JoinWaitlistResult> {
-        // Normalized again here rather than trusting the DTO: this service is
+        // Normalised again here rather than trusting the DTO: this service is
         // also reachable from future internal callers (an import, a CLI) that
         // do not go through class-validator.
-        const email = input.email.trim().toLowerCase();
+        const { email, key } = normaliseEmail(input.email);
+        const businessName = textOrNull(input.business);
+        const bKey = businessKey(businessName);
 
-        const existing = await prisma.waitlistSignup.findUnique({
-            where: { email },
-            select: { id: true },
-        });
-
-        if (existing) {
+        if (await this.exists(key, bKey)) {
             this.logger.log(`waitlist: repeat signup for ${maskEmail(email)}`);
             return { created: false };
         }
 
-        try {
-            await prisma.waitlistSignup.create({
-                data: {
-                    email,
-                    source: input.source ?? null,
-                    ipHash: input.ipHash ?? null,
-                },
-            });
-        } catch (reason) {
-            // Two concurrent first-submissions both pass the findUnique above
-            // and race to insert; the loser hits the unique index. That is the
-            // same outcome the caller wanted, so treat it as a repeat rather
-            // than surfacing a 500.
-            if (isUniqueViolation(reason)) {
-                return { created: false };
-            }
-            throw reason;
-        }
+        const referredById = await this.referrer(input.ref, key, input.ipHash);
+        const data = {
+            email,
+            emailKey: key,
+            businessKey: bKey,
+            businessName,
+            kind: businessName ? (input.kind ?? null) : null,
+            city: textOrNull(input.city),
+            plan: input.plan ?? null,
+            source: cleanSource(input.source),
+            referredById,
+            ipHash: input.ipHash ?? null,
+        };
 
-        this.logger.log(`waitlist: new signup ${maskEmail(email)}`);
-        return { created: true };
+        for (let attempt = 0; attempt < REF_CODE_ATTEMPTS; attempt += 1) {
+            try {
+                const row = await prisma.waitlistSignup.create({
+                    // A link is for the V2 done state; the V1 form shows none.
+                    data: {
+                        ...data,
+                        refCode: businessName ? newRefCode() : null,
+                    },
+                    select: { position: true, refCode: true },
+                });
+                this.logger.log(
+                    `waitlist: new signup ${maskEmail(email)}${referredById ? " (referred)" : ""}`,
+                );
+                return {
+                    created: true,
+                    position: row.position,
+                    refCode: row.refCode,
+                };
+            } catch (reason) {
+                if (prismaErrorCode(reason) !== "P2002") throw reason;
+                // Two concurrent first joins both pass the check above and race
+                // to insert; the loser hits the unique index. That is the
+                // outcome the caller wanted, so it is a repeat, not a 500.
+                // Otherwise the clash was the referral id: draw another.
+                if (await this.exists(key, bKey)) return { created: false };
+            }
+        }
+        throw new Error(
+            "Could not draw a free referral id for a waitlist entry",
+        );
+    }
+
+    private async exists(emailKey: string, bKey: string): Promise<boolean> {
+        const row = await prisma.waitlistSignup.findUnique({
+            where: { emailKey_businessKey: { emailKey, businessKey: bKey } },
+            select: { id: true },
+        });
+        return row !== null;
+    }
+
+    /**
+     * The entry whose link this is, or null: an unknown or malformed id, or
+     * a self-referral — the same person (normalised email) or the same
+     * address (ipHash) as the link's owner — credits nobody.
+     */
+    private async referrer(
+        ref: string | undefined,
+        emailKey: string,
+        ipHash: string | undefined,
+    ): Promise<string | null> {
+        if (!ref || !REF_CODE_PATTERN.test(ref)) return null;
+        const owner = await prisma.waitlistSignup.findUnique({
+            where: { refCode: ref },
+            select: { id: true, emailKey: true, ipHash: true },
+        });
+        if (!owner) return null;
+        if (owner.emailKey === emailKey) return null;
+        if (ipHash && owner.ipHash === ipHash) return null;
+        return owner.id;
     }
 }
 
-function isUniqueViolation(reason: unknown): boolean {
-    return (
-        typeof reason === "object" &&
-        reason !== null &&
-        (reason as { code?: string }).code === "P2002"
-    );
-}
-
-/**
- * Logs are not the place for a full address. Keeps enough to correlate a
- * support report without putting the list in the log aggregator.
- */
-function maskEmail(email: string): string {
-    const [local = "", domain = ""] = email.split("@");
-    const head = local.slice(0, 2);
-    return `${head}${"*".repeat(Math.max(local.length - 2, 0))}@${domain}`;
+/** Trimmed text with its spaces collapsed, or null when nothing is left. */
+function textOrNull(value: string | undefined): string | null {
+    const text = value?.trim().replace(/\s+/g, " ");
+    return text === undefined || text === "" ? null : text;
 }

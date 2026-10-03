@@ -105,7 +105,7 @@ const GROUPS: ConsoleNavGroup[] = [
                 href: "/waitlist",
                 label: "Waitlist",
                 icon: UserPlus,
-                permission: "organization:pii:read",
+                permission: "waitlist:read",
             },
         ],
     },

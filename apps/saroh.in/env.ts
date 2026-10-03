@@ -20,6 +20,13 @@ import { z } from "zod";
  * `open` sends it to sign-up with the plan the visitor chose. Anything but
  * `open` is waitlist, so a missing or misspelled value never points visitors
  * at a sign-up that is still gated.
+ *
+ * `SITE_RELAY_SECRET` (server-only, 32+ characters, byte-identical to the
+ * API's) signs the visitor's address into `x-saroh-relay` on /api/waitlist's
+ * call (plan U30, `lib/waitlist-forward.ts`), so the API's rate limit counts
+ * each visitor rather than this server. Development and test sign with the
+ * API's fixed dev value; unset anywhere else, joins still go through but are
+ * all counted as one, and an error is logged.
  */
 export const env = createEnv({
     client: {
@@ -28,9 +35,15 @@ export const env = createEnv({
     },
     server: {
         API_URL: z.string().url().optional(),
+        SITE_RELAY_SECRET: z.string().min(32).optional(),
+    },
+    shared: {
+        NODE_ENV: z.enum(["development", "test", "production"]).optional(),
     },
     runtimeEnv: {
         API_URL: process.env.API_URL,
+        SITE_RELAY_SECRET: process.env.SITE_RELAY_SECRET,
+        NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,
     },

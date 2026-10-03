@@ -107,6 +107,7 @@ export type AdminPermission =
     | "platform:read"
     | "organization:read"
     | "organization:pii:read"
+    | "waitlist:read"
     | "organization:people:write"
     | "organization:modules:write"
     | "organization:lifecycle:write"

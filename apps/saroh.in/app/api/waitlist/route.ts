@@ -7,22 +7,23 @@
 //
 // It stays a server route rather than the form posting to api.saroh.in
 // directly: that keeps the API origin out of the browser bundle, avoids a CORS
-// preflight on the conversion path, and gives one place to translate the API's
-// response into the shape this form already understands.
+// preflight on the conversion path, gives one place to sign the visitor's
+// address for the API's rate limit (`lib/waitlist-forward.ts`), and one place
+// to translate the API's response into the `{status}` shape both the V2 page
+// and the V1 form read.
 
 import { NextResponse } from "next/server";
 
 import { env } from "@/env";
+import type { WaitlistResponse } from "@/lib/waitlist";
+import { forwardHeaders, joinBody, relaySecret } from "@/lib/waitlist-forward";
 
-/** The response contract the existing client form expects. */
-type WaitlistResponse =
-    | { status: "success"; created?: boolean }
-    | { status: "failure"; reason?: { code?: string } };
+let warnedNoSecret = false;
 
 export async function POST(req: Request) {
-    let email: string | undefined;
+    let posted: unknown;
     try {
-        ({ email } = (await req.json()) as { email?: string });
+        posted = await req.json();
     } catch {
         return NextResponse.json<WaitlistResponse>(
             { status: "failure", reason: { code: "BAD_REQUEST" } },
@@ -30,7 +31,8 @@ export async function POST(req: Request) {
         );
     }
 
-    if (!email) {
+    const body = joinBody(posted);
+    if (!body) {
         return NextResponse.json<WaitlistResponse>(
             { status: "failure", reason: { code: "BAD_REQUEST" } },
             { status: 400 },
@@ -48,20 +50,25 @@ export async function POST(req: Request) {
         );
     }
 
+    const secret = relaySecret(env.SITE_RELAY_SECRET, env.NODE_ENV);
+    if (!secret && !warnedNoSecret) {
+        // The join still goes through; the API then counts every visitor as
+        // this server, so one busy minute can refuse everyone. Set it.
+        warnedNoSecret = true;
+        console.error(
+            "[waitlist] SITE_RELAY_SECRET is not set; the API rate-limits all visitors as one",
+        );
+    }
+
     try {
         const upstream = await fetch(`${env.API_URL}/public/waitlist`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                // The API rate-limits per source IP; without this every signup
-                // looks like it came from this server and one visitor could
-                // exhaust the window for everyone.
-                "X-Forwarded-For":
-                    req.headers.get("x-forwarded-for") ??
-                    req.headers.get("x-real-ip") ??
-                    "",
-            },
-            body: JSON.stringify({ email, source: "saroh.in" }),
+            headers: forwardHeaders({
+                headers: req.headers,
+                host: new URL(req.url).host,
+                secret,
+            }),
+            body: JSON.stringify(body),
         });
 
         if (upstream.status === 429) {
@@ -71,24 +78,40 @@ export async function POST(req: Request) {
             );
         }
 
-        if (!upstream.ok) {
-            const body = await upstream.text();
-            console.error(
-                `[waitlist] upstream ${upstream.status}: ${body.slice(0, 200)}`,
+        if (upstream.status === 400) {
+            // The API refused a field. Its message is about the field, never
+            // the visitor's data, and the page shows its own words for it.
+            return NextResponse.json<WaitlistResponse>(
+                { status: "failure", reason: { code: "INVALID" } },
+                { status: 400 },
             );
+        }
+
+        if (!upstream.ok) {
+            console.error(`[waitlist] upstream ${upstream.status}`);
             return NextResponse.json<WaitlistResponse>(
                 { status: "failure", reason: { code: "UPSTREAM" } },
                 { status: 502 },
             );
         }
 
-        const { created } = (await upstream.json()) as { created?: boolean };
-        return NextResponse.json<WaitlistResponse>({
-            status: "success",
-            created,
-        });
+        const joined = (await upstream.json()) as {
+            created?: boolean;
+            position?: number;
+            ref?: string | null;
+        };
+        return NextResponse.json<WaitlistResponse>(
+            joined.created
+                ? {
+                      status: "success",
+                      created: true,
+                      position: joined.position,
+                      ref: joined.ref ?? undefined,
+                  }
+                : { status: "success", created: false },
+        );
     } catch (reason) {
-        console.error("[waitlist] forward failed:", reason);
+        console.error("[waitlist] forward failed:", String(reason));
         return NextResponse.json<WaitlistResponse>(
             { status: "failure", reason: { code: "UPSTREAM" } },
             { status: 502 },

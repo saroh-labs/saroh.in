@@ -65,9 +65,9 @@ module.exports = {
         "<rootDir>/src/modules/orders/order-read.spec.ts",
         "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.state.spec.ts",
-        // The waitlist spec mocks Prisma (pure unit test) and runs in the
-        // default/unit project — keep it out of the DB-backed run.
-        "<rootDir>/src/modules/waitlist/",
+        // The waitlist's mocked specs run in the default/unit project; only
+        // waitlist.db.spec.ts (U30) runs here.
+        "<rootDir>/src/modules/waitlist/(?!.*\\.db\\.spec\\.ts$)",
         // Plans catalogue U3: pure specs run in the unit project; only the
         // pricing *.db.spec.ts run here.
         "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",
