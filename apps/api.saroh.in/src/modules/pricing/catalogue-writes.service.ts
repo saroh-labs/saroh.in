@@ -9,7 +9,7 @@ import type { Prisma } from "@saroh/database";
 import {
     liveCatalogueVersion,
     prisma,
-    writeCatalogueVersion,
+    writeCatalogueVersionInTx,
 } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { diff, planRows, validateCatalog } from "@saroh/pricing-catalog";
@@ -116,7 +116,7 @@ function dayWords(at: Date): string {
  *
  * Every write runs in one transaction with its admin audit row, so nothing
  * changes unaudited; the controller wraps each in `IdempotencyService.run`.
- * A version and its `Plan` rows are written by `writeCatalogueVersion`; its
+ * A version and its `Plan` rows are written by `writeCatalogueVersionInTx`; its
  * paid rows get a PENDING billing-provider plan, and the version can't go
  * live until those are SYNCED (`liveCatalogueVersion`).
  *
@@ -500,7 +500,7 @@ export class CatalogueWritesService {
         const rows = planRows(input.catalog, version);
         const changes = live ? diff(live.catalog, input.catalog) : [];
 
-        const { planIds } = await writeCatalogueVersion(tx, {
+        const { planIds } = await writeCatalogueVersionInTx(tx, {
             version,
             catalog: input.catalog,
             goLiveAt: input.goLiveAt,

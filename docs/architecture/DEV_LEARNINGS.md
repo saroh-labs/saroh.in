@@ -2433,3 +2433,17 @@ role (granted USAGE/SELECT/UPDATE on sequences, not ownership) never hit it.
 other, never to 1. The RLS gate (`int-rls` in `pnpm prepush --all`) is what
 catches a recurrence.
 **Category**: tests · rule in `apps/api.saroh.in/test/truncate.ts`
+
+## Pricing — a publish nested a transaction the Postgres adapter can't open
+
+**Problem**: Every catalogue publish and rollback failed with "Nested
+transactions are not supported by adapter @prisma/adapter-pg: createSavepoint
+is not implemented". The unit's own gate never ran its db specs, so it shipped
+to the integration branch.
+**Root cause**: `writeCatalogueVersion` picked "open my own transaction" by
+checking `"$transaction" in db`, but a transaction client answers to it too;
+called with the publish's `tx`, it opened a second, nested transaction.
+**Fix**: two functions: `writeCatalogueVersion(prisma, …)` opens its own,
+`writeCatalogueVersionInTx(tx, …)` joins the caller's. Never decide by probing
+the client. The pricing db specs (`catalogue-writes.db.spec.ts`) pin it.
+**Category**: database · rule in `packages/database/src/pricing-catalogue.ts`

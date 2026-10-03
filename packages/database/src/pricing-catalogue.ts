@@ -40,12 +40,22 @@ export interface CatalogueVersionInput {
 }
 
 /**
- * Store one published version and its `Plan` rows. Pass a transaction client
- * to make it part of a publish; on its own client it still writes both or
- * neither. A version number already taken is the unique index's error.
+ * Store one published version and its `Plan` rows, both or neither, in a
+ * transaction of its own. Inside a caller's transaction (a publish), use
+ * `writeCatalogueVersionInTx`: our Postgres adapter has no nested
+ * transactions, and a transaction client still answers to `$transaction`, so
+ * this function can't tell the two apart. A version number already taken is
+ * the unique index's error.
  */
 export async function writeCatalogueVersion(
-    db: Db,
+    db: PrismaClient,
+    input: CatalogueVersionInput,
+): Promise<{ versionId: string; planIds: string[] }> {
+    return db.$transaction((tx) => writeVersionRows(tx, input));
+}
+
+async function writeVersionRows(
+    tx: TransactionClient,
     input: CatalogueVersionInput,
 ): Promise<{ versionId: string; planIds: string[] }> {
     for (const r of input.planRows) {
@@ -55,41 +65,44 @@ export async function writeCatalogueVersion(
             );
         }
     }
-    const write = async (tx: TransactionClient) => {
-        const v = await tx.pricingCatalogVersion.create({
+    const v = await tx.pricingCatalogVersion.create({
+        data: {
+            version: input.version,
+            catalog: input.catalog,
+            goLiveAt: input.goLiveAt,
+            policy: input.policy,
+            note: input.note ?? "",
+            changes: [...(input.changes ?? [])],
+            publishedByUserId: input.publishedByUserId ?? null,
+        },
+        select: { id: true },
+    });
+    const planIds: string[] = [];
+    for (const r of input.planRows) {
+        const p = await tx.plan.create({
             data: {
-                version: input.version,
-                catalog: input.catalog,
-                goLiveAt: input.goLiveAt,
-                policy: input.policy,
-                note: input.note ?? "",
-                changes: [...(input.changes ?? [])],
-                publishedByUserId: input.publishedByUserId ?? null,
+                key: r.key,
+                version: r.version,
+                interval: r.interval,
+                name: r.name,
+                priceCents: r.priceCents,
+                currency: r.currency,
+                entitlements: r.entitlements,
+                active: r.active,
             },
             select: { id: true },
         });
-        const planIds: string[] = [];
-        for (const r of input.planRows) {
-            const p = await tx.plan.create({
-                data: {
-                    key: r.key,
-                    version: r.version,
-                    interval: r.interval,
-                    name: r.name,
-                    priceCents: r.priceCents,
-                    currency: r.currency,
-                    entitlements: r.entitlements,
-                    active: r.active,
-                },
-                select: { id: true },
-            });
-            planIds.push(p.id);
-        }
-        return { versionId: v.id, planIds };
-    };
-    return "$transaction" in db
-        ? (db as PrismaClient).$transaction(write)
-        : write(db as TransactionClient);
+        planIds.push(p.id);
+    }
+    return { versionId: v.id, planIds };
+}
+
+/** `writeCatalogueVersion` as part of the caller's transaction `tx`. */
+export async function writeCatalogueVersionInTx(
+    tx: TransactionClient,
+    input: CatalogueVersionInput,
+): Promise<{ versionId: string; planIds: string[] }> {
+    return writeVersionRows(tx, input);
 }
 
 /** `Plan.key` prefix of a catalogue plan's billing rows (`catalog.<planId>`). */

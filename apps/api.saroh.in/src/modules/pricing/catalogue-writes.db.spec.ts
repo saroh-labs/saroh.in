@@ -18,6 +18,12 @@ jest.mock("../../env", () => ({
     },
 }));
 
+// The controller's guard pulls in better-auth (ESM), which Jest can't load;
+// these specs call the controller directly, so the guard is a stand-in.
+jest.mock("../../common/guards/better-auth.guard", () => ({
+    BetterAuthGuard: class BetterAuthGuard {},
+}));
+
 import {
     liveCatalogueVersion,
     prisma,

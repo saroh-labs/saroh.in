@@ -7,6 +7,12 @@
  * Every catalogue and amount here is made up (`test/fixtures/pricing-catalog.ts`).
  * Runs in the integration project (TEST_DATABASE_URL).
  */
+// The controller's guard pulls in better-auth (ESM), which Jest can't load;
+// these specs call the controller directly, so the guard is a stand-in.
+jest.mock("../../common/guards/better-auth.guard", () => ({
+    BetterAuthGuard: class BetterAuthGuard {},
+}));
+
 import { prisma, writeCatalogueVersion } from "@saroh/database";
 import { planRows } from "@saroh/pricing-catalog";
 
