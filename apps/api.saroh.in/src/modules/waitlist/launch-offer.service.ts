@@ -7,18 +7,20 @@ import {
     NotFoundException,
     ServiceUnavailableException,
 } from "@nestjs/common";
-import { prisma } from "@saroh/database";
-import { catalogPlanIdForKey } from "@saroh/pricing-catalog";
+import { liveCatalogueVersion, prisma } from "@saroh/database";
+import { catalogPlanIdForKey, validateCatalog } from "@saroh/pricing-catalog";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
 import { env } from "../../env";
 import { authorize } from "../organizations/organization-policy";
+import type { PublicLaunchOffer } from "./invite-token";
 import {
     hashInviteToken,
     INVITE_TOKEN_PATTERN,
     launchOffer,
     offerEnds,
+    publicLaunchOffer,
 } from "./invite-token";
 import { maskEmail, normaliseEmail } from "./waitlist-keys";
 
@@ -73,6 +75,28 @@ const OFFER_REASON = "Launch offer: joined from a waitlist invite.";
 @Injectable()
 export class LaunchOfferService {
     private readonly logger = new Logger(LaunchOfferService.name);
+
+    /**
+     * The offer saroh.in's waitlist page shows (`GET /public/waitlist/offer`):
+     * the same `LAUNCH_OFFER_DAYS` and plan the invites carry, named as the
+     * live catalogue names it. Null when there is no offer, no live catalogue,
+     * or the live catalogue has no such plan. A stored snapshot that doesn't
+     * validate is logged and read as no offer, never a 500 on a public page.
+     */
+    async publicOffer(now = new Date()): Promise<PublicLaunchOffer | null> {
+        const offer = launchOffer(env.LAUNCH_OFFER_DAYS);
+        if (!offer) return null;
+        const live = await liveCatalogueVersion(prisma, now);
+        if (!live) return null;
+        const parsed = validateCatalog(live.catalog);
+        if (!parsed.ok) {
+            this.logger.error(
+                `waitlist: launch offer not shown; catalogue version ${live.version} does not validate`,
+            );
+            return null;
+        }
+        return publicLaunchOffer(offer, parsed.catalog);
+    }
 
     /** What onboarding says about an invite before the business exists. */
     async check(
