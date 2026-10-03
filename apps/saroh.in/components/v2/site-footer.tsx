@@ -12,7 +12,7 @@ const LINK =
 
 /**
  * The footer (Footer design): Saroh and who it is for, then Features,
- * Solutions and Saroh (Pricing, Questions, Contact, Sign in), then Follow
+ * Solutions and Saroh (Pricing, Questions, Contact, Sign in), then Follow Saroh
  * (Saroh's accounts and its public code), in columns that wrap at 180px.
  */
 export function SiteFooter() {
@@ -58,7 +58,7 @@ export function SiteFooter() {
                     Sign in
                 </a>
             </Column>
-            <Column title="Follow">
+            <Column title="Follow Saroh">
                 {SAROH_SOCIAL.map((link) => (
                     <a
                         key={link.href}
