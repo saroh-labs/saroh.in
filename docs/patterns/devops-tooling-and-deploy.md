@@ -416,5 +416,10 @@ On each unit's GitHub issue, comment when the unit lands on development.
   backfill, roll the API out at once (DEC-074's role update), then the
   `pvt` backfill; the release PR's merge ships the frontends last. Its four
   new flags stay off in production until their conditions are met.
+- **Current** — **The pricing catalogue's release** is
+  `docs/architecture/PRICING_ROLLOUT.md`: the API that reads plan overrides
+  goes out before the grandfather backfill, which runs dry first with the
+  owner's end date and the release time as its cutoff, and the catalogue
+  replaces `FREE_ENTITLEMENTS` (U12) only where the backfill has run.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.

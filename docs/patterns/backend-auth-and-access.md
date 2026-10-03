@@ -215,6 +215,14 @@ orgId)` (`organizations/organization-kind.ts`).
 - **Current** — **Three control planes, never conflated** (ADR-003): feature flags
   are Saroh's rollout, entitlements are what a plan permits, modules are what an
   Organization has chosen.
+- **Current** (plans catalogue U5) — **A live `plan` override decides a
+  business's plan ahead of its subscription.**
+  `EntitlementService.getPlanEntitlements` reads it first (`livePlanOverride`: unrevoked, not past
+  `expiresAt`, newest wins), then the subscription, then `FREE_ENTITLEMENTS`;
+  raises apply on top. Until U12 it reads the plan through the legacy rows
+  `LEGACY_PLAN_KEYS` maps to it, and ignores one it can't read rather than
+  falling to Free. Grandfathering is these overrides
+  (`docs/architecture/PRICING_ROLLOUT.md`).
 - **Current** (DEC-068) — **Turning a module on creates its minimum in the
   switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
   checks `module:manage` and then the action for each thing it creates

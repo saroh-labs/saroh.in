@@ -44,6 +44,9 @@ export * from "./backfill/store-members-to-memberships";
 // The F10b business-type backfill (`company` → `pvt`), exported so the API's
 // integration suite can run it twice and check what it did.
 export * from "./backfill/business-type-pvt";
+// The plans catalogue U5 grandfather backfill, exported so the API's
+// integration suite can run it twice and check it against LEGACY_PLAN_KEYS.
+export * from "./backfill/pricing-grandfather";
 // The P3 order-number backfill (DEC-066), exported so the API's integration
 // suite can run it twice and check what it did.
 export * from "./backfill/order-numbers";
