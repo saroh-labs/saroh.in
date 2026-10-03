@@ -29,9 +29,13 @@ export function PricingPlans({ model }: { model: PricingPageModel }) {
         <>
             <Container
                 as="section"
-                aria-label="Plans"
+                aria-labelledby="plans-title"
                 className="grid gap-3.5 pt-14"
             >
+                {/* For the outline only: the cards' names are h3s under it. */}
+                <h2 id="plans-title" className="sr-only">
+                    Plans
+                </h2>
                 {showControls ? (
                     <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
                         {model.yearly ? (

@@ -190,7 +190,8 @@ function Menu({
                 type="button"
                 aria-haspopup="true"
                 aria-expanded={open}
-                aria-controls={`nav-menu-${id}`}
+                // Only while the menu is in the page: a closed one isn't.
+                aria-controls={open ? `nav-menu-${id}` : undefined}
                 onClick={onToggle}
                 className={cn(
                     TOP,
