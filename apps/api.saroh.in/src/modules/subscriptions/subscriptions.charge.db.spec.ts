@@ -31,6 +31,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { failedRenewals } from "../home/home-money-sources";
 import { InvoicesService } from "../invoices/invoices.service";
+import * as underWay from "../payments/charge-under-way";
 import {
     chargeUnderWayOn,
     CHECKOUT_LIFE_MS,
@@ -943,6 +944,42 @@ describe("a pay-link checkout's window (review 3)", () => {
         await runDue(invoice.id);
         expect(calls("charge")).toHaveLength(1);
         expect(await intentsOf(invoice.id)).toHaveLength(2);
+    });
+
+    it("asks about every subscription's checkouts in one query, and still leaves out one being paid by link", async () => {
+        const paying = await autopayMember();
+        const payingInvoice = await renew(paying.subscriptionId);
+        const idle = await autopayMember();
+        const idleInvoice = await renew(idle.subscriptionId);
+        // The customer is paying one of them in a pay-link checkout.
+        await prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                invoiceId: payingInvoice.id,
+                provider: "RAZORPAY",
+                amountCents: 120_000,
+                currency: "INR",
+                status: "REQUIRES_PAYMENT",
+                providerIntentId: `order_link_${next()}`,
+            },
+        });
+
+        const batched = jest.spyOn(underWay, "checkoutsOpenOn");
+        const single = jest.spyOn(underWay, "checkoutOpenOn");
+        try {
+            const retryable = await charges.mandateRetryable(
+                owner.organizationId,
+                [paying.subscriptionId, idle.subscriptionId],
+            );
+            expect([...retryable]).toEqual([idle.subscriptionId]);
+            expect(batched).toHaveBeenCalledTimes(1);
+            expect(single).not.toHaveBeenCalled();
+        } finally {
+            batched.mockRestore();
+            single.mockRestore();
+        }
+        await offHome(payingInvoice.id);
+        await offHome(idleInvoice.id);
     });
 
     it("a checkout opened again before the charge comes back puts it off again", async () => {

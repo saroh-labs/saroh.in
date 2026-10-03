@@ -8,6 +8,7 @@ import { chargePlan, keptPlan } from "../subscriptions/autopay-timing";
 import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
 import {
     checkoutOpenOn,
+    checkoutsOpenOn,
     OPEN_MANDATE_CHARGE,
     openCheckoutWhere,
 } from "./charge-under-way";
@@ -779,15 +780,19 @@ export class MandateChargesService {
      * Whether each subscription's unpaid renewal can be retried through
      * its autopay (D13, default 35): `MANDATE` when it has a chargeable
      * mandate and its latest unpaid invoice is within the limit, with no
-     * pay-link checkout open on it (`checkoutOpenOn`: Retry by autopay would
-     * be refused, so the screen offers the link). Anything else is a pay
-     * link. Callers check "a charge is under way" apart.
+     * pay-link checkout open on it (`checkoutsOpenOn`: Retry by autopay
+     * would be refused, so the screen offers the link). Anything else is a
+     * pay link. Callers check "a charge is under way" apart. The checkouts
+     * are asked about once for every candidate invoice, not per
+     * subscription (Home and the list ask for many).
      */
     async mandateRetryable(
         organizationId: string,
         subscriptionIds: readonly string[],
+        now: Date = new Date(),
     ): Promise<Set<string>> {
-        const retryable = new Set<string>();
+        /** Subscription id → the invoice autopay could take. */
+        const candidates = new Map<string, string>();
         for (const subscriptionId of new Set(subscriptionIds)) {
             const mandate = await this.chargeableMandate(
                 organizationId,
@@ -804,11 +809,20 @@ export class MandateChargesService {
             });
             if (
                 invoice?.currency === mandate.currency &&
-                toMinor(invoice.total) <= mandate.maxAmountCents &&
-                !(await checkoutOpenOn(prisma, organizationId, invoice.id))
+                toMinor(invoice.total) <= mandate.maxAmountCents
             ) {
-                retryable.add(subscriptionId);
+                candidates.set(subscriptionId, invoice.id);
             }
+        }
+        const open = await checkoutsOpenOn(
+            prisma,
+            organizationId,
+            [...candidates.values()],
+            now,
+        );
+        const retryable = new Set<string>();
+        for (const [subscriptionId, invoiceId] of candidates) {
+            if (!open.has(invoiceId)) retryable.add(subscriptionId);
         }
         return retryable;
     }

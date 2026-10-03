@@ -262,6 +262,29 @@ export async function checkoutOpenOn(
 }
 
 /**
+ * Which of these invoices have a pay-link checkout open at `now`: one
+ * query for them all (Home and the subscriptions list ask for many).
+ */
+export async function checkoutsOpenOn(
+    db: Db,
+    organizationId: string,
+    invoiceIds: readonly string[],
+    now: Date = new Date(),
+): Promise<Set<string>> {
+    if (invoiceIds.length === 0) return new Set();
+    const rows = await db.paymentIntent.findMany({
+        where: {
+            organizationId,
+            invoiceId: { in: [...invoiceIds] },
+            ...openCheckoutWhere(now),
+        },
+        distinct: ["invoiceId"],
+        select: { invoiceId: true },
+    });
+    return new Set(rows.flatMap((r) => (r.invoiceId ? [r.invoiceId] : [])));
+}
+
+/**
  * When the checkouts open on the invoice at `now` have all closed, or null
  * when none is open: the moment a charge that stood aside for them may be
  * queued again.
