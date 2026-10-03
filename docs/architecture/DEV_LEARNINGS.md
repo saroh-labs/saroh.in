@@ -2319,3 +2319,32 @@ source, which the alert page doesn't.
 host in some browsers), and storage never returns a bare path (R2 and the memory adapter both give an
 absolute `https://` address), so `mediaSrc` no longer accepts one.
 **Category**: security · CodeQL
+
+## Sites — a web-address change and a publish deadlocked in the other order (code review 3)
+
+**Symptom**: found in review. A publish (or restore, or go-live) that had
+taken the site's lock just before the owner changed the web address could
+end the change with `deadlock detected` (40P01), which the change reports as
+"<address>.saroh.app is taken".
+**Cause**: the two took the same rows in opposite orders. `move` locks the
+Organization FOR UPDATE, then inserts an `AddressReservation` naming the
+site (FOR KEY SHARE on the Site). `putLive` locked the Site FOR UPDATE, then
+inserted the Publication, whose foreign key needs FOR KEY SHARE on the
+Organization. The earlier fix ("a site lock that the publish's own UPDATE
+upgraded") was pinned by a spec that modelled the change without its
+Organization lock and in READ COMMITTED, so it ran only the order that
+already worked and could not see this one.
+**Fix**: one order, Organization then Site. `lockSite` takes the business's
+row FOR KEY SHARE before the Site FOR UPDATE (and test-release creation now
+locks through `lockSite`). A change that waited behind a publish then fails
+its serializable snapshot (40001) without anyone having taken the address,
+so `change` runs again (three tries) and only then reports "taken".
+`live-pointer.db.spec.ts` now models the change as it is (Serializable,
+Organization FOR UPDATE first) and adds the publish-first order through the
+real `WebAddressService.change`; `waitUntilBlockedBy` names the table the
+waiter must be blocked on, so a test can't pass on the wrong wait.
+**Rule**: a test that models a concurrent transaction takes the real one's
+locks, in the real one's order and isolation level, or calls the real code;
+and every pair of transactions that lock the same rows is run in both
+orders (`backend-data-and-money.md`, lock order for a site).
+**Category**: sites · locks · concurrency · tests

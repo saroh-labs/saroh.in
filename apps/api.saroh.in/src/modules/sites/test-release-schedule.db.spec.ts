@@ -668,7 +668,7 @@ describe("the site.go_live job (T10)", () => {
         const run = handler.handle(job);
         // The job has reached the site's lock and waits on the publish:
         // Postgres says so, rather than a sleep guessing it.
-        await waitUntilBlockedBy(publisher);
+        await waitUntilBlockedBy(publisher, "Site");
         commit();
         const fix = await publish;
         await run;
