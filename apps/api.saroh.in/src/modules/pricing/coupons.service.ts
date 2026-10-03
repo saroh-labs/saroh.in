@@ -4,8 +4,12 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
-import type { Prisma } from "@saroh/database";
-import { liveCatalogueVersion, prisma } from "@saroh/database";
+import type { PricingCoupon, Prisma } from "@saroh/database";
+import {
+    liveCatalogueVersion,
+    outsideOrgContext,
+    prisma,
+} from "@saroh/database";
 import { validateCatalog } from "@saroh/pricing-catalog";
 
 import {
@@ -72,7 +76,9 @@ const withUses = { _count: { select: { redemptions: true } } } as const;
  * The discount is checked against the live catalogue on save: every plan it
  * names must be a paid plan there, and the monthly discount can't be more
  * than the cheapest of them costs a month. Redeeming (one use per business,
- * within `maxRedemptions`, before `expiresAt`) is U16's checkout.
+ * within `maxRedemptions`, before `expiresAt`) is U16's checkout: it asks
+ * {@link findUsableCoupon} and the billing webhook writes the redemption
+ * when the first discounted charge is paid.
  */
 @Injectable()
 export class CouponsService {
@@ -220,7 +226,10 @@ export class CouponsService {
         });
     }
 
-    /** Delete a coupon nobody has used; archive one somebody has. */
+    /**
+     * Delete a coupon nobody has used; archive one somebody has, or one a
+     * checkout was quoted with (its row keeps the coupon, RESTRICT).
+     */
     async remove(
         actorUserId: string,
         id: string,
@@ -229,7 +238,10 @@ export class CouponsService {
     ): Promise<{ id: string; code: string; outcome: "deleted" | "archived" }> {
         return prisma.$transaction(async (tx) => {
             const row = await this.lock(tx, id);
-            const used = row._count.redemptions > 0;
+            const used =
+                row._count.redemptions > 0 ||
+                (await tx.billingCheckout.count({ where: { couponId: id } })) >
+                    0;
             if (used) {
                 await tx.pricingCoupon.update({
                     where: { id },
@@ -338,4 +350,74 @@ export class CouponsService {
             metadata,
         });
     }
+}
+
+/**
+ * A coupon a business may use on a plan now (U16), or a 400 saying why not:
+ * no such code (or archived), paused, expired, not for this plan, used by
+ * this business already, or used up. "Used up" counts the redemptions and
+ * the other businesses' checkouts waiting with it, so a coupon can't be
+ * promised past `maxRedemptions` while checkouts are open. Read against the
+ * live catalogue's plan id, as the coupon's own checks on save are.
+ *
+ * Those two counts are across businesses, so they are read outside the
+ * request's organization (`outsideOrgContext`): under row-level security a
+ * business sees only its own redemptions and checkouts.
+ */
+export async function findUsableCoupon(input: {
+    code: string;
+    organizationId: string;
+    /** The catalogue plan id (`grow`), not the `Plan` row. */
+    planId: string;
+    planName: string;
+    now: Date;
+}): Promise<PricingCoupon> {
+    const code = input.code.trim().toUpperCase();
+    const refuse = (message: string): never => {
+        throw new BadRequestException({
+            message,
+            details: { field: "coupon" },
+        });
+    };
+    const coupon = code
+        ? await prisma.pricingCoupon.findUnique({ where: { code } })
+        : null;
+    if (!coupon || coupon.archivedAt) {
+        return refuse(`There's no coupon ${code || "with that code"}.`);
+    }
+    if (!coupon.active) return refuse(`Coupon ${code} isn't available now.`);
+    if (coupon.expiresAt && coupon.expiresAt.getTime() <= input.now.getTime()) {
+        return refuse(`Coupon ${code} has expired.`);
+    }
+    if (!coupon.planIds.includes(input.planId)) {
+        return refuse(`Coupon ${code} doesn't apply to ${input.planName}.`);
+    }
+    const mine = await prisma.pricingCouponRedemption.findUnique({
+        where: {
+            couponId_organizationId: {
+                couponId: coupon.id,
+                organizationId: input.organizationId,
+            },
+        },
+        select: { id: true },
+    });
+    if (mine) return refuse(`You've used coupon ${code} already.`);
+    const [used, waiting] = await outsideOrgContext(() =>
+        Promise.all([
+            prisma.pricingCouponRedemption.count({
+                where: { couponId: coupon.id },
+            }),
+            prisma.billingCheckout.count({
+                where: {
+                    couponId: coupon.id,
+                    status: "OPEN",
+                    organizationId: { not: input.organizationId },
+                },
+            }),
+        ]),
+    );
+    if (used + waiting >= coupon.maxRedemptions) {
+        return refuse(`Coupon ${code} has been used up.`);
+    }
+    return coupon;
 }

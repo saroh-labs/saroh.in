@@ -3,18 +3,23 @@ import {
     Controller,
     Get,
     Header,
+    Ip,
     Param,
     Post,
+    Put,
     Query,
     StreamableFile,
     UseGuards,
 } from "@nestjs/common";
 import type { Plan } from "@saroh/database";
 
+import { hashClientIp } from "../../common/client-ip";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { AddonsView } from "./addons.service";
+import { AddonsService } from "./addons.service";
 import type { BillingAccessView } from "./catalogue-access";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import type {
@@ -27,6 +32,7 @@ import {
     CancelSubscriptionDto,
     ChangePlanDto,
     ChangePlanQuery,
+    SetAddonDto,
     SubscribeDto,
 } from "./dto";
 import { PlansService } from "./plans.service";
@@ -74,6 +80,7 @@ export class BillingController {
         private readonly access: CatalogueAccessService,
         private readonly checkouts: CheckoutService,
         private readonly invoices: SarohInvoicesService,
+        private readonly addons: AddonsService,
     ) {}
 
     /** Saroh's invoices to the business for its plan, newest first (U17). */
@@ -103,13 +110,18 @@ export class BillingController {
      * What changing to a catalogue plan would be and cost (U15): the kind of
      * change, the recurring charge with GST, anything charged now, and when
      * it starts. `billing:read`. The site's `?plan=&cycle=` lands here.
+     * With `coupon=`, the coupon checked and its discount shown (U16),
+     * rate-limited per business and per address.
      */
     @Get("change-plan")
     quoteChange(
         @OrgContext() ctx: OrganizationContext,
         @Query() query: ChangePlanQuery,
+        @Ip() ip: string,
     ): Promise<ChangePlanQuoteView> {
-        return this.checkouts.quote(ctx, query);
+        return this.checkouts.quote(ctx, query, new Date(), {
+            addressKey: hashClientIp(ip),
+        });
     }
 
     /**
@@ -121,8 +133,30 @@ export class BillingController {
     changePlan(
         @OrgContext() ctx: OrganizationContext,
         @Body() dto: ChangePlanDto,
+        @Ip() ip: string,
     ): Promise<ChangePlanResult> {
-        return this.checkouts.changePlan(ctx, dto);
+        return this.checkouts.changePlan(ctx, dto, new Date(), {
+            addressKey: hashClientIp(ip),
+        });
+    }
+
+    /** The add-ons the business's plan offers, and what it holds (U16). */
+    @Get("addons")
+    listAddons(@OrgContext() ctx: OrganizationContext): Promise<AddonsView> {
+        return this.addons.list(ctx);
+    }
+
+    /**
+     * Hold this many of an add-on; zero removes it (U16). Limits rise at
+     * once; billed with the plan's next charge. `billing:manage`.
+     */
+    @Put("addons/:addonId")
+    setAddon(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("addonId") addonId: string,
+        @Body() dto: SetAddonDto,
+    ): Promise<AddonsView> {
+        return this.addons.set(ctx, addonId, dto.quantity);
     }
 
     /** The checkout waiting for authorisation, and one scheduled (U15). */

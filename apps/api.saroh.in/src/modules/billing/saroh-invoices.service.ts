@@ -12,6 +12,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { stateCode, stateName } from "../invoices/gst-states";
 import { formatSellerAddress } from "../invoices/order-invoice";
 import { authorize } from "../organizations/organization-policy";
+import { chargedAddonRowsInTx } from "./addon-charges";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { periodStart as periodStartOf } from "./checkout-quote";
 import type { ParsedBillingEvent } from "./providers/billing-provider.port";
@@ -167,7 +168,21 @@ export class SarohInvoicesService {
 
         const end = input.periodEnd;
         if (!end) return null;
-        return this.recordInTx(tx, {
+        const start = periodStartOf(end, cycle);
+        // A coupon takes its discount off the first charge (U16).
+        const plan0 = planLine(planName, cycle, checkout.pricePaise, seller);
+        if (checkout.discountCharges > 0) {
+            plan0.discountPaise = checkout.discountPaise;
+        }
+        // A scheduled change's first charge carries the add-ons owed (U16).
+        const addons = await this.addonLinesInTx(tx, {
+            organizationId: checkout.organizationId,
+            provider: checkout.provider,
+            providerSubscriptionId: checkout.providerSubscriptionId,
+            chargedAt: start,
+            cycle,
+        });
+        const id = await this.recordInTx(tx, {
             organizationId: checkout.organizationId,
             source,
             chargeKey: periodKey(
@@ -183,12 +198,14 @@ export class SarohInvoicesService {
             planId: checkout.planId,
             planName,
             cycle,
-            periodStart: periodStartOf(end, cycle),
+            periodStart: start,
             periodEnd: end,
-            lines: [planLine(planName, cycle, checkout.pricePaise, seller)],
+            lines: [plan0, ...addons.lines],
             billTo: billToOf(checkout),
             issuedAt: now,
         });
+        await this.markAddonsInvoiced(tx, addons.rowIds, id);
+        return id;
     }
 
     /**
@@ -240,20 +257,46 @@ export class SarohInvoicesService {
                 },
             },
         });
-        // A scheduled change's first charge, when the sweep moved it first.
-        const first =
-            checkout?.kind === "SCHEDULED" &&
-            !(await tx.sarohInvoice.findFirst({
-                where: {
-                    organizationId: input.organizationId,
-                    provider: sub.provider,
-                    providerSubscriptionId: sub.providerSubscriptionId,
-                },
-                select: { id: true },
-            }));
-        return this.recordInTx(tx, {
+        // Charges of this provider subscription already invoiced, an
+        // upgrade's difference aside: this one is the next.
+        const before = await tx.sarohInvoice.count({
+            where: {
+                organizationId: input.organizationId,
+                provider: sub.provider,
+                providerSubscriptionId: sub.providerSubscriptionId,
+                source: { not: "UPGRADE" },
+            },
+        });
+        // A scheduled change's first charge, when the sweep moved it first;
+        // a trial's first charge, at its end, is a new plan's first (U16).
+        const firstOf =
+            before === 0 && checkout?.kind === "SCHEDULED"
+                ? "SCHEDULED"
+                : before === 0 && checkout?.kind === "TRIAL"
+                  ? "NEW"
+                  : null;
+        const line = planLine(
+            sub.plan.name,
+            cycle,
+            sub.plan.priceCents,
+            this.sellerNow(),
+        );
+        // A coupon's months (U16): off each of the provider subscription's
+        // first charges, as the provider was told to.
+        if (checkout && before < checkout.discountCharges) {
+            line.discountPaise = checkout.discountPaise;
+        }
+        const chargedAt = periodStartOf(end, cycle);
+        const addons = await this.addonLinesInTx(tx, {
             organizationId: input.organizationId,
-            source: first ? "SCHEDULED" : "RENEWAL",
+            provider: sub.provider,
+            providerSubscriptionId: sub.providerSubscriptionId,
+            chargedAt,
+            cycle,
+        });
+        const id = await this.recordInTx(tx, {
+            organizationId: input.organizationId,
+            source: firstOf ?? "RENEWAL",
             chargeKey: periodKey(sub.provider, sub.providerSubscriptionId, end),
             provider: sub.provider,
             providerSubscriptionId: sub.providerSubscriptionId,
@@ -263,19 +306,14 @@ export class SarohInvoicesService {
             planId: sub.plan.id,
             planName: sub.plan.name,
             cycle,
-            periodStart: periodStartOf(end, cycle),
+            periodStart: chargedAt,
             periodEnd: end,
-            lines: [
-                planLine(
-                    sub.plan.name,
-                    cycle,
-                    sub.plan.priceCents,
-                    this.sellerNow(),
-                ),
-            ],
+            lines: [line, ...addons.lines],
             billTo: checkout ? billToOf(checkout) : null,
             issuedAt: now,
         });
+        await this.markAddonsInvoiced(tx, addons.rowIds, id);
+        return id;
     }
 
     /**
@@ -298,6 +336,44 @@ export class SarohInvoicesService {
             subscriptionId: input.subscriptionId,
             eventKey: input.providerEventId,
             final: input.final,
+        });
+    }
+
+    // ── Add-ons on a charge (U16) ───────────────────────────────────────
+
+    /** The add-on rows a charge took, as invoice lines (`addon-charges.ts`). */
+    private async addonLinesInTx(
+        tx: Tx,
+        input: {
+            organizationId: string;
+            provider: string;
+            providerSubscriptionId: string;
+            chargedAt: Date;
+            cycle: "month" | "year";
+        },
+    ): Promise<{ lines: SarohLineInput[]; rowIds: string[] }> {
+        const rows = await chargedAddonRowsInTx(tx, input);
+        const sac = this.sellerNow().sac;
+        return {
+            lines: rows.map((r) => ({
+                description: r.description,
+                sac,
+                quantity: r.quantity,
+                unitPaise: r.unitPaise,
+            })),
+            rowIds: rows.map((r) => r.id),
+        };
+    }
+
+    private async markAddonsInvoiced(
+        tx: Tx,
+        rowIds: string[],
+        invoiceId: string | null,
+    ): Promise<void> {
+        if (!invoiceId || rowIds.length === 0) return;
+        await tx.subscriptionAddonCharge.updateMany({
+            where: { id: { in: rowIds }, status: "SENT" },
+            data: { status: "INVOICED", invoiceId },
         });
     }
 

@@ -8,7 +8,9 @@ import type {
     CreateProviderPlanInput,
     CreateSubscriptionInput,
     CreateSubscriptionResult,
+    NextChargeItem,
     ParsedBillingEvent,
+    ProviderChargeCapability,
     ProviderPlanCapability,
     SubscriptionStatus,
     WebhookHeaders,
@@ -65,6 +67,43 @@ export class FakeProviderPlans implements ProviderPlanCapability {
 }
 
 /**
+ * The fake's next-charge items (U16 add-ons): each one recorded, keyed by
+ * Saroh's reference so a repeat for one reference returns the same id, as a
+ * provider asked twice should. A test queues failures with {@link failNext}.
+ */
+export class FakeProviderCharges implements ProviderChargeCapability {
+    readonly added: NextChargeItem[] = [];
+    private readonly byReference = new Map<string, string>();
+    private readonly failures: ("REFUSED" | "UNKNOWN")[] = [];
+
+    failNext(...kinds: ("REFUSED" | "UNKNOWN")[]): void {
+        this.failures.push(...kinds);
+    }
+
+    addToNextCharge(
+        item: NextChargeItem,
+    ): Promise<{ providerChargeId: string }> {
+        const failure = this.failures.shift();
+        if (failure) {
+            return Promise.reject(
+                new BillingProviderError(
+                    failure,
+                    failure === "REFUSED"
+                        ? "item refused (HTTP 400)"
+                        : "network error",
+                ),
+            );
+        }
+        const known = this.byReference.get(item.reference);
+        if (known) return Promise.resolve({ providerChargeId: known });
+        this.added.push(item);
+        const providerChargeId = `fake_item_${item.reference}`;
+        this.byReference.set(item.reference, providerChargeId);
+        return Promise.resolve({ providerChargeId });
+    }
+}
+
+/**
  * Deterministic, network-free billing provider for tests/dev (S7-005).
  *
  * Records every create/cancel call (so a test can assert the resolved plan
@@ -81,6 +120,7 @@ export class FakeBillingProvider implements BillingProvider {
     readonly cancelCalls: string[] = [];
     readonly cancelOptions: (CancelSubscriptionOptions | undefined)[] = [];
     readonly plans = new FakeProviderPlans();
+    readonly charges = new FakeProviderCharges();
     /** The next `createSubscription` fails with this, once. */
     failNextCreate: BillingProviderError | null = null;
 

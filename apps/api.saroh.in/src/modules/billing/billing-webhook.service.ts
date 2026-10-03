@@ -14,7 +14,14 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { periodEnd } from "./checkout-quote";
+import {
+    clearAddonsInTx,
+    rehomeAddonChargesInTx,
+    rollAddonChargesInTx,
+} from "./addon-charges";
+import { enqueueBillingEmail } from "./billing-email.job";
+import { periodEnd, periodStart } from "./checkout-quote";
+import { redeemCouponInTx, trialNoticeAt } from "./offers";
 import { applyDueMoveInTx } from "./plan-moves";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import type {
@@ -388,12 +395,21 @@ export class BillingWebhookService {
                     cancelAtPeriodEnd: Boolean(oldProvider),
                 },
             });
-            // The one it replaces runs to the end of the period paid.
+            // The one it replaces runs to the end of the period paid; the
+            // add-ons owed then ride on this one's first charge (U16).
             if (oldProvider) {
                 await enqueueProviderCancel(tx, {
                     organizationId: org,
                     ...oldProvider,
                     atCycleEnd: true,
+                });
+                await rehomeAddonChargesInTx(tx, {
+                    organizationId: org,
+                    subscriptionId: sub.id,
+                    fromProviderSubscriptionId:
+                        oldProvider.providerSubscriptionId,
+                    provider: checkout.provider,
+                    toProviderSubscriptionId: checkout.providerSubscriptionId,
                 });
             }
             return {
@@ -409,17 +425,24 @@ export class BillingWebhookService {
             };
         }
 
-        // NEW or UPGRADE: on the plan now. An upgrade keeps the period
-        // already paid (its own charges start when it ends); a new plan's
-        // period starts with this first charge.
+        // NEW, UPGRADE or TRIAL: on the plan now. An upgrade keeps the
+        // period already paid (its own charges start when it ends); a new
+        // plan's period starts with this first charge; a trial runs to its
+        // end, when the first charge is taken (U16).
+        const trial = checkout.kind === "TRIAL";
+        // Another plan while a trial runs keeps the trial's add-ons.
+        const continuing =
+            trial && sub?.status === "TRIALING" && Boolean(oldProvider);
         const currentPeriodEnd =
             checkout.kind === "UPGRADE"
                 ? (checkout.startAt ?? sub?.currentPeriodEnd ?? null)
-                : (event.currentPeriodEnd ?? periodEnd(now, cycle));
+                : trial
+                  ? checkout.startAt
+                  : (event.currentPeriodEnd ?? periodEnd(now, cycle));
         const fields = {
             planId: checkout.planId,
             billingCycle: cycle,
-            status: "ACTIVE",
+            status: trial ? "TRIALING" : "ACTIVE",
             provider: checkout.provider,
             providerSubscriptionId: checkout.providerSubscriptionId,
             providerCustomerId: checkout.providerCustomerId,
@@ -443,16 +466,50 @@ export class BillingWebhookService {
             where: { id: checkout.id },
             data: { status: "COMPLETED", completedAt: now },
         });
-        // Saroh's invoice for what was just charged (U17): the first period
-        // of a new plan, or an upgrade's difference.
-        await this.invoices?.invoiceCheckoutChargeInTx(tx, {
-            checkout,
-            event,
-            now,
-            source: checkout.kind === "UPGRADE" ? "UPGRADE" : "NEW",
-            periodEnd: currentPeriodEnd,
-            fromPlanName: sub?.plan.name ?? null,
-        });
+        // A new plan starts with no add-ons; a plan taking over billing
+        // takes what was owed on the old one's next charge (U16).
+        if (checkout.kind === "NEW" || (trial && !continuing)) {
+            await clearAddonsInTx(tx, saved.id);
+        } else if (oldProvider) {
+            await rehomeAddonChargesInTx(tx, {
+                organizationId: org,
+                subscriptionId: saved.id,
+                fromProviderSubscriptionId: oldProvider.providerSubscriptionId,
+                provider: checkout.provider,
+                toProviderSubscriptionId: checkout.providerSubscriptionId,
+            });
+        }
+        if (trial) {
+            // Nothing charged yet: no invoice and no redemption until the
+            // trial's end. The business hears before then (U17's mail).
+            if (currentPeriodEnd) {
+                await enqueueBillingEmail(
+                    tx,
+                    {
+                        kind: "TRIAL_ENDING",
+                        organizationId: org,
+                        subscriptionId: saved.id,
+                        endsAt: currentPeriodEnd.toISOString(),
+                    },
+                    trialNoticeAt(currentPeriodEnd, now),
+                );
+            }
+        } else {
+            // Saroh's invoice for what was just charged (U17): the first
+            // period of a new plan, or an upgrade's difference.
+            await this.invoices?.invoiceCheckoutChargeInTx(tx, {
+                checkout,
+                event,
+                now,
+                source: checkout.kind === "UPGRADE" ? "UPGRADE" : "NEW",
+                periodEnd: currentPeriodEnd,
+                fromPlanName: sub?.plan.name ?? null,
+            });
+        }
+        // The coupon is redeemed with the first discounted charge (U16).
+        if (checkout.kind === "NEW") {
+            await redeemCouponInTx(tx, checkout, saved.id);
+        }
         // The subscription it replaces stops now: the period it paid for is
         // covered by the new one (an upgrade's difference) or by nothing
         // further being owed.
@@ -590,6 +647,7 @@ export class BillingWebhookService {
                 organizationId: true,
                 provider: true,
                 providerSubscriptionId: true,
+                currentPeriodEnd: true,
                 plan: {
                     select: {
                         id: true,
@@ -620,8 +678,47 @@ export class BillingWebhookService {
                 event,
                 now,
             });
+            await this.afterCharge(tx, subscriptionId, before, event);
         }
         return { result: { status: "processed", changed: true } };
+    }
+
+    /**
+     * After a charge on the subscription's own provider subscription (U16):
+     * a trial's coupon is redeemed with its first charge, and the add-ons
+     * held for the period just begun are owed on the next one.
+     */
+    private async afterCharge(
+        tx: Tx,
+        subscriptionId: string,
+        before: {
+            provider: string | null;
+            providerSubscriptionId: string | null;
+            currentPeriodEnd: Date | null;
+            plan: { interval: string };
+        },
+        event: ParsedBillingEvent,
+    ): Promise<void> {
+        if (before.provider && before.providerSubscriptionId) {
+            const checkout = await tx.billingCheckout.findUnique({
+                where: {
+                    provider_providerSubscriptionId: {
+                        provider: before.provider,
+                        providerSubscriptionId: before.providerSubscriptionId,
+                    },
+                },
+            });
+            if (checkout?.kind === "TRIAL") {
+                await redeemCouponInTx(tx, checkout, subscriptionId);
+            }
+        }
+        const nextEnd = event.currentPeriodEnd;
+        if (!nextEnd) return;
+        const cycle = before.plan.interval === "year" ? "year" : "month";
+        const chargedAt =
+            before.currentPeriodEnd ?? periodStart(nextEnd, cycle);
+        if (nextEnd.getTime() <= chargedAt.getTime()) return;
+        await rollAddonChargesInTx(tx, { subscriptionId, chargedAt, nextEnd });
     }
 
     /** A scheduled change's first charge, once its move applied (U17). */

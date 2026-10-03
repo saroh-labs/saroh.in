@@ -9,7 +9,9 @@ import type {
     CreateProviderPlanInput,
     CreateSubscriptionInput,
     CreateSubscriptionResult,
+    NextChargeItem,
     ParsedBillingEvent,
+    ProviderChargeCapability,
     ProviderPlanCapability,
     SubscriptionStatus,
     WebhookHeaders,
@@ -72,9 +74,23 @@ export class RazorpayBillingProvider implements BillingProvider {
         createPlan: (input) => this.createPlan(input),
     };
 
+    readonly charges: ProviderChargeCapability = {
+        addToNextCharge: (item) => this.addToNextCharge(item),
+    };
+
     async createSubscription(
         input: CreateSubscriptionInput,
     ): Promise<CreateSubscriptionResult> {
+        // A coupon (U16). Assumed Razorpay takes money off a subscription
+        // only through an Offer made in its Dashboard and linked by
+        // `offer_id`, and Saroh's coupons have none: refuse, never charge
+        // the full amount for a discounted plan. Unverified (U16).
+        if (input.discount && input.discount.amountPaise > 0) {
+            throw new BillingProviderError(
+                "REFUSED",
+                "Razorpay subscription creation refused: coupons aren't supported yet",
+            );
+        }
         const body: Record<string, unknown> = {
             total_count: TOTAL_COUNT[input.interval] ?? TOTAL_COUNT.month,
             quantity: 1,
@@ -251,6 +267,43 @@ export class RazorpayBillingProvider implements BillingProvider {
             if (items.length < FIND_PLAN_PAGE_SIZE) return null;
         }
         return null;
+    }
+
+    // ── Items on the next charge (U16) ──────────────────────────────────
+
+    /**
+     * An add-on owed for a period, as a one-off add-on on the subscription
+     * (`POST /subscriptions/:id/addons`), which Razorpay charges with the
+     * subscription's next invoice. Unverified (U16): that it is taken with
+     * the next charge and not later, that a subscription that is only
+     * authenticated (a trial) accepts one, and that a repeat after a lost
+     * answer can't be told from a new one (Razorpay keeps no reference).
+     */
+    private async addToNextCharge(
+        item: NextChargeItem,
+    ): Promise<{ providerChargeId: string }> {
+        const res = await this.call(
+            "add-on item",
+            "POST",
+            `/subscriptions/${encodeURIComponent(item.providerSubscriptionId)}/addons`,
+            {
+                item: {
+                    name: item.name,
+                    amount: item.amountPaise,
+                    currency: item.currency,
+                    description: `${REFERENCE_NOTE}:${item.reference}`,
+                },
+                quantity: 1,
+            },
+        );
+        const json = (await res.json()) as { id?: string };
+        if (!json.id) {
+            throw new BillingProviderError(
+                "UNKNOWN",
+                "Razorpay add-on item failed: missing id",
+            );
+        }
+        return { providerChargeId: json.id };
     }
 
     // ── HTTP ────────────────────────────────────────────────────────────

@@ -218,6 +218,8 @@ export class BillingEmailHandler {
             select: {
                 status: true,
                 currentPeriodEnd: true,
+                provider: true,
+                providerSubscriptionId: true,
                 plan: { select: { name: true, priceCents: true } },
                 organization: { select: { name: true } },
             },
@@ -244,11 +246,35 @@ export class BillingEmailHandler {
             ) {
                 return this.skip(job, "not_trialing");
             }
+            // What the first charge will be: the plan, less a coupon the
+            // trial's checkout carries (U16).
+            const checkout =
+                sub.provider && sub.providerSubscriptionId
+                    ? await prisma.billingCheckout.findUnique({
+                          where: {
+                              provider_providerSubscriptionId: {
+                                  provider: sub.provider,
+                                  providerSubscriptionId:
+                                      sub.providerSubscriptionId,
+                              },
+                          },
+                          select: {
+                              discountPaise: true,
+                              discountCharges: true,
+                          },
+                      })
+                    : null;
+            const off =
+                checkout && checkout.discountCharges > 0
+                    ? checkout.discountPaise
+                    : 0;
             words = trialEndingEmail({
                 businessName,
                 planName: sub.plan.name,
                 endsOn: day(endsAt),
-                total: money(withGstPaise(sub.plan.priceCents)),
+                total: money(
+                    withGstPaise(Math.max(0, sub.plan.priceCents - off)),
+                ),
             });
         }
         if (!(await this.deliver(job, p.organizationId, words))) return;

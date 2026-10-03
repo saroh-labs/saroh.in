@@ -2,13 +2,17 @@ import { Transform } from "class-transformer";
 import {
     IsBoolean,
     IsIn,
+    IsInt,
     IsOptional,
     IsString,
     Matches,
+    Max,
     MaxLength,
+    Min,
     MinLength,
 } from "class-validator";
 
+import { MAX_ADDON_QUANTITY } from "./offers";
 import { SUPPORTED_BILLING_PROVIDERS } from "./providers/billing-provider.port";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -84,7 +88,25 @@ export class ChangePlanDto {
     @IsString()
     @Matches(/^[0-9A-Z]{15}$/, { message: "A GSTIN is 15 characters." })
     gstin?: string;
+
+    /**
+     * A coupon code (U16), upper-cased. Checked on the server against the
+     * coupon, the plan and the business; the discount is the server's.
+     */
+    @IsOptional()
+    @Transform(upper)
+    @IsString()
+    @MaxLength(32, { message: "That isn't a coupon code." })
+    coupon?: string;
 }
 
 /** `GET …/billing/change-plan?plan=&cycle=`: the same two, to quote. */
 export class ChangePlanQuery extends ChangePlanDto {}
+
+/** `PUT …/billing/addons/:addonId`: how many to hold; zero removes it (U16). */
+export class SetAddonDto {
+    @IsInt()
+    @Min(0)
+    @Max(MAX_ADDON_QUANTITY)
+    quantity!: number;
+}

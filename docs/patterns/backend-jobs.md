@@ -252,6 +252,12 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   trialing say nothing; a notice is claimed as a `CustomerNotice`
   (`SAROH_BILLING_EMAIL`) once it has left. A send that fails throws and is
   retried; no recipient or no mail set up ends the job with a log line.
+- **`billing.addons.sync`** (U16) puts a subscription's QUEUED add-on
+  charges (`SubscriptionAddonCharge`) on its provider subscription's next
+  charge, queued with the rows (a purchase, a renewal, a change of
+  provider subscription). Each row goes under its own id as the reference
+  and only a QUEUED row becomes SENT; a refusal is logged and the row
+  waits for the next charge; anything unanswered is retried.
 - **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
   PENDING run, a partial unique index): due pending moves that are ready
   (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid

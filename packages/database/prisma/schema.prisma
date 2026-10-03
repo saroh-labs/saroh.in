@@ -165,14 +165,14 @@ model Organization {
 
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
-  sites            Site[]
-  pages            Page[]
-  pageVersions     PageVersion[]
-  sections         Section[]
-  siteComments     SiteComment[]
-  siteApprovals    SiteApproval[]
-  sitePreviewLinks SitePreviewLink[]
-  publications     Publication[]
+  sites                Site[]
+  pages                Page[]
+  pageVersions         PageVersion[]
+  sections             Section[]
+  siteComments         SiteComment[]
+  siteApprovals        SiteApproval[]
+  sitePreviewLinks     SitePreviewLink[]
+  publications         Publication[]
   // Frozen candidates of a site and their links (DEC-071).
   siteTestReleases     SiteTestRelease[]
   siteTestReleaseLinks SiteTestReleaseLink[]
@@ -303,28 +303,30 @@ model Organization {
   customerThreadMessages CustomerThreadMessage[]
 
   // Autopay mandates at the business's own provider (round-2 D11, D20).
-  paymentMandates         PaymentMandate[]
+  paymentMandates          PaymentMandate[]
   // A class pack's history and its holders' extensions (round-2 E13).
-  packEvents              PackEvent[]
-  packExtensions          PackExtension[]
+  packEvents               PackEvent[]
+  packExtensions           PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
-  customerNotices         CustomerNotice[]
+  customerNotices          CustomerNotice[]
   // Places in line for full classes (round-2 A12).
-  classWaitlistEntries    ClassWaitlistEntry[]
+  classWaitlistEntries     ClassWaitlistEntry[]
   // Bulk kitchen moves held on the server, then committed (round-2 B6).
-  orderStageBatches       OrderStageBatch[]
+  orderStageBatches        OrderStageBatch[]
   // Each person's alert choices here (round-2 F14).
-  notificationPreferences NotificationPreference[]
+  notificationPreferences  NotificationPreference[]
   // Its one order-number series, across every storefront (P3, DEC-066).
-  orderNumberSequence     OrderNumberSequence?
+  orderNumberSequence      OrderNumberSequence?
   // Web addresses it used to have, held for it after a change (DEC-069, L1).
-  addressReservations     AddressReservation[]
+  addressReservations      AddressReservation[]
   // Saroh billing: add-ons bought and coupons used (pricing catalogue U1).
   subscriptionAddons       SubscriptionAddon[]
   pricingCouponRedemptions PricingCouponRedemption[]
   // Saroh billing: checkouts for a plan change (pricing catalogue U15).
   billingCheckouts         BillingCheckout[]
   sarohInvoices            SarohInvoice[]
+  // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
+  subscriptionAddonCharges SubscriptionAddonCharge[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -2936,14 +2938,14 @@ model Site {
   currentPublicationId String?      @unique
   currentPublication   Publication? @relation("SiteCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
 
-  pages          Page[]
-  comments       SiteComment[]
+  pages            Page[]
+  comments         SiteComment[]
   // The site's writing (ADR-004).
-  posts          Post[]
-  postCategories PostCategory[]
-  approvals      SiteApproval[]
-  previewLinks   SitePreviewLink[]
-  publications   Publication[]     @relation("SitePublications")
+  posts            Post[]
+  postCategories   PostCategory[]
+  approvals        SiteApproval[]
+  previewLinks     SitePreviewLink[]
+  publications     Publication[]         @relation("SitePublications")
   // Frozen candidates of this site, served on its test host (DEC-071).
   testReleases     SiteTestRelease[]
   testReleaseLinks SiteTestReleaseLink[]
@@ -2952,9 +2954,9 @@ model Site {
   // advisory and a bypass is recorded. On: Publish, restore and Go live
   // succeed only for an approved test release, unless an owner overrides,
   // and the override is recorded. Only an owner turns it on or off.
-  publishNeedsApproval Boolean @default(false)
+  publishNeedsApproval Boolean        @default(false)
   // Who may review this site (#276).
-  reviewers      SiteReviewer[]
+  reviewers            SiteReviewer[]
 
   // Verified subdomain / custom-domain claims routed to this Site (S2-007).
   // Nullable on the Domain side (Domain.siteId) — a claim exists before it is
@@ -3379,13 +3381,11 @@ model Publication {
 /**
  * A test release (DEC-071): a named, non-live candidate of a site, served
  * whole at `test--<address>.saroh.app` to whoever holds one of its links.
- *
  * The frozen snapshot is an ordinary `Publication` with `kind = 'TEST'`, so
  * publications stay append-only. Everything about the release that changes
  * (its name and note, a schedule, going live, being discarded) lives here.
  * Going live appends a LIVE copy of the snapshot (`livePublicationId`); the
  * site never points at the TEST row.
- *
  * User ids are plain columns, as `Publication.publishedByUserId` is: removing
  * a person from Saroh never takes a release, or its record, with them.
  */
@@ -3455,7 +3455,6 @@ model SiteTestRelease {
  * hex stored, the raw token returned once. Its own table, so a draft preview
  * token can never open a test host and a test token can never open
  * `/preview/<token>`.
- *
  * SHARE is a link someone made to send; OPEN is a short one minted for the
  * person opening the release from the workspace. A link stops working when it
  * expires, is revoked, or its release is discarded or has gone live.
@@ -4952,6 +4951,7 @@ model Subscription {
 
   addons            SubscriptionAddon[]
   couponRedemptions PricingCouponRedemption[]
+  addonCharges      SubscriptionAddonCharge[]
 
   // Saroh billing (U15): when the provider says the last event it applied
   // happened. A delivery older than this is acknowledged and changes
@@ -6605,6 +6605,7 @@ model PricingCoupon {
   updatedAt DateTime @updatedAt
 
   redemptions PricingCouponRedemption[]
+  checkouts   BillingCheckout[]
 }
 
 // PricingCouponRedemption — one business used one coupon. Written when the
@@ -6653,6 +6654,51 @@ model SubscriptionAddon {
 
   @@unique([subscriptionId, addonId])
   @@index([organizationId])
+}
+
+// An add-on owed for one period, put on the provider subscription's next
+// charge (pricing catalogue U16). Add-ons are charged after the period they
+// cover: a row is written at the start of each period for what is held then
+// (from the day of purchase, prorated, for one bought mid-period), sent to
+// the provider as a one-off item on its next charge (`billing.addons.sync`),
+// and becomes a line on Saroh's invoice for that charge. Never edited once
+// sent; a row the provider never took moves to the next charge.
+model SubscriptionAddonCharge {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  addonId     String
+  // The invoice line's words, quantity and price per unit before GST.
+  description String
+  quantity    Int
+  unitPaise   Int
+
+  // The days it pays for.
+  periodStart DateTime
+  periodEnd   DateTime
+  // The provider charge it rides on: the provider subscription's next one.
+  chargeAt    DateTime
+
+  provider               String
+  providerSubscriptionId String
+  // The provider's id for the item, once sent.
+  providerChargeId       String?
+
+  status    String  @default("QUEUED") // QUEUED | SENT | INVOICED | DROPPED
+  // Saroh's invoice it became a line on.
+  invoiceId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([subscriptionId, status])
+  @@index([provider, providerSubscriptionId, status])
 }
 
 // PricingProviderPlan — the billing provider's plan for one billable `Plan`
@@ -6706,7 +6752,9 @@ model BillingCheckout {
   planId String
   plan   Plan   @relation(fields: [planId], references: [id])
   cycle  String // "month" | "year"
-  kind   String // NEW | UPGRADE | SCHEDULED
+  // NEW | UPGRADE | SCHEDULED | TRIAL (U16: on the plan once authorised, its
+  // first charge at `startAt`, the trial's end)
+  kind   String
   status String @default("OPEN") // OPEN | SCHEDULED | COMPLETED | CANCELLED
 
   provider               String
@@ -6721,7 +6769,16 @@ model BillingCheckout {
   chargeNowPaise    Int @default(0)
   chargeNowGstPaise Int @default(0)
 
-  // When the plan's own charges start; null for NEW (at authorisation).
+  // A coupon (U16): `discountPaise` off each of the first `discountCharges`
+  // charges of the plan, before GST, as quoted. Written to
+  // `PricingCouponRedemption` when the first discounted charge is paid.
+  couponId        String?
+  coupon          PricingCoupon? @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  discountPaise   Int            @default(0)
+  discountCharges Int            @default(0)
+
+  // When the plan's own charges start; null for NEW (at authorisation), the
+  // trial's end for TRIAL.
   startAt     DateTime?
   expiresAt   DateTime
   completedAt DateTime?
@@ -6743,6 +6800,7 @@ model BillingCheckout {
   @@index([organizationId])
   @@index([planId])
   @@index([status, expiresAt])
+  @@index([couponId])
 }
 
 // Saroh's own GST invoice to a business, for a charge Saroh took for its

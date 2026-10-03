@@ -242,3 +242,104 @@ describe("moveReadiness", () => {
         ).toBe("needs-authorisation");
     });
 });
+
+describe("offers in the quote (U16)", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it("a paid plan with a trial the business may have is TRIAL: nothing now, the first charge at the trial's end", () => {
+        const q = quoteChange({
+            subscription: sub({ plan: FREE, provider: null }),
+            target: B,
+            now: NOW,
+            trialDays: 7,
+        });
+        const ends = new Date(NOW.getTime() + 7 * DAY);
+        expect(q).toMatchObject({
+            kind: "TRIAL",
+            startAt: ends,
+            trialEndsAt: ends,
+            effectiveAt: null,
+            chargeNowPaise: 0,
+            firstChargePaise: 22_200,
+        });
+        // No trial offered (or had already): NEW.
+        expect(
+            quoteChange({ subscription: null, target: B, now: NOW }).kind,
+        ).toBe("NEW");
+    });
+
+    it("another paid plan while a trial runs stays a trial to the same end; Free ends it now", () => {
+        const trialing = sub({ status: "TRIALING" });
+        expect(
+            quoteChange({ subscription: trialing, target: C, now: NOW }),
+        ).toMatchObject({
+            kind: "TRIAL",
+            startAt: END,
+            trialEndsAt: END,
+            chargeNowPaise: 0,
+        });
+        expect(
+            quoteChange({ subscription: trialing, target: FREE, now: NOW }),
+        ).toMatchObject({ kind: "TO_FREE", effectiveAt: NOW });
+    });
+
+    it("a monthly coupon comes off each of its months; the provider is told the GST-inclusive difference", () => {
+        const q = quoteChange({
+            subscription: null,
+            target: B,
+            now: NOW,
+            coupon: { discountPaise: 111, months: 3 },
+        });
+        expect(q).toMatchObject({
+            kind: "NEW",
+            discountPaise: 111,
+            discountCharges: 3,
+            firstChargePaise: 22_089,
+            firstChargeGstPaise: gstPaise(22_089),
+            firstChargeTotalPaise: 22_089 + gstPaise(22_089),
+            discountTotalPaise:
+                22_200 + gstPaise(22_200) - (22_089 + gstPaise(22_089)),
+            // The recurring charge itself is unchanged.
+            pricePaise: 22_200,
+        });
+    });
+
+    it("a yearly coupon is its months' worth once, off the first yearly charge, never more than it", () => {
+        expect(
+            quoteChange({
+                subscription: null,
+                target: B_YEAR,
+                now: NOW,
+                coupon: { discountPaise: 111, months: 3 },
+            }),
+        ).toMatchObject({
+            discountPaise: 333,
+            discountCharges: 1,
+            firstChargePaise: 222_000 - 333,
+        });
+        expect(
+            quoteChange({
+                subscription: null,
+                target: B,
+                now: NOW,
+                coupon: { discountPaise: 99_999, months: 1 },
+            }),
+        ).toMatchObject({ discountPaise: 22_200, firstChargePaise: 0 });
+    });
+
+    it("a coupon never touches a change that doesn't start a plan", () => {
+        expect(
+            quoteChange({
+                subscription: sub(),
+                target: C,
+                now: NOW,
+                coupon: { discountPaise: 111, months: 3 },
+            }),
+        ).toMatchObject({
+            kind: "UPGRADE",
+            discountPaise: 0,
+            discountCharges: 0,
+            firstChargePaise: 33_300,
+        });
+    });
+});
