@@ -49,7 +49,9 @@ module.exports = {
     // organizations `*.db.spec.ts` (F19's role reach) is the exception.
     testPathIgnorePatterns: [
         "<rootDir>/src/modules/organizations/(?!.*\\.db\\.spec\\.ts$)",
-        "<rootDir>/src/modules/admin/",
+        // Admin specs mock Prisma and run in the unit project; only the
+        // admin *.db.spec.ts (U11's overrides) run here.
+        "<rootDir>/src/modules/admin/(?!.*\\.db\\.spec\\.ts$)",
         "\\.authorization\\.spec\\.ts$",
         // #384 customer delete: mocked Prisma, runs in the unit project.
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",

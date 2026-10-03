@@ -31,7 +31,7 @@ import type {
 import { MODULE_MAP, OVERRIDE_KINDS } from "@saroh/pricing-catalog";
 
 /** A row's `MODULE_MAP` entry; a row the map doesn't know governs nothing. */
-function mapEntry(moduleId: string): ModuleMapEntry | undefined {
+export function mapEntry(moduleId: string): ModuleMapEntry | undefined {
     return Object.prototype.hasOwnProperty.call(MODULE_MAP, moduleId)
         ? MODULE_MAP[moduleId]
         : undefined;

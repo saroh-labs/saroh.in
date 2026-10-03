@@ -57,7 +57,8 @@ export function pendingFromFor(
     return moveDateFor(currentPeriodEnd, goLiveAt, cycle);
 }
 
-function samePlan(
+/** Whether two `Plan` rows read the same to a business: nothing to tell it. */
+export function samePlan(
     a: { name: string; priceCents: number; entitlements: unknown },
     b: { name: string; priceCents: number; entitlements: unknown },
 ): boolean {

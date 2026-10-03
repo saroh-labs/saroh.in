@@ -179,6 +179,88 @@ export async function revokeLimitAction(
     );
 }
 
+/** Grant, remove, or set the limit of one catalogue row (pricing U11). */
+export async function moduleOverrideAction(
+    organizationId: string,
+    input: Reasoned & {
+        kind: "grant" | "remove" | "limit";
+        moduleKey: string;
+        value?: number;
+        expiresAt?: string;
+    },
+) {
+    return refresh(
+        organizationId,
+        await adminWrite<{ id: string; warning: string | null }>(
+            `${base(organizationId)}/overrides/modules`,
+            "POST",
+            input,
+            "Could not save the override.",
+        ),
+    );
+}
+
+export async function priceOverrideAction(
+    organizationId: string,
+    input: Reasoned & { pricePaise: number; expiresAt?: string },
+) {
+    return refresh(
+        organizationId,
+        await adminWrite(
+            `${base(organizationId)}/overrides/price`,
+            "POST",
+            input,
+            "Could not set the price.",
+        ),
+    );
+}
+
+export async function planOverrideAction(
+    organizationId: string,
+    input: Reasoned & { planKey: string; expiresAt: string },
+) {
+    return refresh(
+        organizationId,
+        await adminWrite(
+            `${base(organizationId)}/overrides/plan`,
+            "POST",
+            input,
+            "Could not put it on the plan.",
+        ),
+    );
+}
+
+export async function removeOverrideAction(
+    organizationId: string,
+    overrideId: string,
+    input: Reasoned,
+) {
+    return refresh(
+        organizationId,
+        await adminWrite(
+            `${base(organizationId)}/overrides/${encodeURIComponent(overrideId)}`,
+            "DELETE",
+            input,
+            "Could not remove the override.",
+        ),
+    );
+}
+
+export async function catalogueMoveAction(
+    organizationId: string,
+    input: Reasoned & { when: "now" | "renewal" },
+) {
+    return refresh(
+        organizationId,
+        await adminWrite(
+            `${base(organizationId)}/catalogue-move`,
+            "POST",
+            input,
+            "Could not move it to the live version.",
+        ),
+    );
+}
+
 export async function setModuleAction(
     organizationId: string,
     moduleKey: string,

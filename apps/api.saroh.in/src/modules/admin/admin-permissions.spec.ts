@@ -64,6 +64,19 @@ describe("admin permission policy", () => {
         ]);
     });
 
+    it("lets Billing and Platform Owner make one business's catalogue exceptions", () => {
+        const holders = Object.values(AdminRole)
+            .filter((role) =>
+                permissionsFor([role]).includes(
+                    AdminPermission.PricingOverride,
+                ),
+            )
+            .sort();
+        expect(holders).toEqual(
+            [AdminRole.Billing, AdminRole.PlatformOwner].sort(),
+        );
+    });
+
     it("gives Platform Owner every control-plane permission", () => {
         expect(permissionsFor([AdminRole.PlatformOwner])).toEqual(
             ALL_ADMIN_PERMISSIONS,
