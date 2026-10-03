@@ -50,6 +50,10 @@ export const AdminPermission = {
     PricingPublish: "pricing:publish",
     // Coupons apply the moment they are saved, outside versions.
     CouponsManage: "coupons:manage",
+    // One business's catalogue exceptions (pricing U11): grant, remove or
+    // limit a row, put it on a plan, move it to the live version. A custom
+    // price needs this and pricing:publish.
+    PricingOverride: "pricing:override",
 } as const;
 
 export type AdminPermission =
@@ -88,6 +92,7 @@ const ROLE_PERMISSIONS = {
         AdminPermission.SubscriptionOverride,
         AdminPermission.PricingRead,
         AdminPermission.PricingEdit,
+        AdminPermission.PricingOverride,
     ],
     [AdminRole.ReleaseManager]: [
         AdminPermission.PlatformRead,

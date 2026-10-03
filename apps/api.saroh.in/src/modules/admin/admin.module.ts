@@ -26,6 +26,7 @@ import { AdminOperationsService } from "./admin-operations.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsController } from "./admin-organizations.controller";
 import { AdminOrganizationsService } from "./admin-organizations.service";
+import { AdminOverridesService } from "./admin-overrides.service";
 import { AdminPeopleController } from "./admin-people.controller";
 import { AdminPeopleService } from "./admin-people.service";
 import { AdminStaffController } from "./admin-staff.controller";
@@ -69,6 +70,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminOrganizationViewService,
         AdminOrganizationsService,
         AdminLifecycleService,
+        AdminOverridesService,
         AdminStaffService,
         AdminPeopleService,
         AdminMachineryService,

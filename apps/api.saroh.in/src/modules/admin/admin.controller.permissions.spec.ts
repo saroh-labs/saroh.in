@@ -264,6 +264,23 @@ describe("Pricing permissions", () => {
         },
     );
 
+    it.each([
+        "setModuleOverride",
+        "setPlanOverride",
+        "removeOverride",
+        "moveToLive",
+    ] as const)("needs pricing override to %s", (method) => {
+        expect(perms(method)).toEqual([AdminPermission.PricingOverride]);
+    });
+
+    // A custom price is a price change too: override alone is refused.
+    it("needs pricing override and pricing publish to set a custom price", () => {
+        expect(perms("setPriceOverride")).toEqual([
+            AdminPermission.PricingOverride,
+            AdminPermission.PricingPublish,
+        ]);
+    });
+
     it.each(["createCoupon", "updateCoupon", "deleteCoupon"] as const)(
         "needs pricing read and coupons manage to %s",
         (method) => {
