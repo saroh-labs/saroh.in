@@ -7,6 +7,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import { planMeter } from "../billing/metering.service";
 import { listAt } from "../products/listings.service";
 import { sanitizeRichHtml } from "../sites/sanitize";
 import {
@@ -120,12 +121,34 @@ export class ImportsService {
         let created = 0;
         let updated = 0;
 
+        // New products count toward the plan's cap (U13): the whole file is
+        // checked before anything is written, so an import that can't fit
+        // is refused whole rather than stopping partway; each chunk checks
+        // again on its own transaction.
+        const newProducts = (chunk: readonly WritableRow[]) =>
+            entity === "products"
+                ? chunk.filter(
+                      (r) =>
+                          r.outcome === "CREATE" &&
+                          (r.values.status ?? "DRAFT") !== "ARCHIVED",
+                  ).length
+                : 0;
+        if (organizationId && newProducts(rows) > 0) {
+            await planMeter.assertRoom(organizationId, "products", {
+                adding: newProducts(rows),
+            });
+        }
+
         for (let i = 0; i < rows.length; i += WRITE_CHUNK) {
             const chunk = rows.slice(i, i + WRITE_CHUNK);
             // One transaction per chunk: a failure rolls back that chunk only,
             // so a large import is not all-or-nothing (§15 asks for a
             // correction path, not an atomic monolith).
             await prisma.$transaction(async (tx) => {
+                if (organizationId)
+                    await planMeter.roomInTx(tx, organizationId, "products", {
+                        adding: newProducts(chunk),
+                    });
                 for (const row of chunk) {
                     await this.write(tx, storeId, organizationId, entity, row);
                     if (row.outcome === "CREATE") created += 1;

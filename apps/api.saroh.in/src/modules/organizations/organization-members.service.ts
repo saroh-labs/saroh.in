@@ -19,6 +19,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { planMeter } from "../billing/metering.service";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
@@ -292,33 +293,59 @@ export class OrganizationMembersService {
 
         const token = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-        const invitation = await prisma.organizationInvitation.upsert({
-            where: {
-                organizationId_email: {
-                    organizationId: ctx.organizationId,
-                    email: dto.email,
-                },
+        // The plan's team members cap counts people and open invitations
+        // (U13): a new invitation is checked; sending a live one again adds
+        // nobody.
+        const invitation = await planMeter.withRoom(
+            ctx.organizationId,
+            "members",
+            (tx) =>
+                tx.organizationInvitation.upsert({
+                    where: {
+                        organizationId_email: {
+                            organizationId: ctx.organizationId,
+                            email: dto.email,
+                        },
+                    },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        email: dto.email,
+                        role: dto.role,
+                        siteIds,
+                        tokenHash: hashInviteToken(token),
+                        invitedByUserId: ctx.userId,
+                        expiresAt,
+                    },
+                    update: {
+                        role: dto.role,
+                        siteIds,
+                        tokenHash: hashInviteToken(token),
+                        invitedByUserId: ctx.userId,
+                        expiresAt,
+                        status: "PENDING",
+                        acceptedAt: null,
+                    },
+                    select: {
+                        id: true,
+                        email: true,
+                        role: true,
+                        expiresAt: true,
+                    },
+                }),
+            {
+                addingIn: async (tx) =>
+                    (await tx.organizationInvitation.count({
+                        where: {
+                            organizationId: ctx.organizationId,
+                            email: dto.email,
+                            status: "PENDING",
+                            expiresAt: { gt: new Date() },
+                        },
+                    })) > 0
+                        ? 0
+                        : 1,
             },
-            create: {
-                organizationId: ctx.organizationId,
-                email: dto.email,
-                role: dto.role,
-                siteIds,
-                tokenHash: hashInviteToken(token),
-                invitedByUserId: ctx.userId,
-                expiresAt,
-            },
-            update: {
-                role: dto.role,
-                siteIds,
-                tokenHash: hashInviteToken(token),
-                invitedByUserId: ctx.userId,
-                expiresAt,
-                status: "PENDING",
-                acceptedAt: null,
-            },
-            select: { id: true, email: true, role: true, expiresAt: true },
-        });
+        );
 
         const organization = await prisma.organization.findUnique({
             where: { id: ctx.organizationId },

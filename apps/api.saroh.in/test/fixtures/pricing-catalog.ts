@@ -225,3 +225,84 @@ export function fakeLegacyMappedCatalog(edit?: (c: Catalog) => void): Catalog {
     }
     return c;
 }
+
+/**
+ * A made-up catalogue with every row metering counts or locks (plans
+ * catalogue U13), on the plan ids legacy keys map to (`free`, `grow`,
+ * `pro`). Names, prices and caps are fake and small, so a spec reaches
+ * them in a few writes:
+ *
+ * - `products`: 3 / 5 / no cap; `blog`: 2 / 4 / no cap;
+ *   `members`: 2 / 4 / no cap; `integrations`: 1 / 2 / no cap.
+ * - `orders` and `bookings`: 2 a month on `free`, no cap above it.
+ * - `roles` and `themes`: hidden on `free` and `grow`, on for `pro`;
+ *   `review`: locked on `free`, on above it.
+ */
+export function fakeMeteredCatalog(edit?: (c: Catalog) => void): Catalog {
+    const capped = (
+        id: string,
+        name: string,
+        caps: [number | null, number | null, number | null],
+        per: "" | "month" = "",
+    ) => ({
+        id,
+        name,
+        group: "g",
+        cells: Object.fromEntries(
+            (["free", "grow", "pro"] as const).map((plan, i) => {
+                const limit = caps[i];
+                return [
+                    plan,
+                    limit === null
+                        ? { inc: true, text: "No cap" }
+                        : { inc: true, text: String(limit), limit, per },
+                ];
+            }),
+        ),
+    });
+    const switched = (
+        id: string,
+        name: string,
+        off: "locked" | "hidden",
+        onFrom: "grow" | "pro",
+    ) => ({
+        id,
+        name,
+        group: "g",
+        cells: {
+            free: { inc: false, off },
+            grow:
+                onFrom === "grow"
+                    ? { inc: true, text: "Included" }
+                    : { inc: false, off },
+            pro: { inc: true, text: "Included" },
+        },
+    });
+    const c = parseCatalog({
+        plans: [
+            { id: "free", name: "Plan A", pricePaise: 0 },
+            { id: "grow", name: "Plan B", pricePaise: 22_200, featured: true },
+            { id: "pro", name: "Plan C", pricePaise: 33_300 },
+        ],
+        groups: [{ id: "g", name: "Group" }],
+        modules: [
+            capped("products", "Things", [3, 5, null]),
+            capped("orders", "Orders", [2, null, null], "month"),
+            capped("bookings", "Visits", [2, null, null], "month"),
+            capped("blog", "Posts", [2, 4, null]),
+            capped("members", "People", [2, 4, null]),
+            capped("integrations", "Links", [1, 2, null]),
+            switched("roles", "Own roles", "hidden", "pro"),
+            switched("themes", "Looks", "hidden", "pro"),
+            switched("review", "Second look", "locked", "grow"),
+        ],
+        yearly: { on: false, paid: 10 },
+        gst: { show: "excl" },
+        addons: [],
+    });
+    if (edit) {
+        edit(c);
+        return parseCatalog(c);
+    }
+    return c;
+}

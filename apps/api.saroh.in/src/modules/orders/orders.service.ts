@@ -10,6 +10,7 @@ import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
+import { planMeter } from "../billing/metering.service";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
 import { assertBusinessDetails } from "../invoices/business-details";
@@ -358,6 +359,10 @@ export class OrdersService {
             try {
                 const created = await prisma.$transaction(
                     async (tx) => {
+                        // The plan's monthly orders cap (U13): an order
+                        // taken by hand is refused at it, before anything
+                        // is written. The site's checkout never is (OQ-8).
+                        await planMeter.roomInTx(tx, numberingOrg, "orders");
                         // Found or made in this transaction: an order that
                         // fails leaves no customer behind (B13).
                         const party = await orderPartyInTx(tx, {

@@ -1,13 +1,19 @@
+import type { OnModuleInit } from "@nestjs/common";
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { AuditModule } from "../audit/audit.module";
+import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
+import { JobHandlerRegistry } from "../jobs/job-handler.registry";
+import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import { EntitlementService } from "./entitlement.service";
+import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
+import { PlanLimitNoticeHandler } from "./plan-limit-notice.handler";
 import { PlansService } from "./plans.service";
 import { billingProviderFactoryProvider } from "./providers/provider.factory";
 import { SubscriptionsService } from "./subscriptions.service";
@@ -28,19 +34,28 @@ import { SubscriptionsService } from "./subscriptions.service";
  * {@link EntitlementService} is exported for other modules to call before
  * creating a limited resource (a site/member/etc.); it and
  * `GET …/billing/access` read {@link CatalogueAccessService} (plans catalogue
- * U12), exported for metering (U13).
+ * U12), exported for metering (U13). {@link MeteringService} counts and
+ * enforces the catalogue's limits behind `PLAN_ENFORCEMENT` (U13), and
+ * {@link PlanLimitNoticeHandler} tells a business it is near or at one.
  *
  * NOTE: this module is intentionally NOT self-registering — the app owner wires
  * it into `AppModule`.
  */
 @Module({
-    imports: [AuditModule, forwardRef(() => OrganizationsModule)],
+    imports: [
+        AuditModule,
+        FeatureFlagModule,
+        JobsModule,
+        forwardRef(() => OrganizationsModule),
+    ],
     controllers: [PlansController, BillingController, BillingWebhookController],
     providers: [
         PlansService,
         SubscriptionsService,
         CatalogueAccessService,
         EntitlementService,
+        MeteringService,
+        PlanLimitNoticeHandler,
         BillingWebhookService,
         billingProviderFactoryProvider,
         OrganizationGuard,
@@ -48,8 +63,18 @@ import { SubscriptionsService } from "./subscriptions.service";
     exports: [
         CatalogueAccessService,
         EntitlementService,
+        MeteringService,
         SubscriptionsService,
         PlansService,
     ],
 })
-export class BillingModule {}
+export class BillingModule implements OnModuleInit {
+    constructor(
+        private readonly registry: JobHandlerRegistry,
+        private readonly limitNotice: PlanLimitNoticeHandler,
+    ) {}
+
+    onModuleInit(): void {
+        this.registry.register(PLAN_LIMIT_NOTICE_TYPE, this.limitNotice.handle);
+    }
+}

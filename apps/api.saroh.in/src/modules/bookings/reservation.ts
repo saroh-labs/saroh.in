@@ -8,6 +8,8 @@ import { Prisma, prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { ActivationEvents } from "../analytics/activation-events";
+import { planMeter } from "../billing/metering.service";
+import { bookingsPaused } from "../billing/plan-limit-errors";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
@@ -393,6 +395,15 @@ export async function reserveInTx(
     const organizationId = service.organizationId;
     const email = input.bookerEmail.trim().toLowerCase();
     const snapshot = buildSnapshot(service, input, startAt, endAt);
+    // The plan's monthly bookings cap (U13), before anything is written. A
+    // course's sessions are the course's (COURSES), not counted here. The
+    // booking page is told only that the business isn't taking bookings
+    // online, and nothing is paid yet (a pay-now hold is made below).
+    if (!course) {
+        await planMeter.roomInTx(tx, organizationId, "bookings", {
+            refuse: by.actorUserId === null ? bookingsPaused : undefined,
+        });
+    }
     // The free-cancel deadline, fixed now from today's rule (E8, DEC-051):
     // no later move changes it.
     const freeCancelUntil = freeCancelDeadline(

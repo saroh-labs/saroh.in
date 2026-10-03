@@ -14,6 +14,7 @@ import type {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { authorize } from "../organizations/organization-policy";
 import { encryptSecret } from "../payments/crypto";
@@ -204,32 +205,51 @@ export class CommunicationsService {
         // persisted or logged.
         const sealed = encryptSecret(JSON.stringify(credentials));
 
-        const row = await prisma.communicationProvider.upsert({
-            where: {
-                organizationId_channel: {
-                    organizationId: ctx.organizationId,
-                    channel,
-                },
+        // The plan's integrations cap (U13): a new connection is checked;
+        // changing the keys of a connected one adds nothing.
+        const row = await planMeter.withRoom(
+            ctx.organizationId,
+            "integrations",
+            (tx) =>
+                tx.communicationProvider.upsert({
+                    where: {
+                        organizationId_channel: {
+                            organizationId: ctx.organizationId,
+                            channel,
+                        },
+                    },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        channel,
+                        provider,
+                        status: "CONNECTED",
+                        fromAddress: input.fromAddress ?? null,
+                        encryptedCredentials: sealed.ciphertext,
+                        credentialsIv: sealed.iv,
+                        credentialsAuthTag: sealed.authTag,
+                    },
+                    update: {
+                        provider,
+                        status: "CONNECTED",
+                        fromAddress: input.fromAddress ?? null,
+                        encryptedCredentials: sealed.ciphertext,
+                        credentialsIv: sealed.iv,
+                        credentialsAuthTag: sealed.authTag,
+                    },
+                }),
+            {
+                addingIn: async (tx) =>
+                    (await tx.communicationProvider.count({
+                        where: {
+                            organizationId: ctx.organizationId,
+                            channel,
+                            status: "CONNECTED",
+                        },
+                    })) > 0
+                        ? 0
+                        : 1,
             },
-            create: {
-                organizationId: ctx.organizationId,
-                channel,
-                provider,
-                status: "CONNECTED",
-                fromAddress: input.fromAddress ?? null,
-                encryptedCredentials: sealed.ciphertext,
-                credentialsIv: sealed.iv,
-                credentialsAuthTag: sealed.authTag,
-            },
-            update: {
-                provider,
-                status: "CONNECTED",
-                fromAddress: input.fromAddress ?? null,
-                encryptedCredentials: sealed.ciphertext,
-                credentialsIv: sealed.iv,
-                credentialsAuthTag: sealed.authTag,
-            },
-        });
+        );
 
         return redact(row);
     }

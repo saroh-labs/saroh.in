@@ -7,6 +7,7 @@ import {
     AuditOutcome,
     auditMetadata,
 } from "../audit/audit.service";
+import { planMeter } from "../billing/metering.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 
@@ -99,6 +100,9 @@ export async function setPublishNeedsApproval(
         select: { publishNeedsApproval: true },
     });
     if (site.publishNeedsApproval === on) return;
+    // Reviewing changes before they go live is a plan row (U13): turning it
+    // on is refused where the plan leaves it off; turning it off never is.
+    if (on) await planMeter.assertIncluded(ctx.organizationId, "review");
     if (on && !(await testReleasesOn(ctx.organizationId))) {
         throw new ConflictException({
             message: APPROVAL_SETTING_UNAVAILABLE_MESSAGE,

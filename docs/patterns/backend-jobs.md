@@ -58,8 +58,23 @@
   timestamp-without-timezone (`DEV_LEARNINGS.md`).
 - **Current** — **Payloads carry ids, not data;** the handler re-reads current
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
-- **Adopted** — **Advisory locks have a registry.** None are in use; add the
-  registry to this file before the first one.
+- **Current** — **Advisory locks have a registry** (below). A new
+  `pg_advisory_xact_lock` adds its row in the same change.
+
+### Advisory lock registry — **Current**
+
+Each is a transaction lock on `hashtext(<key>)`, held until the
+transaction ends. Take it before the transaction's row locks, so it never
+waits while holding one.
+
+| Key                                       | Serialises                                                | Where                                            |
+| ----------------------------------------- | --------------------------------------------------------- | ------------------------------------------------ |
+| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person            | `class-packs/first-pack.ts`                      |
+| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business         | `subscriptions/plans.ts` (`lockPlanNames`)       |
+| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…) | `billing/metering.service.ts` (`lockMeter`, U13) |
+
+Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
+(`test/lock-wait.ts`).
 
 ### Know what the warnings mean — **Current**
 
@@ -183,6 +198,23 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   whatever they chose.
 - A queued job still runs with `SITE_TEST_RELEASES` off (KTD-16): it is a
   go-live the merchant was told would happen.
+
+## Plan limit notices — **Current** (plans catalogue U13)
+
+- **`plan.limit.notice`** tells a business it has used 80% of a plan
+  limit, reached it, or (the site's checkout, a soft cap) gone past it.
+  A metered write queues it on its own transaction only when it crosses
+  one of those lines (`MeteringService.roomInTx`, `crossesNotice`), so a
+  write under 80% queues nothing. Payload: `{ organizationId, moduleId }`.
+- **Re-read, then decide** (`billing/plan-limit-notice.handler.ts`): with
+  `PLAN_ENFORCEMENT` off since, the row uncapped or off, or the count back
+  under 80%, it says nothing. Otherwise it counts again and words the
+  notice with `limitNotice` (`@saroh/pricing-catalog`).
+- **Once per row, level, limit and window**, claimed as a `CustomerNotice`
+  (`PLAN_LIMIT`, `plan-limit:<row>:<warn|full|over>:<limit>:<month|all>`)
+  before the inbox row (`plan.limit`, owners and admins) is written; a
+  monthly limit's window is the month in the business's zone, so next
+  month warns again.
 
 ## Pricing catalogue — **Current** (plans catalogue U4)
 

@@ -12,6 +12,7 @@ import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
@@ -457,30 +458,49 @@ export class PaymentsService {
             }),
         );
 
-        const row = await prisma.merchantPaymentProvider.upsert({
-            where: {
-                organizationId_provider: {
-                    organizationId: ctx.organizationId,
-                    provider,
-                },
+        // The plan's integrations cap (U13): a new connection is checked;
+        // changing the keys of a connected one adds nothing.
+        const row = await planMeter.withRoom(
+            ctx.organizationId,
+            "integrations",
+            (tx) =>
+                tx.merchantPaymentProvider.upsert({
+                    where: {
+                        organizationId_provider: {
+                            organizationId: ctx.organizationId,
+                            provider,
+                        },
+                    },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        provider,
+                        status: "CONNECTED",
+                        publicKey,
+                        encryptedCredentials: sealed.ciphertext,
+                        credentialsIv: sealed.iv,
+                        credentialsAuthTag: sealed.authTag,
+                    },
+                    update: {
+                        status: "CONNECTED",
+                        publicKey,
+                        encryptedCredentials: sealed.ciphertext,
+                        credentialsIv: sealed.iv,
+                        credentialsAuthTag: sealed.authTag,
+                    },
+                }),
+            {
+                addingIn: async (tx) =>
+                    (await tx.merchantPaymentProvider.count({
+                        where: {
+                            organizationId: ctx.organizationId,
+                            provider,
+                            status: "CONNECTED",
+                        },
+                    })) > 0
+                        ? 0
+                        : 1,
             },
-            create: {
-                organizationId: ctx.organizationId,
-                provider,
-                status: "CONNECTED",
-                publicKey,
-                encryptedCredentials: sealed.ciphertext,
-                credentialsIv: sealed.iv,
-                credentialsAuthTag: sealed.authTag,
-            },
-            update: {
-                status: "CONNECTED",
-                publicKey,
-                encryptedCredentials: sealed.ciphertext,
-                credentialsIv: sealed.iv,
-                credentialsAuthTag: sealed.authTag,
-            },
-        });
+        );
 
         return redact(row);
     }

@@ -97,9 +97,12 @@ export const FlagKey = {
     /**
      * The plans catalogue's kill switch (OQ-4): on, a module the business's
      * plan doesn't include is unavailable (module availability's plan gate,
-     * U12) and, once U13 lands, the catalogue's limits are enforced. Off,
-     * the catalogue still answers every read (`GET …/billing/access`, the
-     * limits `EntitlementService` has always enforced) but locks nothing new.
+     * U12), and the catalogue's limits and locks are enforced and its limit
+     * notices sent (`MeteringService`, U13). Off, the catalogue still
+     * answers every read (`GET …/billing/access` with its usage, the limits
+     * `EntitlementService` has always enforced) but locks nothing new.
+     * Readers: module availability, `MeteringService` (every metered write
+     * and switch) and the `plan.limit.notice` handler.
      */
     PLAN_ENFORCEMENT: "PLAN_ENFORCEMENT",
 } as const;
