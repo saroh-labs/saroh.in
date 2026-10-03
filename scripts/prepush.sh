@@ -154,6 +154,10 @@ record() {
     [ -n "$TREE" ] && date +%s >"$PASSES/$TREE-$1"; return 0
 }
 say() { printf '=== %-16s %s\n' "$1" "$2"; }
+# A step that ran but could not check anything (the registry was unreachable)
+# writes why to $STEP_SKIP and returns 0; `step` then says SKIP with that
+# reason instead of PASS, and doesn't record a pass.
+STEP_SKIP="$W/step.skip"
 # step <name> <command…>: runs it unless this tree already passed it. A full
 # pass of a step counts for its changed-only form ("vitest" for
 # "vitest:changed").
@@ -162,8 +166,13 @@ step() {
     if cached "$name" "${name%:changed}"; then say "$name" "PASS (cached)"; return 0; fi
     printf '=== %-16s ' "$name"
     s=$(date +%s)
+    rm -f "$STEP_SKIP"
     if "$@" >"$LOG" 2>&1; then
-        echo "PASS ($(( $(date +%s) - s ))s)"; record "$name"
+        if [ -s "$STEP_SKIP" ]; then
+            echo "SKIP — $(cat "$STEP_SKIP") ($(( $(date +%s) - s ))s)"
+        else
+            echo "PASS ($(( $(date +%s) - s ))s)"; record "$name"
+        fi
     else
         echo "FAIL ($(( $(date +%s) - s ))s)"; tail -40 "$LOG"; FAILED="$FAILED $name"
     fi
@@ -695,19 +704,47 @@ else
 fi
 
 # CI's dependency audit (critical only), the same rule: a critical advisory
-# fails; an unreachable registry is a warning. Never cached, because a new
-# advisory fails a tree that passed yesterday (#771, Next.js next/og RCE).
+# fails; an unreachable registry is a SKIP, which CI runs again. Never cached,
+# because a new advisory fails a tree that passed yesterday (#771, Next.js
+# next/og RCE).
+#
+# What counts as unreachable: the socket and DNS errors, pnpm's own fetch and
+# bad-response codes, and "offline". Anything else is a real failure, and its
+# reason is printed: the advisory table's lines, else the output's last 20.
+AUDIT_NET_ERRORS='ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|FetchError|ERR_PNPM_FETCH_5|ERR_PNPM_AUDIT_BAD_RESPONSE|offline'
+# One attempt, bounded: `timeout 60` where there is one (gtimeout from
+# coreutils on a Mac), else pnpm's own fetch timeout and one quick retry.
+# PREPUSH_AUDIT_REGISTRY points it elsewhere, to try the offline path by hand.
+audit_once() {
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 60 pnpm audit --audit-level critical ${PREPUSH_AUDIT_REGISTRY:+--registry "$PREPUSH_AUDIT_REGISTRY"}
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout 60 pnpm audit --audit-level critical ${PREPUSH_AUDIT_REGISTRY:+--registry "$PREPUSH_AUDIT_REGISTRY"}
+    else
+        npm_config_fetch_timeout=20000 npm_config_fetch_retries=1 \
+            npm_config_fetch_retry_mintimeout=2000 npm_config_fetch_retry_maxtimeout=5000 \
+            pnpm audit --audit-level critical ${PREPUSH_AUDIT_REGISTRY:+--registry "$PREPUSH_AUDIT_REGISTRY"}
+    fi
+}
 audit_critical() {
-    local out attempt
+    local out rc attempt lines
     for attempt in 1 2 3; do
-        if out=$(pnpm audit --audit-level critical 2>&1); then return 0; fi
-        if ! printf '%s' "$out" | grep -qE 'ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND|FetchError'; then
-            printf '%s\n' "$out" | grep -E '│ (critical|Package|Vulnerable|Patched)|More info|Severity'
+        out=$(audit_once 2>&1) && return 0
+        rc=$?
+        # 124: the attempt ran out its 60s, which is the registry not answering.
+        if [ "$rc" != 124 ] && ! printf '%s' "$out" | grep -qiE "$AUDIT_NET_ERRORS"; then
+            lines=$(printf '%s\n' "$out" | grep -E '│ (critical|Package|Vulnerable|Patched)|More info|Severity')
+            if [ -n "$lines" ]; then
+                printf '%s\n' "$lines"
+            else
+                printf '%s\n' "$out" | tail -20
+            fi
             return 1
         fi
-        sleep 10
+        echo "audit: registry unreachable (attempt $attempt of 3, exit $rc)"
+        [ "$attempt" -lt 3 ] && sleep 3
     done
-    echo "audit: registry unreachable; CI will run it"
+    echo "registry unreachable; CI will run it" >"$STEP_SKIP"
     return 0
 }
 step audit audit_critical
