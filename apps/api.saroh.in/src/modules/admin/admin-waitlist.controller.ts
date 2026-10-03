@@ -1,4 +1,4 @@
-import { Body, Get, Post, Query } from "@nestjs/common";
+import { Body, Get, Param, Post, Query } from "@nestjs/common";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
@@ -7,12 +7,13 @@ import { IdempotencyService } from "../../common/idempotency/idempotency.service
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 import { AdminWaitlistService } from "./admin-waitlist.service";
-import { InviteWaitlistDto, ListWaitlistDto } from "./dto";
+import { DeleteWaitlistDto, InviteWaitlistDto, ListWaitlistDto } from "./dto";
 
 /**
- * The waitlist (admin console U11). A signup is an email address and
- * nothing else, so every route needs personal-data read; inviting needs its
- * own permission. The public signup (`POST /waitlist`) is unchanged.
+ * The waitlist (admin console U11; marketing U30). An entry is personal data
+ * (an email, a business, a city), so every route needs `waitlist:read`;
+ * inviting and removing someone need `waitlist:invite` too. The public
+ * signup is `POST /public/waitlist`.
  */
 @AdminRoutes()
 export class AdminWaitlistController {
@@ -22,20 +23,20 @@ export class AdminWaitlistController {
     ) {}
 
     @Get("waitlist/summary")
-    @RequireAdminPermission(AdminPermission.OrganizationPiiRead)
-    summary() {
+    @RequireAdminPermission(AdminPermission.WaitlistRead)
+    waitlistSummary() {
         return this.waitlist.summary();
     }
 
     @Get("waitlist")
-    @RequireAdminPermission(AdminPermission.OrganizationPiiRead)
-    list(@Query() query: ListWaitlistDto) {
+    @RequireAdminPermission(AdminPermission.WaitlistRead)
+    listWaitlist(@Query() query: ListWaitlistDto) {
         return this.waitlist.list(query);
     }
 
     @Post("waitlist/invite")
     @RequireAdminPermission(
-        AdminPermission.OrganizationPiiRead,
+        AdminPermission.WaitlistRead,
         AdminPermission.WaitlistInvite,
     )
     invite(
@@ -50,6 +51,28 @@ export class AdminWaitlistController {
             },
             { ids: [...dto.ids].sort(), reason: dto.reason },
             () => this.waitlist.invite(staff, dto.ids, dto.reason),
+        );
+    }
+
+    /** Remove one entry when its owner asks (plan KTD-17). */
+    @Post("waitlist/:id/remove")
+    @RequireAdminPermission(
+        AdminPermission.WaitlistRead,
+        AdminPermission.WaitlistInvite,
+    )
+    removeFromWaitlist(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("id") id: string,
+        @Body() dto: DeleteWaitlistDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.waitlist.remove",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { id, reason: dto.reason },
+            () => this.waitlist.remove(staff, id, dto.reason),
         );
     }
 }

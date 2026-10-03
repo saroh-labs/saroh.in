@@ -1,14 +1,44 @@
 /*
  * The marketing site's canvas, from "Saroh Marketing Site": a shade darker
  * than the product's Paper, so the lighter bands and white cards read as
- * sections rather than as more of the same page. Dark mode keeps the
- * product's own ground, where bands sit on the raised card colour instead.
+ * sections rather than as more of the same page.
+ *
+ * The site is light only (owner, 2026-10-03): no dark theme, no
+ * `prefers-color-scheme`, no toggle. `color-scheme: light` keeps form controls
+ * and scrollbars light whatever the visitor's system asks for.
  */
 :root {
-    --marketing-canvas: 42 23% 89%; /* #E9E5DC */
-}
-.dark {
-    --marketing-canvas: var(--background);
+    color-scheme: light;
+
+    /*
+     * Marketing Site V2 values the ADR-005 tokens do not already hold (plan
+     * KTD-14). Paper, Ink, Saffron 500/700, Ink 500 and the two lines map onto
+     * `background`, `foreground`, `brand-500`, `brand-700`, `muted-foreground`,
+     * `border` and `border-strong`; only what is left lives here, as
+     * Tailwind's `mk-*` colours (tailwind.config.ts).
+     */
+    --mk-body: 40 7.2% 24.5%; /* #43403A — running copy */
+    --mk-hover: 41.5 24.5% 89.6%; /* #EBE7DE — ghost control hover */
+    --mk-ink-hover: 42.9 6.4% 21.4%; /* #3A3833 — Ink button hover */
+    --mk-line-soft: 42.9 20.6% 86.7%; /* #E4E0D6 — cards on the menu sheet */
+    --mk-saffron: 38.4 86.8% 55.5%; /* #F0A92B — the button on dark bands */
+    --mk-saffron-hover: 38.9 89.4% 63.1%; /* #F5BA4D */
+    --mk-on-ink: 42.4 18.3% 81.8%; /* #D9D4C8 — copy on an Ink band */
+    --mk-on-ink-muted: 41.2 10.1% 69%; /* #B8B3A8 — notes on an Ink band */
+    --mk-on-ink-line: 40 7% 33.7%; /* #5C5850 — outline button on Ink */
+    --mk-on-ink-hover: 40 7% 16.9%; /* #2E2C28 */
+    --mk-on-ink-accent: 38 81% 69%; /* #F0C170 — a plan's fit line on Ink */
+    --mk-tint: 40 72.4% 94.3%; /* #FBF4E6 — the highlighted plan's column */
+    --mk-soon: 40.5 90.2% 92%; /* #FDF1D8 — the "Coming soon" pill */
+    --mk-line-row: 42 23.8% 91.8%; /* #EFECE5 — rules between table rows */
+
+    /* The design's three shadows: cards on hover, screenshots, the hero. */
+    --mk-shadow-card: 0 10px 30px rgba(28, 28, 26, 0.08);
+    --mk-shadow-shot: 0 18px 50px rgba(28, 28, 26, 0.14);
+    --mk-shadow-hero: 0 30px 80px rgba(28, 28, 26, 0.22);
+    --mk-shadow-menu: 0 24px 60px rgba(28, 28, 26, 0.16);
+    --mk-shadow-zoom: 0 30px 80px rgba(0, 0, 0, 0.4);
+    --mk-scrim: rgba(28, 28, 26, 0.82); /* behind an enlarged screenshot */
 }
 
 /*
