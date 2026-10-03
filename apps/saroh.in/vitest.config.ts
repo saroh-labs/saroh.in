@@ -21,6 +21,7 @@ export default defineConfig({
             "content/**/*.test.ts",
             "lib/**/*.test.ts",
             "components/**/*.test.tsx",
+            "app/**/*.test.tsx",
         ],
     },
 });

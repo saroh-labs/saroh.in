@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -186,9 +187,15 @@ function Accordion({
                 )}
             >
                 {label}
-                <span aria-hidden className="text-xs">
-                    {open ? "▴" : "▾"}
-                </span>
+                <ChevronDown
+                    aria-hidden
+                    data-chevron
+                    strokeWidth={2.25}
+                    className={cn(
+                        "size-[18px] text-muted-foreground transition-transform duration-fast ease-out motion-reduce:transition-none",
+                        open && "rotate-180",
+                    )}
+                />
             </button>
             {open ? (
                 <div id={`nav-sheet-${id}`} className="grid gap-0.5 pb-2">
