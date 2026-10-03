@@ -19,6 +19,7 @@ import {
     emailFor,
     hashPassword,
     id,
+    linkSeededPayers,
     publishSeedPost,
     syncStorefrontFulfilmentTypes,
     utcDay,
@@ -224,6 +225,15 @@ export async function seedShowcase(
     for (const b of businesses) {
         await alignOrderNumberSequence(prisma, b.id);
     }
+    // Every paying customer gets a contact, as a payment would give them,
+    // so the Customers list shows them (C2).
+    // Rye & Co. and Kavi Dental link their own (their films count them).
+    await linkSeededPayers(
+        prisma,
+        businesses
+            .map((b) => b.id)
+            .filter((id) => id !== RYE.orgId && id !== KAVI.orgId),
+    );
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);

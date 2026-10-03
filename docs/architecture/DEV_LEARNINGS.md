@@ -2405,3 +2405,27 @@ starts with https://`, `That isn't an address a photo can load from`), with
 action uses, never a second rule that should agree with it; and an action
 that refuses says so (`frontend-error-feedback.md`).
 **Category**: products · forms · feedback
+
+## Seed — the Customers list stood empty for every seeded business
+
+**Problem**: Sell → Customers read "0 customers" on Northwind and Leela &
+Loom, with "292 (84) paying customers aren't linked to a contact yet", and
+Review said none of them had a contact to link to. Found while filming the
+demo videos.
+**Root cause**: The Customers list is keyed on the contact (C2, DEC-041). A
+real business gets one per paying customer from the payment path
+(`ensureContactForPaidOrder`) or, for older data, the one-off backfill. The
+seed writes paid orders straight to the database, so neither ran; only the
+bakery and the clinic, which link a few customers by hand, had any.
+**Fix**: `linkSeededPayers` (`packages/database/src/seed/helpers.ts`) runs
+the one rule, `linkPayingCustomer`, for every seeded customer with a paid
+order, at the end of the base seed and the showcase. The rule takes optional
+fixed ids and a time, so what it makes carries the seed prefix (exact
+teardown) and dates to the first payment. A re-run relinks the seed's own
+contacts, since re-seeding a business re-creates its customers and their
+links go with them. Rye & Co. and Kavi Dental keep their hand-written links
+and their one possible match.
+**Rule**: Seed data that skips an API path (a payment, a booking) also skips
+what that path makes on the side. Run the same rule from the seed, with
+seed ids. `checkBoutique` now fails if a paying customer has no contact.
+**Category**: seed · customers · `packages/database/src/seed/helpers.ts`
