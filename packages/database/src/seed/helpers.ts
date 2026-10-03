@@ -6,6 +6,10 @@ import {
     describeHeldStockMismatches,
     heldStockMismatches,
 } from "../backfill/held-stock";
+import {
+    linkPayingCustomer,
+    normaliseBackfillEmail,
+} from "../backfill/paying-customer-contacts";
 import type { SeedSection, SeedSite } from "./data";
 import { SEED_PREFIX, SEEDED_STYLE_VARIABLES } from "./data";
 
@@ -776,4 +780,101 @@ export async function syncStorefrontFulfilmentTypes(
             SELECT st."id" FROM "Store" st
             WHERE st."organizationId" = ANY(${scope}::text[])
         )`;
+}
+
+/**
+ * A contact for every seeded customer who has paid (C2, DEC-041), as the
+ * payment path makes one in a real business.
+ *
+ * The seed writes paid orders straight to the database, so nothing it made
+ * passed through `ensureContactForPaidOrder`, and the business-wide
+ * Customers list (keyed on the contact) stood empty with "N paying
+ * customers aren't linked to a contact yet" — for every seeded business
+ * whose fixtures did not link by hand. This runs the one rule
+ * (`linkPayingCustomer`) for each seeded customer with a paid order, with
+ * seed ids and the time of their first payment. A customer the fixtures
+ * linked already is left alone, and one whose email a contact already
+ * holds stays a suggestion, as the rule says. A business whose fixtures
+ * write their own links (the bakery, the clinic) is not passed in: their
+ * films count exactly the links and the one possible match they set.
+ *
+ * Returns how many contacts it made. Run again, it makes none.
+ */
+export async function linkSeededPayers(
+    prisma: Db,
+    organizationIds: readonly string[],
+): Promise<number> {
+    // By the order's store: the base seed's orders leave `organizationId`
+    // unset, and the store always names the business.
+    const paid = await prisma.order.findMany({
+        where: {
+            store: { organizationId: { in: [...organizationIds] } },
+            paymentStatus: { in: ["PAID", "REFUNDED"] },
+            customerId: { startsWith: SEED_PREFIX },
+        },
+        select: {
+            customerId: true,
+            createdAt: true,
+            store: { select: { organizationId: true } },
+        },
+        orderBy: { createdAt: "asc" },
+    });
+    const first = new Map<string, { organizationId: string; at: Date }>();
+    for (const order of paid) {
+        if (!order.customerId || first.has(order.customerId)) continue;
+        first.set(order.customerId, {
+            organizationId: order.store.organizationId,
+            at: order.createdAt,
+        });
+    }
+    // A run before this one made these contacts; re-seeding a business
+    // re-creates its customers, and their links go with them. The seed's
+    // own contact is relinked to its own customer, not left as a stranger
+    // holding the email (which the rule would make a suggestion).
+    const ours = new Set(
+        (
+            await prisma.contact.findMany({
+                where: {
+                    organizationId: { in: [...organizationIds] },
+                    id: { startsWith: id("payer", "") },
+                },
+                select: { id: true },
+            })
+        ).map((c) => c.id),
+    );
+    let made = 0;
+    for (const [customerId, { organizationId, at }] of Array.from(first)) {
+        const tail = customerId.slice(SEED_PREFIX.length);
+        const fixed = {
+            contactId: id("payer", tail),
+            linkId: id("payer_link", tail),
+            at,
+        };
+        if (ours.has(fixed.contactId)) {
+            await prisma.customerIdentityLink.createMany({
+                data: [
+                    {
+                        id: fixed.linkId,
+                        organizationId,
+                        contactId: fixed.contactId,
+                        customerId,
+                        reason: "PAYMENT",
+                        createdAt: at,
+                    },
+                ],
+                skipDuplicates: true,
+            });
+            continue;
+        }
+        const outcome = await prisma.$transaction((tx) =>
+            linkPayingCustomer(
+                tx,
+                { organizationId, customerId, reason: "PAYMENT" },
+                normaliseBackfillEmail,
+                fixed,
+            ),
+        );
+        if (outcome === "made") made += 1;
+    }
+    return made;
 }

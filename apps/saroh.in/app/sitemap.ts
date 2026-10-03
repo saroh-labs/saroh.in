@@ -1,18 +1,16 @@
 import type { MetadataRoute } from "next";
 
-import { JOBS } from "@/lib/site-content";
+import { LAUNCH_MODE } from "@/lib/links";
+import { SITE_URL } from "@/lib/seo";
+import { indexedPaths } from "@/lib/site-pages";
 
-const SITE = "https://www.saroh.in";
-
-/** The marketing pages: home, how it works, coming soon, one per job. */
+/**
+ * Every page worth indexing (plan U26, `lib/site-pages.ts`).
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
-    return [
-        { url: `${SITE}/`, changeFrequency: "weekly", priority: 1 },
-        { url: `${SITE}/how-it-works`, changeFrequency: "monthly" },
-        { url: `${SITE}/coming-soon`, changeFrequency: "monthly" },
-        ...JOBS.map((job) => ({
-            url: `${SITE}/${job.key}`,
-            changeFrequency: "monthly" as const,
-        })),
-    ];
+    return indexedPaths(LAUNCH_MODE).map((path) => ({
+        url: `${SITE_URL}${path}`,
+        changeFrequency: path === "/" ? "weekly" : "monthly",
+        priority: path === "/" ? 1 : 0.7,
+    }));
 }

@@ -486,6 +486,9 @@ jobs:
       BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://localhost:3003,http://localhost:3333
       APP_URL: http://localhost:3003
       NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+      # Where accounts sends a new account (onboarding); unset, the production
+      # build falls back to https://app.saroh.in.
+      NEXT_PUBLIC_APP_URL: http://localhost:3003
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
       NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
@@ -504,6 +507,8 @@ jobs:
       # The site-review flow takes the token out of that address and opens it
       # against this origin instead.
       E2E_RENDERER_URL: http://localhost:3005
+      # The marketing site, saroh.in (`web`), for marketing.spec.ts (plan U29).
+      E2E_WEB_URL: http://localhost:3002
       # The API's links to the renderer (pay links, DEC-069 L6): this
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.
@@ -595,13 +600,13 @@ jobs:
         run: >-
           pnpm turbo run db:seed:showcase build --log-order=grouped
           --filter=@saroh/database --filter=@saroh/api --filter=auth
-          --filter=application --filter=sites
+          --filter=application --filter=sites --filter=web
       - name: Build the apps under test (the database came from the dump)
         if: steps.seed-dump.outputs.cache-hit == 'true'
         run: >-
           pnpm turbo run build --log-order=grouped
           --filter=@saroh/database --filter=@saroh/api --filter=auth
-          --filter=application --filter=sites
+          --filter=application --filter=sites --filter=web
       # Before the stack starts: the specs write to it.
       - name: Dump the seeded database for the next run
         if: steps.seed-dump.outputs.cache-hit != 'true'
@@ -630,6 +635,8 @@ jobs:
           # The renderer: a shared preview link is served by THIS app, on the
           # renderer's own origin, and the not-live bar is its markup.
           pnpm --filter sites exec next start -p 3005 > /tmp/renderer.log 2>&1 &
+          # The marketing site: its waitlist forwards to this stack's API.
+          API_URL=http://localhost:3333 pnpm --filter web exec next start -p 3002 > /tmp/web.log 2>&1 &
 
           wait_for() {
             name="$1"
@@ -666,6 +673,7 @@ jobs:
           wait_for accounts http://localhost:3000/login
           wait_for app http://localhost:3003/
           wait_for renderer http://localhost:3005/preview/not-a-token '200 307 404'
+          wait_for web http://localhost:3002/ '200'
 
       - name: Upload the servers' logs
         if: failure()

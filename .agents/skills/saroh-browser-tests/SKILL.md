@@ -134,6 +134,9 @@ changes reach; CI runs them all.
   `${SITE}/shop` is `site:/shop`. A list key covers its dynamic children
   (`app:/customers` covers `/customers/[id]`) but not a static sibling, so a
   spec on `/billing/plans/new` names that route too.
+- `web:/<route>`: a route of the marketing site, saroh.in. A run that
+  picks a `web:` spec also builds and starts that site (on 3002, at
+  `E2E_WEB_URL`; `marketing.spec.ts`).
 - `api:<module>`: each module behind a screen it drives or an endpoint it
   calls, by folder under `apps/api.saroh.in/src/modules`.
 - `pkg:<package>`: a shared package it renders, such as `pkg:site-blocks`

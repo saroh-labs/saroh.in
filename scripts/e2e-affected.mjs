@@ -14,12 +14,14 @@
  *   site:/<route>      a route of the merchant-site renderer, saroh.app
  *                      (the `[domain]` segment dropped: `site:/shop`)
  *   accounts:/<route>  a route of accounts.saroh.in
+ *   web:/<route>       a route of the marketing site, saroh.in (apps/saroh.in,
+ *                      the `web` package)
  *   api:<module>       a folder of apps/api.saroh.in/src/modules
  *   pkg:<package>      a folder of packages/
  *
  * This maps changed files to those keys and prints the specs that name one:
  *
- *   - a file of app.saroh.in, saroh.app or accounts.saroh.in (a page, a
+ *   - a file of app.saroh.in, saroh.app, accounts.saroh.in or saroh.in (a page, a
  *     component, a lib module) → the routes whose files import it, directly
  *     or through other files (an import scan of the app). A route's layout
  *     reaches the routes beneath it; a spec on `app:/customers` is reached by
@@ -90,11 +92,14 @@ const SUITES = {
     },
 };
 
-/** The three Next apps the browser specs drive, with their key prefix. */
+/** The Next apps the browser specs drive, with their key prefix. */
 const SURFACES = [
     { key: "app", dir: "apps/app.saroh.in", dropSegments: [] },
     { key: "site", dir: "apps/saroh.app", dropSegments: ["[domain]"] },
     { key: "accounts", dir: "apps/accounts.saroh.in", dropSegments: [] },
+    // The marketing site (plan U29): its content/ and redirects.js are
+    // outside app/, components/ and lib/, so they reach every web: spec.
+    { key: "web", dir: "apps/saroh.in", dropSegments: [] },
 ];
 const API_DIR = "apps/api.saroh.in";
 const API_MODULES = `${API_DIR}/src/modules`;
@@ -351,7 +356,7 @@ function check() {
         console.error("e2e @covers check failed:\n  " + bad.join("\n  "));
         console.error(
             "\nEvery browser spec names what it exercises (scripts/e2e-affected.mjs):\n" +
-                "  // @covers app:/<route> site:/<route> accounts:/<route> api:<module> pkg:<package>",
+                "  // @covers app:/<route> site:/<route> accounts:/<route> web:/<route> api:<module> pkg:<package>",
         );
         process.exit(1);
     }

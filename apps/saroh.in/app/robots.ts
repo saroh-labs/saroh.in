@@ -1,10 +1,13 @@
 import type { MetadataRoute } from "next";
 
-/** Everything is public; the sitemap lists the pages worth indexing. */
+import { SITE_URL } from "@/lib/seo";
+import { CRAWL_DISALLOWED } from "@/lib/site-pages";
+
+/** Crawl everything public but the staff-only and API routes (plan U26). */
 export default function robots(): MetadataRoute.Robots {
     return {
-        rules: { userAgent: "*", allow: "/" },
-        sitemap: "https://www.saroh.in/sitemap.xml",
-        host: "https://www.saroh.in",
+        rules: { userAgent: "*", allow: "/", disallow: CRAWL_DISALLOWED },
+        sitemap: `${SITE_URL}/sitemap.xml`,
+        host: SITE_URL,
     };
 }

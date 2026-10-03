@@ -3,16 +3,23 @@
 **One place a small business sells, takes bookings, follows up on enquiries,
 bills its regulars and keeps a website in step.**
 
+**सारोह** (_saaroh_): _sa_, "with", and _aaroh_, "rising". Let's rise together.
+
 Saroh is built for businesses like a gym, a yoga studio, a clinic, a design
 studio or a shop: one login instead of four tools. It is **source-available**,
 so you can use, modify and self-host it, including to run your own business
 ([licence](#licence)).
 
 > **Where it stands:** early, and built in the open. The hosted service is not
-> open yet — [join the waitlist at saroh.in](https://saroh.in). The whole
+> open yet — [join the waitlist at saroh.in](https://www.saroh.in/waitlist). The whole
 > product runs on your machine today; running your own copy for real use works
 > but has no step-by-step guide yet
 > ([what it takes](setup-instructions.md#running-your-own-copy)).
+
+Follow along: [Instagram](https://www.instagram.com/sarohlabs) ·
+[X](https://x.com/sarohlabs) ·
+[YouTube](https://www.youtube.com/@SarohLabs) ·
+[LinkedIn](https://www.linkedin.com/company/saroh)
 
 ## Watch it
 

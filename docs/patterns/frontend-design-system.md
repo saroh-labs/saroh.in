@@ -192,7 +192,7 @@
   money and large figures, never body copy. JetBrains Mono (`font-mono`) **only
   where a value is measured**: a SKU, an order reference, a timestamp, a token
   value, a route. A label or eyebrow is 11px Geist 600, uppercase at 0.1em —
-  never mono. Nothing is set below 11px. The wordmark's face (Plus Jakarta Sans 600) ships outlined inside `<Wordmark>` and is never loaded.
+  never mono. Nothing is set below 11px. The wordmark's face (Plus Jakarta Sans 600) ships outlined inside `<Wordmark>`; the logo is always `<Wordmark>`. The one exception that loads the face is `saroh.in`, for the Marketing Site V2 phone menu's live "Menu" title (not preloaded, so it is fetched only when that sheet opens).
 - **Current** — **`saroh.app` loads no Saroh face** (H1). A merchant's text is
   set through `--site-font-heading` and `--site-font-body` (`font-site-heading`
   and `font-site-body`, from the site-blocks preset). `SiteTheme` defaults both

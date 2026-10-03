@@ -134,7 +134,9 @@ if [ -n "$TREE" ]; then
     done
 fi
 
-W=$(mktemp -d -t prepush)
+# A template with its X's works on GNU and BSD mktemp alike; `-t prepush`
+# fails on Linux ("too few X's") and left every step without a log dir.
+W=$(mktemp -d "${TMPDIR:-/tmp}/prepush.XXXXXX")
 LOG=$W/step.log
 FAILED=""
 # cached <step> [<step that also counts>…]
@@ -287,6 +289,9 @@ e2e_stack() {
     export BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3333
     export APP_URL=http://localhost:3003
     export NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
+    # Where accounts sends a new account (onboarding); unset, a production
+    # build falls back to https://app.saroh.in.
+    export NEXT_PUBLIC_APP_URL=http://localhost:3003
     export NEXT_PUBLIC_API_URL=http://localhost:3333
     export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
     export NEXT_PUBLIC_APP_DOMAIN=app.saroh.in
@@ -296,6 +301,12 @@ e2e_stack() {
     export E2E_ACCOUNTS_URL=http://localhost:3000
     export E2E_API_URL=http://localhost:3333
     export E2E_RENDERER_URL=http://localhost:3005
+    # The marketing site (saroh.in, the `web` package), built and started
+    # only when a spec that opens it runs (marketing.spec.ts, plan U29), as
+    # CI does: its waitlist forwards to this stack's API.
+    export E2E_WEB_URL=http://localhost:3002
+    local web_filter=""
+    case " $(echo $specs) " in *marketing.spec.ts*) web_filter=--filter=web ;; esac
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
     # never production's saroh.app, which a redirect would otherwise leave for.
     export RENDERER_URL=http://localhost:3005
@@ -326,9 +337,10 @@ e2e_stack() {
         createdb --maintenance-db="$maint" --template="$tpl" "$name"
         echo "    copied in $(( $(date +%s) - s ))s"
         echo "--- build"
+        # shellcheck disable=SC2086
         pnpm turbo run build --log-order=grouped \
             --filter=@saroh/database --filter=@saroh/api --filter=auth \
-            --filter=application --filter=sites
+            --filter=application --filter=sites $web_filter
     else
         echo "--- database: fresh, migrated and seeded (no template for key $key)"
         createdb --maintenance-db="$maint" "$name"
@@ -340,9 +352,10 @@ e2e_stack() {
         # which turbo hashes into every task — is the same on both paths and
         # a build replays from turbo's cache either way.
         echo "--- seed and build"
+        # shellcheck disable=SC2086
         pnpm turbo run db:seed:showcase build --log-order=grouped \
             --filter=@saroh/database --filter=@saroh/api --filter=auth \
-            --filter=application --filter=sites
+            --filter=application --filter=sites $web_filter
         echo "    migrated, seeded and built in $(( $(date +%s) - s ))s"
 
         # Kept for the next run, before anything connects to this one.
@@ -364,10 +377,15 @@ e2e_stack() {
     echo $! >>"$E2E_LOGS/pids"
     pnpm --filter sites exec next start -p 3005 >"$E2E_LOGS/renderer.log" 2>&1 &
     echo $! >>"$E2E_LOGS/pids"
+    if [ -n "$web_filter" ]; then
+        API_URL=http://localhost:3333 pnpm --filter web exec next start -p 3002 >"$E2E_LOGS/web.log" 2>&1 &
+        echo $! >>"$E2E_LOGS/pids"
+    fi
     wait_up api http://localhost:3333/health "200 307"
     wait_up accounts http://localhost:3000/login "200 307"
     wait_up app http://localhost:3003/ "200 307"
     wait_up renderer http://localhost:3005/preview/not-a-token "200 307 404"
+    [ -z "$web_filter" ] || wait_up web http://localhost:3002/ "200"
 
     # The runner (e2e/run.mjs): sign in once, then desk and phone in
     # parallel on PW_WORKERS, then the @serial tests one at a time.
@@ -599,13 +617,16 @@ e2e_start() {
     [ -n "$(git status --porcelain)" ] && \
         echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
     SHA=$(git rev-parse HEAD)
-    E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
+    E2E_LOGS=$(mktemp -d "${TMPDIR:-/tmp}/prepush-e2e-logs.XXXXXX")
     [ "$E2E_STATUS" = run ] &&
         echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
     [ "$PERM_STATUS" = run ] &&
         echo "=== permissions (in the background, after the browser specs) desk + phone, production build"
     ports=""
     [ "$E2E_STATUS" = run ] && ports="3333 3000 3003 3005"
+    # The marketing site, when its spec is in the run (e2e_stack).
+    [ "$E2E_STATUS" = run ] && case " $(echo $specs) " in
+        *marketing.spec.ts*) ports="$ports 3002" ;; esac
     [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
     trap stop_stack EXIT
     # In the background: the lock first (waiting on another run, if one is
