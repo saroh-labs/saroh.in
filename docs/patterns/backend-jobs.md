@@ -189,7 +189,7 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 - **`pricing.site.revalidate`** tells saroh.in that the published pricing
   changed (KTD-10). A publish or roll back that is live at once queues it on
   its own transaction; a scheduled version queues it for its `goLiveAt`.
-  Queued only when `PRICING_REVALIDATE_URL` and `_SECRET` are set; a failed
+  Queued only when `PRICING_SITE_URL` and `PRICING_REVALIDATE_SECRET` are set; a failed
   call throws and retries, and never touches the publish. A version held for
   its billing-provider plans is refreshed by the sync (U15), not here.
 - **`pricing.move.notice`** tells a business, seven days ahead, that "move

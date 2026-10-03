@@ -8,7 +8,7 @@
  * Runs in the integration project (TEST_DATABASE_URL).
  */
 const mockRevalidate = {
-    PRICING_REVALIDATE_URL: "https://site.example.test/api/revalidate",
+    PRICING_SITE_URL: "https://site.example.test",
     PRICING_REVALIDATE_SECRET: "a-revalidate-secret-that-is-long-enough-0",
 };
 jest.mock("../../env", () => ({

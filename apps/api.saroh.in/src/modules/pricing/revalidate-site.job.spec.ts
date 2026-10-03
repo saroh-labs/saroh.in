@@ -16,9 +16,7 @@ const job = (payload: unknown = { version: 4, cause: "publish" }) =>
     ({ id: "job_1", payload }) as unknown as Job;
 
 function configure(on: boolean) {
-    mockEnv.PRICING_REVALIDATE_URL = on
-        ? "https://site.example.test/api/revalidate"
-        : undefined;
+    mockEnv.PRICING_SITE_URL = on ? "https://site.example.test" : undefined;
     mockEnv.PRICING_REVALIDATE_SECRET = on ? SECRET : undefined;
 }
 
@@ -73,7 +71,7 @@ describe("saroh.in revalidation (KTD-10)", () => {
         expect(
             (init.headers as Record<string, string>)[REVALIDATE_SECRET_HEADER],
         ).toBe(SECRET);
-        expect(init.body).toBe("{}");
+        expect(init.body).toBeUndefined();
     });
 
     it("throws when the site is down or refuses, so the queue retries", async () => {

@@ -15,14 +15,17 @@ import { env } from "../../env";
  * retries it with backoff. Revalidating twice is harmless.
  *
  * The hook's contract, which saroh.in's `/api/revalidate` (U24) implements:
- * `POST`, the shared secret in `x-saroh-revalidate-secret` (compared in
- * constant time there), no body that names a path — the site revalidates its
+ * `POST`, the shared secret in `x-saroh-revalidate` (compared in
+ * constant time there), no body and no path — the site revalidates its
  * own fixed list. The payload's `version` is for the logs only.
  */
 export const PRICING_REVALIDATE_TYPE = "pricing.site.revalidate";
 
 /** The header saroh.in reads the shared secret from. */
-export const REVALIDATE_SECRET_HEADER = "x-saroh-revalidate-secret";
+export const REVALIDATE_SECRET_HEADER = "x-saroh-revalidate";
+
+/** saroh.in's hook, under its base URL. */
+export const REVALIDATE_PATH = "/api/revalidate";
 
 /** How long one call may take before it counts as failed (and is retried). */
 const CALL_TIMEOUT_MS = 10_000;
@@ -35,9 +38,10 @@ export interface RevalidatePayload {
 
 /** Where to call and with what, or null when the hook isn't configured. */
 export function revalidateHook(): { url: string; secret: string } | null {
-    const url = env.PRICING_REVALIDATE_URL;
+    const base = env.PRICING_SITE_URL;
     const secret = env.PRICING_REVALIDATE_SECRET;
-    return url && secret ? { url, secret } : null;
+    if (!base || !secret) return null;
+    return { url: new URL(REVALIDATE_PATH, base).toString(), secret };
 }
 
 /**
@@ -83,11 +87,7 @@ export class RevalidateSiteHandler {
         try {
             res = await this.fetchFn(hook.url, {
                 method: "POST",
-                headers: {
-                    [REVALIDATE_SECRET_HEADER]: hook.secret,
-                    "content-type": "application/json",
-                },
-                body: "{}",
+                headers: { [REVALIDATE_SECRET_HEADER]: hook.secret },
                 signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
             });
         } catch (error) {
