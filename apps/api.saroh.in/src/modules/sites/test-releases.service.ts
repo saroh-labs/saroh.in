@@ -14,7 +14,7 @@ import { businessTimezone } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { authorize } from "../organizations/organization-policy";
-import { readVerdicts } from "./live-pointer";
+import { lockSite, readVerdicts } from "./live-pointer";
 import { checkRenderability } from "./publication-renderability";
 import { assertOverrideAllowed, isOwner } from "./publish-approval";
 import { draftFingerprint } from "./review-route";
@@ -115,7 +115,10 @@ export class TestReleasesService {
         const token = mintTestReleaseToken();
 
         const releaseId = await prisma.$transaction(async (tx) => {
-            await tx.$queryRaw`SELECT id FROM "Site" WHERE id = ${siteId} AND "organizationId" = ${ctx.organizationId} FOR UPDATE`;
+            // Organization, then Site, as every way of going live takes
+            // them (`lockSite`): the TEST row's foreign key needs the
+            // business's row, which a web-address change holds.
+            await lockSite(tx, site.id);
             const last = await tx.siteTestRelease.findFirst({
                 where: { siteId, organizationId: ctx.organizationId },
                 orderBy: { number: "desc" },

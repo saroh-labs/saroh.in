@@ -6,7 +6,7 @@
         "test:e2e": "node run.mjs",
         "test:e2e:ui": "playwright test --ui",
         "install:browsers": "playwright install --with-deps chromium",
-        "lint": "eslint .",
+        "lint": "eslint . && node --test eslint.config.test.mjs",
         "typecheck": "tsc --noEmit",
         "test:permissions": "playwright test --config=permissions.config.ts"
     },

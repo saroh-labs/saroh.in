@@ -109,7 +109,14 @@
   So: FOR UPDATE when the transaction will set a key column of the row;
   FOR NO KEY UPDATE (which lets those inserts through) only when none of
   its writes to the row does. Pinned for the site by
-  `live-pointer.db.spec.ts`.
+  `live-pointer.db.spec.ts`. **Lock order for a site: Organization, then
+  Site.** `lockSite` takes the business's row FOR KEY SHARE before the Site
+  FOR UPDATE, because a web-address change holds the Organization FOR
+  UPDATE and then needs the Site; anything new that locks a Site and then
+  inserts a row naming the business goes through `lockSite`. A serializable
+  transaction that waited behind such a lock fails its snapshot (40001)
+  without having lost anything, so it runs again before reporting a lost
+  race (`WebAddressService.change`).
 - **Current** — **An order's number comes from `nextOrderNumberInTx`, in the
   order's transaction** (DEC-066, P3). One `ORD-` series per business across
   its storefronts, counted in `OrderNumberSequence`; never `count + 1`, which

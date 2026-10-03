@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NumberFormat } from "./invoice-number";
 import {
@@ -24,6 +24,20 @@ import {
 } from "./invoice-number";
 
 const now = new Date("2026-09-25T10:00:00Z");
+
+/**
+ * Pin "today" for the code that reads the clock (`longestNumber`,
+ * `numberFormatProblem`, `creditMark`), so the file asserts exact numbers on
+ * any day it runs: FY 26-27 and month 09 against the real clock break on
+ * 1 April 2027. Only `Date` is faked.
+ */
+beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+});
+afterEach(() => {
+    vi.useRealTimers();
+});
 const MONTHLY: NumberFormat = {
     parts: ["PREFIX", "FY", "MONTH"],
     separator: "/",
@@ -133,8 +147,8 @@ describe("a chosen format", () => {
         const plain = { ...short, separator: "" } as const;
         expect(first(plain)).toBe("RC26090001");
         expect(first(plain, true)).toBe("RCCN26090001");
-        // Today's month: the longest number is this month's.
-        expect(longestNumber(plain, "RC")).toMatch(/^RCCN26\d{2}99999$/);
+        // Today's month (pinned): the longest number is this month's.
+        expect(longestNumber(plain, "RC")).toBe("RCCN260999999");
         // January to March are the year that began in April.
         expect(financialYearShort(new Date("2027-03-10T10:00:00Z"))).toBe("26");
     });
@@ -208,7 +222,7 @@ describe("numberFormatProblem mirrors the API", () => {
         const refused = problem(MONTHLY);
         expect(refused?.field).toBe("numberDigits");
         expect(refused?.message).toMatch(
-            /Once the count passes 9999, numbers like RC\/26-27\/\d{2}\/99999 are 17 characters/,
+            /Once the count passes 9999, numbers like RC\/26-27\/09\/99999 are 17 characters/,
         );
         expect(problem({ ...MONTHLY, digits: 3 })).toBeNull();
         expect(longestNumber({ ...MONTHLY, digits: 3 }, "RC")).toHaveLength(16);

@@ -15,8 +15,10 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { backendPid, gate, waitUntilBlockedBy } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
+import { FlagKey } from "../feature-flags/flags";
+import { WebAddressService } from "../organizations/web-address.service";
 import type { LiveSource } from "./live-pointer";
-import { putLive } from "./live-pointer";
+import { lockSite, putLive } from "./live-pointer";
 import { draftFingerprint } from "./review-route";
 import { SitesService } from "./sites.service";
 
@@ -25,6 +27,8 @@ const sites = new SitesService({
     can: jest.fn().mockResolvedValue(true),
     getEntitlements: jest.fn(),
 } as unknown as EntitlementService);
+
+const webAddress = new WebAddressService();
 
 let seq = 0;
 const uniq = (label: string) => `${label}${process.pid}x${++seq}`;
@@ -128,40 +132,105 @@ describe("putLive's site lock (KTD-3)", () => {
         const b = await business();
         const address = uniq("lpnew");
 
-        // The web-address change's shape (`WebAddressService.move`): a row
-        // naming the site goes in first, which takes FOR KEY SHARE on the
-        // Site for its foreign key; then the Site's own address changes.
+        // The web-address change's shape (`WebAddressService.move`), in its
+        // isolation level: Serializable; the Organization row FOR UPDATE
+        // first; then a hold naming the site goes in, which takes FOR KEY
+        // SHARE on the Site for its foreign key; then the business's slug
+        // and the Site's own address change. A model that leaves out the
+        // Organization lock passes against a deadlock (DEV_LEARNINGS).
         const inserted = gate<number>();
         const goOn = gate();
-        const change = inTx(b, async (tx) => {
-            const pid = await backendPid(tx);
-            await tx.addressReservation.create({
-                data: {
-                    organizationId: b.org.id,
-                    address: uniq("lpold"),
-                    siteId: b.site.id,
-                    reservedUntil: new Date(Date.now() + 86_400_000),
-                },
-                select: { id: true },
-            });
-            inserted.release(pid);
-            await goOn.wait;
-            await tx.site.update({
-                where: { id: b.site.id },
-                data: { subdomain: address },
-                select: { id: true },
-            });
-        });
+        const change = prisma.$transaction(
+            async (tx) => {
+                const pid = await backendPid(tx);
+                await tx.$queryRaw`SELECT id FROM "Organization" WHERE id = ${b.org.id} FOR UPDATE`;
+                await tx.addressReservation.create({
+                    data: {
+                        organizationId: b.org.id,
+                        address: uniq("lpold"),
+                        siteId: b.site.id,
+                        reservedUntil: new Date(Date.now() + 86_400_000),
+                    },
+                    select: { id: true },
+                });
+                inserted.release(pid);
+                await goOn.wait;
+                await tx.organization.update({
+                    where: { id: b.org.id },
+                    data: { slug: address },
+                    select: { id: true },
+                });
+                await tx.site.update({
+                    where: { id: b.site.id },
+                    data: { subdomain: address },
+                    select: { id: true },
+                });
+            },
+            { isolationLevel: "Serializable", timeout: 20_000 },
+        );
         const changer = await inserted.wait;
 
-        // A publish starts while the change holds its KEY SHARE, and must
-        // wait for it, before it holds anything the change then needs.
+        // A publish starts while the change holds the business's row, and
+        // waits for it there, before it holds anything the change needs.
         const publish = inTx(b, (tx) => putLiveAgain(tx, b, "publish"));
-        await waitUntilBlockedBy(changer);
+        await waitUntilBlockedBy(changer, "Organization");
 
         goOn.release();
         await expect(change).resolves.toBeUndefined();
         const live = await publish;
+
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: b.site.id },
+            select: { subdomain: true, currentPublicationId: true },
+        });
+        expect(site).toEqual({
+            subdomain: address,
+            currentPublicationId: live.publicationId,
+        });
+    });
+
+    it("lets a web-address change wait for a publish that locked the site first, then go through", async () => {
+        const b = await business();
+        await prisma.featureFlag.upsert({
+            where: { key: FlagKey.WEB_ADDRESS_CHANGE },
+            create: {
+                key: FlagKey.WEB_ADDRESS_CHANGE,
+                enabledByDefault: false,
+            },
+            update: {},
+        });
+        await prisma.featureFlagOverride.create({
+            data: {
+                flagKey: FlagKey.WEB_ADDRESS_CHANGE,
+                organizationId: b.org.id,
+                enabled: true,
+            },
+        });
+        const address = uniq("lpnext");
+
+        // A publish that has reached `lockSite` and is held there, before
+        // it writes the Publication (whose foreign key needs the
+        // business's row).
+        const locked = gate<number>();
+        const goOn = gate();
+        const publish = inTx(b, async (tx) => {
+            const pid = await backendPid(tx);
+            await lockSite(tx, b.site.id);
+            locked.release(pid);
+            await goOn.wait;
+            return putLiveAgain(tx, b, "publish");
+        });
+        const publisher = await locked.wait;
+
+        // The owner changes the address meanwhile: the real change, which
+        // must wait for the publish at the business's row, not take it and
+        // then queue for the site.
+        const change = webAddress.change(b.ctx, address);
+        await waitUntilBlockedBy(publisher, "Organization");
+
+        goOn.release();
+        const live = await publish;
+        await expect(change).resolves.toMatchObject({ address });
 
         const site = await prisma.site.findUniqueOrThrow({
             where: { id: b.site.id },
@@ -198,7 +267,7 @@ describe("putLive's site lock (KTD-3)", () => {
 
         const restore = inTx(b, (tx) => putLiveAgain(tx, b, "restore"));
         // Not a guess: Postgres shows the restore waiting on the publish.
-        await waitUntilBlockedBy(first.pid);
+        await waitUntilBlockedBy(first.pid, "Site");
 
         commit.release();
         await publish;
