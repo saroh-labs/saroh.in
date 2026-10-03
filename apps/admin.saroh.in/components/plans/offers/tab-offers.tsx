@@ -1,19 +1,27 @@
 "use client";
 
-import { TabPlaceholder } from "../tab-placeholder";
+import { AddonsPanel } from "./addons-panel";
+import { CouponsPanel } from "./coupons-panel";
+import { OfferGst } from "./offer-gst";
+import { OfferTrials } from "./offer-trials";
+import { OfferYearly } from "./offer-yearly";
 
 /**
- * The Offers tab: yearly, GST, trials, add-ons and coupons (plans catalogue U9). U6 leaves this slot; U9 replaces it.
- *
- * A tab takes no props. It reads:
- * - `usePlans()` — the server's picture (`pricing`), `coupons`, `access`
- *   (`canEdit`, `canPublish`, `canManageCoupons`), `siteUrl` and `me`;
- * - `useDraft()` — `catalog` to draw, `edit(fn)` to change it (the first
- *   edit starts the draft; it autosaves), `check`, `impact`, `flush()`;
- * - `usePlansNav()` — `setTab(tab, focus?)` and the `focus` it was opened on;
- * - `useFlash()` — the one-line confirmation at the foot of the screen.
- * Writes go through `@/lib/pricing-actions`.
+ * The Offers tab (plans catalogue U9): yearly billing, which price the
+ * pricing page shows first, free trials and add-ons, all part of the shared
+ * draft; and coupons, which aren't, and apply as soon as they are saved.
  */
 export function TabOffers() {
-    return <TabPlaceholder name="Offers" />;
+    return (
+        <section aria-label="Offers" className="grid gap-3.5 text-[13.5px]">
+            <h2 className="font-display text-base font-semibold">Offers</h2>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-3.5">
+                <OfferYearly />
+                <OfferGst />
+                <OfferTrials />
+            </div>
+            <AddonsPanel />
+            <CouponsPanel />
+        </section>
+    );
 }
