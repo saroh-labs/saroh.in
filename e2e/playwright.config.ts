@@ -51,7 +51,15 @@ const API_URL = process.env.E2E_API_URL ?? "https://api.saroh.localhost";
 const RENDERER_URL =
     process.env.E2E_RENDERER_URL ?? "https://saroh.app.localhost";
 
-export const urls = { APP_URL, ACCOUNTS_URL, API_URL, RENDERER_URL };
+/**
+ * The marketing site, saroh.in (`apps/saroh.in`, the `web` package): portless
+ * names it `saroh`, and the seeded stack serves it on 3002
+ * (`scripts/prepush.sh`, CI's browser shards). Only `marketing.spec.ts`
+ * opens it.
+ */
+const WEB_URL = process.env.E2E_WEB_URL ?? "https://saroh.localhost";
+
+export const urls = { APP_URL, ACCOUNTS_URL, API_URL, RENDERER_URL, WEB_URL };
 
 /**
  * Whether a browser this suite opens should accept portless's local CA.
