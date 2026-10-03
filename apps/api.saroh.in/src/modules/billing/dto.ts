@@ -49,3 +49,23 @@ export class CancelSubscriptionDto {
     @IsBoolean()
     immediate?: boolean;
 }
+
+/**
+ * Change the business's catalogue plan (pricing catalogue U15): the plan's id
+ * in the catalogue (`grow`, …) and the billing cycle. Nothing else — every
+ * amount is worked out on the server (KTD-18), so a body carrying a price is
+ * refused by the validation pipe.
+ */
+export class ChangePlanDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    plan!: string;
+
+    @IsIn(["month", "year"], { message: "cycle must be month or year" })
+    cycle!: "month" | "year";
+}
+
+/** `GET …/billing/change-plan?plan=&cycle=`: the same two, to quote. */
+export class ChangePlanQuery extends ChangePlanDto {}

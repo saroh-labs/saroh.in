@@ -16,10 +16,15 @@ jest.mock("@saroh/database", () => {
     };
     const paymentIntent = { findFirst: jest.fn(), findUnique: jest.fn() };
     const webhookEvent = { create: jest.fn() };
+    // No scheduled checkout (U15): a due move is read as applied.
+    const billingCheckout = { findFirst: jest.fn(() => null) };
     return {
         // The live catalogue version: none unless a test says otherwise.
         liveCatalogueVersion: jest.fn(() => null),
+        // Every version's plans are at the billing provider (U15).
+        unsyncedCatalogueVersions: jest.fn(() => []),
         prisma: {
+            billingCheckout,
             subscription,
             pricingCatalogVersion,
             entitlementOverride,

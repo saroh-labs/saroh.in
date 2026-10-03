@@ -251,7 +251,17 @@ export interface BillingAccessView {
     pricePaise: number | null;
     /** A plan override it is on (a grandfathered business: until when). */
     planOverride: { planKey: string; expiresAt: string | null } | null;
-    pendingMove: { planId: string; version: number; from: string } | null;
+    pendingMove: {
+        planId: string;
+        version: number;
+        from: string;
+        /**
+         * Its date has passed but it can't apply yet (U15): `held` while its
+         * version's plans aren't at the billing provider, `authorise` while
+         * the business must authorise the new amount (OQ-6). Null otherwise.
+         */
+        waiting: "held" | "authorise" | null;
+    } | null;
     modules: ModuleAccessView[];
 }
 

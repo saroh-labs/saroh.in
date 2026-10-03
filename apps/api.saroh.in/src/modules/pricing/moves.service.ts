@@ -134,6 +134,7 @@ export async function scheduleMoves(
                     entitlements: true,
                 },
             },
+            pendingPlan: { select: { key: true, interval: true } },
         },
     });
 
@@ -145,6 +146,15 @@ export async function scheduleMoves(
         payload: MoveNoticePayload;
     }[] = [];
     for (const sub of subs) {
+        // A change the business chose for the end of its period (another
+        // plan or cycle, U15) stands: a publish never overrides it.
+        if (
+            sub.pendingPlan &&
+            (sub.pendingPlan.key !== sub.plan.key ||
+                sub.pendingPlan.interval !== sub.plan.interval)
+        ) {
+            continue;
+        }
         // A plan the new version dropped has nowhere to move to: it keeps
         // its terms (the business stays on its version).
         const target = targetOf.get(`${sub.plan.key}|${sub.plan.interval}`);

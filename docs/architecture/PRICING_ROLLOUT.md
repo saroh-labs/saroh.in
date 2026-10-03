@@ -62,6 +62,14 @@ release time.
    it at once, without a deploy.
 7. **U13 enforcement**, behind the same switch; then the merchant app (U14)
    and Saroh's own billing (U15–U17).
+8. **Saroh billing (U15)** needs, on the instance: Saroh's own Razorpay keys
+   and webhook secret (`SAROH_RAZORPAY_KEY_ID`, `SAROH_RAZORPAY_KEY_SECRET`,
+   `SAROH_RAZORPAY_WEBHOOK_SECRET`), the webhook pointed at
+   `/public/billing/webhooks/razorpay` with the `subscription.*` events, and
+   the migration `20261021120000_saroh_billing`. Run the test-mode spike
+   below before the first real checkout. Until the keys are set, a publish
+   with paid plans stays **waiting** (its plans can't reach the provider) and
+   the version before it stays live — nothing breaks, nothing is sold.
 
 ## How a plan override reads (U5)
 
@@ -102,6 +110,109 @@ into access; `EntitlementService`, module availability and
 - **Fail safe:** a missing or invalid version, or a plan not in it, reads the
   business off its own row (or the free floor) and logs
   `catalogue_access_unresolved`.
+
+## Saroh billing (U15)
+
+How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
+`checkout-quote.ts` (the one rule), `billing-webhook.service.ts`,
+`plan-moves.ts`, `provider-plan-sync.service.ts`, `moves-apply.handler.ts`.
+
+- **Provider plans.** A publish writes a PENDING `PricingProviderPlan` per
+  paid `Plan` row (yearly only while yearly is on) and queues
+  `billing.provider-plans.sync`. The job asks the provider for a plan made
+  under the row's id, else makes one at the row's price **with GST**
+  (`withGstPaise`), per month or per year: SYNCED with the provider's id, or
+  FAILED with the reason — a refusal at once, an unanswered call after
+  `MAX_SYNC_ATTEMPTS`. While a row waits the job re-queues itself with a
+  growing pause. A version with any row not SYNCED never goes live; when the
+  last one is SYNCED and its go-live has passed, it is live there and then
+  and saroh.in is told (`pricing.site.revalidate`, cause `go-live`).
+  `POST /admin/pricing/versions/:v/provider-sync` (`pricing:publish`) asks
+  again for the FAILED rows. Cancelling a version drops its waiting sync.
+- **Changing plan** — `GET …/billing/change-plan?plan=&cycle=` quotes
+  (`billing:read`), `POST …/billing/change-plan {plan, cycle}` changes
+  (`billing:manage`). The client sends a plan id and a cycle only; the plan
+  row comes from the live version and every amount from `quoteChange`
+  (integer paise, GST per line). The kinds:
+    - **Free**: at the end of the period paid at the provider (a pending
+      move, the provider subscription told to end with the period), else at
+      once. No checkout.
+    - **NEW** (from Free, cancelled, or a plan not billed through the
+      provider): a checkout; on the plan once its first charge is paid.
+    - **UPGRADE** (pricier, same cycle, mid-period): a checkout whose
+      provider subscription starts at the period's end with the difference
+      for what's left (prorated, GST added) as an upfront charge; on the plan
+      once authorised, and the old provider subscription is cancelled.
+    - **SCHEDULED** (cheaper, the other cycle, or the plan a "move them" is
+      taking it to): a checkout authorised now that starts on the date; it
+      waits as the subscription's pending move, and the old provider
+      subscription is told to end with the period.
+- **A checkout** (`BillingCheckout`) is OPEN until the webhook completes it,
+  lapses after a day (the sweep cancels it at the provider), and is replaced
+  by a newer one. The provider's authorisation link is returned once and never
+  stored. `GET …/billing/checkout` lists the open and scheduled ones.
+- **Webhooks** (`/public/billing/webhooks/:provider`): signature first, then
+  the inbox row and its effect in one transaction (a duplicate event id is a
+  no-op; a failed effect rolls the row back so the retry applies). An event
+  older than the subscription's `providerEventAt` changes nothing, and
+  CANCELLED is terminal, so a late `activated` can't re-open a cancelled
+  plan. `charged` renews (new period end, a due move applied); `pending` is
+  PAST_DUE; `halted` is CANCELLED — read as Free — and the provider
+  subscription is cancelled; `cancelled`/`completed` applies a move to Free or
+  to an authorised plan, else CANCELLED.
+- **Moves** (KTD-4) apply on the renewal webhook or the hourly
+  `billing.moves.apply` sweep, and only when ready (`moveReadiness`): never
+  while the version's provider plans aren't SYNCED, and never at a new amount
+  the provider would charge without the business authorising it (OQ-6) — the
+  access read shows such a move as `waiting: "authorise"` and keeps the old
+  plan; a SCHEDULED checkout to the new plan is how the business authorises
+  it. A publish never overrides a change the business chose for its period's
+  end.
+- **Not here:** trials, coupons, add-on purchases and yearly offers (U16),
+  Saroh's own invoices and billing emails (U17), limit enforcement (U13,
+  behind `PLAN_ENFORCEMENT`), the merchant screens (U14).
+
+### Razorpay test-mode spike (OQ-6) — **unverified**
+
+No test key was available when U15 was built, so the adapter follows
+Razorpay's published Subscriptions API and every answer below is
+**unverified**. Run each against test mode before the first real checkout and
+correct the adapter and this list.
+
+1. **Plan objects.** One Razorpay plan per catalogue row × cycle
+   (`POST /plans`, `period` monthly|yearly, `interval` 1, `item.amount` the
+   GST-inclusive paise), made once and never edited — a price change is a
+   new version, so a new plan. Unverified: that plans can't be edited or
+   deleted (assumed), and that `GET /plans` can be paged to find one by its
+   `notes.saroh_ref` after a lost answer (Razorpay has no lookup by notes).
+2. **Proration.** Assumed Razorpay doesn't prorate for Saroh. An upgrade is a
+   **new** subscription with `start_at` = the old period's end and the
+   difference charged as an upfront `addons` item at authorisation; the old
+   subscription is cancelled at once. Unverified: that an addon with a future
+   `start_at` is charged at authentication, and that `subscription.authenticated`
+   only arrives once it is paid.
+3. **Mid-cycle change.** Assumed not done in place: Razorpay's
+   `PATCH /subscriptions/:id` (`plan_id`, `schedule_change_at`) is
+   documented for card mandates only, and a UPI mandate's maximum may not
+   cover a new amount. Every change of amount is a new subscription the
+   business authorises (SCHEDULED for a cheaper plan, a cycle change or a
+   "move them" at a new price), and the old one is cancelled at the cycle's
+   end (`cancel_at_cycle_end: 1`). Unverified: whether the update API would
+   serve card subscriptions better, and how a UPI mandate's limit is shown.
+4. **Plan-object sync on a move.** A move at the same amount and cycle keeps
+   the old provider subscription (its plan object differs, the amount
+   doesn't). A move at a new amount is never applied silently. Unverified:
+   that keeping a subscription on an older plan object at the same amount has
+   no side effect on invoices or renewals.
+5. **Events.** Assumed: `subscription.authenticated` (mandate authorised),
+   `activated` and `charged` (paid; `payload.subscription.entity.current_end`
+   the period's end), `pending` (a failed charge being retried), `halted`
+   (retries exhausted), `cancelled`, `completed`; the delivery id in
+   `x-razorpay-event-id` and the event time in `created_at`. Unverified: the
+   order they arrive in for a `start_at` subscription, and whether `halted`
+   can resume.
+6. **`total_count`.** Required by Razorpay; sent as 120 monthly / 10 yearly
+   charges so a plan runs until cancelled. Unverified: the maximum allowed.
 
 ## Undoing it
 

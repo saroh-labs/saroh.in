@@ -36,6 +36,7 @@ import {
     DiscardDraftDto,
     PreviewTokenDto,
     PublishDto,
+    RetryProviderSyncDto,
     RollbackDto,
     SaveDraftDto,
     UpdateCouponDto,
@@ -204,6 +205,34 @@ export class AdminPricingController {
             },
             { version, note: dto.note ?? "", reason: dto.reason },
             () => this.writes.rollback(staff.userId, version, dto, new Date()),
+        );
+    }
+
+    /** Ask the billing provider again for a version's failed plans (U15). */
+    @Post("pricing/versions/:version/provider-sync")
+    @RequireAdminPermission(
+        AdminPermission.PricingRead,
+        AdminPermission.PricingPublish,
+    )
+    retryProviderSync(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("version", ParseIntPipe) version: number,
+        @Body() dto: RetryProviderSyncDto,
+    ): Promise<{ version: number; retried: number }> {
+        return this.idempotency.run(
+            {
+                scope: "pricing.version.provider-sync",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { version, reason: dto.reason },
+            () =>
+                this.writes.retryProviderSync(
+                    staff.userId,
+                    version,
+                    dto,
+                    new Date(),
+                ),
         );
     }
 

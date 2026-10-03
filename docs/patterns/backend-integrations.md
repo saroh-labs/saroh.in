@@ -263,6 +263,22 @@ a note saying so.
 - **Adopted** — **No fallback that can produce a plausible wrong answer.** When a
   wrong result is costly, fail loudly. Not audited across adapters.
 
+## Saroh billing on Razorpay Subscriptions (U15) — **Current**, unverified
+
+Saroh charging a business for its plan goes through `BillingProvider`
+(`modules/billing/providers`), never the merchant port. U15 adds an optional
+`plans` capability (provider plan objects, made once per catalogue row ×
+cycle and looked up by Saroh's reference before a retry makes another),
+subscriptions on a provider plan with `start_at` and an upfront charge, and
+cancel now or at the cycle's end. Adapters throw `BillingProviderError`
+(`REFUSED` a 4xx, `UNKNOWN` anything that may have worked) and keep only the
+HTTP status. The fake (`providers/fake.provider.ts`) implements all of it.
+**Not yet run against Razorpay test mode**: the open questions and the
+assumptions made are listed in `docs/architecture/PRICING_ROLLOUT.md` →
+"Razorpay test-mode spike". The webhook inbox applies an event in the same
+transaction as its row and ignores one older than the last applied
+(`Subscription.providerEventAt`).
+
 ## Razorpay recurring payments (D11 spike) — **Current**
 
 Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:

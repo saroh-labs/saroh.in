@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
 import type { Plan } from "@saroh/database";
 
 import { OrgContext } from "../../common/decorators/org-context.decorator";
@@ -7,7 +7,18 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { BillingAccessView } from "./catalogue-access";
 import { CatalogueAccessService } from "./catalogue-access.service";
-import { CancelSubscriptionDto, SubscribeDto } from "./dto";
+import type {
+    ChangePlanQuoteView,
+    ChangePlanResult,
+    CheckoutsView,
+} from "./checkout.service";
+import { CheckoutService } from "./checkout.service";
+import {
+    CancelSubscriptionDto,
+    ChangePlanDto,
+    ChangePlanQuery,
+    SubscribeDto,
+} from "./dto";
 import { PlansService } from "./plans.service";
 import type { SubscriptionWithPlan } from "./subscriptions.service";
 import { SubscriptionsService } from "./subscriptions.service";
@@ -49,7 +60,42 @@ export class BillingController {
     constructor(
         private readonly subscriptions: SubscriptionsService,
         private readonly access: CatalogueAccessService,
+        private readonly checkouts: CheckoutService,
     ) {}
+
+    /**
+     * What changing to a catalogue plan would be and cost (U15): the kind of
+     * change, the recurring charge with GST, anything charged now, and when
+     * it starts. `billing:read`. The site's `?plan=&cycle=` lands here.
+     */
+    @Get("change-plan")
+    quoteChange(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: ChangePlanQuery,
+    ): Promise<ChangePlanQuoteView> {
+        return this.checkouts.quote(ctx, query);
+    }
+
+    /**
+     * Change plan (U15): to a free plan at the period's end (or now), or a
+     * checkout the business authorises on the provider's page.
+     * `billing:manage`.
+     */
+    @Post("change-plan")
+    changePlan(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: ChangePlanDto,
+    ): Promise<ChangePlanResult> {
+        return this.checkouts.changePlan(ctx, dto);
+    }
+
+    /** The checkout waiting for authorisation, and one scheduled (U15). */
+    @Get("checkout")
+    getCheckouts(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<CheckoutsView> {
+        return this.checkouts.current(ctx);
+    }
 
     /** What the business's plan gives it, row by row (plans catalogue U12). */
     @Get("access")

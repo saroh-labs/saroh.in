@@ -115,6 +115,9 @@ export class PublishDto extends ReasonedWriteDto {
 /** `DELETE /admin/pricing/versions/:version` (cancel a scheduled version). */
 export class CancelVersionDto extends ReasonedWriteDto {}
 
+/** `POST /admin/pricing/versions/:version/provider-sync` (U15). */
+export class RetryProviderSyncDto extends ReasonedWriteDto {}
+
 /** `POST /admin/pricing/versions/:version/rollback`. */
 export class RollbackDto extends ReasonedWriteDto {
     @IsOptional()
