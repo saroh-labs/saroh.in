@@ -125,10 +125,22 @@ export type AdminPermission =
     | "staff:read"
     | "staff:grant"
     | "audit:read"
-    | "waitlist:invite";
+    | "waitlist:invite"
+    | "pricing:read"
+    | "pricing:edit"
+    | "pricing:publish"
+    | "coupons:manage";
 
 export type ControlPlaneResult<T> =
-    { ok: true; data: T } | { ok: false; error: string };
+    | { ok: true; data: T }
+    | {
+          ok: false;
+          error: string;
+          /** The API's status, for a caller that acts on a refusal (a 409). */
+          status?: number;
+          /** The API's `error.details`, as sent. Data, never copy to show. */
+          details?: unknown;
+      };
 
 export async function adminFetch(
     path: string,
@@ -203,7 +215,16 @@ export async function adminWrite<T = unknown>(
         body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!res.ok) {
-        return { ok: false, error: await readError(res, fallback) };
+        const body = (await res
+            .clone()
+            .json()
+            .catch(() => null)) as { error?: { details?: unknown } } | null;
+        return {
+            ok: false,
+            error: await readError(res, fallback),
+            status: res.status,
+            details: body?.error?.details,
+        };
     }
     const text = await res.text();
     return { ok: true, data: (text ? JSON.parse(text) : null) as T };
