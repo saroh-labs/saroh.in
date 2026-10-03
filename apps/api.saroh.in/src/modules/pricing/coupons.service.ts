@@ -17,6 +17,7 @@ import {
     AdminAuditService,
 } from "../admin/admin-audit.service";
 import { AdminPermission } from "../admin/admin-permissions";
+import { RAZORPAY_OFFER_ID } from "./dto";
 
 type Tx = Prisma.TransactionClient;
 
@@ -27,6 +28,12 @@ export interface AdminCoupon {
     discountPaise: number;
     months: number;
     planIds: string[];
+    /**
+     * The Razorpay Offer that takes the same discount off on Razorpay's
+     * side, made in the Razorpay Dashboard; null: the coupon can't be used
+     * with a Razorpay checkout.
+     */
+    razorpayOfferId: string | null;
     active: boolean;
     maxRedemptions: number;
     expiresAt: string | null;
@@ -42,6 +49,7 @@ export interface CouponFields {
     planIds: string[];
     maxRedemptions: number;
     expiresAt: Date | null;
+    razorpayOfferId: string | null;
 }
 
 type CouponRow = Prisma.PricingCouponGetPayload<{
@@ -55,6 +63,7 @@ function view(row: CouponRow): AdminCoupon {
         discountPaise: row.discountPaise,
         months: row.months,
         planIds: row.planIds,
+        razorpayOfferId: row.razorpayOfferId,
         active: row.active,
         maxRedemptions: row.maxRedemptions,
         expiresAt: row.expiresAt?.toISOString() ?? null,
@@ -118,6 +127,7 @@ export class CouponsService {
                         planIds: input.planIds,
                         maxRedemptions: input.maxRedemptions,
                         expiresAt: input.expiresAt,
+                        razorpayOfferId: input.razorpayOfferId,
                         active: input.active,
                         createdByUserId: actorUserId,
                     },
@@ -147,6 +157,7 @@ export class CouponsService {
                     planIds: row.planIds,
                     maxRedemptions: row.maxRedemptions,
                     expiresAt: row.expiresAt?.toISOString() ?? null,
+                    razorpayOfferId: row.razorpayOfferId,
                     active: row.active,
                 },
             );
@@ -175,6 +186,10 @@ export class CouponsService {
                     input.expiresAt === undefined
                         ? row.expiresAt
                         : input.expiresAt,
+                razorpayOfferId:
+                    input.razorpayOfferId === undefined
+                        ? row.razorpayOfferId
+                        : input.razorpayOfferId,
             };
             await this.checkFields(next, now, {
                 // An expiry already passed may stay as it is (pausing an
@@ -204,6 +219,7 @@ export class CouponsService {
                 "planIds",
                 "maxRedemptions",
                 "expiresAt",
+                "razorpayOfferId",
                 "active",
             ] as const) {
                 if (input[key] !== undefined) {
@@ -285,6 +301,16 @@ export class CouponsService {
         now: Date,
         opts: { expiryChanged: boolean } = { expiryChanged: true },
     ): Promise<void> {
+        if (
+            f.razorpayOfferId !== null &&
+            !RAZORPAY_OFFER_ID.test(f.razorpayOfferId)
+        ) {
+            throw new BadRequestException({
+                message:
+                    "A Razorpay offer ID is offer_ and 14 letters or digits, like offer_ABCDEFGHIJKLMN.",
+                details: { field: "razorpayOfferId" },
+            });
+        }
         if (
             opts.expiryChanged &&
             f.expiresAt &&

@@ -465,6 +465,33 @@ describe("pricing catalogue tables (DB, U1)", () => {
                 },
             });
 
+        it("takes a Razorpay offer id only in Razorpay's shape", async () => {
+            const ok = await coupon("FAKE333");
+            await expect(
+                prisma.pricingCoupon.update({
+                    where: { id: ok.id },
+                    data: { razorpayOfferId: "offer_ABCDEFGHIJKLMN" },
+                }),
+            ).resolves.toMatchObject({
+                razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+            });
+            for (const bad of [
+                "offer_ABCDEFGHIJKLM",
+                "offer_ABCDEFGHIJKLMNO",
+                "offer_ABCDEFGHIJK-MN",
+                "",
+            ]) {
+                expect(
+                    await refused(
+                        prisma.pricingCoupon.update({
+                            where: { id: ok.id },
+                            data: { razorpayOfferId: bad },
+                        }),
+                    ),
+                ).toMatch(/PricingCoupon_razorpay_offer_shape/);
+            }
+        });
+
         it("stores codes upper-cased, so the same code in two cases is refused", async () => {
             await coupon("FAKE111");
             expect(await refused(coupon("FAKE111"))).toMatch(/unique|Unique/i);

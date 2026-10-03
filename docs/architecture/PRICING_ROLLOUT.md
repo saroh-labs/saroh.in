@@ -235,8 +235,9 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   Monthly: its discount off each of its months; yearly: that many months'
   worth once, off the first yearly charge, never more than the charge. The
   checkout keeps `couponId`, `discountPaise`, `discountCharges`; the
-  provider is told the GST-inclusive difference per charge, so it charges
-  exactly what the invoice says. The redemption row is written by the
+  provider is told the GST-inclusive difference per charge; on Razorpay it
+  is the coupon's Offer that takes it off, and that Offer must match
+  (Coupons on Razorpay, below). The redemption row is written by the
   webhook with the first discounted charge (a NEW plan's completion, a
   trial's first charge), never at checkout; an abandoned checkout redeems
   nothing. Invoices take the discount off the plan line for the provider
@@ -260,13 +261,8 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
 
 ### Provider assumptions added by U16 — **unverified**
 
-7. **Coupons.** Assumed Razorpay takes money off a subscription only
-   through an Offer made in its Dashboard and linked by `offer_id`; Saroh's
-   coupons have none, so the adapter **refuses** a checkout with a coupon
-   (REFUSED → 409 "That coupon can't be used with payments just now"),
-   never charging the full price for a discounted plan. Settle before
-   coupons go live: Offers per coupon, or another way to discount the first
-   charges.
+7. **Coupons.** Settled by the test-mode spike (row 7 below) and the next
+   section: a coupon goes through Razorpay only with its Razorpay Offer.
 8. **Trials.** A subscription with `start_at` at the trial's end and no
    addons: assumed `subscription.authenticated` arrives once the mandate is
    authorised (a token charge, refunded), and `activated`/`charged` at
@@ -278,6 +274,54 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
    so a retry after a lost answer may add the item twice. An item added
    after Razorpay has drawn up the next invoice is assumed to wait for the
    one after; Saroh's invoice would then list it a charge early.
+
+### Coupons on Razorpay: Offers
+
+Razorpay takes a discount off a subscription only through an **Offer**,
+passed as `offer_id` when the subscription is made; Offers **can't be made
+through the API** (405, test-mode spike). So each coupon is linked by hand:
+
+1. The owner makes the Offer in the Razorpay Dashboard.
+2. They paste its id into the coupon's **Razorpay offer ID** in the admin
+   console (Plans › Offers). `PricingCoupon.razorpayOfferId`, migration
+   `20261021170000_coupon_razorpay_offer`; the CHECK
+   `PricingCoupon_razorpay_offer_shape` holds it to Razorpay's shape,
+   `offer_` and 14 letters or digits (20 in all, Razorpay's docs). It can be
+   changed or cleared at any time, unlike the code; each change is audited
+   (`pricing.coupon.update`).
+
+At checkout the adapter sends the coupon's `offer_id` with the
+subscription. A coupon **without** one is refused before Razorpay is asked
+(REFUSED → 409 "That coupon can't be used with payments just now. Try
+without it.", field `coupon`), never charging the full price. Saroh's own
+accounting is unchanged: the checkout's `couponId`, `discountPaise` and
+`discountCharges`, the redemption row with the first discounted charge,
+the invoice's `discountPaise` and the quote's amounts. Cashfree refuses any
+coupon; the fake provider behaves as Razorpay does.
+
+**The Offer's discount must match the coupon's.** Razorpay applies its
+own Offer's terms, not Saroh's numbers, so a mismatch means the business is
+charged one amount and invoiced another. Set the Offer to:
+
+- a **flat** amount off (not a percentage), equal to the coupon's discount
+  **with GST**, the difference `withGstPaise(price) −
+withGstPaise(price − discount)` the quote shows;
+- applied to the **first N charges**, N being the coupon's months on
+  monthly, and **one** charge on yearly, where the amount is the months'
+  worth (capped at the charge). A coupon of more than one month is a
+  different Offer on yearly than on monthly, and one coupon holds one Offer
+  id: limit such a coupon to monthly plans, or keep it to one month;
+- valid on the plans the coupon names, for at least as long as the coupon
+  (`expiresAt`), and not limited to a payment method a business might use.
+
+There is **no check** that the two match: Razorpay documents no endpoint to
+read an Offer back (`GET /v1/offers/:id` isn't in its API reference; only
+the list `GET /v1/offers` was seen in the spike, and the shape of an
+Offer's discount fields in it is unverified). Unverified as well: that
+Razorpay refuses an unknown or expired `offer_id` with a 4xx (it would then
+read as REFUSED, the same 409), and how the Offer's discount shows on the
+`subscription.charged` amount. Check both with a test payment before the
+first real coupon.
 
 ## Saroh's own invoices (U17)
 

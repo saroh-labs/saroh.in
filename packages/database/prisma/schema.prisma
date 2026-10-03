@@ -6589,10 +6589,15 @@ model PricingCoupon {
 
   // Taken off each month for `months` months (monthly), or off the first
   // yearly charge as `months` months' worth, capped at that charge (U16).
-  discountPaise Int
-  months        Int
+  discountPaise   Int
+  months          Int
   // Catalogue plan ids it applies to.
-  planIds       String[]
+  planIds         String[]
+  // The Razorpay Offer that takes the same discount off on Razorpay's side
+  // (`offer_` + 14 letters or digits; the column's CHECK). Made by hand in
+  // the Razorpay Dashboard, which offers no API to make one. Without it a
+  // Razorpay checkout refuses the coupon. Changeable, unlike the code.
+  razorpayOfferId String?
 
   active         Boolean   @default(true)
   maxRedemptions Int

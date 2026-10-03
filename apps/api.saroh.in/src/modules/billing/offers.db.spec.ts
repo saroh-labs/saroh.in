@@ -48,6 +48,7 @@ import { SarohInvoicesService } from "./saroh-invoices.service";
 import type { SarohSeller } from "./saroh-seller";
 
 const SECRET = "whsec_fake_platform_secret";
+const OFFER_ID = "offer_ABCDEFGHIJKLMN";
 const DAY = 24 * 60 * 60 * 1000;
 const tag = `${process.pid}-${Date.now()}`;
 
@@ -211,6 +212,7 @@ async function coupon(
         active: boolean;
         maxRedemptions: number;
         expiresAt: Date | null;
+        razorpayOfferId: string | null;
     }> = {},
 ) {
     return prisma.pricingCoupon.create({
@@ -220,6 +222,9 @@ async function coupon(
             months: 2,
             planIds: ["b", "c"],
             maxRedemptions: 5,
+            // A made-up Razorpay Offer: the fake, like Razorpay, refuses a
+            // coupon without one.
+            razorpayOfferId: OFFER_ID,
             ...over,
         },
     });
@@ -418,6 +423,7 @@ describe("coupons", () => {
             amountPaise:
                 withGstPaise(c.priceCents) - withGstPaise(c.priceCents - 111),
             charges: 2,
+            razorpayOfferId: OFFER_ID,
         });
         // Not redeemed at checkout.
         expect(await prisma.pricingCouponRedemption.count()).toBe(0);
@@ -606,6 +612,57 @@ describe("coupons", () => {
             }),
         ).rejects.toMatchObject({ status: 409 });
         expect(await prisma.billingCheckout.count()).toBe(0);
+    });
+
+    it("a coupon without a Razorpay offer is refused with a 409 on the coupon, recording nothing", async () => {
+        await install();
+        const ctx = await business();
+        await coupon("NO-OFFER", { razorpayOfferId: null });
+        await expect(
+            checkout.changePlan(ctx, {
+                plan: "c",
+                cycle: "month",
+                coupon: "NO-OFFER",
+            }),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: { details: { field: "coupon" } },
+        });
+        expect(fake.createCalls).toHaveLength(0);
+        expect(await prisma.billingCheckout.count()).toBe(0);
+        expect(await prisma.pricingCouponRedemption.count()).toBe(0);
+    });
+
+    it("a coupon with a Razorpay offer reaches the provider as its offer, and Saroh's own accounting stands", async () => {
+        await install();
+        const ctx = await business();
+        const made = await coupon("WITH-OFFER", { months: 1 });
+        const r = await checkout.changePlan(ctx, {
+            plan: "c",
+            cycle: "month",
+            coupon: "WITH-OFFER",
+        });
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        expect(fake.createCalls).toHaveLength(1);
+        expect(fake.createCalls[0]?.discount?.razorpayOfferId).toBe(OFFER_ID);
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: r.checkout.id },
+            }),
+        ).toMatchObject({
+            couponId: made.id,
+            discountPaise: 111,
+            discountCharges: 1,
+        });
+        await deliver(`fake_sub_${r.checkout.id}`, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+        expect(
+            await prisma.pricingCouponRedemption.findFirstOrThrow(),
+        ).toMatchObject({ couponId: made.id, discountPaise: 111 });
+        expect(
+            (await prisma.sarohInvoice.findFirstOrThrow()).discountPaise,
+        ).toBe(111);
     });
 
     it("rate-limits coupon checks per business", async () => {

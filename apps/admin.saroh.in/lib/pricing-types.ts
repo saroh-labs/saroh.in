@@ -183,6 +183,8 @@ export interface AdminCoupon {
     discountPaise: number;
     months: number;
     planIds: string[];
+    /** The Razorpay Offer made in its Dashboard; null: none linked. */
+    razorpayOfferId: string | null;
     active: boolean;
     maxRedemptions: number;
     expiresAt: string | null;
@@ -199,6 +201,7 @@ export interface CouponInput {
     planIds: string[];
     maxRedemptions: number;
     expiresAt?: string | null;
+    razorpayOfferId?: string | null;
     active?: boolean;
 }
 

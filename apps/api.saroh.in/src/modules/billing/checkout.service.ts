@@ -565,6 +565,7 @@ export class CheckoutService {
                                   code: coupon.code,
                                   amountPaise: quote.discountTotalPaise,
                                   charges: quote.discountCharges,
+                                  razorpayOfferId: coupon.razorpayOfferId,
                               }
                             : null,
                     reference: id,
@@ -573,7 +574,8 @@ export class CheckoutService {
             this.logger.warn(
                 `billing_checkout_provider_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
             );
-            // A provider that can't take a coupon off refuses it (U16).
+            // A provider that can't take a coupon off refuses it (U16):
+            // Razorpay, a coupon without its Razorpay Offer.
             if (
                 discounted &&
                 error instanceof BillingProviderError &&

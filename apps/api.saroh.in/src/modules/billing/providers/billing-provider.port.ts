@@ -68,8 +68,18 @@ export interface CreateSubscriptionInput {
      * each of the subscription's first `charges` charges. A provider that
      * can't take one off refuses (`BillingProviderError` REFUSED) rather
      * than charge the full amount.
+     *
+     * `razorpayOfferId` is the coupon's Razorpay Offer, made in the Razorpay
+     * Dashboard: Razorpay takes a discount off only through one, applying
+     * the Offer's own terms, which must match the coupon's
+     * (`PRICING_ROLLOUT.md`). Razorpay refuses a coupon without one.
      */
-    discount?: { code: string; amountPaise: number; charges: number } | null;
+    discount?: {
+        code: string;
+        amountPaise: number;
+        charges: number;
+        razorpayOfferId?: string | null;
+    } | null;
     /** Saroh's reference for this attempt (the checkout id), for the notes. */
     reference?: string;
 }

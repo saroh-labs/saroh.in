@@ -42,6 +42,7 @@ function coupon(over: Partial<AdminCoupon> = {}): AdminCoupon {
         discountPaise: 1_000,
         months: 1,
         planIds: ["b"],
+        razorpayOfferId: null,
         active: true,
         maxRedemptions: 10,
         expiresAt: null,
@@ -255,6 +256,78 @@ describe("coupons", () => {
         expect(actions.updateCouponAction).toHaveBeenCalledWith(
             "c1",
             expect.objectContaining({ active: false }),
+        );
+    });
+
+    it("checks a Razorpay offer id beside the field, then saves it through the reason dialog", async () => {
+        actions.updateCouponAction.mockResolvedValue({
+            ok: true,
+            data: coupon({
+                razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+                updatedAt: "2026-09-27T00:00:00.000Z",
+            }),
+        });
+        draw({ coupons: [coupon()] });
+        const field = screen.getByLabelText("Razorpay offer ID");
+        const hint = document.getElementById(
+            (field.getAttribute("aria-describedby") ?? "").split(" ")[0] ?? "",
+        );
+        expect(hint?.textContent).toBe(
+            "Make the offer in your Razorpay Dashboard, then paste its ID here.",
+        );
+
+        fireEvent.change(field, { target: { value: "offer_short" } });
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+        expect(
+            screen.getByText(/offer_ and 14 letters or digits/),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole("button", { name: "Save changes" }),
+        ).toHaveProperty("disabled", true);
+
+        fireEvent.change(field, {
+            target: { value: " offer_ABCDEFGHIJKLMN" },
+        });
+        expect(field.getAttribute("aria-invalid")).toBe("false");
+        fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+        await confirmWithReason("Save changes");
+
+        expect(actions.savePricingDraftAction).not.toHaveBeenCalled();
+        expect(actions.updateCouponAction).toHaveBeenCalledWith(
+            "c1",
+            expect.objectContaining({
+                razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+                reason: "Testing this",
+            }),
+        );
+    });
+
+    it("clears a Razorpay offer id, and shows the API's refusal beside the field", async () => {
+        actions.updateCouponAction.mockResolvedValue({
+            ok: false,
+            error: "A Razorpay offer ID is offer_ and 14 letters or digits.",
+            status: 400,
+            details: { field: "razorpayOfferId" },
+        });
+        draw({
+            coupons: [coupon({ razorpayOfferId: "offer_ABCDEFGHIJKLMN" })],
+        });
+        const field = screen.getByLabelText("Razorpay offer ID");
+        expect((field as HTMLInputElement).value).toBe("offer_ABCDEFGHIJKLMN");
+        fireEvent.change(field, { target: { value: "" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+        await confirmWithReason("Save changes");
+
+        expect(actions.updateCouponAction).toHaveBeenCalledWith(
+            "c1",
+            expect.objectContaining({ razorpayOfferId: null }),
+        );
+        await waitFor(() =>
+            expect(field.getAttribute("aria-invalid")).toBe("true"),
+        );
+        const ids = (field.getAttribute("aria-describedby") ?? "").split(" ");
+        expect(document.getElementById(ids[1] ?? "")?.textContent).toBe(
+            "A Razorpay offer ID is offer_ and 14 letters or digits.",
         );
     });
 
