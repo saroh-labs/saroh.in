@@ -1,5 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { liveCatalogueVersion, prisma } from "@saroh/database";
+import {
+    liveCatalogueVersion,
+    prisma,
+    unsyncedCatalogueVersions,
+} from "@saroh/database";
 import type {
     BoughtAddon,
     Catalog,
@@ -36,6 +40,8 @@ import {
     withoutRaises,
 } from "./catalogue-access";
 import { usageByModule } from "./metering";
+import type { MoveReadiness } from "./plan-moves";
+import { moveReadiness } from "./plan-moves";
 
 /**
  * The floor for a business the catalogue doesn't reach yet: no subscription
@@ -64,11 +70,16 @@ export interface LivePlanOverride {
     expiresAt: Date | null;
 }
 
-/** A move to another plan version that hasn't reached its date yet (KTD-4). */
+/**
+ * A move to another plan version not applied yet (KTD-4): its date is still
+ * to come, or it has come and the move is `held` or must be authorised
+ * (U15, `plan-moves.ts`).
+ */
 export interface PendingMove {
     planId: string;
     version: number;
     from: Date;
+    waiting: "held" | "authorise" | null;
 }
 
 /** Why a business is read off the legacy path instead of the catalogue. */
@@ -202,19 +213,27 @@ export class CatalogueAccessService {
                 where: { organizationId },
                 select: {
                     status: true,
+                    provider: true,
+                    providerSubscriptionId: true,
+                    cancelAtPeriodEnd: true,
+                    pendingPlanId: true,
                     pendingFrom: true,
                     plan: {
                         select: {
+                            id: true,
                             key: true,
                             version: true,
+                            interval: true,
                             priceCents: true,
                             entitlements: true,
                         },
                     },
                     pendingPlan: {
                         select: {
+                            id: true,
                             key: true,
                             version: true,
+                            interval: true,
                             priceCents: true,
                             entitlements: true,
                         },
@@ -250,10 +269,26 @@ export class CatalogueAccessService {
             subscription && subscription.status !== "CANCELLED"
                 ? subscription
                 : null;
-        const due =
-            live?.pendingPlan && live.pendingFrom && live.pendingFrom <= now
-                ? live.pendingPlan
-                : null;
+        // A due move is what it's on only once it can be billed as it reads
+        // (U15): not while its version is held at the billing provider, nor
+        // while the business must authorise a new amount.
+        let readiness: MoveReadiness = "none";
+        if (live?.pendingPlan && live.pendingFrom && live.pendingFrom <= now) {
+            const [scheduled, held] = await Promise.all([
+                prisma.billingCheckout.findFirst({
+                    where: { organizationId, status: "SCHEDULED" },
+                    select: { planId: true },
+                }),
+                unsyncedCatalogueVersions(prisma),
+            ]);
+            readiness = moveReadiness({
+                subscription: live,
+                scheduledPlanId: scheduled?.planId ?? null,
+                held: new Set(held),
+                now,
+            });
+        }
+        const due = readiness === "ready" ? (live?.pendingPlan ?? null) : null;
         const billed = due ?? live?.plan ?? null;
 
         // Where the catalogue puts it: a plan, on a version (null = live).
@@ -346,6 +381,12 @@ export class CatalogueAccessService {
                               live.pendingPlan.key,
                           version: live.pendingPlan.version,
                           from: live.pendingFrom,
+                          waiting:
+                              readiness === "held"
+                                  ? "held"
+                                  : readiness === "needs-authorisation"
+                                    ? "authorise"
+                                    : null,
                       }
                     : null,
             modules,
@@ -407,6 +448,7 @@ export class CatalogueAccessService {
                       planId: a.pendingMove.planId,
                       version: a.pendingMove.version,
                       from: a.pendingMove.from.toISOString(),
+                      waiting: a.pendingMove.waiting,
                   }
                 : null,
             modules: moduleAccessViews(

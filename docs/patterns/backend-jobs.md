@@ -230,3 +230,20 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   replaced or applied says nothing; once per move, claimed as a
   `CustomerNotice` (`plan-move:<subscriptionId>:<pendingFrom>`). Cancelling
   the version, or a newer move, deletes the notices still PENDING.
+
+## Saroh billing — **Current** (plans catalogue U15)
+
+- **`billing.provider-plans.sync`** makes a published version's paid plans at
+  Saroh's billing provider (RECOMMENDATIONS 5). Queued on the publish's own
+  transaction, one waiting per version; while rows are PENDING it re-queues
+  itself with a growing pause, so the queue's own retries aren't spent.
+  Asking for a plan made under the row's id first keeps a repeat from making
+  a second. The last row SYNCED puts a version past its go-live live and
+  queues `pricing.site.revalidate` on the same transaction.
+- **`billing.provider.cancel`** cancels a provider subscription (now, or at
+  the cycle's end) after a plan change commits: the change never waits on the
+  provider, and a refusal (already cancelled) isn't retried.
+- **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
+  PENDING run, a partial unique index): due pending moves that are ready
+  (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid
+  subscription's move is applied by its renewal webhook first.

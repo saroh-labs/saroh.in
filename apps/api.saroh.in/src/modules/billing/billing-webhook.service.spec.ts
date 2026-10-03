@@ -6,8 +6,14 @@
 // FakeBillingProvider doing a REAL HMAC-SHA256 hex compare against a fixed
 // secret (no process.env).
 jest.mock("@saroh/database", () => {
-    const subscription = { findFirst: jest.fn(), update: jest.fn() };
-    const billingWebhookEvent = { create: jest.fn(), update: jest.fn() };
+    const subscription = {
+        findFirst: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+        update: jest.fn(),
+    };
+    const billingWebhookEvent = { createMany: jest.fn(), update: jest.fn() };
+    // No checkout owns these provider subscriptions (U15).
+    const billingCheckout = { findUnique: jest.fn(() => null) };
     // Merchant delegates — present ONLY so we can assert billing never uses them.
     const merchantPaymentProvider = { findUnique: jest.fn() };
     const paymentIntent = { findFirst: jest.fn(), update: jest.fn() };
@@ -15,18 +21,22 @@ jest.mock("@saroh/database", () => {
     const paymentRefund = { create: jest.fn(), findFirst: jest.fn() };
     const webhookEvent = { create: jest.fn(), update: jest.fn() };
     const order = { findUnique: jest.fn(), update: jest.fn() };
-    return {
-        prisma: {
-            subscription,
-            billingWebhookEvent,
-            merchantPaymentProvider,
-            paymentIntent,
-            paymentAttempt,
-            paymentRefund,
-            webhookEvent,
-            order,
-        },
+    const client: Record<string, unknown> = {
+        subscription,
+        billingWebhookEvent,
+        billingCheckout,
+        // The row lock the reconcile takes.
+        $queryRaw: jest.fn(() => []),
+        merchantPaymentProvider,
+        paymentIntent,
+        paymentAttempt,
+        paymentRefund,
+        webhookEvent,
+        order,
     };
+    // One transaction: the inbox row and its effect together (U15).
+    client.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(client));
+    return { prisma: client };
 });
 
 import { createHmac } from "node:crypto";
@@ -41,9 +51,28 @@ import {
 } from "./providers/fake.provider";
 
 const subFindFirst = prisma.subscription.findFirst as jest.Mock;
+const subFindOne = prisma.subscription.findUniqueOrThrow as jest.Mock;
 const subUpdate = prisma.subscription.update as jest.Mock;
-const bweCreate = prisma.billingWebhookEvent.create as jest.Mock;
+const bweCreate = prisma.billingWebhookEvent.createMany as jest.Mock;
 const bweUpdate = prisma.billingWebhookEvent.update as jest.Mock;
+
+/** The subscription the event names: found, then read under its lock. */
+function onSubscription(row: { status: string } | null) {
+    subFindFirst.mockResolvedValue(
+        row ? { id: "sub_1", organizationId: "org_1" } : null,
+    );
+    if (row) {
+        subFindOne.mockResolvedValue({
+            id: "sub_1",
+            organizationId: "org_1",
+            provider: "RAZORPAY",
+            providerSubscriptionId: "prov_sub_1",
+            providerEventAt: null,
+            pendingFrom: null,
+            ...row,
+        });
+    }
+}
 
 const SECRET = "whsec_fake_platform_secret";
 
@@ -88,7 +117,7 @@ function bodyOf(over: Record<string, unknown> = {}): Buffer {
     return Buffer.from(
         JSON.stringify({
             providerEventId: "evt_1",
-            type: "subscription.halted",
+            type: "subscription.pending",
             providerSubscriptionId: "prov_sub_1",
             status: "PAST_DUE",
             ...over,
@@ -101,14 +130,10 @@ beforeEach(() => jest.clearAllMocks());
 describe("BillingWebhookService signature verification", () => {
     it("accepts a valid HMAC and moves the subscription status", async () => {
         const { service } = makeService();
-        subFindFirst.mockResolvedValue({
-            id: "sub_1",
-            organizationId: "org_1",
-            status: "ACTIVE",
-        });
-        bweCreate.mockResolvedValue({ id: "bwe_1" });
+        onSubscription({ status: "ACTIVE" });
+        bweCreate.mockResolvedValue({ count: 1 });
 
-        const raw = bodyOf();
+        const raw = bodyOf({ phase: "pending" });
         const result = await service.handle("razorpay", raw, {
             "x-fake-signature": sign(raw),
         });
@@ -119,20 +144,24 @@ describe("BillingWebhookService signature verification", () => {
             where: { id: "sub_1" },
             data: { status: "PAST_DUE" },
         });
-        // Inbox row stamped processed. The event records the resolved org id.
+        // Inbox row written and stamped processed, with the resolved org id.
         expect(bweCreate).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: expect.objectContaining({
-                    provider: "RAZORPAY",
-                    providerEventId: "evt_1",
-                    organizationId: "org_1",
-                }),
+                data: [
+                    expect.objectContaining({
+                        provider: "RAZORPAY",
+                        providerEventId: "evt_1",
+                        organizationId: "org_1",
+                    }),
+                ],
+                skipDuplicates: true,
             }),
         );
-        expect(bweUpdate).toHaveBeenCalledWith({
-            where: { id: "bwe_1" },
-            data: { processedAt: expect.any(Date) },
-        });
+        expect(bweUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: { processedAt: expect.any(Date) },
+            }),
+        );
         expectNoMerchantAccess();
     });
 
@@ -163,48 +192,26 @@ describe("BillingWebhookService signature verification", () => {
 });
 
 describe("BillingWebhookService idempotency", () => {
-    it("first delivery reconciles once; a duplicate (P2002) is a 200 no-op that writes NOTHING", async () => {
+    it("a duplicate delivery (the inbox row exists) is a 200 no-op that moves NOTHING", async () => {
         const { service } = makeService();
-        subFindFirst.mockResolvedValue({
-            id: "sub_1",
-            organizationId: "org_1",
-            status: "ACTIVE",
-        });
+        onSubscription({ status: "ACTIVE" });
+        bweCreate.mockResolvedValueOnce({ count: 0 });
 
         const raw = bodyOf();
-        const headers = { "x-fake-signature": sign(raw) };
-
-        // First delivery: status moves exactly once.
-        bweCreate.mockResolvedValueOnce({ id: "bwe_1" });
-        const first = await service.handle("razorpay", raw, headers);
-        expect(first).toEqual({ status: "processed", changed: true });
-        expect(subUpdate).toHaveBeenCalledTimes(1);
-
-        // Duplicate delivery: unique (provider, providerEventId) → P2002 →
-        // 200 no-op → NO further state change.
-        jest.clearAllMocks();
-        subFindFirst.mockResolvedValue({
-            id: "sub_1",
-            organizationId: "org_1",
-            status: "ACTIVE",
+        const result = await service.handle("razorpay", raw, {
+            "x-fake-signature": sign(raw),
         });
-        bweCreate.mockRejectedValueOnce({ code: "P2002" });
-
-        const second = await service.handle("razorpay", raw, headers);
-        expect(second).toEqual({ status: "duplicate", changed: false });
+        expect(result).toEqual({ status: "duplicate", changed: false });
         expect(subUpdate).not.toHaveBeenCalled();
+        expect(bweUpdate).not.toHaveBeenCalled();
     });
 
     it("a same→same target is an ignored no-op (never asserted, never written)", async () => {
         const { service } = makeService();
-        subFindFirst.mockResolvedValue({
-            id: "sub_1",
-            organizationId: "org_1",
-            status: "PAST_DUE",
-        });
-        bweCreate.mockResolvedValue({ id: "bwe_1" });
+        onSubscription({ status: "PAST_DUE" });
+        bweCreate.mockResolvedValue({ count: 1 });
 
-        const raw = bodyOf(); // target PAST_DUE == current PAST_DUE
+        const raw = bodyOf({ phase: "pending" }); // PAST_DUE == PAST_DUE
         const result = await service.handle("razorpay", raw, {
             "x-fake-signature": sign(raw),
         });
@@ -217,16 +224,13 @@ describe("BillingWebhookService idempotency", () => {
 describe("BillingWebhookService state machine", () => {
     it("REJECTS an illegal transition (CANCELLED → ACTIVE) — status unchanged, event unprocessed", async () => {
         const { service } = makeService();
-        subFindFirst.mockResolvedValue({
-            id: "sub_1",
-            organizationId: "org_1",
-            status: "CANCELLED", // terminal
-        });
-        bweCreate.mockResolvedValue({ id: "bwe_1" });
+        onSubscription({ status: "CANCELLED" }); // terminal
+        bweCreate.mockResolvedValue({ count: 1 });
 
         const raw = bodyOf({
             type: "subscription.activated",
             status: "ACTIVE",
+            phase: "activated",
         });
         const result = await service.handle("razorpay", raw, {
             "x-fake-signature": sign(raw),
@@ -241,8 +245,8 @@ describe("BillingWebhookService state machine", () => {
 
     it("ignores a verified event with no matching subscription", async () => {
         const { service } = makeService();
-        subFindFirst.mockResolvedValue(null);
-        bweCreate.mockResolvedValue({ id: "bwe_1" });
+        onSubscription(null);
+        bweCreate.mockResolvedValue({ count: 1 });
 
         const raw = bodyOf();
         const result = await service.handle("razorpay", raw, {
@@ -254,7 +258,7 @@ describe("BillingWebhookService state machine", () => {
         // The inbox still records it (org id null since unresolved).
         expect(bweCreate).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: expect.objectContaining({ organizationId: null }),
+                data: [expect.objectContaining({ organizationId: null })],
             }),
         );
     });

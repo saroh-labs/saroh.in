@@ -1,7 +1,8 @@
-import type { OnModuleInit } from "@nestjs/common";
+import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { forwardRef, Module } from "@nestjs/common";
 
 import { OrganizationGuard } from "../../common/guards/organization.guard";
+import { env } from "../../env";
 import { AuditModule } from "../audit/audit.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
@@ -11,12 +12,28 @@ import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
 import { CatalogueAccessService } from "./catalogue-access.service";
+import { CheckoutService } from "./checkout.service";
 import { EntitlementService } from "./entitlement.service";
 import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
+import {
+    BILLING_MOVES_APPLY_TYPE,
+    MovesApplyHandler,
+} from "./moves-apply.handler";
 import { PlanLimitNoticeHandler } from "./plan-limit-notice.handler";
 import { PlansService } from "./plans.service";
+import {
+    BILLING_PROVIDER_CANCEL_TYPE,
+    ProviderCancelHandler,
+} from "./provider-cancel.job";
+import {
+    PROVIDER_PLAN_SYNC_TYPE,
+    ProviderPlanSyncService,
+} from "./provider-plan-sync.service";
 import { billingProviderFactoryProvider } from "./providers/provider.factory";
 import { SubscriptionsService } from "./subscriptions.service";
+
+/** How often a stopped sweep chain is looked for and restarted. */
+const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
 
 /**
  * Saroh SaaS billing (S7-005).
@@ -38,6 +55,11 @@ import { SubscriptionsService } from "./subscriptions.service";
  * enforces the catalogue's limits behind `PLAN_ENFORCEMENT` (U13), and
  * {@link PlanLimitNoticeHandler} tells a business it is near or at one.
  *
+ * Saroh's own checkout and plan changes (plans catalogue U15) are
+ * {@link CheckoutService}; three jobs back them: the billing-provider plan
+ * sync a publish queues, the provider cancels a change queues, and the
+ * hourly sweep that applies due moves and lapses unpaid checkouts.
+ *
  * NOTE: this module is intentionally NOT self-registering — the app owner wires
  * it into `AppModule`.
  */
@@ -57,6 +79,10 @@ import { SubscriptionsService } from "./subscriptions.service";
         MeteringService,
         PlanLimitNoticeHandler,
         BillingWebhookService,
+        CheckoutService,
+        ProviderPlanSyncService,
+        ProviderCancelHandler,
+        MovesApplyHandler,
         billingProviderFactoryProvider,
         OrganizationGuard,
     ],
@@ -68,13 +94,39 @@ import { SubscriptionsService } from "./subscriptions.service";
         PlansService,
     ],
 })
-export class BillingModule implements OnModuleInit {
+export class BillingModule implements OnModuleInit, OnModuleDestroy {
+    private chainCheck?: ReturnType<typeof setInterval>;
+
     constructor(
         private readonly registry: JobHandlerRegistry,
+        private readonly sync: ProviderPlanSyncService,
+        private readonly cancel: ProviderCancelHandler,
+        private readonly sweep: MovesApplyHandler,
         private readonly limitNotice: PlanLimitNoticeHandler,
     ) {}
 
-    onModuleInit(): void {
+    /**
+     * Registers the four jobs and starts the sweep's chain — the renewal
+     * job's shape (ADR-007): never under test, where no worker runs, and
+     * never throwing, so a database not up yet cannot stop the boot.
+     */
+    async onModuleInit(): Promise<void> {
+        this.registry.register(PROVIDER_PLAN_SYNC_TYPE, this.sync.handle);
+        this.registry.register(
+            BILLING_PROVIDER_CANCEL_TYPE,
+            this.cancel.handle,
+        );
+        this.registry.register(BILLING_MOVES_APPLY_TYPE, this.sweep.handle);
         this.registry.register(PLAN_LIMIT_NOTICE_TYPE, this.limitNotice.handle);
+        if (env.NODE_ENV === "test") return;
+        await this.sweep.schedule(new Date());
+        this.chainCheck = setInterval(() => {
+            void this.sweep.ensureScheduled();
+        }, CHAIN_CHECK_MS);
+        this.chainCheck.unref();
+    }
+
+    onModuleDestroy(): void {
+        clearInterval(this.chainCheck);
     }
 }

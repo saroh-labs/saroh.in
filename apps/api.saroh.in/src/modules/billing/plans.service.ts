@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Plan } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { liveCatalogueVersion, prisma } from "@saroh/database";
+import type { BillingCycle } from "@saroh/pricing-catalog";
+import { catalogPlanKey } from "@saroh/pricing-catalog";
 
 /**
  * Pricing catalogue `Plan` rows (`catalog.<plan>`, plan 2026-09-29 U1) are
  * not offered through this legacy path: a merchant moves onto the catalogue
- * through its own checkout (U15), which lifts this filter.
+ * through its own checkout (U15, `resolveCatalogue` below), never through
+ * `listActive` or `resolveActiveByKey`.
  */
 export const NOT_CATALOGUE_PLAN = {
     key: { not: { startsWith: "catalog." } },
@@ -45,5 +48,34 @@ export class PlansService {
             throw new NotFoundException(`No active plan for key "${key}"`);
         }
         return plan;
+    }
+
+    /**
+     * A catalogue plan's billable row on the LIVE version, for a cycle
+     * (checkout, U15): the one place the `NOT_CATALOGUE_PLAN` filter is
+     * lifted. 404 when no version is live or the version has no such plan;
+     * a retired plan (`active` false) comes back for the caller to refuse.
+     */
+    async resolveCatalogue(
+        planId: string,
+        cycle: BillingCycle,
+        now: Date = new Date(),
+    ): Promise<Plan & { liveVersion: number }> {
+        const live = await liveCatalogueVersion(prisma, now);
+        const row = live
+            ? await prisma.plan.findUnique({
+                  where: {
+                      key_version_interval: {
+                          key: catalogPlanKey(planId),
+                          version: live.version,
+                          interval: cycle,
+                      },
+                  },
+              })
+            : null;
+        if (!live || !row) {
+            throw new NotFoundException(`There's no plan "${planId}" to buy.`);
+        }
+        return { ...row, liveVersion: live.version };
     }
 }

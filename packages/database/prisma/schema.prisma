@@ -322,6 +322,8 @@ model Organization {
   // Saroh billing: add-ons bought and coupons used (pricing catalogue U1).
   subscriptionAddons       SubscriptionAddon[]
   pricingCouponRedemptions PricingCouponRedemption[]
+  // Saroh billing: checkouts for a plan change (pricing catalogue U15).
+  billingCheckouts         BillingCheckout[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -3884,6 +3886,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_payments_confirm_pending", where: raw("type = 'payments.confirm-pending' AND status = 'PENDING'"))
   // One waiting run of the waitlist retention sweep (U30), like the renewal chain.
   @@unique([type], map: "Job_one_pending_waitlist_retention", where: raw("type = 'waitlist.retention' AND status = 'PENDING'"))
+  // One waiting run of Saroh billing's plan-move sweep (U15), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_billing_moves_apply", where: raw("type = 'billing.moves.apply' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -4904,6 +4908,7 @@ model Plan {
   // interval. The old (key, version) key could not hold both cycles.
   pendingSubscriptions Subscription[]        @relation("SubscriptionPendingPlan")
   providerPlans        PricingProviderPlan[]
+  checkouts            BillingCheckout[]
 
   @@unique([key, version, interval])
 }
@@ -4946,6 +4951,11 @@ model Subscription {
 
   addons            SubscriptionAddon[]
   couponRedemptions PricingCouponRedemption[]
+
+  // Saroh billing (U15): when the provider says the last event it applied
+  // happened. A delivery older than this is acknowledged and changes
+  // nothing, so a late `activated` can't undo a newer `cancelled`.
+  providerEventAt DateTime?
 
   @@unique([provider, providerSubscriptionId])
   @@unique([id, organizationId])
@@ -6655,4 +6665,63 @@ model PricingProviderPlan {
   @@unique([planId, provider])
   @@unique([provider, providerPlanId])
   @@index([status])
+}
+
+// BillingCheckout — one attempt to put a business on a paid catalogue plan
+// (pricing catalogue U15). Saroh asks its own billing provider for a new
+// provider subscription on the plan's provider plan; the business authorises
+// it on the provider's page, and the provider's webhook completes it here.
+// The amount is always Saroh's: the plan row's price, and for an upgrade the
+// difference for the rest of the period, both worked out on the server.
+//
+// - NEW: on the plan from the moment it's authorised (coming from Free, a
+//   cancelled plan or one Saroh doesn't bill through a provider).
+// - UPGRADE: on the plan at once; the difference for the rest of the period
+//   is charged at authorisation and the plan's own charges start at `startAt`
+//   (the old period's end). The old provider subscription is cancelled.
+// - SCHEDULED: authorised now, on the plan from `startAt` (a cheaper plan, a
+//   cycle change, or a move the business must authorise again, OQ-6). It
+//   stays SCHEDULED until then, as the subscription's pending move.
+//
+// OPEN waits for the authorisation and lapses at `expiresAt`. One OPEN and
+// one SCHEDULED per business at most.
+model BillingCheckout {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+  cycle  String // "month" | "year"
+  kind   String // NEW | UPGRADE | SCHEDULED
+  status String @default("OPEN") // OPEN | SCHEDULED | COMPLETED | CANCELLED
+
+  provider               String
+  providerSubscriptionId String
+  providerPlanId         String
+  providerCustomerId     String?
+
+  // The plan's recurring price before GST, in paise, as it was quoted.
+  pricePaise        Int
+  // An UPGRADE's difference for the rest of the period, charged at
+  // authorisation; zero otherwise.
+  chargeNowPaise    Int @default(0)
+  chargeNowGstPaise Int @default(0)
+
+  // When the plan's own charges start; null for NEW (at authorisation).
+  startAt     DateTime?
+  expiresAt   DateTime
+  completedAt DateTime?
+  endedReason String?
+
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerSubscriptionId])
+  @@unique([organizationId, status], map: "BillingCheckout_one_live_per_org", where: raw("status = 'OPEN' OR status = 'SCHEDULED'"))
+  @@index([organizationId])
+  @@index([planId])
+  @@index([status, expiresAt])
 }

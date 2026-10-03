@@ -20,6 +20,12 @@ import {
     AdminAuditService,
 } from "../admin/admin-audit.service";
 import { AdminPermission } from "../admin/admin-permissions";
+import {
+    CATALOGUE_BILLING_PROVIDER,
+    enqueueProviderPlanSync,
+    PROVIDER_PLAN_SYNC_TYPE,
+    retryProviderPlanSyncInTx,
+} from "../billing/provider-plan-sync.service";
 import type { StaffName } from "./catalogue.service";
 import { DRAFT_SAVE_ACTION, SHARED_DRAFT_ID } from "./catalogue.service";
 import type { PublishPolicy } from "./dto";
@@ -31,9 +37,6 @@ import {
 } from "./revalidate-site.job";
 
 type Tx = Prisma.TransactionClient;
-
-/** The platform account's provider a paid catalogue plan is billed through. */
-export const CATALOGUE_BILLING_PROVIDER = "RAZORPAY";
 
 /** A draft larger than this is not a catalogue someone is editing. */
 export const MAX_DRAFT_BYTES = 256 * 1024;
@@ -458,6 +461,49 @@ export class CatalogueWritesService {
         });
     }
 
+    /**
+     * Ask the billing provider again for a version's plans that failed to
+     * sync (U15): the FAILED rows go back to PENDING and a sync is queued.
+     * Nothing else changes; the version goes live when they are SYNCED.
+     */
+    async retryProviderSync(
+        actorUserId: string,
+        version: number,
+        input: { reason: string; idempotencyKey: string },
+        now: Date,
+    ): Promise<{ version: number; retried: number }> {
+        return prisma.$transaction(async (tx) => {
+            const row = await tx.pricingCatalogVersion.findUnique({
+                where: { version },
+                select: { id: true },
+            });
+            if (!row)
+                throw new NotFoundException(`There's no version ${version}.`);
+            const retried = await retryProviderPlanSyncInTx(tx, version, now);
+            if (retried === 0) {
+                throw new ConflictException(
+                    `Version ${version} has no plans that failed to reach the billing provider.`,
+                );
+            }
+            await this.audit.write(tx, {
+                actorUserId,
+                permission: AdminPermission.PricingPublish,
+                action: "pricing.version.provider-sync.retry",
+                targetType: "pricing_version",
+                targetId: String(version),
+                reason: input.reason,
+                outcome: AdminAuditOutcome.Success,
+                idempotencyKey: this.auditKey(
+                    actorUserId,
+                    "pricing.version.provider-sync.retry",
+                    input.idempotencyKey,
+                ),
+                metadata: { version, retried },
+            });
+            return { version, retried };
+        });
+    }
+
     // ── Shared steps ────────────────────────────────────────────────────
 
     /**
@@ -527,6 +573,8 @@ export class CatalogueWritesService {
                     status: "PENDING",
                 })),
             });
+            // The provider sync (U15) runs once this commits.
+            await enqueueProviderPlanSync(tx, version, input.now);
         }
 
         const moves: ScheduledMoves =
@@ -617,10 +665,15 @@ export class CatalogueWritesService {
         return { version: row.version, catalog: check.catalog };
     }
 
-    /** A cancelled version's go-live revalidation, not yet run. */
+    /** A cancelled version's go-live revalidation and provider sync, not yet run. */
     private async dropRevalidations(tx: Tx, version: number): Promise<void> {
         const jobs = await tx.job.findMany({
-            where: { type: PRICING_REVALIDATE_TYPE, status: "PENDING" },
+            where: {
+                type: {
+                    in: [PRICING_REVALIDATE_TYPE, PROVIDER_PLAN_SYNC_TYPE],
+                },
+                status: "PENDING",
+            },
             select: { id: true, payload: true },
         });
         const ids = jobs
