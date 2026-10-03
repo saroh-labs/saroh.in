@@ -2420,3 +2420,16 @@ Tailwind 3.
 `mk-*` sizes, radii, shadows, widths and spacing; V2 focus rings write
 `focus-visible:[outline-style:solid]`. `lib/cn.test.ts` pins both.
 **Category**: frontend · rule in `apps/saroh.in/lib/cn.ts`
+
+## Tests — the first sequence in the schema broke every suite under RLS
+
+**Problem**: With the waitlist's `position` column in, the whole integration
+suite passed plainly but every file failed under `TEST_RLS=on`: "must be owner
+of sequence WaitlistSignup_position_seq".
+**Root cause**: `test/truncate.ts` ran `TRUNCATE … RESTART IDENTITY`, which
+needs ownership of each sequence. Until then no table had one, so the RLS test
+role (granted USAGE/SELECT/UPDATE on sequences, not ownership) never hit it.
+**Fix**: truncate without `RESTART IDENTITY`; specs compare positions to each
+other, never to 1. The RLS gate (`int-rls` in `pnpm prepush --all`) is what
+catches a recurrence.
+**Category**: tests · rule in `apps/api.saroh.in/test/truncate.ts`

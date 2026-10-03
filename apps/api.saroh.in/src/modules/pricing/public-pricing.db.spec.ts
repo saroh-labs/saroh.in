@@ -38,13 +38,14 @@ async function publish(version: number, goLiveAt: Date, catalog: Catalog) {
     });
 }
 
-async function saveDraft(catalog: unknown, revision: number) {
+async function saveDraft(catalog: unknown, revision: number, createdAt?: Date) {
     await prisma.pricingCatalogDraft.deleteMany({});
     return prisma.pricingCatalogDraft.create({
         data: {
             id: SHARED_DRAFT_ID,
             catalog: catalog as Prisma.InputJsonValue,
             revision,
+            ...(createdAt ? { createdAt } : {}),
         },
     });
 }
@@ -210,10 +211,14 @@ describe("public pricing (DB, U3)", () => {
         });
 
         it("is a 404 for a new draft that happens to reach the same revision", async () => {
-            await saveDraft(draftCatalog, 3);
+            const first = await saveDraft(draftCatalog, 3);
             const { token } = await service.mintPreviewToken(3, new Date());
-            await new Promise((r) => setTimeout(r, 5));
-            await saveDraft(draftCatalog, 3);
+            // A later draft, told apart by its createdAt rather than a sleep.
+            await saveDraft(
+                draftCatalog,
+                3,
+                new Date(first.createdAt.getTime() + 1000),
+            );
             await refused(token);
         });
 
