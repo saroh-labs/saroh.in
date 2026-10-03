@@ -931,3 +931,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: U4 gave `coupons:manage` to Platform Owner only, because the plan named a "Billing lead" role that doesn't exist.
 - Decision: the Billing staff role holds `coupons:manage`, as well as Platform Owner.
 - Consequences: `admin-permissions.ts` and its spec pin Billing as a holder.
+
+## DEC-077 Saroh invoices as Virashi Softwares LLP, with GST
+
+**Status: Accepted — 2026-10-03** · user · answers the plans catalogue's U17 seller question
+
+- Context: Saroh's own invoices (U17) need a legal seller, and the catalogue adds GST to plan prices.
+- Decision: Saroh is a product of **Virashi Softwares LLP**, which is GST-registered. Saroh's invoices are tax invoices issued by Virashi Softwares LLP under its GSTIN, and plan prices carry GST as the catalogue says.
+- Consequences: the seller details are configuration, not code (`SAROH_LEGAL_NAME`, `SAROH_GSTIN`, `SAROH_GST_STATE`, `SAROH_REGISTERED_ADDRESS`, `SAROH_INVOICE_SAC`), set on the API before the first real charge. The GSTIN and address are never committed.
