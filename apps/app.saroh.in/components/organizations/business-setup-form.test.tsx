@@ -28,6 +28,15 @@ vi.mock("@saroh/auth/client", () => ({
     authClient: { signOut: vi.fn() },
 }));
 vi.mock("@/lib/accounts", () => ({ accountsLoginUrl: "/login" }));
+const startCheckout = vi.fn();
+vi.mock("@/lib/saroh-billing/checkout-actions", () => ({
+    startCheckoutAfterOnboarding: (...args: unknown[]) =>
+        startCheckout(...args) as unknown,
+}));
+const showError = vi.fn();
+vi.mock("@saroh/ui/toast", () => ({
+    showError: (...args: unknown[]) => showError(...args) as unknown,
+}));
 
 let root: Root;
 let host: HTMLDivElement;
@@ -210,5 +219,60 @@ describe("What are you setting up? (DEC-070)", () => {
         expect(radio("Just me").getAttribute("aria-checked")).toBe("true");
         expect(radio("Just me").tabIndex).toBe(0);
         expect(business.tabIndex).toBe(-1);
+    });
+
+    describe("a paid plan picked on saroh.in (U27)", () => {
+        const GROW = { plan: "grow", cycle: "month" as const, name: "Grow" };
+
+        beforeEach(() => {
+            startCheckout.mockReset();
+            showError.mockReset();
+            act(() =>
+                root.render(
+                    <BusinessSetupForm
+                        email="asha@example.com"
+                        checkout={GROW}
+                    />,
+                ),
+            );
+        });
+
+        it("goes on to its checkout once the business exists, sending only the plan and cycle", async () => {
+            startCheckout.mockResolvedValue({ kind: "done" });
+            act(() => radio("A business").click());
+            typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+            await submit();
+            expect(createOrganization).toHaveBeenCalled();
+            expect(startCheckout).toHaveBeenCalledWith({
+                plan: "grow",
+                cycle: "month",
+            });
+            expect(showError).not.toHaveBeenCalled();
+        });
+
+        it("says so when the checkout can't start, and the business stays", async () => {
+            startCheckout.mockResolvedValue({
+                kind: "failed",
+                error: "The payment page couldn't be opened, so it's on Free for now.",
+            });
+            act(() => radio("A business").click());
+            typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+            await submit();
+            expect(showError).toHaveBeenCalledWith(
+                "Rye & Co. Bakery is set up, but Grow isn't started yet.",
+                "The payment page couldn't be opened, so it's on Free for now.",
+            );
+        });
+
+        it("never starts a checkout when the business wasn't made", async () => {
+            createOrganization.mockResolvedValue({
+                ok: false,
+                error: "Something went wrong.",
+            });
+            act(() => radio("A business").click());
+            typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+            await submit();
+            expect(startCheckout).not.toHaveBeenCalled();
+        });
     });
 });

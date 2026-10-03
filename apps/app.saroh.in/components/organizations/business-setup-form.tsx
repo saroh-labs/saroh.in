@@ -35,6 +35,7 @@ import {
     ORGANIZATION_KINDS,
 } from "@/lib/organizations/kind";
 import type { AddressAvailability } from "@/lib/organizations/service";
+import { startCheckoutAfterOnboarding } from "@/lib/saroh-billing/checkout-actions";
 
 import { SetupKindChoice } from "./setup-kind-choice";
 
@@ -105,11 +106,17 @@ type FormValues = z.infer<typeof formSchema>;
 export function BusinessSetupForm({
     email,
     backTo,
+    checkout,
 }: {
     /** Who is signed in — named beside the way out, so it is clear whose. */
     email: string;
     /** Where Back goes: the workspace, when they already have a business. */
     backTo?: string;
+    /**
+     * The paid plan picked on saroh.in (plan U27): once the business exists,
+     * its checkout. Null: it starts on Free, as every business does.
+     */
+    checkout?: { plan: string; cycle: "month" | "year"; name: string } | null;
 }) {
     const router = useRouter();
     const form = useForm<FormValues>({
@@ -212,6 +219,25 @@ export function BusinessSetupForm({
                 showError(res.error);
             }
             return;
+        }
+        if (checkout) {
+            const started = await startCheckoutAfterOnboarding({
+                plan: checkout.plan,
+                cycle: checkout.cycle,
+            });
+            if (started.kind === "authorise") {
+                // The provider's page, given once (U15). Leaving the app,
+                // so the button stays "Setting up…" until the page goes.
+                window.location.assign(started.url);
+                await new Promise(() => undefined);
+                return;
+            }
+            if (started.kind === "failed") {
+                showError(
+                    `${values.name.trim()} is set up, but ${checkout.name} isn't started yet.`,
+                    started.error,
+                );
+            }
         }
         router.push("/");
         router.refresh();

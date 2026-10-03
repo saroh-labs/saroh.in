@@ -140,7 +140,10 @@ export type VerificationOtpType =
  * plugin config in @saroh/auth).
  *
  * The console fallback prints the code so local dev, which has no SMTP, can
- * still complete a signup.
+ * still complete a signup. Where the fake code transport is allowed (never in
+ * production, `siteCodesFakeAllowed`), it also leaves the code in the
+ * temp-directory outbox, so a browser test can sign up a new account from
+ * the marketing site end to end (plan U27, `signup-from-marketing.spec.ts`).
  */
 export function sendVerificationOtpEmail(
     to: string,
@@ -152,6 +155,9 @@ export function sendVerificationOtpEmail(
     const minutes = Math.max(1, Math.round(expiresInSeconds / 60));
     if (!transporter) {
         console.info(`[${copy.heading}] (no SMTP) ${to}: code ${otp}`);
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            writeSiteCodeOutbox(to, otp);
+        }
         return Promise.resolve();
     }
     void transporter.sendMail({

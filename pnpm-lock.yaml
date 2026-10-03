@@ -511,6 +511,9 @@ importers:
       '@saroh/block-contract':
         specifier: workspace:*
         version: link:../../packages/block-contract
+      '@saroh/pricing-catalog':
+        specifier: workspace:*
+        version: link:../../packages/pricing-catalog
       '@saroh/site-blocks':
         specifier: workspace:*
         version: link:../../packages/site-blocks

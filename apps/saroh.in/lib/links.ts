@@ -36,6 +36,12 @@ export interface CtaInput {
     paid?: boolean;
     /** Open mode: the trial length a plan card offers, when a trial is on. */
     trialDays?: number;
+    /**
+     * Open mode: the billing cycle a paid plan's card shows (Pricing's
+     * Monthly / Yearly switch). Carried to sign-up as `cycle`; it only
+     * preselects, and the checkout prices it on the server (U15).
+     */
+    cycle?: "month" | "year";
     /** Defaults to the site's mode; tests and previews pass one. */
     mode?: LaunchMode;
 }
@@ -57,7 +63,8 @@ export interface Cta {
  * - waitlist: "Join the waitlist" (or "Get early access · Grow" when a paid
  *   plan is named), to `/waitlist?plan=…&src=…`.
  * - open: the design's "Start free", "Choose Grow" or "Start N-day trial", to
- *   sign-up with `?plan=…`.
+ *   sign-up with `?plan=…&cycle=…` (a paid plan only) `&src=…`. Accounts
+ *   carries the plan through sign-up and onboarding to the checkout (U27).
  */
 export function cta({
     src,
@@ -65,6 +72,7 @@ export function cta({
     planName,
     paid: paidIn,
     trialDays,
+    cycle,
     mode = LAUNCH_MODE,
 }: CtaInput): Cta {
     const paid = plan !== undefined && (paidIn ?? plan !== "free");
@@ -88,6 +96,7 @@ export function cta({
     }
     const q = new URLSearchParams();
     if (plan) q.set("plan", plan);
+    if (paid) q.set("cycle", cycle ?? "month");
     q.set("src", src);
     let label = "Start free";
     if (paid) {

@@ -12,6 +12,7 @@ export * from "./limit-notice";
 export * from "./module-map";
 export * from "./moves";
 export * from "./overrides";
+export * from "./plan-intent";
 export * from "./plan-rows";
 export * from "./price";
 export * from "./schema";

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { SIGNUP_PANEL } from "@/components/auth/panel-copy";
 import { SignupForm } from "@/components/auth/signup-form";
+import { onboardingForPlan } from "@/lib/plan-intent";
 import { safeDestination } from "@/lib/return-to";
 
 export const metadata: Metadata = {
@@ -19,17 +20,25 @@ export const metadata: Metadata = {
  * workspace who had never used Saroh (#276) is exactly the person who arrives
  * here rather than at login, and they were losing the invitation they clicked
  * and landing in onboarding for a workspace of their own.
+ *
+ * A visitor who picked a plan on saroh.in arrives with `?plan=&cycle=` (plan
+ * U27). With nowhere else to return to, the account goes on to onboarding
+ * carrying them, and from there to that plan's checkout. An invitation's
+ * `redirect` wins: an invitee joins someone else's business, and buys
+ * nothing.
  */
 export default async function SignupPage({
     searchParams,
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { redirect, email } = await searchParams;
+    const { redirect, email, plan, cycle } = await searchParams;
+    const returnTo =
+        safeDestination(redirect) ?? onboardingForPlan(plan, cycle);
     return (
         <SplitShell panel={<SplitPanel {...SIGNUP_PANEL} />}>
             <SignupForm
-                returnTo={safeDestination(redirect)}
+                returnTo={returnTo}
                 invitedEmail={typeof email === "string" ? email : undefined}
             />
         </SplitShell>
