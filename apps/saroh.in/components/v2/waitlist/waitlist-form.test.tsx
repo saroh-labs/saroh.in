@@ -166,9 +166,9 @@ describe("WaitlistForm", () => {
         expect((await screen.findByRole("alert")).textContent).toMatch(
             /try again/i,
         );
-        expect(screen.getByLabelText("Business name").value).toBe(
-            "Glow Studio",
-        );
+        expect(
+            screen.getByLabelText<HTMLInputElement>("Business name").value,
+        ).toBe("Glow Studio");
         expect(gtag).not.toHaveBeenCalled();
     });
 
@@ -209,7 +209,9 @@ describe("WaitlistForm", () => {
         );
 
         await waitFor(() =>
-            expect(screen.getByLabelText("Business name").value).toBe(""),
+            expect(
+                screen.getByLabelText<HTMLInputElement>("Business name").value,
+            ).toBe(""),
         );
     });
 
