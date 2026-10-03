@@ -18,6 +18,7 @@ export default defineConfig({
         environment: "node",
         globals: true,
         include: [
+            "*.test.ts",
             "content/**/*.test.ts",
             "lib/**/*.test.ts",
             "components/**/*.test.tsx",

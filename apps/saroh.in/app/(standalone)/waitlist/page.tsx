@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { WaitlistForm } from "@/components/v2/waitlist/waitlist-form";
 import { HERO_KINDS, WAITLIST, WAITLIST_FOOTER } from "@/content/waitlist";
+import { pageMetadata } from "@/lib/seo";
 import { openingShort, waitlistContext } from "@/lib/waitlist";
 
 /*
@@ -25,12 +26,11 @@ const devanagari = localFont({
 const DESCRIPTION =
     "Join the Saroh waitlist: sell, take bookings and run your website from one place. We'll email you once, with your invite, when we open.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
     title: "Join the waitlist — Saroh",
     description: DESCRIPTION,
-    alternates: { canonical: "/waitlist" },
-    openGraph: { title: "Join the waitlist — Saroh", description: DESCRIPTION },
-};
+    path: "/waitlist",
+});
 
 const GUTTER = "px-mk-gutter";
 const FRAME = "mx-auto box-border w-full max-w-[1180px]";

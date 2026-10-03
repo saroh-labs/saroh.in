@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./site.css";
 
+import { home } from "@/content/home";
+import { SITE_NAME, SITE_URL } from "@/lib/seo";
+
 import { GoogleAnalytics } from "./google-analytics";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
@@ -48,34 +51,34 @@ const fontWordmark = localFont({
     preload: false,
 });
 
-// From "Saroh Marketing Site": what the product is, in the words a search
-// result shows.
-const DESCRIPTION =
-    "Saroh runs the selling, bookings, website and contacts for one business in one place. Switch on what you do; the rest never appears.";
-
+// Every page sets its own title, description, canonical and share tags
+// (`lib/seo.ts`). These are the fallbacks for a page that sets none, such as
+// the 404: Home's words, and no canonical, so a missing page never claims
+// another's address.
 export const metadata: Metadata = {
     // The site is served at www (saroh.in redirects there), so every
     // canonical and share link names www: one host for search engines.
-    metadataBase: new URL("https://www.saroh.in"),
-    title: "Saroh — one business, not four logins",
-    description: DESCRIPTION,
+    metadataBase: new URL(SITE_URL),
+    title: home.metaTitle,
+    description: home.sub,
     openGraph: {
         type: "website",
-        siteName: "Saroh",
-        title: "Saroh — one business, not four logins",
-        description: DESCRIPTION,
+        siteName: SITE_NAME,
+        locale: "en_IN",
+        title: home.metaTitle,
+        description: home.sub,
     },
     twitter: {
         card: "summary_large_image",
-        title: "Saroh — one business, not four logins",
-        description: DESCRIPTION,
+        title: home.metaTitle,
+        description: home.sub,
     },
 };
 
 /**
- * The shell every page shares: fonts, GA and the light-only scheme. Each
- * generation of the site brings its own chrome through a route group:
- * `(v1)` the pages U26 removes, `(v2)` the Marketing Site V2 pages.
+ * The shell every page shares: fonts, GA and the light-only scheme. Pages
+ * bring their own chrome through route groups: `(v2)` the Marketing Site V2
+ * pages, `(standalone)` the waitlist, `(preview)` the pricing draft.
  *
  * Light only (owner, 2026-10-03): no theme provider, no dark class, no
  * toggle; `color-scheme: light` is set here and in site.css.

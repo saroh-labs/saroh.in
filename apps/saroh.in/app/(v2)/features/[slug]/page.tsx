@@ -10,10 +10,10 @@ import {
 } from "@/components/v2/feature/feature-related";
 import { FeatureSteps } from "@/components/v2/feature/feature-steps";
 import { featureHref, features, isFeatureSlug } from "@/content/features";
-import { shots } from "@/content/shots";
 import { FEATURE_SLUGS } from "@/content/types";
 import { freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
+import { pageMetadata } from "@/lib/seo";
 
 /**
  * The eight feature pages (plan U22): ONE template, the Features design,
@@ -36,36 +36,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (!isFeatureSlug(slug)) return {};
     const feature = features[slug];
     const title = `${feature.name} — ${feature.headline}`;
-    const hero = shots[feature.hero.shot];
-    const images = hero.src
-        ? [
-              {
-                  url: hero.src,
-                  width: hero.width,
-                  height: hero.height,
-                  alt: feature.hero.alt,
-              },
-          ]
-        : undefined;
-    return {
+    return pageMetadata({
         title: `${title} · Saroh`,
+        socialTitle: title,
         description: feature.sub,
-        alternates: { canonical: featureHref(slug) },
-        openGraph: {
-            type: "website",
-            siteName: "Saroh",
-            url: featureHref(slug),
-            title,
-            description: feature.sub,
-            images,
-        },
-        twitter: {
-            card: "summary_large_image",
-            title,
-            description: feature.sub,
-            images: images?.map((i) => i.url),
-        },
-    };
+        path: featureHref(slug),
+    });
 }
 
 export default async function FeaturePage({ params }: Props) {

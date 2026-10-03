@@ -23,6 +23,7 @@ import {
     solutionPlanTeasers,
 } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
+import { pageMetadata } from "@/lib/seo";
 
 /**
  * `/solutions/shops`, `/solutions/gyms`, `/solutions/clinics` (plan U23): ONE
@@ -45,13 +46,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (!isSolutionSlug(slug)) return {};
     const s = solutions[slug];
     const title = `Saroh for ${s.longName.toLowerCase()}`;
-    return {
+    return pageMetadata({
         title,
         description: s.sub,
-        openGraph: { title, description: s.sub },
-        twitter: { title, description: s.sub },
-        alternates: { canonical: solutionHref(slug) },
-    };
+        path: solutionHref(slug),
+    });
 }
 
 export default async function SolutionPage({ params }: Props) {

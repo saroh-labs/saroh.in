@@ -8,12 +8,14 @@ import { Faq } from "@/components/v2/faq";
 import { HomeHero } from "@/components/v2/home/home-hero";
 import { HomePricing } from "@/components/v2/home/home-pricing";
 import { TourVideo } from "@/components/v2/home/tour-video";
+import { JsonLd } from "@/components/v2/json-ld";
 import { PillLink } from "@/components/v2/pill";
 import { SectionHeading } from "@/components/v2/section-heading";
 import { faqItems, HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
 import { home } from "@/content/home";
 import { solutionHref, solutionList } from "@/content/solutions";
+import { HOME_OG_ALT } from "@/lib/og-card";
 import {
     freePlanLine,
     homePlanTeasers,
@@ -21,6 +23,8 @@ import {
     startFreeFaq,
 } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
+import { pageMetadata } from "@/lib/seo";
+import { organizationLd, softwareApplicationLd } from "@/lib/structured-data";
 
 /**
  * `/` (plan U21): the Home design, "saroh" hero and "band" closer. The hero,
@@ -34,13 +38,12 @@ import { readLivePricing } from "@/lib/pricing";
  */
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
     title: home.metaTitle,
     description: home.sub,
-    alternates: { canonical: "/" },
-    openGraph: { title: home.metaTitle, description: home.sub, url: "/" },
-    twitter: { title: home.metaTitle, description: home.sub },
-};
+    path: "/",
+    image: { url: "/opengraph-image", alt: HOME_OG_ALT },
+});
 
 export default async function HomePage() {
     const catalog = await readLivePricing();
@@ -50,6 +53,12 @@ export default async function HomePage() {
 
     return (
         <>
+            <JsonLd
+                data={[
+                    organizationLd(),
+                    softwareApplicationLd(catalog, home.sub),
+                ]}
+            />
             <HomeHero freeLine={freePlanLine(catalog)} />
 
             <Container
