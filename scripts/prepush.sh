@@ -287,6 +287,9 @@ e2e_stack() {
     export BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3003,http://localhost:3333
     export APP_URL=http://localhost:3003
     export NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
+    # Where accounts sends a new account (onboarding); unset, a production
+    # build falls back to https://app.saroh.in (signup-from-marketing.spec).
+    export NEXT_PUBLIC_APP_URL=http://localhost:3003
     export NEXT_PUBLIC_API_URL=http://localhost:3333
     export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
     export NEXT_PUBLIC_APP_DOMAIN=app.saroh.in
