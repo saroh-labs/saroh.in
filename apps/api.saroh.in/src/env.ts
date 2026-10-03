@@ -138,6 +138,11 @@ const envSchema = z.object({
     // to see the "couldn't send" path and alert. Development, or named
     // outright off production (the CI browser stack); never in production.
     SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
+    // The opening-day launch offer (marketing plan U31, OQ-1): how many days
+    // of the offer plan a business made through a waitlist invite gets, from
+    // the moment it is made. The owner's number, set per instance, never
+    // committed. Unset, no invite can be sent and none grants an offer.
+    LAUNCH_OFFER_DAYS: z.coerce.number().int().min(1).max(366).optional(),
     // The customer account area on merchant sites (round-2 plan A, A5):
     // `on` serves `public/site-accounts/me`, home and receipts; anything else
     // (unset included) answers 404, so the area stays dark until A6–A8 and

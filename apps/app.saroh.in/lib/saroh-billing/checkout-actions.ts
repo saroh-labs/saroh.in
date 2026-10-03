@@ -2,6 +2,7 @@
 
 import { apiFetch, orgBase, readError } from "@/lib/api/http";
 
+import { INVITE_TOKEN, LAUNCH_OFFER_FAILED } from "./launch-offer";
 import type {
     ApiAnswer,
     ChangeAnswer,
@@ -53,4 +54,39 @@ export async function startCheckoutAfterOnboarding(
                 body: JSON.stringify(body),
             }),
     });
+}
+
+/**
+ * The launch offer an opening-day invite carries (plan U31), taken for the
+ * business onboarding has just made and made active: the API checks the
+ * invite against this account's address, marks the waitlist entry joined
+ * and puts the business on the offer plan. Needs `billing:manage`, which
+ * its Owner has.
+ */
+export async function takeLaunchOfferAfterOnboarding(
+    token: unknown,
+): Promise<{ ok: true; until: string } | { ok: false; error: string }> {
+    if (typeof token !== "string" || !INVITE_TOKEN.test(token)) {
+        return { ok: false, error: LAUNCH_OFFER_FAILED };
+    }
+    const base = await orgBase();
+    if (!base) return { ok: false, error: LAUNCH_OFFER_FAILED };
+    const res = await apiFetch(`${base}/launch-offer`, {
+        method: "POST",
+        body: JSON.stringify({ token }),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        until?: string;
+        message?: string;
+    } | null;
+    if (res.ok && typeof data?.until === "string") {
+        return { ok: true, until: data.until };
+    }
+    return {
+        ok: false,
+        error:
+            res.status >= 500
+                ? LAUNCH_OFFER_FAILED
+                : readError(data, LAUNCH_OFFER_FAILED),
+    };
 }

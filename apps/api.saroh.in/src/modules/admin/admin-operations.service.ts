@@ -8,11 +8,16 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import { WaitlistInvitesService } from "../waitlist/invites.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
 
-export const OPERATION_KINDS = ["jobs.retry", "webhooks.replay"] as const;
+export const OPERATION_KINDS = [
+    "jobs.retry",
+    "webhooks.replay",
+    "waitlist.invite",
+] as const;
 export type OperationKind = (typeof OPERATION_KINDS)[number];
 
 /** The most targets one operation may carry. Past this, narrow the filter. */
@@ -38,6 +43,14 @@ export interface OperationPlan {
 const TARGET_TYPE: Record<OperationKind, string> = {
     "jobs.retry": "job",
     "webhooks.replay": "webhook_event",
+    "waitlist.invite": "waitlist",
+};
+
+/** The permission each kind is started under, for the audit trail. */
+const PERMISSION: Record<OperationKind, AdminPermission> = {
+    "jobs.retry": AdminPermission.JobsRetry,
+    "webhooks.replay": AdminPermission.WebhooksReplay,
+    "waitlist.invite": AdminPermission.WaitlistInvite,
 };
 
 /**
@@ -62,6 +75,7 @@ export class AdminOperationsService implements OnApplicationBootstrap {
     constructor(
         private readonly audit: AdminAuditService,
         private readonly webhooks: WebhooksService,
+        private readonly invites: WaitlistInvitesService,
     ) {}
 
     /** Resume whatever a restart interrupted. */
@@ -136,10 +150,7 @@ export class AdminOperationsService implements OnApplicationBootstrap {
             });
             await this.audit.write(tx, {
                 actorUserId: input.staff.userId,
-                permission:
-                    input.kind === "jobs.retry"
-                        ? AdminPermission.JobsRetry
-                        : AdminPermission.WebhooksReplay,
+                permission: PERMISSION[input.kind],
                 action: `operation.${input.kind}.started`,
                 targetType: "admin_operation",
                 targetId: created.id,
@@ -290,8 +301,9 @@ export class AdminOperationsService implements OnApplicationBootstrap {
     private async resumeInterrupted(): Promise<void> {
         // A row left RUNNING was mid-flight when the process stopped. It is
         // put back to PENDING: every executor below is safe to run again
-        // (a retry of a job already PENDING, or a replay of an event no longer
-        // FAILED, is a skip), so resuming it cannot apply anything twice.
+        // (a retry of a job already PENDING, a replay of an event no longer
+        // FAILED, or an invite already claimed, is a skip), so resuming it
+        // cannot apply anything twice.
         const open = await prisma.adminOperation.findMany({
             where: { status: { in: ["PENDING", "RUNNING"] } },
             select: { id: true },
@@ -310,9 +322,14 @@ export class AdminOperationsService implements OnApplicationBootstrap {
         kind: OperationKind,
         ids: string[],
     ): Promise<PlannedItem[]> {
-        return kind === "jobs.retry"
-            ? this.classifyJobs(ids)
-            : this.classifyWebhooks(ids);
+        switch (kind) {
+            case "jobs.retry":
+                return this.classifyJobs(ids);
+            case "webhooks.replay":
+                return this.classifyWebhooks(ids);
+            case "waitlist.invite":
+                return this.invites.classify(ids);
+        }
     }
 
     private async classifyJobs(ids: string[]): Promise<PlannedItem[]> {
@@ -416,6 +433,7 @@ export class AdminOperationsService implements OnApplicationBootstrap {
         kind: OperationKind,
         targetId: string,
     ): Promise<{ status: "DONE" | "SKIPPED" | "FAILED"; detail?: string }> {
+        if (kind === "waitlist.invite") return this.invites.sendOne(targetId);
         if (kind === "webhooks.replay") {
             const result = await this.webhooks.replay(targetId);
             if (result.status === "skipped") {

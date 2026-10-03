@@ -243,6 +243,49 @@ correct the adapter and this list.
 6. **`total_count`.** Required by Razorpay; sent as 120 monthly / 10 yearly
    charges so a plan runs until cancelled. Unverified: the maximum allowed.
 
+## Opening-day invites and the launch offer (U31)
+
+What keeps the waitlist's promise when Saroh opens. Code:
+`waitlist/invites.service.ts` (sending), `waitlist/launch-offer.service.ts`
+(taking the offer), `waitlist/invite-token.ts` (the rules).
+
+- **Before the first invite**, on the instance: `ACCOUNTS_URL` (where the
+  link goes), `LAUNCH_OFFER_DAYS` (the offer's length — the owner's number,
+  never committed), an SMTP transport, the migration
+  `20261021150000_waitlist_invites`, and sign-up open (`launchMode=open`,
+  U27). Without the first two the console says why and offers no button;
+  every entry's dry run reads "refused".
+- **Sending** is a bulk admin operation, `waitlist.invite`
+  (`AdminOperationsService`), from Instance › Waitlist: a dry run first,
+  then one row per entry under one idempotency key, followed on
+  Operations › run. One invite per entry, safe to re-run: an entry is
+  claimed (`invitedAt`, a fresh token's SHA-256 and its end) only while
+  nobody has invited it, and marked sent (`inviteSentAt`) once the email
+  has left. A send that fails is released (still waiting); one interrupted
+  mid-send is sent again by a later batch after 15 minutes. Needs
+  `waitlist:read` and `waitlist:invite`.
+- **The link** is accounts' `/signup?invite=&email=`. The token rides to
+  onboarding (`?invite=`, also through "Log in" for someone who already has
+  an account) and wins over a plan intent: no checkout.
+- **Taking the offer.** Onboarding asks `POST /waitlist/invite/check` for
+  the line under its heading and fills the business name from the entry.
+  Once the business exists it calls
+  `POST /organizations/:id/launch-offer {token}` (`billing:manage`), which
+  in one transaction marks the entry joined (`joinedAt`,
+  `joinedOrganizationId`) and writes a `plan` override, `planKey: grow`,
+  `expiresAt` = now + `LAUNCH_OFFER_DAYS`, audited as
+  `organization.plan.launch_offer`. No payment details; when it ends the
+  business reads its own row (Free).
+- **Refused, politely:** an unknown link (404), a used or expired one (410,
+  "ask for a new invite"), another address (403 — the account's address,
+  the one its sign-up code was checked against, must match the entry's,
+  compared as the waitlist compares them), a business already on a paid
+  plan (409). Tokens last 30 days. A repeat for the same business answers
+  the same.
+- **Email** is the identity transport; with no SMTP it never leaves the
+  process — `SITE_CODES_EMAIL_FAKE=log` prints it (off production),
+  `fail` fails it (`email-launch-invite.spec.ts`).
+
 ## Undoing it
 
 Revoke the overrides (`revokedAt`) rather than deleting them; the audit
