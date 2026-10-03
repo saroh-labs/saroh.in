@@ -16,8 +16,8 @@ describe("captured shots", () => {
     });
 
     it("a captured shot replaces its placeholder", () => {
-        for (const key of Object.keys(CAPTURED) as (keyof typeof shots)[]) {
-            expect(shots[key].src).toBe(CAPTURED[key]!.src);
+        for (const [key, shot] of Object.entries(CAPTURED)) {
+            expect(shots[key as keyof typeof shots].src).toBe(shot.src);
         }
     });
 });
