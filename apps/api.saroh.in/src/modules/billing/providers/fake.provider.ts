@@ -147,6 +147,7 @@ export class FakeBillingProvider implements BillingProvider {
             phase?: BillingEventPhase;
             eventAt?: string;
             currentPeriodEnd?: string | null;
+            providerPaymentId?: string;
         };
         return {
             type: body.type ?? "unknown",
@@ -161,6 +162,9 @@ export class FakeBillingProvider implements BillingProvider {
                           ? new Date(body.currentPeriodEnd)
                           : null,
                   }
+                : {}),
+            ...(body.providerPaymentId
+                ? { providerPaymentId: body.providerPaymentId }
                 : {}),
         };
     }

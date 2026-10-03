@@ -70,6 +70,14 @@ release time.
    below before the first real checkout. Until the keys are set, a publish
    with paid plans stays **waiting** (its plans can't reach the provider) and
    the version before it stays live — nothing breaks, nothing is sold.
+9. **Saroh's own invoices (U17)** need, on the instance: the migration
+   `20261021130000_saroh_invoices`, and Saroh's seller details
+   (`SAROH_LEGAL_NAME`, `SAROH_GSTIN`, `SAROH_GST_STATE`,
+   `SAROH_REGISTERED_ADDRESS`, `SAROH_BILLING_EMAIL`, `SAROH_INVOICE_SAC`,
+   `SAROH_INVOICE_PREFIX`; `ENVIRONMENT.md`) set **before the first real
+   charge**: each invoice copies them when it is written and is never
+   rewritten. The series restarts every financial year
+   (`SRH/26-27/00001`).
 
 ## How a plan override reads (U5)
 
@@ -198,8 +206,61 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
   it. A publish never overrides a change the business chose for its period's
   end.
 - **Not here:** trials, coupons, add-on purchases and yearly offers (U16),
-  Saroh's own invoices and billing emails (U17), limit enforcement (U13,
-  behind `PLAN_ENFORCEMENT`), the merchant screens (U14).
+  limit enforcement (U13, behind `PLAN_ENFORCEMENT`), the merchant screens
+  (U14). Saroh's own invoices are below (U17).
+
+## Saroh's own invoices (U17)
+
+The GST invoice Saroh issues a business for each charge it takes for a
+plan, and the billing mail. Code: `billing/saroh-invoices.service.ts`,
+`saroh-invoice-terms.ts` (the pure rules), `saroh-invoice-paper.ts` (the
+paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
+`saroh-seller.ts` (Saroh's details, from env), `billing-email.job.ts` and
+`billing-emails.ts` (the words).
+
+- **Written with the charge.** The billing webhook writes the invoice on
+  its own transaction, under the subscription's row lock, so the inbox row,
+  the plan change and the invoice commit together (a failure rolls the
+  event back and the provider's retry writes it). The hooks are separate,
+  named calls: `invoiceCheckoutChargeInTx` from `completeCheckout` (a new
+  plan's first period, an upgrade's difference) and from a scheduled
+  change's first charge, `invoiceRenewalInTx` from `renewed()`, and
+  `paymentFailedInTx` when a charge fails (`pending`, `halted`). A
+  SCHEDULED checkout that is only authorised charges nothing and gets no
+  invoice.
+- **Once per charge.** `SarohInvoice.chargeKey` is unique and checked before
+  a number is taken: `upgrade:<checkout>` for an upgrade's difference,
+  `period:<provider>:<subscription>:<period end>` for a period. A renewal
+  whose provider subscription already has an invoice for a period end
+  within half a cycle is not invoiced again — Razorpay's `activated` and
+  `charged` for one payment make one invoice. An event with no period end
+  is not invoiced.
+- **Numbers** are Saroh's own series, `<prefix>/<financial year>/<5 digits>`
+  (`SRH/26-27/00001`), counted in `SarohInvoiceSequence` inside the
+  invoice's transaction, so a rolled-back charge leaves no gap. The
+  financial year is India's (April–March, `Asia/Kolkata`).
+- **GST** is 18% on the line's amount after any discount, rounded half-up to
+  the paisa once per line (`gstPaise`, KTD-18), and added (Saroh's prices
+  are before GST). Place of supply: the state given at checkout, else the
+  state of the GSTIN given there or on the business's profile, else the
+  profile's state, else Saroh's own. Saroh's state → CGST + SGST (odd paisa
+  to CGST), any other → IGST. The migration's CHECKs hold the sums.
+- **Checkout** takes an optional `billingState` (a GST state code or name)
+  and `gstin` on `POST …/billing/change-plan`, checked before the provider
+  is asked (a 400 for a state that isn't one, a GSTIN that doesn't check out
+  or isn't in the state given), and keeps them on the `BillingCheckout`.
+  Renewals read them from the checkout that made the provider subscription.
+- **After money, nothing is refused** (DEC-068): a business with no address
+  still gets its invoice; missing seller details are logged
+  (`saroh_invoice_seller_incomplete`) and the paper says "Invoice", not
+  "Tax invoice".
+- **Reading.** `GET …/billing/invoices` (newest first) and
+  `GET …/billing/invoices/:id/pdf` (drawn on request, never stored), both
+  `billing:read`. The Settings › Plan list and download wait for U14's
+  designs.
+- **Mail.** `billing.email` (`backend-jobs.md`) sends the invoice with its
+  PDF, a failed payment (retrying, or now on Free) and a trial ending (U16
+  queues it), to everyone whose role has `billing:manage`.
 
 ### Razorpay test-mode spike (OQ-6) — **unverified**
 

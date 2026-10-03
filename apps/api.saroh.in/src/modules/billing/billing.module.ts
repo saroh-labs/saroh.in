@@ -8,6 +8,7 @@ import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
@@ -30,6 +31,7 @@ import {
     ProviderPlanSyncService,
 } from "./provider-plan-sync.service";
 import { billingProviderFactoryProvider } from "./providers/provider.factory";
+import { SarohInvoicesService } from "./saroh-invoices.service";
 import { SubscriptionsService } from "./subscriptions.service";
 
 /** How often a stopped sweep chain is looked for and restarted. */
@@ -60,6 +62,11 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  * sync a publish queues, the provider cancels a change queues, and the
  * hourly sweep that applies due moves and lapses unpaid checkouts.
  *
+ * Saroh's own invoices for those charges (U17) are
+ * {@link SarohInvoicesService}, written by the webhook with the charge, and
+ * {@link BillingEmailHandler} sends them and the failed-payment and
+ * trial-ending mail.
+ *
  * NOTE: this module is intentionally NOT self-registering — the app owner wires
  * it into `AppModule`.
  */
@@ -83,6 +90,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         ProviderPlanSyncService,
         ProviderCancelHandler,
         MovesApplyHandler,
+        SarohInvoicesService,
+        BillingEmailHandler,
         billingProviderFactoryProvider,
         OrganizationGuard,
     ],
@@ -103,10 +112,11 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         private readonly cancel: ProviderCancelHandler,
         private readonly sweep: MovesApplyHandler,
         private readonly limitNotice: PlanLimitNoticeHandler,
+        private readonly billingEmail: BillingEmailHandler,
     ) {}
 
     /**
-     * Registers the four jobs and starts the sweep's chain — the renewal
+     * Registers the five jobs and starts the sweep's chain — the renewal
      * job's shape (ADR-007): never under test, where no worker runs, and
      * never throwing, so a database not up yet cannot stop the boot.
      */
@@ -118,6 +128,7 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         );
         this.registry.register(BILLING_MOVES_APPLY_TYPE, this.sweep.handle);
         this.registry.register(PLAN_LIMIT_NOTICE_TYPE, this.limitNotice.handle);
+        this.registry.register(BILLING_EMAIL_TYPE, this.billingEmail.handle);
         if (env.NODE_ENV === "test") return;
         await this.sweep.schedule(new Date());
         this.chainCheck = setInterval(() => {

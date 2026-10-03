@@ -172,6 +172,11 @@ export interface ParsedBillingEvent {
     eventAt?: Date | null;
     /** The end of the period the subscription is now paid to, when sent. */
     currentPeriodEnd?: Date | null;
+    /**
+     * The provider's id for the payment this event reports, when it carries
+     * one (a `charged` event). Kept on Saroh's invoice for the charge (U17).
+     */
+    providerPaymentId?: string | null;
 }
 
 export interface BillingProvider {
