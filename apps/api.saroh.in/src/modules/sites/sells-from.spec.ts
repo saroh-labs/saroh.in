@@ -1,4 +1,4 @@
-import { isShopPath } from "./sells-from";
+import { automaticStorefront, isShopPath } from "./sells-from";
 import { checkShop } from "./site-flags";
 
 /**
@@ -21,7 +21,7 @@ describe("checkShop", () => {
                 pageId: null,
                 field: "storefrontId",
                 message: expect.stringContaining(
-                    "Pick which storefront this site sells from",
+                    "Pick which location your online shop sells from",
                 ),
             }),
         ]);
@@ -62,7 +62,7 @@ describe("checkShop", () => {
             ["reservedAddress", "p_shop"],
             ["reservedAddress", "p_under"],
         ]);
-        expect(flags[0]?.message).toMatch(/Change its address/);
+        expect(flags[0]?.message).toMatch(/Change its path/);
     });
 
     it("says nothing about a hidden page, which isn't on the site", () => {
@@ -74,6 +74,69 @@ describe("checkShop", () => {
                 isShopPath,
             }),
         ).toEqual([]);
+    });
+});
+
+/**
+ * KTD-10 (DEC-069): which storefront a site takes on its own. A fake store
+ * table answers the two reads — with listings, and open at all.
+ */
+describe("automaticStorefront", () => {
+    function db(stores: { id: string; listed: boolean }[]) {
+        return {
+            store: {
+                findMany: ({ where }: { where: { listings?: unknown } }) =>
+                    Promise.resolve(
+                        stores
+                            .filter((s) => !where.listings || s.listed)
+                            .slice(0, 2)
+                            .map(({ id }) => ({ id })),
+                    ),
+            },
+        } as unknown as Parameters<typeof automaticStorefront>[0];
+    }
+
+    it("takes the one open storefront with listings, as G11 does", async () => {
+        await expect(
+            automaticStorefront(
+                db([
+                    { id: "online", listed: true },
+                    { id: "empty", listed: false },
+                ]),
+                "org",
+            ),
+        ).resolves.toBe("online");
+    });
+
+    it("asks when several have listings", async () => {
+        await expect(
+            automaticStorefront(
+                db([
+                    { id: "a", listed: true },
+                    { id: "b", listed: true },
+                ]),
+                "org",
+            ),
+        ).resolves.toBeNull();
+    });
+
+    it("takes the only open storefront when nothing is listed yet", async () => {
+        await expect(
+            automaticStorefront(db([{ id: "counter", listed: false }]), "org"),
+        ).resolves.toBe("counter");
+    });
+
+    it("asks when two are open and none is listed, and has none to take with none", async () => {
+        await expect(
+            automaticStorefront(
+                db([
+                    { id: "a", listed: false },
+                    { id: "b", listed: false },
+                ]),
+                "org",
+            ),
+        ).resolves.toBeNull();
+        await expect(automaticStorefront(db([]), "org")).resolves.toBeNull();
     });
 });
 

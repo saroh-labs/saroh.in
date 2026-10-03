@@ -4,6 +4,7 @@ import {
     allergenText,
     blurbOf,
     fieldText,
+    madeByLine,
     onTheShop,
     priceOf,
     publicStock,
@@ -168,6 +169,48 @@ describe("details", () => {
         expect(onTheShop({ warranty: false }, "warranty")).toBe(false);
         expect(onTheShop({}, "warranty")).toBe(true);
         expect(onTheShop(null, "warranty")).toBe(true);
+    });
+});
+
+describe("madeByLine (P5)", () => {
+    it("names the product's maker and where it is made", () => {
+        expect(
+            madeByLine({
+                maker: "Tanvi Studio",
+                madeIn: "Jaipur",
+                shopFields: {},
+            }),
+        ).toBe("Tanvi Studio, Jaipur");
+        expect(
+            madeByLine({ maker: "Kama Labs", madeIn: null, shopFields: null }),
+        ).toBe("Kama Labs");
+    });
+
+    it("hides the row when nothing is set: never the storefront's name", () => {
+        // A product made here has no maker (the editor clears it).
+        expect(
+            madeByLine({ maker: null, madeIn: null, shopFields: {} }),
+        ).toBeNull();
+        expect(
+            madeByLine({ maker: "  ", madeIn: "", shopFields: {} }),
+        ).toBeNull();
+    });
+
+    it("leaves out what the merchant switched off the shop", () => {
+        expect(
+            madeByLine({
+                maker: "Tanvi Studio",
+                madeIn: "Jaipur",
+                shopFields: { maker: false },
+            }),
+        ).toBe("Jaipur");
+        expect(
+            madeByLine({
+                maker: "Tanvi Studio",
+                madeIn: "Jaipur",
+                shopFields: { maker: false, madeIn: false },
+            }),
+        ).toBeNull();
     });
 });
 

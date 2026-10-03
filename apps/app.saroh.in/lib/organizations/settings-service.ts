@@ -5,6 +5,8 @@ import type {
     NumberRestart,
 } from "@/lib/invoices/invoice-number";
 
+import type { OrganizationKind } from "./kind";
+
 /**
  * Organization settings access (name + business profile).
  *
@@ -75,12 +77,23 @@ export interface SetupFacts {
     services: number;
     sites: number;
     sitesNotLive: number;
+    /**
+     * Invoices that aren't void (DEC-070). Absent from an API older than
+     * it; whether the business handles money is then read from the modules
+     * alone.
+     */
+    invoices?: number;
 }
 
 export interface OrganizationSettings {
     id: string;
     name: string;
     slug: string;
+    /**
+     * What is being set up (DEC-070); words and defaults only. Absent from
+     * an API older than it — read it through `kindOf`.
+     */
+    kind?: OrganizationKind;
     profile: OrganizationProfile | null;
     /** The earliest order in the business, ISO; `null` before the first. */
     tradingSince: string | null;
@@ -119,6 +132,11 @@ export interface TaxSettingsInput {
 
 export interface OrganizationSettingsInput {
     name?: string;
+    /**
+     * What is being set up (DEC-070, K5): words and defaults only. Needs
+     * `org:update`, as the name does.
+     */
+    kind?: OrganizationKind;
     profile?: Partial<Record<keyof OrganizationProfile, string>>;
     tax?: TaxSettingsInput;
     /** "" clears a line; the state goes as `tax.state`. */
@@ -136,6 +154,34 @@ export async function getOrganizationSettings(): Promise<OrganizationSettings | 
     const base = await orgBase();
     if (!base) return null;
     return getJson<OrganizationSettings>(`${base}/settings`);
+}
+
+/**
+ * The settings read for a step outside Settings ("Add your business
+ * details", DEC-068), as a result rather than a throw: a role that may not
+ * read them (403) is told so in place, never sent to a forbidden page.
+ */
+export async function readOrganizationSettings(): Promise<
+    | { ok: true; data: OrganizationSettings }
+    | { ok: false; error: string; forbidden: boolean }
+> {
+    const base = await orgBase();
+    if (!base) {
+        return {
+            ok: false,
+            error: "No active organization.",
+            forbidden: false,
+        };
+    }
+    const res = await apiFetch(`${base}/settings`);
+    const data = (await res.json().catch(() => null)) as unknown;
+    if (!res.ok || !data) {
+        return {
+            ...toFailure(data, "Couldn't read your business details."),
+            forbidden: res.status === 403,
+        };
+    }
+    return { ok: true, data: data as OrganizationSettings };
 }
 
 /**

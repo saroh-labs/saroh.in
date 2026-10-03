@@ -8,6 +8,8 @@ export const BookingEventType = {
     Cancelled: "CANCELLED",
     Attended: "ATTENDED",
     NoShow: "NO_SHOW",
+    // Payment taken at the desk (P2): the history says who took it.
+    PaidAtDesk: "PAID_AT_DESK",
 } as const;
 
 export type BookingEventType =

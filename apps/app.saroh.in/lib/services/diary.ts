@@ -5,6 +5,7 @@ import type {
     ClassSession,
     DiaryBooking,
 } from "./booking-calendar";
+import { paidAtDeskText } from "./desk-pay";
 
 /**
  * The bookings calendar's geometry (U15): local days in the business's zone,
@@ -598,6 +599,7 @@ export function whoFor(b: DiaryBooking): string {
 
 /** How a place was paid, in words. */
 export function paidText(b: DiaryBooking): string {
+    if (b.paidAtDesk) return paidAtDeskText(b.paidAtDesk.method);
     switch (b.paidWith) {
         case "MEMBERSHIP":
             return "Membership";
@@ -628,14 +630,15 @@ export function blockLine(block: Block, withTeacher = true): string {
             : places;
     }
     const b = block.booking;
-    const pay =
-        b.paidWith === "DESK" && block.state === "booked"
-            ? " · pays at the session"
-            : b.paidWith === "PACK"
-              ? " · pack"
-              : b.paidWith === "MEMBERSHIP"
-                ? " · membership"
-                : "";
+    const pay = b.paidAtDesk
+        ? " · paid at the desk"
+        : b.paidWith === "DESK" && block.state === "booked"
+          ? " · pays at the session"
+          : b.paidWith === "PACK"
+            ? " · pack"
+            : b.paidWith === "MEMBERSHIP"
+              ? " · membership"
+              : "";
     return `${b.service.name}${pay}`;
 }
 

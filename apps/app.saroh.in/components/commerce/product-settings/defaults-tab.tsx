@@ -3,7 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import type { CatalogueView } from "@/lib/products/settings";
 import { saveDefaults, undoDefaults } from "@/lib/products/settings-actions";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/products/settings-rules";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import {
     chipBtn,
     primaryBtn,
@@ -56,6 +57,8 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
 
     const changed = changes(rows, base);
     const dirty = changed.length > 0;
+    const saveBar = useRef<HTMLDivElement>(null);
+    useBottomBarInset(saveBar, dirty && catalogue.canWrite);
     const problem = defaultsProblem(rows);
     const names = Object.fromEntries(rows.map((r) => [r.key, r.name]));
     const hit = affected(changed, catalogue.defaults.stillOnDefault, names);
@@ -305,7 +308,10 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
             </div>
 
             {dirty && catalogue.canWrite ? (
-                <div className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5">
+                <div
+                    ref={saveBar}
+                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5"
+                >
                     <div className="flex flex-wrap items-center gap-2">
                         <span
                             role="status"

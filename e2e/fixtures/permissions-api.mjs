@@ -175,8 +175,8 @@ const CATALOGUE = {
             label: "Change what a role can do",
             note: "Includes inventing roles. Someone with this can grant only what they hold themselves.",
         },
-        { action: "store:read", group: "sell", label: "See storefronts" },
-        { action: "store:write", group: "sell", label: "Change storefronts" },
+        { action: "store:read", group: "sell", label: "See locations" },
+        { action: "store:write", group: "sell", label: "Change locations" },
         { action: "order:read", group: "sell", label: "See orders" },
         {
             action: "payment:manage",
@@ -493,10 +493,8 @@ createServer((req, res) => {
                   }
                 : {}),
             actions: [],
-            primaryAction: null,
             hasAnyModule: true,
             upcoming: [],
-            numbers: [],
             unavailable: [],
             needs: [],
             needsTotal: 0,

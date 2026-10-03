@@ -37,8 +37,9 @@ export type BookingLocationType = (typeof BOOKING_LOCATION_TYPES)[number];
 
 /**
  * What is paid at booking (E1), as a share of the service's price. Worked
- * out on the server from `priceCents`, never sent by the client. Nothing
- * takes it at booking until E8.
+ * out on the server from `priceCents`, never sent by the client. The
+ * booking page takes it online when the service is booked (E8); anything
+ * left is paid later, at the desk or on a treatment's order.
  */
 export const DEPOSIT_MODES = [
     "NONE",
@@ -190,8 +191,8 @@ export class CreateServiceDto {
     meetingUrl?: string | null;
 
     /**
-     * How many visits one booking of it is, 1 to 12 (E1). Stored now;
-     * honoured from E9/E10.
+     * How many visits one booking of it is, 1 to 12 (E1). More than one
+     * makes it a treatment, sold as one order (E9/E10).
      */
     @IsOptional()
     @IsInt({ message: VISITS_MESSAGE })
@@ -201,7 +202,7 @@ export class CreateServiceDto {
 
     /**
      * What is paid at booking (E1): only on a priced service, checked in the
-     * service. Stored now; taken from E8.
+     * service, and taken online on the booking page (E8).
      */
     @IsOptional()
     @IsIn(DEPOSIT_MODES)
@@ -301,8 +302,8 @@ export class UpdateServiceDto {
     meetingUrl?: string | null;
 
     /**
-     * How many visits one booking of it is, 1 to 12 (E1). Stored now;
-     * honoured from E9/E10.
+     * How many visits one booking of it is, 1 to 12 (E1). More than one
+     * makes it a treatment, sold as one order (E9/E10).
      */
     @IsOptional()
     @IsInt({ message: VISITS_MESSAGE })
@@ -312,7 +313,7 @@ export class UpdateServiceDto {
 
     /**
      * What is paid at booking (E1): only on a priced service, checked in the
-     * service. Stored now; taken from E8.
+     * service, and taken online on the booking page (E8).
      */
     @IsOptional()
     @IsIn(DEPOSIT_MODES)

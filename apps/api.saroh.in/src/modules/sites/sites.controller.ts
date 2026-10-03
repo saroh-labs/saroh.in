@@ -8,6 +8,7 @@ import {
     Patch,
     Post,
     Put,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 import { listTemplates } from "@saroh/templates";
@@ -24,6 +25,9 @@ import {
     CreatePageDto,
     CreatePreviewLinkDto,
     CreateSiteFromTemplateDto,
+    GoLiveOptionsDto,
+    RequestReviewDto,
+    ReviewTargetQueryDto,
     SetCommentResolvedDto,
     UpdateDraftSectionsDto,
     UpdatePageDto,
@@ -76,6 +80,15 @@ export class SitesController {
         }));
     }
 
+    /**
+     * What `/sites/new` prefills: `{ siteName, address }` (DEC-069, L5).
+     * Declared before `:siteId` so "new-defaults" is never captured as an id.
+     */
+    @Get("new-defaults")
+    newDefaults(@OrgContext() ctx: OrganizationContext) {
+        return this.sites.newSiteDefaults(ctx);
+    }
+
     /** List the org's non-deleted sites. */
     @Get()
     list(@OrgContext() ctx: OrganizationContext) {
@@ -92,15 +105,17 @@ export class SitesController {
     }
 
     /**
-     * Every note on this site, with the section each is about resolved against
-     * the current draft. Requires `site:read`.
+     * Every note on the draft, with the section each is about resolved against
+     * the current draft; or, with `?testReleaseId=`, every note on that test
+     * release, against its frozen pages. Requires `site:read`.
      */
     @Get(":siteId/comments")
     listComments(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Query() query: ReviewTargetQueryDto,
     ) {
-        return this.sites.listComments(ctx, siteId);
+        return this.sites.listComments(ctx, siteId, query.testReleaseId);
     }
 
     /** Leave a note pinned to a section. Requires `site:comment`. */
@@ -135,18 +150,23 @@ export class SitesController {
     }
 
     /**
-     * Ask for a review (#278). Requires `site:update` — the person whose work
-     * it is saying they are ready for eyes. It blocks nothing.
+     * Ask for a review (#278) of the draft, or of a test release named in the
+     * body (T8). Requires `site:update` — the person whose work it is saying
+     * they are ready for eyes. It blocks nothing.
      */
     @Post(":siteId/review/request")
     requestReview(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Body() dto: RequestReviewDto,
     ) {
-        return this.sites.requestReview(ctx, siteId);
+        return this.sites.requestReview(ctx, siteId, dto.testReleaseId);
     }
 
-    /** Record a reviewer's verdict. Requires `site:approve`. */
+    /**
+     * Record a reviewer's verdict, on the draft or on a test release (T8).
+     * Requires `site:approve`.
+     */
     @Post(":siteId/approvals")
     createApproval(
         @OrgContext() ctx: OrganizationContext,
@@ -188,13 +208,17 @@ export class SitesController {
         return this.previewLinks.revoke(ctx, siteId, linkId);
     }
 
-    /** The latest verdict plus the open-note count. Requires `site:read`. */
+    /**
+     * The latest verdict plus the open-note count, for the draft or, with
+     * `?testReleaseId=`, for that test release (T8). Requires `site:read`.
+     */
     @Get(":siteId/review")
     getReviewState(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Query() query: ReviewTargetQueryDto,
     ) {
-        return this.sites.getReviewState(ctx, siteId);
+        return this.sites.getReviewState(ctx, siteId, query.testReleaseId);
     }
 
     /**
@@ -368,7 +392,9 @@ export class SitesController {
 
     /**
      * Put a past version back. Appends a new publication rather than deleting
-     * the ones after it, so the restore can itself be undone.
+     * the ones after it, so the restore can itself be undone. With
+     * "Publishing needs approval" on, 409 unless an owner sends `override`
+     * (DEC-071, Q3).
      */
     @Post(":siteId/publications/:publicationId/restore")
     @HttpCode(200)
@@ -376,21 +402,26 @@ export class SitesController {
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
         @Param("publicationId") publicationId: string,
+        @Body() dto: GoLiveOptionsDto,
     ) {
-        return this.sites.restorePublication(ctx, siteId, publicationId);
+        return this.sites.restorePublication(ctx, siteId, publicationId, {
+            override: dto.override,
+        });
     }
 
     /**
      * Publish the site: snapshot its pages' current drafts into a new immutable
      * Publication (sanitizing rich fields) and repoint the live pointer.
-     * Requires `site:publish`.
+     * Requires `site:publish`. With "Publishing needs approval" on, 409
+     * unless an owner sends `override` (DEC-071, R10).
      */
     @Post(":siteId/publish")
     @HttpCode(200)
     publish(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Body() dto: GoLiveOptionsDto,
     ) {
-        return this.sites.publishSite(ctx, siteId);
+        return this.sites.publishSite(ctx, siteId, { override: dto.override });
     }
 }

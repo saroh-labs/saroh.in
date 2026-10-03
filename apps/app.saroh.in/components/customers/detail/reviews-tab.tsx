@@ -19,7 +19,7 @@ import { Empty } from "./parts";
 
 /** A text action under a review: pointer, hover, focus and pressed. */
 const TEXT_ACTION =
-    "cursor-pointer rounded-sm text-[12.5px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70 disabled:cursor-not-allowed disabled:opacity-50 coarse:min-h-11";
+    "cursor-pointer rounded-sm text-[12.5px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-not-allowed disabled:opacity-50 coarse:min-h-11";
 
 /**
  * Customer Detail's Reviews tab (C6, after "Saroh Customer Detail"): what
@@ -80,7 +80,7 @@ export function ReviewsTab({
                                             r.productId,
                                             "reviews",
                                         )}
-                                        className="cursor-pointer rounded-sm text-[13px] font-semibold text-foreground underline-offset-2 transition-colors duration-fast hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70"
+                                        className="cursor-pointer rounded-sm text-[13px] font-semibold text-brand underline-offset-2 transition-colors duration-fast hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground"
                                     >
                                         {r.productName}
                                     </Link>

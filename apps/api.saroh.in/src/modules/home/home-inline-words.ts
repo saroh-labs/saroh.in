@@ -82,10 +82,27 @@ export function markSentWords(
 }
 
 /**
+ * Retry by autopay (RETRY, `via: MANDATE`, D13): the subscription's own
+ * retry, which charges the customer's autopay again. Their provider tells
+ * them about the debit first (the pre-debit notice), so the charge lands
+ * a day or so later; Saroh sends nothing itself.
+ */
+export function retryMandateWords(first: string | null): Words {
+    const whose = first ? `${first}'s` : "their";
+    return {
+        label: "Charge autopay again",
+        confirm: `This charges ${whose} autopay again for this renewal. Their bank tells them a day ahead, so the payment lands in a day or two. Saroh sends nothing itself.`,
+        yes: "Charge autopay",
+        done: "Autopay charge started",
+        sends: false,
+    };
+}
+
+/**
  * Retry by pay link (RETRY, `via: PAY_LINK`): the subscription's own retry,
  * which makes a new pay link for the unpaid renewal. Nothing is charged and
  * nothing is sent — the merchant copies the link and sends it themselves,
- * as on Subscription Detail. D13's mandate retry will have words of its own.
+ * as on Subscription Detail.
  */
 export function retryWords(first: string | null): Words {
     const whose = first ? `${first}'s` : "this";
@@ -145,6 +162,23 @@ export function replyWords(first: string | null, signsIn: boolean): Words {
             : `${who} doesn't sign in on your site now. They'll see your reply when they sign in there. Nothing is emailed or texted.`,
         yes: "Send reply",
         done: first ? `Replied · it's in ${first}'s account` : "Replied",
+        sends: true,
+    };
+}
+
+/**
+ * Reply to a low-star review (REVIEW_REPLY, F2): the reply is posted under
+ * the review on the business's site, where anyone can read it. Nothing is
+ * emailed: a review's reply has no sender, so the design's "and Dev is
+ * emailed" isn't said.
+ */
+export function reviewReplyWords(first: string | null): Words {
+    const whose = first ? `${first}'s` : "their";
+    return {
+        label: "Reply",
+        confirm: `Your reply shows under ${whose} review on your site, where anyone can read it. Nothing is emailed.`,
+        yes: "Post reply",
+        done: "Reply posted",
         sends: true,
     };
 }

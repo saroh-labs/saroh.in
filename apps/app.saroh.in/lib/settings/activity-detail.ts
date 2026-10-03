@@ -126,7 +126,7 @@ function trackingRows(
                     null,
                     business
                         ? `Cleared ${counted(cleared, "mark")}`
-                        : `Cleared at ${counted(cleared, "storefront")}`,
+                        : `Cleared at ${counted(cleared, "location")}`,
                 ),
             );
         }
@@ -141,7 +141,7 @@ function trackingRows(
                 null,
                 units === 0
                     ? "None on the shelves"
-                    : `${counted(units, "unit")} set to 0${at > 0 ? ` at ${counted(at, "storefront")}` : ""}`,
+                    : `${counted(units, "unit")} set to 0${at > 0 ? ` at ${counted(at, "location")}` : ""}`,
             ),
         );
     }
@@ -301,7 +301,7 @@ function detailRows(
                         ? [row("Role", null, role(meta.role))]
                         : []),
                     ...(text(meta.storefront)
-                        ? [row("From storefront", null, text(meta.storefront))]
+                        ? [row("From location", null, text(meta.storefront))]
                         : []),
                 ],
                 withoutValues: false,

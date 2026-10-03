@@ -54,16 +54,22 @@ const CHIP = {
  *
  * An appointment's visits are marked on Order Detail (DESIGN-NOTES), so it
  * offers no next action here.
+ *
+ * On a phone (DEC-067) a card opens the same panel as a sheet from the
+ * bottom (`side="bottom"`), rather than going straight to the full page.
  */
 export function OrderQuickView({
     row,
     can,
     onOpenChange,
+    side = "right",
 }: {
     /** The row it opened from; null when closed. */
     row: OrderRow | null;
     can: OrderAbilities;
     onOpenChange: (open: boolean) => void;
+    /** From the right at the desk; from the bottom on a phone (B5). */
+    side?: "right" | "bottom";
 }) {
     const [read, setRead] = useState<Read>({ state: "loading" });
     const [attempt, setAttempt] = useState(0);
@@ -111,6 +117,7 @@ export function OrderQuickView({
         return (
             <QuickLook
                 open={false}
+                side={side}
                 onOpenChange={onOpenChange}
                 title=""
                 description=""
@@ -127,6 +134,9 @@ export function OrderQuickView({
     return (
         <QuickLook
             open
+            side={side}
+            close="plain"
+            closeLabel="Close quick view"
             onOpenChange={onOpenChange}
             title={`${ref} · ${customer}`}
             titleClassName="font-display text-[20px] font-semibold tracking-[-0.02em]"
@@ -142,7 +152,7 @@ export function OrderQuickView({
                     <Button
                         asChild
                         variant="outline"
-                        className="mr-auto h-[38px] gap-[7px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                        className="mr-auto h-[38px] cursor-pointer gap-[7px] rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
                     >
                         <Link href={orderPageHref(row.store.id, row.id)}>
                             Open full page
@@ -153,7 +163,7 @@ export function OrderQuickView({
                         next.via === "page" ? (
                             <Button
                                 asChild
-                                className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                                className="h-[38px] cursor-pointer rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
                             >
                                 <Link
                                     href={orderPageHref(
@@ -177,7 +187,7 @@ export function OrderQuickView({
                                         to: next.to,
                                     })
                                 }
-                                className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                                className="h-[38px] cursor-pointer rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
                             >
                                 {next.label}
                             </Button>
@@ -218,7 +228,15 @@ export function OrderQuickView({
     );
 }
 
-function QuickViewBody({ order }: { order: OrderRead }) {
+/**
+ * The customer's name, a Saffron link to Customer Detail as the design
+ * draws it (DEC-073): Ink on hover, a step lighter pressed, and a ring on
+ * keyboard focus.
+ */
+const CUSTOMER_LINK =
+    "cursor-pointer rounded-sm text-brand transition-colors duration-fast hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+export function QuickViewBody({ order }: { order: OrderRead }) {
     const money = order.money;
     const currency = money?.currency ?? "INR";
     const format = (a: string | number) =>
@@ -360,10 +378,7 @@ function QuickViewBody({ order }: { order: OrderRead }) {
                 <dt className="text-muted-foreground">Customer</dt>
                 <dd className="min-w-0">
                     {c && customerLink ? (
-                        <Link
-                            href={customerLink}
-                            className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
+                        <Link href={customerLink} className={CUSTOMER_LINK}>
                             {c.name ?? c.email ?? "Customer"}
                         </Link>
                     ) : walkIn ? (

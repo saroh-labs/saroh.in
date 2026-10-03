@@ -6,9 +6,16 @@ import type { RenderedProductGrid } from "@saroh/block-contract";
 import { PRODUCT_GRID_DEFAULT_COUNT } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import {
+    isShopListingCard,
+    productCardsOf,
+    productGridQuery,
+} from "../lib/product-grid-read";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
+import { cardLink, listCard, listPhoto } from "./list-layout";
 
 /**
  * `productGrid` v1 — products from the catalogue, read live (G12).
@@ -49,55 +56,9 @@ export interface ProductGridFeed {
 /** What the section is called when the merchant left the title empty. */
 export const PRODUCT_GRID_TITLE = "Our products";
 
-/**
- * The public read's query for this grid, or null when it can show nothing
- * yet (a collection or products still to be chosen): no read is made.
- */
-export function productGridQuery(content: RenderedProductGrid): string | null {
-    const q = new URLSearchParams();
-    const source = content.source ?? "newest";
-    q.set("source", source);
-    if (source === "collection") {
-        if (!content.collectionId) return null;
-        q.set("collection", content.collectionId);
-    }
-    if (source === "picked") {
-        const ids = content.productIds ?? [];
-        if (ids.length === 0) return null;
-        q.set("ids", ids.join(","));
-    }
-    q.set("count", String(content.count ?? PRODUCT_GRID_DEFAULT_COUNT));
-    return q.toString();
-}
-
-export function isShopListingCard(value: unknown): value is ShopListingCard {
-    if (typeof value !== "object" || value === null) return false;
-    const v = value as Record<string, unknown>;
-    const image = v.image as Record<string, unknown> | null | undefined;
-    return (
-        typeof v.slug === "string" &&
-        typeof v.name === "string" &&
-        typeof v.currency === "string" &&
-        typeof v.price === "string" &&
-        (v.mrp === null || typeof v.mrp === "string") &&
-        typeof v.priceFrom === "boolean" &&
-        (image === null ||
-            (typeof image === "object" &&
-                typeof image.url === "string" &&
-                typeof image.alt === "string")) &&
-        Array.isArray(v.variantTitles) &&
-        v.variantTitles.every((t) => typeof t === "string") &&
-        (v.blurb === null || typeof v.blurb === "string") &&
-        typeof v.soldOut === "boolean"
-    );
-}
-
-/** The cards in a read's body, narrowed rather than cast (#264); else null. */
-export function productCardsOf(body: unknown): ShopListingCard[] | null {
-    const rows = (body as { products?: unknown } | null)?.products;
-    if (!Array.isArray(rows)) return null;
-    return rows.filter(isShopListingCard);
-}
+// The read's query and checks live beside the server's use of them
+// (lib/product-grid-read).
+export { isShopListingCard, productCardsOf, productGridQuery };
 
 /** The storefront's name in a read's body, for the canvas's notes. */
 function storefrontOf(body: unknown): string | null {
@@ -339,9 +300,21 @@ function ProductCards({
         content.count ?? PRODUCT_GRID_DEFAULT_COUNT,
     );
     if (products.length === 0) return null;
-    const showPrices = content.showPrices !== false;
+    // Display options (G16). Absent: cards with their photos, lines and
+    // prices, and no button (the card itself opens the product).
+    const show: CardShow = {
+        price: content.showPrices !== false,
+        photo: content.showPhotos !== false,
+        line: content.showDescriptions !== false,
+        label: said(content.buttonLabel),
+    };
+    const list = content.layout === "list";
     const base =
         feed.basePath != null ? trimTrailingSlashes(feed.basePath) : null;
+    const card = (p: ShopListingCard) =>
+        list
+            ? listCard(show.photo && p.image !== null)
+            : cn(cardClass, !show.photo && "pt-4");
 
     return (
         <GridFrame
@@ -361,10 +334,19 @@ function ProductCards({
                 )
             }
         >
-            <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]">
+            <ul
+                className={cn(
+                    "grid",
+                    list
+                        ? "grid-cols-1 gap-2.5"
+                        : "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]",
+                )}
+            >
                 {products.map((p) => {
-                    const inner = (
-                        <CardBody product={p} showPrice={showPrices} />
+                    const inner = list ? (
+                        <ListRowBody product={p} show={show} />
+                    ) : (
+                        <CardBody product={p} show={show} />
                     );
                     return (
                         <li key={p.slug} className="min-w-0">
@@ -372,7 +354,7 @@ function ProductCards({
                                 <a
                                     href={`${base}/${encodeURIComponent(p.slug)}`}
                                     className={cn(
-                                        cardClass,
+                                        card(p),
                                         "hover:border-site-fg/40 group cursor-pointer transition-[border-color,transform] active:scale-[0.99]",
                                         focusRing,
                                     )}
@@ -380,7 +362,7 @@ function ProductCards({
                                     {inner}
                                 </a>
                             ) : (
-                                <div className={cardClass}>{inner}</div>
+                                <div className={card(p)}>{inner}</div>
                             )}
                         </li>
                     );
@@ -390,19 +372,50 @@ function ProductCards({
     );
 }
 
-function CardBody({
+/** What each card shows (G16's display options, resolved). */
+interface CardShow {
+    price: boolean;
+    photo: boolean;
+    line: boolean;
+    /** The merchant's words at the card's foot; null draws none. */
+    label: string | null;
+}
+
+/** "Show as: List" (G16): the photo on the left, the words beside it. */
+function ListRowBody({
     product: p,
-    showPrice,
+    show,
 }: {
     product: ShopListingCard;
-    showPrice: boolean;
+    show: CardShow;
 }) {
-    const line = cardLine(p.blurb);
-    const eyebrow = p.variantTitles.join(" · ");
-    const amount = formatAmount(p.price, p.currency);
     return (
         <>
-            {p.image ? (
+            {show.photo && p.image ? (
+                <img
+                    src={p.image.url}
+                    alt={p.image.alt}
+                    loading="lazy"
+                    className={listPhoto}
+                />
+            ) : null}
+            <span className="grid min-w-0 content-start gap-1.5 py-4">
+                <CardWords product={p} show={show} />
+            </span>
+        </>
+    );
+}
+
+function CardBody({
+    product: p,
+    show,
+}: {
+    product: ShopListingCard;
+    show: CardShow;
+}) {
+    return (
+        <>
+            {!show.photo ? null : p.image ? (
                 // Remote images from the merchant's media, a plain <img> as
                 // every block's: next/image would need each origin allowlisted.
                 <img
@@ -417,6 +430,24 @@ function CardBody({
                     className="bg-site-bg mb-1.5 block h-[130px]"
                 />
             )}
+            <CardWords product={p} show={show} />
+        </>
+    );
+}
+
+/** A card's words: its options, name, line, price and the merchant's button. */
+function CardWords({
+    product: p,
+    show,
+}: {
+    product: ShopListingCard;
+    show: CardShow;
+}) {
+    const line = show.line ? cardLine(p.blurb) : null;
+    const eyebrow = optionSummary(p.variantTitles, p.optionName);
+    const amount = formatAmount(p.price, p.currency);
+    return (
+        <>
             {eyebrow || p.soldOut ? (
                 <span className="flex items-center gap-2 px-4">
                     <span className="text-site-muted min-w-0 flex-1 truncate text-[11.5px] font-bold uppercase tracking-[0.08em]">
@@ -437,7 +468,7 @@ function CardBody({
                     {line}
                 </span>
             ) : null}
-            {showPrice ? (
+            {show.price ? (
                 <span
                     className={cn(
                         "mt-1 px-4 text-[15px] font-bold tabular-nums",
@@ -447,6 +478,7 @@ function CardBody({
                     {p.priceFrom ? `From ${amount}` : amount}
                 </span>
             ) : null}
+            {show.label ? <span className={cardLink}>{show.label}</span> : null}
         </>
     );
 }

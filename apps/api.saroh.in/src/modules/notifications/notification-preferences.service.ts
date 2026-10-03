@@ -11,6 +11,8 @@ import {
 } from "../audit/audit.service";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { ModuleKey } from "../capabilities/module-registry";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import { allows } from "../organizations/organization-policy";
 import type {
     AlertChannel,
@@ -59,7 +61,9 @@ export interface AlertChange {
  * - **Rows** are offered only when the person's role reads what they are
  *   about (`ALERT_READS`) and the module they belong to is on for the
  *   business and rolled out to it (DEC-057: a module that is rolled out
- *   off is never named).
+ *   off is never named). The Website row also needs `SITE_TEST_RELEASES`:
+ *   only a scheduled go-live raises it, and a business without test
+ *   releases is not told of them.
  * - **Channels** are only what can deliver: the bell to someone who sees
  *   the inbox, email through the business's own connected provider
  *   (DEC-011), and WhatsApp never — Saroh keeps no WhatsApp number for a
@@ -73,6 +77,7 @@ export class NotificationPreferencesService {
     constructor(
         private readonly availability: ModuleAvailabilityService,
         private readonly audit: AuditService,
+        private readonly flags: FeatureFlagService,
     ) {}
 
     async read(ctx: OrganizationContext): Promise<AlertPreferencesView> {
@@ -176,7 +181,9 @@ export class NotificationPreferencesService {
     ): Promise<AlertEvent[]> {
         const has = (action: Parameters<typeof allows>[1]) =>
             allows(ctx, action);
-        const readable = ALERT_EVENTS.filter((e) => mayHearAbout(e, has));
+        const readable = ALERT_EVENTS.filter((e) =>
+            mayHearAbout(e, has, ctx.roleKey),
+        );
         const modules = [
             ...new Set(
                 readable
@@ -192,7 +199,14 @@ export class NotificationPreferencesService {
                 ),
             ),
         );
+        const releases =
+            readable.includes("site") &&
+            (await this.flags.isEnabled(
+                FlagKey.SITE_TEST_RELEASES,
+                ctx.organizationId,
+            ));
         return readable.filter((e) => {
+            if (e === "site" && !releases) return false;
             const module = ALERT_MODULE[e];
             return module === null || on.get(module) === true;
         });

@@ -3,10 +3,12 @@ import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
 import { Home } from "lucide-react";
 import Link from "next/link";
 
-import { firstRunJobs } from "@/lib/home/first-run";
+import type { InvoiceJobFacts } from "@/lib/home/first-run";
+import { firstRunJobs, onButNotOpen } from "@/lib/home/first-run";
 import { formatList, nextLine } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
 import { showsWeek, weekRows } from "@/lib/home/week";
+import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
@@ -52,6 +54,8 @@ export function HomeDashboard({
     modules,
     businessName,
     setup = null,
+    kind,
+    invoicing,
 }: {
     home: HomeModel;
     /** Read only for a business with nothing on — the first-run question. */
@@ -59,11 +63,25 @@ export function HomeDashboard({
     businessName: string;
     /** Null for someone who may not change the business (`org:update`). */
     setup?: HomeSetup | null;
+    /**
+     * What is being set up (DEC-070): the first-run jobs' order and words.
+     * Absent, a business's.
+     */
+    kind?: string;
+    /** For "Invoice a client"; absent, it isn't offered. */
+    invoicing?: InvoiceJobFacts;
 }) {
     // Nothing on yet: ask what the business wants to do, on Home itself,
     // rather than an empty dashboard whose every band says "nothing yet".
     if (!home.hasAnyModule) {
-        return <FirstRun modules={modules ?? []} businessName={businessName} />;
+        return (
+            <FirstRun
+                modules={modules ?? []}
+                businessName={businessName}
+                kind={kind}
+                invoicing={invoicing}
+            />
+        );
     }
 
     const now = new Date();
@@ -134,16 +152,22 @@ export function HomeDashboard({
 function FirstRun({
     modules,
     businessName,
+    kind,
+    invoicing,
 }: {
     modules: ModuleView[];
     businessName: string;
+    kind?: string;
+    invoicing?: InvoiceJobFacts;
 }) {
-    const jobs = firstRunJobs(modules);
+    const jobs = firstRunJobs(modules, kind, invoicing);
     if (jobs.length > 0) return <FirstRunJobs modules={modules} jobs={jobs} />;
 
     // May turn things on, just none of the four starting jobs: the full list
     // is still theirs, so point at it rather than saying nobody can.
-    if (modules.some((m) => m.canManage && m.lifecycle !== "ENABLED")) {
+    if (
+        rolledOut(modules).some((m) => m.canManage && m.lifecycle !== "ENABLED")
+    ) {
         return (
             <EmptyState
                 icon={<Home aria-hidden />}
@@ -156,6 +180,19 @@ function FirstRun({
                         </Link>
                     </Button>
                 }
+            />
+        );
+    }
+
+    // Turned on, just not for this person's role (a Storefront team member,
+    // or a custom role that reads nothing). Saying the business picked
+    // nothing would be false.
+    if (onButNotOpen(modules)) {
+        return (
+            <EmptyState
+                icon={<Home aria-hidden />}
+                title="Nothing here is open to you yet"
+                description={`${businessName} runs on Saroh, but your role doesn't reach any of it yet. An owner or admin can change what you can reach, in Team.`}
             />
         );
     }

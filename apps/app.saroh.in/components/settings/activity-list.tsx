@@ -2,10 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { useNarrow } from "@/lib/hooks/use-narrow";
 import type { ActivityLine } from "@/lib/settings/activity";
 import type { ActivityDetail } from "@/lib/settings/activity-detail";
 
@@ -57,7 +58,7 @@ export function ActivityList({
                                 type="button"
                                 onClick={() => setOpenId(line.id)}
                                 aria-haspopup="dialog"
-                                className="min-w-0 text-pretty text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
+                                className="min-w-0 text-pretty text-left underline-offset-2 after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring active:text-muted-foreground"
                             >
                                 <strong className="font-semibold">
                                     {line.who}
@@ -83,21 +84,6 @@ export function ActivityList({
                 onClose={() => setOpenId(null)}
             />
         </>
-    );
-}
-
-const NARROW = "(max-width: 759px)";
-
-/** Whether the screen is phone-width; false on the server. */
-function useNarrow(): boolean {
-    return useSyncExternalStore(
-        (notify) => {
-            const query = window.matchMedia(NARROW);
-            query.addEventListener("change", notify);
-            return () => query.removeEventListener("change", notify);
-        },
-        () => window.matchMedia(NARROW).matches,
-        () => false,
     );
 }
 

@@ -30,7 +30,8 @@ const STEPS = ["pause", "switch", "cancel", "restart"] as const;
  * last ran and the subscriber's phone and allergies are read on their own,
  * so a role without invoices, or one failed read, costs its own panel and
  * nothing else. `?do=pause|switch|cancel|restart` arrives from the list's
- * quick look and opens that step.
+ * quick look and opens that step; `?do=autopay-link` from Home's "Send a
+ * set-up link" (D14) opens that sheet.
  */
 export default async function SubscriptionPage({
     params,
@@ -93,6 +94,7 @@ export default async function SubscriptionPage({
                 canWrite={canWrite}
                 canPayLink={may("invoice:write")}
                 initialStep={step}
+                openSetUpLink={query.do === "autopay-link"}
                 contacts={contacts}
                 nowIso={now.toISOString()}
             />

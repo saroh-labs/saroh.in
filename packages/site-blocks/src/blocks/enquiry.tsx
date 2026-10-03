@@ -5,8 +5,13 @@ import { useEffect, useId, useState } from "react";
 import type { RenderedEnquiry } from "@saroh/block-contract";
 import { cn } from "../lib/utils";
 
+import type { SignedInCustomer } from "../account/api";
+import type { SendResult } from "../account/messages";
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import { useTestRelease } from "../test-release/context";
+import { TestReleaseStop } from "../test-release/test-release-stop";
+import { isTestReleaseRefusal } from "../test-release/words";
 import { ctaClasses } from "./cta";
 
 /**
@@ -25,17 +30,29 @@ import { ctaClasses } from "./cta";
  * A section with no `formId` (never synced) renders nothing rather than POST to
  * a broken URL. `idempotencyKey` is stable per mount so a double-click / retry
  * can't create two leads.
+ *
+ * On a test release (DEC-071, T6) Send posts nothing: the form says what the
+ * live site would do with it instead. The API refuses a post from a test
+ * host on its own too (409 `TEST_RELEASE`), and that answer reads the same.
  */
 
 type SubmitState =
     | { kind: "idle" }
     | { kind: "submitting" }
     | { kind: "success" }
-    | { kind: "error"; message: string };
+    | { kind: "error"; message: string }
+    /** A test release: nothing was sent, and the form says why. */
+    | { kind: "test-release" };
+
+/** What the live site does with an enquiry, for a test release's stop. */
+const ENQUIRY_LIVE = "this form sends your message to the business";
+/** And with a message to the customer's thread. */
+const THREAD_LIVE = "this sends your message to the business's inbox";
 
 /**
  * The message a link asked for: `?about=` names a product "Ask about
- * ordering" sent (G13), `?join=` a plan "Ask about joining" sent (G9).
+ * ordering" sent (G13), `?join=` a plan "Ask about joining" sent (G9),
+ * `?pack=` a class pack "Ask about this pack" sent (G20).
  */
 export function askedFromSearch(search: string): string | null {
     const read = (key: string) => {
@@ -44,6 +61,8 @@ export function askedFromSearch(search: string): string | null {
     };
     const plan = read("join");
     if (plan) return `I'd like to join ${plan}. `;
+    const pack = read("pack");
+    if (pack) return `I'd like to buy ${pack}. `;
     const product = read("about");
     return product ? `I'd like to order ${product}. ` : null;
 }
@@ -68,13 +87,44 @@ function inputTypeFor(type: RenderedEnquiry["fields"][number]["type"]): string {
     }
 }
 
+/**
+ * A signed-in customer's message thread (round-2 A13), handed in by the live
+ * site while the account area is on and someone is signed in. With it, the
+ * Contact page's form writes to the business in the customer's thread —
+ * the reply comes to their Messages — instead of starting an enquiry.
+ */
+export interface EnquiryThread {
+    businessName: string;
+    customer: SignedInCustomer;
+    send: (text: string) => Promise<SendResult>;
+    /** The account's Messages tab, where the reply shows. */
+    messagesHref: string;
+}
+
 export default function EnquirySection({
     content,
     apiUrl = DEFAULT_API_URL,
+    thread = null,
 }: {
     content: RenderedEnquiry;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /** Signed in on the live site: the form writes to their thread. */
+    thread?: EnquiryThread | null;
+}) {
+    return thread && content.formId ? (
+        <ThreadForm content={content} thread={thread} />
+    ) : (
+        <EnquiryForm content={content} apiUrl={apiUrl} />
+    );
+}
+
+function EnquiryForm({
+    content,
+    apiUrl,
+}: {
+    content: RenderedEnquiry;
+    apiUrl: string;
 }) {
     // A stable id per mount for accessible label ids.
     const baseId = useId();
@@ -88,6 +138,7 @@ export default function EnquirySection({
 
     const [values, setValues] = useState<Record<string, string>>({});
     const [state, setState] = useState<SubmitState>({ kind: "idle" });
+    const testRelease = useTestRelease() !== null;
 
     // "Ask about ordering" on a product page (G13) links here with
     // `?about=<product>`, and "Ask about joining" on a Plans block (G9) with
@@ -117,6 +168,10 @@ export default function EnquirySection({
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (testRelease) {
+            setState({ kind: "test-release" });
+            return;
+        }
         setState({ kind: "submitting" });
         try {
             const res = await fetch(
@@ -145,6 +200,10 @@ export default function EnquirySection({
             const body = (await res.json().catch(() => null)) as {
                 message?: string;
             } | null;
+            if (isTestReleaseRefusal(res.status, body)) {
+                setState({ kind: "test-release" });
+                return;
+            }
             setState({
                 kind: "error",
                 message:
@@ -251,6 +310,182 @@ export default function EnquirySection({
                     <p role="alert" className={destructiveAlertClasses}>
                         {state.message}
                     </p>
+                ) : null}
+                {state.kind === "test-release" ? (
+                    <TestReleaseStop live={ENQUIRY_LIVE} nothing="sent" />
+                ) : null}
+
+                <button
+                    type="submit"
+                    disabled={submitting}
+                    className={cn(
+                        ctaClasses("primary"),
+                        "w-fit disabled:cursor-not-allowed disabled:opacity-60",
+                    )}
+                >
+                    {submitting ? "Sending…" : (content.submitLabel ?? "Send")}
+                </button>
+            </form>
+        </section>
+    );
+}
+
+/** The thread's cap (`MESSAGE_MAX` in site-accounts/thread-store.ts). */
+export const THREAD_MESSAGE_MAX = 2_000;
+
+/** A value with something in it, else null: an empty string says nothing. */
+function said(value: string | null | undefined): string | null {
+    const trimmed = value?.trim();
+    return trimmed === undefined || trimmed === "" ? null : trimmed;
+}
+
+/**
+ * The Contact page's form for a signed-in customer (A13): who they are is
+ * known, so it asks only for the message, and sends it to their thread with
+ * the business. The reply comes to their Messages, which the thanks links
+ * to. A message a link asked for (`?about=`, `?join=`, `?pack=`) starts it,
+ * as it starts an enquiry.
+ */
+function ThreadForm({
+    content,
+    thread,
+}: {
+    content: RenderedEnquiry;
+    thread: EnquiryThread;
+}) {
+    const fieldId = useId();
+    const [text, setText] = useState("");
+    const [state, setState] = useState<SubmitState>({ kind: "idle" });
+    const testRelease = useTestRelease() !== null;
+    const areaLabel = content.fields.find((f) => f.type === "textarea")?.label;
+    const label = said(areaLabel) ?? "Message";
+
+    useEffect(() => {
+        const asked = askedFromUrl();
+        if (!asked) return;
+        const timer = setTimeout(() => {
+            setText((prev) => prev || asked);
+        }, 0);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const submitting = state.kind === "submitting";
+    const named = thread.customer.name;
+    const who = said(named) ?? thread.customer.email;
+
+    async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (submitting) return;
+        const body = text.trim();
+        if (!body) {
+            setState({ kind: "error", message: "Write your message" });
+            return;
+        }
+        if (body.length > THREAD_MESSAGE_MAX) {
+            setState({
+                kind: "error",
+                message: "Keep it to 2,000 characters",
+            });
+            return;
+        }
+        if (testRelease) {
+            setState({ kind: "test-release" });
+            return;
+        }
+        setState({ kind: "submitting" });
+        const result = await thread.send(body).catch((): SendResult => ({
+            ok: false,
+            message: "We couldn't reach the business. Try again in a moment.",
+        }));
+        if (result.ok) {
+            setText("");
+            setState({ kind: "success" });
+        } else if ("reason" in result) {
+            // The only refusal with a reason: a test release (DEC-071).
+            setState({ kind: "test-release" });
+        } else {
+            setState({ kind: "error", message: result.message });
+        }
+    }
+
+    if (state.kind === "success") {
+        return (
+            <section
+                id="enquiry"
+                className="mx-auto w-full max-w-2xl scroll-mt-20 px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+            >
+                <div
+                    role="status"
+                    className="border-site-border bg-site-surface grid justify-items-center gap-4 rounded-[var(--site-radius)] border p-8 text-center"
+                >
+                    <p className="text-site-fg text-lg font-medium">
+                        Sent. {thread.businessName} will reply in your Messages.
+                    </p>
+                    <a
+                        href={thread.messagesHref}
+                        className={cn(ctaClasses("secondary"), "w-fit")}
+                    >
+                        Open Messages
+                    </a>
+                </div>
+            </section>
+        );
+    }
+
+    return (
+        <section
+            id="enquiry"
+            className="mx-auto w-full max-w-2xl scroll-mt-20 px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+        >
+            {content.title ? (
+                <h2 className="text-site-fg text-3xl font-bold tracking-tight">
+                    {content.title}
+                </h2>
+            ) : null}
+            {content.description ? (
+                <p className="text-site-body mt-3">{content.description}</p>
+            ) : null}
+
+            <form
+                className="mt-8 grid gap-[var(--site-grid-gap)]"
+                onSubmit={(e) => void onSubmit(e)}
+                noValidate
+            >
+                <p className="text-site-body text-sm">
+                    Signed in as {who}. The reply comes to your Messages.
+                </p>
+                <div className="grid gap-1.5">
+                    <label
+                        htmlFor={fieldId}
+                        className="text-site-fg text-sm font-medium"
+                    >
+                        {label}
+                    </label>
+                    <textarea
+                        id={fieldId}
+                        name="message"
+                        required
+                        rows={4}
+                        maxLength={THREAD_MESSAGE_MAX}
+                        value={text}
+                        disabled={submitting}
+                        onChange={(e) => {
+                            setText(e.target.value);
+                            if (state.kind === "error") {
+                                setState({ kind: "idle" });
+                            }
+                        }}
+                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 outline-none focus:ring-2"
+                    />
+                </div>
+
+                {state.kind === "error" ? (
+                    <p role="alert" className={destructiveAlertClasses}>
+                        {state.message}
+                    </p>
+                ) : null}
+                {state.kind === "test-release" ? (
+                    <TestReleaseStop live={THREAD_LIVE} nothing="sent" />
                 ) : null}
 
                 <button

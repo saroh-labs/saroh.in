@@ -6,6 +6,7 @@ import {
     filteredEmptyTitle,
     filterParams,
     filtersActive,
+    filtersOn,
     NO_FILTERS,
     readOrdersFilters,
     stepOptions,
@@ -188,6 +189,42 @@ describe("filtersActive", () => {
         ).toBe(true);
         expect(filtersActive({ ...NO_FILTERS, late: true })).toBe(true);
         expect(filtersActive({ ...NO_FILTERS, attention: true })).toBe(true);
+    });
+});
+
+describe("filtersOn — the phone's Filters count (B5)", () => {
+    it("is 0 with nothing on, and a custom date without a day is not on", () => {
+        expect(filtersOn(NO_FILTERS)).toBe(0);
+        expect(filtersOn({ ...NO_FILTERS, date: "custom" })).toBe(0);
+    });
+
+    it("counts a date once, preset or range, and each other filter", () => {
+        expect(
+            filtersOn({
+                ...NO_FILTERS,
+                date: "custom",
+                from: "2026-09-01",
+                to: "2026-09-10",
+            }),
+        ).toBe(1);
+        expect(
+            filtersOn({
+                ...NO_FILTERS,
+                date: "today",
+                step: "ready",
+                fulfilment: "PICKUP",
+                payment: "unpaid",
+                product: "p1",
+                attention: true,
+                late: true,
+            }),
+        ).toBe(7);
+    });
+
+    it("agrees with filtersActive", () => {
+        const some = { ...NO_FILTERS, late: true };
+        expect(filtersOn(some) > 0).toBe(filtersActive(some));
+        expect(filtersOn(NO_FILTERS) > 0).toBe(filtersActive(NO_FILTERS));
     });
 });
 

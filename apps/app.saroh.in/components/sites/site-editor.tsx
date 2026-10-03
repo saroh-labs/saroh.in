@@ -26,10 +26,17 @@ import { useEditorStyle } from "@/components/sites/editor/use-editor-style";
 import { useEditorViewport } from "@/components/sites/editor/use-editor-viewport";
 import { usePublish } from "@/components/sites/editor/use-publish";
 import { useSiteChrome } from "@/components/sites/editor/use-site-chrome";
+import { useTestReleases } from "@/components/sites/editor/use-test-releases";
 import { useUndo } from "@/components/sites/editor/use-undo";
 import { PrePublishCheck } from "@/components/sites/pre-publish-check";
+import {
+    testReleaseActions,
+    TestReleaseSheets,
+} from "@/components/sites/test-releases/test-release-sheets";
+import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
 import { resolveStyleVariables } from "@/lib/sites/style";
+import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 
 /**
  * SiteEditor (S2-004): the page's blocks beside a live `DraftPreview` of local
@@ -61,12 +68,25 @@ export function SiteEditor({
     initialStyle,
     styleOptions,
     shopOpen = false,
+    packsOpen = false,
+    addablePageKinds,
+    initialTestReleases = { state: "off" },
+    canPublish = false,
+    publishNeedsApproval = false,
+    canOverride = false,
+    livePublishedAt = null,
 }: SiteEditorProps) {
     const review = useEditorReview({
         siteId,
         pageId,
         initialComments,
         initialReview,
+    });
+    // The site's test releases (DEC-071, T11); hidden while they're off.
+    const releaseState = useTestReleases({
+        siteId,
+        initialRead: initialTestReleases,
+        initialLivePublishedAt: livePublishedAt,
     });
     const publish = usePublish({
         siteId,
@@ -76,7 +96,25 @@ export function SiteEditor({
         initialPendingChanges,
         initialPendingSiteChanges,
         refreshReview: review.refreshReview,
+        initialNeedsApproval: publishNeedsApproval,
+        canOverride,
+        // Publishing moves the live site under the releases: a scheduled
+        // go-live won't run over it, and Go live replaces something newer.
+        onLiveChanged: () => {
+            if (!releaseState.available) return;
+            void releaseState.refresh();
+            void releaseState.readLive();
+        },
     });
+    const releases = {
+        ...releaseState,
+        abilities: {
+            canPublish,
+            canUpdate: canUpdateSite,
+            needsApproval: publish.needsApproval,
+            canOverride,
+        },
+    };
     // The header's name and footer's line (G6), saved like the look.
     const chrome = useSiteChrome({
         ...{ siteId, siteName, footerPreview },
@@ -181,6 +219,10 @@ export function SiteEditor({
                 }}
                 {...viewport}
                 openFeedback={() => setInspector("feedback")}
+                canUpdateSite={canUpdateSite}
+                addablePageKinds={addablePageKinds}
+                scheduled={releases.scheduled}
+                testRelease={testReleaseActions(releases)}
             />
 
             <EditorPanels
@@ -202,6 +244,7 @@ export function SiteEditor({
                         flagsBySection={flagsBySection}
                         notedKeys={review.notedKeys}
                         shopOpen={shopOpen}
+                        packsOpen={packsOpen}
                     />
                 }
                 canvas={
@@ -239,6 +282,29 @@ export function SiteEditor({
                         unreadableSections={unreadableSections}
                     />
                 }
+                releases={
+                    releases.available
+                        ? {
+                              open: releases.panelOpen,
+                              onClose: () => releases.setPanelOpen(false),
+                              content: (
+                                  <TestReleasesPanel
+                                      siteId={siteId}
+                                      releases={releases}
+                                  />
+                              ),
+                          }
+                        : undefined
+                }
+            />
+
+            <TestReleaseSheets
+                siteId={siteId}
+                releases={releases}
+                // A release freezes what the server holds (the rule Publish
+                // keeps): unsaved work on screen would not be in it.
+                unsaved={unsaved}
+                recordWentLive={publish.recordWentLive}
             />
 
             {/*
@@ -264,6 +330,7 @@ export function SiteEditor({
                 variables={resolveStyleVariables(style, styleOptions)}
                 onAdd={(type, variant) => addSection(type, variant)}
                 shopOpen={shopOpen}
+                packsOpen={packsOpen}
             />
 
             {publish.checking ? (
@@ -278,6 +345,17 @@ export function SiteEditor({
                     pendingSummary={publish.pendingSummary}
                     pendingKnown={publish.pendingKnown}
                     review={review.review}
+                    needsApproval={publish.needsApproval}
+                    canOverride={publish.canOverride}
+                    // KTD-14: a scheduled go-live won't run over this.
+                    scheduledWarning={
+                        releases.scheduledRelease
+                            ? publishOverScheduleWarning(
+                                  releases.scheduledRelease,
+                                  releases.zone,
+                              )
+                            : null
+                    }
                     onPublish={() => void publish.onPublish(chrome.displayName)}
                     onClose={() => publish.setChecking(false)}
                     onJump={jumpToFlag}

@@ -1,0 +1,4 @@
+# Parallel units each append an entry at the end; keep both sides.
+docs/architecture/DEV_LEARNINGS.md merge=union
+# Parallel units append decisions at the end; keep both sides.
+docs/architecture/DECISIONS.md merge=union

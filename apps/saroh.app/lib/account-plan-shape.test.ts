@@ -25,6 +25,10 @@ const SUB = {
     canPause: true,
     canResume: false,
     canCancel: true,
+    autopay: null,
+    autopayPays: null,
+    autopayCharging: null,
+    autopayNextCharge: null,
 };
 
 const PACK = {
@@ -39,6 +43,8 @@ const TAB = {
     subscriptions: { ok: true, value: [SUB] },
     packs: { ok: true, value: [PACK] },
     pauseWeeks: [2, 4, 8],
+    autopayMethods: [],
+    autopayChecks: {},
 };
 
 describe("planTabResult", () => {
@@ -56,11 +62,143 @@ describe("planTabResult", () => {
             subscriptions: { ok: false },
             packs: { ok: false },
             pauseWeeks: [2, 4, 8],
+            autopayMethods: [],
+            autopayChecks: {},
         });
         expect(
             planTabResult({ ...TAB, subscriptions: { ok: false } })
                 ?.subscriptions,
         ).toEqual({ ok: false });
+    });
+
+    it("reads autopay (D12): the provider's methods and each plan's state, anything strange as none", () => {
+        const tab = planTabResult({
+            ...TAB,
+            autopayMethods: ["UPI", "NACH", "CARD"],
+            subscriptions: {
+                ok: true,
+                value: [
+                    {
+                        ...SUB,
+                        autopay: {
+                            state: "ON",
+                            method: "UPI",
+                            hint: "mo•••@okicici",
+                        },
+                        autopayPays: { total: "2500.00", currency: "INR" },
+                    },
+                    { ...SUB, ref: "sub_2", autopay: { state: "MAYBE" } },
+                ],
+            },
+        });
+        expect(tab?.autopayMethods).toEqual(["UPI", "CARD"]);
+        const subs = tab?.subscriptions;
+        expect(subs?.ok && subs.value[0].autopay).toEqual({
+            state: "ON",
+            method: "UPI",
+            hint: "mo•••@okicici",
+            check: null,
+        });
+        expect(subs?.ok && subs.value[0].autopayPays).toEqual({
+            total: "2500.00",
+            currency: "INR",
+        });
+        expect(subs?.ok && subs.value[1].autopay).toBeNull();
+        // An API from before D12 offers none.
+        const { autopayMethods: _, ...older } = TAB;
+        expect(planTabResult(older)?.autopayMethods).toEqual([]);
+    });
+
+    it("reads an autopay charge under way (D13), anything strange as none", () => {
+        const tab = planTabResult({
+            ...TAB,
+            subscriptions: {
+                ok: true,
+                value: [
+                    {
+                        ...SUB,
+                        autopayCharging: { at: "2026-10-02T10:00:00.000Z" },
+                    },
+                    { ...SUB, ref: "sub_2", autopayCharging: { at: 7 } },
+                ],
+            },
+        });
+        const subs = tab?.subscriptions;
+        expect(subs?.ok && subs.value[0].autopayCharging).toEqual({
+            at: "2026-10-02T10:00:00.000Z",
+        });
+        expect(subs?.ok && subs.value[1].autopayCharging).toBeNull();
+    });
+
+    it("reads when autopay next charges (D13B), anything strange as none", () => {
+        const tab = planTabResult({
+            ...TAB,
+            subscriptions: {
+                ok: true,
+                value: [
+                    {
+                        ...SUB,
+                        autopayNextCharge: { at: "2026-10-29T18:30:00.000Z" },
+                    },
+                    { ...SUB, ref: "sub_2", autopayNextCharge: { at: "soon" } },
+                    { ...SUB, ref: "sub_3" },
+                ],
+            },
+        });
+        const subs = tab?.subscriptions;
+        expect(subs?.ok && subs.value[0].autopayNextCharge).toEqual({
+            at: "2026-10-29T18:30:00.000Z",
+        });
+        expect(subs?.ok && subs.value[1].autopayNextCharge).toBeNull();
+        expect(subs?.ok && subs.value[2].autopayNextCharge).toBeNull();
+    });
+
+    it("reads the ₹1 check (D12B): each method's before, each plan's after, anything strange as none", () => {
+        const rupee = { amount: "1.00", currency: "INR" };
+        const tab = planTabResult({
+            ...TAB,
+            autopayMethods: ["UPI", "CARD", "EMANDATE"],
+            autopayChecks: { UPI: rupee, CARD: { amount: 1 } },
+            subscriptions: {
+                ok: true,
+                value: [
+                    {
+                        ...SUB,
+                        autopay: {
+                            state: "ON",
+                            method: "UPI",
+                            hint: null,
+                            check: {
+                                ...rupee,
+                                state: "REFUNDED",
+                                refundedAt: "2026-10-02T06:00:00.000Z",
+                            },
+                        },
+                    },
+                    {
+                        ...SUB,
+                        ref: "sub_2",
+                        autopay: {
+                            state: "ON",
+                            method: "UPI",
+                            hint: null,
+                            check: { ...rupee, state: "LOST" },
+                        },
+                    },
+                ],
+            },
+        });
+        expect(tab?.autopayChecks).toEqual({ UPI: rupee });
+        const subs = tab?.subscriptions;
+        expect(subs?.ok && subs.value[0].autopay?.check).toEqual({
+            ...rupee,
+            state: "REFUNDED",
+            refundedAt: "2026-10-02T06:00:00.000Z",
+        });
+        expect(subs?.ok && subs.value[1].autopay?.check).toBeNull();
+        // An API from before D12B names none.
+        const { autopayChecks: _, ...older } = TAB;
+        expect(planTabResult(older)?.autopayChecks).toEqual({});
     });
 
     it("refuses what isn't a tab at all", () => {

@@ -84,7 +84,7 @@ export function ListFirstRun({
                     {hasStorefront ? null : (
                         <Button asChild>
                             <Link href={newStorefrontHref}>
-                                Create a storefront
+                                Create a location
                             </Link>
                         </Button>
                     )}
@@ -106,7 +106,7 @@ export function ListNote() {
             been added here. Everyone else is in{" "}
             <Link
                 href="/contacts"
-                className="font-medium text-brand hover:text-foreground"
+                className="font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
             >
                 Contacts
             </Link>

@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+import { allergyNotesOf } from "@/lib/orders/attention";
 import {
     allergenWords,
     allergyCheck,
-    allergyNotesFrom,
     canCancel,
     eventText,
     flowOf,
     goesToAddress,
+    headerStep,
+    howWords,
     isOpen,
     kitchenStanding,
     PAYMENT_TRANSITIONS,
@@ -17,7 +19,30 @@ import {
     stepsOf,
     waiting,
 } from "@/lib/orders/lifecycle";
-import type { OrderReadEvent, OrderReadLine } from "@/lib/orders/read";
+import type {
+    OrderAttentionEntry,
+    OrderReadEvent,
+    OrderReadLine,
+} from "@/lib/orders/read";
+
+/** A Needs attention Allergy entry as the order read carries it (B15). */
+const allergy = (
+    over: Partial<OrderAttentionEntry> = {},
+): OrderAttentionEntry => ({
+    id: "at_1",
+    kind: "ALLERGY",
+    label: "Peanuts",
+    detail: null,
+    sensitive: false,
+    allergen: null,
+    matchAllergens: [],
+    source: "STAFF",
+    ...over,
+});
+
+/** The banner's input from these entries (Z2a: never the notes). */
+const fromAttention = (entries: OrderAttentionEntry[]) =>
+    allergyNotesOf({ entries, hiddenSensitiveCount: 0 }) ?? [];
 
 describe("canCancel", () => {
     it("allows cancelling before the goods go out, and not after", () => {
@@ -62,6 +87,71 @@ const line = (over: Partial<OrderReadLine> = {}): OrderReadLine => ({
     quantity: 2,
     refundedQuantity: 0,
     ...over,
+});
+
+describe("the header's step pill and how it leaves (the design)", () => {
+    const pickup = {
+        status: "PENDING" as const,
+        paymentStatus: "PAID" as const,
+        refundStanding: "NONE" as const,
+        stage: "NEW" as const,
+        steps: [
+            { stage: "NEW" as const, label: "New" },
+            { stage: "PREPARING" as const, label: "Preparing" },
+            { stage: "READY" as const, label: "Ready" },
+            { stage: "COLLECTED" as const, label: "Collected" },
+        ],
+        fulfilmentLabel: "Pick-up",
+    };
+
+    it("says the step it is at, never Unfulfilled, toned as the list tones it", () => {
+        expect(headerStep(pickup)).toEqual({ label: "New", tone: "new" });
+        expect(
+            headerStep({ ...pickup, status: "PROCESSING", stage: "PREPARING" }),
+        ).toEqual({ label: "Preparing", tone: "prog" });
+        expect(
+            headerStep({ ...pickup, status: "PROCESSING", stage: "READY" }),
+        ).toEqual({ label: "Ready", tone: "ready" });
+        expect(
+            headerStep({ ...pickup, status: "DELIVERED", stage: "COLLECTED" }),
+        ).toEqual({ label: "Collected", tone: "done" });
+    });
+
+    it("says Refunded or Cancelled in red", () => {
+        expect(headerStep({ ...pickup, refundStanding: "REFUNDED" })).toEqual({
+            label: "Refunded",
+            tone: "bad",
+        });
+        expect(headerStep({ ...pickup, status: "CANCELLED" })).toEqual({
+            label: "Cancelled",
+            tone: "bad",
+        });
+    });
+
+    it("reads Pick-up at the storefront, never the old Collection", () => {
+        const at = {
+            fulfilmentType: "PICKUP" as const,
+            fulfilmentLabel: "Pick-up",
+            store: { id: "s1", name: "Hill Road" },
+            deliveryAddress: null,
+        };
+        expect(howWords(at)).toBe("Pick-up at Hill Road");
+        expect(
+            howWords({
+                ...at,
+                fulfilmentType: "LOCAL_DELIVERY",
+                fulfilmentLabel: "Local delivery",
+                deliveryAddress: { city: "Pune" } as never,
+            }),
+        ).toBe("Local delivery to Pune");
+        expect(
+            howWords({
+                ...at,
+                fulfilmentType: "SHIPPING",
+                fulfilmentLabel: "Shipping",
+            }),
+        ).toBe("Shipping");
+    });
 });
 
 describe("the kitchen flow", () => {
@@ -220,16 +310,15 @@ describe("allergyCheck", () => {
         );
         expect(asWritten.hits).toEqual([]);
 
-        const notes = allergyNotesFrom([
-            {
-                body: "Peanut allergy",
-                allergens: [peanutsA],
+        const notes = fromAttention([
+            allergy({
+                allergen: peanutsA,
                 matchAllergens: [peanutsA, peanutsB],
-            },
-            { body: "Prefers oat milk", allergens: [], matchAllergens: [] },
+            }),
+            allergy({ id: "at_2", kind: "OTHER", label: "Prefers oat milk" }),
         ]);
         expect(notes).toEqual([
-            { body: "Peanut allergy", allergens: [peanutsA, peanutsB] },
+            { body: "Allergy: Peanuts", allergens: [peanutsA, peanutsB] },
         ]);
         const check = allergyCheck([satay], notes);
         expect(check.hits).toEqual([peanutsB]);
@@ -237,10 +326,10 @@ describe("allergyCheck", () => {
         expect(allergenWords(check.hits)).toBe("peanuts");
     });
 
-    it("keeps a note's own ids when the wider list is missing", () => {
+    it("keeps an entry's own allergen when the wider list is missing", () => {
         expect(
-            allergyNotesFrom([{ body: "Sesame", allergens: [SESAME] }]),
-        ).toEqual([{ body: "Sesame", allergens: [SESAME] }]);
+            fromAttention([allergy({ label: "Sesame", allergen: SESAME })]),
+        ).toEqual([{ body: "Allergy: Sesame", allergens: [SESAME] }]);
     });
 
     it("does not hit a different allergen on another storefront", () => {
@@ -253,15 +342,14 @@ describe("allergyCheck", () => {
                     },
                 }),
             ],
-            allergyNotesFrom([
-                {
-                    body: "Peanuts",
-                    allergens: [{ id: "al_peanuts_a", name: "Peanuts" }],
+            fromAttention([
+                allergy({
+                    allergen: { id: "al_peanuts_a", name: "Peanuts" },
                     matchAllergens: [
                         { id: "al_peanuts_a", name: "Peanuts" },
                         { id: "al_peanuts_b", name: "Peanuts" },
                     ],
-                },
+                }),
             ]),
         );
         expect(check.hits).toEqual([]);

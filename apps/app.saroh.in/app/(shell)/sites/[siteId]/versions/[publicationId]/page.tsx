@@ -9,6 +9,7 @@ import { PastVersionPreview } from "@/components/sites/past-version-preview";
 import { RestoreVersion } from "@/components/sites/restore-version";
 import { requireSession } from "@/lib/session";
 import { exactDate } from "@/lib/sites/format-date";
+import { releaseTitle } from "@/lib/sites/release-review";
 import { getPublication, getSite } from "@/lib/sites/service";
 
 /**
@@ -62,6 +63,8 @@ export default async function PastVersionPage({
 
     const isCurrent = site.currentPublicationId === publication.id;
     const base = `/sites/${siteId}/versions/${publicationId}`;
+    // The test release this version went live from, if any (T12).
+    const release = publication.testRelease ?? null;
 
     return (
         <PageContainer>
@@ -88,6 +91,18 @@ export default async function PastVersionPage({
                 {isCurrent
                     ? "This is the version visitors see now."
                     : "A past version, as it was served. It is not what visitors see now, and nothing here can be edited."}
+                {release ? (
+                    <>
+                        {" It went live from "}
+                        <Link
+                            href={`/sites/${siteId}/releases/${release.id}`}
+                            className="font-medium underline underline-offset-2 hover:text-foreground focus-visible:text-foreground"
+                        >
+                            {releaseTitle(release)}
+                        </Link>
+                        .
+                    </>
+                ) : null}
             </p>
 
             {renderable ? null : (
@@ -98,12 +113,16 @@ export default async function PastVersionPage({
                 </PartialNotice>
             )}
 
-            <RestoreVersion
-                siteId={siteId}
-                publicationId={publication.id}
-                isCurrent={isCurrent}
-                renderable={renderable}
-            />
+            {site.can.publish ? (
+                <RestoreVersion
+                    siteId={siteId}
+                    publicationId={publication.id}
+                    isCurrent={isCurrent}
+                    renderable={renderable}
+                    needsApproval={site.publishNeedsApproval === true}
+                    canOverride={site.canOverride === true}
+                />
+            ) : null}
 
             {pages.length > 1 ? (
                 <nav

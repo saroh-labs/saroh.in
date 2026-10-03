@@ -21,8 +21,9 @@ import {
     IgnoreModuleReadiness,
     RequireModule,
 } from "../capabilities/require-module.decorator";
-import { payLinkUrl } from "../invoices/pay-link-url";
+import { payLinkUrlFor } from "../invoices/pay-link-url";
 import {
+    AutopayLinkDto,
     CancelSubscriptionDto,
     ChangePlanDto,
     CollectionScheduleDto,
@@ -33,12 +34,15 @@ import {
     ListSubscriptionEventsQueryDto,
     ListSubscriptionsQueryDto,
     PauseSubscriptionDto,
+    PlanChargeTimingDto,
     PlanDraftDto,
     PlanInputDto,
+    RetryPaymentDto,
     SkipCollectionDto,
     SubscribeDto,
     SubscriptionSettingsDto,
 } from "./dto";
+import { SubscriptionAutopayService } from "./subscription-autopay.service";
 import { SubscriptionsService } from "./subscriptions.service";
 
 /**
@@ -147,8 +151,27 @@ export class SubscriptionPlansController {
     }
 
     /**
+     * The plan's own "When autopay charges" (D13B), or null for the
+     * business's setting. Straight onto the plan, not its draft.
+     */
+    @Patch(":planId/autopay-timing")
+    setChargeTiming(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("planId") id: string,
+        @Body() dto: PlanChargeTimingDto,
+    ) {
+        return this.subscriptions.setPlanChargeTiming(
+            ctx,
+            id,
+            dto.autopayChargeTiming,
+        );
+    }
+
+    /**
      * The old Plans form's whole-plan save, kept for one release while the
-     * app moves to the editor (D7); removed by follow-up Z6. Refuses a draft.
+     * app moves to the editor. Since D7 no app screen calls it; it stays
+     * for the previous app image until follow-up Z6 removes it, at least a
+     * checkpoint later. Refuses a draft.
      */
     @Patch(":planId")
     update(
@@ -184,7 +207,10 @@ export class SubscriptionPlansController {
 @RequireModule("PAYMENTS")
 @IgnoreModuleReadiness()
 export class SubscriptionsController {
-    constructor(private readonly subscriptions: SubscriptionsService) {}
+    constructor(
+        private readonly subscriptions: SubscriptionsService,
+        private readonly autopay: SubscriptionAutopayService,
+    ) {}
 
     @Get()
     list(
@@ -212,6 +238,16 @@ export class SubscriptionsController {
         @Body() dto: SubscriptionSettingsDto,
     ) {
         return this.subscriptions.updateSettings(ctx, dto);
+    }
+
+    /**
+     * Whether this business offers autopay now, and by which methods (D14):
+     * the workspace's copy promises autopay only when it does. Before
+     * `:subscriptionId` too.
+     */
+    @Get("autopay")
+    autopayOffer(@OrgContext() ctx: OrganizationContext) {
+        return this.autopay.offer(ctx);
     }
 
     @Get(":subscriptionId")
@@ -333,9 +369,11 @@ export class SubscriptionsController {
     }
 
     /**
-     * Retry a failed charge: a new pay link for the overdue latest invoice,
-     * replacing the old one. Answers with the token and the link's address
-     * (Home's "Retry by pay link", F4), shown once.
+     * Retry a failed renewal (D13): charge their autopay again (`via`
+     * MANDATE) or make a new pay link (PAY_LINK, the default), replacing
+     * the old one. A pay link's token and address are answered once
+     * (Home's "Retry by pay link", F4); an autopay retry answers without
+     * one. `paid`: the provider had already captured it.
      */
     @Post(":subscriptionId/retry")
     @HttpCode(200)
@@ -343,8 +381,44 @@ export class SubscriptionsController {
     async retry(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
+        @Body() dto: RetryPaymentDto,
     ) {
-        const link = await this.subscriptions.retryPayment(ctx, id);
-        return { ...link, url: payLinkUrl(link.token) };
+        const done = await this.subscriptions.retryPayment(ctx, id, dto.via);
+        return {
+            ...done,
+            url: done.token
+                ? await payLinkUrlFor(ctx.organizationId, done.token)
+                : null,
+        };
+    }
+
+    /**
+     * "Send a set-up link" (D14): the provider's page to approve autopay on
+     * for one method, answered once and never stored; emailed as well when
+     * asked and the business can. 403 while the business doesn't offer
+     * autopay (its provider can't, or the rollout flag is off).
+     */
+    @Post(":subscriptionId/autopay/link")
+    @HttpCode(201)
+    @Header("Cache-Control", "no-store")
+    autopayLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+        @Body() dto: AutopayLinkDto,
+    ) {
+        return this.autopay.sendLink(ctx, id, dto);
+    }
+
+    /**
+     * "Cancel autopay" (D14): ends its mandate, asking the provider first
+     * (DEC-026). The subscription goes on, invoiced with a pay link.
+     */
+    @Post(":subscriptionId/autopay/cancel")
+    @HttpCode(200)
+    cancelAutopay(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("subscriptionId") id: string,
+    ) {
+        return this.autopay.cancel(ctx, id);
     }
 }

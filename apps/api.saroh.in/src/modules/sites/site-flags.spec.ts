@@ -1,4 +1,6 @@
 import {
+    ADDRESS_MISSING_MESSAGE,
+    checkAddress,
     checkPage,
     checkShop,
     checkSite,
@@ -203,6 +205,91 @@ describe("the text block's photo (G7)", () => {
         expect(flags.map((f) => [f.type, f.field])).toContainEqual([
             "emptyRequiredField",
             "image",
+        ]);
+    });
+});
+
+describe("a project's photo and link (K11)", () => {
+    const projects = (items: unknown[], hidden = false) =>
+        page([{ type: "projects", content: { items }, hidden }]);
+
+    it("flags a photo with no description, naming the project", () => {
+        const flags = checkPage(
+            projects([
+                {
+                    title: "Menus for a bakery",
+                    image: { src: "https://cdn.example.com/a.jpg", alt: " " },
+                },
+            ]),
+            ["/"],
+        );
+        expect(flags).toHaveLength(1);
+        expect(flags[0]).toMatchObject({
+            type: "emptyRequiredField",
+            field: "items",
+            sectionIndex: 0,
+        });
+        expect(flags[0].message).toMatch(
+            /"Menus for a bakery".*no description/,
+        );
+    });
+
+    it("flags each undescribed photo, and none that are described", () => {
+        const flags = checkPage(
+            projects([
+                { title: "A", image: { src: "https://x/a.jpg" } },
+                { title: "B", image: { src: "https://x/b.jpg", alt: "B" } },
+                { title: "C" },
+                { title: "D", image: { src: "https://x/d.jpg" } },
+            ]),
+            ["/"],
+        );
+        expect(flags.map((f) => f.message)).toEqual([
+            expect.stringMatching(/"A"/),
+            expect.stringMatching(/"D"/),
+        ]);
+    });
+
+    it("flags a link to a page that is not on the site", () => {
+        const flags = checkPage(
+            projects([
+                { title: "A", link: "/work/menus" },
+                { title: "B", link: "/about" },
+                { title: "C", link: "https://example.com/c" },
+            ]),
+            ["/", "/about"],
+        );
+        expect(flags.map((f) => [f.type, f.field])).toEqual([
+            ["brokenLink", "items"],
+        ]);
+        expect(flags[0].message).toMatch(/\/work\/menus/);
+    });
+
+    it("says nothing about a hidden block", () => {
+        expect(
+            checkPage(
+                projects(
+                    [{ title: "A", image: { src: "https://x/a.jpg" } }],
+                    true,
+                ),
+                ["/"],
+            ),
+        ).toEqual([]);
+    });
+
+    it("reaches the pre-publish check, not only the rail", () => {
+        const flags = checkSite(
+            site({
+                pages: [
+                    projects([
+                        { title: "A", image: { src: "https://x/a.jpg" } },
+                    ]),
+                ],
+            }),
+        );
+        expect(flags.map((f) => [f.type, f.field])).toContainEqual([
+            "emptyRequiredField",
+            "items",
         ]);
     });
 });
@@ -750,7 +837,7 @@ describe("module pages and reserved addresses (G14)", () => {
             {
                 type: "reservedAddress",
                 message:
-                    "This page can't be seen: /book is your booking page. Change its address so visitors can reach it.",
+                    "This page can't be seen: /book is your booking page. Change its path so visitors can reach it.",
                 pageId: "walk",
                 sectionIndex: null,
                 field: "path",
@@ -796,7 +883,7 @@ describe("module pages and reserved addresses (G14)", () => {
         expect(reserved(flags).map((f) => [f.pageId, f.message])).toEqual([
             [
                 "acct",
-                "This page can't be seen: /account is where your customers see their account. Change its address so visitors can reach it.",
+                "This page can't be seen: /account is where your customers see their account. Change its path so visitors can reach it.",
             ],
         ]);
     });
@@ -844,5 +931,54 @@ describe("module pages and reserved addresses (G14)", () => {
             ],
         });
         expect(flags.map((f) => f.pageId)).toEqual(["range"]);
+    });
+
+    it("says 'your online shop' and 'location', never 'storefront' (DEC-069, L12)", () => {
+        const flags = checkShop({
+            storefrontChosen: false,
+            candidates: 2,
+            isShopPath: (p) => p === "/shop" || p.startsWith("/shop/"),
+            pages: [{ id: "range", path: "/shop/range", hidden: false }],
+        });
+        expect(flags.map((f) => f.message)).toEqual([
+            "Pick which location your online shop sells from. Until you do, the shop and its products don't show on the site.",
+            "/shop/range is where your online shop lives. This page keeps showing there for now. Change its path so the shop can open.",
+        ]);
+    });
+});
+
+describe("checkAddress (DEC-069, L5)", () => {
+    it("raises nothing for a site with a web address", () => {
+        expect(checkAddress("rye")).toEqual([]);
+    });
+
+    it("blocks publishing a site with no web address", () => {
+        expect(checkAddress(null)).toEqual([
+            {
+                type: "addressMissing",
+                message: ADDRESS_MISSING_MESSAGE,
+                pageId: null,
+                sectionIndex: null,
+                field: "subdomain",
+                blocking: true,
+            },
+        ]);
+        expect(ADDRESS_MISSING_MESSAGE).toMatch(
+            /^Choose a web address before publishing/,
+        );
+    });
+
+    it("leaves every other flag advisory", () => {
+        const flags = [
+            ...checkSite(site({ seoDescription: null, pages: [page([])] })),
+            ...checkShop({
+                storefrontChosen: false,
+                candidates: 2,
+                isShopPath: () => false,
+                pages: [],
+            }),
+        ];
+        expect(flags.length).toBeGreaterThan(0);
+        expect(flags.some((f) => f.blocking)).toBe(false);
     });
 });

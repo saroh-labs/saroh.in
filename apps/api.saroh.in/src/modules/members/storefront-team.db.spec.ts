@@ -220,6 +220,8 @@ describe("storefront people join the team (DB, F16)", () => {
                     "org:read",
                     "product-review:read",
                     "store:read",
+                    // DEC-074: their storefront's orders, the kitchen's view.
+                    "order:stage",
                 ].sort(),
             );
 
@@ -273,14 +275,15 @@ describe("storefront people join the team (DB, F16)", () => {
             }
         });
 
-        it("can't open Customers, a contact, Bookings or an order", async () => {
+        it("can't open Customers, a contact, Bookings or an order's money", async () => {
             const ctx = await as("VIEWER");
+            // DEC-074: the kitchen's view of their storefront's orders.
+            expect(allows(ctx, "order:stage")).toBe(true);
             for (const action of [
                 "contact:read",
                 "booking:read",
                 "service:read",
                 "order:read",
-                "order:stage",
                 "payment:read",
                 "invoice:read",
                 "subscription:read",
@@ -299,9 +302,10 @@ describe("storefront people join the team (DB, F16)", () => {
             await expect(
                 new BookingsService().listBookings(ctx),
             ).rejects.toBeInstanceOf(ForbiddenException);
-            await expect(
-                new OrderKitchenService().read(ctx, orderId),
-            ).rejects.toBeInstanceOf(ForbiddenException);
+            // Their storefront's order, in the kitchen's view: no money.
+            const read = await new OrderKitchenService().read(ctx, orderId);
+            expect(read.money).toBeNull();
+            expect(read.customer?.email).toBeUndefined();
         });
 
         it("never lowers or replaces a role someone already holds", async () => {
@@ -413,6 +417,7 @@ describe("storefront people join the team (DB, F16)", () => {
                         "media:read",
                         "store:read",
                         "product-review:read",
+                        "order:stage",
                     ],
                 },
             });

@@ -10,18 +10,19 @@ import { useState } from "react";
 import { dismissStorefrontTeamNotice } from "@/lib/organizations/member-actions";
 import type { StorefrontTeamNoticePerson } from "@/lib/organizations/members";
 
-/** "3 people from your storefronts are now on your team as Storefront team". */
+/** "3 people from your locations are now on your team as Location team". */
 export function storefrontNoticeTitle(count: number, roleLabel: string) {
     return count === 1
-        ? `1 person from your storefronts is now on your team as ${roleLabel}`
-        : `${count} people from your storefronts are now on your team as ${roleLabel}`;
+        ? `1 person from your locations is now on your team as ${roleLabel}`
+        : `${count} people from your locations are now on your team as ${roleLabel}`;
 }
 
 /**
  * Team's one-time notice after storefront people were put on the team
  * (F16, DEC-048 amended 2026-09-27). One roster underneath: everyone who
  * works on a storefront is now on the business's team, in the narrow
- * Storefront team role — no customers, bookings, orders or money. The owner
+ * Storefront team role — their storefront's orders without the money
+ * (DEC-074), and no customers, bookings or money. The owner
  * is told who, and can change anyone's role from here, so any widening is
  * on purpose.
  *
@@ -71,10 +72,10 @@ export function StorefrontTeamNotice({
                         {storefrontNoticeTitle(people.length, roleLabel)}
                     </p>
                     <p className="mt-0.5 text-[12px] leading-[1.5] text-muted-foreground">
-                        They can see the team and the storefronts, but not
-                        customers, bookings, orders or money. What they do in
-                        their storefront hasn&apos;t changed. Change a role if
-                        someone needs more.
+                        They can see the team, and see and move their own
+                        location&apos;s orders, but not customers, bookings or
+                        money. What they do in their location hasn&apos;t
+                        changed. Change a role if someone needs more.
                     </p>
                 </div>
                 <Button

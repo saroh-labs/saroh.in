@@ -125,7 +125,7 @@ export function HeaderAttention({ state }: { state: AttentionState }) {
 }
 
 const TEXT_BTN =
-    "text-[12px] text-muted-foreground transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed coarse:min-h-11";
+    "text-[12px] text-muted-foreground transition-colors duration-fast hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed coarse:min-h-11";
 
 /**
  * Overview's Needs attention card: each entry with its detail and who added
@@ -153,7 +153,7 @@ export function AttentionCard({
                     <button
                         type="button"
                         onClick={state.add}
-                        className="text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                        className="text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11"
                     >
                         Add
                     </button>
@@ -199,7 +199,7 @@ export function AttentionCard({
                                             aria-label={`Remove ${tagText(e)}`}
                                             className={cn(
                                                 TEXT_BTN,
-                                                "hover:text-destructive-subtle-foreground",
+                                                "hover:text-destructive-subtle-foreground active:bg-destructive-subtle",
                                             )}
                                         >
                                             Remove

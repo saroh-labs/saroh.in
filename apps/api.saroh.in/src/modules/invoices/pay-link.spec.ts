@@ -1,6 +1,16 @@
 // The workspace side of an invoice's pay link (ADR-007, U13): who may make
 // one, when, that only the token's hash is kept, that asking again replaces
 // it, and that voiding revokes it. The database is mocked.
+// The business-details refusal (DEC-068) has its own specs
+// (`business-details.spec.ts`, `business-details.db.spec.ts`); here
+// the business has its address.
+jest.mock("./business-details", () => ({
+    ...jest.requireActual<typeof import("./business-details")>(
+        "./business-details",
+    ),
+    assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
@@ -12,8 +22,15 @@ jest.mock("@saroh/database", () => {
         ...actual,
         prisma: {
             invoice: { findFirst: jest.fn(), updateMany: jest.fn() },
-            merchantPaymentProvider: { count: jest.fn() },
+            merchantPaymentProvider: {
+                count: jest.fn(),
+                findFirst: jest.fn(),
+            },
             paymentIntent: { findMany: jest.fn() },
+            // DEC-070: Payments on (no row) unless a test turns it off.
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },
@@ -84,11 +101,20 @@ function row(over: Record<string, unknown> = {}) {
 
 const service = new InvoicesService();
 
+/** A connection that can open the checkout window. */
+const RAZORPAY_READY = {
+    id: "mpp_1",
+    provider: "RAZORPAY",
+    status: "CONNECTED",
+    publicKey: "rzp_test_Public1",
+};
+
 beforeEach(() => {
     jest.clearAllMocks();
     db.invoice.findFirst?.mockResolvedValue(row());
     db.invoice.updateMany?.mockResolvedValue({ count: 1 });
     db.merchantPaymentProvider.count?.mockResolvedValue(1);
+    db.merchantPaymentProvider.findFirst?.mockResolvedValue(RAZORPAY_READY);
     db.paymentIntent.findMany?.mockResolvedValue([]);
 });
 
@@ -139,13 +165,46 @@ describe("making a pay link", () => {
     });
 
     it("refuses when no payment provider is connected", async () => {
-        db.merchantPaymentProvider.count?.mockResolvedValue(0);
-        await expect(
-            service.createPayLink(owner, "inv_1"),
-        ).rejects.toBeInstanceOf(ConflictException);
-        expect(db.merchantPaymentProvider.count).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", status: "CONNECTED" },
+        db.merchantPaymentProvider.findFirst?.mockResolvedValue(null);
+        await expect(service.createPayLink(owner, "inv_1")).rejects.toThrow(
+            new ConflictException(
+                "Connect a payment provider to send a pay link.",
+            ),
+        );
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("looks only for a connection that can open the checkout window (B11, D22)", async () => {
+        await service.createPayLink(owner, "inv_1");
+        expect(db.merchantPaymentProvider.findFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                status: "CONNECTED",
+                OR: [
+                    { provider: { not: "RAZORPAY" } },
+                    {
+                        AND: [
+                            { publicKey: { not: null } },
+                            { publicKey: { not: "" } },
+                        ],
+                    },
+                ],
+            },
+            orderBy: { createdAt: "asc" },
         });
+    });
+
+    it("refuses a Razorpay connection missing its public key id, saying what it needs", async () => {
+        // None can open the window; the one connected is Razorpay, no key.
+        db.merchantPaymentProvider.findFirst
+            ?.mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({
+                ...RAZORPAY_READY,
+                publicKey: null,
+            });
+        await expect(service.createPayLink(owner, "inv_1")).rejects.toThrow(
+            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Providers.",
+        );
         expect(db.invoice.updateMany).not.toHaveBeenCalled();
     });
 
@@ -169,8 +228,13 @@ describe("making a pay link", () => {
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
             merchantPaymentProvider: {
-                count: jest.fn().mockResolvedValue(1),
+                findFirst: jest.fn().mockResolvedValue(RAZORPAY_READY),
             },
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
+            // D13: no autopay charge under way.
+            paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
         };
         const { token } = await service.createPayLinkInTx(
             own as never,
@@ -184,6 +248,45 @@ describe("making a pay link", () => {
         );
         expect(db.invoice.findFirst).not.toHaveBeenCalled();
         expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("one charge at a time (D13)", () => {
+    it("refuses a pay link while an autopay charge is under way", async () => {
+        db.paymentIntent.findMany?.mockResolvedValue([
+            {
+                id: "pi_m",
+                invoiceId: "inv_1",
+                debitAfter: new Date("2026-10-02T10:00:00Z"),
+                createdAt: new Date("2026-10-01T10:00:00Z"),
+            },
+        ]);
+        const attempt = service.createPayLink(owner, "inv_1");
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow("Autopay charge in progress");
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("says so on the invoice read, with when the debit is asked for", async () => {
+        db.paymentIntent.findMany?.mockImplementation(
+            (args: { where: { status?: unknown } }) =>
+                Promise.resolve(
+                    args.where.status === "SUCCEEDED"
+                        ? []
+                        : [
+                              {
+                                  id: "pi_m",
+                                  invoiceId: "inv_1",
+                                  debitAfter: new Date("2026-10-02T10:00:00Z"),
+                                  createdAt: new Date("2026-10-01T10:00:00Z"),
+                              },
+                          ],
+                ),
+        );
+        const view = await service.get(owner, "inv_1");
+        expect(view.online?.autopayCharge).toEqual({
+            at: "2026-10-02T10:00:00.000Z",
+        });
     });
 });
 
@@ -223,6 +326,7 @@ describe("the invoice read", () => {
         );
         const view = await service.get(owner, "inv_1");
         expect(view.online).toEqual({
+            autopayCharge: null,
             providerConnected: true,
             payLinkActive: true,
             payments: [],

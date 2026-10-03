@@ -45,10 +45,36 @@ describe("searchSettings", () => {
                 },
             ]);
         }
-        // The tab is "Address" now; the setting keeps its full name.
+        // The tab is "Registered address" (DEC-069 names the addresses apart).
         expect(searchSettings("registered address", owner)[0]?.href).toBe(
             "/settings/organization?section=address",
         );
+    });
+
+    it("finds the web address and the registered address by name, and by the words they went by (DEC-069)", () => {
+        const webAddress = {
+            label: "Web address",
+            where: "Business",
+            href: "/settings/organization?section=identity",
+        };
+        for (const query of [
+            "web address",
+            "workspace address",
+            "subdomain",
+            "saroh.app",
+        ]) {
+            expect(searchSettings(query, owner)).toEqual([webAddress]);
+        }
+        expect(searchSettings("address", owner).map((h) => h.label)).toEqual([
+            "Web address",
+            "Registered address",
+        ]);
+        expect(searchSettings("address on invoices", owner)[0]?.label).toBe(
+            "Registered address",
+        );
+        expect(
+            SETTINGS_INDEX.some((e) => e.label === "Workspace address"),
+        ).toBe(false);
     });
 
     it("finds the type of business by each type's name (F10)", () => {
@@ -88,8 +114,39 @@ describe("searchSettings", () => {
     it("leaves the page's name out when asked (the ⌘K menu)", () => {
         expect(searchSettings("business", owner, { byPage: false })).toEqual([
             expect.objectContaining({ label: "Business name" }),
+            // "A business" is one of its answers (DEC-070).
+            expect.objectContaining({ label: "What you're setting up" }),
             expect.objectContaining({ label: "Type of business" }),
         ]);
+    });
+
+    it("finds what you're setting up by each answer (DEC-070, K5)", () => {
+        const hit = {
+            label: "What you're setting up",
+            where: "Business",
+            href: "/settings/organization?section=identity",
+        };
+        for (const query of ["just me", "A site for my work", "portfolio"]) {
+            expect(searchSettings(query, owner)).toEqual([hit]);
+        }
+        expect(searchSettings("freelancer", owner)).toContainEqual(hit);
+    });
+
+    it("names the Business page in the kind's words", () => {
+        expect(
+            searchSettings("gstin", { ...owner, kind: "SOLO" })[0]?.where,
+        ).toBe("Your details");
+        expect(
+            searchSettings("gstin", { ...owner, kind: "WORK" })[0]?.where,
+        ).toBe("Your details");
+        expect(searchSettings("gstin", { ...owner, kind: "X" })[0]?.where).toBe(
+            "Business",
+        );
+        // Found by the page's own name, as it is shown.
+        expect(
+            searchSettings("your details", { ...owner, kind: "SOLO" }).length,
+        ).toBeGreaterThan(0);
+        expect(searchSettings("your details", owner)).toEqual([]);
     });
 
     it("lists the first eight before anything is typed", () => {
@@ -158,6 +215,28 @@ describe("searchSettings", () => {
         expect(labels({ role: null })).toEqual([
             "People — invite or change a role",
         ]);
+    });
+
+    it("never offers a setting for a module this business doesn't have (DEC-057)", () => {
+        const labels = (modules: string[] | null) =>
+            searchSettings("", { ...owner, modules }, { limit: 100 }).map(
+                (h) => h.label,
+            );
+        // Contacts and Payments not rolled out, or off: not offered.
+        expect(labels(["COMMERCE"])).not.toContain("Contacts pipeline");
+        expect(labels(["COMMERCE"])).not.toContain("Payment provider");
+        expect(labels(["CRM", "PAYMENTS"])).toEqual(
+            expect.arrayContaining(["Contacts pipeline", "Payment provider"]),
+        );
+        // Unknown (the list couldn't be read): offered, as the rail fails open.
+        expect(labels(null)).toContain("Contacts pipeline");
+        // The Modules entry names no module at all.
+        const modulesEntry = SETTINGS_INDEX.find(
+            (e) => e.page === "/settings/modules" && !e.module,
+        );
+        expect(modulesEntry?.label).not.toMatch(
+            /\b(Sell|Payments|Website|Contacts|Appointments|Courses|Class packs)\b/,
+        );
     });
 
     it("points every entry at a settings page", () => {

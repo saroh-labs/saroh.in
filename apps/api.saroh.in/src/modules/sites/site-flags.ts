@@ -10,6 +10,10 @@
  *
  * So this module NEVER throws and never refuses anything. It reports.
  *
+ * One flag is not advisory: a site with no web address (DEC-069, L5).
+ * Published, it would be live at no address at all, so that flag is
+ * `blocking` and `publishSite` refuses until the site has one.
+ *
  * It lives on the server and is the single source of truth. The editor could
  * have run the same rules in the browser to update a dot per keystroke, but two
  * implementations of nine rules is two sets of answers that drift, and the
@@ -58,7 +62,9 @@ export type FlagType =
     | "shopCantTakeOrders"
     // A Product grid (G12) that will show nothing, or less than was
     // picked, because what it names isn't on sale at the storefront.
-    | "productsNotOnSale";
+    | "productsNotOnSale"
+    // The site has no web address (DEC-069, L5): the one flag that blocks.
+    | "addressMissing";
 
 /**
  * Flags that cannot be computed yet. Empty since #206 built the navigation
@@ -82,6 +88,11 @@ export interface Flag {
      * dot on the rail row.
      */
     field: string | null;
+    /**
+     * Publishing is refused until this is fixed. Only `addressMissing` sets
+     * it; every other flag is advisory and leaves it out.
+     */
+    blocking?: true;
 }
 
 /** One page's sections as the checks need them. */
@@ -344,6 +355,41 @@ function checkSection(
                     "images",
                 );
             }
+            break;
+        }
+
+        case "projects": {
+            /*
+             * Each project's photo must be described (K11), as the text
+             * block's is (G7): the contract saves a photo before it is
+             * described, so this is where it is asked for. A project's link
+             * to a path is checked against the site's pages, as a button's is.
+             */
+            const items = Array.isArray(c.items) ? c.items : [];
+            items.forEach((raw, i) => {
+                const item = obj(raw);
+                const name = str(item.title).trim();
+                const which = name ? `"${name}"` : `project ${i + 1}`;
+                const photo = obj(item.image);
+                if (
+                    str(photo.src).trim() !== "" &&
+                    str(photo.alt).trim() === ""
+                ) {
+                    at(
+                        "emptyRequiredField",
+                        `The photo for ${which} has no description, so someone using a screen reader won't know what it shows.`,
+                        "items",
+                    );
+                }
+                const link = str(item.link).trim();
+                if (link !== "" && isBrokenInternalLink(link, pagePaths)) {
+                    at(
+                        "brokenLink",
+                        `The link for ${which} points at ${link}, which is not a page on this site.`,
+                        "items",
+                    );
+                }
+            });
             break;
         }
 
@@ -620,7 +666,7 @@ export function checkSite(site: FlagSiteInput): Flag[] {
         }
         flags.push({
             type: "reservedAddress",
-            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its address so visitors can reach it.`,
+            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its path so visitors can reach it.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",
@@ -692,7 +738,7 @@ export function checkShop(input: ShopFlagInput): Flag[] {
         flags.push({
             type: "storefrontUnchosen",
             message:
-                "Pick which storefront this site sells from. Until you do, the shop and its products don't show on the site.",
+                "Pick which location your online shop sells from. Until you do, the shop and its products don't show on the site.",
             pageId: null,
             sectionIndex: null,
             field: "storefrontId",
@@ -713,11 +759,38 @@ export function checkShop(input: ShopFlagInput): Flag[] {
         if (page.kind === "SHOP" && page.path === SHOP_ROOT) continue;
         flags.push({
             type: "reservedAddress",
-            message: `${page.path} is where your shop lives. This page keeps showing there for now. Change its address so the shop can open.`,
+            message: `${page.path} is where your online shop lives. This page keeps showing there for now. Change its path so the shop can open.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",
         });
     }
     return flags;
+}
+
+// ---------------------------------------------------------------------------
+// The web address (DEC-069, L5)
+// ---------------------------------------------------------------------------
+
+/** What the address flag says; `publishSite`'s refusal says the same. */
+export const ADDRESS_MISSING_MESSAGE =
+    "Choose a web address before publishing. Without one, nobody can reach this site.";
+
+/**
+ * A site made before every site had an address (L5) can still have none. It
+ * is never given one silently — the owner chooses, in Settings › Business —
+ * and until then publishing is refused. This is the flag that says why.
+ */
+export function checkAddress(subdomain: string | null): Flag[] {
+    if (subdomain) return [];
+    return [
+        {
+            type: "addressMissing",
+            message: ADDRESS_MISSING_MESSAGE,
+            pageId: null,
+            sectionIndex: null,
+            field: "subdomain",
+            blocking: true,
+        },
+    ];
 }

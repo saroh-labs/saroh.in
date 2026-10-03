@@ -12,6 +12,7 @@ import { useRef, useState, useTransition } from "react";
 
 import { CustomDomain } from "@/components/sites/custom-domain";
 import { MediaPicker } from "@/components/sites/media-picker";
+import { PublishApprovalSection } from "@/components/sites/publish-approval-row";
 import { SellsFromRow } from "@/components/sites/sells-from-row";
 import { Row, Section } from "@/components/sites/settings-rows";
 import { ShareCards, webImageUrl } from "@/components/sites/share-cards";
@@ -38,12 +39,14 @@ import {
 } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
 import { describePendingChanges } from "@/lib/sites/pending";
+import type { PublishApproval } from "@/lib/sites/publish-approval";
 import type {
     SiteDetail,
     SiteFooter,
     SiteNavigationItem,
     SiteSettingsInput,
 } from "@/lib/sites/service";
+import type { SiteAddress } from "@/lib/sites/share-links";
 
 /**
  * A site's address, search appearance and share card (#188).
@@ -66,7 +69,25 @@ const Missing = () => (
     <span className="text-muted-foreground">Nothing set yet</span>
 );
 
-export function SiteSettings({ site }: { site: SiteDetail }) {
+export function SiteSettings({
+    site,
+    address: reached,
+    approval = null,
+}: {
+    site: SiteDetail;
+    /**
+     * Where the site is reached (`siteAddressOf`, DEC-069 L8): its verified
+     * domain when the business has one, and its web address on Saroh
+     * beside it.
+     * Null for a site with no address yet.
+     */
+    address: SiteAddress | null;
+    /**
+     * "Publishing needs approval" (DEC-071, T13); null leaves it out
+     * (`readPublishApproval`).
+     */
+    approval?: PublishApproval | null;
+}) {
     const [seoTitle, setSeoTitle] = useState(site.seoTitle ?? "");
     const [seoDescription, setSeoDescription] = useState(
         site.seoDescription ?? "",
@@ -129,7 +150,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
     const [editing, setEditing] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const address = site.subdomain ? `${site.subdomain}.saroh.app` : null;
+    const address = reached?.host ?? null;
     const live = Boolean(site.currentPublication);
 
     function save(input: SiteSettingsInput, label: string) {
@@ -227,12 +248,12 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                 }
             >
                 <Row
-                    label="Address"
+                    label="Web address"
                     action={
                         live && address ? (
                             <Button variant="outline" size="sm" asChild>
                                 <a
-                                    href={`https://${address}`}
+                                    href={reached?.url}
                                     target="_blank"
                                     rel="noreferrer"
                                 >
@@ -285,11 +306,17 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                 ) : null}
             </Section>
 
+            {approval ? (
+                <PublishApprovalSection siteId={site.id} approval={approval} />
+            ) : null}
+
             <Section
-                title="Saroh address"
-                description="Every site gets one of these and keeps it. Your own domain, below, is added alongside it."
+                title="Web address"
+                description="Your business's web address on Saroh. Your own domain, below, is added alongside it, and this one keeps working."
             >
-                <Row label="Subdomain">{address ?? <Missing />}</Row>
+                <Row label="On Saroh">
+                    {reached?.platformHost ?? <Missing />}
+                </Row>
             </Section>
 
             <Section
@@ -305,6 +332,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                     siteId={site.id}
                     sellsFrom={site.sellsFrom}
                     canChange={site.can.manageSettings}
+                    awaiting={site.shopAwaitsSellsFrom === true}
                 />
             ) : null}
 
@@ -313,7 +341,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                 description="Where this site's posts live. Yours to name — a practice has updates, a studio has a journal."
             >
                 <Row
-                    label="Address"
+                    label="Posts path"
                     action={
                         editing === "postsPrefix" ? (
                             <div className="flex gap-2">
@@ -327,7 +355,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                                                 postsPrefix:
                                                     postsPrefix || null,
                                             },
-                                            "Writing address",
+                                            "Posts path",
                                         )
                                     }
                                 >
@@ -363,7 +391,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                                 autoFocus
                                 placeholder="blog"
                                 onChange={(e) => setPostsPrefix(e.target.value)}
-                                aria-label="Writing address"
+                                aria-label="Posts path"
                             />
                             <p className="text-xs text-muted-foreground">
                                 {address
@@ -661,7 +689,7 @@ export function SiteSettings({ site }: { site: SiteDetail }) {
                                 ? { url: socialImageUrl, ...socialImageFacts }
                                 : null
                         }
-                        liveUrl={live && address ? `https://${address}` : null}
+                        liveUrl={live && reached ? reached.url : null}
                     />
                 </Row>
             </Section>

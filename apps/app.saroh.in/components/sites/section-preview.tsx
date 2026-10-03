@@ -6,6 +6,8 @@ import type {
     SiteFooterContent,
 } from "@saroh/site-blocks";
 import {
+    ModulePageTop,
+    modulePageTopOf,
     PageSections,
     SiteFooter,
     SiteHeader,
@@ -94,7 +96,14 @@ export function DraftPreview({
     siteId,
     onOpenPage,
     onFormBlocked,
+    page: current = null,
 }: {
+    /**
+     * The page being drawn. A module page's title (DEC-073 #9) is drawn
+     * above its blocks as the live site draws it, and its rich-text intro
+     * lines up with the cards. Omitted, the blocks alone.
+     */
+    page?: Pick<SitePage, "kind" | "title"> | null;
     /**
      * The site being drawn, so blocks that read live data (Visit us, G8)
      * show the real values on the canvas. Omitted, they say where the real
@@ -170,6 +179,7 @@ export function DraftPreview({
      * that document IS the merchant's site; this one is a panel inside a Saroh
      * screen, and `:root` here would repaint the editor around it.
      */
+    const top = current ? modulePageTopOf(current) : null;
     const vars =
         style && styleOptions
             ? resolveStyleVariables(style, styleOptions)
@@ -218,6 +228,7 @@ export function DraftPreview({
                         // same place as the site it is drawing; unset, the
                         // block's own default (production) applies.
                         apiUrl={env.NEXT_PUBLIC_API_URL}
+                        modulePage={top !== null}
                     />
                 );
                 if (!editing) return <div key={index}>{rendered}</div>;
@@ -322,6 +333,7 @@ export function DraftPreview({
             ) : (
                 header
             )}
+            {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
             <div className="space-y-4 p-[var(--site-page-margin)]">{page}</div>
             {footer && editing && onSelectChrome ? (
                 <CanvasBlock

@@ -251,7 +251,7 @@ export function ServiceEditor({
                 </span>
             </nav>
 
-            <div className="sticky top-[61px] z-10 flex flex-wrap items-center gap-2.5 border-b border-border bg-background px-6 py-3 max-[759px]:px-4">
+            <div className="sticky top-[61px] z-10 flex flex-wrap items-center gap-2.5 border-b border-border bg-card px-6 py-3 dark:bg-background max-[759px]:px-4">
                 <div className="min-w-0 flex-[1_1_260px]">
                     <div className="flex flex-wrap items-center gap-2.5">
                         <h1 className="m-0 min-w-0 break-words font-display text-[22px] font-semibold tracking-[-0.02em]">

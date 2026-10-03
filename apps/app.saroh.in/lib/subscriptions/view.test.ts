@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import type { Plan, Subscription, SubscriptionCharge } from "./service";
 import {
+    autopayLine,
     chargeRow,
+    chargingText,
     classesText,
     collectionRows,
     dayText,
+    failWhy,
     gstNote,
     headline,
     listTab,
@@ -16,6 +19,7 @@ import {
     payRows,
     paysBy,
     ranLine,
+    retryOffer,
     rowWhen,
     screenTabFromQuery,
     tabFromQuery,
@@ -433,5 +437,146 @@ describe("headline", () => {
         );
         expect(h.big).toBe("—");
         expect(h.pill).toEqual({ tone: "accent", label: "Ends 1 Oct" });
+    });
+});
+
+describe("autopayLine (D12)", () => {
+    const base = {
+        method: "UPI" as const,
+        hint: "mo•••@okicici",
+        limit: "1500.00",
+        currency: "INR",
+        since: "2026-10-01T05:00:00.000Z",
+        failure: null,
+    };
+
+    it("says autopay is on, with the method, hint and limit", () => {
+        expect(autopayLine({ ...base, state: "ON" })).toBe(
+            "Autopay on · UPI · mo•••@okicici · limit ₹1,500",
+        );
+    });
+
+    it("says a set-up is waiting for the customer", () => {
+        expect(autopayLine({ ...base, state: "PENDING", hint: null })).toBe(
+            "Autopay pending · UPI — waiting for them to approve it",
+        );
+    });
+
+    it("says a failed set-up, and why", () => {
+        expect(
+            autopayLine({
+                ...base,
+                state: "FAILED",
+                method: "CARD",
+                hint: null,
+                failure: "EXPIRED",
+            }),
+        ).toBe("Autopay failed · card — they didn't approve it in time");
+        expect(
+            autopayLine({
+                ...base,
+                state: "FAILED",
+                hint: null,
+                failure: "PROVIDER_REFUSED",
+            }),
+        ).toBe("Autopay failed · UPI — the payment provider didn't accept it");
+    });
+
+    it("is nothing without autopay", () => {
+        expect(autopayLine(null)).toBeNull();
+        expect(autopayLine(undefined)).toBeNull();
+    });
+
+    it("says where the ₹1 check's refund is (D12B), never as money in", () => {
+        const check = { amount: "1.00", currency: "INR", refundedAt: null };
+        expect(
+            autopayLine({
+                ...base,
+                state: "ON",
+                check: { ...check, state: "REFUNDED" },
+            }),
+        ).toBe(
+            "Autopay on · UPI · mo•••@okicici · limit ₹1,500 · ₹1 check refunded",
+        );
+        expect(
+            autopayLine({
+                ...base,
+                state: "PENDING",
+                hint: null,
+                check: { ...check, state: "REFUNDING" },
+            }),
+        ).toBe(
+            "Autopay pending · UPI — waiting for them to approve it · ₹1 check being refunded",
+        );
+        expect(
+            autopayLine({
+                ...base,
+                state: "FAILED",
+                hint: null,
+                failure: "NOT_APPROVED",
+                check: { ...check, state: "NOT_REFUNDED" },
+            }),
+        ).toBe(
+            "Autopay failed · UPI — they didn't approve it · ₹1 check not refunded — refund it from your payment provider",
+        );
+        expect(autopayLine({ ...base, state: "ON", check: null })).toBe(
+            "Autopay on · UPI · mo•••@okicici · limit ₹1,500",
+        );
+    });
+});
+
+describe("autopay's retry (D13)", () => {
+    const failed = {
+        id: "inv_1",
+        number: "INV-0012",
+        dueAt: "2026-09-25T00:00:00.000Z",
+        total: "1200.00",
+    };
+
+    it("says a charge is under way with the day it is asked for, and offers no Retry", () => {
+        const s = sub({
+            paymentFailed: true,
+            failedCharge: failed,
+            autopayCharge: { at: "2026-09-19T10:00:00.000Z" },
+            retryVia: null,
+        });
+        expect(chargingText(s, NOW)).toBe(
+            "Autopay charge in progress · 19 Sep",
+        );
+        expect(retryOffer(s, true)).toBeNull();
+        expect(headline(s, null, NOW).line).toMatch(
+            /^Autopay charge in progress · 19 Sep\./,
+        );
+    });
+
+    it("charges autopay again when the API offers it, else a new link for someone who may make one", () => {
+        expect(
+            retryOffer(
+                sub({ failedCharge: failed, retryVia: "MANDATE" }),
+                false,
+            ),
+        ).toEqual({ label: "Charge autopay again", via: "MANDATE" });
+        expect(
+            retryOffer(
+                sub({ failedCharge: failed, retryVia: "PAY_LINK" }),
+                true,
+            ),
+        ).toEqual({ label: "Retry with a new pay link", via: "PAY_LINK" });
+        expect(
+            retryOffer(
+                sub({ failedCharge: failed, retryVia: "PAY_LINK" }),
+                false,
+            ),
+        ).toBeNull();
+        // An API older than D13: a pay link, as before.
+        expect(retryOffer(sub({ failedCharge: failed }), true)?.via).toBe(
+            "PAY_LINK",
+        );
+    });
+
+    it("a renewal autopay didn't collect before its due date says so, not 'past due'", () => {
+        expect(failWhy(sub({ failedCharge: failed }), NOW)).toBe(
+            "Renewal of ₹1,200 wasn't collected by autopay",
+        );
     });
 });

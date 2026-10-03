@@ -7,9 +7,12 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { AutopayService } from "../payments/autopay.service";
+import type { MandateMethod } from "../payments/providers/provider.port";
 import { PLANS_ON_SALE } from "./plan-on-sale";
 
 /**
@@ -29,6 +32,9 @@ import { PLANS_ON_SALE } from "./plan-on-sale";
  *   module rolled out for the business AND switched on. Otherwise a 404, the
  *   same as a site with no plans at all, so a rollout flag never leaks
  *   (DEC-057).
+ * - **Whether Join works** (G20): `payOnline`, the booking page's own
+ *   question (a connected provider that opens a checkout). It never says
+ *   how — the site names no payment method (DEC-059).
  * - **An explicit allow-list.** Name, description, price, currency and how
  *   often — no counts, no ids of anything else. Nothing about how to pay:
  *   the site names no payment method (DEC-059).
@@ -61,6 +67,19 @@ export interface PublicPlan {
 
 export interface PublicPlans {
     plans: PublicPlan[];
+    /**
+     * Whether a signed-in customer can join online now (G20): Payments on
+     * and a provider that opens a checkout. False: the site offers "Ask
+     * about joining" instead. Added beside `plans`, so an older site that
+     * never reads it keeps working.
+     */
+    payOnline: boolean;
+    /**
+     * Every way the business's provider can take autopay (D12), for the
+     * join sheet's "Pay with"; empty when it takes none, or Join isn't
+     * paid online. Added beside the rest, so an older site ignores it.
+     */
+    autopayMethods: MandateMethod[];
 }
 
 function notFound(): never {
@@ -136,6 +155,8 @@ export class PublicPlansService {
             READS_PER_WINDOW,
             READ_WINDOW_MS,
         ),
+        // Autopay's methods (D12); absent where a test builds this by hand.
+        @Optional() private readonly autopay?: AutopayService,
     ) {}
 
     async list(
@@ -155,31 +176,55 @@ export class PublicPlansService {
         if (!site) notFound();
         const { organizationId } = site;
 
-        const rows = await runInOrgContext(organizationId, async () => {
-            if (!(await paymentsOffered(organizationId))) notFound();
-            return prisma.subscriptionPlan.findMany({
-                where: { organizationId, ...PLANS_ON_SALE },
-                take: MAX_PLANS,
-                orderBy: [{ price: "asc" }, { name: "asc" }, { id: "asc" }],
-                // The published columns only: never `pendingChanges`.
-                select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    price: true,
-                    currency: true,
-                    interval: true,
-                    _count: {
+        const [rows, payOnline] = await runInOrgContext(
+            organizationId,
+            async () => {
+                if (!(await paymentsOffered(organizationId))) notFound();
+                return Promise.all([
+                    prisma.subscriptionPlan.findMany({
+                        where: { organizationId, ...PLANS_ON_SALE },
+                        take: MAX_PLANS,
+                        orderBy: [
+                            { price: "asc" },
+                            { name: "asc" },
+                            { id: "asc" },
+                        ],
+                        // The published columns only: never `pendingChanges`.
                         select: {
-                            subscriptions: {
-                                where: { status: { not: "CANCELLED" } },
+                            id: true,
+                            name: true,
+                            description: true,
+                            price: true,
+                            currency: true,
+                            interval: true,
+                            _count: {
+                                select: {
+                                    subscriptions: {
+                                        where: { status: { not: "CANCELLED" } },
+                                    },
+                                },
                             },
                         },
-                    },
-                },
-            });
-        });
+                    }),
+                    takesOnlinePayment(organizationId),
+                ]);
+            },
+        );
+        // How the join sheet can offer autopay (D12): the provider's own
+        // list, only where Join is paid online; a provider that can't say
+        // offers none.
+        const autopay = this.autopay;
+        const autopayMethods =
+            payOnline && autopay
+                ? await runInOrgContext(organizationId, () =>
+                      autopay
+                          .offer(organizationId)
+                          .catch((): MandateMethod[] => []),
+                  )
+                : [];
         return {
+            payOnline,
+            autopayMethods,
             plans: orderPlans(
                 rows.map(({ _count, ...row }) => ({
                     ...row,

@@ -1,5 +1,6 @@
 import { cache } from "react";
 
+import { rolledOutKeys } from "./rollout";
 import type { ModuleView } from "./schema";
 import { listModules } from "./service";
 
@@ -36,6 +37,8 @@ export async function modulesOrUnknown(): Promise<ModuleView[] | null> {
 export type ModuleAccess =
     | { state: "available" }
     | { state: "unavailable"; module: ModuleView }
+    /** Saroh hasn't rolled it out to this business: never shown (DEC-057). */
+    | { state: "hidden" }
     /** Availability could not be established; do not claim it is switched off. */
     | { state: "unknown" };
 
@@ -54,6 +57,12 @@ export async function moduleAccess(moduleKey: string): Promise<ModuleAccess> {
 
     const found = modules.find((m) => m.key === moduleKey);
     if (!found) return { state: "unknown" };
+    if (
+        found.readiness === "DISABLED" &&
+        !rolledOutKeys(modules).has(found.key)
+    ) {
+        return { state: "hidden" };
+    }
 
     // `readiness`, NOT `lifecycle` — and this distinction is the whole bug this
     // guard shipped with. `lifecycle` is only the Organization's own choice;

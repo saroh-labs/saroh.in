@@ -8,8 +8,10 @@ import type {
     RenderedGallery,
     RenderedHero,
     RenderedJournal,
+    RenderedPacks,
     RenderedPlans,
     RenderedProductGrid,
+    RenderedProjects,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
@@ -19,6 +21,7 @@ import type {
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
 import CtaSection from "./blocks/cta";
+import type { EnquiryThread } from "./blocks/enquiry";
 import EnquirySection from "./blocks/enquiry";
 import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
@@ -26,14 +29,20 @@ import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
 import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
+import type { PacksFeed } from "./blocks/packs";
+import PacksSection from "./blocks/packs";
 import type { PlansFeed } from "./blocks/plans";
 import PlansSection from "./blocks/plans";
 import type { ProductGridFeed } from "./blocks/product-grid";
 import ProductGridSection from "./blocks/product-grid";
+import ProjectsSection from "./blocks/projects";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
 import VisitUsSection from "./blocks/visit-us";
+import type { ModulePageTopContent } from "./module-page-top";
+import { ModulePageTop } from "./module-page-top";
+import type { PricesActions } from "./prices/api";
 
 /**
  * One section of a published page, as the snapshot carries it.
@@ -69,9 +78,18 @@ export default function SectionRenderer({
     siteId,
     journal,
     plans,
+    packs,
+    prices,
+    thread,
     productGrid,
+    modulePage = false,
 }: {
     section: Section;
+    /**
+     * The section is on a module page (DEC-073 #9): a rich-text intro lines
+     * up with the cards rather than sitting in the centred reading column.
+     */
+    modulePage?: boolean;
     /**
      * Base URL of the public API, for the blocks that talk to it. Optional:
      * each defaults to production, which is what the app-level env fallback did
@@ -99,6 +117,22 @@ export default function SectionRenderer({
      */
     plans?: PlansFeed;
     /**
+     * The business's class packs on sale, read by the page that serves the
+     * site (G20), for the Class packs block. Undefined on the editor's
+     * canvas, where the block reads them itself.
+     */
+    packs?: PacksFeed;
+    /**
+     * Join and Buy's actions (G20), handed in by the live site when the
+     * account area is on. Absent: Plans and Class packs offer "Ask about…".
+     */
+    prices?: PricesActions | null;
+    /**
+     * A signed-in customer's thread (A13), handed in by the live site while
+     * the account area is on: the Contact page's form writes to it.
+     */
+    thread?: EnquiryThread | null;
+    /**
      * This section's products, read by the page that serves the site (G12),
      * for a Product grid. Undefined on the editor's canvas, where the block
      * reads them itself and says why when there are none.
@@ -119,6 +153,7 @@ export default function SectionRenderer({
             return (
                 <RichTextSection
                     content={section.content as RenderedRichText}
+                    align={modulePage ? "cards" : "column"}
                 />
             );
         case "cta":
@@ -134,6 +169,7 @@ export default function SectionRenderer({
                 <EnquirySection
                     content={section.content as RenderedEnquiry}
                     apiUrl={apiUrl}
+                    thread={thread}
                 />
             );
         case "features":
@@ -184,6 +220,17 @@ export default function SectionRenderer({
                 <PlansSection
                     content={section.content as RenderedPlans}
                     feed={plans}
+                    prices={prices}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
+        case "packs":
+            return (
+                <PacksSection
+                    content={section.content as RenderedPacks}
+                    feed={packs}
+                    prices={prices}
                     apiUrl={apiUrl}
                     siteId={siteId}
                 />
@@ -195,6 +242,12 @@ export default function SectionRenderer({
                     feed={productGrid}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                />
+            );
+        case "projects":
+            return (
+                <ProjectsSection
+                    content={section.content as RenderedProjects}
                 />
             );
         case "booking":
@@ -246,9 +299,27 @@ export function PageSections({
     siteId,
     journal,
     plans,
+    packs,
+    prices,
+    thread,
     productGrids,
+    top = null,
+    modulePage = top !== null,
 }: {
     sections: Section[];
+    /**
+     * A module page's title (and lead), drawn above its sections (DEC-073
+     * #9), as the design's Book, Prices and Shop pages open. The first
+     * section then starts close under it, as the design's list does,
+     * instead of a whole section's padding below.
+     */
+    top?: ModulePageTopContent | null;
+    /**
+     * Lay the sections out as a module page's (a rich-text intro on the
+     * cards' line) without drawing the top: the editor's canvas draws each
+     * section on its own and the top once above them. Follows `top`.
+     */
+    modulePage?: boolean;
     /** Passed through to the blocks that talk to the public API. */
     apiUrl?: string;
     /** The site's booking page (U19), linked from services; live sites only. */
@@ -259,6 +330,12 @@ export function PageSections({
     journal?: JournalFeed;
     /** The business's plans on sale, for the Plans block (G9). */
     plans?: PlansFeed;
+    /** The business's class packs on sale, for the Class packs block (G20). */
+    packs?: PacksFeed;
+    /** Join and Buy's actions on a live site (G20). */
+    prices?: PricesActions | null;
+    /** A signed-in customer's thread, for the Contact page's form (A13). */
+    thread?: EnquiryThread | null;
     /**
      * Each Product grid's products (G12), by the section's index in
      * `sections`: every grid asks for its own.
@@ -267,8 +344,11 @@ export function PageSections({
 }) {
     return (
         <>
+            {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
             {sections.map((section, i) => {
                 const style = paddingOverride(section.content);
+                // Close under the page's title, not a section's padding away.
+                const className = top && i === 0 ? "[&>*]:!pt-5" : undefined;
                 const rendered = (
                     <SectionRenderer
                         section={section}
@@ -277,13 +357,15 @@ export function PageSections({
                         siteId={siteId}
                         journal={journal}
                         plans={plans}
+                        packs={packs}
+                        prices={prices}
+                        thread={thread}
                         productGrid={productGrids?.[i]}
+                        modulePage={modulePage}
                     />
                 );
-                return style === undefined ? (
-                    <div key={i}>{rendered}</div>
-                ) : (
-                    <div key={i} style={style}>
+                return (
+                    <div key={i} className={className} style={style}>
                         {rendered}
                     </div>
                 );

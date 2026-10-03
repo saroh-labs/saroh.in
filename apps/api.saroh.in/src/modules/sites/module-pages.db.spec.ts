@@ -82,6 +82,8 @@ async function business(
             organizationId: org.id,
             name: "Pulse",
             slug: uniq("g14-site-"),
+            // A site publishes only with an address (L5).
+            subdomain: uniq("g14-sub-"),
         },
     });
     await prisma.page.create({
@@ -208,6 +210,9 @@ describe("module pages (G14, real database)", () => {
         expect(sections[1]?.content).toMatchObject({
             serviceIds: [first.id, second.id],
             showPrices: true,
+            // The design's Book page: cards, each "Choose a time".
+            layout: "cards",
+            buttonLabel: "Choose a time",
         });
         expect(sections.every((s) => s.key.length > 0)).toBe(true);
 
@@ -226,6 +231,74 @@ describe("module pages (G14, real database)", () => {
             { label: "Book", href: "/book", kind: "BOOK" },
         ]);
         expect(checkRenderability(snapshot).renderable).toBe(true);
+    });
+
+    it("starts a Prices page with Try it once, Memberships and Class packs (G20)", async () => {
+        const b = await business();
+        const org = b.ctx.organizationId;
+        const priced = async (name: string, priceCents: number, shown = true) =>
+            prisma.service.update({
+                where: { id: (await service(org, name, shown)).id },
+                data: { priceCents, currency: "INR" },
+                select: { id: true },
+            });
+        const pt = await priced("Personal training", 150_000);
+        const trial = await priced("Trial class", 40_000);
+        await priced("Hidden class", 10_000, false);
+        await service(org, "Free intro");
+        await priced("Yoga", 60_000);
+
+        const prices = await sites.createPage(b.ctx, b.siteId, {
+            kind: "PRICES",
+        });
+        const sections = await draftSections(prices.id);
+        expect(sections.map((s) => s.type)).toEqual([
+            "richText",
+            "servicesList",
+            "plans",
+            "packs",
+        ]);
+        expect(sections[0]?.content).toMatchObject({
+            value: "<p>Try one class, buy a pack, or join. Price per class is shown so you can compare.</p>",
+        });
+        // The cheapest two shown on the booking page with a price.
+        expect(sections[1]?.content).toMatchObject({
+            heading: "Try it once",
+            serviceIds: [trial.id, expect.any(String)],
+            showPrices: true,
+            layout: "cards",
+            buttonLabel: "Choose a time",
+        });
+        expect(
+            (sections[1]?.content as { serviceIds: string[] }).serviceIds,
+        ).not.toContain(pt.id);
+        expect(sections[2]?.content).toMatchObject({ title: "Memberships" });
+        expect(sections[3]?.content).toMatchObject({ title: "Class packs" });
+    });
+
+    it("leaves off a Prices section whose module is off or not rolled out (DEC-057)", async () => {
+        const noPacks = await business({
+            notRolledOut: ["MODULE_CLASS_PACKS"],
+        });
+        const a = await sites.createPage(noPacks.ctx, noPacks.siteId, {
+            kind: "PRICES",
+        });
+        expect((await draftSections(a.id)).map((s) => s.type)).toEqual([
+            "richText",
+            "plans",
+        ]);
+        expect((await draftSections(a.id))[0]?.content).toMatchObject({
+            value: "<p>Join.</p>",
+        });
+
+        const packsOnly = await business({ switchedOff: ["PAYMENTS"] });
+        const b = await sites.createPage(packsOnly.ctx, packsOnly.siteId, {
+            kind: "PRICES",
+        });
+        expect((await draftSections(b.id)).map((s) => s.type)).toEqual([
+            "richText",
+            "packs",
+        ]);
     });
 
     it("starts a Book page with the intro alone while no service is shown", async () => {
@@ -273,7 +346,7 @@ describe("module pages (G14, real database)", () => {
         ]);
     });
 
-    it.each(["/book", "/shop/sale", "/checkout"])(
+    it.each(["/book", "/shop/sale", "/checkout", "/pay"])(
         "refuses a free-form page at %s with the reason and another address",
         async (path) => {
             const b = await business();
@@ -284,7 +357,7 @@ describe("module pages (G14, real database)", () => {
                 }),
             );
             expect(status).toBe(400);
-            expect(body.message).toMatch(/Pick another address, such as/);
+            expect(body.message).toMatch(/Pick another path, such as/);
             expect(body.details).toMatchObject({
                 field: "path",
                 reason: "reserved",
@@ -305,7 +378,7 @@ describe("module pages (G14, real database)", () => {
         );
         expect(status).toBe(409);
         expect(body.message).toBe(
-            'Your page "Our range" uses /shop. Change its address first.',
+            'Your page "Our range" uses /shop. Change its path first.',
         );
 
         const { flags } = await sites.getSiteFlags(b.ctx, b.siteId);
@@ -326,7 +399,7 @@ describe("module pages (G14, real database)", () => {
         expect(flags.find((f) => f.type === "reservedAddress")).toMatchObject({
             pageId: walk.id,
             message:
-                "This page can't be seen: /book is your booking page. Change its address so visitors can reach it.",
+                "This page can't be seen: /book is your booking page. Change its path so visitors can reach it.",
         });
 
         // And a Book page waits for it to move.
@@ -339,6 +412,25 @@ describe("module pages (G14, real database)", () => {
         await expect(
             sites.createPage(b.ctx, b.siteId, { kind: "BOOK" }),
         ).resolves.toMatchObject({ path: "/book" });
+    });
+
+    it("flags a free-form page already at /pay: pay links live there (DEC-069, L7)", async () => {
+        const b = await business();
+        const fees = await freePage(b, "/pay", "Pay your fees");
+        // A neighbour of the address is free.
+        await freePage(b, "/payments", "Ways to pay");
+
+        const { flags } = await sites.getSiteFlags(b.ctx, b.siteId);
+        expect(
+            flags
+                .filter((f) => f.type === "reservedAddress")
+                .map((f) => [f.pageId, f.message]),
+        ).toEqual([
+            [
+                fees.id,
+                "This page can't be seen: /pay is where your customers pay a link you sent. Change its path so visitors can reach it.",
+            ],
+        ]);
     });
 
     it("refuses a Shop page with Commerce off, naming the module", async () => {
@@ -386,6 +478,20 @@ describe("module pages (G14, real database)", () => {
             "JOURNAL",
             "CONTACT",
         ]);
+        // Class packs is rolled out and on: its block is offered.
+        expect(detail.packsBlockOffered).toBe(true);
+    });
+
+    it("offers the Class packs block only while Class packs is rolled out and on (DEC-057)", async () => {
+        const hidden = await business({ notRolledOut: ["MODULE_CLASS_PACKS"] });
+        expect(
+            (await sites.getSite(hidden.ctx, hidden.siteId)).packsBlockOffered,
+        ).toBe(false);
+
+        const off = await business({ switchedOff: ["CLASS_PACKS"] });
+        expect(
+            (await sites.getSite(off.ctx, off.siteId)).packsBlockOffered,
+        ).toBe(false);
     });
 
     it("offers only what is on and not yet added, and nothing without site:update", async () => {
@@ -435,8 +541,11 @@ describe("module pages (G14, real database)", () => {
             "/journal",
             "/contact",
         ]);
+        // With nothing priced to book, no "Try it once" (G20).
         expect((await draftSections(prices.id)).map((s) => s.type)).toEqual([
+            "richText",
             "plans",
+            "packs",
         ]);
         expect((await draftSections(journal.id)).map((s) => s.type)).toEqual([
             "journal",
@@ -478,7 +587,7 @@ describe("module pages (G14, real database)", () => {
             sites.createPage(b.ctx, b.siteId, { kind: "CONTACT" }),
         );
         expect(status).toBe(400);
-        expect(body.message).toContain("Pick another address");
+        expect(body.message).toContain("Pick another path");
         expect(body.details).toMatchObject({
             field: "path",
             reason: "taken",

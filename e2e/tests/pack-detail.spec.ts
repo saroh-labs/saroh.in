@@ -1,7 +1,10 @@
+// @covers accounts:/login app:/open app:/class-packs api:class-packs api:bookings
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { stamp as ownStamp } from "../fixtures/own-data";
+import { useSession } from "../fixtures/sessions";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * Pack Detail (round-2 E16) on Northwind, where browser checks may write:
@@ -19,24 +22,28 @@ const orgApi = (path: string) =>
     `${urls.API_URL}/organizations/${NORTHWIND_ORG}${path}`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${NORTHWIND_ORG}`);
 }
 
-/** A service and the kind of pack that pays for it (E13). */
+/**
+ * A service and the kind of pack that pays for it (E13): one of the seed's,
+ * never a service another test is making and deleting ("E2E …"), nor the
+ * walkthrough, whose times the booking-page specs are taking.
+ */
 async function aService(
     request: APIRequestContext,
 ): Promise<{ id: string; kind: "CLASSES" | "ONE_TO_ONE" } | null> {
     const res = await request.get(orgApi("/services"), { headers });
     if (!res.ok()) return null;
-    const services = (await res.json()) as { id: string; capacity: number }[];
-    const s = services.at(0);
+    const services = (await res.json()) as {
+        id: string;
+        name: string;
+        capacity: number;
+    }[];
+    const s = services.find(
+        (x) => !x.name.startsWith("E2E ") && x.name !== "Warehouse walkthrough",
+    );
     if (!s) return null;
     return { id: s.id, kind: s.capacity > 1 ? "CLASSES" : "ONE_TO_ONE" };
 }
@@ -86,7 +93,7 @@ test.describe("Pack Detail on Northwind (E16)", () => {
         const on = await request.get(orgApi("/class-packs"), { headers });
         test.skip(!on.ok(), "Class packs aren't on for Northwind");
 
-        const stamp = Date.now();
+        const stamp = ownStamp(test.info());
         const name = `E2E detail ${stamp}`;
         const emptyName = `E2E nobody ${stamp}`;
         const contact = await request.post(orgApi("/contacts"), {
@@ -200,7 +207,7 @@ test.describe("Pack Detail's other tabs on Northwind (E17)", () => {
         const on = await request.get(orgApi("/class-packs"), { headers });
         test.skip(!on.ok(), "Class packs aren't on for Northwind");
 
-        const stamp = Date.now();
+        const stamp = ownStamp(test.info());
         const name = `E2E tabs ${stamp}`;
         const contact = await request.post(orgApi("/contacts"), {
             headers,
@@ -249,26 +256,42 @@ test.describe("Pack Detail's other tabs on Northwind (E17)", () => {
                 { headers },
             );
             const today = slots.ok()
-                ? ((await slots.json()) as { startAt: string }[]).find(
+                ? ((await slots.json()) as { startAt: string }[]).filter(
                       (s) => northwindDay(s.startAt) === northwindDay(now),
                   )
-                : undefined;
-            test.skip(!today, "No open slot left today for the service");
-            if (!today) return;
-            const booked = await request.post(
-                orgApi(`/services/${service.id}/bookings`),
-                {
-                    headers,
-                    data: {
-                        startAt: today.startAt,
-                        contactId,
-                        useClassPack: true,
-                        packPurchaseId: purchaseId,
-                    },
-                },
+                : [];
+            test.skip(
+                today.length === 0,
+                "No open slot left today for the service",
             );
-            expect(booked.ok(), await booked.text()).toBe(true);
-            bookingId = ((await booked.json()) as { id: string }).id;
+            // The first of today's times still free when it is asked for:
+            // the other project's copy of this test books from the same list
+            // at the same moment, and one of them is refused the time.
+            let refused = "";
+            for (const slot of today) {
+                const booked = await request.post(
+                    orgApi(`/services/${service.id}/bookings`),
+                    {
+                        headers,
+                        data: {
+                            startAt: slot.startAt,
+                            contactId,
+                            useClassPack: true,
+                            packPurchaseId: purchaseId,
+                        },
+                    },
+                );
+                if (!booked.ok()) {
+                    refused = `${booked.status()} ${await booked.text()}`;
+                    continue;
+                }
+                bookingId = ((await booked.json()) as { id: string }).id;
+                break;
+            }
+            expect(
+                bookingId,
+                `no time today could be booked: ${refused}`,
+            ).toBeTruthy();
 
             await page.goto(`/class-packs/${packId}?tab=used`);
             const use = page.getByRole("listitem").filter({ hasText: who });

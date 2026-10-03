@@ -49,8 +49,13 @@ function isCard(v: unknown): v is ShopListingCard {
                 isString(v.image.alt))) &&
         Array.isArray(v.variantTitles) &&
         v.variantTitles.every(isString) &&
+        // What the options are (DEC-073 #12); an older API sends none.
+        (v.optionName === undefined || isStringOrNull(v.optionName)) &&
         isStringOrNull(v.blurb) &&
-        typeof v.soldOut === "boolean"
+        typeof v.soldOut === "boolean" &&
+        // What the card's Add to bag holds (an older API sends neither).
+        (v.listingId === undefined || isString(v.listingId)) &&
+        (v.bagVariantId === undefined || isStringOrNull(v.bagVariantId))
     );
 }
 

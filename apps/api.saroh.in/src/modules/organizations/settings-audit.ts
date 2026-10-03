@@ -5,6 +5,7 @@ import { stateName } from "../invoices/gst-states";
 import type { NumberRestart } from "../invoices/numbering";
 import { numberFormatFor, seriesFor } from "../invoices/numbering";
 import { businessTypeRead } from "./business-type";
+import { kindRead } from "./organization-kind";
 
 /**
  * A settings save as the audit stream says it (#509): each business detail
@@ -14,9 +15,14 @@ import { businessTypeRead } from "./business-type";
  * value is `audit/audit-changes.ts`'s decision, not this file's.
  */
 
-/** What the snapshot reads: the organization's name and its profile. */
+/**
+ * What the snapshot reads: the organization's name, what is being set up
+ * (DEC-070) and its profile.
+ */
 export interface SettingsRow {
     name: string;
+    /** Absent on a row read before DEC-070; reads as BUSINESS. */
+    kind?: string | null;
     businessProfile: {
         legalName?: string | null;
         type?: string | null;
@@ -100,6 +106,9 @@ export function settingsSnapshot(
     const rate = rateToBps(p.deliveryGstRate ?? null);
     return {
         name: row?.name ?? null,
+        // As stored (BUSINESS, SOLO, WORK); the app words it, as it does
+        // the type. No row at all reads as nothing, not as BUSINESS.
+        kind: row ? kindRead(row.kind) : null,
         legalName: p.legalName ?? null,
         // In today's words: a `company` row reads as `pvt` (F10).
         type: businessTypeRead(p.type),

@@ -25,6 +25,76 @@
 - **Who sees what:** invoice ids and numbers go only to a role with
   `invoice:read`; a subscription or pack view without it still says what is
   owed, not which invoices.
+- **Invoicing needs no module; taking money online needs Payments**
+  (DEC-070, amending DEC-019). `InvoicesController` has no class-level
+  gate: create, issue, send, remind, void, credit, record paid and the PDF
+  ask only for `invoice:*`. The pay-link route alone keeps
+  `@RequireModule("PAYMENTS")` + `@IgnoreModuleReadiness()`, and
+  `createPayLink` also refuses with Payments off (`assertPaymentsOn`) or no
+  provider (`businessPayLinkProvider`). `invoicePayOnline`
+  (`invoices/pay-online.ts`) is the one "can this be paid online" rule: it
+  is `payOnline` on the send view and on the pay page's read. Send with it
+  false mints the same token as a **view link** (`createPayLinkInTx(…, {
+requireProvider: false })`), the email says "view it and download a copy",
+  and the pay page's payment-intent and autopay answer 409 "This business
+  doesn't take payment online." Automatic invoicing (renewals, packs,
+  courses, subscribe) still stops with Payments off (`payments-on.ts`).
+
+## Business details before money — **Current** (DEC-068, M3)
+
+Every invoice prints the business's registered address, and a
+GST-registered business's GSTIN. **Refuse before money; record and flag
+after it.**
+
+- **The rule is one file**, `invoices/business-details.ts`: missing is the
+  address (first line, city, PIN, and an Indian address's state,
+  `gstState`) and, when `gstRegistered`, the GSTIN (`taxId`). No profile is
+  a missing address.
+- **Before money, a merchant's action is refused** with
+  `assertBusinessDetails`: a 409 `{ reason: "BUSINESS_DETAILS_MISSING",
+missing: ["address", "gstin"] }` in merchant words, before anything is
+  written or numbered. The app reads `missing` off the failure (`toFailure`,
+  `mutate`) and asks for the details in place (`useBusinessDetailsStep`),
+  then runs the action again.
+- **After money, nothing is refused.** Paper written because money moved is
+  written without the details, and Home's Needs you says so
+  (`PAYMENTS_BUSINESS_DETAILS`, `home/home-business-details.ts`: missing
+  details and any numbered paper, to whoever holds `org:update`).
+- **Every path that writes an invoice, and which side it is on:**
+
+    | Path                                                                 | Money                              | Behaviour                            |
+    | -------------------------------------------------------------------- | ---------------------------------- | ------------------------------------ |
+    | Issue a draft (`InvoicesService.issue`)                              | before                             | refused                              |
+    | Send / Remind (`InvoiceSendService`)                                 | before                             | refused                              |
+    | An invoice's pay link, and Retry by pay link (`payLink`)             | before                             | refused                              |
+    | A member's own "Pay now" (`payLinkForCustomer`)                      | before                             | allowed: the customer can't add them |
+    | An order's pay link; New order with a pay link                       | before                             | refused                              |
+    | A booking's pay link (`BookingsService.payLink`)                     | before                             | refused                              |
+    | Subscribe (`SubscriptionsService.subscribe`)                         | before                             | refused                              |
+    | Restart past the paid period by hand (`resume`)                      | before                             | refused                              |
+    | A pack sold at the desk still to be paid (`paidBy` none or NONE)     | before                             | refused                              |
+    | A course enrolment with Payments on                                  | before                             | refused                              |
+    | Connect a payment provider (`connectProvider`)                       | before                             | refused: online money starts here    |
+    | An order paid online (webhook → `ensureOrderInvoice`)                | after                              | recorded, flagged                    |
+    | A payment on a superseded charge (`invoiceSupersededPayment`)        | after                              | recorded, flagged                    |
+    | Renewal, early renewal, a pause ending (the job)                     | after                              | recorded, flagged                    |
+    | A member's own resume; Undo of a skip that invoices the period       | no new sale: the period was agreed | recorded, flagged                    |
+    | Retry by charging the mandate                                        | the invoice is already out         | not checked                          |
+    | A pack paid at the desk (CASH, UPI, CARD, BANK, ONLINE)              | after                              | recorded, flagged                    |
+    | Money taken at the desk for a booking (`booking-desk-pay.ts`)        | after                              | recorded, flagged                    |
+    | New order paid at the counter; an order marked paid by hand          | after                              | recorded, flagged                    |
+    | Booking hold, pack or plan bought online (numbered on the webhook)   | after                              | recorded, flagged                    |
+    | Credit notes and an edit's correction (`correctOrderInvoiceForEdit`) | corrections of paper already out   | never checked                        |
+
+- **A new path that writes an invoice or opens a way to be paid picks a
+  side.** Merchant-initiated and before money: call `assertBusinessDetails`
+  before the transaction (or first in it). Anything a payment, a job or a
+  customer triggers: never call it. The site's checkout and booking page
+  are not re-gated: a business connected before DEC-068 keeps taking
+  online payments, and Home asks for the details.
+- **Tests:** an integration spec's business needs an address before it
+  connects a provider or issues anything: `giveBusinessDetails` in
+  `test/business-details.ts`. The seed gives every business one.
 
 ## Invoices for orders, corrections and GST — **Current** (ADR-008, DEC-023)
 
@@ -59,6 +129,18 @@
   delivery state, else the business's state — same state CGST + SGST, else
   IGST. Registered → tax invoice; unregistered → receipt. A registered
   business's orders ignore the storefront's old add-on tax.
+- **GST shows only when it applies (DEC-072)** — presentation, on the
+  paper, the PDF, the pay page and anything else a customer reads:
+    - An unregistered business charges no GST, so its paper shows none: no
+      rate, no HSN/SAC column, no tax columns, no "Nil-rated".
+    - A registered business's line whose `gstRate` is null is "not set"
+      (D15): no rate, no "0%", no "Nil-rated". It is taxed at nothing and is
+      not a 0% supply, so it never makes a paper a bill of supply.
+    - Only a rate recorded as exactly 0 is labelled "Nil-rated".
+    - One rule, twice: `lineGstNote` in `invoices/invoice-paper-view.ts` (the
+      PDF) and in the app's `lib/invoices/paper-title.ts` (Invoice Detail's
+      paper). Change both together. Stored rates are never rewritten to
+      match.
 - **Numbering:** `InvoiceSequence` per business **and series**; never renumber
   an existing invoice. The financial year is April–March for everyone (GST
   sets it; not a setting), and a number's financial year and month are dated
@@ -228,8 +310,12 @@
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, currency, status, billed-to name) served server-to-server to
-  `saroh.app/pay/<token>`; reads and payment starts are rate-limited per link.
+  tax, total, currency, status, billed-to name, and `payOnline`) served
+  server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
+  rate-limited per link. With `payOnline` false (DEC-070) the page shows the
+  invoice with no Pay button, only "Print or save as PDF", and starting a payment or autopay
+  is a 409 (`assertPaysOnline`). An older API without the field means "as
+  before": show Pay.
 - **The amount is the stored invoice's.** A payment request carries only a
   provider and an idempotency key; anything else is ignored.
 - **`PaymentIntent` pays an Order or an Invoice** — exactly one (a CHECK in the
@@ -288,6 +374,25 @@
   business's `returnCredit` override refunds it only with `payment:manage`.
   A visit of a treatment has no booking invoice, so it never refunds here
   (DEC-050): its money goes back through the order.
+- **Money taken at the desk is the booking's paper, paid by hand** (round-2
+  P2, DEC-023): `POST services/bookings/:id/desk-payment` (`booking:write`
+  and `invoice:write`, the pay link's pair) takes cash, UPI or card. With
+  no invoice it issues the booking's own (source BOOKING) and writes it
+  PAID with the method; a pay link already out is that ISSUED invoice paid
+  instead, its token cleared; after a deposit only the rest is taken, on a
+  SUPPLEMENTARY invoice against the deposit's (source BOOKING, `bookingId`
+  set). Nothing is charged, so nothing is refundable online: the booking's
+  `paidAtDeskCents` and `deskMethod` read PAID booking paper whose method
+  is one of `PAYMENT_METHODS` — so "Mark it paid" on the invoice counts
+  too — and `dueCents` subtracts it. What "Take ₹X" may take, and why not
+  (cancelled, a hold, a treatment's visit, a course's session, a pack or
+  membership, a payment PROCESSING, a voided invoice, no price, paid), is
+  one pure rule, `bookings/desk-take.ts`, shared by the booking read, the
+  diary and the write. The write takes the cancel's lock order, refuses an
+  `amountCents` that differs from what it works out, and answers a repeat
+  of the last take (same method and amount, within ten minutes) as it did.
+  A `PAID_AT_DESK` BookingEvent names who took it. No Undo: the invoice
+  is issued paper.
 - **Cancel and move have one write each, whoever acts** (A6):
   `bookings/booking-cancel.ts` and `booking-move.ts`. The team calls them
   from `BookingsService`, the customer from their account
@@ -349,11 +454,14 @@
   member's allowance only through `subscriptions/classes-allowance.ts`
   (`classesAllowance`, `HAS_ALLOWANCE_WHERE`): booking with the membership
   and Customer Detail's "Classes left" do, and the detail names the next
-  period's number when it differs. A null stamp is a row the previous image
-  wrote and reads the plan's number (the one-release fallback; follow-up Z1
-  removes it once no live row is unset); the backfill is
-  `backfill/classes-per-period.cli.ts` (`ROUND_2_PHASE_2_ROLLOUT.md`, D10).
-  A seed writing subscriptions sets both columns.
+  period's number when it differs. Since Z1 a set stamp is the only
+  designed state: the subscription's own value, null included, is
+  authoritative. A null stamp can only come from an API below D10 (a
+  rollback with no backfill after it); it is logged at ERROR as
+  `subscription_allowance_unset` and served the plan's number, never
+  unlimited, and the fix is the backfill
+  `backfill/classes-per-period.cli.ts` (`ROUND_2_PHASE_2_ROLLOUT.md`, D10
+  and Z1). A seed writing subscriptions sets both columns.
 - **Only an ACTIVE plan is on sale** (round-2 D21). A plan's `status` is a
   String, and a DRAFT (D5) isn't published yet. Every path that sells a plan
   — subscribe, a plan change, and a sign-up from the site — calls
@@ -462,9 +570,83 @@
 "PRIVACY_REMOVAL")` before its transaction and refuses while
   `unconfirmed` isn't zero. `cancelConfirmedAt` null on a CANCELLED row is
   "being confirmed" (DEC-026); a confirmed row is never asked again.
-- **Payment failed** is derived — the latest invoice unpaid past due — never
-  stored. "Retry now" mints a new pay link for that invoice, replacing the
-  old one; nothing is charged.
+- **Payment failed** is derived — the latest invoice unpaid and past due,
+  or whose autopay charge failed since it was issued (RENEWAL_FAILED,
+  MANDATE_LIMIT_LOW) — never stored. Retry (`subscriptions.service.ts`
+  `retryPayment`) asks the provider about an open charge first (a capture
+  it finds pays the invoice; one still in flight is a 409), then either
+  charges the mandate again under a new key (`via: MANDATE`) or mints a new
+  pay link, replacing the old one (`PAY_LINK`, the default). The read's
+  `retryVia` says which is on offer.
+- **Renewals charge the mandate** (round-2 D13). `renewOne` issues the
+  period's invoice, then `MandateChargesService.queueInTx` on the same
+  transaction: with an ACTIVE mandate whose provider's charging is on
+  (`payments/mandate-charge-gate.ts`, the rollout flag) and the invoice
+  within `maxAmountCents`, it writes a CREATED intent under
+  `inv_<invoiceId>_<attempt>` and the `subscription.charge` job; above the
+  limit it writes MANDATE_LIMIT_LOW and charges nothing; otherwise
+  nothing. The job (`subscription-charge.handler.ts`, steps in
+  `charge-job.ts`) prepares (order + pre-debit notice), debits at
+  `debitAfter` once the notice is DELIVERED or NOT_NEEDED, and looks the
+  debit up if its webhook is late. Each step re-checks the subscription
+  isn't CANCELLED and the mandate is still chargeable, or lets the charge
+  go (CANCELLED). Outcomes are written by `payments/mandate-charge-outcome.ts`
+  (CHARGED; RENEWAL_FAILED with `data.reason`; the team's "Payment failed"
+  alert on a decline). When the debit happens is the merchant's choice
+  (next point).
+- **The merchant chooses when autopay debits** (round-2 D13B, DEC-065;
+  `subscriptions/autopay-timing.ts`). `BusinessProfile.autopayChargeTiming`,
+  overridden by `SubscriptionPlan.autopayChargeTiming` when set (the booked
+  plan's for a renewal that switches plan): `DAY_AFTER_RENEWAL` (default,
+  D13 as it shipped: invoice on the renewal date, debit 26 hours later, at
+  once for a card or eMandate), `ON_RENEWAL_DATE` (the invoice and notice
+  `AUTOPAY_LEAD_DAYS` = 2 days early, the debit on the renewal date; every
+  method gets the early invoice) or `ON_DUE_DATE` (the debit at the start
+  of the due date, the notice 2 days before; no room for a Retry). Rules
+  every reader must keep:
+    - The planned debit is written on the charge's CREATED intent
+      (`debitAfter`) by `queueInTx`'s `schedule`, PREPARE is enqueued for 2
+      days before it, and `prepareCharge`'s `notBefore` keeps a no-notice
+      method from being debited sooner. **A setting changed later never moves
+      a queued charge.** DAY_AFTER_RENEWAL and Retry plan nothing (null).
+    - The early invoice comes from the renewal job's second pass
+      (`SubscriptionRenewHandler.renewEarly` → `renewEarlyOne`): ACTIVE, not
+      set to end, Payments on, a chargeable mandate, and **no invoice at all
+      yet for the next period**. On the renewal date `renewOne` finds it live
+      and advances without another.
+    - **Anything that stops the next period being billed as invoiced drops
+      the early invoice** (`subscriptions/early-renewal.ts`,
+      `dropEarlyRenewalInTx`): cancel (now or at period end), pause, and a
+      plan change booked or undone call it under the row lock; the charge
+      job's `stillCharging` calls it too before any step. It cancels the open
+      charge (never one PROCESSING), voids the invoice — or credits it in full
+      for a GST-registered business (DEC-023) — and writes
+      EARLY_INVOICE_CANCELLED. A new write that ends, pauses or re-terms a
+      subscription must call it.
+    - A VOID or CREDITED invoice is not a period's live invoice (`renewOne`,
+      and the `Invoice_one_live_per_period` index), so a subscription kept
+      after its early invoice was dropped is invoiced on the renewal date.
+    - The customer's "Next autopay charge" (`subscriptions/next-autopay-charge.ts`)
+      is a queued charge's planned debit, else the next renewal's projected
+      from the renewal date, the timing and the mandate's method.
+- **One charge at a time per invoice** (D13). While a mandate charge is
+  under way (`payments/charge-under-way.ts`: open and either PROCESSING or
+  on an ACTIVE mandate; sales only, never D12B's ₹1 check), a pay link,
+  its checkout, Send and Send reminder, the account's "Pay now" and Retry
+  are refused with 409 "Autopay charge in progress", and the reads say
+  "Autopay charge in progress · ‹date›" (`autopayCharge`,
+  `online.autopayCharge`, `autopayCharging`).
+- **And the other way round: autopay stands aside for an open pay-link
+  checkout** (`openCheckoutWhere`, `checkoutOpenOn`). A pay-link intent
+  counts as open for `CHECKOUT_LIFE_MS` (3 days) after its last activity —
+  made, or its newest PaymentAttempt — and a FAILED one only for
+  `FAILED_CHECKOUT_MS` (an hour) after it failed: Razorpay's retry is in the
+  same session. Pass the caller's `now`. While one is open, nothing queues,
+  prepares or debits a charge and Retry offers the pay link; a charge that
+  stands aside writes RENEWAL_FAILED (CHECKOUT_OPEN: Home's tag is
+  "Autopay didn't charge — paying by link", never "Payment failed") and a
+  resume step for
+  the moment the checkout closes (`checkoutOpenUntil`), so autopay comes back without the merchant.
 
 ## Courses and class packs — **Current**
 
@@ -531,8 +713,13 @@
 
 ## Modules and routes — **Current**
 
-- Subscriptions and invoices: PAYMENTS, with `@IgnoreModuleReadiness()` so a
-  business with no provider still records payments by hand. Courses: its own
+- Subscriptions: PAYMENTS, with `@IgnoreModuleReadiness()` so a business
+  with no provider still records payments by hand. Invoices: no module
+  (DEC-070), `invoice:*` alone; only `POST :invoiceId/pay-link` keeps a
+  method-level `@RequireModule("PAYMENTS")` + `@IgnoreModuleReadiness()`,
+  pinned in `capabilities/module-annotations.spec.ts`. The rail shows
+  Invoices under Payments while it's on, and as its own row while it's off
+  (`nav-items.tsx`, `unlessModule`). Courses: its own
   COURSES module (depends on APPOINTMENTS). Class packs: its own CLASS_PACKS
   module (depends on APPOINTMENTS; E12, default 44), reached with
   `pack:read`. Online classes: APPOINTMENTS.

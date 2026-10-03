@@ -116,7 +116,7 @@ export function acrossStorefronts(
 ): string | null {
     const sold = cells.filter((c) => c.soldHere && c.word !== "NOT_SOLD_HERE");
     if (sold.length === 0) return null;
-    const name = (c: { storeId: string }) => names[c.storeId] ?? "a storefront";
+    const name = (c: { storeId: string }) => names[c.storeId] ?? "a location";
     const out = sold.filter((c) => c.canSell <= 0);
     const selling = sold.filter((c) => c.canSell > 0);
     return [

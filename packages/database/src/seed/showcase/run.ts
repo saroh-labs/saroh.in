@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import { holdOpenLines } from "../../backfill/held-stock";
 import { assertDatabaseTarget } from "../../database-target";
+import { alignOrderNumberSequence } from "../../order-number";
 import {
     ANALYTICS_DAYS,
     ANALYTICS_PATHS,
@@ -218,6 +219,11 @@ export async function seedShowcase(
         prisma,
         businesses.map((b) => b.id),
     );
+    // Each business's one order-number series (P3, DEC-066) continues from
+    // its fixtures: the next order taken by hand follows the highest.
+    for (const b of businesses) {
+        await alignOrderNumberSequence(prisma, b.id);
+    }
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);
@@ -282,15 +288,24 @@ async function retireBusinesses(ctx: Context) {
     }
 }
 
-/** The business's zone (ADR-007): what renewals and "today" are counted in. */
-async function setTimezone(ctx: Context, key: string, orgId: string) {
+/**
+ * The business's zone (ADR-007): what renewals and "today" are counted in;
+ * and its registered address, which its invoices print (DEC-068).
+ */
+async function setProfile(
+    ctx: Context,
+    key: string,
+    orgId: string,
+    address: ShowcaseBusiness["registeredAddress"],
+) {
+    const profile = { timezone: TIMEZONE, ...address };
     await ctx.prisma.businessProfile.upsert({
         where: { organizationId: orgId },
-        update: { timezone: TIMEZONE },
+        update: profile,
         create: {
             id: sid(key, "profile"),
             organizationId: orgId,
-            timezone: TIMEZONE,
+            ...profile,
         },
     });
 }
@@ -924,7 +939,7 @@ async function seedBusiness(
         },
     });
     const orgId = org.id;
-    await setTimezone(ctx, key, orgId);
+    await setProfile(ctx, key, orgId, biz.registeredAddress);
 
     // --- team
     const ownerId = biz.owner

@@ -91,6 +91,10 @@ function setup(opts: {
     reach?: InlinePorts["orderReach"];
     signsIn?: boolean;
     noSending?: boolean;
+    /** D13: each renewal's autopay, by subscription. */
+    charges?: Record<string, "CHARGING" | "MANDATE">;
+    /** D14: the business offers autopay now. */
+    autopayOffered?: boolean;
 }) {
     const db = {
         order: { findMany: jest.fn().mockResolvedValue(opts.orders ?? []) },
@@ -114,6 +118,20 @@ function setup(opts: {
     const ports: InlinePorts = {
         orderReach: opts.reach ?? jest.fn().mockResolvedValue("EMAIL"),
         signsIn: jest.fn().mockResolvedValue(opts.signsIn ?? true),
+        ...(opts.charges
+            ? {
+                  renewalCharges: jest
+                      .fn()
+                      .mockResolvedValue(new Map(Object.entries(opts.charges))),
+              }
+            : {}),
+        ...(opts.autopayOffered === undefined
+            ? {}
+            : {
+                  autopayOffered: jest
+                      .fn()
+                      .mockResolvedValue(opts.autopayOffered),
+              }),
     };
     const service = new HomeInlineService(
         opts.noSending ? undefined : sending,
@@ -243,6 +261,30 @@ describe("retryVia", () => {
         ).toBeNull();
         expect(retryVia({ at: null }, NOW)).toBeNull();
     });
+
+    it("takes a renewal whose autopay failed before its due date (D13)", () => {
+        const ahead = new Date(NOW.getTime() + DAY).toISOString();
+        expect(retryVia({ at: ahead, tag: "Payment failed" }, NOW)).toBe(
+            "PAY_LINK",
+        );
+        expect(retryVia({ at: ahead, tag: "Autopay limit too low" }, NOW)).toBe(
+            "PAY_LINK",
+        );
+        expect(
+            retryVia(
+                { at: ahead, tag: "Autopay didn't charge — paying by link" },
+                NOW,
+            ),
+        ).toBe("PAY_LINK");
+    });
+
+    it("charges autopay again when the mandate can take it, else a link only for someone who may make one", () => {
+        const past = new Date(NOW.getTime() - DAY).toISOString();
+        expect(retryVia({ at: past }, NOW, { mandate: true })).toBe("MANDATE");
+        expect(
+            retryVia({ at: past }, NOW, { mandate: false, payLink: false }),
+        ).toBeNull();
+    });
 });
 
 describe("HomeInlineService.decorate", () => {
@@ -327,9 +369,39 @@ describe("HomeInlineService.decorate", () => {
             sends: false,
             undoable: false,
         });
-        // Not past due: the pay-link retry refuses it (D13's mandate retry
-        // will take it).
-        expect(actions[0].evidence?.[1].inline).toBeUndefined();
+        // Not yet due, but its autopay failed (D13): it can be retried.
+        expect(actions[0].evidence?.[1].inline).toMatchObject({
+            kind: "RETRY",
+            via: "PAY_LINK",
+            target: "sub_2",
+        });
+    });
+
+    it("offers no Retry while an autopay charge is under way (D13)", async () => {
+        const { service } = setup({ charges: { sub_1: "CHARGING" } });
+        const past = new Date(NOW.getTime() - 2 * DAY).toISOString();
+        const actions = [
+            action("PAYMENTS_FAILED_RENEWALS", [ev("sub_1", { at: past })]),
+        ];
+        await service.decorate(actions, OWNER, NOW);
+        expect(actions[0].evidence?.[0].inline).toBeUndefined();
+    });
+
+    it("retries by autopay when the mandate can take it, in its own words (D13)", async () => {
+        const { service } = setup({ charges: { sub_1: "MANDATE" } });
+        const past = new Date(NOW.getTime() - 2 * DAY).toISOString();
+        const actions = [
+            action("PAYMENTS_FAILED_RENEWALS", [ev("sub_1", { at: past })]),
+        ];
+        // Charging autopay needs subscription:write only, not invoice:write.
+        await service.decorate(actions, holding("subscription:write"), NOW);
+        expect(actions[0].evidence?.[0].inline).toMatchObject({
+            kind: "RETRY",
+            via: "MANDATE",
+            label: "Charge autopay again",
+            sends: false,
+            undoable: false,
+        });
     });
 
     it("offers no Retry without subscription:write and invoice:write, or without a payment provider", async () => {
@@ -345,6 +417,64 @@ describe("HomeInlineService.decorate", () => {
         const b = make();
         await setup({ providers: 0 }).service.decorate(b, OWNER, NOW);
         expect(b[0].evidence?.[0].inline).toBeUndefined();
+    });
+
+    it("offers Send a set-up link beside Retry when the autopay limit is too low (D14)", async () => {
+        const { service } = setup({ autopayOffered: true });
+        const future = new Date(NOW.getTime() + DAY).toISOString();
+        const actions = [
+            action("PAYMENTS_FAILED_RENEWALS", [
+                ev("sub_1", { at: future, tag: "Autopay limit too low" }),
+                ev("sub_2", { at: future, tag: "Payment failed" }),
+            ]),
+        ];
+        await service.decorate(actions, OWNER, NOW);
+        const [low, failed] = actions[0].evidence ?? [];
+        expect(low.link).toEqual({
+            label: "Send a set-up link",
+            href: "/billing/subscriptions/sub_1?do=autopay-link",
+        });
+        // Retry by pay link stays: the renewal can still be paid today.
+        expect(low.inline).toMatchObject({ kind: "RETRY", via: "PAY_LINK" });
+        // A decline needs no new authorisation.
+        expect(failed.link).toBeUndefined();
+
+        // It rides onto the row.
+        const { needs } = flattenNeeds(actions, "Asia/Kolkata");
+        expect(needs.find((n) => n.id.endsWith("sub_1"))?.link).toEqual(
+            low.link,
+        );
+    });
+
+    it("offers no set-up link without subscription:write, without autopay, or while a charge is under way", async () => {
+        const future = new Date(NOW.getTime() + DAY).toISOString();
+        const make = (tag = "Autopay limit too low") => [
+            action("PAYMENTS_FAILED_RENEWALS", [
+                ev("sub_1", { at: future, tag }),
+            ]),
+        ];
+
+        const a = make();
+        await setup({ autopayOffered: true }).service.decorate(
+            a,
+            holding("invoice:write", "subscription:read"),
+            NOW,
+        );
+        expect(a[0].evidence?.[0].link).toBeUndefined();
+
+        const b = make();
+        await setup({ autopayOffered: false }).service.decorate(b, OWNER, NOW);
+        expect(b[0].evidence?.[0].link).toBeUndefined();
+
+        // No way to read the offer (a Home built by hand): nothing promised.
+        const c = make();
+        await setup({}).service.decorate(c, OWNER, NOW);
+        expect(c[0].evidence?.[0].link).toBeUndefined();
+
+        // A charge under way re-tags the row; it offers nothing.
+        const d = make("Autopay charge in progress · 29 Sep");
+        await setup({ autopayOffered: true }).service.decorate(d, OWNER, NOW);
+        expect(d[0].evidence?.[0].link).toBeUndefined();
     });
 
     it("offers Send reminder from D17's send flag, in its words", async () => {
@@ -407,6 +537,45 @@ describe("HomeInlineService.decorate", () => {
         const off = make();
         await setup({}).service.decorate(off, OWNER, NOW);
         expect(off[0].evidence?.[0].inline).toBeUndefined();
+    });
+
+    it("offers Reply on a low-star review to product-review:write, saying nothing is emailed", async () => {
+        const make = () => [
+            action("COMMERCE_LOW_STAR_REVIEWS", [
+                ev("review_1", { subtitle: "Dev S." }),
+            ]),
+        ];
+
+        const owner = make();
+        await setup({}).service.decorate(owner, OWNER, NOW);
+        expect(owner[0].evidence?.[0].inline).toMatchObject({
+            kind: "REVIEW_REPLY",
+            label: "Reply",
+            target: "review_1",
+            person: "Dev",
+            sends: true,
+            yes: "Post reply",
+        });
+        expect(owner[0].evidence?.[0].inline?.confirm).toBe(
+            "Your reply shows under Dev's review on your site, where anyone can read it. Nothing is emailed.",
+        );
+
+        // Reading reviews isn't answering them.
+        const reader = make();
+        await setup({}).service.decorate(
+            reader,
+            holding("product-review:read"),
+            NOW,
+        );
+        expect(reader[0].evidence?.[0].inline).toBeUndefined();
+
+        const writer = make();
+        await setup({}).service.decorate(
+            writer,
+            holding("product-review:write"),
+            NOW,
+        );
+        expect(writer[0].evidence?.[0].inline?.kind).toBe("REVIEW_REPLY");
     });
 
     it("gives a Member none of them by default", async () => {

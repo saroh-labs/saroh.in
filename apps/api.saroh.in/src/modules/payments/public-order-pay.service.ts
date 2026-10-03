@@ -9,6 +9,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { orderPayLinkUrlFor } from "../invoices/pay-link-url";
 import { hashPayToken } from "../invoices/pay-token";
 import { lineName } from "../orders/order-line";
 import type { PayLinkStanding } from "../orders/order-pay-link";
@@ -48,6 +49,12 @@ export interface PublicOrderPayView {
     status: PayLinkStanding;
     /** The business's site theme as `--site-*` variables; null for defaults. */
     theme: Record<string, string> | null;
+    /**
+     * Where this link lives (DEC-069, plan L6): `orderPayLinkUrlFor`'s
+     * answer, the business's own address or the apex. The renderer sends
+     * a pay page opened on another host here.
+     */
+    payUrl: string;
 }
 
 /** Reads per caller per minute: a page reload is fine, a scraper is not. */
@@ -170,6 +177,7 @@ export class PublicOrderPayService {
                 theme: site
                     ? siteStyleVariables(parseSiteStyle(site.style))
                     : null,
+                payUrl: await orderPayLinkUrlFor(found.organizationId, token),
             };
         });
     }

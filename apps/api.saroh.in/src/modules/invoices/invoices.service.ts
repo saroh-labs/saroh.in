@@ -10,6 +10,12 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { authorize } from "../organizations/organization-policy";
+import {
+    autopayChargeInProgress,
+    chargeUnderWayOn,
+} from "../payments/charge-under-way";
+import { businessPayLinkProvider } from "../payments/pay-link-provider";
+import { assertBusinessDetails } from "./business-details";
 import type {
     CreditInvoiceDto,
     InvoiceInputDto,
@@ -42,6 +48,7 @@ import {
     writeDocumentLines,
 } from "./order-invoicing";
 import { mintPayToken } from "./pay-token";
+import { assertPaymentsOn } from "./payments-on";
 import type {
     InvoiceOnlineView,
     InvoiceRow,
@@ -57,6 +64,15 @@ import type { LineInput } from "./totals";
 import { fromCents, MAX_CENTS, toCents } from "./totals";
 
 type Tx = Prisma.TransactionClient;
+
+/**
+ * What an invoice's link is for: a pay link needs Payments and a provider
+ * that can take the money; a view link (Send, with neither) doesn't.
+ */
+export interface LinkOptions {
+    requireProvider: boolean;
+}
+const PAY_LINK: LinkOptions = { requireProvider: true };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 500;
@@ -174,37 +190,51 @@ export class InvoicesService {
      * new link, and the one before stops working: that is both "copy the
      * link" the first time and "new link" after it.
      *
-     * Only an issued invoice has a link, and only a business with a
-     * connected provider can take the payment behind it. An order's invoice
-     * never has one: paying it pays the order (ADR-008).
+     * Only an issued invoice has a link, and only a business with Payments
+     * on and a connected provider can take the payment behind it (DEC-070:
+     * invoicing doesn't need Payments, taking money online does). An
+     * order's invoice never has one: paying it pays the order (ADR-008).
      */
     async createPayLink(
         ctx: OrganizationContext,
         id: string,
     ): Promise<{ token: string }> {
-        return this.payLink(prisma, ctx, id);
+        return this.payLink(prisma, ctx, id, PAY_LINK);
     }
 
     /**
      * {@link createPayLink} on the caller's transaction, so what the caller
      * records about the new link commits or rolls back with it, under the
      * caller's lock — a subscription's RETRIED, say.
+     *
+     * Send passes `requireProvider: false` when the business doesn't take
+     * payment online (DEC-070): the same kind of token then opens the
+     * invoice without a Pay button, a view link.
      */
     async createPayLinkInTx(
         tx: Tx,
         ctx: OrganizationContext,
         id: string,
+        options: LinkOptions = PAY_LINK,
     ): Promise<{ token: string }> {
-        return this.payLink(tx, ctx, id);
+        return this.payLink(tx, ctx, id, options);
     }
 
     private async payLink(
         db: Tx,
         ctx: OrganizationContext,
         id: string,
+        options: LinkOptions,
     ): Promise<{ token: string }> {
         authorize(ctx, "invoice:write");
-        return this.mintPayLink(db, ctx.organizationId, id);
+        // A link asks to be paid: the business details first (DEC-068). A
+        // member's own "Pay now" is never refused for it.
+        await assertBusinessDetails(db, ctx.organizationId);
+        // Taking money online is Payments' (DEC-070); a view link isn't.
+        if (options.requireProvider) {
+            await assertPaymentsOn(db, ctx.organizationId, "make a pay link");
+        }
+        return this.mintInvoiceLink(db, ctx.organizationId, id, options);
     }
 
     /**
@@ -219,13 +249,20 @@ export class InvoicesService {
         organizationId: string,
         id: string,
     ): Promise<{ token: string }> {
-        return this.mintPayLink(db, organizationId, id);
+        return this.mintInvoiceLink(db, organizationId, id, PAY_LINK);
     }
 
-    private async mintPayLink(
+    /**
+     * Mint the invoice's link token. A pay link (`requireProvider`) needs a
+     * provider that can open the checkout window. A view link doesn't: its
+     * token is the same kind, and the pay page offers "Pay online" only
+     * when the business takes payment online (DEC-070).
+     */
+    private async mintInvoiceLink(
         db: Tx,
         organizationId: string,
         id: string,
+        options: LinkOptions,
     ): Promise<{ token: string }> {
         const ctx = { organizationId };
         const current = await this.read(ctx.organizationId, id, db);
@@ -237,13 +274,16 @@ export class InvoicesService {
                     : this.notIssued(current.status, "paid"),
             );
         }
-        const connected = await db.merchantPaymentProvider.count({
-            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
-        });
-        if (connected === 0) {
-            throw new ConflictException(
-                "Connect a payment provider to take payment online.",
-            );
+        // A provider that can open the checkout window, by the rule the pay
+        // page starts its payment with (B11, D22): a Razorpay connection
+        // missing its public key id counts as none, and the 409 says what
+        // it needs.
+        if (options.requireProvider) {
+            await businessPayLinkProvider(db, ctx.organizationId);
+        }
+        // One charge at a time (D13): no link while autopay is charging it.
+        if (await chargeUnderWayOn(db, ctx.organizationId, id)) {
+            throw autopayChargeInProgress();
         }
         const { token, tokenHash } = mintPayToken();
         const { count } = await db.invoice.updateMany({
@@ -444,6 +484,9 @@ export class InvoicesService {
         authorize(ctx, "invoice:write");
         const current = await this.read(ctx.organizationId, id);
         this.assertDraft(current.status, "issued again");
+        // Before its number: the paper prints the business's address, and
+        // a registered business's GSTIN (DEC-068).
+        await assertBusinessDetails(prisma, ctx.organizationId);
 
         await prisma.$transaction(async (tx) => {
             // Read the draft again under its lock: an edit that landed since
@@ -933,7 +976,7 @@ export class InvoicesService {
         organizationId: string,
         invoiceId: string,
     ): Promise<InvoiceOnlineView> {
-        const [connected, link, intents] = await Promise.all([
+        const [connected, link, intents, charging] = await Promise.all([
             prisma.merchantPaymentProvider.count({
                 where: { organizationId, status: "CONNECTED" },
             }),
@@ -958,8 +1001,10 @@ export class InvoicesService {
                     refunds: { select: { status: true } },
                 },
             }),
+            chargeUnderWayOn(prisma, organizationId, invoiceId),
         ]);
         return {
+            autopayCharge: charging ? { at: charging.at.toISOString() } : null,
             providerConnected: connected > 0,
             payLinkActive: Boolean(link?.payTokenHash),
             payments: intents.map((i) => ({

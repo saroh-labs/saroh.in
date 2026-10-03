@@ -54,7 +54,6 @@ export default async function AccountBookingsPage({
     return (
         <AccountBookingsTab
             bookings={bookings}
-            title={tab.label}
             businessName={account.businessName}
             phone={options?.phone ?? null}
             api={{

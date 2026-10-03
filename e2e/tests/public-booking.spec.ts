@@ -1,7 +1,9 @@
+// @covers accounts:/login site:/book api:bookings api:site-accounts api:payments pkg:site-blocks
 import type { Page, Request } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
 import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
@@ -29,6 +31,8 @@ import { asNewVisitor, signInOnSheet } from "./site-codes";
  * for everyone else, and let go again. The checkout itself (E11) runs against
  * a fake provider: the handoff and Razorpay's script are stood in for in the
  * browser, and the hold reads confirmed once the fake window has paid.
+ * A deposit (E8) runs the same way: staff set the service, found through
+ * the API by its name, to take 50% for the one test, and put it back after.
  */
 
 const ORG = "seed_org";
@@ -39,23 +43,27 @@ const SITE = (() => {
 const SERVICE = "Warehouse walkthrough";
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 /**
  * Open the page on the service and pick a free time: its label, and the
  * service's id (from the page's own read of its days).
+ *
+ * Every test here books at the same moment as the others, on both projects,
+ * and a list of free times shrinks as they book: "the third free time" is a
+ * different time a second later, so two tests picking by position took the
+ * same one ("That time has just gone"). Each test has a DAY of its own
+ * instead — `slot` (0–3, one per test) counted back from the furthest open
+ * day, the phone's four before the desk's — and takes that day's first
+ * time. The first open day is left to `site-sign-in.spec.ts`.
  */
 async function pickTime(
     page: Page,
-    nth: number,
+    slot: number,
 ): Promise<{ label: string; serviceId: string }> {
+    const phone = test.info().project.name.startsWith("phone");
+    const fromEnd = 1 + slot + (phone ? 4 : 0);
     await page.goto(`${SITE}/book`);
     await expect(
         page.getByRole("heading", { name: "Book your appointment" }),
@@ -66,16 +74,17 @@ async function pickTime(
     await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
     const serviceId =
         new URL((await daysRead).url()).pathname.split("/")[3] ?? "";
-    // The furthest day with free times, never today: late in the day today
-    // may have fewer free times left than the test picks from.
     const openDays = page.getByRole("radio", { name: /times? free/ });
     await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
-    await openDays.nth((await openDays.count()) - 1).click();
+    const count = await openDays.count();
+    // Nine open days: eight for these tests, the first for site sign-in.
+    expect(count, "open days on the walkthrough").toBeGreaterThan(8);
+    await openDays.nth(count - fromEnd).click();
     const times = page.locator('[role="radiogroup"] button[role="radio"]', {
         hasText: /^\d{2}:\d{2}$/,
     });
     await expect(times.first()).toBeVisible({ timeout: 15_000 });
-    const time = times.nth(nth);
+    const time = times.first();
     const label = (await time.innerText()).trim();
     await time.click();
     await expect(time).toHaveAttribute("aria-checked", "true");
@@ -171,12 +180,54 @@ test.describe("the booking page", () => {
     // Each test is a different customer, from an address of their own.
     test.beforeEach(({ page }) => asNewVisitor(page));
 
+    test("a link to one service opens the page on it (?service=, read on the server)", async ({
+        page,
+    }) => {
+        // The service's id, as the page itself reads its days.
+        await page.goto(`${SITE}/book`);
+        const daysRead = page.waitForRequest((r) =>
+            /\/public\/services\/[^/]+\/days$/.test(new URL(r.url()).pathname),
+        );
+        await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
+        const serviceId =
+            new URL((await daysRead).url()).pathname.split("/")[3] ?? "";
+
+        // A services list's Book (or "Choose a time") links here. The
+        // middleware once dropped the query on its way to the page, and
+        // the flow opened on no service at all.
+        await page.goto(
+            `${SITE}/book?service=${encodeURIComponent(serviceId)}`,
+        );
+        await expect(
+            page.getByRole("radio", { name: new RegExp(SERVICE) }),
+        ).toHaveAttribute("aria-checked", "true");
+    });
+
+    test("the header names the clinic's place and phone, read on the server (E6)", async ({
+        page,
+    }) => {
+        // Read only: Kavi Dental is a film set. The page reads the public
+        // visit on the server; the check it ran came from a "use client"
+        // module, so every header fell back to the business's name alone.
+        const renderer = new URL(urls.RENDERER_URL);
+        await page.goto(
+            `${renderer.protocol}//kavi-dental.${renderer.host}/book`,
+        );
+        const header = page.locator("section").first();
+        await expect(
+            header.getByText(/12th Main, Indiranagar, Bengaluru/),
+        ).toBeVisible();
+        await expect(
+            header.getByRole("link", { name: "+91 80409 92210" }),
+        ).toHaveAttribute("href", "tel:+918040992210");
+    });
+
     test("pay at the desk: signed in at the last step, booked, and in the team's calendar as paid at the desk", async ({
         page,
     }, testInfo) => {
         test.setTimeout(120_000);
         const email = `desk-${testInfo.project.name}-${Date.now()}@example.in`;
-        await pickTime(page, 1);
+        await pickTime(page, 0);
 
         // Days say what they are: Full, Closed, or how many are free.
         await expect(
@@ -228,7 +279,7 @@ test.describe("the booking page", () => {
     }, testInfo) => {
         test.setTimeout(120_000);
         const email = `now-${testInfo.project.name}-${Date.now()}@example.in`;
-        const { label, serviceId } = await pickTime(page, 2);
+        const { label, serviceId } = await pickTime(page, 1);
         await details(page);
         await expect(
             page.getByRole("radio", { name: /^Pay ₹\S+ now Online/ }),
@@ -317,7 +368,7 @@ test.describe("the booking page", () => {
         );
         const bookBodies = watchBookings(page);
 
-        await pickTime(page, 3);
+        await pickTime(page, 2);
         await details(page);
         await continueAndSignIn(page, email);
 
@@ -354,58 +405,9 @@ test.describe("the booking page", () => {
         test.setTimeout(120_000);
         const email = `paid-${testInfo.project.name}-${Date.now()}@example.in`;
 
-        // The fake provider: the API's handoff for the hold's invoice, and
-        // Razorpay's script, which opens a window that pays at once.
-        await page.route("**/payment-intent", (route) =>
-            route.fulfill({
-                status: 201,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    paymentIntentId: "pi_e2e",
-                    provider: "RAZORPAY",
-                    providerIntentId: "order_e2e",
-                    amountCents: 150_000,
-                    currency: "INR",
-                    publicKey: "rzp_test_e2e",
-                    clientParams: { razorpayOrderId: "order_e2e" },
-                }),
-            }),
-        );
-        await page.route(
-            "https://checkout.razorpay.com/v1/checkout.js",
-            (route) =>
-                route.fulfill({
-                    contentType: "application/javascript",
-                    body: `window.Razorpay = function (options) {
-                    window.__razorpay = JSON.parse(JSON.stringify(options));
-                    return {
-                        open: function () {
-                            setTimeout(function () {
-                                options.handler({ razorpay_payment_id: "pay_e2e", razorpay_order_id: options.order_id });
-                            }, 300);
-                        },
-                        close: function () {},
-                        on: function () {},
-                    };
-                };`,
-                }),
-        );
-        // The webhook's part: once the window has paid, the hold reads
-        // confirmed. Until then the page asks the real API.
-        let confirmed = false;
-        await page.route("**/public/services/holds/*", (route) =>
-            confirmed && route.request().method() === "GET"
-                ? route.fulfill({
-                      contentType: "application/json",
-                      body: JSON.stringify({
-                          state: "CONFIRMED",
-                          holdExpiresAt: null,
-                      }),
-                  })
-                : route.continue(),
-        );
+        const provider = await fakeProvider(page, 150_000);
 
-        await pickTime(page, 4);
+        await pickTime(page, 3);
         await details(page);
         const intent = page.waitForRequest((r) =>
             r.url().includes("/payment-intent"),
@@ -434,7 +436,7 @@ test.describe("the booking page", () => {
         // (DEC-059).
         expect(opened.config).toBeUndefined();
 
-        confirmed = true;
+        provider.confirm();
         await expect(
             page.getByRole("heading", { name: "You're booked, Asha." }),
         ).toBeVisible({ timeout: 15_000 });
@@ -445,4 +447,189 @@ test.describe("the booking page", () => {
             `${urls.API_URL}/public/services/holds/${payToken}/release`,
         );
     });
+
+    // @serial: the deposit is the service's own setting, and while it is on
+    // no booking of the walkthrough anywhere offers Pay at the desk.
+    test(
+        "a deposit: paid online to hold the time, the rest at the visit, and never at the desk (E8)",
+        {
+            tag: "@serial",
+        },
+        async ({ page, browser, request }, testInfo) => {
+            test.setTimeout(150_000);
+            const email = `deposit-${testInfo.project.name}-${Date.now()}@example.in`;
+
+            // Staff, in a context of their own: the service found through the
+            // API by its name, and set to take a 50% deposit for this test.
+            const staff = await browser.newContext({ ignoreHTTPSErrors });
+            const desk = await staff.newPage();
+            await signIn(desk);
+            const services = (await (
+                await desk.request.get(
+                    `${urls.API_URL}/organizations/${ORG}/services`,
+                )
+            ).json()) as {
+                id: string;
+                name: string;
+                priceCents: number | null;
+                depositMode: string;
+            }[];
+            const walkthrough = services.find((s) => s.name === SERVICE);
+            expect(walkthrough?.priceCents ?? 0).toBeGreaterThan(0);
+            const serviceUrl = `${urls.API_URL}/organizations/${ORG}/services/${walkthrough?.id ?? ""}`;
+            const setDeposit = (depositMode: string) =>
+                desk.request.patch(serviceUrl, {
+                    data: { depositMode },
+                    // The API refuses a write with no Origin (#50).
+                    headers: { origin: urls.APP_URL },
+                });
+            const was = walkthrough?.depositMode ?? "NONE";
+            const set = await setDeposit("PERCENT_50");
+            expect(set.ok()).toBe(true);
+            const depositCents = (
+                (await set.json()) as { depositCents: number }
+            ).depositCents;
+            expect(depositCents).toBe(
+                Math.round((walkthrough?.priceCents ?? 0) / 2),
+            );
+
+            let payToken = "";
+            try {
+                const provider = await fakeProvider(page, depositCents);
+                const bookBodies = watchBookings(page);
+                await pickTime(page, 0);
+                await details(page);
+
+                // The deposit first and chosen; the whole price the other way;
+                // no desk.
+                const paying = page
+                    .getByRole("radiogroup", { name: "Paying" })
+                    .filter({ visible: true });
+                const deposit = paying.getByRole("radio", {
+                    name: /^Pay ₹[\d,]+ deposit now The rest \(₹[\d,]+\) at Northwind Supply\. Refunded if you cancel in time\./,
+                });
+                await expect(deposit).toHaveAttribute("aria-checked", "true");
+                await expect(
+                    paying.getByRole("radio", {
+                        name: /^Pay the full ₹[\d,]+ now/,
+                    }),
+                ).toBeVisible();
+                await expect(
+                    paying.getByRole("radio", { name: /Pay at the desk/ }),
+                ).toHaveCount(0);
+                const part = /^Pay (₹[\d,]+) deposit now/.exec(
+                    await deposit.innerText(),
+                )?.[1];
+                expect(part).toBeTruthy();
+
+                const intent = page.waitForRequest((r) =>
+                    r.url().includes("/payment-intent"),
+                );
+                await page
+                    .getByRole("button", { name: "Continue to sign in" })
+                    .filter({ visible: true })
+                    .click();
+                await signInOnSheet(page, email);
+                payToken = payTokenOf(await intent);
+                expect(bookBodies.map((b) => b.pay)).toEqual(["DEPOSIT"]);
+
+                // Only the deposit is asked for now, and a deposit is never
+                // turned into a desk booking.
+                await expect(
+                    page.getByRole("heading", {
+                        name: `Pay ${part} to confirm your place`,
+                    }),
+                ).toBeVisible();
+                await expect(
+                    page.getByRole("button", {
+                        name: "Book it to pay at the desk",
+                    }),
+                ).toHaveCount(0);
+                await expect(page.getByText("Paying…")).toBeVisible();
+
+                provider.confirm();
+                await expect(
+                    page.getByRole("heading", { name: "You're booked, Asha." }),
+                ).toBeVisible({ timeout: 15_000 });
+                await expect(
+                    page.getByText(
+                        new RegExp(
+                            `^Paid a ${part} deposit\\. The rest \\(₹[\\d,]+\\) is paid at Northwind Supply\\.$`,
+                        ),
+                    ),
+                ).toBeVisible();
+            } finally {
+                // Nothing was paid for real: let the hold go, and put the
+                // service back as it was.
+                if (payToken) {
+                    await request.post(
+                        `${urls.API_URL}/public/services/holds/${payToken}/release`,
+                    );
+                }
+                await setDeposit(was);
+                await staff.close();
+            }
+        },
+    );
 });
+
+/**
+ * The fake provider (E11): the API's handoff for the hold's invoice, and
+ * Razorpay's script, whose window pays at once. `confirm` stands in for the
+ * webhook: from then on the hold reads confirmed; until then the page asks
+ * the real API.
+ */
+async function fakeProvider(
+    page: Page,
+    amountCents: number,
+): Promise<{ confirm: () => void }> {
+    await page.route("**/payment-intent", (route) =>
+        route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({
+                paymentIntentId: "pi_e2e",
+                provider: "RAZORPAY",
+                providerIntentId: "order_e2e",
+                amountCents,
+                currency: "INR",
+                publicKey: "rzp_test_e2e",
+                clientParams: { razorpayOrderId: "order_e2e" },
+            }),
+        }),
+    );
+    await page.route("https://checkout.razorpay.com/v1/checkout.js", (route) =>
+        route.fulfill({
+            contentType: "application/javascript",
+            body: `window.Razorpay = function (options) {
+                window.__razorpay = JSON.parse(JSON.stringify(options));
+                return {
+                    open: function () {
+                        setTimeout(function () {
+                            options.handler({ razorpay_payment_id: "pay_e2e", razorpay_order_id: options.order_id });
+                        }, 300);
+                    },
+                    close: function () {},
+                    on: function () {},
+                };
+            };`,
+        }),
+    );
+    let confirmed = false;
+    await page.route("**/public/services/holds/*", (route) =>
+        confirmed && route.request().method() === "GET"
+            ? route.fulfill({
+                  contentType: "application/json",
+                  body: JSON.stringify({
+                      state: "CONFIRMED",
+                      holdExpiresAt: null,
+                  }),
+              })
+            : route.continue(),
+    );
+    return {
+        confirm: () => {
+            confirmed = true;
+        },
+    };
+}

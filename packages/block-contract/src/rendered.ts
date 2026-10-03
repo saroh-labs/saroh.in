@@ -267,6 +267,9 @@ const renderedServicesList = z.object({
     serviceIds: z.array(z.string()),
     showPrices: z.boolean().optional(),
     cta: renderedCtaSchema.optional(),
+    layout: z.enum(["cards", "list"]).optional(),
+    showDescriptions: z.boolean().optional(),
+    buttonLabel: z.string().optional(),
 });
 
 /**
@@ -293,6 +296,8 @@ const renderedJournal = z.object({
     count: z.union([z.literal(3), z.literal(6)]).optional(),
     showExcerpts: z.boolean().optional(),
     showImages: z.boolean().optional(),
+    layout: z.enum(["cards", "list"]).optional(),
+    buttonLabel: z.string().optional(),
 });
 
 /**
@@ -306,6 +311,8 @@ const renderedPlans = z.object({
     highlight: z.enum(["first", "none"]).optional(),
     buttonLabel: z.string().optional(),
     showDescriptions: z.boolean().optional(),
+    layout: z.enum(["cards", "list"]).optional(),
+    showPrices: z.boolean().optional(),
 });
 
 /**
@@ -321,6 +328,44 @@ const renderedProductGrid = z.object({
     productIds: z.array(z.string()).optional(),
     count: z.number().int().optional(),
     showPrices: z.boolean().optional(),
+    layout: z.enum(["cards", "list"]).optional(),
+    showPhotos: z.boolean().optional(),
+    showDescriptions: z.boolean().optional(),
+    buttonLabel: z.string().optional(),
+});
+
+/**
+ * `packs`, as published (G20): nothing resolves at publish. The packs are read
+ * when the page is served, from the business the site belongs to.
+ */
+const renderedPacks = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    buttonLabel: z.string().optional(),
+    showDescriptions: z.boolean().optional(),
+});
+
+/**
+ * `projects`, as published (K11): nothing resolves at publish. Looser than
+ * the authoring schema, as `features` is: a snapshot is immutable and may
+ * outlive today's bounds. The component re-checks each `link` rather than
+ * trusting that the snapshot was written by today's contract.
+ */
+const renderedProjects = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    items: z
+        .array(
+            z.object({
+                image: renderedImageSchema.optional(),
+                title: z.string(),
+                summary: z.string().optional(),
+                link: z.string().optional(),
+            }),
+        )
+        .min(1),
 });
 
 /**
@@ -353,6 +398,8 @@ export const RENDERED_SCHEMAS = {
     journal: renderedJournal,
     plans: renderedPlans,
     productGrid: renderedProductGrid,
+    packs: renderedPacks,
+    projects: renderedProjects,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -374,6 +421,8 @@ export type RenderedVisitUs = RenderedContent<"visitUs">;
 export type RenderedJournal = RenderedContent<"journal">;
 export type RenderedPlans = RenderedContent<"plans">;
 export type RenderedProductGrid = RenderedContent<"productGrid">;
+export type RenderedPacks = RenderedContent<"packs">;
+export type RenderedProjects = RenderedContent<"projects">;
 
 /**
  * Validate rendered content for a block type.

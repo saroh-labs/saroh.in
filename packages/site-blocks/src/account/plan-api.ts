@@ -1,3 +1,5 @@
+import type { AutopayMethod, AutopayStart } from "../autopay/api";
+import type { TestReleaseRefusal } from "../test-release/words";
 import type { AccountPlanTab } from "./model";
 
 /**
@@ -8,10 +10,13 @@ import type { AccountPlanTab } from "./model";
 
 export type PlanChangeResult =
     | { ok: true; message: string; tab: AccountPlanTab }
-    | { ok: false; message: string };
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export type PayNowResult =
-    { ok: true; url: string } | { ok: false; message: string };
+    | { ok: true; url: string }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export interface PlanApi {
     pause: (ref: string, weeks: number) => Promise<PlanChangeResult>;
@@ -19,7 +24,21 @@ export interface PlanApi {
     cancel: (ref: string) => Promise<PlanChangeResult>;
     /** A fresh pay link for the plan's overdue invoice, made now. */
     payNow: (ref: string) => Promise<PayNowResult>;
+    /**
+     * Turn autopay on, or change how it pays (D12), with the method picked.
+     * Absent: the site can't, and My plan offers none.
+     */
+    startAutopay?: (
+        ref: string,
+        method: AutopayMethod,
+        idempotencyKey: string,
+    ) => Promise<AutopayStartResult>;
 }
+
+export type AutopayStartResult =
+    | { ok: true; data: AutopayStart }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 /** Said when the site's server couldn't be reached. */
 export const PLAN_OFFLINE =

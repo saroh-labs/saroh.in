@@ -16,6 +16,7 @@ import type { FieldErrors } from "react-hook-form";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -154,10 +155,14 @@ export function InvoiceForm({
     /** A GST-registered business: lines carry a rate and HSN/SAC. */
     registered: boolean;
     businessName: string;
-    /** A payment provider is connected, so issuing can make a pay link. */
+    /** A pay link can be made (Payments on, a provider connected), so issuing makes one. */
     providerConnected: boolean;
 }) {
     const router = useRouter();
+    const details = useBusinessDetailsStep({
+        then: "issue it",
+        continueLabel: "Save and issue",
+    });
     const ids = {
         contact: useId(),
         gstin: useId(),
@@ -275,7 +280,13 @@ export function InvoiceForm({
             router.push(to);
             return;
         }
-        const issued = await issueInvoice(id);
+        // No registered address yet (DEC-068): asked here, then it issues.
+        const issued = await details.run(() => issueInvoice(id));
+        if (!issued) {
+            showSuccess("Saved as a draft. Issue it once your address is in.");
+            router.push(to);
+            return;
+        }
         if (!issued.ok) {
             // The draft is saved; only issuing failed. Say which.
             showError(`Saved as a draft, but not issued: ${issued.error}`);
@@ -331,356 +342,371 @@ export function InvoiceForm({
             "h-8 rounded-full border px-3 text-[12.5px] transition-colors duration-fast coarse:h-11",
             on
                 ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                : "border-border bg-card font-medium text-muted-foreground hover:text-foreground",
+                : "border-border bg-card font-medium text-muted-foreground hover:border-border-strong hover:text-foreground active:bg-accent-active",
         );
 
     return (
-        <form
-            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-            className="flex flex-wrap items-start gap-4"
-            noValidate
-        >
-            <div className="grid min-w-0 flex-[3_1_440px] gap-3">
-                <Card label="Billed to">
-                    <Controller
-                        control={form.control}
-                        name="contactId"
-                        render={({ field }) => (
-                            <ContactPicker
-                                id={ids.contact}
-                                contacts={contacts}
-                                value={field.value}
-                                onValueChange={field.onChange}
-                                disabled={isSubmitting}
-                                aria-label="Who it's for"
-                                aria-invalid={Boolean(errors.contactId)}
-                            />
-                        )}
-                    />
-                    {errors.contactId ? (
-                        <p className="mt-1.5 text-[12px] text-destructive-subtle-foreground">
-                            {errors.contactId.message}
-                        </p>
-                    ) : null}
-                    {registered ? (
-                        buyerOpen ? (
-                            <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-                                <div className="grid content-start gap-1.5">
-                                    <Label
-                                        htmlFor={ids.gstin}
-                                        className="text-[12.5px]"
-                                    >
-                                        Their GSTIN{" "}
-                                        <span className="font-normal text-muted-foreground">
-                                            (if registered)
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id={ids.gstin}
-                                        maxLength={15}
-                                        autoCapitalize="characters"
-                                        placeholder="29AAGFL5531Q1ZO"
-                                        className="h-9 font-mono text-[13px] uppercase"
-                                        aria-invalid={Boolean(
-                                            errors.billToGstin,
-                                        )}
-                                        disabled={isSubmitting}
-                                        {...form.register("billToGstin")}
-                                    />
-                                    {errors.billToGstin ? (
-                                        <p className="text-[12px] text-destructive-subtle-foreground">
-                                            {errors.billToGstin.message}
+        <>
+            {details.step}
+            <form
+                onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+                className="flex flex-wrap items-start gap-4"
+                noValidate
+            >
+                <div className="grid min-w-0 flex-[3_1_440px] gap-3">
+                    <Card label="Billed to">
+                        <Controller
+                            control={form.control}
+                            name="contactId"
+                            render={({ field }) => (
+                                <ContactPicker
+                                    id={ids.contact}
+                                    contacts={contacts}
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    disabled={isSubmitting}
+                                    aria-label="Who it's for"
+                                    aria-invalid={Boolean(errors.contactId)}
+                                />
+                            )}
+                        />
+                        {errors.contactId ? (
+                            <p className="mt-1.5 text-[12px] text-destructive-subtle-foreground">
+                                {errors.contactId.message}
+                            </p>
+                        ) : null}
+                        {registered ? (
+                            buyerOpen ? (
+                                <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+                                    <div className="grid content-start gap-1.5">
+                                        <Label
+                                            htmlFor={ids.gstin}
+                                            className="text-[12.5px]"
+                                        >
+                                            Their GSTIN{" "}
+                                            <span className="font-normal text-muted-foreground">
+                                                (if registered)
+                                            </span>
+                                        </Label>
+                                        <Input
+                                            id={ids.gstin}
+                                            maxLength={15}
+                                            autoCapitalize="characters"
+                                            placeholder="29AAGFL5531Q1ZO"
+                                            className="h-9 font-mono text-[13px] uppercase"
+                                            aria-invalid={Boolean(
+                                                errors.billToGstin,
+                                            )}
+                                            disabled={isSubmitting}
+                                            {...form.register("billToGstin")}
+                                        />
+                                        {errors.billToGstin ? (
+                                            <p className="text-[12px] text-destructive-subtle-foreground">
+                                                {errors.billToGstin.message}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                    <div className="grid content-start gap-1.5">
+                                        <Label
+                                            htmlFor={ids.state}
+                                            className="text-[12.5px]"
+                                        >
+                                            Their state
+                                        </Label>
+                                        <Controller
+                                            control={form.control}
+                                            name="billToState"
+                                            render={({ field }) => (
+                                                <OptionSelect
+                                                    id={ids.state}
+                                                    value={field.value}
+                                                    onValueChange={
+                                                        field.onChange
+                                                    }
+                                                    options={STATES}
+                                                    disabled={isSubmitting}
+                                                    aria-invalid={Boolean(
+                                                        errors.billToState,
+                                                    )}
+                                                />
+                                            )}
+                                        />
+                                        <p className="text-[12px] text-muted-foreground">
+                                            {errors.billToState?.message ??
+                                                "The place of supply. Another state than yours is IGST."}
                                         </p>
-                                    ) : null}
+                                    </div>
+                                    <div className="grid gap-1.5 sm:col-span-2">
+                                        <Label
+                                            htmlFor={ids.address}
+                                            className="text-[12.5px]"
+                                        >
+                                            Their address, as it prints
+                                        </Label>
+                                        <Textarea
+                                            id={ids.address}
+                                            rows={2}
+                                            maxLength={500}
+                                            className="text-[13px]"
+                                            disabled={isSubmitting}
+                                            {...form.register("billToAddress")}
+                                        />
+                                    </div>
                                 </div>
-                                <div className="grid content-start gap-1.5">
-                                    <Label
-                                        htmlFor={ids.state}
-                                        className="text-[12.5px]"
-                                    >
-                                        Their state
-                                    </Label>
-                                    <Controller
-                                        control={form.control}
-                                        name="billToState"
-                                        render={({ field }) => (
-                                            <OptionSelect
-                                                id={ids.state}
-                                                value={field.value}
-                                                onValueChange={field.onChange}
-                                                options={STATES}
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setBuyerOpen(true)}
+                                    className="mt-2 py-1 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                >
+                                    + Their GSTIN, state and address
+                                </button>
+                            )
+                        ) : null}
+                    </Card>
+
+                    <Card label="Lines">
+                        <ul className="grid gap-1.5">
+                            {fields.map((line, i) => {
+                                const lineErr = errors.lines?.[i];
+                                return (
+                                    <li key={line.id} className="grid gap-1.5">
+                                        <div className="grid grid-cols-[minmax(0,3fr)_70px_100px_30px] gap-1.5">
+                                            <Input
+                                                aria-label={`Line ${i + 1}: what it's for`}
+                                                placeholder="What it's for"
+                                                className="h-9 rounded-[8px] text-[13px]"
                                                 disabled={isSubmitting}
                                                 aria-invalid={Boolean(
-                                                    errors.billToState,
+                                                    lineErr?.description,
                                                 )}
-                                            />
-                                        )}
-                                    />
-                                    <p className="text-[12px] text-muted-foreground">
-                                        {errors.billToState?.message ??
-                                            "The place of supply. Another state than yours is IGST."}
-                                    </p>
-                                </div>
-                                <div className="grid gap-1.5 sm:col-span-2">
-                                    <Label
-                                        htmlFor={ids.address}
-                                        className="text-[12.5px]"
-                                    >
-                                        Their address, as it prints
-                                    </Label>
-                                    <Textarea
-                                        id={ids.address}
-                                        rows={2}
-                                        maxLength={500}
-                                        className="text-[13px]"
-                                        disabled={isSubmitting}
-                                        {...form.register("billToAddress")}
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => setBuyerOpen(true)}
-                                className="mt-2 py-1 text-[12.5px] font-semibold text-brand hover:text-foreground"
-                            >
-                                + Their GSTIN, state and address
-                            </button>
-                        )
-                    ) : null}
-                </Card>
-
-                <Card label="Lines">
-                    <ul className="grid gap-1.5">
-                        {fields.map((line, i) => {
-                            const lineErr = errors.lines?.[i];
-                            return (
-                                <li key={line.id} className="grid gap-1.5">
-                                    <div className="grid grid-cols-[minmax(0,3fr)_70px_100px_30px] gap-1.5">
-                                        <Input
-                                            aria-label={`Line ${i + 1}: what it's for`}
-                                            placeholder="What it's for"
-                                            className="h-9 rounded-[8px] text-[13px]"
-                                            disabled={isSubmitting}
-                                            aria-invalid={Boolean(
-                                                lineErr?.description,
-                                            )}
-                                            {...form.register(
-                                                `lines.${i}.description`,
-                                            )}
-                                        />
-                                        <Input
-                                            aria-label={`Line ${i + 1}: quantity`}
-                                            inputMode="numeric"
-                                            className="h-9 rounded-[8px] text-[13px] tabular-nums"
-                                            disabled={isSubmitting}
-                                            aria-invalid={Boolean(
-                                                lineErr?.quantity,
-                                            )}
-                                            {...form.register(
-                                                `lines.${i}.quantity`,
-                                                {
-                                                    valueAsNumber: true,
-                                                },
-                                            )}
-                                        />
-                                        <Input
-                                            aria-label={`Line ${i + 1}: price each, ${currency}`}
-                                            inputMode="decimal"
-                                            placeholder="₹ each"
-                                            className="h-9 rounded-[8px] text-[13px] tabular-nums"
-                                            disabled={isSubmitting}
-                                            aria-invalid={Boolean(
-                                                lineErr?.unitPrice,
-                                            )}
-                                            {...form.register(
-                                                `lines.${i}.unitPrice`,
-                                            )}
-                                        />
-                                        <button
-                                            type="button"
-                                            aria-label={`Remove line ${i + 1}`}
-                                            disabled={isSubmitting}
-                                            onClick={() =>
-                                                fields.length > 1
-                                                    ? remove(i)
-                                                    : form.setValue(`lines.0`, {
-                                                          description: "",
-                                                          quantity: 1,
-                                                          unitPrice: "",
-                                                          gstRate: "",
-                                                          hsnSac: "",
-                                                      })
-                                            }
-                                            className="grid place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground"
-                                        >
-                                            <X aria-hidden className="size-4" />
-                                        </button>
-                                    </div>
-                                    {registered ? (
-                                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] gap-1.5 sm:grid-cols-[170px_140px_1fr]">
-                                            <Controller
-                                                control={form.control}
-                                                name={`lines.${i}.gstRate`}
-                                                render={({ field }) => (
-                                                    <OptionSelect
-                                                        size="sm"
-                                                        aria-label={`Line ${i + 1}: GST rate`}
-                                                        value={
-                                                            field.value as GstRateValue
-                                                        }
-                                                        onValueChange={
-                                                            field.onChange
-                                                        }
-                                                        options={
-                                                            GST_RATE_OPTIONS
-                                                        }
-                                                        placeholder="GST rate"
-                                                        disabled={isSubmitting}
-                                                    />
+                                                {...form.register(
+                                                    `lines.${i}.description`,
                                                 )}
                                             />
                                             <Input
-                                                aria-label={`Line ${i + 1}: HSN or SAC`}
-                                                placeholder="HSN / SAC"
+                                                aria-label={`Line ${i + 1}: quantity`}
                                                 inputMode="numeric"
-                                                className="h-8 rounded-[8px] font-mono text-[12px]"
+                                                className="h-9 rounded-[8px] text-[13px] tabular-nums"
                                                 disabled={isSubmitting}
                                                 aria-invalid={Boolean(
-                                                    lineErr?.hsnSac,
+                                                    lineErr?.quantity,
                                                 )}
                                                 {...form.register(
-                                                    `lines.${i}.hsnSac`,
+                                                    `lines.${i}.quantity`,
+                                                    {
+                                                        valueAsNumber: true,
+                                                    },
                                                 )}
                                             />
+                                            <Input
+                                                aria-label={`Line ${i + 1}: price each, ${currency}`}
+                                                inputMode="decimal"
+                                                placeholder="₹ each"
+                                                className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                disabled={isSubmitting}
+                                                aria-invalid={Boolean(
+                                                    lineErr?.unitPrice,
+                                                )}
+                                                {...form.register(
+                                                    `lines.${i}.unitPrice`,
+                                                )}
+                                            />
+                                            <button
+                                                type="button"
+                                                aria-label={`Remove line ${i + 1}`}
+                                                disabled={isSubmitting}
+                                                onClick={() =>
+                                                    fields.length > 1
+                                                        ? remove(i)
+                                                        : form.setValue(
+                                                              `lines.0`,
+                                                              {
+                                                                  description:
+                                                                      "",
+                                                                  quantity: 1,
+                                                                  unitPrice: "",
+                                                                  gstRate: "",
+                                                                  hsnSac: "",
+                                                              },
+                                                          )
+                                                }
+                                                className="grid place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground active:bg-accent-active"
+                                            >
+                                                <X
+                                                    aria-hidden
+                                                    className="size-4"
+                                                />
+                                            </button>
                                         </div>
-                                    ) : null}
-                                    {lineErr ? (
-                                        <p className="text-[12px] text-destructive-subtle-foreground">
-                                            {lineErr.description?.message ??
-                                                lineErr.quantity?.message ??
-                                                lineErr.unitPrice?.message ??
-                                                lineErr.hsnSac?.message}
-                                        </p>
-                                    ) : null}
-                                </li>
-                            );
-                        })}
-                    </ul>
-                    <button
-                        type="button"
-                        disabled={isSubmitting}
-                        onClick={() =>
-                            append({
-                                description: "",
-                                quantity: 1,
-                                unitPrice: "",
-                                gstRate: "",
-                                hsnSac: "",
-                            })
-                        }
-                        className="mt-1 py-1.5 text-[12.5px] font-semibold text-brand hover:text-foreground"
-                    >
-                        + Add a line
-                    </button>
-                    {registered ? (
-                        <p className="mt-1 text-[12px] text-muted-foreground">
-                            Prices include GST. A line with no rate is nil-rated
-                            (0%).
+                                        {registered ? (
+                                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] gap-1.5 sm:grid-cols-[170px_140px_1fr]">
+                                                <Controller
+                                                    control={form.control}
+                                                    name={`lines.${i}.gstRate`}
+                                                    render={({ field }) => (
+                                                        <OptionSelect
+                                                            size="sm"
+                                                            aria-label={`Line ${i + 1}: GST rate`}
+                                                            value={
+                                                                field.value as GstRateValue
+                                                            }
+                                                            onValueChange={
+                                                                field.onChange
+                                                            }
+                                                            options={
+                                                                GST_RATE_OPTIONS
+                                                            }
+                                                            placeholder="GST rate"
+                                                            disabled={
+                                                                isSubmitting
+                                                            }
+                                                        />
+                                                    )}
+                                                />
+                                                <Input
+                                                    aria-label={`Line ${i + 1}: HSN or SAC`}
+                                                    placeholder="HSN / SAC"
+                                                    inputMode="numeric"
+                                                    className="h-8 rounded-[8px] font-mono text-[12px]"
+                                                    disabled={isSubmitting}
+                                                    aria-invalid={Boolean(
+                                                        lineErr?.hsnSac,
+                                                    )}
+                                                    {...form.register(
+                                                        `lines.${i}.hsnSac`,
+                                                    )}
+                                                />
+                                            </div>
+                                        ) : null}
+                                        {lineErr ? (
+                                            <p className="text-[12px] text-destructive-subtle-foreground">
+                                                {lineErr.description?.message ??
+                                                    lineErr.quantity?.message ??
+                                                    lineErr.unitPrice
+                                                        ?.message ??
+                                                    lineErr.hsnSac?.message}
+                                            </p>
+                                        ) : null}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                        <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={() =>
+                                append({
+                                    description: "",
+                                    quantity: 1,
+                                    unitPrice: "",
+                                    gstRate: "",
+                                    hsnSac: "",
+                                })
+                            }
+                            className="mt-1 py-1.5 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                        >
+                            + Add a line
+                        </button>
+                        {registered ? (
+                            <p className="mt-1 text-[12px] text-muted-foreground">
+                                Prices include GST. A line with no rate set is
+                                charged no GST.
+                            </p>
+                        ) : null}
+                    </Card>
+
+                    <Card label="Due">
+                        <div
+                            role="radiogroup"
+                            aria-label="Due"
+                            className="flex flex-wrap items-center gap-1.5"
+                        >
+                            {draft?.dueAt ? (
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={due === "kept"}
+                                    onClick={() => form.setValue("due", "kept")}
+                                    className={chip(due === "kept")}
+                                >
+                                    <ViewerDate
+                                        iso={draft.dueAt}
+                                        variant="dayMonth"
+                                    />
+                                </button>
+                            ) : null}
+                            {DUES.map((d) => (
+                                <button
+                                    key={d.days}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={due === d.days}
+                                    onClick={() => form.setValue("due", d.days)}
+                                    className={chip(due === d.days)}
+                                >
+                                    {d.label}
+                                </button>
+                            ))}
+                        </div>
+                    </Card>
+                </div>
+
+                <aside className="min-w-0 flex-[2_1_260px] rounded-[12px] border border-border bg-card px-4 py-3.5 lg:sticky lg:top-3">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        Total
+                    </h2>
+                    <p className="mb-0.5 mt-1 font-display text-[28px] font-semibold tabular-nums tracking-[-0.02em]">
+                        {show(total)}
+                    </p>
+                    <p className="text-[12px] text-muted-foreground">
+                        {registered
+                            ? "GST worked out per line when it's issued — prices include it."
+                            : `No GST — ${businessName} isn't registered.`}
+                    </p>
+                    <p className="mt-3 text-[12.5px] leading-[1.5] text-foreground">
+                        A draft has no number and can still change. Issuing
+                        numbers it and locks the lines
+                        {withLink
+                            ? ", and copies its pay link for you to send — Saroh doesn't send it."
+                            : " — Saroh doesn't send it; print it or share it yourself."}
+                    </p>
+                    <div className="mt-3 flex flex-col gap-2">
+                        <Button
+                            type="submit"
+                            disabled={isSubmitting || noLine}
+                            onClick={() => setIntent("issue")}
+                            className="h-10 rounded-[10px] text-[13.5px]"
+                        >
+                            {isSubmitting && intent === "issue"
+                                ? "Issuing…"
+                                : withLink
+                                  ? "Issue with pay link"
+                                  : "Issue it"}
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="outline"
+                            disabled={isSubmitting || noLine}
+                            onClick={() => setIntent("draft")}
+                            className="h-10 rounded-[10px] text-[13.5px]"
+                        >
+                            {isSubmitting && intent === "draft"
+                                ? "Saving…"
+                                : draft
+                                  ? "Save the draft"
+                                  : "Save as draft"}
+                        </Button>
+                    </div>
+                    {noLine && typed ? (
+                        <p className="mt-2 text-[12px] text-destructive-subtle-foreground">
+                            Add at least one line with a description, quantity
+                            and price.
                         </p>
                     ) : null}
-                </Card>
-
-                <Card label="Due">
-                    <div
-                        role="radiogroup"
-                        aria-label="Due"
-                        className="flex flex-wrap items-center gap-1.5"
-                    >
-                        {draft?.dueAt ? (
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked={due === "kept"}
-                                onClick={() => form.setValue("due", "kept")}
-                                className={chip(due === "kept")}
-                            >
-                                <ViewerDate
-                                    iso={draft.dueAt}
-                                    variant="dayMonth"
-                                />
-                            </button>
-                        ) : null}
-                        {DUES.map((d) => (
-                            <button
-                                key={d.days}
-                                type="button"
-                                role="radio"
-                                aria-checked={due === d.days}
-                                onClick={() => form.setValue("due", d.days)}
-                                className={chip(due === d.days)}
-                            >
-                                {d.label}
-                            </button>
-                        ))}
-                    </div>
-                </Card>
-            </div>
-
-            <aside className="min-w-0 flex-[2_1_260px] rounded-[12px] border border-border bg-card px-4 py-3.5 lg:sticky lg:top-3">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Total
-                </h2>
-                <p className="mb-0.5 mt-1 font-display text-[28px] font-semibold tabular-nums tracking-[-0.02em]">
-                    {show(total)}
-                </p>
-                <p className="text-[12px] text-muted-foreground">
-                    {registered
-                        ? "GST worked out per line when it's issued — prices include it."
-                        : `No GST — ${businessName} isn't registered.`}
-                </p>
-                <p className="mt-3 text-[12.5px] leading-[1.5] text-foreground">
-                    A draft has no number and can still change. Issuing numbers
-                    it and locks the lines
-                    {withLink
-                        ? ", and copies its pay link for you to send — Saroh doesn't send it."
-                        : " — Saroh doesn't send it; print it or share it yourself."}
-                </p>
-                <div className="mt-3 flex flex-col gap-2">
-                    <Button
-                        type="submit"
-                        disabled={isSubmitting || noLine}
-                        onClick={() => setIntent("issue")}
-                        className="h-10 rounded-[10px] text-[13.5px]"
-                    >
-                        {isSubmitting && intent === "issue"
-                            ? "Issuing…"
-                            : withLink
-                              ? "Issue with pay link"
-                              : "Issue it"}
-                    </Button>
-                    <Button
-                        type="submit"
-                        variant="outline"
-                        disabled={isSubmitting || noLine}
-                        onClick={() => setIntent("draft")}
-                        className="h-10 rounded-[10px] text-[13.5px]"
-                    >
-                        {isSubmitting && intent === "draft"
-                            ? "Saving…"
-                            : draft
-                              ? "Save the draft"
-                              : "Save as draft"}
-                    </Button>
-                </div>
-                {noLine && typed ? (
-                    <p className="mt-2 text-[12px] text-destructive-subtle-foreground">
-                        Add at least one line with a description, quantity and
-                        price.
-                    </p>
-                ) : null}
-            </aside>
-        </form>
+                </aside>
+            </form>
+        </>
     );
 }
 

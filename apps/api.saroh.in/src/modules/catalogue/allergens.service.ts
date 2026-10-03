@@ -118,7 +118,6 @@ export class AllergensService {
                 _count: {
                     select: {
                         products: true,
-                        contactNotes: true,
                         contactAttention: { where: { removedAt: null } },
                     },
                 },
@@ -132,17 +131,9 @@ export class AllergensService {
                 field: "allergenId",
             });
         }
-        // A customer's allergy is never dropped in passing (U8): the notes
-        // that name it are edited first, by someone who reads them.
-        const noted = allergen._count.contactNotes;
-        if (noted > 0) {
-            throw new ConflictException({
-                message: `${allergen.name} is in ${noted} customer ${noted === 1 ? "note" : "notes"} — take it off them first.`,
-                field: "allergenId",
-            });
-        }
-        // The same for Needs attention (C1): an entry still on a record, or
-        // waiting as a suggestion, is taken off first.
+        // A customer's allergy is never dropped in passing: a Needs attention
+        // entry (C1) still on a record, or waiting as a suggestion, is taken
+        // off first. Notes no longer name allergens (Z2a).
         const onRecords = allergen._count.contactAttention;
         if (onRecords > 0) {
             throw new ConflictException({
@@ -151,10 +142,15 @@ export class AllergensService {
             });
         }
         // Entries already removed keep their label and let the allergen go.
+        // Old note rows that still name it (nothing reads them since Z2a;
+        // the table goes with Z2) would block the delete, so they go too.
         await prisma.$transaction([
             prisma.contactAttention.updateMany({
                 where: { allergenId, organizationId },
                 data: { allergenId: null },
+            }),
+            prisma.contactNoteAllergen.deleteMany({
+                where: { allergenId, organizationId },
             }),
             prisma.storeAllergen.delete({ where: { id: allergenId } }),
         ]);

@@ -10,6 +10,7 @@ import {
 
 import { focusRing, inputFill, quietFill } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
+import type { TestReleaseRefusal } from "../test-release/words";
 import type { AccountMessage, AccountThread, Block } from "./model";
 import { messageMeta } from "./model";
 import { Unavailable } from "./parts";
@@ -28,7 +29,9 @@ import { Unavailable } from "./parts";
  */
 
 export type SendResult =
-    { ok: true; message: AccountMessage } | { ok: false; message: string };
+    | { ok: true; message: AccountMessage }
+    | { ok: false; message: string }
+    | TestReleaseRefusal;
 
 export interface MessagesApi {
     send: (text: string) => Promise<SendResult>;
@@ -104,9 +107,6 @@ export function AccountMessages({
 
     return (
         <div className="grid gap-3.5">
-            <h1 className="font-site-heading text-site-fg m-0 text-[26px] font-semibold tracking-[-0.02em]">
-                Messages
-            </h1>
             <section
                 aria-labelledby={`${id}-title`}
                 className="bg-site-surface border-site-border grid gap-2 rounded-[calc(var(--site-radius)+14px)] border p-3.5"

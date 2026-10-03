@@ -50,6 +50,12 @@ export interface InvoiceOnline {
     providerConnected: boolean;
     payLinkActive: boolean;
     payments: InvoiceOnlinePayment[];
+    /**
+     * An autopay charge is under way on it (D13), `at` being when the debit
+     * is asked for: the pay link and sends are held until the bank answers.
+     * Null or absent (an API older than D13): none.
+     */
+    autopayCharge?: { at: string } | null;
 }
 
 /** Where an invoice can be sent (D17): the business's email, the account thread. */
@@ -57,17 +63,26 @@ export type SendChannel = "email" | "thread";
 
 /**
  * Whether it can be sent, and how (D17) — the one flag Invoice Detail and
- * Home both read. No channels: no Send, only "Copy pay link".
+ * Home both read. No channels: no Send, and "Copy pay link" only where it
+ * can be paid online (`payOnline`).
  */
 export interface InvoiceSend {
     channels: SendChannel[];
     reason?:
         | "NOT_OWED"
-        | "NO_PAYMENT_PROVIDER"
         | "NO_EMAIL_PROVIDER"
-        | "NO_EMAIL_ADDRESS";
+        | "NO_EMAIL_ADDRESS"
+        /** An autopay charge is under way on it (D13). */
+        | "AUTOPAY_PENDING";
     /** Where the email would go. */
     emailTo?: string;
+    /**
+     * The link it sends is a pay link: Payments is on and a provider can
+     * take the money (DEC-070). False: a link to view the invoice, with no
+     * Pay button. Absent from an API before DEC-070, which read a connected
+     * provider instead. The workspace reads it and never guesses.
+     */
+    payOnline?: boolean;
     /** Something went in the last day: the next reminder can go from here. */
     nextReminderAt: string | null;
 }
@@ -259,6 +274,21 @@ export async function listInvoices(): Promise<CappedList<Invoice>> {
         getJson<Invoice[]>(`${base}/invoices?view=overdue`),
     ]);
     return withLive(newest ?? [], issued ?? [], overdue ?? []);
+}
+
+/**
+ * Whether the business has made any invoice yet: Home's "Invoice a client"
+ * (DEC-070) goes once it has. Null when the API couldn't answer — a refusal
+ * or a failure — so the caller decides what an unknown means; nothing here
+ * throws, since Home must not break over a first-run card.
+ */
+export async function hasAnyInvoice(): Promise<boolean | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    const res = await apiFetch(`${base}/invoices`).catch(() => null);
+    if (!res?.ok) return null;
+    const rows = (await res.json().catch(() => null)) as unknown;
+    return Array.isArray(rows) ? rows.length > 0 : null;
 }
 
 /**

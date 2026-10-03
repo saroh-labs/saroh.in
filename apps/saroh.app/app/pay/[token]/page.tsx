@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { SiteTheme } from "@saroh/site-blocks";
 
 import { InvoicePay } from "@/components/invoice-pay";
+import { publicApiUrl } from "@/lib/api-url";
 import { getPayInvoice } from "@/lib/invoice-pay";
+import { payRedirect, TENANT_HOST_HEADER } from "@/lib/pay-host";
 
 /**
- * A customer paying an invoice from its pay link (ADR-007, U13). On this
- * service's own apex — an invoice belongs to a business, not to a Site, so
- * there is no tenant host to choose — wearing the business's site theme,
- * never Saroh's.
+ * A customer paying an invoice from its pay link (ADR-007, U13), wearing
+ * the business's site theme, never Saroh's. Served on this service's apex,
+ * and on the business's own address by the middleware's rewrite (DEC-069,
+ * L6); opened on any other business's host, it sends the customer to the
+ * link's own address (`lib/pay-host.ts`).
  *
  * The link is a credential: the page is noindex and sends no referrer, so the
  * token never leaves in a Referer header to anything the page links to.
@@ -61,10 +66,19 @@ export default async function PayPage({
     }
 
     const { invoice } = result;
+    const elsewhere = payRedirect(
+        (await headers()).get(TENANT_HOST_HEADER),
+        invoice.payUrl,
+    );
+    if (elsewhere) redirect(elsewhere);
     return (
         <main className="min-h-screen bg-site-bg text-site-body">
             {invoice.theme ? <SiteTheme variables={invoice.theme} /> : null}
-            <InvoicePay token={token} invoice={invoice} />
+            <InvoicePay
+                token={token}
+                invoice={invoice}
+                apiUrl={publicApiUrl()}
+            />
         </main>
     );
 }

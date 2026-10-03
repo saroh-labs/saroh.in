@@ -3,6 +3,8 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import type { AutopayChargeTiming } from "./autopay-timing";
+import { isAutopayChargeTiming } from "./autopay-timing";
 import type { Interval } from "./periods";
 import type { PlanFigures, PriceGroup } from "./plan-figures";
 import { planFigures } from "./plan-figures";
@@ -32,6 +34,11 @@ export interface PlanView extends PlanFigures {
      */
     pendingChangedAt: string | null;
     createdAt: string;
+    /**
+     * When autopay charges this plan's renewals (D13B, DEC-065); null: the
+     * business's setting.
+     */
+    autopayChargeTiming: AutopayChargeTiming | null;
 }
 
 const PLAN_SELECT = {
@@ -45,6 +52,7 @@ const PLAN_SELECT = {
     classesPerMonth: true,
     pendingChangedAt: true,
     createdAt: true,
+    autopayChargeTiming: true,
 } as const;
 
 type PlanRow = Prisma.SubscriptionPlanGetPayload<{
@@ -114,6 +122,9 @@ function planView(row: PlanRow, groups: readonly PriceGroup[]): PlanView {
         classesPerMonth: row.classesPerMonth,
         pendingChangedAt: row.pendingChangedAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString(),
+        autopayChargeTiming: isAutopayChargeTiming(row.autopayChargeTiming)
+            ? row.autopayChargeTiming
+            : null,
         ...planFigures(row, groups),
     };
 }

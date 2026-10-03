@@ -2,6 +2,7 @@ import { Transform } from "class-transformer";
 import {
     IsArray,
     IsIn,
+    IsObject,
     IsOptional,
     IsString,
     MaxLength,
@@ -60,4 +61,14 @@ export class ModuleMutationDto {
     @IsArray()
     @IsString({ each: true })
     acknowledgedBlockerCodes?: string[];
+
+    /**
+     * What turning it on asks for (DEC-068), one shape per module — checked
+     * by `parseModuleSetup` against the module in the path, since a body
+     * DTO can't know it. Only with `status: "ENABLED"`. Absent: the module
+     * switches on as before, with nothing created.
+     */
+    @IsOptional()
+    @IsObject({ message: "Send the setup as an object." })
+    setup?: Record<string, unknown>;
 }

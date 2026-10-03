@@ -175,7 +175,7 @@ export class OrderFulfilmentChangeService {
                     message:
                         type === "DIGITAL"
                             ? "Only an order whose items are all digital can be sent digitally."
-                            : `${store.name} doesn't offer ${FULFILMENT_RULES[type].label.toLowerCase()}. Turn it on in the storefront's settings first.`,
+                            : `${store.name} doesn't offer ${FULFILMENT_RULES[type].label.toLowerCase()}. Turn it on in the location's settings first.`,
                     field: "fulfilment",
                 });
             }

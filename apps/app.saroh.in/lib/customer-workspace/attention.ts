@@ -224,6 +224,45 @@ export function pickKind(
 export const NO_SENSITIVE_NOTE =
     "Your role can't add sensitive notes, so everyone who can see customers will read this one.";
 
+/** The permission that lets a role read a sensitive note (C13). */
+export const SENSITIVE_ACTION = "customer:sensitive";
+
+/**
+ * The roles whose people can read a sensitive note, by name — "Dentist,
+ * Owner" — for C12's sensitive tick (DEC-073). A role counts when it holds
+ * `customer:sensitive` (an invented role's `grants`, implied holds
+ * included; a built-in's `actions` already are) and someone holds it, so
+ * the tick names the people it means. Alphabetical, as the design lists
+ * them.
+ */
+export function rolesThatSeeSensitive(
+    roles: {
+        label: string;
+        actions: string[];
+        grants?: string[];
+        members: number;
+    }[],
+): string[] {
+    return roles
+        .filter(
+            (r) =>
+                r.members > 0 &&
+                (r.grants ?? r.actions).includes(SENSITIVE_ACTION),
+        )
+        .map((r) => r.label)
+        .sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * The sensitive tick's words: "Sensitive — only people who can see
+ * sensitive notes (Dentist, Owner) can read it"; without the roles when
+ * they couldn't be read.
+ */
+export function sensitiveTickText(roles: string[] | null | undefined): string {
+    const who = roles?.length ? ` (${roles.join(", ")})` : "";
+    return `Sensitive — only people who can see sensitive notes${who} can read it`;
+}
+
 /** The allergen is picked from the list, when the business has one. */
 export function picksAllergen(
     draft: Pick<AttentionDraft, "kind">,
@@ -391,12 +430,13 @@ export function suggestionsTitle(
 }
 
 /**
- * "Rahul wrote this when booking online, 18 Sep at 10:42", or, for a note
- * sent from their account on the site, "Rahul sent this from their account,
+ * "Rahul Verma wrote this when booking online, 18 Sep at 10:42" — their
+ * full name, as the design has it (DEC-073) — or, for a note sent from
+ * their account on the site, "Rahul Verma sent this from their account,
  * 18 Sep at 10:42".
  */
 export function suggestionWhen(
-    first: string | null,
+    name: string | null,
     entry: Pick<AttentionEntry, "source" | "createdAt">,
     timeZone: string,
     now: Date,
@@ -407,7 +447,7 @@ export function suggestionWhen(
         minute: "2-digit",
         hourCycle: "h23",
     }).format(new Date(entry.createdAt));
-    const who = first?.trim() ? first.trim() : "They";
+    const who = name?.trim() ? name.trim() : "They";
     const how =
         entry.source === "CUSTOMER"
             ? "sent this from their account"

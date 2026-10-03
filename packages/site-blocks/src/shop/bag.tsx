@@ -11,6 +11,9 @@ import { SignInSheet } from "../account/sign-in-sheet";
 import type { OpenCheckout } from "../booking-flow/checkout";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
+import { useTestRelease } from "../test-release/context";
+import { TestReleaseStopSheet } from "../test-release/test-release-stop";
+import { itemsText } from "../test-release/words";
 import type {
     CheckoutStarted,
     ShopCheckoutApi,
@@ -18,7 +21,7 @@ import type {
     StartCheckout,
 } from "./api";
 import { SHOP_OFFLINE } from "./api";
-import type { BagDraft } from "./bag-sheet";
+import type { BagDraft, BagPriced } from "./bag-sheet";
 import { BagSheet, EMPTY_DRAFT } from "./bag-sheet";
 import { bagCount, clearBag, onOpenBag, useBag } from "./bag-store";
 import {
@@ -46,13 +49,18 @@ import { readPendingCheckout, writePendingCheckout } from "./pending-checkout";
  * order. A payment made but not yet confirmed when its sheet closes is
  * remembered (`pending-checkout.ts`) and asked about until the server
  * answers; the bag empties once the order is placed.
+ *
+ * On a test release (DEC-071, T6) the bag is priced as usual, and
+ * "Continue" stops there: in place of the sign-in sheet it says what the
+ * live site would take for it. No order, no payment.
  */
 
 type Step =
     | { kind: "closed" }
     | { kind: "bag" }
     | { kind: "sign-in"; then: StartCheckout }
-    | { kind: "pay"; started: CheckoutStarted };
+    | { kind: "pay"; started: CheckoutStarted }
+    | { kind: "test-release"; priced: BagPriced };
 
 export interface ShopBagProps {
     /** The site the bag belongs to (its id). */
@@ -66,6 +74,11 @@ export interface ShopBagProps {
     };
     /** The provider window; replaced in tests. */
     openCheckout?: OpenCheckout;
+    /**
+     * The public API the checkout's return is posted to (P1), so a paid
+     * order is placed without waiting for the webhook.
+     */
+    apiUrl?: string;
 }
 
 export function ShopBag({
@@ -74,9 +87,11 @@ export function ShopBag({
     api,
     account,
     openCheckout,
+    apiUrl,
 }: ShopBagProps) {
     const items = useBag(site);
     const count = bagCount(items);
+    const testRelease = useTestRelease() !== null;
     const [step, setStep] = useState<Step>({ kind: "closed" });
     const [customer, setCustomer] = useState(account.customer);
     const [busy, setBusy] = useState(false);
@@ -179,7 +194,11 @@ export function ShopBag({
         setProblem(result);
     }
 
-    function place(request: StartCheckout) {
+    function place(request: StartCheckout, priced: BagPriced) {
+        if (testRelease) {
+            setStep({ kind: "test-release", priced });
+            return;
+        }
         if (!customer) {
             setStep({ kind: "sign-in", then: request });
             return;
@@ -250,6 +269,18 @@ export function ShopBag({
                 }}
             />
 
+            <TestReleaseStopSheet
+                open={step.kind === "test-release"}
+                live={
+                    step.kind === "test-release"
+                        ? testStopLine(step.priced)
+                        : ""
+                }
+                nothing="ordered"
+                back="Back to your bag"
+                onClose={() => setStep({ kind: "bag" })}
+            />
+
             {step.kind === "pay" && customer ? (
                 <CheckoutPay
                     started={step.started}
@@ -262,8 +293,15 @@ export function ShopBag({
                     onBack={() => setStep({ kind: "bag" })}
                     onClose={close}
                     openCheckout={openCheckout}
+                    apiUrl={apiUrl}
                 />
             ) : null}
         </>
     );
+}
+
+/** "the customer signs in here and pays ₹1,240 for 3 items". */
+export function testStopLine({ total, count }: BagPriced): string {
+    const pays = total ? `pays ${total}` : "pays";
+    return `the customer signs in here and ${pays} for ${itemsText(count)}`;
 }

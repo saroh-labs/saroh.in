@@ -719,10 +719,20 @@ describe("invoices and offers", () => {
         ).toBe("Standard membership");
     });
 
-    it("never invents a yes to offers, and offers stop until they asked to", () => {
+    it("never invents a yes to offers, and offers stop only after a yes (DEC-073)", () => {
         const none = { status: null, source: null, at: null };
         expect(offersText(none, IST, NOW)).toBe("Nothing recorded yet.");
-        expect(canStopOffers(none)).toBe(true);
+        // Nothing recorded: nothing goes to them, so nothing to stop.
+        expect(canStopOffers(none)).toBe(false);
+        const yes = {
+            status: "GRANTED",
+            source: "checkout",
+            at: "2026-09-18T00:00:00Z",
+        };
+        expect(offersText(yes, IST, NOW)).toBe(
+            "Said yes to offers by email · 18 Sep",
+        );
+        expect(canStopOffers(yes)).toBe(true);
         const stopped = {
             status: "REVOKED",
             source: null,

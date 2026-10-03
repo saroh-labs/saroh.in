@@ -1,9 +1,11 @@
+// @covers accounts:/login app:/open app:/commerce/products api:products api:stock
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
-import { demoUser, urls } from "../playwright.config";
+import { urls } from "../playwright.config";
 
 /**
  * The product page's Overview and Stock tab (#522, #523): the header, the
@@ -23,13 +25,7 @@ const NW: Storefront = { organizationId: ORG, storeId: STORE };
 const COUNT = 7;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 const api = (path: string) => `${urls.API_URL}/stores/${STORE}/products${path}`;

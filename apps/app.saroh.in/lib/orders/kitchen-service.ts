@@ -1,13 +1,13 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, getJson, mutate, orgBase } from "@/lib/api/http";
 
+import { allergyNotesOf } from "./attention";
 import type { CourierFields } from "./courier";
-import type { DetailAllergyNote } from "./lifecycle";
-import { allergyNotesFrom } from "./lifecycle";
 import type {
     AllergyNote,
     FulfilmentType,
     KitchenStage,
+    OrderAttention,
     OrderRead,
 } from "./read";
 
@@ -54,16 +54,17 @@ export async function readOrderQuickView(
 }
 
 /**
- * What the customer's notes say they are allergic to, from the contact's
- * detail read (U8) — each note that names allergens, by the ids of every
- * storefront's allergen of that name.
+ * The customer's allergies from their Needs attention (C1, Z2a), read from
+ * the contact's detail: each Allergy entry that names an allergen, by every
+ * allergen of that name in the business. Only for an order read from before
+ * B15, which carries no `attention` of its own. Notes carry text only.
  *
- * `null` when it could not be read: the banner then says the notes could not
- * be checked, rather than saying nothing, because silence reads as "no
+ * `null` when it could not be read: the banner then says the allergies could
+ * not be checked, rather than saying nothing, because silence reads as "no
  * allergy". Not `getJson`: a 403 there would take over the whole order page,
  * and this is one panel of it.
  */
-export async function getAllergyNotes(
+export async function getAttentionAllergies(
     contactId: string,
 ): Promise<AllergyNote[] | null> {
     const base = await orgBase();
@@ -74,12 +75,11 @@ export async function getAllergyNotes(
         );
         if (!res.ok) return null;
         const body = (await res.json()) as {
-            notes: { rows: DetailAllergyNote[] } | null;
+            attention?: OrderAttention | null;
         };
-        if (!body.notes) return null;
-        return allergyNotesFrom(body.notes.rows);
+        return allergyNotesOf(body.attention ?? null) ?? null;
     } catch {
-        // An unreachable API: the banner names the notes as unchecked.
+        // An unreachable API: the banner names the allergies as unchecked.
         return null;
     }
 }

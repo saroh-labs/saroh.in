@@ -1,7 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 
 import { SiteEditor } from "@/components/sites/site-editor";
-import { env } from "@/env";
 import { requireSession } from "@/lib/session";
 import { parseSectionContent } from "@saroh/block-contract";
 
@@ -13,6 +12,12 @@ import {
     getSiteFlags,
     listComments,
 } from "@/lib/sites/service";
+import { siteAddressOf } from "@/lib/sites/share-links";
+import {
+    readWebAddressLinks,
+    RENDERER_APEX,
+} from "@/lib/sites/share-links-read";
+import { readTestReleases } from "@/lib/sites/test-releases-api";
 
 /**
  * Site editor host (S2-004). Resolves the site (notFound when missing / not
@@ -20,9 +25,6 @@ import {
  * editable draft, and hands the draft sections to the client SiteEditor. The
  * editing + live preview happen client-side; only Save/Publish hit the API.
  */
-/** Matches the sites index; the renderer defaults the same way. */
-const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
-
 export default async function SiteEditorPage({
     params,
     searchParams,
@@ -65,12 +67,18 @@ export default async function SiteEditorPage({
     // Flags are whole-site, so they load alongside the page rather than per
     // page — the pre-publish check groups them by page and cannot be answered
     // from the one page that happens to be open.
-    const [draft, flags, comments, review] = await Promise.all([
-        getPageDraft(siteId, activePage.id),
-        getSiteFlags(siteId),
-        listComments(siteId),
-        getReviewState(siteId),
-    ]);
+    const [draft, flags, comments, review, webAddress, testReleases] =
+        await Promise.all([
+            getPageDraft(siteId, activePage.id),
+            getSiteFlags(siteId),
+            listComments(siteId),
+            getReviewState(siteId),
+            // Where the site is reached, custom domain first (DEC-069, L8).
+            readWebAddressLinks(),
+            // Test releases (DEC-071, T11): `off` hides them; a failed read
+            // is said in their panel and never keeps the editor from opening.
+            readTestReleases(siteId),
+        ]);
     /*
      * Checked against the block contract, not cast into it (#275).
      *
@@ -140,10 +148,25 @@ export default async function SiteEditorPage({
             canUpdateSite={site.can.manageSettings}
             initialStyle={site.style}
             styleOptions={site.styleOptions}
-            address={site.subdomain ? `${site.subdomain}.${ROOT_DOMAIN}` : null}
+            address={
+                siteAddressOf(site, webAddress, RENDERER_APEX)?.host ?? null
+            }
             // The API sends where the site sells from only while the shop is
             // open for the business; only then is a Product grid offered.
             shopOpen={site.sellsFrom != null}
+            // The Class packs block, only while Class packs is rolled out
+            // and on (DEC-057).
+            packsOpen={site.packsBlockOffered === true}
+            // The module pages the page menu may offer (G14, G16); the API
+            // lists none for a role without `site:update`.
+            addablePageKinds={site.addablePageKinds ?? []}
+            initialTestReleases={testReleases}
+            canPublish={site.can.publish}
+            // "Publishing needs approval" (DEC-071, R10), and whether this
+            // person is the owner who may go live past it (KTD-11).
+            publishNeedsApproval={site.publishNeedsApproval === true}
+            canOverride={site.canOverride === true}
+            livePublishedAt={site.currentPublication?.publishedAt ?? null}
         />
     );
 }

@@ -1,9 +1,13 @@
+// @covers accounts:/login app:/open app:/sites app:/sites/new app:/sites/[siteId]/releases/[releaseId] site:/preview api:sites pkg:site-blocks
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { northwind, stamp as ownStamp } from "../fixtures/own-data";
+import { useSession } from "../fixtures/sessions";
 import {
     demoReviewer,
     demoUser,
+    ignoreHTTPSErrors,
     NORTHWIND_ORG,
     REVIEWED_SITE,
     urls,
@@ -27,13 +31,7 @@ import {
  */
 
 async function signIn(page: Page, who: { email: string; password: string }) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page, who);
 }
 
 /** The reviewer's one site, opened from Website in the rail. */
@@ -130,18 +128,24 @@ test.describe("a reviewer", () => {
         ).toBeVisible();
     });
 
-    test("reads the page itself, not a list of page titles", async ({
-        page,
-    }) => {
-        await openTheReviewedSite(page);
+    // @serial: it reads the site's first block, which site-versions hides
+    // and puts back.
+    test(
+        "reads the page itself, not a list of page titles",
+        {
+            tag: "@serial",
+        },
+        async ({ page }) => {
+            await openTheReviewedSite(page);
 
-        // The seeded home page's own copy, rendered through the real blocks.
-        // What this replaced was a list of titles and paths, which told a
-        // reviewer a site had pages and nothing about what was on them.
-        await expect(
-            page.getByText("Packaging, storage and safety supplies"),
-        ).toBeVisible();
-    });
+            // The seeded home page's own copy, rendered through the real blocks.
+            // What this replaced was a list of titles and paths, which told a
+            // reviewer a site had pages and nothing about what was on them.
+            await expect(
+                page.getByText("Packaging, storage and safety supplies"),
+            ).toBeVisible();
+        },
+    );
 
     test("leaves a note on a section, and the note comes back", async ({
         page,
@@ -158,7 +162,7 @@ test.describe("a reviewer", () => {
         await note.focus();
         await note.click();
 
-        const body = `Opening hours look wrong — ${Date.now()}`;
+        const body = `Opening hours look wrong — ${ownStamp(test.info())}`;
         await page.getByLabel(/Your note about/i).fill(body);
         await page.getByRole("button", { name: "Add note" }).click();
 
@@ -254,4 +258,183 @@ test.describe("a shared preview link", () => {
 
         await preview.close();
     });
+});
+
+/**
+ * Reviewing a test release (DEC-071, T12): the reviewer reads the release,
+ * not the draft, and approves that. The draft then moves on; the release
+ * still reads Approved in the editor's panel, and the draft's own review is
+ * as it was.
+ *
+ * `@serial`: it edits Northwind's home draft, which other site specs read,
+ * and puts it back. The release is the test's own, stamped, and discarded
+ * at the end.
+ */
+test.describe("a reviewer and a test release", () => {
+    test(
+        "approves the release, and the editor's row reads Approved",
+        { tag: "@serial" },
+        async ({ page, browser }, testInfo) => {
+            test.setTimeout(150_000);
+
+            // The owner, in a context of their own: makes the release and
+            // edits the draft through the API, and reads the editor.
+            // At the desk, whichever project runs this: the reviewer is
+            // the one on the phone.
+            const ownerContext = await browser.newContext({
+                ignoreHTTPSErrors,
+                viewport: { width: 1440, height: 900 },
+            });
+            const owner = await ownerContext.newPage();
+            await useSession(owner);
+            const nw = northwind(owner.request);
+            const sites =
+                await nw.get<{ id: string; subdomain: string | null }[]>(
+                    "/sites",
+                );
+            const siteId = sites.find((s) => s.subdomain === "northwind")?.id;
+            expect(siteId, "Northwind has its site at northwind").toBeTruthy();
+
+            const name = `E2E review ${ownStamp(testInfo)}`;
+
+            interface Review {
+                latestApproval: { outcome: string; at: string } | null;
+                outstanding: boolean;
+                pending: boolean;
+            }
+            const draftReview = () => nw.get<Review>(`/sites/${siteId}/review`);
+            const before = await draftReview();
+
+            const site = await nw.get<{
+                pages: { id: string; isHome: boolean }[];
+            }>(`/sites/${siteId}`);
+            const home = site.pages.find((p) => p.isHome) ?? site.pages[0];
+            const draftPath = `/sites/${siteId}/pages/${home.id}/draft`;
+            const original = (
+                await nw.get<{
+                    sections: {
+                        type: string;
+                        contractVersion: number;
+                        content: unknown;
+                        hidden?: boolean;
+                        key?: string;
+                    }[];
+                }>(draftPath)
+            ).sections.map(
+                ({ type, contractVersion, content, hidden, key }) => ({
+                    type,
+                    contractVersion,
+                    content,
+                    hidden,
+                    key,
+                }),
+            );
+            let releaseId: string | null = null;
+
+            /** The home draft with a stamped heading of this test's on top. */
+            const withHeading = async (heading: string) => {
+                const now = await nw.get<{ revision: number }>(draftPath);
+                await nw.put(`${draftPath}/sections`, {
+                    revision: now.revision,
+                    sections: [
+                        {
+                            type: "hero",
+                            contractVersion: 1,
+                            content: { heading },
+                        },
+                        ...original,
+                    ],
+                });
+            };
+
+            try {
+                // A release of this test's own bytes. A verdict is bound to
+                // a release's fingerprint (KTD-10), so a release of the seed's
+                // draft would already carry an earlier run's approval.
+                await withHeading(`Under review ${name}`);
+                const made = await nw.post<{ release: { id: string } }>(
+                    `/sites/${siteId}/test-releases`,
+                    { name },
+                );
+                releaseId = made.release.id;
+
+                // The reviewer finds it on Review, opens it, and approves it.
+                await useSession(page, "reviewer");
+                await openTheReviewedSite(page);
+                const listed = page.getByRole("listitem", { name });
+                await expect(listed).toContainText(
+                    "Nobody has reviewed this test release yet.",
+                );
+                await listed.getByRole("link", { name: "Review" }).click();
+                await page.waitForURL(/\/releases\//, { timeout: 30_000 });
+
+                await expect(
+                    page
+                        .locator("[data-review-subject]")
+                        .filter({ visible: true }),
+                ).toContainText(name);
+                // The release as it was frozen, drawn from its snapshot.
+                await expect(
+                    page.getByText(`Under review ${name}`),
+                ).toBeVisible();
+
+                await page
+                    .getByRole("button", { name: "Approve" })
+                    .filter({ visible: true })
+                    .click();
+                await expect(
+                    page.locator("[data-release-verdict]"),
+                ).toContainText("approved this test release.");
+
+                // The draft moves on after the verdict.
+                await withHeading(`After review ${name}`);
+
+                // The release still reads Approved, in the editor's panel.
+                await owner.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
+                await owner.goto(`${urls.APP_URL}/sites/${siteId}`);
+                // The editor redraws its top bar while it settles, so the
+                // menu is opened until the panel shows, as T11's spec does.
+                const releasesPanel = owner.getByRole("dialog", {
+                    name: "Test releases",
+                });
+                await expect(async () => {
+                    if (!(await releasesPanel.isVisible())) {
+                        await owner
+                            .getByRole("button", {
+                                name: "More test release actions",
+                            })
+                            .click({ timeout: 2_000 });
+                        await owner
+                            .getByRole("menuitem", { name: /^Test releases/ })
+                            .click({ timeout: 2_000 });
+                    }
+                    await expect(releasesPanel).toBeVisible({
+                        timeout: 2_000,
+                    });
+                }).toPass({ timeout: 30_000 });
+                const row = releasesPanel.getByRole("listitem", { name });
+                await expect(row).toContainText(/Approved by /);
+                await expect(row).toContainText("Your draft has changed since");
+
+                // And the draft's own review is as it was.
+                const after = await draftReview();
+                expect(after.latestApproval).toEqual(before.latestApproval);
+                expect(after.outstanding).toBe(before.outstanding);
+                expect(after.pending).toBe(before.pending);
+            } finally {
+                // Put the home draft back as it was.
+                const now = await nw.get<{ revision: number }>(draftPath);
+                await nw.put(`${draftPath}/sections`, {
+                    revision: now.revision,
+                    sections: original,
+                });
+                if (releaseId) {
+                    await nw.post(
+                        `/sites/${siteId}/test-releases/${releaseId}/discard`,
+                    );
+                }
+                await ownerContext.close();
+            }
+        },
+    );
 });

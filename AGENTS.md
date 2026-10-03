@@ -27,6 +27,12 @@ pnpm (`pnpm@9`) + Turborepo monorepo.
 - **Organization is the tenant root**, not Store (ADR-001).
 - **Merchant sites never inherit Saroh's brand**; the `--site-*` token layer is
   separate by design.
+- **The repo is public.** Nothing internal is committed: prices, plan limits,
+  unreleased pricing designs, anything the user calls internal. Read the file
+  list before every push.
+- **Never push a unit branch or open a PR per unit.** Work lands in a local
+  `batch-<date>-<n>` branch and goes up once per batch — every push burns five
+  Vercel builds. `docs/patterns/devops-tooling-and-deploy.md`.
 - Shared tokens live in `packages/ui/src/globals.css` and
   `tooling/tailwind-config`. `--accent` is a shadcn neutral, not a brand
   accent — renaming it breaks components.
@@ -73,15 +79,39 @@ the right-hand files **before** writing code.
 | Handle a credential, or find one where it should not be                                                    | `docs/patterns/devops-secrets.md`                                                              |
 | Add logging, a degraded path, a health check or error tracking                                             | `docs/patterns/devops-observability.md`                                                        |
 | Change lint, TypeScript, CI, tests or dependencies, or ship the API                                        | `docs/patterns/devops-tooling-and-deploy.md`                                                   |
+| Start work, create a branch, push, open a PR or release                                                    | `docs/patterns/devops-tooling-and-deploy.md` → Branches, batches and pull requests             |
 
 ## Before you finish
 
 ```bash
-pnpm run lint && pnpm run typecheck
-pnpm --filter @saroh/api test:unit
-TEST_DATABASE_URL=... pnpm --filter @saroh/api test:int
-pnpm run check:routes && pnpm run check:blocks && pnpm run check:cycles
+pnpm prepush          # secrets, lint, types, check:*, unit tests, vitest
+pnpm prepush --all    # before a push: + API integration (TEST_DATABASE_URL)
+                      #   and the changed screens' browser specs, desk + phone,
+                      #   on CI's seeded stack built from HEAD (E2E_DATABASE_URL)
 ```
+
+A step that passed on a tree is never re-run on it (`--no-cache` forces it);
+`--all` stops the local `pnpm dev` stack first and says how to restart it.
+Locally `--int` and `--e2e` run only the specs the batch reaches (`--full`
+runs all). So every new browser spec starts with a `// @covers …` line
+(`pnpm run check:e2e-covers`).
+A new browser spec owns its data — it runs beside every other test — and
+tags a business-wide change `@serial` (`saroh-browser-tests` skill).
+
+`git push` runs the quick gate itself (`.husky/pre-push`); `--no-verify`
+is for emergencies only. CI is the last net, not the first: every CI round trip is a push, five
+Vercel builds and twenty minutes. `scripts/prepush.sh` runs what CI runs.
+
+## Learn from every miss
+
+When CI, a review, the user or production catches a mistake:
+
+1. Fix it, then add an entry to `docs/architecture/DEV_LEARNINGS.md`
+   (symptom, cause, fix, where the rule lives).
+2. If a check could have caught it earlier, add that check to
+   `scripts/prepush.sh`, a lint rule or a test, not only to prose.
+3. If it is a new way of working, put it in the pattern file for its area
+   and a row in Triggers below, and follow it from the next commit on.
 
 ## Keeping this file short
 

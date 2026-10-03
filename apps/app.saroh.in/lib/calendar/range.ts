@@ -161,9 +161,14 @@ export function dayShortcuts(
     return out;
 }
 
-/** The four reads any layer rests on; a role with none sees the locked card. */
+/**
+ * The reads any layer rests on; a role with none sees the locked card. The
+ * orders layer reaches whoever moves orders too (`order:stage`, E20,
+ * DEC-067), without their money.
+ */
 export const LAYER_READS = [
     "order:read",
+    "order:stage",
     "booking:read",
     "subscription:read",
     "invoice:read",

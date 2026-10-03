@@ -101,7 +101,7 @@ const ROLE_LABEL: Record<OrganizationRole, string> = {
 const ROLE_BLURB: Record<OrganizationRole, string> = {
     OWNER: "Can open and change everything. A business always has at least one owner, so it can never be locked out.",
     ADMIN: "Can do everything an owner can, except close the business or change or remove an owner.",
-    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves kitchen orders along. Can see settings, but can't change them or see money.",
+    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves kitchen orders along. No money, and no business settings.",
     REVIEWER:
         "Can look at the websites they're invited to, comment and sign them off. Nothing else in the business.",
 };
@@ -110,7 +110,7 @@ const ROLE_BLURB: Record<OrganizationRole, string> = {
 const ROLE_PLAIN: Record<OrganizationRole, string> = {
     OWNER: "can open everything",
     ADMIN: "everything except removing an owner",
-    MEMBER: "runs the day · can see settings, can't change them or see money",
+    MEMBER: "runs the day — no money or settings",
     REVIEWER: "invited websites, nothing else",
 };
 
@@ -257,7 +257,10 @@ export function TeamScreen({
         .find((m) => (m.roleKey ?? m.role) === "OWNER" && m.name?.trim())
         ?.name?.trim()
         .split(/\s+/)[0];
-    const readOnlyNote = canManage
+    // On Roles, it is the role editor's own permission that counts: a
+    // custom role holding `member:role:update` may edit roles (within its
+    // reach) without being able to manage people, so it isn't read-only.
+    const readOnlyNote = (tab === "roles" ? canEditRoles : canManage)
         ? undefined
         : `Only owners and admins can change this.${ownerFirstName ? ` Ask ${ownerFirstName} if something needs updating.` : ""}`;
 
@@ -928,7 +931,7 @@ function MemberDrawer({
                                                 "flex items-center gap-[11px] rounded-[9px] border px-3 py-[9px] text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed",
                                                 on
                                                     ? "border-border-strong bg-foreground/[0.03]"
-                                                    : "border-muted hover:border-border-strong",
+                                                    : "border-muted hover:border-border-strong active:bg-accent-active",
                                             )}
                                         >
                                             <RoleDot role={r} />
@@ -1013,7 +1016,7 @@ function MemberDrawer({
                                         setDraft(null);
                                         onRemove(member);
                                     }}
-                                    className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                                 >
                                     Remove from {organizationName}
                                 </button>

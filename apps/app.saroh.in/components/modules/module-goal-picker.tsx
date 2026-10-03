@@ -2,14 +2,15 @@
 
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
-import { showError } from "@saroh/ui/toast";
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
-import { setModuleStatusAction } from "@/lib/modules/actions";
+import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
+import { kindWords, preselect } from "@/lib/organizations/kind";
 
 /**
  * Need-based module onboarding (#119). Asks what the business needs to *do* —
@@ -22,6 +23,8 @@ import type { ModuleView } from "@/lib/modules/schema";
  * once per card — state communicated through a control role. Deferring the
  * commit makes reversibility a property of the design rather than a feature to
  * build, and lets the whole choice be described before anything happens.
+ * Confirming opens one "Turn on" sheet for every pick (DEC-068), which asks
+ * each module's minimum in one form and turns them on in order.
  *
  * Dependencies come from the server-owned read model (`view.dependencies`), so
  * the client never hardcodes the capability graph. They are also SHOWN: picking
@@ -35,66 +38,91 @@ interface Goal {
 }
 
 /**
- * Commerce leads (product decision 2026-08-02: commerce-led, not commerce-only),
- * so selling is offered first and pre-selected. Everything else is a peer, not a
- * lesser option — the ordering states a default, it does not rank the business
- * models we serve.
+ * What is suggested follows what is being set up (DEC-070, `preselect` in
+ * `lib/organizations/kind.ts`): for a business, commerce leads (product
+ * decision 2026-08-02: commerce-led, not commerce-only), so selling is
+ * offered first and pre-selected; a site for someone's work starts from the
+ * website; "Just me" is suggested nothing, since its first job is often an
+ * invoice, which needs no module. The suggestion moves to the top and
+ * nothing else moves — the ordering states a default, it does not rank the
+ * business models we serve, and every goal stays on offer for every kind.
+ *
+ * The words for the people it deals with ("customers", "clients",
+ * "readers") are the kind's too.
  */
-const RECOMMENDED_KEY = "COMMERCE";
+function goalsFor(kind: unknown): Goal[] {
+    const { people } = kindWords(kind);
+    const goals: Goal[] = [
+        {
+            moduleKey: "COMMERCE",
+            title: "Sell products",
+            description: "Run a catalog, take orders, and manage inventory.",
+        },
+        {
+            moduleKey: "APPOINTMENTS",
+            title: "Take appointments",
+            description: `Offer services and let ${people} book time with you.`,
+        },
+        {
+            moduleKey: "COURSES",
+            title: "Run courses",
+            description:
+                "Sell a set of dated sessions with limited seats, like a six-week class.",
+        },
+        {
+            moduleKey: "WEBSITE",
+            title: "Show up online",
+            description:
+                "Publish a website with pages, forms, and your own domain.",
+        },
+        {
+            moduleKey: "CRM",
+            title: `Manage ${people} & leads`,
+            description: "Capture enquiries and track them through a pipeline.",
+        },
+        {
+            moduleKey: "PAYMENTS",
+            title: "Take payments",
+            description:
+                "Connect a provider to get paid for bookings and orders.",
+        },
+        {
+            moduleKey: "COMMUNICATIONS",
+            title: `Message ${people}`,
+            description: "Send messages and follow-ups with consent tracking.",
+        },
+        {
+            moduleKey: "AUTOMATIONS",
+            title: "Automate follow-ups",
+            description: "Trigger actions automatically as work comes in.",
+        },
+        {
+            moduleKey: "INSIGHTS",
+            title: "See performance",
+            description: "Track views, enquiries, and sales over time.",
+        },
+    ];
+    const suggested = preselect(kind);
+    return [
+        ...goals.filter((g) => g.moduleKey === suggested),
+        ...goals.filter((g) => g.moduleKey !== suggested),
+    ];
+}
 
-const GOALS: Goal[] = [
-    {
-        moduleKey: "COMMERCE",
-        title: "Sell products",
-        description: "Run a catalog, take orders, and manage inventory.",
-    },
-    {
-        moduleKey: "APPOINTMENTS",
-        title: "Take appointments",
-        description: "Offer services and let customers book time with you.",
-    },
-    {
-        moduleKey: "COURSES",
-        title: "Run courses",
-        description:
-            "Sell a set of dated sessions with limited seats, like a six-week class.",
-    },
-    {
-        moduleKey: "WEBSITE",
-        title: "Show up online",
-        description:
-            "Publish a website with pages, forms, and your own domain.",
-    },
-    {
-        moduleKey: "CRM",
-        title: "Manage customers & leads",
-        description: "Capture enquiries and track them through a pipeline.",
-    },
-    {
-        moduleKey: "PAYMENTS",
-        title: "Take payments",
-        description: "Connect a provider to get paid for bookings and orders.",
-    },
-    {
-        moduleKey: "COMMUNICATIONS",
-        title: "Message customers",
-        description: "Send messages and follow-ups with consent tracking.",
-    },
-    {
-        moduleKey: "AUTOMATIONS",
-        title: "Automate follow-ups",
-        description: "Trigger actions automatically as work comes in.",
-    },
-    {
-        moduleKey: "INSIGHTS",
-        title: "See performance",
-        description: "Track views, enquiries, and sales over time.",
-    },
-];
-
-export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
+export function ModuleGoalPicker({
+    modules,
+    kind,
+}: {
+    modules: ModuleView[];
+    /** What is being set up (DEC-070); absent, a business. */
+    kind?: string;
+}) {
     const router = useRouter();
-    const [pending, startTransition] = useTransition();
+    const goals = useMemo(() => goalsFor(kind), [kind]);
+    const suggested = preselect(kind);
+    // The picks, handed to the "Turn on" sheet (DEC-068); null when closed.
+    const [turningOn, setTurningOn] = useState<string[] | null>(null);
+    const pending = turningOn !== null;
 
     const byKey = useMemo(
         () => new Map(modules.map((m) => [m.key, m])),
@@ -112,9 +140,16 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
         [modules],
     );
 
+    /**
+     * Only what Saroh has rolled out to this business (DEC-057): the API
+     * lists every module, a dark one with ROLLOUT_DISABLED. The dependency
+     * walk below still reads every module, so a hidden one already on
+     * counts as on and is never named.
+     */
+    const shown = useMemo(() => rolledOutKeys(modules), [modules]);
     const available = useMemo(
-        () => GOALS.filter((g) => byKey.has(g.moduleKey)),
-        [byKey],
+        () => goals.filter((g) => shown.has(g.moduleKey)),
+        [goals, shown],
     );
     /**
      * Only offer what this member is actually allowed to turn on. Rendering a
@@ -127,12 +162,17 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
     );
 
     const [selected, setSelected] = useState<Set<string>>(() => {
-        // Pre-select the recommended goal so the screen answers its own
+        // Pre-select the kind's suggestion so the screen answers its own
         // question. Nothing is committed, so this is a suggestion the merchant
         // can undo in one click — not a default they are stuck with.
         const initial = new Set<string>();
-        if (byKey.has(RECOMMENDED_KEY) && !alreadyOn.has(RECOMMENDED_KEY)) {
-            initial.add(RECOMMENDED_KEY);
+        if (
+            suggested &&
+            shown.has(suggested) &&
+            !alreadyOn.has(suggested) &&
+            byKey.get(suggested)?.canManage
+        ) {
+            initial.add(suggested);
         }
         return initial;
     });
@@ -162,7 +202,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
             .filter((k) => k !== moduleKey && !alreadyOn.has(k))
             .map(
                 (k) =>
-                    GOALS.find((g) => g.moduleKey === k)?.title ??
+                    goals.find((g) => g.moduleKey === k)?.title ??
                     byKey.get(k)?.label ??
                     k,
             );
@@ -192,32 +232,23 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
             router.push("/");
             return;
         }
-        startTransition(async () => {
-            // Commit prerequisites before dependants, in the server's order.
-            const ordered: string[] = [];
-            for (const key of Array.from(selected)) {
-                for (const dep of withDeps(key)) {
-                    if (!alreadyOn.has(dep) && !ordered.includes(dep)) {
-                        ordered.push(dep);
-                    }
-                }
-            }
-            for (const key of ordered) {
-                const result = await setModuleStatusAction(key, "ENABLED");
-                if (!result.ok) {
-                    // Stop at the first failure rather than pressing on — a
-                    // partially-enabled set is worse than a clear error, and the
-                    // merchant's remaining selection is still on screen to retry.
-                    showError(result.error);
-                    return;
-                }
-            }
-            router.push("/");
-        });
+        // One sheet for every pick: one form with a section for each
+        // module that asks for something, and one "Turn on". It lands on
+        // the first pick's screen when it is done.
+        setTurningOn(
+            goals.map((g) => g.moduleKey).filter((k) => selected.has(k)),
+        );
     };
 
     return (
         <div className="space-y-8">
+            <TurnOnSheet
+                picked={turningOn}
+                modules={modules}
+                onOpenChange={(open) => {
+                    if (!open) setTurningOn(null);
+                }}
+            />
             {choosable.length > 0 ? (
                 <fieldset className="space-y-3" disabled={pending}>
                     <legend className="sr-only">
@@ -271,7 +302,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                                         >
                                             {goal.title}
                                         </span>
-                                        {goal.moduleKey === RECOMMENDED_KEY ? (
+                                        {goal.moduleKey === suggested ? (
                                             <span className="rounded-full bg-highlight-subtle px-2 py-0.5 text-[11px] font-medium text-highlight-subtle-foreground">
                                                 Suggested
                                             </span>
@@ -297,7 +328,7 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                 </fieldset>
             ) : null}
 
-            {alreadyOn.size > 0 ? (
+            {available.some((g) => alreadyOn.has(g.moduleKey)) ? (
                 <div className="space-y-2">
                     <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Already on
@@ -357,11 +388,9 @@ export function ModuleGoalPicker({ modules }: { modules: ModuleView[] }) {
                         onClick={confirm}
                         disabled={pending}
                     >
-                        {pending
-                            ? "Setting up…"
-                            : resolved.size === 0
-                              ? "Continue"
-                              : "Set up my workspace"}
+                        {resolved.size === 0
+                            ? "Continue"
+                            : "Set up my workspace"}
                     </Button>
                 </div>
             </div>

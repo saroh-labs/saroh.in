@@ -6,9 +6,12 @@ import {
     openTotal,
     REPLY_MAX,
     replyLabel,
+    replyMax,
     replyReady,
+    REVIEW_REPLY_MAX,
     runOf,
     undoneText,
+    writesReply,
 } from "./inline-actions";
 import type { HomeInline } from "./service";
 
@@ -114,6 +117,10 @@ describe("what is said after", () => {
         expect(failedText(inline({ kind: "RETRY" }))).toBe(
             "No new pay link was made.",
         );
+        // D13: a retry by autopay.
+        expect(failedText(inline({ kind: "RETRY", via: "MANDATE" }))).toBe(
+            "Autopay wasn't charged.",
+        );
         expect(failedText(inline({ kind: "REPLY" }))).toBe(
             "Your reply wasn't sent.",
         );
@@ -122,5 +129,40 @@ describe("what is said after", () => {
     it("drops the heading's count as rows are done, never below none", () => {
         expect(openTotal(4, 1)).toBe(3);
         expect(openTotal(1, 2)).toBe(0);
+    });
+});
+
+describe("a reply to a low-star review (F2)", () => {
+    const review = inline({
+        kind: "REVIEW_REPLY",
+        label: "Reply",
+        yes: "Post reply",
+        done: "Reply posted",
+        target: "review_1",
+        person: "Dev",
+    });
+
+    it("is written in the row, held ten seconds like any reply", () => {
+        expect(writesReply(review)).toBe(true);
+        expect(writesReply(inline({ kind: "REPLY" }))).toBe(true);
+        expect(writesReply(inline())).toBe(false);
+        expect(runOf(review)).toBe("held");
+    });
+
+    it("stops at the review API's limit, not the thread's", () => {
+        expect(replyMax(review)).toBe(REVIEW_REPLY_MAX);
+        expect(replyMax(inline({ kind: "REPLY" }))).toBe(REPLY_MAX);
+        const long = "x".repeat(REVIEW_REPLY_MAX + 1);
+        expect(replyReady(long, replyMax(review))).toBe(false);
+        expect(replyReady(long, replyMax(inline({ kind: "REPLY" })))).toBe(
+            true,
+        );
+    });
+
+    it("says posted, not sent", () => {
+        expect(undoneText(review, false)).toBe(
+            "Not posted. Your reply is still in the box.",
+        );
+        expect(failedText(review)).toBe("Your reply wasn't posted.");
     });
 });

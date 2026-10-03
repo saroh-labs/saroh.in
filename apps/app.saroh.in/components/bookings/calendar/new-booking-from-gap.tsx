@@ -367,7 +367,7 @@ function Form({
                     <button
                         type="button"
                         onClick={() => void closeExtra()}
-                        className="text-[12.5px] font-semibold text-foreground underline underline-offset-2"
+                        className="text-[12.5px] font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
                     >
                         Close these extra hours
                     </button>
@@ -375,7 +375,7 @@ function Form({
                 <button
                     type="button"
                     onClick={() => onBlock(target)}
-                    className="mr-auto text-[12.5px] font-semibold text-foreground underline underline-offset-2"
+                    className="mr-auto text-[12.5px] font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
                 >
                     Block this time instead
                 </button>

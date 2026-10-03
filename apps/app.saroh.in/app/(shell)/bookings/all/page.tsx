@@ -13,6 +13,8 @@ import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
+import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import { viewParam } from "@/lib/views/search-params";
 import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 
@@ -71,6 +73,14 @@ export default async function BookingsPage({
           )
         : every;
 
+    // No bookings at all yet: "Share your booking page" while it is live
+    // (DEC-069, L8). Only then is the web address read, and a read that
+    // fails (or a role it isn't shown to) just leaves the button out.
+    const share =
+        every.length === 0 && !since
+            ? shareLink(await readWebAddressLinks(), BOOKINGS_FIRST_RUN)
+            : null;
+
     return (
         <PageContainer width="wide">
             <PageHeader
@@ -125,6 +135,7 @@ export default async function BookingsPage({
                 <BookingsView
                     bookings={upcoming}
                     initialView={viewParam(params)}
+                    share={share}
                 />
             </div>
         </PageContainer>

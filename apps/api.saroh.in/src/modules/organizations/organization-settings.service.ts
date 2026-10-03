@@ -30,8 +30,10 @@ import {
     taxView,
     touchesTax,
 } from "./business-tax-settings";
-import { businessTypeWrite } from "./business-type";
+import { businessTypeRead, businessTypeWrite } from "./business-type";
 import type { UpdateOrganizationDto } from "./dto";
+import type { OrganizationKind } from "./organization-kind";
+import { kindRead } from "./organization-kind";
 import { authorize } from "./organization-policy";
 import { settingsChanges, settingsSnapshot } from "./settings-audit";
 
@@ -40,6 +42,11 @@ export interface OrganizationSettings {
     id: string;
     name: string;
     slug: string;
+    /**
+     * What is being set up (DEC-070): BUSINESS, SOLO ("Just me") or WORK
+     * ("A site for my work"). Words and defaults only.
+     */
+    kind: OrganizationKind;
     profile: {
         legalName: string | null;
         type: string | null;
@@ -94,6 +101,12 @@ export interface SetupFacts {
     sites: number;
     /** Of those, the ones with nothing published now (never, or taken down). */
     sitesNotLive: number;
+    /**
+     * Invoices that aren't void: drafts and issued paper alike. Once there is
+     * one, the business invoices, so the address its invoices print is asked
+     * for even with nothing on that takes money (DEC-070, KTD-7).
+     */
+    invoices: number;
 }
 
 /** What the settings read selects from the profile. */
@@ -171,7 +184,8 @@ function splitProfile(
         ...profile
     } = p;
     return {
-        profile,
+        // A row the F10b backfill hasn't reached yet still says `company`.
+        profile: { ...profile, type: businessTypeRead(profile.type) },
         tax: taxView(p, counters),
         registeredAddress: addressView(p),
         logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,
@@ -273,8 +287,8 @@ export class OrganizationSettingsService {
 
         const profileData = reduceProfile(dto.profile);
         const timezone = zoneWrite(profileData.timezone);
-        // "" clears it; a private limited company is still kept as
-        // `company` this release (`business-type.ts`, boundary 9).
+        // "" clears it; an old client's `company` is stored as `pvt`
+        // (`business-type.ts`, F10b).
         const typeValue = businessTypeWrite(profileData.type);
         const businessType = typeValue === undefined ? {} : { type: typeValue };
         // Checked and made E.164 before anything is written; "" clears it.
@@ -296,6 +310,7 @@ export class OrganizationSettingsService {
             : {};
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
+            ...(dto.kind !== undefined ? ["kind"] : []),
             ...Object.keys(profileData),
             ...Object.keys(phone),
             ...Object.keys(taxData),
@@ -313,6 +328,7 @@ export class OrganizationSettingsService {
                 id: true,
                 name: true,
                 slug: true,
+                kind: true,
                 businessProfile: { select: PROFILE_SELECT },
             },
         } as const;
@@ -320,10 +336,15 @@ export class OrganizationSettingsService {
             // As it was, inside the write's own transaction, so the audit
             // row's "before" is what this save replaced.
             const before = await tx.organization.findUnique(read);
-            if (dto.name !== undefined) {
+            // The name and the kind are the organization's own columns.
+            const own = {
+                ...(dto.name !== undefined ? { name: dto.name } : {}),
+                ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+            };
+            if (Object.keys(own).length > 0) {
                 await tx.organization.update({
                     where: { id: ctx.organizationId },
-                    data: { name: dto.name },
+                    data: own,
                 });
             }
 
@@ -379,6 +400,7 @@ export class OrganizationSettingsService {
             id: settings.id,
             name: settings.name,
             slug: settings.slug,
+            kind: kindRead(settings.kind),
             ...splitProfile(
                 settings.businessProfile,
                 await this.counters(
@@ -480,6 +502,7 @@ export class OrganizationSettingsService {
                 id: true,
                 name: true,
                 slug: true,
+                kind: true,
                 businessProfile: { select: PROFILE_SELECT },
             },
         });
@@ -490,6 +513,7 @@ export class OrganizationSettingsService {
             id: organization.id,
             name: organization.name,
             slug: organization.slug,
+            kind: kindRead(organization.kind),
             ...splitProfile(
                 organization.businessProfile,
                 await this.counters(
@@ -533,23 +557,27 @@ export class OrganizationSettingsService {
     /** What the take-money checklist ticks, counted now. */
     private async setupFacts(organizationId: string): Promise<SetupFacts> {
         const site = { organizationId, deletedAt: null };
-        const [products, services, sites, sitesNotLive] = await Promise.all([
-            prisma.product.count({
-                where: { organizationId, status: { not: "ARCHIVED" } },
-            }),
-            prisma.service.count({
-                where: {
-                    organizationId,
-                    deletedAt: null,
-                    status: { not: "ARCHIVED" },
-                },
-            }),
-            prisma.site.count({ where: site }),
-            prisma.site.count({
-                where: { ...site, currentPublicationId: null },
-            }),
-        ]);
-        return { products, services, sites, sitesNotLive };
+        const [products, services, sites, sitesNotLive, invoices] =
+            await Promise.all([
+                prisma.product.count({
+                    where: { organizationId, status: { not: "ARCHIVED" } },
+                }),
+                prisma.service.count({
+                    where: {
+                        organizationId,
+                        deletedAt: null,
+                        status: { not: "ARCHIVED" },
+                    },
+                }),
+                prisma.site.count({ where: site }),
+                prisma.site.count({
+                    where: { ...site, currentPublicationId: null },
+                }),
+                prisma.invoice.count({
+                    where: { organizationId, status: { not: "VOID" } },
+                }),
+            ]);
+        return { products, services, sites, sitesNotLive, invoices };
     }
 
     /** The earliest order in the business, across every storefront. */

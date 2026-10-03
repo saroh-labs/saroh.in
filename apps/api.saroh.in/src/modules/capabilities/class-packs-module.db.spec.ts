@@ -14,6 +14,7 @@
  */
 import { backfillClassPacksModule, prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ClassPacksService } from "../class-packs/class-packs.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -54,6 +55,7 @@ async function business(name: string, appointments?: string) {
             slug: `e12-${name.toLowerCase().replace(/\W+/g, "-")}-${tag}`,
         },
     });
+    await giveBusinessDetails(org.id);
     if (appointments) {
         await prisma.organizationModule.create({
             data: {

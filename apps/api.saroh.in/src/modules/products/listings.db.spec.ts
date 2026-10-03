@@ -207,7 +207,7 @@ describe("Listings and StockLevel per storefront (DB)", () => {
                 customerId: buyer[online],
                 items: [{ productId: id, variantId: large.id, quantity: 1 }],
             }),
-        ).rejects.toThrow("isn't sold at this storefront");
+        ).rejects.toThrow("isn't sold at this location");
         // Hill Road still sells both.
         await orders.create(hill, ownerId, {
             customerId: buyer[hill],

@@ -27,7 +27,7 @@ const product = {
     howToUse: null,
     materials: null,
     materialsLabel: "Ingredients or material",
-    maker: "Online",
+    maker: "Tanvi Studio",
     warranty: null,
     returns: null,
     extras: [],

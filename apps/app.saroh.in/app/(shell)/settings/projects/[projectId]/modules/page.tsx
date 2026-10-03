@@ -2,6 +2,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 
 import { ProjectModuleSelector } from "@/components/projects/project-module-selector";
 import { PageContainer } from "@/components/shared/page-container";
+import { rolledOut } from "@/lib/modules/rollout";
 import { listModules } from "@/lib/modules/service";
 import { requireSession } from "@/lib/session";
 
@@ -20,7 +21,8 @@ export default async function ProjectModulesPage({
 }) {
     await requireSession();
     const { projectId } = await params;
-    const modules = await listModules(projectId);
+    // Only what Saroh has rolled out to this business (DEC-057).
+    const modules = rolledOut(await listModules(projectId));
 
     return (
         <PageContainer width="form">

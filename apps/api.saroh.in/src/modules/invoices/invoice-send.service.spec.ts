@@ -5,9 +5,27 @@ jest.mock("../../env", () => ({
     env: { NODE_ENV: "test", RENDERER_URL: "https://saroh.app" },
 }));
 
+// PAY_LINK_ON_SITE (DEC-069, L7): off unless a test turns it on.
+const payLinkOnSite = jest.fn().mockResolvedValue(false);
+jest.mock("../feature-flags/feature-flags.service", () => ({
+    FeatureFlagService: jest.fn().mockImplementation(() => ({
+        isEnabled: payLinkOnSite,
+    })),
+}));
+
 jest.mock("../communications/account-thread", () => ({
     ACCOUNT_THREAD_POSTER: Symbol("ACCOUNT_THREAD_POSTER"),
     accountThreadOn: jest.fn().mockResolvedValue(true),
+}));
+
+// The business-details refusal (DEC-068) has its own specs
+// (`business-details.spec.ts`, `business-details.db.spec.ts`); here
+// the business has its address.
+jest.mock("./business-details", () => ({
+    ...jest.requireActual<typeof import("./business-details")>(
+        "./business-details",
+    ),
+    assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@saroh/database", () => {
@@ -19,10 +37,17 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         customerThreadMessage: { findFirst: jest.fn(), count: jest.fn() },
-        merchantPaymentProvider: { count: jest.fn() },
+        merchantPaymentProvider: { findFirst: jest.fn() },
+        // DEC-070: Payments on or off decides a pay link or a view link.
+        organizationModule: { findFirst: jest.fn() },
+        // D13: an autopay charge under way holds the send.
+        paymentIntent: { findMany: jest.fn() },
         customerAccount: { count: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         organization: { findUnique: jest.fn() },
+        // Where the pay link lives (DEC-069, L7): the live site, its domain.
+        site: { findFirst: jest.fn() },
+        domain: { findFirst: jest.fn() },
         $queryRaw: jest.fn(),
     };
     return {
@@ -101,7 +126,9 @@ beforeEach(() => {
     db.message!.count!.mockResolvedValue(0);
     db.customerThreadMessage!.findFirst!.mockResolvedValue(null);
     db.customerThreadMessage!.count!.mockResolvedValue(0);
-    db.merchantPaymentProvider!.count!.mockResolvedValue(1);
+    db.merchantPaymentProvider!.findFirst!.mockResolvedValue({ id: "mpp_1" });
+    db.organizationModule!.findFirst!.mockResolvedValue(null);
+    db.paymentIntent!.findMany!.mockResolvedValue([]);
     db.customerAccount!.count!.mockResolvedValue(0);
     db.businessProfile!.findUnique!.mockResolvedValue(null);
     comms.emailConnected.mockResolvedValue(true);
@@ -110,17 +137,53 @@ beforeEach(() => {
         contactId: "c_1",
     });
     (accountThreadOn as jest.Mock).mockResolvedValue(true);
+    payLinkOnSite.mockResolvedValue(false);
 });
 
 describe("the send flag", () => {
-    it("needs a payment provider: no pay link, nothing to send", async () => {
-        db.merchantPaymentProvider!.count!.mockResolvedValue(0);
+    it("with a provider and Payments on: a pay link (payOnline)", async () => {
         const { send } = await service().readFor("org_1", "inv_1");
         expect(send).toEqual({
-            channels: [],
-            reason: "NO_PAYMENT_PROVIDER",
+            channels: ["email"],
+            emailTo: "asha@example.com",
+            payOnline: true,
             nextReminderAt: null,
         });
+    });
+
+    it("needs no payment provider: it sends a view link (DEC-070)", async () => {
+        db.merchantPaymentProvider!.findFirst!.mockResolvedValue(null);
+        const { send } = await service().readFor("org_1", "inv_1");
+        expect(send).toEqual({
+            channels: ["email"],
+            emailTo: "asha@example.com",
+            payOnline: false,
+            nextReminderAt: null,
+        });
+    });
+
+    it("with Payments off, a connected provider still sends a view link", async () => {
+        db.organizationModule!.findFirst!.mockResolvedValue({ id: "om_1" });
+        const { send } = await service().readFor("org_1", "inv_1");
+        expect(send.channels).toEqual(["email"]);
+        expect(send.payOnline).toBe(false);
+    });
+
+    it("an autopay charge under way holds it: AUTOPAY_PENDING, and a send is a 409 (D13)", async () => {
+        db.paymentIntent!.findMany!.mockResolvedValue([
+            {
+                id: "pi_m",
+                invoiceId: "inv_1",
+                debitAfter: new Date("2026-10-02T10:00:00Z"),
+                createdAt: new Date("2026-10-01T10:00:00Z"),
+            },
+        ]);
+        const { send } = await service().readFor("org_1", "inv_1");
+        expect(send).toMatchObject({ channels: [], reason: "AUTOPAY_PENDING" });
+        await expect(service().remind(owner, "inv_1")).rejects.toThrow(
+            "Autopay charge in progress",
+        );
+        expect(comms.queueTransactional).not.toHaveBeenCalled();
     });
 
     it("no email address and no thread: NO_EMAIL_ADDRESS", async () => {
@@ -227,8 +290,76 @@ describe("sending", () => {
                 total: "₹2,400.00",
                 dueOn: null,
                 overdue: false,
+                payOnline: true,
             },
         });
+    });
+
+    it.each([
+        ["a pay link with a provider", { id: "mpp_1" }, true],
+        ["a view link without one (DEC-070)", null, false],
+    ])("mints %s", async (_label, provider, payOnline) => {
+        db.merchantPaymentProvider!.findFirst!.mockResolvedValue(provider);
+        comms.queueTransactional.mockResolvedValue({
+            id: "m_1",
+            status: "QUEUED",
+            toAddress: "asha@example.com",
+        });
+        db.organization!.findUnique!.mockResolvedValue({ name: "Rye & Co." });
+        const createPayLinkInTx = jest
+            .fn()
+            .mockResolvedValue({ token: "tok_1" });
+        await new InvoiceSendService(
+            { createPayLinkInTx } as unknown as InvoicesService,
+            comms as unknown as CommunicationsService,
+        ).send(owner, "inv_1");
+
+        const input = comms.queueTransactional.mock.calls[0][2];
+        expect(input.vars.payOnline).toBe(payOnline);
+        await expect(input.secretLink()).resolves.toBe(
+            "https://saroh.app/pay/tok_1",
+        );
+        expect(createPayLinkInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            owner,
+            "inv_1",
+            { requireProvider: payOnline },
+        );
+    });
+});
+
+describe("the link on the business's own address (DEC-069, L7)", () => {
+    it("puts the emailed link on the business's site, read on the send's transaction", async () => {
+        payLinkOnSite.mockResolvedValue(true);
+        db.site!.findFirst!.mockResolvedValue({
+            id: "site_1",
+            subdomain: "rye",
+        });
+        db.domain!.findFirst!.mockResolvedValue(null);
+        comms.queueTransactional.mockResolvedValue({
+            id: "m_1",
+            status: "QUEUED",
+            toAddress: "asha@example.com",
+        });
+        db.organization!.findUnique!.mockResolvedValue({ name: "Rye & Co." });
+        const createPayLinkInTx = jest
+            .fn()
+            .mockResolvedValue({ token: "tok_1" });
+        await new InvoiceSendService(
+            { createPayLinkInTx } as unknown as InvoicesService,
+            comms as unknown as CommunicationsService,
+        ).send(owner, "inv_1");
+
+        const input = comms.queueTransactional.mock.calls[0][2];
+        await expect(input.secretLink()).resolves.toBe(
+            "https://rye.saroh.app/pay/tok_1",
+        );
+        expect(payLinkOnSite).toHaveBeenCalledWith("PAY_LINK_ON_SITE", "org_1");
+        expect(db.site!.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ organizationId: "org_1" }),
+            }),
+        );
     });
 });
 

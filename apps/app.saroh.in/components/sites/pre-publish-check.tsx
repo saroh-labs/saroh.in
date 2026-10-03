@@ -1,16 +1,21 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import Link from "next/link";
 import { useEffect } from "react";
 
-import { shortDate } from "@/lib/sites/format-date";
+import {
+    APPROVAL_LINE,
+    goesLive,
+    TYPE_LABEL,
+} from "@/components/sites/pre-publish-words";
 import type {
-    ApprovalOutcome,
     Flag,
     FlagType,
     ReviewState,
     SitePage,
 } from "@/lib/sites/service";
+import { OVERRIDE_RECORD } from "@/lib/sites/test-releases";
 
 /**
  * The pre-publish check (spec §2, "Publish").
@@ -21,75 +26,19 @@ import type {
  *
  * A takeover rather than a dialog on purpose: this is the last look at the
  * whole site before it becomes public, and a panel over the editor invites
- * skimming past it. Nothing here blocks publishing — every flag is advisory,
- * so the primary action stays live at all times and never argues with the
- * merchant about whether they are ready.
+ * skimming past it. Flags are advisory, so the primary action stays live and
+ * never argues with the merchant about whether they are ready — with one
+ * exception (DEC-069, L5): a site with no web address would go live at no
+ * address, so its `blocking` flag holds the button and links to where the
+ * address is chosen.
  */
 
-/** The spec's voice: warm, a little human. Group headings, not error codes. */
-const TYPE_LABEL: Record<FlagType, string> = {
-    emptyRequiredField: "Nothing filled in yet",
-    placeholderText: "Placeholder text still in place",
-    missingImage: "No image yet",
-    hiddenButLinked: "Hidden but linked from navigation",
-    pageNotInNavigation: "Not in the navigation",
-    unpublishedChanges: "Changes visitors cannot see yet",
-    missingSeoDescription: "No search description",
-    brokenLink: "Link goes nowhere",
-    phoneWidth: "Breaks at phone width",
-    storefrontUnchosen: "No storefront to sell from",
-    reservedAddress: "Change address",
-    shopCantTakeOrders: "Can't take orders online",
-    productsNotOnSale: "Products not on sale",
-};
+/** Where the business's web address is chosen (Settings › Business, L4). */
+export const WEB_ADDRESS_SETTINGS_HREF = "/settings/organization";
 
-/**
- * The approval line, worded per outcome. Keyed by the union so a new outcome
- * is a type error here rather than a line that falls through to "asked for
- * changes". Only an approval takes the accent: it is the one good-news verdict.
- */
-const APPROVAL_LINE: Record<
-    ApprovalOutcome,
-    {
-        approved: boolean;
-        text: (approval: NonNullable<ReviewState["latestApproval"]>) => string;
-    }
-> = {
-    // Asked for and not yet answered (#278). Publishing is still allowed from
-    // this panel — it says so, and the publish records as a bypass.
-    REQUESTED: {
-        approved: false,
-        text: ({ by }) => `${by} asked for a review, and nobody has replied`,
-    },
-    APPROVED: { approved: true, text: ({ by }) => `${by} approved this site` },
-    CHANGES_REQUESTED: {
-        approved: false,
-        text: ({ by }) => `${by} asked for changes`,
-    },
-    BYPASSED: {
-        approved: false,
-        text: ({ by, at }) =>
-            `${by} published without approval on ${shortDate(at)}`,
-    },
-};
-
-/**
- * What publishing puts live, in one sentence (G2). A site that has never
- * published goes live whole; a missing count is said, not guessed; and
- * publishing with nothing changed still makes a new version.
- */
-export function goesLive(
-    neverPublished: boolean,
-    pendingKnown: boolean,
-    pendingSummary: string | null,
-): string {
-    if (neverPublished) return "Publishing puts the whole site live.";
-    if (!pendingKnown) {
-        return "We couldn't check what's changed. Publishing puts the site live as it is now.";
-    }
-    if (pendingSummary) return `Publishing puts live: ${pendingSummary}.`;
-    return "Nothing has changed since the last publish. Publishing again makes a new version that matches the live one.";
-}
+// The words live in pre-publish-words.ts; goesLive is re-exported for
+// the callers that imported it from here.
+export { goesLive };
 
 export function PrePublishCheck({
     siteName,
@@ -102,6 +51,9 @@ export function PrePublishCheck({
     pendingSummary,
     pendingKnown,
     review,
+    needsApproval = false,
+    canOverride = false,
+    scheduledWarning = null,
     onPublish,
     onClose,
     onJump,
@@ -128,6 +80,17 @@ export function PrePublishCheck({
     pendingKnown: boolean;
     /** "Approval also shows as a line in the pre-publish check" (spec §2). */
     review: ReviewState;
+    /**
+     * "Publishing needs approval" is on (DEC-071, R10). Only an owner gets
+     * here then, and their publish is the recorded override (KTD-11).
+     */
+    needsApproval?: boolean;
+    canOverride?: boolean;
+    /**
+     * A test release is scheduled to go live, and publishing now means it
+     * won't (KTD-14): said before, not discovered after.
+     */
+    scheduledWarning?: string | null;
     onPublish: () => void;
     onClose: () => void;
     /** Jump to a flag's section. Null pageId means a whole-site flag. */
@@ -159,6 +122,8 @@ export function PrePublishCheck({
         .filter((g) => g.flags.length > 0);
 
     const total = flags.length;
+    // What the API will refuse to publish past (L5): the button waits.
+    const blocked = flags.some((f) => f.blocking);
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -188,18 +153,28 @@ export function PrePublishCheck({
                     <Button
                         type="button"
                         size="sm"
-                        disabled={publishing || unsaved}
+                        // An owner's override is the destructive kind of
+                        // publish: it goes past a rule the business set.
+                        variant={needsApproval ? "destructive" : "default"}
+                        disabled={
+                            publishing ||
+                            unsaved ||
+                            blocked ||
+                            (needsApproval && !canOverride)
+                        }
                         title={
-                            unsaved
-                                ? "Saving your changes — publish is available in a moment"
-                                : undefined
+                            blocked
+                                ? "Choose a web address first"
+                                : unsaved
+                                  ? "Saving your changes — publish is available in a moment"
+                                  : undefined
                         }
                         onClick={onPublish}
                         className="h-8 px-3"
                     >
                         {publishing
                             ? "Publishing…"
-                            : review.outstanding
+                            : needsApproval || review.outstanding
                               ? "Publish without approval"
                               : neverPublished
                                 ? "Publish site"
@@ -217,6 +192,28 @@ export function PrePublishCheck({
                     <p className="mb-6 text-sm">
                         {goesLive(neverPublished, pendingKnown, pendingSummary)}
                     </p>
+                    {/*
+                     * "Publishing needs approval" (DEC-071): what pressing
+                     * Publish here leaves behind, named before it happens.
+                     */}
+                    {needsApproval ? (
+                        <p
+                            role="note"
+                            className="mb-6 rounded-md bg-destructive-subtle px-3 py-2 text-sm text-destructive-subtle-foreground"
+                        >
+                            {canOverride
+                                ? `This site goes live only from an approved test release. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
+                                : "This site goes live only from an approved test release. Make a test release and ask for a review."}
+                        </p>
+                    ) : null}
+                    {scheduledWarning ? (
+                        <p
+                            role="note"
+                            className="mb-6 rounded-md border px-3 py-2 text-sm text-muted-foreground"
+                        >
+                            {scheduledWarning}
+                        </p>
+                    ) : null}
                     {/*
                      * The approval, where the spec puts it: this is the last
                      * look before going live, and whether someone has signed
@@ -362,6 +359,30 @@ function Row({
     page?: SitePage;
     onJump: (pageId: string | null, sectionIndex: number | null) => void;
 }) {
+    if (flag.type === "addressMissing") {
+        // Nothing in the editor fixes this: the address is the business's,
+        // chosen in Settings › Business, so the row goes there.
+        return (
+            <li>
+                <Link
+                    href={WEB_ADDRESS_SETTINGS_HREF}
+                    className="flex w-full cursor-pointer items-start gap-3 p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
+                >
+                    <span
+                        aria-hidden="true"
+                        className="mt-1.5 size-1 shrink-0 rounded-full bg-destructive"
+                    />
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-sm">{flag.message}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {TYPE_LABEL[flag.type]} · Choose one in Settings ›
+                            Business
+                        </span>
+                    </span>
+                </Link>
+            </li>
+        );
+    }
     return (
         <li>
             <button

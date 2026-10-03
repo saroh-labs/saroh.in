@@ -22,6 +22,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { validationPipeOptions } from "../../common/validation";
 import type { AuditService } from "../audit/audit.service";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { OrgAction } from "../organizations/organization-actions";
 import { UpdateAlertDto } from "./notification-preferences.dto";
 import { NotificationPreferencesService } from "./notification-preferences.service";
@@ -33,11 +34,13 @@ const db = prisma as unknown as {
 
 const record = jest.fn();
 const evaluate = jest.fn();
+const releasesOn = jest.fn().mockResolvedValue(false);
 
 function service() {
     return new NotificationPreferencesService(
         { evaluate } as unknown as ModuleAvailabilityService,
         { record } as unknown as AuditService,
+        { isEnabled: releasesOn } as unknown as FeatureFlagService,
     );
 }
 
@@ -156,6 +159,51 @@ describe("reading your alerts", () => {
         modules(["APPOINTMENTS"], ["COMMERCE"]);
         const view = await service().read(ctx());
         expect(view.alerts.map((a) => a.key)).toEqual(["failed", "team"]);
+    });
+
+    it("offers the Website row only with test releases on, to who can publish (DEC-071, T10)", async () => {
+        providers("EMAIL");
+        releasesOn.mockResolvedValue(true);
+        const view = await service().read(ctx());
+        expect(view.alerts.map((a) => a.key)).toEqual([
+            "order",
+            "booking",
+            "failed",
+            "team",
+            "site",
+        ]);
+        // Email on by default: the site changed, or didn't, unwatched.
+        expect(view.alerts.find((a) => a.key === "site")?.channels).toEqual({
+            bell: true,
+            email: true,
+            whatsapp: false,
+        });
+
+        // Can't publish, not offered, and the flag isn't even asked.
+        releasesOn.mockClear();
+        const member = await service().read(
+            ctx({ role: "MEMBER", roleKey: "MEMBER" }),
+        );
+        expect(member.alerts.map((a) => a.key)).not.toContain("site");
+        expect(releasesOn).not.toHaveBeenCalled();
+
+        // The website module off: not named (DEC-057).
+        modules(["WEBSITE"]);
+        const off = await service().read(ctx());
+        expect(off.alerts.map((a) => a.key)).not.toContain("site");
+    });
+
+    it("hides the Website row while the business has no test releases", async () => {
+        releasesOn.mockResolvedValue(false);
+        const view = await service().read(ctx());
+        expect(view.alerts.map((a) => a.key)).not.toContain("site");
+        await expect(
+            service().update(ctx(), {
+                alert: "site",
+                channel: "bell",
+                on: false,
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
     });
 
     it("WhatsApp with a provider still can't reach a team member", async () => {

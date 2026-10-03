@@ -24,12 +24,21 @@ import {
     BusinessHoursSection,
     HOURS_SECTION,
 } from "@/components/organizations/business-hours-section";
+import {
+    BusinessKindField,
+    KIND_ROW_LABEL,
+    kindChoiceLabel,
+} from "@/components/organizations/business-kind-field";
 import { BusinessLogoRow } from "@/components/organizations/business-logo-row";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
 import type { BusinessRow } from "@/components/organizations/business-section";
 import { BusinessSection } from "@/components/organizations/business-section";
 import { GstinGuide } from "@/components/organizations/gstin-guide";
 import { InvoiceNumberFields } from "@/components/organizations/invoice-number-fields";
+import {
+    fieldWidth,
+    RegisteredAddressFields,
+} from "@/components/organizations/registered-address-fields";
 import {
     ADDRESS_API_KEY,
     ADDRESS_KEYS,
@@ -45,7 +54,7 @@ import {
     logoCardUndo,
     useSettingsUndo,
 } from "@/components/organizations/use-settings-undo";
-import { countryName, CountrySelect } from "@/components/shared/country-select";
+import { countryName } from "@/components/shared/country-select";
 import { OptionSelect } from "@/components/shared/option-select";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import {
@@ -70,14 +79,18 @@ import {
     phoneLabel,
     phoneProblem,
 } from "@/lib/organizations/business-phone";
-import type { BusinessTypeValue } from "@/lib/organizations/business-types";
 import {
+    BUSINESS_TYPE_ANCHOR,
     BUSINESS_TYPE_OPTIONS,
     BUSINESS_TYPE_VALUES,
-    businessTypeForApi,
     businessTypeLabel,
     businessTypeOf,
 } from "@/lib/organizations/business-types";
+import {
+    kindOf,
+    kindWords,
+    ORGANIZATION_KINDS,
+} from "@/lib/organizations/kind";
 import { addressProblems } from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
@@ -92,6 +105,8 @@ const optionalText = (schema: z.ZodString) =>
 const formSchema = z
     .object({
         name: z.string().trim().min(1, { message: "Name is required" }),
+        // What is being set up (DEC-070): words and defaults only.
+        kind: z.enum(ORGANIZATION_KINDS),
         legalName: z.string().optional(),
         type: z.enum(BUSINESS_TYPE_VALUES).optional(),
         country: z.string().optional(),
@@ -175,6 +190,7 @@ const FIELD_OF: Record<string, keyof FormValues> = {
     city: "city",
     postalCode: "postalCode",
     name: "name",
+    kind: "kind",
     timezone: "timezone",
     phone: "phone",
 };
@@ -198,6 +214,7 @@ function numberFormatOf(settings: OrganizationSettings) {
 function valuesOf(settings: OrganizationSettings): FormValues {
     return {
         name: settings.name,
+        kind: kindOf(settings.kind),
         legalName: settings.profile?.legalName ?? "",
         type: businessTypeOf(settings.profile?.type),
         country: settings.profile?.country ?? "",
@@ -229,7 +246,7 @@ const SECTIONS = {
     identity: {
         title: "Identity",
         lead: "How the business is named and registered",
-        fields: ["name", "legalName", "type", "timezone"],
+        fields: ["kind", "name", "legalName", "type", "timezone"],
     },
     contact: {
         title: "Contact",
@@ -252,7 +269,7 @@ const SECTIONS = {
         ],
     },
     address: {
-        title: "Address",
+        title: "Registered address",
         lead: "Printed under your legal name",
         fields: [
             "addressLine1",
@@ -355,6 +372,7 @@ export function OrganizationSettingsForm({
     canEdit,
     hours,
     canEditHours,
+    webAddress,
 }: {
     settings: OrganizationSettings;
     canEdit: boolean;
@@ -362,6 +380,11 @@ export function OrganizationSettingsForm({
     hours: StorefrontHoursRead;
     /** May change the storefronts, which is where hours are kept. */
     canEditHours: boolean;
+    /**
+     * The web address card (DEC-069, L4), drawn under Identity. It saves on
+     * its own, so it sits beside this form's `<form>`, never inside it.
+     */
+    webAddress?: React.ReactNode;
 }) {
     const router = useRouter();
     // What the API last said, so the cards read the saved values at once
@@ -476,12 +499,6 @@ export function OrganizationSettingsForm({
                 values[key]?.trim() ?? "",
             ]),
         );
-        // Private limited goes as the spelling every API takes (F10).
-        if ("type" in profile) {
-            profile.type = businessTypeForApi(
-                profile.type as BusinessTypeValue,
-            );
-        }
         const tax = {
             ...(dirtyFields.gstRegistered
                 ? { registered: values.gstRegistered }
@@ -528,6 +545,7 @@ export function OrganizationSettingsForm({
 
         const sent = {
             ...(dirtyFields.name ? { name: values.name.trim() } : {}),
+            ...(dirtyFields.kind ? { kind: values.kind } : {}),
             ...(Object.keys(profile).length > 0 ? { profile } : {}),
             ...(Object.keys(tax).length > 0 ? { tax } : {}),
             ...(Object.keys(registeredAddress).length > 0
@@ -545,8 +563,10 @@ export function OrganizationSettingsForm({
         }
 
         const title = SECTIONS[editing].title;
+        // What is being set up prints on nothing: only its words change.
+        const printed = Object.keys(sent).some((key) => key !== "kind");
         undo.offer(
-            editing === "contact"
+            editing === "contact" || !printed
                 ? `${title} saved`
                 : `${title} saved — invoices from now on use it`,
             cardUndo(settings, result.data, sent, applySaved),
@@ -596,9 +616,21 @@ export function OrganizationSettingsForm({
         void form.trigger(NUMBER_FIELDS);
     };
 
+    // The words of what is saved (DEC-070): an Undo puts them back too.
+    const words = kindWords(saved.kind);
+    const nameLabel =
+        saved.kind === "BUSINESS" ? "Business name" : words.nameLabel;
+    const leadOf = (key: SectionKey) =>
+        key === "identity" && saved.kind !== "BUSINESS"
+            ? "How you're named and registered"
+            : key === "contact"
+              ? `How ${words.people} reach you`
+              : SECTIONS[key].lead;
+
     const rows: Record<SectionKey, BusinessRow[]> = {
         identity: [
-            { label: "Business name", value: saved.name },
+            { label: KIND_ROW_LABEL, value: kindChoiceLabel(saved.kind) },
+            { label: nameLabel, value: saved.name },
             {
                 label: "Legal name",
                 value: saved.legalName ?? "",
@@ -620,12 +652,9 @@ export function OrganizationSettingsForm({
                 mono: true,
                 tag: "From your first order",
             },
-            {
-                label: "Workspace address",
-                value: settings.slug,
-                mono: true,
-                tag: "Can't be changed",
-            },
+            // No address row: the Web address card under this one shows it
+            // whole and changes it (DEC-069, L4), so a second "can't be
+            // changed" line would contradict it.
         ],
         contact: [
             { label: "Contact email", value: saved.contactEmail ?? "" },
@@ -686,7 +715,7 @@ export function OrganizationSettingsForm({
               ],
         address: [
             {
-                label: "Address",
+                label: "Registered address",
                 value: addressText(saved),
                 empty: "No registered address yet",
             },
@@ -739,142 +768,36 @@ export function OrganizationSettingsForm({
     };
 
     /** One field's wrapper, at the width the design gives it. */
-    const at = (basis: string, grow = true) => ({
-        className: cn(
-            "min-w-0",
-            grow ? "flex-[1_1_var(--b)]" : "flex-[0_1_var(--b)]",
-        ),
-        style: { "--b": basis } as React.CSSProperties,
-    });
+    const at = fieldWidth;
 
     // States are India's (GST's list); another country's address has none.
     const inIndia = registered || ["", "IN"].includes(v.country ?? "");
     const addressFields = (
-        <>
-            {(
-                [
-                    [
-                        "addressLine1",
-                        "Address line 1",
-                        "100%",
-                        true,
-                        "address-line1",
-                    ],
-                    [
-                        "addressLine2",
-                        "Address line 2 (optional)",
-                        "100%",
-                        true,
-                        "address-line2",
-                    ],
-                    ["city", "City", "240px", true, "address-level2"],
-                    ["postalCode", "PIN code", "140px", false, "postal-code"],
-                ] as const
-            ).map(([name, label, basis, grow, auto]) => (
-                <FormField
-                    key={name}
-                    control={form.control}
-                    name={name}
-                    render={({ field }) => (
-                        <FormItem {...at(basis, grow)}>
-                            <FormLabel>{label}</FormLabel>
-                            <FormControl>
-                                <Input
-                                    {...field}
-                                    maxLength={name === "postalCode" ? 12 : 120}
-                                    inputMode={
-                                        name === "postalCode"
-                                            ? "numeric"
-                                            : undefined
-                                    }
-                                    autoComplete={auto}
-                                    className={cn(
-                                        name === "postalCode" && "font-mono",
-                                    )}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            ))}
-            {inIndia ? (
-                <FormField
-                    control={form.control}
-                    name="gstState"
-                    render={({ field }) => (
-                        <FormItem {...at("240px")}>
-                            <FormLabel>State</FormLabel>
-                            <FormControl>
-                                <OptionSelect
-                                    // A registered business's state is its
-                                    // GSTIN's: the API takes no other.
-                                    value={
-                                        registered
-                                            ? (v.taxId ?? "")
-                                                  .trim()
-                                                  .slice(0, 2)
-                                                  .toUpperCase()
-                                            : field.value
-                                    }
-                                    onValueChange={field.onChange}
-                                    options={[
-                                        { value: "", label: "Choose a state" },
-                                        ...GST_STATES,
-                                    ]}
-                                    disabled={registered}
-                                    className="w-full"
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                {registered
-                                    ? "Set by your GSTIN."
-                                    : "Printed with the address."}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            ) : null}
-            <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                    <FormItem {...at("220px")}>
-                        <FormLabel>Country</FormLabel>
-                        <FormControl>
-                            <CountrySelect
-                                value={registered ? "IN" : (field.value ?? "")}
-                                onValueChange={field.onChange}
-                                disabled={registered}
-                            />
-                        </FormControl>
-                        <FormDescription>
-                            {registered
-                                ? "GST registration is Indian."
-                                : "Where the business is registered."}
-                        </FormDescription>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-        </>
+        <RegisteredAddressFields
+            control={form.control}
+            registered={registered}
+            gstinState={(v.taxId ?? "").trim().slice(0, 2).toUpperCase()}
+            inIndia={inIndia}
+            withCountry
+            at={at}
+        />
     );
 
     const fieldsOf: Record<SectionKey, React.ReactNode> = {
         identity: (
             <>
+                <BusinessKindField control={form.control} name="kind" at={at} />
                 <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                         <FormItem {...at("100%")}>
-                            <FormLabel>Business name</FormLabel>
+                            <FormLabel>{nameLabel}</FormLabel>
                             <FormControl>
                                 <Input {...field} maxLength={120} />
                             </FormControl>
                             <FormDescription>
-                                Shown to customers on receipts and in the
+                                Shown to {words.people} on receipts and in the
                                 switcher above.
                             </FormDescription>
                             <FormMessage />
@@ -905,7 +828,19 @@ export function OrganizationSettingsForm({
                     control={form.control}
                     name="type"
                     render={({ field }) => (
-                        <FormItem {...at("220px")}>
+                        // The go-live checklist's "Choose your business
+                        // type" lands here (`#business-type`).
+                        // Half the card, as the design draws it: the time
+                        // zone below takes its own row, so a growing Type
+                        // would stretch a seven-word choice across it.
+                        <FormItem
+                            {...at("220px", false)}
+                            id={BUSINESS_TYPE_ANCHOR}
+                            className={cn(
+                                at("220px", false).className,
+                                "scroll-mt-24",
+                            )}
+                        >
                             <FormLabel>Type</FormLabel>
                             <FormControl>
                                 <OptionSelect
@@ -1207,7 +1142,7 @@ export function OrganizationSettingsForm({
                                 "flex shrink-0 items-center gap-[7px] whitespace-nowrap px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
                                 on
                                     ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
+                                    : "font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
                             )}
                         >
                             {titleOf(key)}
@@ -1224,49 +1159,52 @@ export function OrganizationSettingsForm({
 
             <div className="flex flex-wrap items-start gap-5">
                 {tab === "hours" ? null : (
-                    <form
-                        id="business-panel"
-                        role="tabpanel"
-                        aria-labelledby={`business-tab-${tab}`}
-                        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-                        className="grid min-w-0 flex-[1_1_460px] gap-4"
-                    >
-                        <BusinessSection
-                            title={SECTIONS[tab].title}
-                            lead={SECTIONS[tab].lead}
-                            rows={rows[tab]}
-                            note={notes[tab]}
-                            editing={editing === tab}
-                            canEdit={canEdit}
-                            onEdit={() => startEditing(tab)}
-                            onCancel={cancel}
-                            saveOff={!isDirty || sectionErrors > 0}
-                            saving={isSubmitting}
-                            saveWhy={saveWhy}
-                            top={
-                                tab === "identity" ? (
-                                    <BusinessLogoRow
-                                        logoUrl={settings.logo?.url ?? null}
-                                        name={settings.name}
-                                        canEdit={canEdit}
-                                        onSaved={(next, said) => {
-                                            undo.offer(
-                                                said,
-                                                logoCardUndo(
-                                                    settings,
-                                                    next,
-                                                    setSettings,
-                                                ),
-                                            );
-                                            setSettings(next);
-                                        }}
-                                    />
-                                ) : undefined
-                            }
+                    <div className="grid min-w-0 flex-[1_1_460px] gap-4">
+                        <form
+                            id="business-panel"
+                            role="tabpanel"
+                            aria-labelledby={`business-tab-${tab}`}
+                            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+                            className="grid min-w-0 gap-4"
                         >
-                            {fieldsOf[tab]}
-                        </BusinessSection>
-                    </form>
+                            <BusinessSection
+                                title={SECTIONS[tab].title}
+                                lead={leadOf(tab)}
+                                rows={rows[tab]}
+                                note={notes[tab]}
+                                editing={editing === tab}
+                                canEdit={canEdit}
+                                onEdit={() => startEditing(tab)}
+                                onCancel={cancel}
+                                saveOff={!isDirty || sectionErrors > 0}
+                                saving={isSubmitting}
+                                saveWhy={saveWhy}
+                                top={
+                                    tab === "identity" ? (
+                                        <BusinessLogoRow
+                                            logoUrl={settings.logo?.url ?? null}
+                                            name={settings.name}
+                                            canEdit={canEdit}
+                                            onSaved={(next, said) => {
+                                                undo.offer(
+                                                    said,
+                                                    logoCardUndo(
+                                                        settings,
+                                                        next,
+                                                        setSettings,
+                                                    ),
+                                                );
+                                                setSettings(next);
+                                            }}
+                                        />
+                                    ) : undefined
+                                }
+                            >
+                                {fieldsOf[tab]}
+                            </BusinessSection>
+                        </form>
+                        {tab === "identity" ? webAddress : null}
+                    </div>
                 )}
                 {/* Mounted on every tab, so an unsaved week survives a look
                     elsewhere, as the other cards' fields do. */}
@@ -1306,7 +1244,7 @@ export function OrganizationSettingsForm({
             </div>
             <LeaveDialog
                 to={leaveTo}
-                section={editing ? titleOf(editing) : "Business"}
+                section={editing ? titleOf(editing) : words.settingsTab}
                 onKeep={() => {
                     stay();
                     if (editing) setTab(editing);

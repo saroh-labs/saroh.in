@@ -39,7 +39,7 @@ import { SitesService } from "../sites/sites.service";
 import { ModuleAvailabilityService } from "./module-availability.service";
 import { ModuleEnforcementGuard } from "./module-enforcement.guard";
 import type { ModuleKey } from "./module-registry";
-import { MODULE_KEYS } from "./module-registry";
+import { MODULE_BY_KEY, MODULE_KEYS } from "./module-registry";
 import type { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
 /**
@@ -121,7 +121,13 @@ describe("ModuleEnforcementGuard by role, with enforcement on", () => {
                         (key === "APPOINTMENTS" ||
                             key === "CRM" ||
                             key === "COMMERCE"));
-                if (reach) {
+                if (reach && MODULE_BY_KEY.get(key)?.hidden) {
+                    // Hidden until it has a screen (DEC-068): shut to every
+                    // role, as a module Saroh hasn't rolled out is.
+                    await expect(result).rejects.toBeInstanceOf(
+                        ForbiddenException,
+                    );
+                } else if (reach) {
                     await expect(result).resolves.toBe(true);
                 } else {
                     await expect(result).rejects.toBeInstanceOf(

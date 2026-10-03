@@ -28,8 +28,10 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
     features: null,
     faq: null,
     testimonials: null,
-    // Typed by the merchant here, not read from a storefront.
+    // Typed by the merchant here, not read from a location.
     contact: null,
+    // The merchant's own work, typed here: there is nothing to read (K11).
+    projects: null,
     servicesList: {
         reads: "Reads your services live, so names, durations and prices are never out of date here.",
         notice: "What each service is called and what it costs follow Services — change them there, and this block follows.",
@@ -37,10 +39,10 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         linkLabel: "Open Services",
     },
     visitUs: {
-        reads: "Reads your shop's address and opening hours live, so they're never out of date here.",
-        notice: "The address lives on the storefront, and the hours in Settings › Hours — change them there, and this block follows.",
-        href: "/commerce/storefronts",
-        linkLabel: "Open Storefronts",
+        reads: "Reads your location address and opening hours live, so they're never out of date here.",
+        notice: "The location address is set in Sell › Locations, and the hours in Settings › Hours — change them there, and this block follows.",
+        href: "/commerce/locations",
+        linkLabel: "Open Locations",
     },
     journal: {
         reads: "Reads your latest published posts live, so a new post shows here without publishing the site again.",
@@ -54,9 +56,15 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         href: "/billing/subscriptions?tab=plans",
         linkLabel: "Open Plans",
     },
+    packs: {
+        reads: "Reads your class packs on sale live, so a price or a newly published pack shows here without publishing the site again.",
+        notice: "Packs live in Class packs. Only published packs show; a draft or an unpublished change never does.",
+        href: "/class-packs",
+        linkLabel: "Open Class packs",
+    },
     productGrid: {
         reads: "Reads the catalogue. Stays current on its own.",
-        notice: "Products live in Sell › Products. Which products appear follows the catalogue — add or hide them there, and this block follows. Only published products sold where the site sells from show.",
+        notice: "Products live in Sell › Products. Which products appear follows the catalogue — add or hide them there, and this block follows. Only published products at the location your online shop sells from show.",
         href: "/commerce/products",
         linkLabel: "Open Products",
     },

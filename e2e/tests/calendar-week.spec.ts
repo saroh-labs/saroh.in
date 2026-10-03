@@ -1,7 +1,9 @@
+// @covers accounts:/login app:/open app:/calendar api:calendar api:orders api:bookings api:staff
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Home › Calendar's Week (plan 005 E25) on Rye & Co., the seeded bakery:
@@ -19,13 +21,7 @@ const MONTHS = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
 const PULSE = "seed_sc_pulse_org";
 
 async function signIn(page: Page, org = ORG) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${org}`);
 }
 
@@ -186,5 +182,89 @@ test.describe("calendar week, hour grid", () => {
             sw: document.documentElement.scrollWidth,
         }));
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
+    });
+});
+
+/**
+ * The orders layer reaches whoever moves orders (E20, DEC-067): Rye's
+ * Member holds `order:stage`, and sees the orders on the calendar without
+ * their money. Read-only.
+ */
+test.describe("calendar orders for the kitchen (E20)", () => {
+    const member = {
+        email: "nisha.kulkarni@saroh.dev",
+        password: "demo-password-123",
+    };
+
+    test("a Member sees the orders layer, and no amount or money strip", async ({
+        page,
+    }) => {
+        await useSession(page, member);
+        await page.goto(`/open/${ORG}`);
+
+        const from = `${istDay(0).slice(0, 7)}-01`;
+        const res = await page.request.get(
+            `${urls.API_URL}/organizations/${ORG}/calendar?from=${from}&to=${istDay(0)}`,
+            { headers: { "x-organization-id": ORG, origin: urls.APP_URL } },
+        );
+        expect(res.ok()).toBe(true);
+        const month = (await res.json()) as {
+            layers: string[];
+            money?: unknown;
+            days: { layers: { orders?: { items: object[] } } }[];
+        };
+        expect(month.layers).toContain("orders");
+        expect(month).not.toHaveProperty("money");
+        for (const day of month.days) {
+            for (const item of day.layers.orders?.items ?? []) {
+                expect(item).not.toHaveProperty("amount");
+            }
+        }
+
+        await page.goto("/calendar");
+        await expect(
+            page
+                .getByRole("group", { name: "Show on the calendar" })
+                .getByRole("button", { name: /Orders/ }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("group", { name: "This month's money" }),
+        ).toHaveCount(0);
+    });
+});
+
+/**
+ * The month strip's Due counts from today, as the design shows, and what
+ * was due before today is Overdue (E23, DEC-067). Rye is only read.
+ */
+test.describe("calendar money: Due from today (E23)", () => {
+    test("Due is what's owed from today; Overdue shows only when something before today is", async ({
+        page,
+    }) => {
+        await signIn(page);
+        const today = istDay(0);
+        const from = `${today.slice(0, 7)}-01`;
+        const res = await page.request.get(
+            `${urls.API_URL}/organizations/${ORG}/calendar?from=${from}&to=${today}`,
+            { headers: { "x-organization-id": ORG, origin: urls.APP_URL } },
+        );
+        expect(res.ok()).toBe(true);
+        const month = (await res.json()) as {
+            money?: {
+                total: unknown;
+                entries: { date: string; due: number }[];
+            };
+        };
+        test.skip(!month.money?.total, "No money to read here.");
+        const overdue = (month.money?.entries ?? []).some(
+            (e) => e.due > 0 && e.date < today,
+        );
+
+        await page.goto("/calendar");
+        const strip = page.getByRole("group", { name: "This month's money" });
+        await expect(strip.getByRole("button", { name: /^Due/ })).toBeVisible();
+        await expect(
+            strip.getByRole("button", { name: /^Overdue/ }),
+        ).toHaveCount(overdue ? 1 : 0);
     });
 });

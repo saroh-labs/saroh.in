@@ -4,17 +4,21 @@ import {
     Logger,
     Optional,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { holdsPlace } from "../bookings/booking-hold";
 import { bookingDueCents, bookingPrice } from "../bookings/booking-money";
+import type { BookingPaperRow } from "../bookings/desk-take";
+import { paidAtDesk } from "../bookings/desk-take";
 import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { isPastDue } from "../invoices/invoice-state";
 import { realOrderWhere } from "../orders/open-orders";
+import { orderLocationWhere } from "../orders/order-location";
 import { allows, authorize } from "../organizations/organization-policy";
 import { dateKey } from "../subscriptions/collections";
 import type { CalendarStaff, DayOff } from "./days-off";
@@ -55,11 +59,12 @@ import type { WorkingHours } from "./working-hours";
  * ## Layers
  *
  * A layer exists only when its module is on (not DISABLED — the same rule
- * the rail and Home use) and the viewer may read it: orders `order:read`;
- * collections and subscriptions `subscription:read`; invoices
- * `invoice:read`; bookings and classes `booking:read`. A Member therefore
- * gets bookings and classes and nothing billed (DEC-020) — the layers are
- * absent, not an error.
+ * the rail and Home use) and the viewer may read it: orders `order:read` or
+ * `order:stage` (E20, DEC-067: whoever moves orders sees them, as the
+ * Orders list lets them); collections and subscriptions
+ * `subscription:read`; invoices `invoice:read`; bookings and classes
+ * `booking:read`. A Member therefore gets orders, bookings and classes and
+ * nothing billed (DEC-020) — the layers are absent, not an error.
  *
  * ## Degrading
  *
@@ -73,8 +78,11 @@ import type { WorkingHours } from "./working-hours";
  * Takings go only to a role that reads the merchant's money (`payment:read`
  * and `invoice:read`, ADR-008), and count each rupee once: orders plus paid
  * invoices that are not an order's own (ADR-008: every order has one).
- * Order amounts need `payment:read`; subscription and invoice amounts ride
- * with their own reads, and a booking's price with `booking:read` (DEC-039).
+ * Order amounts need `payment:read` and the order's own money read,
+ * `order:read`: someone who only stages orders gets them without money, as
+ * the Orders list sends them (DEC-024). Subscription and invoice amounts
+ * ride with their own reads, and a booking's price with `booking:read`
+ * (DEC-039).
  *
  * Money in, out and due (plan 005 E19) go to `payment:read` alone: each
  * item's `in`/`out`/`due`/`failed`, each day's `money` and the month's
@@ -103,8 +111,8 @@ import type { WorkingHours } from "./working-hours";
  * ## Range (plan 005 E20)
  *
  * The read takes `from`/`to` (local dates, both inclusive) and is refused
- * wholly before the joined month or past three months ahead (`range.ts`);
- * `month` stays as an alias for one release (Z3). A caller who reads none
+ * wholly before the joined month or past three months ahead (`range.ts`).
+ * (The one-release `month` alias is gone: Z3.) A caller who reads none
  * of the layers is refused outright (403), which the app shows as locked.
  * Items carry their person, length and flags; the read also returns the
  * days off, the team and the joined day. A business with no orders gets a
@@ -127,7 +135,7 @@ export interface CalendarUnavailable {
 }
 
 export interface CalendarMonth {
-    /** The month asked for; for a range, the month `from` is in. */
+    /** The month `from` is in. */
     month: string;
     timezone: string;
     timezoneSource: ZoneSource;
@@ -184,6 +192,7 @@ export interface CalendarMonth {
  */
 const LAYER_READS = [
     "order:read",
+    "order:stage",
     "booking:read",
     "subscription:read",
     "invoice:read",
@@ -277,16 +286,7 @@ export class CalendarService {
         @Optional() private readonly db: typeof prisma = prisma,
     ) {}
 
-    /** One month: the query the previous app sends (alias until Z3). */
-    month(
-        ctx: OrganizationContext,
-        month: string,
-        now: Date = new Date(),
-    ): Promise<CalendarMonth> {
-        return this.read(ctx, { month }, now);
-    }
-
-    /** The days asked for: `from`/`to`, or the `month` alias. */
+    /** The days asked for: `from`/`to`. */
     async read(
         ctx: OrganizationContext,
         query: CalendarQuery,
@@ -322,11 +322,16 @@ export class CalendarService {
 
         const money =
             allows(ctx, "payment:read") && allows(ctx, "invoice:read");
-        const orderAmounts = allows(ctx, "payment:read");
+        // An order's money is `order:read`'s: `order:stage` moves it
+        // without seeing it (DEC-024), on the calendar as on Orders.
+        const orderAmounts =
+            allows(ctx, "payment:read") && allows(ctx, "order:read");
         // Money in, out and due: the Payments scope alone (E19).
         const cells = allows(ctx, "payment:read");
         const sees: Record<LayerKey, boolean> = {
-            orders: on.has("COMMERCE") && allows(ctx, "order:read"),
+            orders:
+                on.has("COMMERCE") &&
+                (allows(ctx, "order:read") || allows(ctx, "order:stage")),
             collections: on.has("PAYMENTS") && allows(ctx, "subscription:read"),
             subscriptions:
                 on.has("PAYMENTS") && allows(ctx, "subscription:read"),
@@ -372,6 +377,8 @@ export class CalendarService {
                     orderAmounts,
                     money,
                     now,
+                    // A location's team sees its storefronts' (DEC-074).
+                    orderLocationWhere(ctx),
                 ),
             ),
             attempt("collections", sees.collections, () =>
@@ -641,6 +648,8 @@ export class CalendarService {
         amounts: boolean,
         money: boolean,
         now: Date,
+        /** The viewer's storefronts, when they are narrowed (DEC-074). */
+        location: Prisma.OrderWhereInput = {},
     ): Promise<{
         items: DatedItem[];
         takings: TakingEntry[];
@@ -654,6 +663,7 @@ export class CalendarService {
                     createdAt: { gte: window.start, lt: window.end },
                     // Never an abandoned site checkout, as Orders (B1).
                     ...realOrderWhere(),
+                    ...location,
                 },
                 orderBy: { createdAt: "asc" },
                 select: {
@@ -1234,11 +1244,19 @@ export class CalendarService {
                 bookerEmail: true,
                 service: { select: { name: true } },
                 // Its own invoice (ADR-008): what was paid online for it,
-                // and whether a pay link still asks for the rest.
+                // and whether a pay link still asks for the rest; and what
+                // was taken at the desk, a deposit's balance with it (P2).
                 invoices: {
-                    where: { kind: "INVOICE", source: "BOOKING" },
+                    where: {
+                        kind: { in: ["INVOICE", "SUPPLEMENTARY"] },
+                        source: "BOOKING",
+                    },
                     select: {
+                        kind: true,
                         status: true,
+                        paymentMethod: true,
+                        total: true,
+                        paidAt: true,
                         paymentIntents: {
                             where: { status: "SUCCEEDED" },
                             select: { amountCents: true },
@@ -1257,6 +1275,7 @@ export class CalendarService {
             const date = dayOf(b.startAt, zone);
             const { priceCents, currency } = bookingPrice(b.snapshot);
             const owes = this.bookingOwes(b, held, date >= today);
+            const desk = paidAtDesk(b.invoices);
             return {
                 layer: "bookings" as const,
                 date,
@@ -1278,7 +1297,13 @@ export class CalendarService {
                     subtitle:
                         [
                             b.staff ? `With ${b.staff.name}` : null,
-                            !held && b.paidWith ? PAID_WITH[b.paidWith] : null,
+                            held
+                                ? null
+                                : desk.cents > 0
+                                  ? "Paid at the desk"
+                                  : b.paidWith
+                                    ? PAID_WITH[b.paidWith]
+                                    : null,
                         ]
                             .filter(Boolean)
                             .join(" · ") || null,
@@ -1310,21 +1335,26 @@ export class CalendarService {
             outcome: string | null;
             paidWith: string | null;
             snapshot: unknown;
-            invoices: {
-                status: string;
+            invoices: (BookingPaperRow & {
                 paymentIntents: { amountCents: number }[];
-            }[];
+            })[];
         },
         held: boolean,
         ahead: boolean,
     ): DatedItem["owes"] {
         if (held || !ahead || b.outcome === "NO_SHOW") return undefined;
-        if (b.invoices.some((i) => i.status === "ISSUED")) return undefined;
-        const paidOnline = b.invoices
+        const own = b.invoices.filter((i) => i.kind === "INVOICE");
+        if (own.some((i) => i.status === "ISSUED")) return undefined;
+        const paidOnline = own
             .filter((i) => i.status === "PAID" || i.status === "CREDITED")
             .flatMap((i) => i.paymentIntents)
             .reduce((n, p) => n + p.amountCents, 0);
-        const due = bookingDueCents(b, paidOnline);
+        // Taken at the desk (P2) is paid, as online is.
+        const due = bookingDueCents(
+            b,
+            paidOnline,
+            paidAtDesk(b.invoices).cents,
+        );
         const { currency } = bookingPrice(b.snapshot);
         return due && currency
             ? { kind: "booking_due", currency, cents: due }

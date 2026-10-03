@@ -21,7 +21,8 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { payLinkUrl } from "../invoices/pay-link-url";
+import { payLinkUrlFor } from "../invoices/pay-link-url";
+import type { DeskPayment } from "./booking-desk-pay";
 import type { WithoutIntakeNote } from "./booking-intake";
 import { withoutIntakeNote } from "./booking-intake";
 import type {
@@ -30,6 +31,7 @@ import type {
     CancelledBooking,
 } from "./bookings.service";
 import { BookingsService } from "./bookings.service";
+import { TakeDeskPaymentDto } from "./desk-pay.dto";
 import {
     AddRuleDto,
     BookByHandDto,
@@ -252,7 +254,24 @@ export class BookingsController {
         @Param("bookingId") bookingId: string,
     ): Promise<{ url: string }> {
         const { token } = await this.bookings.payLink(ctx, bookingId);
-        return { url: payLinkUrl(token) };
+        return { url: await payLinkUrlFor(ctx.organizationId, token) };
+    }
+
+    /**
+     * "Take ₹X" at the desk (round-2 P2): cash, UPI at the counter or card,
+     * recorded on the booking's invoice (made, found, or a deposit's
+     * balance). 409 when there is nothing to take, a payment is going
+     * through online, or the amount changed; the same take asked again
+     * answers as it did.
+     */
+    @Post("bookings/:bookingId/desk-payment")
+    @HttpCode(200)
+    takeDeskPayment(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("bookingId") bookingId: string,
+        @Body() dto: TakeDeskPaymentDto,
+    ): Promise<DeskPayment> {
+        return this.bookings.takeDeskPayment(ctx, bookingId, dto);
     }
 
     /**

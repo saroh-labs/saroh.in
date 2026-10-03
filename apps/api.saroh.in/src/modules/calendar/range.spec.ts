@@ -42,16 +42,14 @@ describe("assertWithinReach", () => {
             ["2026-05-25", "2026-06-07"],
             ["2026-12-28", "2027-01-03"],
         ]) {
-            expect(() =>
-                assertWithinReach({ kind: "range", from, to }, reach),
-            ).not.toThrow();
+            expect(() => assertWithinReach({ from, to }, reach)).not.toThrow();
         }
     });
 
     it("refuses a range wholly outside, naming the month to open", () => {
         const refused = (from: string, to: string) => {
             try {
-                assertWithinReach({ kind: "range", from, to }, reach);
+                assertWithinReach({ from, to }, reach);
             } catch (e) {
                 expect(e).toBeInstanceOf(BadRequestException);
                 return (e as BadRequestException).getResponse();
@@ -65,25 +63,15 @@ describe("assertWithinReach", () => {
             details: { reason: "too_far_ahead", month: "2026-12" },
         });
     });
-
-    it("never refuses the month alias", () => {
-        expect(() =>
-            assertWithinReach({ kind: "month", month: "2020-01" }, reach),
-        ).not.toThrow();
-    });
 });
 
 describe("spanOf and windows", () => {
-    it("a month, or a range", () => {
-        expect(spanOf({ month: "2026-09" })).toEqual({
-            kind: "month",
-            month: "2026-09",
-        });
+    it("a range, and nothing else (the month alias is gone: Z3)", () => {
         expect(spanOf({ from: "2026-09-28", to: "2026-10-04" })).toEqual({
-            kind: "range",
             from: "2026-09-28",
             to: "2026-10-04",
         });
+        expect(() => spanOf({})).toThrow("from and to are both needed.");
     });
 
     it("a range of one day is that day, between its midnights", () => {
@@ -93,9 +81,9 @@ describe("spanOf and windows", () => {
         expect(w.end.toISOString()).toBe("2026-09-15T18:30:00.000Z");
     });
 
-    it("a month's window is the month's", () => {
+    it("a whole month's range is the month's days", () => {
         expect(
-            windowOf({ kind: "month", month: "2026-02" }, IST).days,
+            windowOf({ from: "2026-02-01", to: "2026-02-28" }, IST).days,
         ).toHaveLength(28);
     });
 });

@@ -40,10 +40,24 @@ export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 export const TEAM_TEMPLATES = ["TEAM_ALERT"] as const;
 export type TeamTemplate = (typeof TEAM_TEMPLATES)[number];
 
+/**
+ * D14's autopay set-up link, sent when staff press "Send a set-up link" on
+ * Subscription Detail: the provider's page to approve autopay on, as a
+ * secret link like a pay link. And the note that staff cancelled their
+ * autopay ("Cancel autopay"), which is also the `event` of the SYSTEM
+ * thread message it writes where the account thread is live.
+ */
+export const AUTOPAY_TEMPLATES = [
+    "AUTOPAY_SET_UP_LINK",
+    "AUTOPAY_CANCELLED",
+] as const;
+export type AutopayTemplate = (typeof AUTOPAY_TEMPLATES)[number];
+
 export const TRANSACTIONAL_TEMPLATES = [
     ...INVOICE_TEMPLATES,
     ...NOTICE_TEMPLATES,
     ...TEAM_TEMPLATES,
+    ...AUTOPAY_TEMPLATES,
 ] as const;
 export type TransactionalTemplate = (typeof TRANSACTIONAL_TEMPLATES)[number];
 
@@ -66,6 +80,12 @@ export interface InvoiceMailVars {
     dueOn: string | null;
     /** Past its due date. */
     overdue: boolean;
+    /**
+     * The link is a pay link (DEC-070). False: it opens the invoice to view
+     * and download, and the email doesn't offer to take the payment.
+     * Absent, as before DEC-070: a pay link.
+     */
+    payOnline?: boolean;
 }
 
 export interface RenderedMessage {
@@ -112,7 +132,9 @@ export function renderTransactional(
     const body = [
         `<p>${greeting}</p>`,
         `<p>${lead}</p>`,
-        `<p>You can pay it by UPI or card here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
+        vars.payOnline === false
+            ? `<p>You can view it and download a copy here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
+            : `<p>You can pay it by UPI or card here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
         reminder
             ? `<p>If you&#39;ve already paid, thank you, and please ignore this.</p>`
             : "",
@@ -122,6 +144,94 @@ export function renderTransactional(
         .join("\n");
 
     return { subject, body };
+}
+
+/** What the autopay set-up email says (D14). Money and dates arrive formatted. */
+export interface AutopayLinkMailVars {
+    business: string;
+    /** "Asha", or null when there's no name. */
+    firstName: string | null;
+    plan: string;
+    /** "UPI", "card", "bank account". */
+    method: string;
+    /** "₹3,800.00": the most one renewal may take. */
+    limit: string;
+    /** "₹1.00" when the method's approval takes a check (DEC-064), else null. */
+    check: string | null;
+    /** "6 Oct 2026": the link stops working after it. */
+    expiresOn: string;
+}
+
+/**
+ * The autopay set-up email (D14). It names only the method staff chose, and
+ * says the ₹1 check before they meet it (DEC-064). The link is the
+ * provider's page, put in at send time like a pay link.
+ */
+export function renderAutopaySetupLink(
+    vars: AutopayLinkMailVars,
+): RenderedMessage {
+    const business = escapeHtml(vars.business);
+    const plan = escapeHtml(vars.plan);
+    const greeting = vars.firstName
+        ? `Hi ${escapeHtml(vars.firstName)},`
+        : "Hello,";
+    const body = [
+        `<p>${greeting}</p>`,
+        `<p>${business} has sent you a link to turn on autopay for ${plan}. Once it&#39;s on, each renewal is paid from your ${escapeHtml(vars.method)}, up to ${escapeHtml(vars.limit)} a time. You can ask ${business} to cancel it whenever you like.</p>`,
+        vars.check
+            ? `<p>To switch it on, your bank needs a ${escapeHtml(vars.check)} check. It&#39;s refunded straight away and is back in your account in 5–7 working days.</p>`
+            : "",
+        `<p>Turn on autopay here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
+        `<p>The link works until ${escapeHtml(vars.expiresOn)}.</p>`,
+        `<p>${business}</p>`,
+    ]
+        .filter(Boolean)
+        .join("\n");
+    return {
+        subject: `Turn on autopay for ${vars.plan} with ${vars.business}`,
+        body,
+    };
+}
+
+/** What the autopay-cancelled note says (D14). */
+export interface AutopayCancelledVars {
+    business: string;
+    /** "Asha", or null when there's no name. */
+    firstName: string | null;
+    plan: string;
+}
+
+/**
+ * The line in the customer's account thread when staff cancel their
+ * autopay (D14). Plain text: a thread message is never rendered as HTML.
+ */
+export function autopayCancelledSentence(vars: AutopayCancelledVars): string {
+    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.`;
+}
+
+/**
+ * The email when staff cancel a customer's autopay (D14): it stopped, the
+ * plan carries on, and how the next renewal is paid. Sent through D17's
+ * transactional path, so a revoked email consent still stops it.
+ */
+export function renderAutopayCancelled(
+    vars: AutopayCancelledVars,
+): RenderedMessage {
+    const business = escapeHtml(vars.business);
+    const plan = escapeHtml(vars.plan);
+    const greeting = vars.firstName
+        ? `Hi ${escapeHtml(vars.firstName)},`
+        : "Hello,";
+    const body = [
+        `<p>${greeting}</p>`,
+        `<p>${business} has turned off autopay for ${plan}. Nothing more will be taken automatically.</p>`,
+        `<p>Your plan carries on. From your next renewal, ${business} sends you an invoice with a link to pay it.</p>`,
+        `<p>${business}</p>`,
+    ].join("\n");
+    return {
+        subject: `Autopay for ${vars.plan} is off`,
+        body,
+    };
 }
 
 /** The stored body with the link put back, for the provider only. */

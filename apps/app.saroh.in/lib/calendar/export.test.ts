@@ -118,16 +118,77 @@ describe("monthCsv", () => {
         expect(total(5)).toBe(sum.out);
         expect(total(6)).toBe(sum.due);
 
-        const strip = monthStrip(august, {
-            when: "past",
-            today: "2026-09-18",
-            currency: "INR",
-        });
+        const at = { when: "past" as const, today: "2026-09-18" };
+        const strip = monthStrip(august, { ...at, currency: "INR" });
         const word = (key: string) => strip.find((p) => p.key === key)?.value;
         // ₹1,840 + ₹420.50 in; ₹200 + ₹10.25 out — whole rupees on screen.
         expect(word("in")).toBe("₹2,261");
         expect(word("out")).toBe("₹210");
-        expect(word("due")).toBe("₹600");
+        // A past month's unpaid invoice is Overdue, not Due (E23, DEC-067).
+        expect(word("due")).toBe("₹0");
+        expect(word("overdue")).toBe("₹600");
+
+        // The file, told where today is, splits them the same way.
+        const split = parse(monthCsv(august, labelOf, at).csv);
+        expect(split[0].slice(6)).toEqual(["Due", "Overdue"]);
+        const col = (i: number) =>
+            split.slice(1).reduce((n, r) => n + minor(r[i]), 0);
+        expect(col(6)).toBe(0);
+        expect(col(7)).toBe(60_000);
+    });
+
+    it("the current month: Due from today and Overdue before it, as the strip says", () => {
+        const september: MoneyEntry[] = [
+            entry({ date: "2026-09-02", in: 50_000 }),
+            entry({
+                date: "2026-09-05",
+                kind: "invoice_due",
+                layer: "invoices",
+                title: "INV-0050",
+                due: 30_000,
+                link: { type: "invoice", id: "inv5" },
+            }),
+            entry({
+                date: "2026-09-18",
+                kind: "booking_due",
+                layer: "bookings",
+                title: "Physio",
+                due: 15_000,
+                link: { type: "booking", id: "b1" },
+            }),
+            entry({
+                date: "2026-09-25",
+                kind: "renewal_due",
+                layer: "subscriptions",
+                title: "Weekly bread",
+                due: 90_000,
+                link: { type: "subscription", id: "s1" },
+            }),
+        ];
+        const at = { when: "current" as const, today: "2026-09-18" };
+        const strip = monthStrip(september, { ...at, currency: "INR" });
+        const word = (key: string) => strip.find((p) => p.key === key)?.value;
+        expect(word("due")).toBe("₹1,050");
+        expect(word("overdue")).toBe("₹300");
+
+        const [head, ...rows] = parse(monthCsv(september, labelOf, at).csv);
+        const due = head.indexOf("Due");
+        const overdue = head.indexOf("Overdue");
+        const total = (i: number) => rows.reduce((n, r) => n + minor(r[i]), 0);
+        expect(total(due)).toBe(105_000);
+        expect(total(overdue)).toBe(30_000);
+        // Each amount owed is in exactly one of the two.
+        for (const r of rows) {
+            expect(minor(r[due]) > 0 && minor(r[overdue]) > 0).toBe(false);
+        }
+    });
+
+    it("no Overdue column when nothing due before today is unpaid", () => {
+        const [head] = parse(
+            monthCsv(august, labelOf, { when: "future", today: "2026-07-01" })
+                .csv,
+        );
+        expect(head).not.toContain("Overdue");
     });
 
     it("quotes commas and quotes, and defuses what a sheet would run", () => {

@@ -109,6 +109,29 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `resolveContact` (a merge lands on the survivor; a removed contact hears
   nothing).
 
+## Autopay charges — **Current** (D13)
+
+- **`subscription.charge`** runs a renewal's autopay charge in steps, each
+  its own run (`subscriptions/charge-job.ts`): `PREPARE` (the order and its
+  pre-debit notice), `DEBIT` (at `debitAfter`, asked again hourly while the
+  notice is out), `LOOK` (the debit looked up when its webhook is late).
+  The renewal writes the first step with the charge's intent on its own
+  transaction; each step writes the next with `enqueueChargeStepInTx`,
+  which skips a step already waiting for that charge, so a redelivered run
+  never forks the chain. The debit is claimed on the intent before it is
+  asked, so a run delivered twice debits once. A redelivery that finds the
+  debit already claimed (`ALREADY`, PROCESSING) writes the `LOOK` step: the
+  run before it may have died between the claim and its next step.
+- **A charge that stands aside comes back on its own** (review 3). When a
+  step refuses for a pay-link checkout the customer has open
+  (CHECKOUT_OPEN), `stoodAside` writes, on the same transaction as its
+  RENEWAL_FAILED, a `PREPARE` with `resume: true` and the next charge key,
+  due when the checkout stops counting as open (`checkoutOpenUntil`). Its
+  run finds no intent under that key and queues the charge again through
+  `queueInTx` under the subscription's row lock (Retry's lock), unless a
+  charge is already under way or a new checkout opened (then it writes
+  itself again for that one's end).
+
 ## Team alerts — **Current** (F14)
 
 - **`team.alert`** tells the business's own team, as each person chose in
@@ -126,3 +149,37 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 - **Once per event**, claimed as a `CustomerNotice` (`TEAM_TOLD`,
   `team:<event>:<id>`), and re-read first: an unpaid checkout, a payment
   that went through after all, or someone who left again is not announced.
+
+## Scheduled go-live — **Current** (DEC-071, T10)
+
+- **`site.go_live`** puts a test release live at the time the merchant
+  chose, in the business's zone (`businessTimezone`; a time the clocks
+  skip is refused, not moved). Scheduling writes the release's schedule
+  columns and the job, `runAt` = the instant, in one transaction
+  (`sites/test-release-schedule.ts`). The payload is
+  `{ testReleaseId, goLiveAt }`.
+- **The release row is the lock.** Scheduling, cancelling and the run each
+  take it `FOR UPDATE`. Cancel (and moving a schedule) deletes the job
+  fenced on `status = 'PENDING'`; a PROCESSING job answers 409 "going
+  live now". A partial unique index allows one live schedule per site.
+- **Re-read, then decide** (`sites/go-live.handler.ts`). A run whose
+  release was cancelled, moved (`goLiveAt` differs), went live or was
+  discarded does nothing. Then it doesn't go live, and says why, when the
+  site was published after it was scheduled (`scheduledOverPublicationId`,
+  KTD-14), when the person who scheduled it left or can no longer publish,
+  or when "Publishing needs approval" is on and the release isn't approved
+  and no owner override was recorded. Otherwise it goes live through
+  `goLiveWithRelease` (so `putLive`) as the person who scheduled it, passing
+  the stored override (while they are still an owner), so it is recorded
+  as OVERRIDDEN exactly as going live by hand with one is (T9).
+- **A clear no-go never retries.** It records `NOT_LIVE` with the reason and
+  clears the schedule, so the merchant can go live now or schedule again. A
+  transient failure throws and the worker retries; the last attempt records
+  `NOT_LIVE` before giving up, so a schedule never hangs as "scheduled".
+- **Told either way** through `team.alert`, event `site`, claimed once per
+  release and instant (`team:site:<releaseId>:<goLiveAt>`). The Website row
+  is offered to whoever holds `site:publish`, bell and email on by default,
+  and only while `SITE_TEST_RELEASES` is on. Whoever scheduled it is emailed
+  whatever they chose.
+- A queued job still runs with `SITE_TEST_RELEASES` off (KTD-16): it is a
+  go-live the merchant was told would happen.

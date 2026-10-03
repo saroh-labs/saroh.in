@@ -1,4 +1,7 @@
 import type { PaymentHandoff } from "../booking-flow/api";
+import type { PackKind } from "../prices/pack-words";
+import { packCount, packUnit } from "../prices/pack-words";
+import type { TestReleaseRefusal } from "../test-release/words";
 
 /**
  * Buying a class pack from the account (round-2 plan A, A11): what the
@@ -16,6 +19,11 @@ export interface AccountPackOnSale {
     validityDays: number;
     price: string;
     currency: string;
+    /**
+     * Classes, or one-to-one sessions: how the sheet counts the credits.
+     * An API from before it said so leaves it out; that reads as classes.
+     */
+    kind?: PackKind;
 }
 
 /** The packs a customer can buy here, and whether they can pay online. */
@@ -42,7 +50,7 @@ export interface AccountPackAttempt {
 }
 
 export type PackResult<T> =
-    { ok: true; data: T } | { ok: false; message: string };
+    { ok: true; data: T } | { ok: false; message: string } | TestReleaseRefusal;
 
 export interface PacksApi {
     /** Start paying for a pack; the same key replays the same payment. */
@@ -64,9 +72,9 @@ export interface PlanPacksShop {
 export const PACKS_OFFLINE =
     "We couldn't reach the business. Try again in a moment.";
 
-/** "10 classes", "1 class". */
-export function classesText(credits: number): string {
-    return `${credits} ${credits === 1 ? "class" : "classes"}`;
+/** "10 classes", "1 class"; "5 sessions" for a one-to-one pack. */
+export function classesText(credits: number, kind?: PackKind): string {
+    return packCount(credits, kind);
 }
 
 /** The sheet's lead, as the design words it: "10 credits to use within 60 days." */
@@ -78,6 +86,6 @@ export function packTermsLine(pack: {
 }
 
 /** Said once a pack is bought, as the design flashes it. */
-export function boughtMessage(name: string): string {
-    return `${name} bought. Book a class to use one.`;
+export function boughtMessage(name: string, kind?: PackKind): string {
+    return `${name} bought. Book a ${packUnit(kind)} to use one.`;
 }

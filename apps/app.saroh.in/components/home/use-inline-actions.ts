@@ -16,15 +16,18 @@ import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
 import {
     failedText,
     keepsUndo,
+    replyMax,
     replyReady,
     runOf,
     undoneText,
+    writesReply,
 } from "@/lib/home/inline-actions";
 import type { HomeInline, HomeNeed } from "@/lib/home/service";
 import { remindInvoice } from "@/lib/invoices/actions";
 import { sendOutcome } from "@/lib/invoices/send";
 import { moveStage, undoStage } from "@/lib/orders/actions";
 import type { KitchenStage } from "@/lib/orders/read";
+import { replyToReview } from "@/lib/product-reviews/actions";
 import { retrySubscription } from "@/lib/subscriptions/actions";
 
 /** A row once its action has run here. */
@@ -170,6 +173,14 @@ export function useInlineActions() {
         let result = inline.done;
         hold(need, inline, {
             commit: async () => {
+                if (inline.kind === "REVIEW_REPLY") {
+                    const res = await replyToReview(inline.target, text);
+                    if (!res.ok) {
+                        refused = res.error;
+                        throw new Error(res.error);
+                    }
+                    return;
+                }
                 if (inline.kind === "REPLY") {
                     const res = await replyAction(inline.target, text);
                     if (!res.ok) {
@@ -198,15 +209,15 @@ export function useInlineActions() {
             settled: (state) => {
                 if (state.status === "undone") {
                     setDone(need.id, null);
-                    if (inline.kind === "REPLY") setOpen(need.id);
+                    if (writesReply(inline)) setOpen(need.id);
                     showSuccess(undoneText(inline, false));
                 } else if (state.status === "failed") {
                     setDone(need.id, null);
-                    if (inline.kind === "REPLY") setOpen(need.id);
+                    if (writesReply(inline)) setOpen(need.id);
                     showError(failedText(inline), refused ?? undefined);
                 } else {
                     setDone(need.id, { text: result });
-                    if (inline.kind === "REPLY") {
+                    if (writesReply(inline)) {
                         setDrafts((all) => ({ ...all, [need.id]: "" }));
                     }
                     if (warning) showWarning(warning);
@@ -217,10 +228,27 @@ export function useInlineActions() {
 
     async function retry(need: HomeNeed, inline: HomeInline) {
         setBusy(need.id);
-        const res = await retrySubscription(inline.target);
+        const res = await retrySubscription(
+            inline.target,
+            inline.via ?? "PAY_LINK",
+        );
         setBusy(null);
         if (!res.ok) {
             showError(failedText(inline), res.error);
+            return;
+        }
+        // By autopay (D13): no link to copy; their bank tells them first.
+        if (!res.data.url) {
+            const text = res.data.paid
+                ? "Already paid by autopay"
+                : inline.done;
+            setDone(need.id, { text });
+            showSuccess(
+                text,
+                res.data.paid
+                    ? undefined
+                    : "Their bank tells them a day ahead, so the payment lands in a day or two.",
+            );
             return;
         }
         setDone(need.id, { text: inline.done, link: res.data.url });
@@ -234,7 +262,10 @@ export function useInlineActions() {
     function confirm(need: HomeNeed) {
         const inline = need.inline;
         if (!inline) return;
-        if (inline.kind === "REPLY" && !replyReady(drafts[need.id] ?? ""))
+        if (
+            writesReply(inline) &&
+            !replyReady(drafts[need.id] ?? "", replyMax(inline))
+        )
             return;
         setOpen(null);
         switch (runOf(inline)) {

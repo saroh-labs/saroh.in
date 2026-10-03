@@ -199,7 +199,7 @@ export function CatalogueScreen({
         const said =
             status === "ARCHIVED"
                 ? one
-                    ? `Stopped selling ${one.name} — it's hidden from ${many ? "every storefront" : "your storefront"} until you sell it again.`
+                    ? `Stopped selling ${one.name} — it's hidden from ${many ? "every location" : "your location"} until you sell it again.`
                     : `${targets.length} products archived.`
                 : one
                   ? `${one.name} is on sale.`
@@ -280,7 +280,7 @@ export function CatalogueScreen({
         (store
             ? ` sold at ${store.name}`
             : many
-              ? ` across ${stores.length} storefronts`
+              ? ` across ${stores.length} locations`
               : "");
 
     return (
@@ -412,7 +412,7 @@ export function CatalogueScreen({
                         ? `Delete “${pendingDelete[0]?.name ?? "this product"}”?`
                         : `Delete ${pendingDelete?.length ?? 0} products?`
                 }
-                description={`${pendingDelete?.length === 1 ? "It is" : "They are"} removed from ${many ? "every storefront that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
+                description={`${pendingDelete?.length === 1 ? "It is" : "They are"} removed from ${many ? "every location that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
                 confirmLabel={
                     pendingDelete?.length === 1
                         ? "Delete product"

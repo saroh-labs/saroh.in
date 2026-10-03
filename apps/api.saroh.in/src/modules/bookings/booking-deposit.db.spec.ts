@@ -22,6 +22,7 @@ jest.mock("../../env", () => ({
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PaymentsService } from "../payments/payments.service";
 import {
@@ -92,6 +93,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "UTC" },
     });
+    await giveBusinessDetails(org.id);
     // Free to cancel until 24 hours before the start.
     await prisma.bookingRules.create({
         data: { organizationId: org.id, freeCancelHours: 24 },
@@ -192,6 +194,10 @@ describe("a deposit at booking (E8, real database)", () => {
             refundableCents: 40_000,
             refundInTimeCancels: true,
             treatmentOrderId: null,
+            // The rest is taken at the desk (P2); a link never bills a balance.
+            paidAtDeskCents: 0,
+            deskMethod: null,
+            take: { cents: 40_000, byLink: false },
         });
     });
 

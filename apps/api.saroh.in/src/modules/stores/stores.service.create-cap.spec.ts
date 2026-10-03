@@ -1,10 +1,13 @@
 /**
  * ADR-010 — several storefronts, up to the plan. Pure unit test with a mocked
  * Prisma: the product's ceiling is checked first (409), the plan's
- * `storefronts` entitlement second (403), and both refusals come before the
- * slug is even looked at.
+ * `storefronts` entitlement second (403), and both refusals come before
+ * anything is written.
  */
 jest.mock("@saroh/database", () => ({
+    isRlsEnforcementEnabled: () => false,
+    currentOrgContext: () => undefined,
+    outsideOrgContext: <T>(fn: () => T) => fn(),
     prisma: {
         store: {
             count: jest.fn(),
@@ -94,7 +97,7 @@ describe("StoresService.createForUser — storefronts up to the plan", () => {
             status: 403,
             response: {
                 message:
-                    "Your plan includes 2 storefronts. A bigger plan adds more.",
+                    "Your plan includes 2 locations. A bigger plan adds more.",
             },
         });
         expect(storeFindUnique).not.toHaveBeenCalled();

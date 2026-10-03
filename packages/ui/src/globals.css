@@ -416,6 +416,30 @@
     [data-numeric] {
         font-variant-numeric: tabular-nums;
     }
+    /* Anything clickable shows the pointer (the standing rule: pointer,
+       hover, focus and pressed on every clickable). Preflight gives it to
+       <button> and [role=button] only; the other widget roles, and a label
+       that wraps its control, get it here, so a hand-rolled radio, tab or
+       menu item inherits it. A base rule, so a primitive's own
+       `cursor-not-allowed` or `cursor-grab` still wins, and a disabled one
+       falls back to the default arrow. */
+    [role="tab"],
+    [role="radio"],
+    [role="checkbox"],
+    [role="switch"],
+    [role="option"],
+    [role="menuitem"],
+    [role="menuitemradio"],
+    [role="menuitemcheckbox"],
+    summary,
+    label:has(> input:not(:disabled)) {
+        cursor: pointer;
+    }
+    :disabled,
+    [aria-disabled="true"],
+    [data-disabled] {
+        cursor: default;
+    }
     /* Display face is optical-size aware; let it tighten as it grows. */
     .font-display {
         font-variation-settings: "opsz" 32;

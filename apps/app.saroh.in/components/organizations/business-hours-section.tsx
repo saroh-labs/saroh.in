@@ -65,7 +65,7 @@ const hoursSchema = z.object({
 });
 
 const NOTE =
-    "Applies to every storefront. Online orders placed while you're closed are ready from the next opening time.";
+    "Applies to every location. Online orders placed while you're closed are ready from the next opening time.";
 
 /** A line under the card's header: why the hours read as they do. */
 function Notice({ children }: { children: React.ReactNode }) {
@@ -76,7 +76,8 @@ function Notice({ children }: { children: React.ReactNode }) {
     );
 }
 
-const LINK = "font-semibold text-foreground underline underline-offset-2";
+const LINK =
+    "font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground";
 
 /**
  * Business → Hours ("Saroh Settings" design): when the business is open,
@@ -190,7 +191,7 @@ export function BusinessHoursSection({
         offerUndo(
             stores.length === 1
                 ? "Hours saved"
-                : `Hours saved for all ${stores.length} storefronts`,
+                : `Hours saved for all ${stores.length} locations`,
             back &&
                 (async () => {
                     const undone = await undoStorefrontHours(back);
@@ -236,14 +237,14 @@ export function BusinessHoursSection({
     const notice =
         hours.state === "sell-off" ? (
             <Notice>
-                Hours are kept on your storefronts, and Sell is switched off.{" "}
+                Hours are kept on your locations, and Sell is switched off.{" "}
                 <Link href="/settings/modules" className={LINK}>
                     Turn on Sell
                 </Link>
             </Notice>
         ) : hours.state === "unavailable" ? (
             <Notice>
-                Your storefronts&apos; hours couldn&apos;t be read, so they
+                Your locations&apos; hours couldn&apos;t be read, so they
                 can&apos;t be changed here right now.{" "}
                 <button
                     type="button"
@@ -258,14 +259,14 @@ export function BusinessHoursSection({
             </Notice>
         ) : !first ? (
             <Notice>
-                Hours are kept on a storefront, and this business has none yet.{" "}
+                Hours are kept on a location, and this business has none yet.{" "}
                 <Link href={newStorefrontHref} className={LINK}>
-                    Create a storefront
+                    Create a location
                 </Link>
             </Notice>
         ) : differ ? (
             <Notice>
-                Your storefronts have different hours — this shows {first.name}
+                Your locations have different hours — this shows {first.name}
                 &apos;s, and saving sets them all to these.
             </Notice>
         ) : undefined;

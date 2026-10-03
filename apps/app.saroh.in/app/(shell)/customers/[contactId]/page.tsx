@@ -7,6 +7,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
 import { loadContactHoldings } from "@/lib/contacts/holdings";
 import { sellPacksOnly } from "@/lib/contacts/panels";
+import { rolesThatSeeSensitive } from "@/lib/customer-workspace/attention";
 import { getCustomerDetail } from "@/lib/customer-workspace/detail";
 import {
     isMergedRedirect,
@@ -19,6 +20,7 @@ import type {
 import { getSuggestions, getThread } from "@/lib/customer-workspace/service";
 import type { ReviewsRead, ThreadRead } from "@/lib/customer-workspace/view";
 import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
+import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { contactReviews } from "@/lib/product-reviews/service";
 import { requireSession } from "@/lib/session";
@@ -111,6 +113,19 @@ export default async function CustomerDetailPage({
               )
             : null;
     const tabs = tabsFor(detail, thread, reviews);
+    const canSensitive =
+        may("customer:sensitive") ||
+        organization?.role === "OWNER" ||
+        organization?.role === "ADMIN";
+    // C12's sensitive tick names who can read the note (DEC-073): read only
+    // when there is a note to tick. A failed read drops the names, not the
+    // tick.
+    const sensitiveRoles =
+        canWrite && canSensitive && detail.attention?.suggestions?.length
+            ? await listRoles()
+                  .then(rolesThatSeeSensitive)
+                  .catch(() => null)
+            : null;
 
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
@@ -119,24 +134,18 @@ export default async function CustomerDetailPage({
                 initialTab={tabFromQuery(query.tab, tabs)}
                 bizName={organization?.name ?? null}
                 // Linked store customers are read only where the business
-                // sells, so their presence says it does. The counter's roles
-                // (a stage but no order read) are refused Sell › Customers
-                // (R7, #508), so their crumb says Contacts, as their rail does.
-                sells={
-                    detail.linkedCustomers !== undefined &&
-                    !(may("order:stage") && !may("order:read"))
-                }
+                // sells, so their presence says it does. Sell › Customers
+                // follows contact:read alone (B16, matrix W-1), a Member's
+                // included, so the crumb says what their rail does.
+                sells={detail.linkedCustomers !== undefined}
                 canWrite={canWrite}
                 canMerge={canMerge}
                 canRemove={canRemove}
                 canConsent={may("consent:write")}
                 // Owner and Admin hold it, including on an API from before
                 // C13, whose list doesn't name it yet.
-                canSensitive={
-                    may("customer:sensitive") ||
-                    organization?.role === "OWNER" ||
-                    organization?.role === "ADMIN"
-                }
+                canSensitive={canSensitive}
+                sensitiveRoles={sensitiveRoles}
                 userId={session.user.id}
                 suggestions={suggestions.filter(
                     (s): s is IdentitySuggestion => s.kind === "customer",

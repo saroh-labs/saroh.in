@@ -6,10 +6,8 @@ import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
-import {
-    overdueFollowUps,
-    crmNumbers as readCrmNumbers,
-} from "./home-crm-sources";
+import { businessDetailsGap } from "./home-business-details";
+import { overdueFollowUps } from "./home-crm-sources";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
@@ -17,7 +15,6 @@ import type {
     HomeEvidence,
     HomeInput,
     HomeModel,
-    HomeNumber,
     HomeSeverity,
     HomeUnavailable,
 } from "./home-model";
@@ -41,6 +38,7 @@ import {
     unansweredMessages,
     viewerOf,
 } from "./home-people-sources";
+import { failedOrderRefunds } from "./home-refunds-failed";
 import { readReviews } from "./home-reviewer";
 import type { HomeSchedule } from "./home-schedule";
 import { NO_SCHEDULE, readSchedule } from "./home-schedule";
@@ -59,7 +57,6 @@ export type {
     HomeLastDay,
     HomeModel,
     HomeNeed,
-    HomeNumber,
     HomeRetryVia,
     HomeReviewPage,
     HomeReviewSite,
@@ -185,8 +182,12 @@ export class HomeService {
         const stores = narrow.storeIds;
         const actions: HomeAction[] = [];
 
-        // Setup / attention actions straight from module readiness.
-        for (const view of views) {
+        // Setup / attention actions straight from module readiness. A staff
+        // member (F11) sees them only if they may set modules up: "Create a
+        // pipeline" or "Connect a provider" on a Member's Home is a row they
+        // can't act on, and the design's staff Home draws none.
+        const offersSetup = !staffView || holds(input, "module:manage");
+        for (const view of offersSetup ? views : []) {
             if (view.readiness === "ATTENTION_REQUIRED") {
                 // SETUP/ATTENTION readiness always carries at least one blocker.
                 const blocker = view.blockers[0];
@@ -216,7 +217,7 @@ export class HomeService {
         );
 
         /*
-         * Read-only bands (the schedule, the numbers) use AVAILABILITY, not
+         * Read-only bands (the schedule) use AVAILABILITY, not
          * ACTIVE — the same rule the sidebar filters on.
          *
          * ACTIVE means "ready to do new work"; a module can be SETUP_REQUIRED
@@ -239,7 +240,6 @@ export class HomeService {
         const canReadLeads = holds(input, "lead:read");
         // The business's days: "Due today" on an order, "was due 14 Sep".
         const zone = await this.businessZone(input.organizationId);
-        const numbers: HomeNumber[] = [];
 
         /*
          * Every source below is independent of the others, so they are read
@@ -274,7 +274,6 @@ export class HomeService {
         const week = weekScope(input, available);
 
         const [
-            crmNumbers,
             overdue,
             open,
             schedule,
@@ -290,19 +289,9 @@ export class HomeService {
             reviews,
             notes,
             messages,
+            refundsFailed,
+            detailsGap,
         ] = await Promise.all([
-            available.has("CRM")
-                ? guard(
-                      { moduleKey: "CRM", label: "Customer numbers" },
-                      () =>
-                          readCrmNumbers(
-                              this.db,
-                              input.organizationId,
-                              canReadLeads,
-                          ),
-                      [] as HomeNumber[],
-                  )
-                : skip([] as HomeNumber[]),
             active.has("CRM") && canReadLeads
                 ? guard(
                       { moduleKey: "CRM", label: "Overdue follow-ups" },
@@ -388,8 +377,8 @@ export class HomeService {
                       noRefunds,
                   )
                 : skip(noRefunds),
-            // Renewals that haven't been paid, and invoices past due (F1).
-            // Like refunds owed, they show wherever Payments is available:
+            // Renewals that haven't been paid (F1). Like refunds owed, they
+            // show wherever Payments is available:
             // the money is owed whether or not a provider is connected
             // today. Each asks for its own read, so a role holding one sees
             // only that one.
@@ -402,6 +391,9 @@ export class HomeService {
                               input.organizationId,
                               now,
                               canReadInvoices,
+                              undefined,
+                              undefined,
+                              zone,
                           ),
                       null,
                   )
@@ -420,7 +412,9 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
-            available.has("PAYMENTS") && canReadInvoices
+            // Invoices past due need no module (DEC-070): a business
+            // invoices by hand with Payments off, and is still owed.
+            canReadInvoices
                 ? guard(
                       { moduleKey: "PAYMENTS", label: "Overdue invoices" },
                       () => overdueInvoices(this.db, input.organizationId, now),
@@ -506,10 +500,32 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // Refunds the provider failed (B9, DEC-067): the customer's
+            // money is still here, so it needs someone. An amount is money,
+            // so `order:read`'s.
+            available.has("COMMERCE") && holds(input, "order:read")
+                ? guard(
+                      { moduleKey: "COMMERCE", label: "Refunds" },
+                      () =>
+                          failedOrderRefunds(
+                              this.db,
+                              input.organizationId,
+                              stores,
+                          ),
+                      null,
+                  )
+                : skip(null),
+            // Invoices going out without the registered address or GSTIN
+            // (DEC-068), to whoever can add them.
+            holds(input, "org:update")
+                ? guard(
+                      { moduleKey: "PAYMENTS", label: "Business details" },
+                      () => businessDetailsGap(this.db, input.organizationId),
+                      null,
+                  )
+                : skip(null),
         ]);
         const unavailable = slots.flat();
-
-        numbers.push(...crmNumbers);
 
         if (overdue.count > 0) {
             actions.push({
@@ -524,22 +540,7 @@ export class HomeService {
         }
 
         if (available.has("COMMERCE")) {
-            if (open.count > 0) {
-                numbers.push({
-                    key: "OPEN_ORDERS",
-                    label: "Open orders",
-                    value: open.count,
-                    // The SCREEN that shows them, not the section above it.
-                    // The rail badges whatever href an OVERDUE action
-                    // carries, so pointing this at "/commerce" put the count
-                    // on Sell and sent the merchant to a list of storefronts
-                    // to hunt for orders one storefront at a time.
-                    href: "/commerce/orders",
-                    moduleKey: "COMMERCE",
-                });
-            }
-
-            // The ACTION, unlike the number, still requires ACTIVE: telling
+            // The action requires ACTIVE: telling
             // a merchant to fulfil orders through a module that is not ready
             // is sending them at a door that does not open.
             if (active.has("COMMERCE")) {
@@ -568,16 +569,6 @@ export class HomeService {
         }
 
         const upcoming = schedule.upcoming;
-        if (schedule.total > 0) {
-            numbers.push({
-                key: "UPCOMING_BOOKINGS",
-                label: "Upcoming bookings",
-                value: schedule.total,
-                href: "/bookings",
-                moduleKey: "APPOINTMENTS",
-            });
-        }
-
         if (owed.count > 0) {
             actions.push({
                 code: "PAYMENTS_REFUNDS_OWED",
@@ -592,6 +583,8 @@ export class HomeService {
                 evidence: owed.evidence,
             });
         }
+        if (refundsFailed) actions.push(refundsFailed);
+        if (detailsGap) actions.push(detailsGap);
         if (renewals) actions.push(renewals);
         if (waiting) actions.push(waiting);
         if (overdueInvoiceAction) actions.push(overdueInvoiceAction);
@@ -629,10 +622,8 @@ export class HomeService {
                 ? { view: "staff" as const, staff: staffView.staff }
                 : { view: "business" as const }),
             actions,
-            primaryAction: actions[0] ?? null,
             hasAnyModule: views.some((v) => v.readiness !== "DISABLED"),
             upcoming,
-            numbers,
             unavailable,
             ...flattenNeeds(actions, zone),
             today,
@@ -665,11 +656,9 @@ export class HomeService {
             view: "reviewer",
             reviews,
             actions: [],
-            primaryAction: null,
             // Not the first-run question: a Reviewer has their sites.
             hasAnyModule: true,
             upcoming: [],
-            numbers: [],
             unavailable,
             needs: [],
             needsTotal: 0,

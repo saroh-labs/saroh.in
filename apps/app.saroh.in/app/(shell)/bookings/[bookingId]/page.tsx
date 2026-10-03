@@ -5,9 +5,14 @@ import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packOffer, usablePacks } from "@/lib/class-packs/balance";
 import { readPurchasesFor } from "@/lib/class-packs/service";
 import { packsOn } from "@/lib/class-packs/switched-on";
+import { hasPaymentProvider } from "@/lib/invoices/tax";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { canReadOrders, canRefundPayments } from "@/lib/services/booking-money";
+import {
+    canReadOrders,
+    canRefundPayments,
+    canTakeDeskPayments,
+} from "@/lib/services/booking-money";
 import { hasEnded } from "@/lib/services/booking-state";
 import { readClassWaitlist } from "@/lib/services/class-waitlist";
 import type { BookingDetail } from "@/lib/services/service";
@@ -51,6 +56,16 @@ export default async function BookingPage({
     // reads. A past appointment offers different controls (#241), but nothing
     // about its OUTCOME is decided by the clock — only a person sets that.
     const organization = await resolveActiveOrganization();
+    // Taking payment at the desk (P2), and sending a pay link instead when
+    // a provider is connected to take it.
+    const canTake = canTakeDeskPayments(organization);
+    const desk = {
+        canTake,
+        canLink:
+            canTake &&
+            !!booking.money?.take?.byLink &&
+            (await hasPaymentProvider().catch(() => false)),
+    };
     return (
         <BookingDetailView
             booking={booking}
@@ -58,6 +73,7 @@ export default async function BookingPage({
             packs={await packsFor(booking)}
             canRefund={canRefundPayments(organization)}
             canReadOrder={canReadOrders(organization)}
+            desk={desk}
             waitlist={await waitlistFor(booking)}
         />
     );

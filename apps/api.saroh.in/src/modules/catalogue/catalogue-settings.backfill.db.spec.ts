@@ -14,23 +14,30 @@ const PER_BUSINESS_UNIQUE = [
     `CREATE UNIQUE INDEX IF NOT EXISTS "CatalogueDefaults_organizationId_key_key" ON "CatalogueDefaults"("organizationId", "key")`,
 ];
 
+/** The backfill's suffix: the storefront's name as a slug. */
+const asSlug = (s: string) =>
+    s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
 const at = (days: number) => new Date(Date.UTC(2026, 0, 1 + days));
 
 async function business(name: string, storeCount: number) {
     const org = await prisma.organization.create({
         data: { name, slug: `bf-${name.toLowerCase()}-${tag}` },
     });
-    const stores: { id: string; slug: string; name: string }[] = [];
+    const stores: { id: string; name: string }[] = [];
     for (let i = 0; i < storeCount; i++) {
         stores.push(
             await prisma.store.create({
                 data: {
                     name: `${name} ${i === 0 ? "Hill Road" : "Online"}`,
-                    slug: `bf-${name.toLowerCase()}-${i}-${tag}`,
+                    // No slug: new locations have none (DEC-069, L14).
                     organizationId: org.id,
                     createdAt: at(i),
                 },
-                select: { id: true, slug: true, name: true },
+                select: { id: true, name: true },
             }),
         );
     }
@@ -348,12 +355,9 @@ describe("Catalogue settings backfill (#529, DB)", () => {
                 organizationId: two.orgId,
                 contactId: contact.id,
                 body: "Peanut allergy",
+                // A note from before Z2a naming the Peanuts that goes.
                 allergens: {
                     create: [
-                        {
-                            allergenId: hillPeanuts.id,
-                            organizationId: two.orgId,
-                        },
                         {
                             allergenId: onlinePeanuts.id,
                             organizationId: two.orgId,
@@ -518,7 +522,9 @@ describe("Catalogue settings backfill (#529, DB)", () => {
             }),
         ).toEqual({ optionValueId: valueOf(onlineSize, "XL") });
 
-        // Peanuts: one, on the product and once on the note.
+        // Peanuts: one, on the product. Notes are text only (Z2a): the old
+        // row naming the Peanuts that went is cleared, not moved, and the
+        // note keeps its words.
         expect(
             (
                 await prisma.storeAllergen.findMany({
@@ -538,7 +544,13 @@ describe("Catalogue settings backfill (#529, DB)", () => {
                 where: { noteId: note.id },
                 select: { allergenId: true },
             }),
-        ).toEqual([{ allergenId: hillPeanuts.id }]);
+        ).toEqual([]);
+        expect(
+            await prisma.contactNote.findUnique({
+                where: { id: note.id },
+                select: { body: true },
+            }),
+        ).toEqual({ body: "Peanut allergy" });
 
         // Tops under Women and Tops under Men stay two, told apart by name.
         const tops = await prisma.category.findMany({
@@ -551,7 +563,7 @@ describe("Catalogue settings backfill (#529, DB)", () => {
             {
                 id: menTops.id,
                 name: `Tops (${online.name})`,
-                slug: `tops-${online.slug}`,
+                slug: `tops-${asSlug(online.name)}`,
             },
         ]);
         expect(mine(report.keptApart)).toEqual(
@@ -575,7 +587,7 @@ describe("Catalogue settings backfill (#529, DB)", () => {
             {
                 id: liveOnline.id,
                 name: `Breads (${live.stores[1].name})`,
-                slug: `breads-${live.stores[1].slug}`,
+                slug: `breads-${asSlug(live.stores[1].name)}`,
             },
         ]);
         expect(mine(report.keptApart)).toEqual(

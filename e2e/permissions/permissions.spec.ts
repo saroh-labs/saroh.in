@@ -1,3 +1,6 @@
+// @covers app:/ app:/sites app:/sites/[siteId]/review app:/settings/organization app:/settings/people
+// @covers app:/contacts app:/commerce/orders app:/commerce/products app:/bookings app:/bookings/all
+// @covers app:/billing/invoices app:/billing/subscriptions
 import type { BrowserContext } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -448,7 +451,7 @@ test("a Manager who edits roles can give only what they hold (F19)", async ({
         page.getByRole("heading", { name: "Counter", exact: true }),
     ).toBeVisible();
     await expect(
-        page.getByRole("switch", { name: "Change storefronts, not allowed" }),
+        page.getByRole("switch", { name: "Change locations, not allowed" }),
     ).toBeEnabled();
     await expect(
         page.getByRole("switch", { name: "Manage payments, not allowed" }),
@@ -515,7 +518,7 @@ test("a person's extra permissions show on Team, and a Manager gives only what t
     ).toBeVisible();
     await expect(
         page.getByRole("switch", {
-            name: "See storefronts, on, included in the role",
+            name: "See locations, on, included in the role",
         }),
     ).toHaveAttribute("aria-disabled", "true");
     // Nothing the Manager lacks is offered.
@@ -527,7 +530,7 @@ test("a person's extra permissions show on Team, and a Manager gives only what t
         page.getByRole("button", { name: "No changes yet" }),
     ).toBeDisabled();
     await page
-        .getByRole("switch", { name: "Change storefronts, off", exact: true })
+        .getByRole("switch", { name: "Change locations, off", exact: true })
         .click();
     await expect(
         page.getByRole("button", { name: "Save changes" }),

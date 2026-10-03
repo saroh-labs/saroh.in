@@ -125,7 +125,7 @@ describe("productStock", () => {
         expect(warnsAt(stock.sizes[0], stock.split)).toBe(
             "Warns at 4 per shop",
         );
-        expect(stockFootnote(stock.split)).toMatch(/^Each storefront/);
+        expect(stockFootnote(stock.split)).toMatch(/^Each location/);
     });
 
     it("keeps stock left at a storefront that stopped selling it", () => {

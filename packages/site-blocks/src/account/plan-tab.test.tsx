@@ -156,6 +156,65 @@ describe("PlanTab", () => {
         expect(screen.queryByText("Class packs")).toBeNull();
     });
 
+    it("says an autopay charge is under way, with its day, and offers no Pay now (D13)", () => {
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf([
+                    {
+                        ...SUB,
+                        payNow: null,
+                        autopayCharging: { at: "2026-10-18T04:30:00.000Z" },
+                    },
+                ])}
+                api={api()}
+            />,
+        );
+        expect(
+            screen.getByText("Autopay charge in progress · 18 Oct 2026"),
+        ).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Pay now" })).toBeNull();
+    });
+
+    it("says when autopay next charges (D13B): the next renewal's, or a queued charge's instead of 'in progress'", () => {
+        const { unmount } = render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf([
+                    {
+                        ...SUB,
+                        payNow: null,
+                        autopayNextCharge: { at: "2026-10-18T04:30:00.000Z" },
+                    },
+                ])}
+                api={api()}
+            />,
+        );
+        expect(
+            screen.getByText("Next autopay charge: 18 Oct 2026"),
+        ).toBeTruthy();
+        unmount();
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf([
+                    {
+                        ...SUB,
+                        payNow: null,
+                        autopayCharging: { at: "2026-10-25T18:30:00.000Z" },
+                        autopayNextCharge: { at: "2026-10-25T18:30:00.000Z" },
+                    },
+                ])}
+                api={api()}
+            />,
+        );
+        expect(
+            screen.getByText("Next autopay charge: 26 Oct 2026"),
+        ).toBeTruthy();
+        expect(screen.queryByText(/Autopay charge in progress/)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Pay now" })).toBeNull();
+    });
+
     it("with pausing off, there is no Pause button and Cancel offers no pause instead", async () => {
         render(
             <PlanTab
@@ -321,6 +380,21 @@ describe("PlanTab", () => {
         ).toBe(false);
     });
 
+    it("with no plan, See plans goes to the site's Prices page (G20)", () => {
+        render(
+            <PlanTab
+                account={ACCOUNT}
+                tab={tabOf([])}
+                api={api()}
+                plansHref="/prices"
+            />,
+        );
+        expect(screen.getByRole("link", { name: "See plans" })).toHaveAttribute(
+            "href",
+            "/prices",
+        );
+    });
+
     it("lists packs, a used-up one as such, and says when a part couldn't be read", () => {
         const { unmount } = render(
             <PlanTab
@@ -338,6 +412,8 @@ describe("PlanTab", () => {
         expect(
             screen.getByText("You're not on a plan with Pulse Fitness."),
         ).toBeTruthy();
+        // No Prices page on the site: nowhere to send them.
+        expect(screen.queryByRole("link", { name: "See plans" })).toBeNull();
         expect(screen.getByText("Active")).toBeTruthy();
         expect(screen.getByText("Used up")).toBeTruthy();
         unmount();

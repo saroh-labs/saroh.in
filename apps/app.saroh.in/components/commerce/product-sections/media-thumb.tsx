@@ -1,6 +1,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Play } from "lucide-react";
 
+import { mediaSrc } from "@/lib/media/media-src";
 import { formatDuration } from "@/lib/products/editor-sections";
 
 /**
@@ -34,7 +35,7 @@ export function MediaThumb({
     if (item.kind !== "video") {
         return (
             /* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */
-            <img src={item.url} alt={alt} className={fill} />
+            <img src={mediaSrc(item.url)} alt={alt} className={fill} />
         );
     }
     const length = formatDuration(item.durationSec);
@@ -42,10 +43,14 @@ export function MediaThumb({
         <>
             {item.posterUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element -- a tenant's own poster */
-                <img src={item.posterUrl} alt={alt} className={fill} />
+                <img
+                    src={mediaSrc(item.posterUrl)}
+                    alt={alt}
+                    className={fill}
+                />
             ) : (
                 <video
-                    src={item.url}
+                    src={mediaSrc(item.url)}
                     preload="metadata"
                     muted
                     playsInline

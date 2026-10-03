@@ -97,7 +97,7 @@ export class UpdateStorefrontDto {
     @IsOptional()
     @Transform(trim)
     @IsString()
-    @MinLength(1, { message: "A storefront needs a name" })
+    @MinLength(1, { message: "A location needs a name" })
     @MaxLength(80)
     name?: string;
 
@@ -149,7 +149,7 @@ export class UpdateStorefrontDto {
     shippingFee?: string | null;
 
     @IsOptional()
-    @IsIn(STOREFRONT_KINDS, { message: "A storefront is a shop or online" })
+    @IsIn(STOREFRONT_KINDS, { message: "Pick Customers visit or No counter" })
     kind?: (typeof STOREFRONT_KINDS)[number];
 
     /** `null` clears it. */

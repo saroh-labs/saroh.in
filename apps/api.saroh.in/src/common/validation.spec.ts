@@ -15,6 +15,7 @@ import {
     UpdateAttentionDto,
 } from "../modules/customer-workspace/dto";
 import { CreateFormDto } from "../modules/forms/dto";
+import { GoLiveOptionsDto, UpdateSiteSettingsDto } from "../modules/sites/dto";
 import { validationPipeOptions } from "./validation";
 
 /**
@@ -147,6 +148,18 @@ const BOOLEAN_FIELDS: {
         what: "whether the booking page still offers a service",
         dto: UpdateServiceDto,
         field: "showOnBookingPage",
+        rest: {},
+    },
+    {
+        what: "whether a site goes live only from an approved test release",
+        dto: UpdateSiteSettingsDto,
+        field: "publishNeedsApproval",
+        rest: {},
+    },
+    {
+        what: "whether an owner goes live without approval",
+        dto: GoLiveOptionsDto,
+        field: "override",
         rest: {},
     },
 ];

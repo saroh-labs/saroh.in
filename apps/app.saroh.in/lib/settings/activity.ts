@@ -125,7 +125,7 @@ const TAB_LABEL: Record<BusinessTab, string> = {
     contact: "Contact",
     tax: "Tax and invoices",
     hours: "Hours",
-    address: "Address",
+    address: "Registered address",
 };
 
 const BUILT_IN_ROLES: Partial<Record<string, string>> = {
@@ -146,7 +146,7 @@ const PRODUCTS = { label: "Products", href: "/commerce/products" };
 const PLAN = { label: "Plan and billing", href: "/settings/billing" };
 /** A storefront's own settings, or the list when it isn't named. */
 const STOREFRONTS_HREF = (storeId: string | null) =>
-    storeId ? storefrontHref(storeId) : "/commerce/storefronts";
+    storeId ? storefrontHref(storeId) : "/commerce/locations";
 
 const business = (tab?: BusinessTab) => ({
     label: tab ? TAB_LABEL[tab] : "Business",
@@ -197,14 +197,14 @@ export function personName(person: AuditPerson | null): string | null {
 
 /**
  * What turning Track stock on or off did, as the tail of a sentence:
- * " — 38 set to 0", " — cleared Sold out at 2 storefronts". Empty when it
+ * " — 38 set to 0", " — cleared Sold out at 2 locations". Empty when it
  * did nothing worth saying.
  */
 function trackingTail(on: boolean, meta: Record<string, unknown>): string {
     if (on) {
         const cleared = countOf(meta.soldOutCleared) ?? 0;
         return cleared > 0
-            ? ` — cleared Sold out at ${counted(cleared, "storefront")}`
+            ? ` — cleared Sold out at ${counted(cleared, "location")}`
             : "";
     }
     const units = countOf(meta.unitsZeroed) ?? 0;
@@ -259,7 +259,7 @@ export function activityLine(
             return line(
                 `${late ? "changed when orders count as late" : "changed how orders leave"}${where ? ` at ${where}` : ""}`,
                 {
-                    label: "Storefronts",
+                    label: "Locations",
                     href: STOREFRONTS_HREF(event.targetId),
                 },
             );
@@ -277,7 +277,7 @@ export function activityLine(
                       ? "turned off linking customers who share an email"
                       : "changed how customers who share an email are linked";
             return line(`${what}${where ? ` at ${where}` : ""}`, {
-                label: "Storefronts",
+                label: "Locations",
                 href: STOREFRONTS_HREF(event.targetId),
             });
         }

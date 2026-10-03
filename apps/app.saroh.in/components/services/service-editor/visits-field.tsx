@@ -7,7 +7,7 @@ import { TREATMENT_NEEDS_STOREFRONT } from "@/lib/services/service-editor";
 import { HELP, NumberField } from "./fields";
 
 /** Where a business adds the storefront a treatment is sold from. */
-export const STOREFRONTS_HREF = "/commerce/storefronts";
+export const STOREFRONTS_HREF = "/commerce/locations";
 
 /**
  * Visits (E10, the Service Editor design): how many visits one booking of a
@@ -46,7 +46,7 @@ export function VisitsStorefrontNote() {
                 href={STOREFRONTS_HREF}
                 className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-                Add a storefront
+                Add a location
             </Link>
         </p>
     );

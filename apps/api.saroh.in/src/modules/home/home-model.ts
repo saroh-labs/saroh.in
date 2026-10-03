@@ -58,6 +58,19 @@ export interface HomeEvidence {
     detail?: string;
     /** The action the row offers in place (F4), set by `home-inline.ts`. */
     inline?: HomeInline;
+    /** A second action the row opens elsewhere, set by `home-inline.ts`. */
+    link?: HomeRowLink;
+}
+
+/**
+ * A step a Needs-you row opens where it is taken, beside its inline action:
+ * "Send a set-up link" on a renewal whose autopay limit is too low (D14)
+ * opens Subscription Detail's own set-up sheet, where the method is picked.
+ */
+export interface HomeRowLink {
+    /** The button: "Send a set-up link". */
+    label: string;
+    href: string;
 }
 
 export interface HomeAction {
@@ -101,21 +114,6 @@ export interface HomeBooking {
 }
 
 /**
- * A count that is a destination.
- *
- * Every number on Home links to the exact rows it counts — `href` carries the
- * filter, not just the screen. A tile that states "12 open leads" and lands on
- * an unfiltered list has made the merchant do the filtering twice.
- */
-export interface HomeNumber {
-    key: string;
-    label: string;
-    value: number;
-    href: string;
-    moduleKey?: string;
-}
-
-/**
  * A part of Home that could not be read.
  *
  * The difference between "you have no open orders" and "we could not find out
@@ -130,14 +128,15 @@ export interface HomeUnavailable {
 }
 
 /** The inline actions a Needs-you row can carry (F4). */
-export type HomeInlineKind = "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+export type HomeInlineKind =
+    "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY" | "REVIEW_REPLY";
 
 /**
- * How a Retry is made (F4). Only a fresh pay link today; D13 adds
- * `MANDATE`, a charge on the customer's autopay, and hides Retry while such
- * a charge is PENDING ("Autopay charge in progress").
+ * How a Retry is made (F4, D13): `PAY_LINK`, a fresh pay link; `MANDATE`,
+ * a new charge on the customer's autopay. No Retry is offered while such a
+ * charge is under way ("Autopay charge in progress").
  */
-export type HomeRetryVia = "PAY_LINK";
+export type HomeRetryVia = "PAY_LINK" | "MANDATE";
 
 /**
  * What an inline action on a Needs-you row will do (F4), decided by the API
@@ -167,7 +166,7 @@ export interface HomeInline {
     sends: boolean;
     /** Whether Undo is offered after (never once a message has left). */
     undoable: boolean;
-    /** What it acts on: the order, subscription, invoice or contact id. */
+    /** What it acts on: the order, subscription, invoice, contact or review id. */
     target: string;
     /** The customer's first name, for what the toast says after; else null. */
     person: string | null;
@@ -206,6 +205,7 @@ export interface HomeNeed {
     href: string;
     moduleKey?: string;
     inline?: HomeInline;
+    link?: HomeRowLink;
 }
 
 /**
@@ -418,12 +418,19 @@ export interface HomeModel {
      * then names.
      */
     reviews?: HomeReviewSite[];
+    /**
+     * The ranked actions `needs` is flattened from. The workspace's rail
+     * reads its badges from them (OVERDUE ones with a count), so they stay.
+     * `primaryAction` and `numbers`, the old Home's other fields, were
+     * removed in Z5 once no live app read them.
+     */
     actions: HomeAction[];
-    primaryAction: HomeAction | null;
     hasAnyModule: boolean;
-    /** Confirmed bookings from now forward; the client groups them by day. */
+    /**
+     * Confirmed bookings from now forward (up to eight): Needs you's "Next"
+     * line reads the first.
+     */
     upcoming: HomeBooking[];
-    numbers: HomeNumber[];
     /**
      * Sources that failed. Empty on a healthy read. Non-empty means what is
      * shown is INCOMPLETE, and Home must say so rather than presenting the
@@ -433,7 +440,7 @@ export interface HomeModel {
     /**
      * Needs you, flat and ranked (F3): every row the sources carry, in the
      * order Home shows them; the client shows the first twelve, then "See
-     * all". `actions` stays beside it for one release (default 130).
+     * all".
      */
     needs: HomeNeed[];
     /**
@@ -465,6 +472,11 @@ export interface HomeInput {
     /** The viewer: a Reviewer's Home reads only their own grants (F9). */
     userId?: string;
     organizationRole: OrgRole;
+    /**
+     * The role as stored: a Storefront team holder's orders are their
+     * storefronts' only (DEC-074), so none means none, not every one.
+     */
+    organizationRoleKey?: string;
     /** Resolved permissions; see `AvailabilityInput.organizationActions`. */
     organizationActions?: ReadonlySet<OrgAction>;
     projectId?: string;

@@ -12,13 +12,14 @@ import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
-import { canSend } from "@/lib/invoices/send";
+import { paymentsModuleOn } from "@/lib/invoices/payments-on";
+import { canSend, paysOnline } from "@/lib/invoices/send";
 import type { Invoice } from "@/lib/invoices/service";
 import { getInvoice, listInvoicesFor } from "@/lib/invoices/service";
 import {
     billedTo,
     invoicePill,
-    paidBy,
+    paidHow,
     sourceLine,
     whenLine,
 } from "@/lib/invoices/status";
@@ -51,9 +52,10 @@ export default async function InvoicePage({
             <PaymentsLocked {...paymentsLockedCopy(organization, "invoices")} />
         );
     }
-    const [invoice, business] = await Promise.all([
+    const [invoice, business, paymentsOn] = await Promise.all([
         getInvoice(invoiceId),
         getInvoiceBusiness(),
+        paymentsModuleOn(),
     ]);
     if (!invoice) notFound();
 
@@ -70,6 +72,9 @@ export default async function InvoicePage({
     const who = billedTo(invoice);
     const money = (a: string) => formatMoneyMajor(a, invoice.currency) ?? a;
     const late = whenLine(invoice);
+    // Whether its link takes payment: the API's word (DEC-070).
+    const payOnline = paysOnline(invoice.send, invoice.online);
+    const again = payOnline ? "Send the pay link again" : "Send it again";
 
     return (
         <PageContainer width="full">
@@ -123,8 +128,8 @@ export default async function InvoicePage({
                             />
                             .{" "}
                             {invoice.source === "SUBSCRIPTION"
-                                ? "The renewal hasn't been paid. Send the pay link again, or call."
-                                : "Send the pay link again, or call."}
+                                ? `The renewal hasn't been paid. ${again}, or call.`
+                                : `${again}, or call.`}
                         </>
                     ) : null
                 }
@@ -147,6 +152,7 @@ export default async function InvoicePage({
                         <HistoryPanel invoice={invoice} />
                     </>
                 }
+                paymentsOn={paymentsOn}
             />
         </PageContainer>
     );
@@ -173,10 +179,7 @@ function payLine(i: Invoice, who: string, canWrite: boolean) {
                     ) : (
                         "today"
                     )}
-                    {i.payment
-                        ? ` by ${paidBy(i.payment.method).toLowerCase()}`
-                        : ""}
-                    .
+                    {i.payment ? ` ${paidHow(i.payment.method)}` : ""}.
                 </>
             );
         case "CREDITED":
@@ -186,6 +189,12 @@ function payLine(i: Invoice, who: string, canWrite: boolean) {
         case "DRAFT":
             return "Not issued yet. A draft has no number and can still change.";
         default:
+            if (!paysOnline(i.send, i.online)) {
+                // No online payment (DEC-070): the link only shows it.
+                return canWrite && canSend(i.send)
+                    ? `Not paid. Send it to ${first}, and mark it paid when the money arrives.`
+                    : `Not paid. Mark it paid when the money arrives.`;
+            }
             if (canWrite && canSend(i.send)) {
                 return `Not paid. ${first} can pay by UPI or card from the pay link — send it to them, or mark it paid when the money arrives.`;
             }

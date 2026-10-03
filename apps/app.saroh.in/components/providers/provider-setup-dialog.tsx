@@ -18,6 +18,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
@@ -26,13 +27,25 @@ import {
     disconnectCommsProvider,
     disconnectPaymentProvider,
 } from "@/lib/providers/actions";
-import { needsPublicKey, RAZORPAY_KEY_ID } from "@/lib/providers/rows";
+import {
+    needsPublicKey,
+    needsWebhookSecret,
+    RAZORPAY_KEY_ID,
+} from "@/lib/providers/rows";
 import type {
     CommsChannel,
     ConnectedCommsProvider,
     ConnectedPaymentProvider,
     PaymentProviderName,
+    PaymentWebhookSetup,
 } from "@/lib/providers/service";
+import { isTestKey, webhookFor } from "@/lib/providers/webhook";
+
+import {
+    StepHeading,
+    WebhookAddressStep,
+    WebhookSecretStep,
+} from "./payment-webhook-steps";
 
 const PAYMENT_PROVIDERS: { value: PaymentProviderName; label: string }[] = [
     { value: "RAZORPAY", label: "Razorpay" },
@@ -112,6 +125,8 @@ export function ProviderSetupDialog(
               /** The provider the dialog opens on. */
               provider?: PaymentProviderName;
               connected: ConnectedPaymentProvider[];
+              /** Each provider's webhook (DEC-063); `null` when unread. */
+              webhooks: PaymentWebhookSetup[] | null;
           }
         | {
               kind: "messaging";
@@ -132,16 +147,18 @@ export function ProviderSetupDialog(
                 <Button
                     size="sm"
                     variant={props.urgent ? "brand" : "outline"}
+                    className="cursor-pointer"
                     aria-label={`${props.trigger} ${props.label}`}
                 >
                     {props.trigger}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[480px]">
+            <DialogContent className="max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-[520px] overflow-y-auto px-4 min-[420px]:px-6">
                 {props.kind === "payments" ? (
                     <PaymentsForm
                         initialProvider={props.provider}
                         connected={props.connected}
+                        webhooks={props.webhooks}
                         onDone={() => setOpen(false)}
                     />
                 ) : (
@@ -160,10 +177,12 @@ export function ProviderSetupDialog(
 function PaymentsForm({
     initialProvider,
     connected,
+    webhooks,
     onDone,
 }: {
     initialProvider?: PaymentProviderName;
     connected: ConnectedPaymentProvider[];
+    webhooks: PaymentWebhookSetup[] | null;
     onDone: () => void;
 }) {
     const router = useRouter();
@@ -186,35 +205,57 @@ function PaymentsForm({
     const keyIdWrong =
         razorpay && keyId.trim() !== "" && !RAZORPAY_KEY_ID.test(keyId.trim());
     const missingKey = current ? needsPublicKey(current) : false;
+    const missingSecret = current ? needsWebhookSecret(current) : false;
+    // Where the provider sends payment updates, and whether it signs them
+    // with a secret of its own (DEC-063): Razorpay does, so it is required;
+    // Cashfree signs with the key secret, so it isn't asked for.
+    const hook = webhookFor(webhooks, provider);
+    const secretRequired = hook?.secretRequired ?? razorpay;
     const [webhookSecret, setWebhookSecret] = useState("");
     const [saving, setSaving] = useState(false);
+    const details = useBusinessDetailsStep({
+        then: `connect ${labelOfPayment(provider)}`,
+        continueLabel: "Save and connect",
+    });
     const [confirming, setConfirming] = useState<PaymentProviderName | null>(
         null,
     );
     const ids = {
         provider: useId(),
+        keys: useId(),
         keyId: useId(),
         secret: useId(),
         public: useId(),
         keyHint: useId(),
-        hook: useId(),
     };
+
+    const incomplete =
+        !keyId.trim() ||
+        !keySecret.trim() ||
+        keyIdWrong ||
+        (secretRequired && !webhookSecret.trim());
 
     async function submit(e: React.FormEvent) {
         e.preventDefault();
+        if (incomplete) return;
         setSaving(true);
-        const res = await connectPaymentProvider({
-            provider,
-            keyId: keyId.trim(),
-            keySecret: keySecret.trim(),
-            ...(!razorpay && publicKey.trim()
-                ? { publicKey: publicKey.trim() }
-                : {}),
-            ...(webhookSecret.trim()
-                ? { webhookSecret: webhookSecret.trim() }
-                : {}),
-        });
+        // Online payments are invoiced: the registered address first
+        // (DEC-068), asked here, then the keys are saved.
+        const res = await details.run(() =>
+            connectPaymentProvider({
+                provider,
+                keyId: keyId.trim(),
+                keySecret: keySecret.trim(),
+                ...(!razorpay && publicKey.trim()
+                    ? { publicKey: publicKey.trim() }
+                    : {}),
+                ...(secretRequired && webhookSecret.trim()
+                    ? { webhookSecret: webhookSecret.trim() }
+                    : {}),
+            }),
+        );
         setSaving(false);
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(`${labelOfPayment(provider)} connected`);
         onDone();
@@ -230,7 +271,7 @@ function PaymentsForm({
     }
 
     return (
-        <form onSubmit={(e) => void submit(e)} className="space-y-4">
+        <form onSubmit={(e) => void submit(e)} className="min-w-0 space-y-4">
             <DialogHeader>
                 <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
                     Payments
@@ -248,7 +289,9 @@ function PaymentsForm({
                     name: labelOfPayment(c.provider),
                     detail: needsPublicKey(c)
                         ? "No key id yet — enter the keys again below"
-                        : c.publicKey,
+                        : needsWebhookSecret(c)
+                          ? "No webhook signing secret — enter the keys again below"
+                          : c.publicKey,
                     status: c.status,
                 }))}
                 onDisconnect={(key) =>
@@ -271,70 +314,96 @@ function PaymentsForm({
                     this connection was saved without one. Enter the key id and
                     secret again to take payments online.
                 </p>
-            ) : null}
-            <div className="grid grid-cols-2 gap-3">
-                <SecretField
-                    id={ids.keyId}
-                    label={razorpay ? "Key ID (public)" : "Key ID"}
-                    value={keyId}
-                    onChange={setKeyId}
-                    invalid={keyIdWrong}
-                    describedBy={razorpay ? ids.keyHint : undefined}
-                />
-                <SecretField
-                    id={ids.secret}
-                    label="Key secret"
-                    value={keySecret}
-                    onChange={setKeySecret}
-                    secret
-                />
-            </div>
-            {razorpay ? (
-                <p
-                    id={ids.keyHint}
-                    className={cn(
-                        "-mt-2 text-[11.5px] leading-[1.45]",
-                        keyIdWrong
-                            ? "text-destructive"
-                            : "text-muted-foreground",
-                    )}
-                >
-                    {keyIdWrong
-                        ? "That isn't a Razorpay key id — it starts rzp_live_ or rzp_test_."
-                        : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it; the secret never leaves Saroh."}
+            ) : missingSecret ? (
+                <p className="rounded-[10px] bg-highlight-subtle px-3.5 py-3 text-[12.5px] leading-[1.45] text-highlight-subtle-foreground">
+                    This connection was saved without its webhook signing
+                    secret, so {labelOfPayment(provider)}&apos;s payment updates
+                    are refused and payments can&apos;t be confirmed. Enter the
+                    keys again with the secret below.
                 </p>
-            ) : (
-                <SecretField
-                    id={ids.public}
-                    label="Public key"
-                    value={publicKey}
-                    onChange={setPublicKey}
-                    optional
-                    hint="Shown to the checkout; not a secret."
-                />
-            )}
-            <SecretField
-                id={ids.hook}
-                label="Webhook signing secret"
-                value={webhookSecret}
-                onChange={setWebhookSecret}
-                secret
-                optional
-                hint="Lets Saroh check that payment updates really came from the provider."
+            ) : null}
+
+            <section aria-labelledby={ids.keys} className="grid gap-2.5">
+                <StepHeading n={1} id={ids.keys}>
+                    Your API keys
+                </StepHeading>
+                <div className="grid gap-3 min-[420px]:grid-cols-2">
+                    <SecretField
+                        id={ids.keyId}
+                        label={razorpay ? "Key ID (public)" : "Key ID"}
+                        value={keyId}
+                        onChange={setKeyId}
+                        invalid={keyIdWrong}
+                        describedBy={razorpay ? ids.keyHint : undefined}
+                    />
+                    <SecretField
+                        id={ids.secret}
+                        label="Key secret"
+                        value={keySecret}
+                        onChange={setKeySecret}
+                        secret
+                    />
+                </div>
+                {razorpay ? (
+                    <p
+                        id={ids.keyHint}
+                        className={cn(
+                            "text-[11.5px] leading-[1.45]",
+                            keyIdWrong
+                                ? "text-destructive"
+                                : "text-muted-foreground",
+                        )}
+                    >
+                        {keyIdWrong
+                            ? "That isn't a Razorpay key id — it starts rzp_live_ or rzp_test_."
+                            : "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it; the secret never leaves Saroh."}
+                    </p>
+                ) : (
+                    <SecretField
+                        id={ids.public}
+                        label="Public key"
+                        value={publicKey}
+                        onChange={setPublicKey}
+                        optional
+                        hint="Shown to the checkout; not a secret."
+                    />
+                )}
+            </section>
+
+            <WebhookAddressStep
+                n={2}
+                provider={provider}
+                setup={hook}
+                testMode={razorpay && isTestKey(keyId)}
             />
 
+            {secretRequired ? (
+                <WebhookSecretStep
+                    n={3}
+                    provider={provider}
+                    value={webhookSecret}
+                    onChange={setWebhookSecret}
+                />
+            ) : (
+                <p className="text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
+                    {labelOfPayment(provider)} signs its payment updates with
+                    your key secret, so there&apos;s no separate secret to add.
+                </p>
+            )}
+
             <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" onClick={onDone}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                    onClick={onDone}
+                >
                     Cancel
                 </Button>
                 <Button
                     type="submit"
-                    disabled={
-                        saving ||
-                        !keyId.trim() ||
-                        !keySecret.trim() ||
-                        keyIdWrong
-                    }
+                    className="cursor-pointer"
+                    disabled={saving || incomplete}
                 >
                     {saving
                         ? "Connecting…"
@@ -356,6 +425,7 @@ function PaymentsForm({
                     onConfirm={() => void disconnect(confirming)}
                 />
             ) : null}
+            {details.step}
         </form>
     );
 }

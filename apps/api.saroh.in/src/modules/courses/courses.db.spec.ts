@@ -5,8 +5,10 @@
  * re-enrolling, cancelling, and deleting the person. Runs in the integration
  * project (TEST_DATABASE_URL).
  */
+import { ConflictException } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingsService } from "../bookings/bookings.service";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
@@ -33,6 +35,7 @@ beforeAll(async () => {
     const created = await prisma.organization.create({
         data: { name: "Courses Org", slug: `courses-org-${process.pid}` },
     });
+    await giveBusinessDetails(created.id);
     // Booking history names the person who enrolled someone, so they exist.
     const user = await prisma.user.create({
         data: { email: `courses-${process.pid}@example.com` },
@@ -337,6 +340,15 @@ describe("courses (real database)", () => {
         const enrolled = await courses.enrol(org, courseId, { contactId });
         const ids = (await bookingsOf(enrolled.id)).map((b) => b.id);
 
+        // The course's invoice keeps their record (DEC-042): refused, and
+        // their sessions stand.
+        await expect(
+            new ContactsService().remove(org, contactId),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(await bookingsOf(enrolled.id)).toHaveLength(3);
+
+        // Enrolled with no paper (as with Payments off), they can go.
+        await prisma.invoice.deleteMany({ where: { contactId } });
         const removed = await new ContactsService().remove(org, contactId);
         expect(removed).toMatchObject({ courses: 1, bookingsCancelled: 3 });
         expect(

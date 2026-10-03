@@ -112,6 +112,11 @@ export const MODULE_PAGE_DEFAULTS: Record<ModulePageKind, KindDefaults> = {
  * been seen since A5. Reserving it lets the editor say so rather than
  * publish a page nobody can reach.
  *
+ * `/pay` is where a customer opens a pay link the business sent (DEC-069,
+ * plan L6/L7): the renderer sends a site's `/pay/<token>` and
+ * `/pay/o/<token>` to its pay pages before any page is looked up, so a page
+ * at `/pay` would never be reached once pay links live on the site.
+ *
  * `purpose` finishes the sentence "/book is …" in the merchant's words.
  */
 export const RESERVED_PAGE_PATHS: readonly {
@@ -120,8 +125,13 @@ export const RESERVED_PAGE_PATHS: readonly {
     purpose: string;
 }[] = [
     { root: "/book", kind: "BOOK", purpose: "your booking page" },
-    { root: "/shop", kind: "SHOP", purpose: "your shop" },
+    { root: "/shop", kind: "SHOP", purpose: "your online shop" },
     { root: "/checkout", kind: null, purpose: "where your customers pay" },
+    {
+        root: "/pay",
+        kind: null,
+        purpose: "where your customers pay a link you sent",
+    },
     {
         root: "/account",
         kind: null,

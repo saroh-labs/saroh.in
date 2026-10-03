@@ -90,7 +90,7 @@ describe("the ways a storefront offers", () => {
             ConflictException,
         );
         expect(() => assertStorefrontOffers("SHIPPING", ["PICKUP"])).toThrow(
-            "This storefront doesn't offer Shipping. It offers Pick-up.",
+            "This location doesn't offer Shipping. It offers Pick-up.",
         );
         expect(() =>
             assertStorefrontOffers("PICKUP", ["PICKUP"]),

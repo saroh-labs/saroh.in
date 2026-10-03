@@ -191,15 +191,18 @@ one exists.
 
 ## Deferred to follow-up work (the contract steps)
 
-| ID | Step | When |
-|---|---|---|
-| Z1 | Remove D10's allowance fallback, once a query finds no unset rows | After CP-2, wave 4 or later |
-| Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows) | Wave 4 or later |
-| Z3 | Remove the calendar's month-query alias | After E20 is live |
-| F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 |
-| Z4 | Remove the `company` business-type alias | A release after F10b |
-| Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it |
-| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 |
+| ID | Step | When | Done |
+|---|---|---|---|
+| Z1 | **Done** (`r2/z1z2`, 2026-09-29). Remove D10's allowance fallback, once a query finds no unset rows. An unset row now logs `subscription_allowance_unset` (ERROR) and is served its plan's number, never unlimited; the pre-deploy gate (backfill prints `set now: 0, still unset: 0`, and the unset-row query returns 0) is in `ROUND_2_PHASE_2_ROLLOUT.md`, "Z1" | After CP-2, wave 4 or later | [x] 2026-09-29 (`r2/z1z2`) |
+| Z2 | Drop `ContactNoteAllergen` (two deploys after C1's rows). **Blocked (checked 2026-09-29, `r2/z1z2`): the table is still live, so it needs Z2a first.** The API writes it (`contact-notes.service.ts` create/update) and reads it (the note view's `allergens`/`matchAllergens` in Customer Detail; `catalogue/allergens.service.ts` refuses deleting an allergen that notes name); the workspace sends and shows it (`customers/detail/notes.tsx` picker, Order Detail's banner in `lib/orders/lifecycle.ts`); `packages/database` reads or writes it in the C1 backfill, the catalogue-settings backfill, the seed and the showcase seed/check. Nothing in e2e, `saroh.app`, the privacy-removal or merge rule tables (rows go with their note, `noteId` ON DELETE CASCADE) or later RLS migrations. Every API image to date reads it, so dropping it now breaks notes and Customer Detail on the serving image and on any rollback. **Unblocked by Z2a (built 2026-09-29): can follow two deploys after Z2a ships** | Two deploys after Z2a |  |
+| Z2a | Stop reading and writing `ContactNoteAllergen`: notes carry text only, allergens live on Needs attention (C1); the note picker, the note view's allergens and Order Detail's note banner move to Attention entries; the allergen-delete check counts Attention only; seeds and backfills stop touching it. A product change to the notes screen: agree it with the user first. **Built** (`r2/z2a`, 2026-09-29; approved by the user 2026-09-29): notes save text only (an older app's `allergenIds` go on Needs attention, never the note), the note view's `allergens`/`matchAllergens` stay, empty; Customer Detail's `allergens` come from Attention; the C1 backfill is removed. Z2 can follow two deploys after Z2a ships; it also drops the two `contactNoteAllergen.deleteMany` calls that clear old rows (rollout doc "Z2a") | Before Z2 | [x] 2026-09-29 (`r2/z2a`) |
+| Z3 | Remove the calendar's month-query alias | After E20 is live | [x] 2026-09-29 (`?month=` is a 400; rollout doc E20) |
+| F10b | Store `pvt`: the API maps `company` → `pvt`, the app sends `pvt`, and an additive backfill rewrites `company` rows (F10 shipped readers only, boundary 9) | A release after F10 | [x] 2026-09-29 (backfill CLI `business-type-pvt.cli.ts`; rollout doc F10b) |
+| Z4 | Remove the `company` business-type alias | A release after F10b |  |
+| Z5 | Remove Home's legacy fields served beside F5's new ones | With B2d, or a release after it | [x] 2026-09-29 (`primaryAction`, `numbers`; `actions`, `upcoming` kept: the app reads them; rollout doc Z5) |
+| Z6 | Remove D5's temporary `PATCH :planId` | A checkpoint after D7 | D7 merged to development 2026-09-29 (#716); do it the release after D7 reaches production |
+| Z7 | P3's contract step: a unique index on (organization, order number), after the backfill's second run prints nothing to change | Once no pre-P3 API image can run | |
+| Z8 | DEC-063's follow-up: no checkout opens on a connection with no webhook secret. Not small or safe now (checked 2026-09-29, fix-pay): the secret is sealed, so it can't join `OPENS_CHECKOUT`, the filter the booking page, pay links, the site checkout's readiness and the booking pay link read; each would decrypt instead, and `payments.service`'s intent create would refuse as it does for a missing key id (DEC-054). And since P1 confirms payments without the webhook, turning it on at deploy would stop every flagged business taking online payment until it adds its secret, with no backfill possible. Do it once the WHSECRET outreach (rollout doc) has run and the "never confirmed" count is down to businesses the team has told, with Settings › Providers saying checkout is off until the secret is added | After the WHSECRET outreach | |
 
 ## Risks and open questions
 
@@ -214,3 +217,17 @@ one exists.
   answered before wave 7 (C13). Proposed: yes.
 - **B8:** build B7's "Share your storefront" button, or drop it? Proposed:
   build it, in B8.
+
+## Payments and checkout polish (P1–P5), after autopay
+
+Found in the live Razorpay test-mode walk-through on Northwind (2026-09-29).
+The user set the order: after the autopay units (D12, D13, D14), with P1
+and P2 first because both involve money.
+
+| ID | Unit | Why | Scope |
+|---|---|---|---|
+| P1 | Confirm a payment on the checkout's signed return, with the webhook as a backup | A booking paid in Razorpay stayed "Awaiting payment" because its webhook never arrived; the hold then lapsed with the money taken | Checkout hands back `razorpay_payment_id`, `order_id` and `signature` to the page. The renderer posts them to the API, which verifies the signature with the key secret and settles the intent through the same idempotent path the webhook uses (bookings, shop orders, G20 joins, pack purchases, pay links). The webhook stays; whichever arrives first settles and the other is a no-op. Add a sweep that asks the provider about intents still pending after N minutes, so a hold never lapses on money already taken. Include a way to reconcile the stuck 15:00 test booking. |
+| P2 | Take payment at the desk from the booking | A pay-at-the-desk booking shows "₹500 due at the visit", with no way to record the payment and no invoice | Booking detail and quick view get "Take ₹X": cash, UPI at the counter, card, or send a pay link. It makes (or finds) the booking's invoice, marks it paid with the method, and the booking shows "Paid at the desk · ‹method›". Respect `payment:manage`/`invoice:write`. Follow the Bookings and Invoice designs. |
+| P3 | Order numbers are unique per business | Two orders in one Orders list are both #ORD-001 (each storefront counts from 1) | Decide the numbering (per-business series, or a storefront prefix) with the user, then an additive change plus display. Needs a DEC entry. |
+| P4 | Shop setup tells the merchant what's missing | `/shop` is a 404 until the site's "Sells from" is answered, and nothing says so; the header has no Shop link; the order confirmation shows only inside the bag sheet | A Website checklist/flag "Choose which storefront your site sells from", a Shop link in the site header when the shop serves (G13's wiring), and an order confirmation page on the merchant's site after payment (same rule as D12: the customer lands on the merchant's site). |
+| P5 | "Made by" on the product page | Shows the storefront's name ("Online") where a maker or brand belongs | Show the product's brand/maker when set; otherwise hide the row. |

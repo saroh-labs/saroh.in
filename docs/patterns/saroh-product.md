@@ -3,7 +3,7 @@
 > **Read when:** designing or changing anything a merchant sees, deciding what
 > to build, or writing copy, a claim or a status.
 > Sources: `PRODUCT.md` (the short brief), `docs/PRODUCT_STRATEGY.md` (§ numbers
-> below), ADR-001 to ADR-006, ADR-010 and DEC-010 to DEC-018, DEC-030. Where
+> below), ADR-001 to ADR-006, ADR-010 and DEC-010 to DEC-018, DEC-030, DEC-070. Where
 > this file and those disagree, they win — fix this file in the same change.
 
 These are the product facts that change engineering rules. The technical
@@ -11,8 +11,66 @@ pattern files refer back here.
 
 ## Who uses it
 
-- **Current** — A small team of 2–5 people with mixed roles, sharing one
-  workspace; nobody is a full-time software operator (`PRODUCT.md`). Avoid
+- **Current** (DEC-070) — **Three kinds of people**: **a business** (shop,
+  studio, practice), **Just me** (freelancer, consultant, creator) and **a
+  site for my work** (portfolio, blog, projects). Setup asks "What are you
+  setting up?" first, with nothing chosen, and stores the answer as
+  `Organization.kind` (`BUSINESS`, `SOLO`, `WORK`; every business set up
+  before it is `BUSINESS`). Whoever holds `org:update` (Owner and Admin)
+  changes it at the top of Settings › Business › Identity, with Undo.
+- **Current** (DEC-070) — **The kind changes words and defaults, never
+  features.** Every module is available to every kind. No guard, module
+  gate, entitlement or refusal reads it: the API reads it through
+  `organizationKind()` only, and `organization-kind.readers.spec.ts` fails
+  a read off its allow-list (onboarding, settings, the summary, the Turn on
+  sheet's prefill, a new site's template) or in a guard, `capabilities/module-*`
+  or entitlements. So never write "only for businesses" or hide anything by
+  kind. The app's words and defaults are one pure file,
+  `apps/app.saroh.in/lib/organizations/kind.ts` (`kindWords`,
+  `kindDefaults`); an unknown or missing kind reads as `BUSINESS`.
+
+    |                                       | A business                        | Just me                                             | A site for my work                |
+    | ------------------------------------- | --------------------------------- | --------------------------------------------------- | --------------------------------- |
+    | The owner                             | your business                     | you                                                 | you                               |
+    | Their people                          | customers                         | clients                                             | readers                           |
+    | Setup's name field                    | What is it called?                | Your name or brand                                  | Your name or brand                |
+    | Settings tab                          | Business                          | Your details                                        | Your details                      |
+    | Home's first run, in order            | Sell, Bookings, Website, Contacts | Bookings, Invoice a client, Contacts, Website, Sell | Website, Contacts, Bookings, Sell |
+    | The module picker suggests            | Sell                              | nothing                                             | Website                           |
+    | Setup asks "registered as a company?" | yes                               | yes                                                 | no                                |
+    | Bookings' Turn on prefill             | Mon–Sat 10–7, no service          | Mon–Fri 10–6, "Consultation", 60 min                | Mon–Sat 10–7, no service          |
+
+    The words reach the surfaces that name the owner or their people in
+    general terms: setup, the module picker, Home's first run and the
+    Settings tab and search. Entity names stay: Sell's **Customers** is the
+    record of who pays and keeps its name for every kind. Sell is never
+    removed for Just me or A site for my work, only moved last. "Invoice a
+    client" turns nothing on: it opens a new invoice, for someone with
+    `invoice:write`, until the business has one.
+
+- **Current** (DEC-070, K4) — The registered address, business type and
+  logo steps appear only once something invoices or takes money: Sell,
+  Bookings, Courses, Class packs or Payments on, or an invoice exists
+  (`handlesMoney` in `lib/settings/ready.ts`, which never reads the kind).
+  They use the kind's words ("Add your address", "Add your details"), and the
+  checklist's heading follows its steps ("Get your site live" when only
+  publishing is left).
+- **Current** (DEC-070, K10–K15) — A new site starts from the kind's
+  template: the starter (`starter@2`) for a business, Personal for Just me,
+  Portfolio (with the Projects block) for A site for my work. The Turn on
+  sheet's Website step says which ("Starts from the Portfolio template"),
+  and `/sites/new` starts its picker there; any registered template can be
+  chosen instead, Writing among them, and an explicit choice always wins.
+  There is no blank site. The kind only picks the default
+  (`sites/site-template.ts`, `KIND_TEMPLATE`), never which templates a
+  business may use. No template assumes a business, speaks as "we", or
+  names an image; every enquiry form a template lays down gets its Form
+  when the site is made, so it takes enquiries from the first publish.
+  Personal lists the real Services only with Bookings on and a service to
+  show; otherwise placeholder offers the owner writes over.
+- **Current** — A business is often a small team of 2–5 people with mixed
+  roles, sharing one workspace; someone working for themselves is a team of
+  one. Nobody is a full-time software operator (`PRODUCT.md`). Avoid
   complexity designed for large specialised teams (§3). Saroh staff use
   `admin.saroh.in`, a separate surface with its own authorization.
 - **Current** — Four primary scenes: desk, phone one-handed, bright shop floor,
@@ -73,7 +131,23 @@ pattern files refer back here.
   (`lib/stores/pick.ts`), singular copy otherwise. A storefront closes (soft)
   only once no order waits and no stock is on hand or promised there — "Move
   or count out its stock first" — and closing never removes a catalogue
-  product. Storefront and website stay separate — mapping them is future work.
+  product.
+- **Current** (DEC-069) — **Merchants read "location", never "storefront".**
+  A storefront (`Store` in code, `storefronts` in the API — the identifiers
+  stay, KTD-1) is a **location**: a place the business sells from in person.
+  Sell › Locations lives at `/commerce/locations`; `/commerce/storefronts`
+  redirects there. The website is where customers go: **your online shop** is
+  the website's `/shop`, and it sells from one location's stock (the site's
+  Sells from). Each location says where it sells — "Sells in person only",
+  "Sells in person and online · Your online shop", or "Online only" —
+  derived from Sells from, never stored. The two kinds read **Customers
+  visit** (`SHOP`: an address, hours and collection) and **No counter**
+  (`ONLINE`: stock kept for online orders). A location has no public address
+  of its own. The four addresses are named apart: _web address_,
+  _registered address_, _location address_ and the blog's _posts path_.
+  A page's or a post's own part of the link is its _path_ ("Page path",
+  "Post path", "Change its path"), never its address; the web address has
+  one place, Settings › Business › Identity's Web address card.
 - **Current** — **Opening hours are edited once, for every storefront**
   (DEC-034): Business → Hours reads the first storefront's week and Save
   writes it to all of them, saying so first when their weeks differ.
@@ -157,9 +231,24 @@ organizations/:org/customers`: everyone who has paid (an order through a
 
 ## Money a person owes, and classes sold ahead (ADR-007)
 
-- **Current** — Invoices, subscriptions and plans live under **Billing**
-  (`/billing/…`) with Payments; courses under **Courses** (its own module);
+- **Current** — Subscriptions and plans live under **Payments** in the rail
+  (addresses `/billing/…`); courses under **Courses** (its own module);
   class packs beside the schedule, under Appointments.
+- **Current** (DEC-070, amending DEC-019) — **Invoicing needs no module.**
+  Creating, issuing, sending, voiding, crediting, downloading and recording
+  an invoice paid need only `invoice:*`. While Payments is on, Invoices sits
+  under Payments in the rail; while it's off, Invoices is a row of its own
+  at the same address, and `/billing` lands there. **Taking money online
+  needs Payments** and a connected provider that can open the checkout:
+  the API says which as `payOnline`, and the workspace never guesses. With
+  it, Send reads "Send with pay link" and the link can be copied; without
+  it, Send reads "Send invoice", there is no pay link to copy, the email
+  says "view it and download a copy", and the customer's page shows the
+  invoice with no Pay button, "Pay ‹business› the way they've asked you
+  to", and "Print or save as PDF". Home's overdue invoices row needs
+  `invoice:read`, not Payments. Issue and Send still need the registered
+  address first for every kind (DEC-068 M3, in place in the business
+  details sheet); recording a payment doesn't.
 - **Current** — Saroh records and invoices; it does not charge a card on file
   and does not send the invoice. Copy says so: "Nothing is charged and nobody is
   contacted", "Saroh doesn't send this. Print it and hand it over."
@@ -167,14 +256,17 @@ organizations/:org/customers`: everyone who has paid (an order through a
   provider's mandates, with a pay link as the fallback. The copy above stays
   true for every subscription without a mandate.
   **Current** (round-2 D17): an invoice is sent only when someone presses
-  "Send with pay link" or "Send reminder", and only where the API's `send`
-  flag names a channel (the business's own email provider; the account
-  thread once A13 and A14 are live). Where it names none, the old copy
-  stays: "Saroh doesn't send it", "Copy pay link".
-- **Current** — **Mention an invoice only when Payments is on.** With Payments
-  off, subscribing is refused, and a pack or course is recorded with the price
-  paid and no invoice — so no copy may promise one. The API says which
-  (`invoicesOnEnrol`); the workspace never guesses.
+  "Send with pay link" (or "Send invoice", above) or "Send reminder", and
+  only where the API's `send` flag names a channel (the business's own
+  email provider; the account thread once A13 and A14 are live). Where it
+  names none, the old copy stays: "Saroh doesn't send it", with "Copy pay
+  link" only when `payOnline` is true.
+- **Current** — **Promise an automatic invoice only when Payments is on.**
+  Invoicing by hand works either way (above), but with Payments off nothing
+  is invoiced automatically: subscribing is refused, renewals wait, and a
+  pack or course is recorded with the price paid and no invoice — so no copy
+  may promise one. The API says which (`invoicesOnEnrol`); the workspace
+  never guesses.
 - **Current** — Overdue, seats left, classes left and "next renewal" are
   derived and said in words, never stored and never shown as colour alone.
 - **Current** — A dialog says what an action books and charges before it
@@ -189,7 +281,31 @@ organizations/:org/customers`: everyone who has paid (an order through a
 - **Current** — `draft → publish → immutable snapshot` (ADR-002). Drafts are
   private; the public renderer reads only `Publication` snapshots; rollback
   repoints `Site.currentPublicationId`. Rich fields are sanitised at publish, so
-  the renderer only ever reads safe content.
+  the renderer only ever reads safe content. Publish, restore and a test
+  release's Go live all repoint through `putLive` (`sites/live-pointer.ts`,
+  DEC-071), which records the review route and any bypass; nothing else in
+  `modules/sites` writes the pointer (`live-pointer.source.spec.ts`).
+- **Current** — Approval is advisory (DEC-047) unless the site turns on
+  **"Publishing needs approval"** (DEC-071, off by default). While it is on,
+  Publish and restore answer 409 `APPROVAL_REQUIRED`, and Go live works only
+  for a test release someone other than the person going live approved, with
+  no newer change request or review request on it. An owner can still go
+  live without approval (`override: true`); that is recorded as the route
+  OVERRIDDEN, an OVERRIDDEN approval row and a
+  `site.publish_approval.override` audit event. Only an owner turns the
+  setting on or off (an audit event each way) or overrides. The rule is
+  enforced in `putLive`, with the words and the owner check in
+  `sites/publish-approval.ts`, so every way of going live obeys it, a
+  scheduled go-live included.
+- **Current** (DEC-071, T12) — Reviewers review a test release on its own
+  page (`/sites/:siteId/releases/:releaseId`), drawn from its frozen
+  snapshot with the session and `site:read`, no link token. A verdict, a
+  request or a note there carries `testReleaseId` and never touches the
+  draft's review; a note pins a section by its position on the frozen page.
+  Every review panel says what it reviews: "Draft" or "Test release N ·
+  name". Version history says which release a go-live came from, badges
+  Approved, Bypassed and "Overridden by ‹owner›", and lists scheduled
+  go-lives.
 - **Current** — Section content validates against the versioned contract in
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing

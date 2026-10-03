@@ -27,6 +27,15 @@
   `RLS_ENFORCEMENT` they are lazy and run in one GUC'd transaction; a promise
   from anywhere else is refused. `TEST_RLS=on` runs the integration suite the
   way enforcement will (#53).
+- **Current** — **A uniqueness check across businesses reads outside the org
+  context.** "Is this slug or address free" must see every business's rows,
+  but under `RLS_ENFORCEMENT` the request's `tx`/`prisma` sees only the
+  caller's, so another business's row looks free and the insert ends in the
+  unique index's raw error. Web addresses go through `addressUse()`
+  (`sites/site-address.ts`), which uses `outsideOrgContext` only when
+  enforcement is on and a context is active. (Store slugs had the same
+  check until L14 stopped writing them.) Never a `tx.<model>.findUnique`
+  on a globally unique column. Prove it under `TEST_RLS=on`.
 - **Current** — **Read a lost serializable race with `isSerializationFailure()`**
   (or `prismaErrorCode()`, `apps/api.saroh.in/src/common/prisma-errors.ts`),
   never `code === "P2034"`. Through the pg driver adapter it can arrive with no
@@ -73,6 +82,8 @@
   collection memberships, listings and shelves deleted explicitly, and the
   product last (a lock conflict left over is a 409 to try again). Only the
   merge's loser, deleted with the API stopped, takes FOR UPDATE first.
+  NO KEY UPDATE holds only while nothing the transaction writes to the
+  product touches a key column (next rule).
   Whether a product counts stock is `Product.stockTracked` and the
   business's `BusinessProfile.stockTracking` (#515), not whether it has a
   row: an untracked product keeps its rows at 0 for the log, so every
@@ -85,6 +96,33 @@
   with composite keys — (storeId, organizationId), (productId,
   organizationId), (variantId, productId) — so the database refuses a row
   mixing two businesses.
+- **Current** — **A row lock is taken at the strength of the write that
+  follows it** (release review of DEC-071, `sites/live-pointer.ts`).
+  Postgres takes an UPDATE that sets a key column — the primary key or any
+  column in a unique index, such as `Site.currentPublicationId` or
+  `Site.subdomain` — as a key update, which needs FOR UPDATE; any other
+  UPDATE needs only FOR NO KEY UPDATE. Lock FOR NO KEY UPDATE first and then
+  write a key column, and the lock is upgraded mid-transaction: it waits on
+  every FOR KEY SHARE (an insert naming the row, for its foreign key) while
+  already holding a lock, and deadlocks (40P01) with a transaction that
+  inserted a child and then writes the row, as a web-address change does.
+  So: FOR UPDATE when the transaction will set a key column of the row;
+  FOR NO KEY UPDATE (which lets those inserts through) only when none of
+  its writes to the row does. Pinned for the site by
+  `live-pointer.db.spec.ts`. **Lock order for a site: Organization, then
+  Site.** `lockSite` takes the business's row FOR KEY SHARE before the Site
+  FOR UPDATE, because a web-address change holds the Organization FOR
+  UPDATE and then needs the Site; anything new that locks a Site and then
+  inserts a row naming the business goes through `lockSite`. A serializable
+  transaction that waited behind such a lock fails its snapshot (40001)
+  without having lost anything, so it runs again before reporting a lost
+  race (`WebAddressService.change`).
+- **Current** — **An order's number comes from `nextOrderNumberInTx`, in the
+  order's transaction** (DEC-066, P3). One `ORD-` series per business across
+  its storefronts, counted in `OrderNumberSequence`; never `count + 1`, which
+  gave each storefront its own ORD-001. A seed that writes fixed numbers calls
+  `alignOrderNumberSequence` after. `@@unique([storeId, orderId])` is still
+  the only unique index: the per-business one is the contract step.
 - **Current** — **An order line bills a product or a service, never both**
   (DEC-050, round-2 E9). `OrderItem.productId` is nullable beside
   `serviceId`, and `OrderItem_bills_one_thing` CHECKs exactly one. A

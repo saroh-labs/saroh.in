@@ -27,6 +27,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import {
@@ -37,6 +38,7 @@ import {
     reissueInvoice,
     voidInvoice,
 } from "@/lib/invoices/actions";
+import { sendLabel } from "@/lib/invoices/send";
 import type { InvoiceStanding, PaymentMethod } from "@/lib/invoices/service";
 
 const METHODS: { value: PaymentMethod; label: string }[] = [
@@ -60,28 +62,37 @@ export interface InvoiceRef {
 /**
  * Issue a draft: it takes the next number in the series and its lines lock.
  * Issuing never sends it, and the dialog says so: where the business can
- * send (D17), "Send with pay link" does both; where it can't, Saroh doesn't
- * send it at all.
+ * send (D17), "Send with pay link" (or "Send invoice", DEC-070) does both;
+ * where it can't, Saroh doesn't send it at all.
  */
 export function IssueDialog({
     open,
     onOpenChange,
     invoice,
     canSend = false,
+    payOnline = true,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     invoice: InvoiceRef;
     /** The business can send it (D17), so the copy names Send. */
     canSend?: boolean;
+    /** Its link takes payment (`payOnline`), so there is a pay link to copy. */
+    payOnline?: boolean;
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
+    // No registered address yet (DEC-068): asked here, then it issues.
+    const details = useBusinessDetailsStep({
+        then: "issue it",
+        continueLabel: "Save and issue",
+    });
 
     async function issue() {
         setBusy(true);
-        const res = await issueInvoice(invoice.id);
+        const res = await details.run(() => issueInvoice(invoice.id));
         setBusy(false);
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(`${res.data.number ?? "Invoice"} issued`);
         onOpenChange(false);
@@ -99,8 +110,10 @@ export function IssueDialog({
                         It takes the next number and its lines lock — a mistake
                         after this is corrected with a credit note.{" "}
                         {canSend
-                            ? "Issuing doesn't send it: Send with pay link issues and sends in one step."
-                            : "Saroh doesn't send it: copy its pay link or print it and hand it over."}
+                            ? `Issuing doesn't send it: ${sendLabel(payOnline)} issues and sends in one step.`
+                            : payOnline
+                              ? "Saroh doesn't send it: copy its pay link or print it and hand it over."
+                              : "Saroh doesn't send it: print it or download the PDF and hand it over."}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -115,6 +128,7 @@ export function IssueDialog({
                         {busy ? "Issuing…" : "Issue it"}
                     </AlertDialogAction>
                 </AlertDialogFooter>
+                {details.step}
             </AlertDialogContent>
         </AlertDialog>
     );

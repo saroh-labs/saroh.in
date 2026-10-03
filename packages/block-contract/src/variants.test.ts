@@ -496,3 +496,157 @@ describe("productGrid", () => {
         expect(resolveVariant("productGrid", {})).toBe("default");
     });
 });
+
+/** G20 — Class packs lists the business's packs on sale, read live. */
+describe("packs", () => {
+    it("is valid with nothing set, so a just-added block saves", () => {
+        expect(parseSectionContent("packs", 1, {}).success).toBe(true);
+    });
+
+    it("keeps a title, a button label and the switch", () => {
+        const parsed = parseSectionContent("packs", 1, {
+            title: "  Class packs ",
+            buttonLabel: " Get it ",
+            showDescriptions: false,
+        });
+        expect(parsed.success && parsed.data).toEqual({
+            title: "Class packs",
+            buttonLabel: "Get it",
+            showDescriptions: false,
+        });
+    });
+
+    it("never stores the packs themselves, so a price can't go stale", () => {
+        const parsed = parseSectionContent("packs", 1, {
+            title: "Packs",
+            packs: [{ name: "Copied pack", price: "99.00" }],
+        });
+        expect(parsed.success && parsed.data).toEqual({ title: "Packs" });
+    });
+
+    it("refuses an over-long title or button label", () => {
+        expect(
+            parseSectionContent("packs", 1, { title: "x".repeat(161) }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("packs", 1, { buttonLabel: "x".repeat(41) })
+                .success,
+        ).toBe(false);
+    });
+
+    it("publishes exactly what was authored", () => {
+        const draft = { title: "Packs", showDescriptions: true };
+        expect(
+            toRendered("packs", draft, { resolvePage: () => undefined }),
+        ).toBe(draft);
+    });
+
+    it("has one look, and content without one wears it", () => {
+        expect(resolveVariant("packs", {})).toBe("default");
+    });
+});
+
+/** K11 — Projects: the merchant's own work, typed in, never read live. */
+describe("projects", () => {
+    const project = { title: "A booking site for a physio clinic" };
+
+    it("accepts its fixtures as authored content, in both looks", () => {
+        for (const look of ["cards", "list"] as const) {
+            const fixture = BLOCK_META.projects.fixtures[look];
+            expect(parseSectionContent("projects", 1, fixture).success).toBe(
+                true,
+            );
+        }
+    });
+
+    it("keeps a photo, a title, a line and a link", () => {
+        const parsed = parseSectionContent("projects", 1, {
+            variant: "list",
+            title: "  Work ",
+            items: [
+                {
+                    image: { src: "https://cdn.example.com/a.jpg", alt: "A" },
+                    title: " Menus ",
+                    summary: "Printed.",
+                    link: "https://example.com/menus",
+                },
+            ],
+        });
+        expect(parsed.success && parsed.data).toEqual({
+            variant: "list",
+            title: "Work",
+            items: [
+                {
+                    image: { src: "https://cdn.example.com/a.jpg", alt: "A" },
+                    title: "Menus",
+                    summary: "Printed.",
+                    link: "https://example.com/menus",
+                },
+            ],
+        });
+    });
+
+    it("saves a photo before it is described; publish asks for that", () => {
+        const parsed = parseSectionContent("projects", 1, {
+            items: [{ ...project, image: { src: "https://x/a.jpg" } }],
+        });
+        expect(parsed.success).toBe(true);
+    });
+
+    it("refuses no projects, and more than 24", () => {
+        expect(parseSectionContent("projects", 1, { items: [] }).success).toBe(
+            false,
+        );
+        expect(
+            parseSectionContent("projects", 1, {
+                items: Array.from({ length: 24 }, () => project),
+            }).success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("projects", 1, {
+                items: Array.from({ length: 25 }, () => project),
+            }).success,
+        ).toBe(false);
+    });
+
+    it("refuses a project with no title", () => {
+        expect(
+            parseSectionContent("projects", 1, { items: [{ title: "  " }] })
+                .success,
+        ).toBe(false);
+    });
+
+    it("refuses a script link, however it is disguised", () => {
+        const scheme = ["java", "script:"].join("");
+        for (const link of [
+            `${scheme}alert(1)`,
+            `java\n${scheme.slice(4)}alert(1)`,
+        ]) {
+            expect(
+                parseSectionContent("projects", 1, {
+                    items: [{ ...project, link }],
+                }).success,
+            ).toBe(false);
+        }
+        expect(
+            parseSectionContent("projects", 1, {
+                items: [{ ...project, link: "/work/menus" }],
+            }).success,
+        ).toBe(true);
+    });
+
+    it("publishes exactly what was authored", () => {
+        const draft = { items: [project] };
+        expect(
+            toRendered("projects", draft, { resolvePage: () => undefined }),
+        ).toBe(draft);
+    });
+
+    it("draws cards when no look, or an unknown one, is named", () => {
+        expect(resolveVariant("projects", { items: [project] })).toBe("cards");
+        expect(resolveVariant("projects", { variant: "list" })).toBe("list");
+        expect(resolveVariant("projects", { variant: "masonry" })).toBe(
+            "cards",
+        );
+    });
+});

@@ -12,6 +12,7 @@ import EnquirySection from "../blocks/enquiry";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import type { ProductPageData } from "../product/product-page";
 import ProductPage from "../product/product-page";
+import { TestReleaseProvider } from "../test-release/context";
 import { AddToBag } from "./add-to-bag";
 import type {
     CheckoutQuote,
@@ -283,6 +284,8 @@ function setup(
         standing?: ShopResult<CheckoutStanding>;
         signedIn?: boolean;
         outcome?: CheckoutOutcome;
+        /** Drawn on a test release (DEC-071, T6). */
+        testRelease?: boolean;
     } = {},
 ) {
     const quote = vi.fn(() =>
@@ -322,7 +325,7 @@ function setup(
         close: vi.fn(),
     }));
     addToBag(SITE, { listingId: "l-bread", variantId: null, quantity: 2 });
-    render(
+    const bag = (
         <ShopBag
             site={SITE}
             businessName="Rye & Co."
@@ -335,7 +338,17 @@ function setup(
                 signIn,
             }}
             openCheckout={openCheckout}
-        />,
+            apiUrl="https://api.test"
+        />
+    );
+    render(
+        over.testRelease ? (
+            <TestReleaseProvider release={{ name: "Diwali menu" }}>
+                {bag}
+            </TestReleaseProvider>
+        ) : (
+            bag
+        ),
     );
     return { quote, start, standing, openCheckout };
 }
@@ -384,6 +397,11 @@ describe("the header's bag", () => {
         });
 
         await screen.findByRole("heading", { name: "Order placed" });
+        // The confirmation page, on the business's own site (P4).
+        expect(
+            screen.getByRole("link", { name: "See your order" }),
+        ).toHaveAttribute("href", `/shop/order/${STARTED.orderId}`);
+        expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
         expect(start).toHaveBeenCalledTimes(1);
         const request = start.mock.calls[0][0];
         expect(request).toMatchObject({
@@ -392,7 +410,11 @@ describe("the header's bag", () => {
         });
         expect(request.key).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
         expect(openCheckout).toHaveBeenCalledWith(
-            expect.objectContaining({ handoff: STARTED.payment }),
+            expect.objectContaining({
+                handoff: STARTED.payment,
+                // The window's return goes to the API (P1).
+                apiUrl: "https://api.test",
+            }),
         );
         expect(standing).toHaveBeenCalledWith("o-1");
         expect(readBag(SITE)).toEqual([]);
@@ -654,5 +676,64 @@ describe("the header's bag", () => {
             />,
         );
         expect(screen.queryByRole("button")).toBeNull();
+    });
+});
+
+describe("the bag on a test release (DEC-071, T6)", () => {
+    it("is priced as usual, then stops where signing in would be: no order, no payment", async () => {
+        const { quote, start, openCheckout } = setup({
+            testRelease: true,
+        });
+        await openTheBag();
+        expect(quote).toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: /^Continue · / }));
+
+        const stop = await screen.findByRole("dialog", {
+            name: "This is a test release",
+        });
+        expect(stop.textContent).toContain(
+            "On the live site, the customer signs in here and pays ₹500 for 2 items.",
+        );
+        expect(stop.textContent).toContain(
+            "Nothing is ordered on a test release.",
+        );
+        expect(
+            screen.queryByText(
+                "Last step: confirm it's you, then we'll finish. No password.",
+            ),
+        ).toBeNull();
+        expect(start).not.toHaveBeenCalled();
+        expect(openCheckout).not.toHaveBeenCalled();
+
+        // Back to the bag, as it was.
+        fireEvent.click(
+            screen.getByRole("button", { name: "Back to your bag" }),
+        );
+        expect(
+            await screen.findByRole("heading", { name: "Your bag" }),
+        ).toBeInTheDocument();
+        expect(readBag(SITE)).toHaveLength(1);
+    });
+
+    it("says it is a test release when the site's server refuses the order", async () => {
+        const { start } = setup({
+            signedIn: true,
+            start: {
+                ok: false,
+                reason: "test-release",
+                message:
+                    "This is a test release. Nothing here is ordered, booked or paid.",
+            },
+        });
+        await openTheBag();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^Place order · / }),
+        );
+        expect(
+            await screen.findByText(
+                "This is a test release. Nothing here is ordered, booked or paid.",
+            ),
+        ).toBeInTheDocument();
+        expect(start).toHaveBeenCalledTimes(1);
     });
 });

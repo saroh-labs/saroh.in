@@ -13,6 +13,7 @@ import type { ProductOverview } from "@/lib/products/overview-rules";
 import {
     allergenLine,
     customFieldText,
+    madeByLine,
     onTheShop,
 } from "@/lib/products/overview-rules";
 import { untrackedShort } from "@/lib/products/tracking";
@@ -261,16 +262,7 @@ export function toShopData(
         materials: shown("materials") ? product.materials : null,
         materialsLabel: "Ingredients or material",
         // Who makes it and where, each on its own switch.
-        maker: product.madeHere
-            ? shown("maker")
-                ? overview.storefront.name
-                : null
-            : [
-                  shown("maker") ? product.maker : null,
-                  shown("madeIn") ? product.madeIn : null,
-              ]
-                  .filter(Boolean)
-                  .join(", ") || null,
+        maker: madeByLine(product),
         warranty: shown("warranty") ? product.warranty : null,
         extras: [
             // Allergens always show when ticked: the shop never claims a
@@ -290,7 +282,7 @@ export function toShopData(
         returns: shown("returns")
             ? product.returnsMode === "OWN"
                 ? product.returnsText
-                : "The storefront's rule"
+                : "The location's rule"
             : null,
         images: product.images.map((i) => ({
             id: i.id,

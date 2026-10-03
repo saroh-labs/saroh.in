@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import {
     issueInvoice,
     remindInvoice,
@@ -28,6 +29,9 @@ import type { InvoiceSend } from "@/lib/invoices/service";
  * told, where, and that a link shared before stops working, before it
  * happens. From a draft, "Send with pay link" issues it first, as the
  * design's draft action does: it takes its number, then goes.
+ *
+ * Without online payment (`send.payOnline` false, DEC-070) the link only
+ * shows the invoice, and the words say so: no pay link is promised.
  */
 export function SendDialog({
     open,
@@ -48,22 +52,29 @@ export function SendDialog({
     const first = invoice.who.split(" ")[0] || invoice.who;
     const reminder = mode === "reminder";
     const label = invoice.number ?? "this invoice";
+    // No registered address yet (DEC-068): asked here, then it goes.
+    const details = useBusinessDetailsStep({
+        then: reminder ? "send the reminder" : "send it",
+        continueLabel: reminder ? "Save and remind" : "Save and send",
+    });
 
     async function go() {
         setBusy(true);
         let number = invoice.number;
         if (mode === "draft") {
-            const issued = await issueInvoice(invoice.id);
+            const issued = await details.run(() => issueInvoice(invoice.id));
+            if (!issued) return setBusy(false);
             if (!issued.ok) {
                 setBusy(false);
                 return showError(issued.error);
             }
             number = issued.data.number ?? number;
         }
-        const res = reminder
-            ? await remindInvoice(invoice.id)
-            : await sendInvoice(invoice.id);
+        const res = await details.run(() =>
+            reminder ? remindInvoice(invoice.id) : sendInvoice(invoice.id),
+        );
         setBusy(false);
+        if (!res) return;
         onOpenChange(false);
         router.refresh();
         if (!res.ok) {
@@ -73,7 +84,12 @@ export function SendDialog({
                     : res.error,
             );
         }
-        const out = sendOutcome(res.data, first, reminder);
+        const out = sendOutcome(
+            res.data,
+            first,
+            reminder,
+            send.payOnline ?? true,
+        );
         if (out.ok) showSuccess(out.message);
         else showError(out.message);
     }
@@ -109,6 +125,7 @@ export function SendDialog({
                         {busy ? "Sending…" : action}
                     </AlertDialogAction>
                 </AlertDialogFooter>
+                {details.step}
             </AlertDialogContent>
         </AlertDialog>
     );

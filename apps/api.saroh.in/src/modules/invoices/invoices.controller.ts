@@ -9,6 +9,7 @@ import {
     Patch,
     Post,
     Query,
+    StreamableFile,
     UseGuards,
 } from "@nestjs/common";
 
@@ -29,26 +30,29 @@ import {
     RecordPaymentDto,
     VoidInvoiceDto,
 } from "./dto";
+import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesService } from "./invoices.service";
-import { payLinkUrl } from "./pay-link-url";
+import { payLinkUrlFor } from "./pay-link-url";
 
 /**
- * Billing → Invoices (ADR-007). Under Payments, which a business can switch
- * on without connecting a provider: an invoice paid in cash or by UPI is
- * recorded by hand, so the "no provider connected" setup blocker must not
- * refuse these routes — the module being on is enough.
+ * Billing → Invoices (ADR-007). Invoicing needs no module (DEC-070): a
+ * business creates, issues, sends, voids, credits and records an invoice
+ * paid with Payments off, so these routes ask only for `invoice:*`, which
+ * the service checks on every route.
  *
- * Authorization is in the service, which every route passes the context to.
+ * The one route that is Payments' is the pay link: a way to take money
+ * online. It keeps its own Payments gate on the handler, and the guard reads
+ * a handler's metadata before the class's. It still skips the "no provider
+ * connected" readiness blocker, so the service can say what the link needs.
  */
 @Controller("organizations/:organizationId/invoices")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("PAYMENTS")
-@IgnoreModuleReadiness()
 export class InvoicesController {
     constructor(
         private readonly invoices: InvoicesService,
         private readonly sending: InvoiceSendService,
+        private readonly pdfs: InvoicePdfService,
     ) {}
 
     @Get()
@@ -76,6 +80,24 @@ export class InvoicesController {
             ...invoice,
             ...(await this.sending.readFor(ctx.organizationId, id)),
         };
+    }
+
+    /**
+     * The issued paper as a PDF, named for its number (D16). Drawn on
+     * request and never stored; a draft is a 409.
+     */
+    @Get(":invoiceId/pdf")
+    @Header("Cache-Control", "no-store")
+    async pdf(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ): Promise<StreamableFile> {
+        const { file, fileName } = await this.pdfs.render(ctx, id);
+        return new StreamableFile(file, {
+            type: "application/pdf",
+            disposition: `attachment; filename="${fileName}"`,
+            length: file.length,
+        });
     }
 
     @Post()
@@ -155,6 +177,8 @@ export class InvoicesController {
      * is kept, so asking again makes a new link and retires the old one.
      */
     @Post(":invoiceId/pay-link")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(201)
     @Header("Cache-Control", "no-store")
     async payLink(
@@ -162,12 +186,14 @@ export class InvoicesController {
         @Param("invoiceId") id: string,
     ): Promise<{ url: string }> {
         const { token } = await this.invoices.createPayLink(ctx, id);
-        return { url: payLinkUrl(token) };
+        return { url: await payLinkUrlFor(ctx.organizationId, token) };
     }
 
     /**
-     * Send it with a fresh pay link through the business's own provider
-     * (D17). The link is never in the answer: it goes only to the customer.
+     * Send it with a fresh link through the business's own email provider
+     * (D17): a pay link when it takes payment online, else a link to view
+     * the invoice (DEC-070). The link is never in the answer: it goes only
+     * to the customer.
      */
     @Post(":invoiceId/send")
     @HttpCode(200)

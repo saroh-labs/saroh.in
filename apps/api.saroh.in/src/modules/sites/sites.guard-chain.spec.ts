@@ -71,6 +71,8 @@ import type { FeatureFlagService } from "../feature-flags/feature-flags.service"
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import { SitesController } from "./sites.controller";
 import { SitesService } from "./sites.service";
+import { TestReleasesController } from "./test-releases.controller";
+import { TestReleasesService } from "./test-releases.service";
 
 const membershipFindUnique = prisma.membership.findUnique as jest.Mock;
 const organizationFindUnique = prisma.organization.findUnique as jest.Mock;
@@ -130,6 +132,21 @@ function request(method = "GET") {
 }
 
 /**
+ * Which controller's metadata the guards read. Site routes name a
+ * `SitesController` handler; the test release routes (DEC-071, T2) live on
+ * their own controller and name one of its handlers.
+ */
+interface Target {
+    controller: { prototype: object };
+    handler: string;
+}
+const SITES: Target = { controller: SitesController, handler: "list" };
+const releaseRoute = (handler: keyof TestReleasesController): Target => ({
+    controller: TestReleasesController,
+    handler,
+});
+
+/**
  * The context the guards read, pointed at a REAL controller handler.
  *
  * This matters more than it looks. `ModuleEnforcementGuard` asks a Reflector
@@ -142,10 +159,14 @@ function request(method = "GET") {
 function execution(
     req: object,
     handler: keyof SitesController = "list",
+    target: Target = SITES,
 ): ExecutionContext {
+    const controller = target.controller;
+    const name = target === SITES ? handler : target.handler;
     return {
-        getHandler: () => SitesController.prototype[handler],
-        getClass: () => SitesController,
+        getHandler: () =>
+            (controller.prototype as Record<string, unknown>)[name],
+        getClass: () => controller,
         switchToHttp: () => ({ getRequest: () => req }),
     } as unknown as ExecutionContext;
 }
@@ -160,9 +181,10 @@ async function throughChain<T>(
     method: string,
     op: (ctx: OrganizationContext) => Promise<T>,
     handler: keyof SitesController = "list",
+    target: Target = SITES,
 ): Promise<T> {
     const req = request(method);
-    const ctx = execution(req, handler);
+    const ctx = execution(req, handler, target);
 
     await new BetterAuthGuard().canActivate(ctx);
     await new OrganizationGuard(new OrganizationContextService()).canActivate(
@@ -200,6 +222,10 @@ class PastTheGate extends Error {
 const REVIEWER_SCOPE = { reviewers: { some: { userId: USER } } };
 
 const service = () => new SitesService({} as EntitlementService);
+const releases = () =>
+    new TestReleasesService(service(), {
+        isEnabled: jest.fn().mockResolvedValue(true),
+    } as unknown as FeatureFlagService);
 
 interface Operation {
     /** What a merchant would call it. */
@@ -210,6 +236,8 @@ interface Operation {
     run: (ctx: OrganizationContext) => Promise<unknown>;
     /** The roles that may do it. Every other role must be refused. */
     allowed: readonly OrgRole[];
+    /** Another controller's handler, when it is not a site route. */
+    target?: Target;
 }
 
 const OPERATIONS: readonly Operation[] = [
@@ -295,6 +323,89 @@ const OPERATIONS: readonly Operation[] = [
         run: (ctx) => service().restorePublication(ctx, SITE, "pub_1"),
         allowed: ["OWNER", "ADMIN"],
     },
+    // Test releases (DEC-071, T2): making and sharing one is editing the
+    // site; reading the list and opening one is reading it, which a reviewer
+    // invited to the site may do.
+    {
+        what: "make a test release",
+        handler: "list",
+        target: releaseRoute("create"),
+        method: "POST",
+        run: (ctx) => releases().create(ctx, SITE, {}),
+        allowed: ["OWNER", "ADMIN"],
+    },
+    {
+        what: "see the test releases",
+        handler: "list",
+        target: releaseRoute("list"),
+        method: "GET",
+        run: (ctx) => releases().list(ctx, SITE),
+        allowed: ["OWNER", "ADMIN", "MEMBER", "REVIEWER"],
+    },
+    {
+        what: "read a test release in the workspace",
+        handler: "list",
+        target: releaseRoute("get"),
+        method: "GET",
+        run: (ctx) => releases().get(ctx, SITE, "release_1"),
+        allowed: ["OWNER", "ADMIN", "MEMBER", "REVIEWER"],
+    },
+    {
+        what: "open a test release",
+        handler: "list",
+        target: releaseRoute("open"),
+        method: "POST",
+        run: (ctx) => releases().open(ctx, SITE, "release_1"),
+        allowed: ["OWNER", "ADMIN", "MEMBER", "REVIEWER"],
+    },
+    {
+        what: "share a test release",
+        handler: "list",
+        target: releaseRoute("createLink"),
+        method: "POST",
+        run: (ctx) =>
+            releases().createLink(ctx, SITE, "release_1", { days: 7 }),
+        allowed: ["OWNER", "ADMIN"],
+    },
+    // Going live with one changes what the public sees: the same act as
+    // publishing (T7).
+    {
+        what: "go live with a test release",
+        handler: "list",
+        target: releaseRoute("goLive"),
+        method: "POST",
+        run: (ctx) => releases().goLive(ctx, SITE, "release_1"),
+        allowed: ["OWNER", "ADMIN"],
+    },
+    // A go-live at a set time is still going live (T10).
+    {
+        what: "schedule a test release's go-live",
+        handler: "list",
+        target: releaseRoute("schedule"),
+        method: "POST",
+        run: (ctx) =>
+            releases().schedule(ctx, SITE, "release_1", {
+                date: "2099-01-01",
+                time: "18:00",
+            }),
+        allowed: ["OWNER", "ADMIN"],
+    },
+    {
+        what: "cancel a test release's scheduled go-live",
+        handler: "list",
+        target: releaseRoute("cancelSchedule"),
+        method: "DELETE",
+        run: (ctx) => releases().cancelSchedule(ctx, SITE, "release_1"),
+        allowed: ["OWNER", "ADMIN"],
+    },
+    {
+        what: "discard a test release",
+        handler: "list",
+        target: releaseRoute("discard"),
+        method: "POST",
+        run: (ctx) => releases().discard(ctx, SITE, "release_1"),
+        allowed: ["OWNER", "ADMIN"],
+    },
 ];
 
 const ROLES: readonly OrgRole[] = ["OWNER", "ADMIN", "MEMBER", "REVIEWER"];
@@ -329,7 +440,12 @@ describe("a website request, through the real guard chain", () => {
         it.each(OPERATIONS.map((op) => [op.what, op] as const))(
             "%s",
             async (_what, op) => {
-                const result = throughChain(op.method, op.run, op.handler);
+                const result = throughChain(
+                    op.method,
+                    op.run,
+                    op.handler,
+                    op.target,
+                );
                 if (op.allowed.includes(role)) {
                     await expect(result).rejects.toBeInstanceOf(PastTheGate);
                 } else {

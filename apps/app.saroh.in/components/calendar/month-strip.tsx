@@ -16,7 +16,8 @@ const BREAKDOWN_ID = "calendar-money-breakdown";
 /**
  * The month's money, after the design (plan 005 E23): In, Out, Net and Due
  * as four buttons, each opening its breakdown by kind under the row, and
- * "Export the month" at the end. Drawn only for a caller the API sent money
+ * "Export the month" at the end. Due counts from today; what was due
+ * before today is a fifth, red "Overdue" when there is some (DEC-067). Drawn only for a caller the API sent money
  * to (`payment:read`); the page leaves it out otherwise.
  *
  * The strip adds up what the switches leave on; the file is the whole
@@ -49,7 +50,7 @@ export function MonthStrip({
         : null;
 
     const exportMonth = () => {
-        const { csv, lines } = monthCsv(cash.all, labelOf);
+        const { csv, lines } = monthCsv(cash.all, labelOf, at);
         download(csv, monthCsvName(month));
         showSuccess(
             `Exported ${lines} ${lines === 1 ? "line" : "lines"} for ${monthTitle(month)} as a spreadsheet file.`,

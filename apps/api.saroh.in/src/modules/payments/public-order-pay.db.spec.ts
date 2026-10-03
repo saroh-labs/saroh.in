@@ -3,7 +3,8 @@
  * link made and replaced, the customer's page (an allow-list), a payment
  * started for what is due and settled by the success webhook (the order
  * paid, its invoice written, the link cleared), an order paid at the
- * counter meanwhile, an order cancelled meanwhile (the capture recorded as
+ * counter meanwhile (its link voided, DEC-067), an order cancelled
+ * meanwhile (the capture recorded as
  * owed back), and the refusals — no provider, a Razorpay connection with
  * no public key id, a Member, another business.
  *
@@ -27,9 +28,11 @@ import {
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { hashPayToken } from "../invoices/pay-token";
+import { takeCounterPaymentInTx } from "../orders/new-order";
 import { OrderKitchenService } from "../orders/order-kitchen.service";
 import { OrderPayLinkService } from "../orders/order-pay-link.service";
 import { OrdersService } from "../orders/orders.service";
@@ -75,6 +78,7 @@ async function business(name: string) {
     const org = await prisma.organization.create({
         data: { name, slug: `order-pay-${name.toLowerCase()}-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     const store = await prisma.store.create({
         data: {
             name,
@@ -333,6 +337,8 @@ describe("paying from an order's pay link (real database)", () => {
             currency: "INR",
             status: "DUE",
             theme: null,
+            // Where the link lives (DEC-069, L6): the apex, the flag off.
+            payUrl: `https://saroh.app/pay/o/${token}`,
         });
         // No email, phone, surname or ids reach the page.
         const text = JSON.stringify(view);
@@ -380,22 +386,66 @@ describe("paying from an order's pay link (real database)", () => {
         );
     });
 
-    it("an order paid at the counter meanwhile reads as paid and starts no payment", async () => {
+    it("paying at the counter voids the link, so nobody can pay twice (DEC-067)", async () => {
         const id = await unpaidOrder();
         const { token } = await payLinks.make(owner, id);
         await orders.updateStatus(storeId, id, owner.userId, {
             paymentStatus: "PAID",
         });
 
-        const view = await publicPay.read(token);
-        expect(view.status).toBe("PAID");
-        expect(view.due).toBe("0.00");
+        expect(await stored(id)).toMatchObject({
+            paymentStatus: "PAID",
+            payTokenHash: null,
+            payLinkCreatedAt: null,
+        });
+        // The page reads it as a link no longer needed.
+        await expect(publicPay.read(token)).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
         await expect(
             publicPay.createIntent(token, { idempotencyKey: "late" }),
-        ).rejects.toThrow("This order is already paid.");
+        ).rejects.toBeInstanceOf(NotFoundException);
         expect(
             await prisma.paymentIntent.count({ where: { orderId: id } }),
         ).toBe(0);
+        // Paid by hand, the counter settles any difference: no new link.
+        await expect(payLinks.make(owner, id)).rejects.toThrow(
+            "This order is already paid.",
+        );
+    });
+
+    it("a counter payment taken with the order (cash, UPI or card) voids any link too", async () => {
+        const id = await unpaidOrder();
+        const { token } = await payLinks.make(owner, id);
+        await prisma.$transaction((tx) =>
+            takeCounterPaymentInTx(tx, {
+                orderId: id,
+                organizationId: owner.organizationId,
+                userId: owner.userId,
+                kind: "UPI",
+                receivedCents: null,
+                at: new Date(),
+            }),
+        );
+        expect(await stored(id)).toMatchObject({
+            paymentStatus: "PAID",
+            payTokenHash: null,
+        });
+        await expect(publicPay.read(token)).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+    });
+
+    it("a payment started before the counter took it can't finish on the voided link", async () => {
+        const id = await unpaidOrder();
+        const { token } = await payLinks.make(owner, id);
+        await publicPay.createIntent(token, { idempotencyKey: "open-tab-2" });
+        await orders.updateStatus(storeId, id, owner.userId, {
+            paymentStatus: "PAID",
+        });
+        await expect(
+            publicPay.createIntent(token, { idempotencyKey: "open-tab-2" }),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("cancelling the order retires its link", async () => {

@@ -38,6 +38,12 @@ type AppHeaderProps =
            * them — then there is no bell.
            */
           unread: number | null;
+          /**
+           * The modules this person has here (the rail's), so search never
+           * offers a setting for one Saroh hasn't rolled out (DEC-057).
+           * `null` = unknown, and search fails open, as the rail does.
+           */
+          moduleKeys?: string[] | null;
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -57,7 +63,7 @@ export function AppHeader(props: AppHeaderProps) {
         );
     }
 
-    const { organizations, activeOrg, user, unread } = props;
+    const { organizations, activeOrg, user, unread, moduleKeys = null } = props;
 
     return (
         // Gaps, not controls, give way on a phone: the switcher's name
@@ -86,6 +92,8 @@ export function AppHeader(props: AppHeaderProps) {
                     actor={{
                         role: activeOrg?.role ?? null,
                         actions: activeOrg?.actions ?? null,
+                        modules: moduleKeys,
+                        kind: activeOrg?.kind,
                     }}
                 />
                 {unread !== null ? <NotificationsLink unread={unread} /> : null}

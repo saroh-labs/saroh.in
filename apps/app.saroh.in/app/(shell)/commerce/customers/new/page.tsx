@@ -31,7 +31,7 @@ export default async function NewCustomerPage() {
                     "Add customer",
                 ]}
                 title="Add customer"
-                description="An email is enough; the rest is whatever you know. They join your business, not one storefront, and show on Customers straight away."
+                description="An email is enough; the rest is whatever you know. They join your business, not one location, and show on Customers straight away."
             />
             <AddCustomerForm />
         </PageContainer>

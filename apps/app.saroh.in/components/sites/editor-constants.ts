@@ -25,7 +25,9 @@ export const SECTION_LABELS: Record<SectionType, string> = {
     visitUs: "Visit us",
     journal: "Journal",
     plans: "Plans",
+    packs: "Class packs",
     productGrid: "Product grid",
+    projects: "Projects",
 };
 
 /**
@@ -49,10 +51,12 @@ export const SECTION_HINTS: Record<SectionType, string> = {
     contact: "Your address, opening hours, phone, email and WhatsApp.",
     servicesList: "Your services with duration and price, always up to date.",
     visitUs:
-        "Your shop's address, hours and Open now, with directions, always up to date.",
+        "A location's address, hours and Open now, with directions, always up to date.",
     journal: "Your latest posts, newest first. A new post shows up on its own.",
     plans: "Your plans on sale, with price and how often. A new plan shows up on its own.",
+    packs: "Your class packs on sale, with the price per class. A new pack shows up on its own.",
     productGrid: "Reads the catalogue. Stays current on its own.",
+    projects: "Your own work, each with a photo, a line about it and a link.",
 };
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
@@ -110,6 +114,7 @@ export const SECTION_ORDER: SectionType[] = [
     "richText",
     "cta",
     "gallery",
+    "projects",
     "enquiry",
     "booking",
     "features",
@@ -120,6 +125,7 @@ export const SECTION_ORDER: SectionType[] = [
     "visitUs",
     "journal",
     "plans",
+    "packs",
     "productGrid",
 ];
 
@@ -131,11 +137,26 @@ export const SECTION_ORDER: SectionType[] = [
  */
 const SHOP_BLOCKS: readonly SectionType[] = ["productGrid"];
 
-/** The blocks the Add tab and the picker offer, in order. */
-export function addableSections(shopOpen: boolean): SectionType[] {
-    return shopOpen
-        ? SECTION_ORDER
-        : SECTION_ORDER.filter((t) => !SHOP_BLOCKS.includes(t));
+/**
+ * The Class packs block, offered only while Class packs is rolled out for
+ * the business and on (the API's `packsBlockOffered`). Off, it is not in
+ * Add block at all (DEC-057); one already on a page stays.
+ */
+const PACKS_BLOCKS: readonly SectionType[] = ["packs"];
+
+/**
+ * The blocks the Add tab and the picker offer, in order. Each gate fails
+ * closed: an API that doesn't say leaves its blocks out.
+ */
+export function addableSections(
+    shopOpen: boolean,
+    packsOpen = false,
+): SectionType[] {
+    return SECTION_ORDER.filter(
+        (t) =>
+            (shopOpen || !SHOP_BLOCKS.includes(t)) &&
+            (packsOpen || !PACKS_BLOCKS.includes(t)),
+    );
 }
 
 /** A sensible empty section for the chosen type (contract v1). */

@@ -76,7 +76,7 @@ export function ProductDetailsCard({
                             {stock === "untracked"
                                 ? untrackedDetail(product.storefronts ?? [])
                                 : stock === "tracked-per-storefront"
-                                  ? "Tracked · counted per storefront"
+                                  ? "Tracked · counted per location"
                                   : "Tracked"}
                         </DetailRow>
                     ) : null}
@@ -115,7 +115,7 @@ export function ProductDetailsCard({
                     >
                         {product.returnsMode === "OWN" && product.returnsText
                             ? product.returnsText
-                            : "The storefront's rule"}
+                            : "The location's rule"}
                     </DetailRow>
                     {product.customFields.map((f) => (
                         <DetailRow

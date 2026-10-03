@@ -1,10 +1,13 @@
 import { Logger } from "@nestjs/common";
 
+import { providerCallSignal } from "./provider-call";
 import type {
     CreateOrderIntentInput,
     CreateOrderIntentResult,
+    FindOrderPaymentsInput,
     FindRefundInput,
     MerchantProvider,
+    OrderPayment,
     ProviderCredentials,
     RefundInput,
     RefundResult,
@@ -189,6 +192,53 @@ export class CashfreeProvider implements MerchantProvider {
         );
     }
 
+    /**
+     * The payments on an order (`GET /orders/{order_id}/payments`, P1),
+     * looked up by the merchant order id Saroh made it under (the Order's
+     * or Invoice's id — what `createOrderIntent` sent as `order_id`).
+     * Cashfree's drop-in returns no signature, so this read is all its
+     * return is checked by. Amounts are rupees, read as decimal text.
+     */
+    async findOrderPayments(
+        input: FindOrderPaymentsInput,
+    ): Promise<OrderPayment[]> {
+        const { merchantRef, credentials } = input;
+        if (!merchantRef) return [];
+        let res: Response;
+        try {
+            res = await fetch(
+                `${this.baseUrl}/orders/${encodeURIComponent(merchantRef)}/payments`,
+                {
+                    headers: this.headers(credentials),
+                    signal: providerCallSignal(),
+                },
+            );
+        } catch {
+            // A dropped connection, or no answer in time.
+            throw new Error("Cashfree payment lookup failed: network error");
+        }
+        if (res.status === 404) return [];
+        if (!res.ok) {
+            this.logger.warn(
+                `Cashfree payment lookup failed with HTTP ${res.status}`,
+            );
+            throw new Error(
+                `Cashfree payment lookup failed (HTTP ${res.status})`,
+            );
+        }
+        let body: unknown;
+        try {
+            body = await res.json();
+        } catch {
+            throw new Error(
+                "Cashfree payment lookup failed: unreadable response",
+            );
+        }
+        return (Array.isArray(body) ? (body as CashfreePayment[]) : [])
+            .map(toOrderPayment)
+            .filter((p): p is OrderPayment => p !== null);
+    }
+
     private headers(credentials: ProviderCredentials): Record<string, string> {
         return {
             "x-client-id": credentials.keyId,
@@ -234,4 +284,49 @@ async function isDuplicateRefund(res: Response): Promise<boolean> {
     } catch {
         return false;
     }
+}
+
+/** One of Cashfree's order payments, as far as Saroh reads it. */
+interface CashfreePayment {
+    cf_payment_id?: string | number;
+    payment_status?: string;
+    payment_amount?: number | string;
+    payment_currency?: string;
+}
+
+const PAYMENT_STATUS: Record<string, OrderPayment["status"]> = {
+    SUCCESS: "CAPTURED",
+    PENDING: "PENDING",
+    NOT_ATTEMPTED: "PENDING",
+    FAILED: "FAILED",
+    USER_DROPPED: "FAILED",
+    CANCELLED: "FAILED",
+    VOID: "FAILED",
+};
+
+function toOrderPayment(payment: CashfreePayment): OrderPayment | null {
+    if (payment.cf_payment_id == null) return null;
+    return {
+        providerPaymentRef: String(payment.cf_payment_id),
+        status:
+            PAYMENT_STATUS[(payment.payment_status ?? "").toUpperCase()] ??
+            "OTHER",
+        amountCents: rupeesToPaise(payment.payment_amount),
+        currency: nonBlank(payment.payment_currency?.trim().toUpperCase()),
+    };
+}
+
+/** Rupees as a number or text ("400.50") → paise, never through a float product. */
+function rupeesToPaise(amount: number | string | undefined): number | null {
+    if (amount == null) return null;
+    const text = typeof amount === "number" ? amount.toFixed(2) : amount.trim();
+    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text);
+    if (!match) return null;
+    const [, whole, fraction = ""] = match;
+    return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+}
+
+function nonBlank(value: string | undefined): string | null {
+    if (!value) return null;
+    return value;
 }

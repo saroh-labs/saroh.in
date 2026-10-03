@@ -99,7 +99,7 @@ export function AvailabilityCard({
                     scroll={false}
                     className={cn(
                         FOCUS,
-                        "mt-1.5 block text-pretty rounded-sm text-[11.5px] leading-[1.45] text-brand hover:text-foreground",
+                        "mt-1.5 block text-pretty rounded-sm text-[11.5px] leading-[1.45] text-brand transition-colors hover:text-foreground active:text-muted-foreground",
                     )}
                 >
                     {held}

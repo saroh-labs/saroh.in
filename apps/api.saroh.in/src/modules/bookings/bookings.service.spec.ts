@@ -1410,7 +1410,7 @@ describe("service fields: visits, Either, deposit, booking page (E1)", () => {
             expect(err).toBeInstanceOf(ConflictException);
             expect((err as ConflictException).getResponse()).toMatchObject({
                 message:
-                    "Treatments are sold as orders — add a storefront first.",
+                    "Treatments are sold as orders — add a location first.",
                 details: { reason: "no-storefront", field: "visits" },
             });
             expect(serviceCreate).not.toHaveBeenCalled();

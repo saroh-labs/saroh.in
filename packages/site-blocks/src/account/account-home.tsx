@@ -2,13 +2,7 @@ import Link from "next/link";
 
 import { BOOKINGS_HREF } from "./bookings-model";
 import type { AccountView, AccountHome as Home } from "./model";
-import {
-    bookingWhen,
-    classesLine,
-    firstName,
-    planLine,
-    planPrice,
-} from "./model";
+import { bookingWhen, classesLine, planLine, planPrice } from "./model";
 import { OrderRow } from "./orders-list";
 import {
     AccountCard,
@@ -37,16 +31,11 @@ export function AccountHome({
     account: AccountView;
     home: Home;
 }) {
-    const first = firstName(account.name);
     const clinic = account.bookingsLabel === "Appointments";
     // The Plan tab's page (A8), linked only when this business shows it.
     const planTab = account.tabs.some((t) => t.key === "plan");
     return (
         <div className="grid gap-3.5">
-            <h1 className="font-site-heading text-site-fg m-0 text-[26px] font-semibold tracking-[-0.02em]">
-                {first ? `Hi, ${first}` : "Hi"}
-            </h1>
-
             {home.nextBooking ? (
                 <NextBooking
                     block={home.nextBooking}

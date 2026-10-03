@@ -37,7 +37,11 @@ function isPackOnSale(v: unknown): v is AccountPackOnSale {
         isCount(v.credits) &&
         isCount(v.validityDays) &&
         isString(v.price) &&
-        isString(v.currency)
+        isString(v.currency) &&
+        // Classes or one-to-one sessions; an older API leaves it out.
+        (v.kind === undefined ||
+            v.kind === "CLASSES" ||
+            v.kind === "ONE_TO_ONE")
     );
 }
 

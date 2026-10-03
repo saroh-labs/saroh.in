@@ -7,8 +7,9 @@
  * a Member — a Member reads every customer's contact details and the whole
  * diary, so a Viewer of one shop would gain the business's customer list
  * without anyone choosing it — but in the narrow **"Storefront team"** role:
- * the org, team, module, media, storefront and review reads, and nothing
- * about customers, bookings, orders or money. What they do inside their
+ * the org, team, module, media, storefront and review reads, their own
+ * storefronts' orders without the money (DEC-074), and nothing about
+ * customers, bookings or money. What they do inside their
  * storefront still comes from their storefront role, exactly as before.
  *
  * `joinTeamFromStorefront` is the one rule. The API runs it when a
@@ -37,10 +38,16 @@ export const STOREFRONT_TEAM_ROLE_KEY = "storefront-team";
 export const STOREFRONT_TEAM_ROLE_LABEL = "Storefront team";
 /**
  * What the role holds when it is made: enough to appear on Team and open the
- * storefronts, and nothing about customers, bookings, orders or money. No
+ * storefronts, and nothing about customers, bookings or money. No
  * `contact:read`, `booking:read` or `service:read` — the read-only floor's
  * diary — so it is narrower than Member. The API's
  * `organizations/storefront-team-role.ts` checks each is a real action.
+ *
+ * `order:stage` (DEC-074): the kitchen's view of an order, with no money,
+ * and moving its stage — which the API narrows to the orders of the
+ * storefronts the person works on (`orders/order-location.ts`). The
+ * migration `20261019120000_storefront_team_orders` gave it to every
+ * business's role made before.
  */
 export const STOREFRONT_TEAM_ACTIONS: readonly string[] = [
     "org:read",
@@ -49,6 +56,7 @@ export const STOREFRONT_TEAM_ACTIONS: readonly string[] = [
     "media:read",
     "store:read",
     "product-review:read",
+    "order:stage",
 ];
 /** The Activity entry each membership made this way writes. */
 export const STOREFRONT_JOIN_AUDIT_ACTION = "membership.storefront-join";

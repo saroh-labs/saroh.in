@@ -152,7 +152,7 @@ export function DayByPerson({
                                 aria-label={`Open hours for ${c.name} on ${dayText}`}
                                 onClick={(e) => closedAt(c, e)}
                                 className={cn(
-                                    "absolute inset-0 z-0 w-full cursor-copy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                                    "absolute inset-0 z-0 w-full cursor-pointer transition-[filter] duration-fast hover:brightness-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:brightness-95",
                                     CLOSED_HATCH,
                                 )}
                             />
@@ -186,7 +186,7 @@ export function DayByPerson({
                                       type="button"
                                       onClick={() => onFree(c, f)}
                                       aria-label={`Book ${c.name} at ${clock(f[0])}, free until ${clock(f[1])}`}
-                                      className="absolute inset-x-1 z-[1] box-border flex cursor-pointer flex-col items-start justify-start overflow-hidden rounded-[7px] border border-dashed border-success-subtle-foreground bg-success-subtle px-[7px] py-[3px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                                      className="absolute inset-x-1 z-[1] box-border flex cursor-pointer flex-col items-start justify-start overflow-hidden rounded-[7px] border border-dashed border-success-subtle-foreground bg-success-subtle px-[7px] py-[3px] text-left transition-[filter,border-style] duration-fast hover:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-95"
                                       style={{
                                           top: at(f[0], from),
                                           height: tall(f[0], f[1]),
@@ -205,7 +205,7 @@ export function DayByPerson({
                                 onClick={() => onBlock(b)}
                                 aria-label={blockLabel(b)}
                                 className={cn(
-                                    "absolute inset-x-1 z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[7px] py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                    "absolute inset-x-1 z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[7px] py-1 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
                                     blockColour(b),
                                     selected === b.key &&
                                         "ring-2 ring-highlight ring-offset-0",

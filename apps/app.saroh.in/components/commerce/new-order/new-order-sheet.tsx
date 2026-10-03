@@ -13,6 +13,7 @@ import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { Chip } from "@/components/shared/chip";
 import { pickName } from "@/lib/customers/picker";
 import { orderHref } from "@/lib/orders/links";
@@ -137,6 +138,10 @@ function NewOrderBody({
     const router = useRouter();
     const o = useNewOrder({ initialStoreId, canLink, canSearch });
     const [saving, setSaving] = useState(false);
+    const details = useBusinessDetailsStep({
+        then: "make the order and its pay link",
+        continueLabel: "Save and create order",
+    });
     const [failed, setFailed] = useState<{
         key: string;
         message: string;
@@ -165,8 +170,13 @@ function NewOrderBody({
     async function create() {
         if (o.problem || saving || !o.pick || !o.way) return;
         setSaving(true);
-        const res = await makeNewOrder(o.storeId, request(o));
+        // A pay link waits for the registered address (DEC-068): asked in
+        // place, then the order is made.
+        const res = await details.run(() =>
+            makeNewOrder(o.storeId, request(o)),
+        );
         setSaving(false);
+        if (!res) return;
         if (!res.ok) {
             setFailed({ key: sent, message: res.error });
             return;
@@ -200,6 +210,7 @@ function NewOrderBody({
     const shownProblem = o.lines.length > 0 ? (refusal ?? o.problem) : null;
     return (
         <>
+            {details.step}
             {/*
               Rows are max-content: the Items card clips its corners
               (overflow-hidden), which lets a grid row shrink it to nothing
@@ -213,7 +224,7 @@ function NewOrderBody({
                         </div>
                         <div
                             role="radiogroup"
-                            aria-label="Storefront"
+                            aria-label="Location"
                             className="flex flex-wrap gap-1.5"
                         >
                             {stores.map((s) => (

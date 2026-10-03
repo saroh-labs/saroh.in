@@ -29,7 +29,14 @@ import {
     addressFromName,
     cleanAddressInput,
 } from "@/lib/organizations/address";
+import {
+    kindDefaults,
+    kindWords,
+    ORGANIZATION_KINDS,
+} from "@/lib/organizations/kind";
 import type { AddressAvailability } from "@/lib/organizations/service";
+
+import { SetupKindChoice } from "./setup-kind-choice";
 
 /**
  * The countries a merchant is most likely to be in, offered as chips, as the
@@ -65,7 +72,11 @@ const TYPES = [
 ] as const;
 
 const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "The business needs a name" }),
+    // Nothing is chosen for them (DEC-070): the answer is theirs to give.
+    kind: z.enum(ORGANIZATION_KINDS, {
+        errorMap: () => ({ message: "Choose what you're setting up" }),
+    }),
+    name: z.string().trim().min(1, { message: "It needs a name" }),
     address: z
         .string()
         .min(3, { message: "An address needs at least 3 characters" }),
@@ -76,8 +87,14 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 /**
- * Setup's one step: name the business, reserve its address, and say the two
- * things invoices and payment providers need to know. Then Saroh opens.
+ * Setup's one step: say what is being set up (DEC-070), name it, reserve its
+ * address, and say the things invoices and payment providers need to know.
+ * Then Saroh opens.
+ *
+ * "What are you setting up?" comes first, with nothing chosen. The rest of
+ * the form appears once it is answered, on the same screen, and speaks in
+ * that answer's words (`kindWords`). The answer changes words and defaults
+ * only: every kind gets the same Saroh.
  *
  * The address follows the name until the merchant edits it, and is checked as
  * they go — it is the one thing here that is hard to change later, because it
@@ -98,6 +115,7 @@ export function BusinessSetupForm({
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
+            kind: undefined,
             name: "",
             address: "",
             type: undefined,
@@ -111,6 +129,12 @@ export function BusinessSetupForm({
     const name = useWatch({ control: form.control, name: "name" });
     const address = useWatch({ control: form.control, name: "address" });
     const country = useWatch({ control: form.control, name: "country" });
+    // Unanswered until they pick: the schema's type says what a valid
+    // submit holds, not what the form holds before one.
+    const kind = useWatch({ control: form.control, name: "kind" }) as
+        FormValues["kind"] | undefined;
+    const words = kindWords(kind);
+    const defaults = kindDefaults(kind);
     const [otherCountry, setOtherCountry] = useState(false);
 
     // The address follows the name until it is edited.
@@ -166,12 +190,18 @@ export function BusinessSetupForm({
         !availability.available;
 
     async function onSubmit(values: FormValues) {
+        // A site for my work is not asked (KTD-6), so it sends no type even
+        // if one was picked under another answer first.
+        const asked = kindDefaults(values.kind).asksRegistered;
         const res = await createOrganization({
             name: values.name.trim(),
+            kind: values.kind,
             address: values.address,
             profile: {
                 // Registered leaves the type unset (see TYPES).
-                ...(values.type === "individual" ? { type: "individual" } : {}),
+                ...(asked && values.type === "individual"
+                    ? { type: "individual" }
+                    : {}),
                 country: values.country,
             },
         });
@@ -189,23 +219,68 @@ export function BusinessSetupForm({
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
+            <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className={cn(
+                    "grid gap-5",
+                    // Until the first question is answered, only it, the
+                    // button and the way out show. Hidden rather than
+                    // unmounted: what was typed survives a change of answer.
+                    !kind && "[&>*:not([data-setup-kept])]:hidden",
+                )}
+            >
+                <FormField
+                    control={form.control}
+                    name="kind"
+                    render={({ field, fieldState }) => (
+                        <FormItem data-setup-kept>
+                            <FormLabel id="kind-label">
+                                What are you setting up?
+                            </FormLabel>
+                            <SetupKindChoice
+                                value={field.value}
+                                onChange={(next) => {
+                                    field.onChange(next);
+                                    // What an unanswered submit said about
+                                    // fields that were not on screen yet is
+                                    // not news once they appear.
+                                    form.clearErrors();
+                                }}
+                                labelledBy="kind-label"
+                                describedBy={
+                                    fieldState.error ? "kind-error" : undefined
+                                }
+                                invalid={Boolean(fieldState.error)}
+                            />
+                            {fieldState.error ? (
+                                <p
+                                    id="kind-error"
+                                    role="alert"
+                                    className="text-[0.8rem] font-medium text-destructive"
+                                >
+                                    {fieldState.error.message}
+                                </p>
+                            ) : null}
+                        </FormItem>
+                    )}
+                />
+
                 <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>What is it called?</FormLabel>
+                            <FormLabel>{words.nameLabel}</FormLabel>
                             <FormControl>
                                 <Input
-                                    placeholder="Rye & Co. Bakery"
+                                    placeholder={defaults.namePlaceholder}
                                     autoComplete="organization"
                                     {...field}
                                 />
                             </FormControl>
                             <FormDescription>
-                                Customers see this on receipts. You can change
-                                it later.
+                                People see this on your site and invoices. You
+                                can change it later.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>
@@ -285,60 +360,66 @@ export function BusinessSetupForm({
                     )}
                 />
 
-                <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel id="type-label">
-                                Is it registered as a company?
-                            </FormLabel>
-                            <div
-                                role="radiogroup"
-                                aria-labelledby="type-label"
-                                className="grid grid-cols-2 gap-2"
-                            >
-                                {TYPES.map((type) => {
-                                    const on = field.value === type.value;
-                                    return (
-                                        <button
-                                            key={type.value}
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={on}
-                                            onClick={() =>
-                                                field.onChange(
-                                                    on ? undefined : type.value,
-                                                )
-                                            }
-                                            className={cn(
-                                                "rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                                on
-                                                    ? "border-foreground bg-muted"
-                                                    : "border-input hover:bg-muted",
-                                            )}
-                                        >
-                                            <span className="block text-[13px] font-semibold">
-                                                {type.label}
-                                            </span>
-                                            <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
-                                                {type.note}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            <FormDescription>
-                                It decides what your invoices say and what a
-                                payment provider will ask you for.
-                            </FormDescription>
-                        </FormItem>
-                    )}
-                />
+                {defaults.asksRegistered ? (
+                    <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel id="type-label">
+                                    Is it registered as a company?
+                                </FormLabel>
+                                <div
+                                    role="radiogroup"
+                                    aria-labelledby="type-label"
+                                    className="grid grid-cols-2 gap-2"
+                                >
+                                    {TYPES.map((type) => {
+                                        const on = field.value === type.value;
+                                        return (
+                                            <button
+                                                key={type.value}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={on}
+                                                onClick={() =>
+                                                    field.onChange(
+                                                        on
+                                                            ? undefined
+                                                            : type.value,
+                                                    )
+                                                }
+                                                className={cn(
+                                                    "rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                    on
+                                                        ? "border-foreground bg-muted"
+                                                        : "border-input hover:bg-muted active:bg-accent-active",
+                                                )}
+                                            >
+                                                <span className="block text-[13px] font-semibold">
+                                                    {type.label}
+                                                </span>
+                                                <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
+                                                    {type.note}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <FormDescription>
+                                    It decides what your invoices say and what a
+                                    payment provider will ask you for.
+                                </FormDescription>
+                            </FormItem>
+                        )}
+                    />
+                ) : null}
 
                 <FormItem>
                     <FormLabel id="country-label">
-                        Where does it trade?
+                        {kind === "BUSINESS"
+                            ? "Where does it trade?"
+                            : "Where are you based?"}
                     </FormLabel>
                     <div
                         role="radiogroup"
@@ -361,7 +442,7 @@ export function BusinessSetupForm({
                                         "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                         on
                                             ? "border-foreground bg-foreground text-background"
-                                            : "border-input hover:bg-muted",
+                                            : "border-input hover:bg-muted active:bg-accent-active",
                                     )}
                                 >
                                     <span className="font-mono text-[11px] opacity-70">
@@ -380,7 +461,7 @@ export function BusinessSetupForm({
                                 "inline-flex h-8 items-center rounded-full border px-3 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 otherCountry
                                     ? "border-foreground bg-foreground text-background"
-                                    : "border-input hover:bg-muted",
+                                    : "border-input hover:bg-muted active:bg-accent-active",
                             )}
                         >
                             Another country
@@ -396,12 +477,14 @@ export function BusinessSetupForm({
                         />
                     ) : null}
                     <FormDescription id="country-note">
-                        Where the business is based. You can change it in
-                        Business settings.
+                        {kind === "BUSINESS"
+                            ? "Where the business is based."
+                            : "Where you work from."}{" "}
+                        You can change it in Settings.
                     </FormDescription>
                 </FormItem>
 
-                <div className="flex gap-2 pt-1">
+                <div data-setup-kept className="flex gap-2 pt-1">
                     {backTo ? (
                         <Button asChild variant="outline" className="h-10">
                             <Link href={backTo}>Back</Link>
@@ -417,16 +500,23 @@ export function BusinessSetupForm({
                                 : undefined
                         }
                     >
-                        {isSubmitting ? "Creating…" : "Create the business"}
+                        {isSubmitting
+                            ? "Setting up…"
+                            : kind === "BUSINESS"
+                              ? "Create the business"
+                              : "Set it up"}
                     </Button>
                 </div>
 
-                <p className="text-[12px] text-muted-foreground">
+                <p
+                    data-setup-kept
+                    className="text-[12px] text-muted-foreground"
+                >
                     Signed in as{" "}
                     <span className="text-foreground">{email}</span> ·{" "}
                     <button
                         type="button"
-                        className="text-foreground underline-offset-4 hover:underline"
+                        className="text-foreground underline-offset-4 hover:underline active:text-muted-foreground"
                         onClick={() => {
                             void authClient.signOut().then(() => {
                                 window.location.href = accountsLoginUrl;

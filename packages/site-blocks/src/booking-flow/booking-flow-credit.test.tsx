@@ -432,6 +432,57 @@ describe("a class credit online (A10)", () => {
         });
     });
 
+    it("on a phone, the credit found after signing in is a note, not the red error (P2)", async () => {
+        window.matchMedia = vi.fn(() => ({
+            matches: true,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        })) as unknown as typeof window.matchMedia;
+        serve();
+        const credit = creditReads(PACK);
+        render(
+            <BookingFlow
+                page={PAGE}
+                apiUrl={API}
+                account={account({ customer: null, credit })}
+            />,
+        );
+        await pickSession();
+        fireEvent.change(screen.getByLabelText("Name"), {
+            target: { value: "Asha Rao" },
+        });
+        fireEvent.click(
+            screen.getByRole("button", { name: "Continue to sign in" }),
+        );
+        const sheet = await screen.findByRole("dialog");
+        fireEvent.change(within(sheet).getByLabelText("Email"), {
+            target: { value: "asha@example.in" },
+        });
+        fireEvent.click(
+            within(sheet).getByRole("button", { name: "Send code" }),
+        );
+        fireEvent.change(await within(sheet).findByLabelText("Code"), {
+            target: { value: "123456" },
+        });
+        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
+
+        const found =
+            "You have a class credit for this, so we've picked it. Book with 1 credit, or choose another way to pay.";
+        await waitFor(() =>
+            expect(
+                screen
+                    .getAllByRole("status")
+                    .filter((el) => el.textContent === found),
+            ).not.toHaveLength(0),
+        );
+        // Nothing went wrong: no alert, and nothing booked yet.
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(bookBodies()).toHaveLength(0);
+        expect(
+            screen.getByRole("button", { name: "Book with 1 credit" }),
+        ).toBeInTheDocument();
+    });
+
     it("signing in with no credit books straight after the code, as before", async () => {
         serve();
         render(

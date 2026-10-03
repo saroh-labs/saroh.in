@@ -30,11 +30,13 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrderKitchenService } from "../orders/order-kitchen.service";
 import { listOrderRows } from "../orders/order-list";
 import { OrdersService } from "../orders/orders.service";
+import { ORDER_PAYING_ONLINE } from "../orders/payment-in-flight";
 import { PaymentsService } from "../payments/payments.service";
 import {
     FakeMerchantProvider,
@@ -143,6 +145,7 @@ beforeAll(async () => {
     await prisma.businessProfile.create({
         data: { organizationId: org.id, timezone: "UTC" },
     });
+    await giveBusinessDetails(org.id);
     await prisma.bookingRules.create({
         data: { organizationId: org.id, freeCancelHours: 24 },
     });
@@ -663,6 +666,7 @@ describe("a treatment sold as one order (E9, real database)", () => {
         const org = await prisma.organization.create({
             data: { name: "Elsewhere", slug: `visits-other-${tag}` },
         });
+        await giveBusinessDetails(org.id);
         const stranger: OrganizationContext = {
             organizationId: org.id,
             userId: owner.userId,
@@ -714,6 +718,7 @@ describe("a treatment refused before anything is held (E9)", () => {
         const org = await prisma.organization.create({
             data: { name: "No Shop Dental", slug: `visits-noshop-${tag}` },
         });
+        await giveBusinessDetails(org.id);
         const serviceId = await service(org.id, {
             name: "Root canal treatment",
             visits: 3,
@@ -740,6 +745,7 @@ describe("a treatment refused before anything is held (E9)", () => {
         const org = await prisma.organization.create({
             data: { name: "Shop Off Dental", slug: `visits-shopoff-${tag}` },
         });
+        await giveBusinessDetails(org.id);
         await prisma.store.create({
             data: {
                 name: "Clinic",
@@ -837,5 +843,109 @@ describe("an order line bills exactly one thing (E9, the CHECK)", () => {
                 data: { orderId, quantity: 1, price: "1.00" },
             }),
         ).rejects.toThrow();
+    });
+});
+
+describe("marking a treatment paid while it is paid online (#622)", () => {
+    const markPaid = (orderId: string) =>
+        orders.updateStatus(storeId, orderId, owner.userId, {
+            paymentStatus: "PAID",
+        });
+
+    it("refuses while visit 1's pay-now hold is open, and the customer's payment then bills it once", async () => {
+        keySeq += 1;
+        const { booking, payToken } = await publicBookings.bookOnline(
+            whitening,
+            {
+                startAt: nextStart().toISOString(),
+                bookerName: "Meera",
+                bookerEmail: "meera@example.in",
+                idempotencyKey: `visit_${keySeq}`,
+                pay: "NOW",
+            },
+            "ip_1",
+        );
+        expect(booking.status).toBe("PENDING");
+        const orderId = booking.orderId ?? "";
+        // The customer has the payment window open.
+        const intent = await publicInvoices.createIntent(payToken ?? "", {});
+
+        const refused = markPaid(orderId);
+        await expect(refused).rejects.toBeInstanceOf(ConflictException);
+        await expect(markPaid(orderId)).rejects.toThrow(
+            ORDER_PAYING_ONLINE.hold,
+        );
+        // Nothing written: still unpaid, no invoice of the order's own.
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: orderId } }))
+                .paymentStatus,
+        ).toBe("UNPAID");
+        expect(
+            await prisma.invoice.count({
+                where: { orderId, source: "ORDER" },
+            }),
+        ).toBe(0);
+
+        // The payment lands: the order is paid, on one invoice.
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: intent.providerIntentId,
+            providerPaymentRef: `pay_hold_${keySeq}`,
+        });
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: orderId } }))
+                .paymentStatus,
+        ).toBe("PAID");
+        // Marking it paid now is the same state again: nothing new.
+        await markPaid(orderId);
+        expect(await prisma.invoice.count({ where: { orderId } })).toBe(1);
+    });
+
+    it("refuses while a payment on the order is going through online, and marks it once that has failed", async () => {
+        keySeq += 1;
+        const { booking } = await publicBookings.bookOnline(
+            whitening,
+            {
+                startAt: nextStart().toISOString(),
+                bookerName: "Dev",
+                bookerEmail: "dev@example.in",
+                idempotencyKey: `visit_${keySeq}`,
+                pay: "DESK",
+            },
+            "ip_1",
+        );
+        expect(booking.status).toBe("CONFIRMED");
+        const orderId = booking.orderId ?? "";
+        const charging = await prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                orderId,
+                provider: "RAZORPAY",
+                amountCents: 1_200_000,
+                currency: "INR",
+                status: "PROCESSING",
+            },
+        });
+
+        await expect(markPaid(orderId)).rejects.toThrow(
+            ORDER_PAYING_ONLINE.charging,
+        );
+        expect(await prisma.invoice.count({ where: { orderId } })).toBe(0);
+
+        await prisma.paymentIntent.update({
+            where: { id: charging.id },
+            data: { status: "FAILED" },
+        });
+        await markPaid(orderId);
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: orderId } }))
+                .paymentStatus,
+        ).toBe("PAID");
+        expect(
+            await prisma.invoice.count({
+                where: { orderId, source: "ORDER", status: "PAID" },
+            }),
+        ).toBe(1);
     });
 });

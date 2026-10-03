@@ -70,19 +70,21 @@ export function YourProfile({
                             >
                                 {row.value || row.empty}
                             </dd>
-                            {row.change ? (
-                                <Button asChild variant="outline" size="sm">
-                                    {/* Cross-origin: accounts.saroh.in owns identity. */}
-                                    <a
-                                        href={accountUrl}
-                                        aria-label={`${row.change} your ${row.label.toLowerCase()} on your Saroh account`}
-                                    >
-                                        {row.change}
-                                    </a>
-                                </Button>
-                            ) : (
-                                <span />
-                            )}
+                            {/* A `dd` of its own: a `dl` group holds only
+                                `dt` and `dd` (axe's definition-list). */}
+                            <dd>
+                                {row.change ? (
+                                    <Button asChild variant="outline" size="sm">
+                                        {/* Cross-origin: accounts.saroh.in owns identity. */}
+                                        <a
+                                            href={accountUrl}
+                                            aria-label={`${row.change} your ${row.label.toLowerCase()} on your Saroh account`}
+                                        >
+                                            {row.change}
+                                        </a>
+                                    </Button>
+                                ) : null}
+                            </dd>
                         </div>
                     ))}
                 </dl>

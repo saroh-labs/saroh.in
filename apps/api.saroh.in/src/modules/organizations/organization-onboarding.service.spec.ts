@@ -17,11 +17,18 @@ jest.mock("@saroh/database", () => {
         site: {
             findUnique: jest.fn(),
         },
+        // An address another business held before a change (DEC-069).
+        addressReservation: {
+            findUnique: jest.fn(),
+        },
         membership: {
             create: jest.fn(),
         },
     };
     return {
+        currentOrgContext: () => undefined,
+        isRlsEnforcementEnabled: () => false,
+        outsideOrgContext: <T>(fn: () => T) => fn(),
         prisma: {
             ...client,
             $transaction: jest.fn((cb: (tx: typeof client) => unknown) =>
@@ -43,6 +50,9 @@ const orgCreate = prisma.organization.create as jest.Mock;
 const siteFindUnique = (
     prisma as unknown as { site: { findUnique: jest.Mock } }
 ).site.findUnique;
+const heldFindUnique = (
+    prisma as unknown as { addressReservation: { findUnique: jest.Mock } }
+).addressReservation.findUnique;
 const profileCreate = prisma.businessProfile.create as jest.Mock;
 const membershipCreate = prisma.membership.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
@@ -59,6 +69,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         // Default happy-path stubs; individual tests override as needed.
         orgFindUnique.mockResolvedValue(null);
         siteFindUnique.mockResolvedValue(null);
+        heldFindUnique.mockResolvedValue(null);
         orgCreate.mockResolvedValue({ id: "org_1", slug: "acme" });
         profileCreate.mockResolvedValue({ id: "bp_1" });
         membershipCreate.mockResolvedValue({ id: "mem_1" });
@@ -78,14 +89,16 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(transaction).toHaveBeenCalledTimes(1);
 
         expect(orgCreate).toHaveBeenCalledWith({
-            data: { name: "Acme", slug: "acme" },
+            // No kind sent (an app from before DEC-070): a business.
+            data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
             select: { id: true, slug: true },
         });
         expect(profileCreate).toHaveBeenCalledWith({
             data: {
                 organizationId: "org_1",
                 legalName: "Acme Inc",
-                type: "company",
+                // An old client's spelling is stored as `pvt` (F10b).
+                type: "pvt",
                 country: "US",
                 taxId: undefined,
                 contactEmail: undefined,
@@ -97,13 +110,13 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
     });
 
-    it("keeps a private limited company as company this release, and takes a new type as sent (F10)", async () => {
+    it("stores a private limited company as pvt, and takes a new type as sent (F10b)", async () => {
         await service.onboard("user_1", {
             name: "Acme",
             profile: { type: "pvt" },
         });
         expect(profileCreate).toHaveBeenLastCalledWith({
-            data: expect.objectContaining({ type: "company" }),
+            data: expect.objectContaining({ type: "pvt" }),
         });
 
         await service.onboard("user_1", {
@@ -126,7 +139,35 @@ describe("OrganizationOnboardingService.onboard", () => {
             targetType: "organization",
             targetId: "org_1",
             outcome: AuditOutcome.Success,
-            metadata: { slug: "acme" },
+            metadata: { slug: "acme", kind: "BUSINESS" },
+        });
+    });
+
+    describe("what is being set up (DEC-070)", () => {
+        it.each(["BUSINESS", "SOLO", "WORK"] as const)(
+            "stores %s as chosen, and audits it",
+            async (kind) => {
+                await service.onboard("user_1", { name: "Asha Rao", kind });
+
+                expect(orgCreate).toHaveBeenCalledWith({
+                    data: { name: "Asha Rao", slug: "asha-rao", kind },
+                    select: { id: true, slug: true },
+                });
+                expect(record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        metadata: { slug: "acme", kind },
+                    }),
+                );
+            },
+        );
+
+        it("stores a business when an older app sends no kind", async () => {
+            await service.onboard("user_1", { name: "Rye" });
+            expect(orgCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ kind: "BUSINESS" }),
+                }),
+            );
         });
     });
 
@@ -195,7 +236,7 @@ describe("OrganizationOnboardingService.onboard", () => {
             select: { id: true },
         });
         expect(orgCreate).toHaveBeenCalledWith({
-            data: { name: "  My Shop!  ", slug: "my-shop" },
+            data: { name: "  My Shop!  ", slug: "my-shop", kind: "BUSINESS" },
             select: { id: true, slug: true },
         });
     });
@@ -208,7 +249,11 @@ describe("OrganizationOnboardingService.onboard", () => {
             });
             expect(orgCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    data: { name: "Rye & Co. Bakery", slug: "ryeandco" },
+                    data: {
+                        name: "Rye & Co. Bakery",
+                        slug: "ryeandco",
+                        kind: "BUSINESS",
+                    },
                 }),
             );
         });
@@ -235,6 +280,42 @@ describe("OrganizationOnboardingService.onboard", () => {
             });
             expect(orgCreate).not.toHaveBeenCalled();
         });
+
+        it("refuses an address with two hyphens in a row, in the rule's words (DEC-071)", async () => {
+            const err = await service
+                .onboard("user_1", { name: "My Shop", address: "my--shop" })
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(BadRequestException);
+            expect((err as BadRequestException).getResponse()).toMatchObject({
+                message: "An address can't have two hyphens in a row",
+                details: { field: "address" },
+            });
+            expect(transaction).not.toHaveBeenCalled();
+        });
+
+        it("counts an address another business still holds after a change as taken", async () => {
+            heldFindUnique.mockResolvedValue({
+                organizationId: "org_other",
+                reservedUntil: new Date(Date.now() + 86_400_000),
+            });
+            const err = await service
+                .onboard("user_1", { name: "Rye", address: "ryeandco" })
+                .catch((e: unknown) => e);
+            expect(err).toBeInstanceOf(ConflictException);
+            expect(orgCreate).not.toHaveBeenCalled();
+        });
+
+        it("cuts a long name's address to 57 characters, with no hyphen at the cut", async () => {
+            // 56 letters, a space, then more: the cut lands on the hyphen.
+            await service.onboard("user_1", {
+                name: `${"a".repeat(56)} bakery`,
+            });
+            expect(orgCreate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ slug: "a".repeat(56) }),
+                }),
+            );
+        });
     });
 });
 
@@ -247,6 +328,7 @@ describe("OrganizationOnboardingService.checkAddress", () => {
         jest.clearAllMocks();
         orgFindUnique.mockResolvedValue(null);
         siteFindUnique.mockResolvedValue(null);
+        heldFindUnique.mockResolvedValue(null);
     });
 
     it("says a free address is available, normalised", async () => {
@@ -261,6 +343,9 @@ describe("OrganizationOnboardingService.checkAddress", () => {
         ["-rye", /hyphen/],
         ["rye co", /lowercase/],
         ["support", /kept for Saroh/],
+        ["test", /kept for Saroh/],
+        ["my--shop", /^An address can't have two hyphens in a row$/],
+        ["a".repeat(58), /^An address can have at most 57 characters$/],
     ])("says why %s cannot be used", async (address, reason) => {
         const answer = await service.checkAddress(address);
         expect(answer.available).toBe(false);

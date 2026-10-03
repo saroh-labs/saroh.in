@@ -1,7 +1,9 @@
+// @covers accounts:/login app:/open app:/ app:/bookings app:/commerce app:/contacts api:home api:bookings
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * The four scenes, as tests rather than as a review checklist (§18, #178).
@@ -25,13 +27,7 @@ import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
 const ROUTES = ["/", "/bookings", "/commerce", "/contacts"] as const;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     // The owner is in several businesses: with none chosen, `/` is the
     // chooser, not Home — and every scene below would measure the wrong page.
     await page.goto(`${urls.APP_URL}/open/${NORTHWIND_ORG}`);
@@ -119,7 +115,7 @@ test.describe("the phone tab bar", () => {
             page,
         }, testInfo) => {
             test.skip(
-                testInfo.project.name !== "phone",
+                !testInfo.project.name.startsWith("phone"),
                 "The tab bar is drawn below 760px only.",
             );
             await signIn(page);
@@ -133,45 +129,75 @@ test.describe("the phone tab bar", () => {
             // Scrolled until the page stops growing: a long list (Northwind's
             // contacts, with the showcase on) draws more rows as it nears its
             // end, so one jump lands above a foot that is still arriving.
-            await expect(async () => {
-                const before = await page.evaluate(() => {
-                    window.scrollTo(0, document.documentElement.scrollHeight);
-                    return document.documentElement.scrollHeight;
-                });
-                await page.waitForTimeout(300);
-                const after = await page.evaluate(() => {
-                    window.scrollTo(0, document.documentElement.scrollHeight);
-                    return document.documentElement.scrollHeight;
-                });
-                expect(after).toBe(before);
-            }).toPass({ timeout: 15_000 });
-            const hidden = await page.evaluate(() => {
-                const nav = document.querySelector('nav[aria-label="Main"]');
-                if (!nav) return ["no tab bar"];
-                const top = nav.getBoundingClientRect().top;
-                return [
-                    ...document.querySelectorAll<HTMLElement>(
-                        "button, a[href], [role=button], input",
-                    ),
-                ]
-                    .filter((el) => !nav.contains(el))
-                    .filter((el) => {
-                        const r = el.getBoundingClientRect();
-                        return (
-                            r.width > 0 &&
-                            r.height > 0 &&
-                            r.bottom > top + 1 &&
-                            r.top < window.innerHeight
-                        );
-                    })
-                    .map((el) =>
-                        (
-                            el.getAttribute("aria-label") ??
-                            (el.textContent.trim() || el.tagName)
-                        ).slice(0, 30),
-                    );
-            });
-            expect(hidden).toEqual([]);
+            // Settled when two looks in a row find the same height.
+            let last = -1;
+            await expect
+                .poll(
+                    async () => {
+                        // A route that settles on another address (/commerce)
+                        // can still be moving on a busy machine: a look that
+                        // lands mid-navigation is not settled, so look again.
+                        const height = await page
+                            .evaluate(() => {
+                                window.scrollTo(
+                                    0,
+                                    document.documentElement.scrollHeight,
+                                );
+                                return document.documentElement.scrollHeight;
+                            })
+                            .catch(() => null);
+                        if (height === null) {
+                            last = -1;
+                            return false;
+                        }
+                        const settled = height === last;
+                        last = height;
+                        return settled;
+                    },
+                    { timeout: 15_000, intervals: [300] },
+                )
+                .toBe(true);
+            // Measured again until it holds: a route that redirects
+            // (/commerce → /commerce/locations) can be between pages on a
+            // busy runner, with the old bar gone and the new one not drawn
+            // yet. A control really under the bar still fails at the timeout.
+            await expect
+                .poll(
+                    () =>
+                        page
+                            .evaluate(() => {
+                                const nav = document.querySelector(
+                                    'nav[aria-label="Main"]',
+                                );
+                                if (!nav) return ["no tab bar"];
+                                const top = nav.getBoundingClientRect().top;
+                                return [
+                                    ...document.querySelectorAll<HTMLElement>(
+                                        "button, a[href], [role=button], input",
+                                    ),
+                                ]
+                                    .filter((el) => !nav.contains(el))
+                                    .filter((el) => {
+                                        const r = el.getBoundingClientRect();
+                                        return (
+                                            r.width > 0 &&
+                                            r.height > 0 &&
+                                            r.bottom > top + 1 &&
+                                            r.top < window.innerHeight
+                                        );
+                                    })
+                                    .map((el) =>
+                                        (
+                                            el.getAttribute("aria-label") ??
+                                            (el.textContent.trim() ||
+                                                el.tagName)
+                                        ).slice(0, 30),
+                                    );
+                            })
+                            .catch(() => ["between pages"]),
+                    { timeout: 10_000, intervals: [300] },
+                )
+                .toEqual([]);
         });
     }
 
@@ -179,7 +205,7 @@ test.describe("the phone tab bar", () => {
         page,
     }, testInfo) => {
         test.skip(
-            testInfo.project.name !== "phone",
+            !testInfo.project.name.startsWith("phone"),
             "The tab bar is drawn below 760px only.",
         );
         await signIn(page);
@@ -227,7 +253,7 @@ test.describe("touch targets", () => {
         page,
     }, testInfo) => {
         test.skip(
-            testInfo.project.name !== "phone",
+            !testInfo.project.name.startsWith("phone"),
             "Only the phone project has a coarse pointer; the desk keeps its density on purpose.",
         );
 
@@ -287,7 +313,7 @@ test.describe("Home's Needs you (F3)", () => {
         // At most twelve rows before "See all N" (default 121).
         expect(await rows.count()).toBeLessThanOrEqual(12);
 
-        if (testInfo.project.name !== "phone") return;
+        if (!testInfo.project.name.startsWith("phone")) return;
 
         // On a phone the list comes before Today (F5).
         const today = page.getByRole("region", { name: "Today" });

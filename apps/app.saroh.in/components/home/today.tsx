@@ -135,7 +135,7 @@ function TodayLine({
             className={cn(
                 // The whole row is the link (its title's overlay), as the
                 // design draws it; the marks sit above that overlay.
-                "relative grid grid-cols-[56px_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/60",
+                "relative grid grid-cols-[56px_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/60 active:bg-muted",
                 !first && "border-t border-border",
             )}
         >
@@ -201,7 +201,7 @@ function MarkButton({
         <button
             type="button"
             onClick={onClick}
-            className="h-[34px] rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-neutral-700 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11 dark:text-neutral-300"
+            className="h-[34px] rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-neutral-700 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:min-h-11 dark:text-neutral-300"
         >
             {children}
         </button>

@@ -53,7 +53,8 @@
   per screen.
 - **Current** — **Hover moves one ramp step, pressed two**, never a new hue and
   never an opacity. **De-emphasis is a colour, not an opacity:** Ink 500 on
-  light.
+  light. (The calendar's past-day chips were `opacity-80`, which took their
+  words under 4.5:1; they are `saturate-50` now.)
 - **Current** — **`--layer-1`…`--layer-7` are the Business Calendar's layer
   fills** (umber, green, slate, clay, bronze, navy and stone — invoices' own,
   E21 — as the design draws them, kept on dark), with `--layer-foreground` for the count written on them.
@@ -123,6 +124,11 @@
 
 ## Touch, reflow and accessibility
 
+- **Current** — **A sticky bottom bar reports its height.** Anything stuck to
+  the foot of the screen (an editor's phone bar, a count's Save, a settings
+  Save) calls `useBottomBarInset(ref)` (`lib/hooks/use-bottom-bar-inset.ts`);
+  the Toaster adds `--bottom-bar-inset` to its offsets, so a toast never
+  covers, and swallows the tap on, the button the merchant reaches for next.
 - **Current** — **Touch targets reach 44px on a touch pointer.** Every `Button`
   size grows through the `coarse:` variant (`default` and `icon` 40→44px, `sm`
   32→44px) and keeps its desk height under a mouse; `coarse:` is a pointer
@@ -131,10 +137,38 @@
 - **Adopted** — **Reflow at 320px and 390px** with no hidden operation and no
   page-level horizontal scroll; wide content scrolls inside its own container
   (14, 18, 04 §4). Put `min-w-0` on grid and flex columns holding text.
+- **Current** — **A long value wraps whole; its buttons never move**
+  (2026-09-29, P2). An email or a name a merchant typed wraps with
+  `[overflow-wrap:anywhere]` rather than `truncate` where it is the thing
+  being confirmed, and the button beside it is `shrink-0`. `DialogContent`
+  and `AlertDialogContent` hold one `minmax(0,1fr)` column, break long words
+  and scroll inside past the screen's height, so no value can push a
+  dialog's actions off a phone. `e2e/tests/phone-reflow.spec.ts` checks the
+  dialogs and sheets at 320 and 390 with a 60-character email.
 - **Adopted** — **No hover-only affordance, ever** (PRODUCT_STRATEGY §19): the
   phone and the shop floor have no hover.
 - **Current** — **The focus ring is Ink 900 with a Paper offset** (Saffron 400
   on dark), so it reads on white, Paper, Ink and Saffron alike.
+- **Current** — **Every clickable shows the pointer and has a hover, a
+  keyboard focus and a pressed state of its own** (the user's standing rule,
+  P3). The primitives carry all four — Button, tabs, menu, select and command
+  items, checkbox, radio, switch, toggle, the dialog and sheet close, the
+  data view's rows and filters — and a base rule in `globals.css` gives the
+  pointer to every ARIA widget role, so a hand-rolled radio or tab inherits
+  it. A hand-rolled control pairs its `hover:` with an `active:` one step
+  further along the ramp (`hover:bg-muted active:bg-accent-active`; a text
+  link `hover:text-foreground active:text-muted-foreground`; a calendar block
+  `hover:brightness-110 active:brightness-90`), and a focus ring is
+  `focus-visible:`, never `focus:`, so a mouse click paints none. Two guards:
+  `packages/ui/src/components/ui/interaction-states.test.tsx` pins the states
+  on each primitive (and forbids `cursor-default` on a clickable one), and
+  `e2e/tests/a11y.spec.ts` runs axe (WCAG 2.0/2.1 A and AA; serious and
+  critical fail), checks every visible control's computed cursor and tabs
+  through each main screen for a visible ring, desk and phone. Its ALLOW list
+  is where a known debt goes, with its reason.
+- **Current** — **A link inside a sentence is underlined at rest.** Colour
+  alone does not tell it from the text around it (axe `link-in-text-block`):
+  Saffron 700 and Ink 500 differ by 1.04:1.
 - **Adopted** — **Contrast materially above 4.5:1** for body text, in light and
   dark and every skin (`PRODUCT.md`); never colour alone; the focus ring is never
   removed; `muted-foreground` is never set below 14px or given opacity

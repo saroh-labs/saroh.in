@@ -28,6 +28,7 @@ export { default as ContactSection } from "./blocks/contact";
 export { CtaButton, default as CtaSection, ctaClasses } from "./blocks/cta";
 export type { CtaSurface } from "./blocks/cta";
 export { default as EnquirySection } from "./blocks/enquiry";
+export type { EnquiryThread } from "./blocks/enquiry";
 export { default as FaqSection } from "./blocks/faq";
 export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
@@ -45,31 +46,44 @@ export {
 } from "./blocks/on-today";
 export type { PublicToday, PublicTodayItem } from "./blocks/on-today";
 export {
+    PACKS_ASK,
+    PACKS_BUY,
+    PACKS_TITLE,
+    default as PacksSection,
+    packEyebrow,
+    packPerClass,
+} from "./blocks/packs";
+// Called by saroh.app's server: from a module with no "use client".
+export type { PacksFeed, PublicPack } from "./blocks/packs";
+export {
     PLANS_BUTTON,
+    PLANS_JOIN,
     default as PlansSection,
     joinHref,
     planEvery,
     planPrice,
-    plansOf,
 } from "./blocks/plans";
+export { packsOf } from "./prices/pack-words";
+// Called by saroh.app's server: from a module with no "use client".
 export type { PlansFeed, PublicPlan } from "./blocks/plans";
 export {
     PRODUCT_GRID_TITLE,
     default as ProductGridSection,
-    productCardsOf,
-    productGridQuery,
 } from "./blocks/product-grid";
+export { PROJECTS_LINK, default as ProjectsSection } from "./blocks/projects";
+export { plansAutopayMethods, plansOf, plansPayOnline } from "./lib/plans-read";
+// Called by saroh.app's server: from a module with no "use client".
 export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
-export {
-    default as VisitUsSection,
-    directionsHref,
-    isPublicVisit,
-} from "./blocks/visit-us";
-export type { PublicVisit } from "./blocks/visit-us";
+export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
+export { productCardsOf, productGridQuery } from "./lib/product-grid-read";
+// Server-safe (not in the "use client" block): saroh.app reads it for the
+// booking page's header on the server (E6).
+export { isPublicVisit } from "./lib/public-visit";
+export type { PublicVisit } from "./lib/public-visit";
 
 // The one rule for "Open now" (G8): Visit us, the hero's On today (G18) and
 // the booking page's header (E6) all say it through this.
@@ -129,8 +143,18 @@ export type {
 } from "./shop/api";
 export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
 export { ShopBag } from "./shop/bag";
+// The order confirmation page after a shop payment (P4).
 export type { ShopBagProps } from "./shop/bag";
 export type { BagItem } from "./shop/bag-store";
+export {
+    OrderConfirmation,
+    orderConfirmationHref,
+} from "./shop/order-confirmation";
+export type {
+    OrderConfirmationData,
+    OrderConfirmationLine,
+    OrderConfirmationLookup,
+} from "./shop/order-confirmation";
 
 // Not a page block either: the booking page on a merchant's site (U19),
 // `/<domain>/book` — every service, two weeks of times, pay now or at the desk.
@@ -268,15 +292,107 @@ export type {
     PacksApi,
     PlanPacksShop,
 } from "./account/packs-api";
+// G20: joining a plan and buying a pack from the site's Prices page.
 export { ACCOUNT_TAB_HREF, AccountTabBar } from "./account/tab-bar";
+// The account's compact header, and the site's chrome stepping aside for it
+// (DEC-073 #10).
+export {
+    AccountHeader,
+    SiteChromeFrame,
+    accountTitle,
+    businessInitial,
+    isAccountPath,
+} from "./account/account-header";
 export type { TrackLookup } from "./account/track-sheet";
+export { PRICES_OFFLINE, joinedMessage } from "./prices/api";
+export type {
+    JoinApi,
+    JoinProblem,
+    JoinResult,
+    PlanJoinAttempt,
+    PlanJoinStarted,
+    PricesActions,
+} from "./prices/api";
+export { JoinSheet } from "./prices/join-sheet";
+export type { JoinSheetProps, JoinablePlan } from "./prices/join-sheet";
+// D12: the customer sets up autopay (the join, My plan, the pay link).
+export type { AutopayStartResult } from "./account/plan-api";
+export {
+    AUTOPAY_METHODS,
+    autopayCheckStateOf,
+    autopayChecksOf,
+    autopayMethodsOf,
+    autopayOutcomeOf,
+    autopayStartOf,
+    autopayStateOf,
+    isAutopayMethod,
+} from "./autopay/api";
+export type {
+    AutopayCheck,
+    AutopayCheckState,
+    AutopayChecks,
+    AutopayMethod,
+    AutopayOutcome,
+    AutopayStart,
+    AutopayState,
+} from "./autopay/api";
+export {
+    AutopayMethodChoice,
+    landOnBusinessSite,
+    openAutopayWindow,
+} from "./autopay/choice";
+export type { AutopayWindowOutcome } from "./autopay/choice";
+export { AutopayDone } from "./autopay/done";
+export type { AutopayDoneProps, AutopayDoneState } from "./autopay/done";
+export {
+    autopayCheckAfter,
+    autopayCheckBefore,
+    autopayCheckLine,
+    autopayMethodLabel,
+    autopayMethodSub,
+    autopayStateLine,
+    autopayWith,
+} from "./autopay/words";
+export { openProviderCheckout } from "./booking-flow/checkout";
+export { PayOption } from "./booking-flow/steps/pay-option";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
-export { SiteFooter, SiteHeader, footerLine, siteMenu } from "./site-chrome";
+export {
+    SiteFooter,
+    SiteHeader,
+    footerLine,
+    siteMenu,
+    withShopLink,
+} from "./site-chrome";
 export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
+// A module page's title and lead (DEC-073 #9).
+export { ModulePageTop, modulePageTopOf } from "./module-page-top";
+export type { ModulePageTopContent } from "./module-page-top";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope } from "./site-theme";
+
+// A test release (DEC-071, T6): the layout's provider, the hook the flows
+// read, the stop they show instead of taking a real order, booking,
+// payment or enquiry, and the words the site's server actions refuse in.
+export { TestReleaseProvider, useTestRelease } from "./test-release/context";
+export type { TestReleaseInfo } from "./test-release/context";
+export {
+    TestReleaseStop,
+    TestReleaseStopSheet,
+} from "./test-release/test-release-stop";
+export type { TestReleaseVerb } from "./test-release/test-release-stop";
+// Server-safe: the site's server actions refuse in these words.
+export {
+    SIGN_IN_OFF_TEXT,
+    TEST_RELEASE_CODE,
+    TEST_RELEASE_MESSAGE,
+    TEST_RELEASE_REASON,
+    TEST_RELEASE_REFUSAL,
+    isTestReleaseRefusal,
+    itemsText,
+} from "./test-release/words";
+export type { TestReleaseRefusal } from "./test-release/words";

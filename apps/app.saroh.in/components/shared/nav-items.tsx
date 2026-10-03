@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { mayAddWebsite } from "@/lib/business-limits";
+import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
@@ -298,6 +299,14 @@ export interface NavItem {
      * a merchant never meets an empty heading.
      */
     moduleKey?: string;
+    /**
+     * Offered only while this module is NOT available: a row that stands
+     * in for a page the module otherwise holds. Invoices need no module
+     * (DEC-070), and sit under Payments while it's on; with it off they
+     * get this row of their own. While availability is unknown the module's
+     * own section is shown, so this row isn't.
+     */
+    unlessModule?: string;
 }
 
 export interface NavGroup {
@@ -362,8 +371,9 @@ export function showsGroupLabel(group: NavGroup): boolean {
  * promise a merge that has not happened — the same over-claim that was removed
  * from the marketing site.
  */
-const STOREFRONTS_HREF = "/commerce/storefronts";
+const STOREFRONTS_HREF = "/commerce/locations";
 const STOCK_HREF = "/commerce/stock";
+const INVOICES_HREF = "/billing/invoices";
 
 export const NAV_GROUPS: NavGroup[] = [
     {
@@ -451,8 +461,9 @@ export const NAV_GROUPS: NavGroup[] = [
                     {
                         href: STOREFRONTS_HREF,
                         // Singular for the business with one; `navFor`
-                        // names it "Storefronts" once there are more.
-                        label: "Storefront",
+                        // names it "Locations" once there are more
+                        // (DEC-069: storefronts are called locations).
+                        label: "Location",
                         action: "store:read",
                     },
                 ],
@@ -516,7 +527,7 @@ export const NAV_GROUPS: NavGroup[] = [
                 // them. `/billing` itself redirects to Subscriptions.
                 href: "/billing",
                 label: "Payments",
-                icon: ReceiptText,
+                icon: CreditCard,
                 moduleKey: "PAYMENTS",
                 children: [
                     {
@@ -531,6 +542,18 @@ export const NAV_GROUPS: NavGroup[] = [
                         action: "invoice:read",
                     },
                 ],
+            },
+            // Invoices without Payments (DEC-070, KTD-11): a business that
+            // doesn't take money online still bills, sends and records paid.
+            // While Payments is on, Invoices sits under it (above); while it
+            // is off, this row takes its place. Same address, so no link
+            // breaks.
+            {
+                href: INVOICES_HREF,
+                label: "Invoices",
+                icon: ReceiptText,
+                action: "invoice:read",
+                unlessModule: "PAYMENTS",
             },
             {
                 href: "/contacts",
@@ -739,6 +762,13 @@ export function navGroupsWithSites(
  */
 export function navRowsForModule(moduleKey: string): string[] {
     const rows: string[] = [];
+    // A page that keeps a row of its own while the module is off (Invoices,
+    // DEC-070) doesn't go with it.
+    const staying = new Set(
+        NAV_GROUPS.flatMap((g) => g.items)
+            .filter((i) => i.unlessModule === moduleKey)
+            .map((i) => i.href),
+    );
     for (const group of NAV_GROUPS) {
         for (const item of group.items) {
             const own = item.moduleKey ?? group.moduleKey;
@@ -747,7 +777,9 @@ export function navRowsForModule(moduleKey: string): string[] {
             // should be told the names they navigate by. A section that spans
             // modules (Bookings) names the ones this module owns.
             const children = (item.children ?? []).filter(
-                (child) => (child.moduleKey ?? own) === moduleKey,
+                (child) =>
+                    (child.moduleKey ?? own) === moduleKey &&
+                    !(child.href && staying.has(child.href)),
             );
             if (own !== moduleKey && children.length === 0) continue;
             if (own === moduleKey) rows.push(item.label);
@@ -768,7 +800,14 @@ export function filterNavGroups(
     groups: readonly NavGroup[],
     availableModuleKeys: readonly string[] | null,
 ): NavGroup[] {
-    if (availableModuleKeys === null) return [...groups];
+    if (availableModuleKeys === null) {
+        // Unknown: every module's own rows are shown, so a row standing in
+        // for one of them while it is off is not.
+        return groups.map((group) => ({
+            ...group,
+            items: group.items.filter((item) => !item.unlessModule),
+        }));
+    }
     const available = new Set(availableModuleKeys);
     const allowed = (key?: string) => !key || available.has(key);
 
@@ -779,6 +818,9 @@ export function filterNavGroups(
                 ...group,
                 items: group.items.flatMap((item) => {
                     if (!allowed(item.moduleKey)) return [];
+                    if (item.unlessModule && available.has(item.unlessModule)) {
+                        return [];
+                    }
                     if (!item.children?.some((c) => c.moduleKey)) {
                         return [item];
                     }
@@ -864,6 +906,7 @@ function landOnFirstChild(item: NavItem, children: NavChild[]): NavItem {
  */
 export function navFor({
     role,
+    roleKey,
     actions,
     moduleKeys,
     sites,
@@ -872,6 +915,11 @@ export function navFor({
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
+    /**
+     * The role as stored. A Storefront team holder (DEC-074) is offered
+     * Sell with Orders alone: their storefront's orders are their work.
+     */
+    roleKey?: string | null;
     /**
      * What the actor may do, as the API resolved it. Preferred over `role`,
      * which cannot describe a role the business invented.
@@ -886,7 +934,7 @@ export function navFor({
     sites?: readonly { id: string; name: string }[];
     /**
      * How many storefronts the business has; with more than one the row
-     * reads "Storefronts" (ADR-010). `null` or absent keeps the singular.
+     * reads "Locations" (ADR-010, DEC-069). `null` or absent keeps the singular.
      */
     storefronts?: number | null;
     /**
@@ -903,8 +951,36 @@ export function navFor({
         role,
         actions,
     );
-    const groups = stockTracked === false ? withoutStockRows(tracked) : tracked;
+    const stocked =
+        stockTracked === false ? withoutStockRows(tracked) : tracked;
+    const groups = isLocationScopedRole(roleKey)
+        ? sellOrdersOnly(stocked)
+        : stocked;
     return (storefronts ?? 0) > 1 ? pluralStorefronts(groups) : groups;
+}
+
+const ORDERS_HREF = "/commerce/orders";
+
+/**
+ * Sell for a location's team (DEC-074): its Orders alone, and the row lands
+ * there. The storefronts, products and stock their role can read stay
+ * reachable by address; the rail offers the work.
+ */
+function sellOrdersOnly(groups: NavGroup[]): NavGroup[] {
+    return groups
+        .map((group) => ({
+            ...group,
+            items: group.items.flatMap((item) => {
+                if (item.href !== "/commerce" || !item.children) return [item];
+                const children = item.children.filter(
+                    (c) => c.href === ORDERS_HREF,
+                );
+                return children.length > 0
+                    ? [{ ...item, href: ORDERS_HREF, children }]
+                    : [];
+            }),
+        }))
+        .filter((group) => group.items.length > 0);
 }
 
 /** The rows that need the business to track stock, taken out. */
@@ -922,10 +998,10 @@ function withoutStockRows(groups: NavGroup[]): NavGroup[] {
     }));
 }
 
-/** The Storefront row, named for a business that has several. */
+/** The Location row, named for a business that has several. */
 function pluralStorefronts(groups: NavGroup[]): NavGroup[] {
     const rename = <T extends { href?: string; label: string }>(row: T): T =>
-        row.href === STOREFRONTS_HREF ? { ...row, label: "Storefronts" } : row;
+        row.href === STOREFRONTS_HREF ? { ...row, label: "Locations" } : row;
     return groups.map((group) => ({
         ...group,
         items: group.items.map((item) => ({

@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
 import { PreviewGone } from "@/components/preview-gone";
-import { ModulePageUnavailable, PageSections } from "@saroh/site-blocks";
+import {
+    modulePageTopOf,
+    ModulePageUnavailable,
+    PageSections,
+} from "@saroh/site-blocks";
 
 import { publicApiUrl } from "@/lib/api-url";
 import { moduleOff } from "@/lib/module-pages";
@@ -13,6 +17,7 @@ import {
     getPreviewPosts,
     postsPrefix,
 } from "@/lib/publication";
+import { getPreviewPacksFeed } from "@/lib/site-packs";
 import { getPreviewPlansFeed } from "@/lib/site-plans";
 import { getPreviewProductGridFeeds } from "@/lib/site-product-grids";
 
@@ -55,11 +60,18 @@ export default async function PreviewPage({
     }
 
     // The draft's posts (G10), as the preview's own index shows them, and
-    // the plans on sale now (G9) and each Product grid's products (G12): a
-    // draft plan or product never shows, even here.
-    const [journal, plans, productGrids] = await Promise.all([
+    // the plans (G9) and class packs (G20) on sale now and each Product
+    // grid's products (G12): a draft plan, pack or product never shows, even
+    // here. A preview joins and buys nothing: its blocks ask instead.
+    const [journal, plans, packs, productGrids] = await Promise.all([
         getPreviewJournalFeed(page.sections, preview.snapshot, token),
         getPreviewPlansFeed(
+            page.sections,
+            preview.snapshot,
+            preview.siteId,
+            token,
+        ),
+        getPreviewPacksFeed(
             page.sections,
             preview.snapshot,
             preview.siteId,
@@ -71,10 +83,12 @@ export default async function PreviewPage({
     return (
         <PageSections
             sections={page.sections}
+            top={modulePageTopOf(page)}
             apiUrl={publicApiUrl()}
             siteId={preview.siteId}
             journal={journal}
             plans={plans}
+            packs={packs}
             productGrids={productGrids}
         />
     );

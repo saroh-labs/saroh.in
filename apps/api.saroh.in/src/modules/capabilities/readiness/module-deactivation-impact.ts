@@ -307,9 +307,9 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
             say: (c) => {
                 if (c === undefined) return null;
                 if (c === null)
-                    return "We couldn't count your unpaid invoices. They stay open, and their pay links still work.";
+                    return "We couldn't count your unpaid invoices. They stay open, and their links show the invoice with no Pay button until it's back on.";
                 if (c.count === 0) return null;
-                return `${n(c.count, "unpaid invoice stays", "unpaid invoices stay")} open, and ${c.count === 1 ? "its pay link still works" : "their pay links still work"}.`;
+                return `${n(c.count, "unpaid invoice stays", "unpaid invoices stay")} open, and ${c.count === 1 ? "its link shows" : "their links show"} the invoice with no Pay button until it's back on.`;
             },
         },
         {
@@ -357,13 +357,13 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
             },
             say: (c) => {
                 if (c === undefined)
-                    return "Your storefronts stop taking orders.";
+                    return "Your locations stop taking orders.";
                 if (c === null)
-                    return "We couldn't read your storefronts. They stop taking orders.";
+                    return "We couldn't read your locations. They stop taking orders.";
                 if (c.count === 0) return null;
                 if (c.names?.length === c.count)
                     return `${names(c.names)} ${c.count === 1 ? "stops" : "stop"} taking orders.`;
-                return `Your ${c.count} storefronts stop taking orders.`;
+                return `Your ${c.count} locations stop taking orders.`;
             },
         },
         {

@@ -216,6 +216,55 @@ describe("what each role is offered", () => {
         ).not.toContain("/commerce/stock");
     });
 
+    it("offers a Storefront team holder Sell with Orders alone (DEC-074)", () => {
+        const storefrontTeam = [
+            "org:read",
+            "member:read",
+            "module:read",
+            "media:read",
+            "store:read",
+            "product-review:read",
+            "order:stage",
+        ];
+        const groups = navFor({
+            role: "MEMBER",
+            roleKey: "storefront-team",
+            actions: storefrontTeam,
+            moduleKeys: AVAILABLE_TO.OWNER,
+            stockTracked: true,
+        });
+        const offered = hrefs(groups);
+        expect(offered).toContain("/commerce/orders");
+        for (const other of [
+            "/commerce/products",
+            "/commerce/stock",
+            "/commerce/storefronts",
+            "/commerce",
+        ]) {
+            expect(offered).not.toContain(other);
+        }
+        // Sell lands on Orders, not on the Storefronts it no longer offers.
+        const sell = groups
+            .flatMap((g) => g.items)
+            .find((i) => i.label === "Sell");
+        expect(sell?.href).toBe("/commerce/orders");
+        expect(sell?.children?.map((c) => c.href)).toEqual([
+            "/commerce/orders",
+        ]);
+        // The same permissions in any other role keep Sell as it was.
+        expect(
+            hrefs(
+                navFor({
+                    role: "MEMBER",
+                    roleKey: "front-desk",
+                    actions: storefrontTeam,
+                    moduleKeys: AVAILABLE_TO.OWNER,
+                    stockTracked: true,
+                }),
+            ),
+        ).toContain("/commerce/products");
+    });
+
     it("offers a new site only to a business that has none (ADR-006)", () => {
         const offeredWith = (sites: typeof SITES) =>
             hrefs(
@@ -231,7 +280,7 @@ describe("what each role is offered", () => {
         expect(offeredWith(SITES)).not.toContain("/sites/new");
     });
 
-    it("names the row Storefronts only once there are several (ADR-010)", () => {
+    it("names the row Locations only once there are several (ADR-010, DEC-069)", () => {
         const label = (storefronts?: number | null) =>
             navFor({
                 role: "OWNER",
@@ -240,11 +289,11 @@ describe("what each role is offered", () => {
             })
                 .flatMap((g) => g.items)
                 .flatMap((i) => [i, ...(i.children ?? [])])
-                .find((row) => row.href === "/commerce/storefronts")?.label;
-        expect(label()).toBe("Storefront");
-        expect(label(null)).toBe("Storefront");
-        expect(label(1)).toBe("Storefront");
-        expect(label(2)).toBe("Storefronts");
+                .find((row) => row.href === "/commerce/locations")?.label;
+        expect(label()).toBe("Location");
+        expect(label(null)).toBe("Location");
+        expect(label(1)).toBe("Location");
+        expect(label(2)).toBe("Locations");
     });
 
     it("does not offer a member what it would be refused", () => {
@@ -556,14 +605,14 @@ describe("the storefront rows follow store:read", () => {
         );
     const sites: { id: string; name: string }[] = [];
     // Customers follows contact:read (matrix W-1, B16), below.
-    const storefront = ["/commerce/products", "/commerce/storefronts"];
+    const storefront = ["/commerce/products", "/commerce/locations"];
 
     it("still offers products and the storefront to a Member, whose floor includes it", () => {
         const hrefs = childHrefs(
             navFor({ role: "MEMBER", moduleKeys: null, sites }),
         );
         expect(hrefs).toContain("/commerce/products");
-        expect(hrefs).toContain("/commerce/storefronts");
+        expect(hrefs).toContain("/commerce/locations");
     });
 
     it("offers a store:read role both storefront rows", () => {
@@ -784,9 +833,51 @@ describe("Payments (ADR-007)", () => {
         }
     });
 
-    it("offers it to no one without Payments", () => {
+    it("offers Payments to no one without it, and Invoices a row of their own (DEC-070)", () => {
+        const groups = navFor({
+            role: "OWNER",
+            moduleKeys: ["COMMERCE", "CRM"],
+        });
+        const items = groups.flatMap((g) => g.items);
+        expect(items.map((i) => i.label)).not.toContain("Payments");
+        expect(hrefs(groups)).not.toContain("/billing/subscriptions");
+        // A top-level row, not a page under a section.
+        const invoices = items.find((i) => i.label === "Invoices");
+        expect(invoices?.href).toBe("/billing/invoices");
+        expect(invoices?.children).toBeUndefined();
+        expect(
+            isNavItemActive("/billing/invoices/inv_1", "/billing/invoices"),
+        ).toBe(true);
+    });
+
+    it("keeps Invoices under Payments while it's on, with no second row", () => {
+        const items = navFor({
+            role: "OWNER",
+            moduleKeys: AVAILABLE_TO.OWNER,
+        }).flatMap((g) => g.items);
+        expect(items.map((i) => i.label)).not.toContain("Invoices");
+        const payments = items.find((i) => i.label === "Payments");
+        expect(payments?.children?.map((c) => c.href)).toContain(
+            "/billing/invoices",
+        );
+    });
+
+    it("gives a business with no modules on its Invoices row", () => {
+        const offered = hrefs(navFor({ role: "OWNER", moduleKeys: [] }));
+        expect(offered).toContain("/billing/invoices");
+    });
+
+    it("shows Payments' own Invoices, not the stand-in row, while availability is unknown", () => {
+        const items = navFor({ role: "OWNER", moduleKeys: null }).flatMap(
+            (g) => g.items,
+        );
+        expect(items.filter((i) => i.label === "Invoices")).toHaveLength(0);
+        expect(items.map((i) => i.label)).toContain("Payments");
+    });
+
+    it("does not offer the Invoices row to a role without invoice:read", () => {
         const offered = hrefs(
-            navFor({ role: "OWNER", moduleKeys: ["COMMERCE", "CRM"] }),
+            navFor({ role: "MEMBER", moduleKeys: ["WEBSITE", "CRM"] }),
         );
         expect(offered).not.toContain("/billing/invoices");
     });
@@ -1030,10 +1121,10 @@ describe("Bookings, a section across two modules", () => {
         ]);
         expect(navRowsForModule("COURSES")).toEqual(["Courses"]);
         expect(navRowsForModule("CLASS_PACKS")).toEqual(["Class packs"]);
+        // Invoices keep a row of their own with Payments off (DEC-070).
         expect(navRowsForModule("PAYMENTS")).toEqual([
             "Payments",
             "Subscriptions",
-            "Invoices",
         ]);
     });
 });

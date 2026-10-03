@@ -62,4 +62,4 @@ export const SOLD_OUT_NEEDS_UNTRACKED =
     "This product counts its stock, so it shows Sold out when the count runs out. Stop tracking it to mark it sold out by hand.";
 
 /** The storefront named doesn't sell the product. */
-export const NOT_SOLD_THERE = "That storefront doesn't sell this product.";
+export const NOT_SOLD_THERE = "That location doesn't sell this product.";

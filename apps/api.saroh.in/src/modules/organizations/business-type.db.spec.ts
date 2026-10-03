@@ -1,12 +1,14 @@
 /**
- * A business's legal form against a real Postgres (F10): each of the six
- * saves and reads back, a private limited company is still stored as
- * `company` this release (release boundary 9, so a rollback reads it), and
- * the audit row says the change in today's words.
+ * A business's legal form against a real Postgres (F10, F10b): each of the
+ * six saves and reads back, a private limited company is stored as `pvt`
+ * whichever spelling is sent (an old client's `company` is still accepted
+ * until Z4), a row still stored as `company` answers as `pvt`, the F10b
+ * backfill rewrites those rows (idempotently), and the audit row says the
+ * change in today's words.
  *
  * Runs in the integration project (TEST_DATABASE_URL).
  */
-import { prisma } from "@saroh/database";
+import { backfillBusinessTypePvt, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, AuditService } from "../audit/audit.service";
@@ -53,7 +55,7 @@ const lastChanges = async (ctx: OrganizationContext) => {
     return (row?.metadata as { changes?: unknown } | null)?.changes;
 };
 
-describe("business types (real database, F10)", () => {
+describe("business types (real database, F10, F10b)", () => {
     it("saves LLP and records type: individual → llp", async () => {
         const ctx = await business("individual");
 
@@ -71,19 +73,19 @@ describe("business types (real database, F10)", () => {
         for (const type of BUSINESS_TYPES) {
             await settings.update(ctx, { profile: { type } });
             const read = await settings.get(ctx);
-            // Private limited is still kept in the old spelling.
-            expect(read.profile?.type).toBe(type === "pvt" ? "company" : type);
+            expect(read.profile?.type).toBe(type);
+            expect(await storedType(ctx)).toBe(type);
         }
     });
 
-    it("keeps an old client's company as company, and an existing company reads back as it was", async () => {
+    it("stores an old client's company as pvt, and answers a stored company as pvt", async () => {
         const ctx = await business("company");
-        expect((await settings.get(ctx)).profile?.type).toBe("company");
+        expect((await settings.get(ctx)).profile?.type).toBe("pvt");
 
         await settings.update(ctx, { profile: { type: "individual" } });
         await settings.update(ctx, { profile: { type: "company" } });
 
-        expect(await storedType(ctx)).toBe("company");
+        expect(await storedType(ctx)).toBe("pvt");
         expect(await lastChanges(ctx)).toEqual([
             { field: "type", before: "individual", after: "pvt" },
         ]);
@@ -98,5 +100,27 @@ describe("business types (real database, F10)", () => {
         expect(await lastChanges(ctx)).toEqual([
             { field: "type", before: "trust", after: null },
         ]);
+    });
+
+    it("the backfill rewrites stored company rows to pvt, touches nothing else, and a second run does nothing", async () => {
+        const company = await business("company");
+        const llp = await business("llp");
+        const none = await business(null);
+
+        const first = await backfillBusinessTypePvt(prisma);
+
+        // Other tests' rows may share the database: at least this one moved.
+        expect(first.companyBefore).toBeGreaterThanOrEqual(1);
+        expect(first.rewritten).toBe(first.companyBefore);
+        expect(first.companyAfter).toBe(0);
+        expect(await storedType(company)).toBe("pvt");
+        expect(await storedType(llp)).toBe("llp");
+        expect(await storedType(none)).toBeNull();
+
+        expect(await backfillBusinessTypePvt(prisma)).toEqual({
+            companyBefore: 0,
+            rewritten: 0,
+            companyAfter: 0,
+        });
     });
 });

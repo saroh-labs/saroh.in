@@ -96,4 +96,36 @@ describe("toRendered", () => {
         const content = { label: "Go", href: "/somewhere", style: "primary" };
         expect(toRendered("cta", content, { resolvePage })).toEqual(content);
     });
+
+    /**
+     * G16: what the editor sets about how a list shows reaches the snapshot
+     * as it was set, so the live site draws what the canvas drew.
+     */
+    it("carries a list's display options to the published page", () => {
+        const services = {
+            serviceIds: ["svc_1"],
+            layout: "list",
+            showPrices: false,
+            showDescriptions: false,
+            buttonLabel: "Choose a time",
+            cta: { label: "About", action: { kind: "page", pageId: "p2" } },
+        };
+        expect(toRendered("servicesList", services, { resolvePage })).toEqual({
+            ...services,
+            cta: { ...services.cta, href: "/about" },
+        });
+        const grid = {
+            layout: "list",
+            showPhotos: false,
+            showDescriptions: false,
+            buttonLabel: "View",
+        };
+        expect(toRendered("productGrid", grid, { resolvePage })).toEqual(grid);
+        const plans = { layout: "list", showPrices: false, highlight: "none" };
+        expect(toRendered("plans", plans, { resolvePage })).toEqual(plans);
+        const journal = { layout: "list", buttonLabel: "Read" };
+        expect(toRendered("journal", journal, { resolvePage })).toEqual(
+            journal,
+        );
+    });
 });

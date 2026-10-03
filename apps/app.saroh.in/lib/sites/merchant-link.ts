@@ -1,3 +1,5 @@
+import { trimTrailingSlashes } from "@saroh/site-blocks/url-path";
+
 /**
  * Where a link on the merchant's page really goes (#336 review).
  *
@@ -26,7 +28,7 @@ export function merchantLinkUrl(
     // Protocol-relative ("//host/path") names a site of its own.
     if (raw.startsWith("//")) return `https:${raw}`;
     if (!siteAddress) return null;
-    const base = `https://${siteAddress.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+    const base = `https://${trimTrailingSlashes(siteAddress.replace(/^https?:\/\//, ""))}`;
     try {
         return new URL(raw, `${base}/`).toString();
     } catch {
@@ -40,7 +42,7 @@ export type PreviewLinkTarget<P> =
 
 /** "/about/" and "/about" are the same page; "" is home. */
 function samePath(a: string, b: string): boolean {
-    const norm = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
+    const norm = (p: string) => (p.length > 1 ? trimTrailingSlashes(p) : p);
     return norm(a || "/") === norm(b || "/");
 }
 
@@ -77,9 +79,10 @@ export function previewLinkTarget<P extends { path: string }>(
     }
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
     const own = siteAddress
-        ?.replace(/^https?:\/\//, "")
-        .replace(/\/+$/, "")
-        .toLowerCase();
+        ? trimTrailingSlashes(
+              siteAddress.replace(/^https?:\/\//, ""),
+          ).toLowerCase()
+        : undefined;
     const host = url.host.toLowerCase();
     if (host !== NOWHERE && (!own || host !== own)) return null;
     const page = pages.find((p) => samePath(p.path, url.pathname));

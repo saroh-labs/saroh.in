@@ -9,9 +9,14 @@ import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { CreateSiteForm } from "@/components/sites/create-site-form";
 import { mayAddWebsite } from "@/lib/business-limits";
+import { kindDefaults } from "@/lib/organizations/kind";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
-import { listSites, listTemplates } from "@/lib/sites/service";
+import {
+    getNewSiteDefaults,
+    listSites,
+    listTemplates,
+} from "@/lib/sites/service";
 
 export const metadata = { title: "New site" };
 
@@ -76,13 +81,23 @@ export default async function NewSitePage() {
         );
     }
 
+    // The business's own address, or a free one like it (DEC-069, L5).
+    const defaults = await getNewSiteDefaults();
+
     return (
         <PageContainer width="form">
             <PageHeader
                 title="Create a site"
-                description="Pick a template and name your new site."
+                description="Name your new site, check its web address and pick a template."
             />
-            <CreateSiteForm templates={templates} />
+            <CreateSiteForm
+                templates={templates}
+                defaults={defaults}
+                // The kind's template, picked to start with (DEC-070, K15).
+                defaultTemplateId={
+                    kindDefaults(organization?.kind).starterTemplate
+                }
+            />
         </PageContainer>
     );
 }

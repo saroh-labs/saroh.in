@@ -11,6 +11,7 @@ import { useEffect, useId, useState } from "react";
 import { MediaThumb } from "@/components/commerce/product-sections/media-thumb";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { listLibrary } from "@/lib/media/actions";
+import { mediaSrc } from "@/lib/media/media-src";
 import type { LibraryItem } from "@/lib/media/service";
 import type { PhotoDraft } from "@/lib/products/editor-sections";
 import {
@@ -391,6 +392,23 @@ function LibraryPanel({
     );
 }
 
+/**
+ * What's wrong with a typed photo address, in the merchant's words, or null
+ * when "Add photo" will add it (or nothing is typed yet). Read from the same
+ * `mediaSrc` the click stores, so the button is never on for an address the
+ * click would quietly drop.
+ */
+export function photoAddressProblem(raw: string): string | null {
+    const typed = raw.trim();
+    if (!typed) return null;
+    if (mediaSrc(typed)?.startsWith("https://")) return null;
+    if (/^http:/i.test(typed)) return "Use the https:// address";
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(typed)) {
+        return "An address starts with https://";
+    }
+    return "That isn't an address a photo can load from";
+}
+
 export function AddressPanel({
     onAdd,
 }: {
@@ -399,7 +417,11 @@ export function AddressPanel({
     const id = useId();
     const [url, setUrl] = useState("");
     const [alt, setAlt] = useState("");
-    const valid = /^https:\/\/\S+$/.test(url.trim());
+    // On only when the click will add: the address `mediaSrc` rebuilds
+    // behind https://, which is what's stored.
+    const safe = mediaSrc(url);
+    const valid = safe?.startsWith("https://") === true;
+    const problem = photoAddressProblem(url);
     return (
         <div className="flex flex-col gap-2 rounded-[10px] bg-muted p-3">
             <label htmlFor={`${id}-url`} className="text-[12.5px] font-medium">
@@ -411,6 +433,8 @@ export function AddressPanel({
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://images.example.com/photo.jpg"
                 className="font-mono text-[12px]"
+                aria-invalid={problem ? true : undefined}
+                aria-describedby={`${id}-url-hint`}
             />
             <label htmlFor={`${id}-alt`} className="text-[12.5px] font-medium">
                 What it shows
@@ -420,17 +444,26 @@ export function AddressPanel({
                 value={alt}
                 onChange={(e) => setAlt(e.target.value)}
             />
-            <p className="text-[12px] text-muted-foreground">
-                {url && !valid
-                    ? "An address starts with https://."
-                    : "The shop shows it from that address."}
+            <p
+                id={`${id}-url-hint`}
+                className={cn(
+                    "text-[12px]",
+                    problem ? "text-destructive" : "text-muted-foreground",
+                )}
+            >
+                {problem ?? "The shop shows it from that address."}
             </p>
             <div>
                 <Button
                     type="button"
                     size="sm"
                     disabled={!valid}
-                    onClick={() => onAdd(url.trim(), alt.trim())}
+                    onClick={() => {
+                        // What's stored is the address rebuilt behind https://,
+                        // never the text as typed (release #772).
+                        if (safe?.startsWith("https://"))
+                            onAdd(safe, alt.trim());
+                    }}
                 >
                     Add photo
                 </Button>

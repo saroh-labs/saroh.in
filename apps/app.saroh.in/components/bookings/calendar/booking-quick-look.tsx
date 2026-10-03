@@ -15,6 +15,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
+import { TakePayment } from "@/components/bookings/take-payment";
 import { formatMoney } from "@/lib/format/money";
 import {
     bookingChangeText,
@@ -211,6 +212,9 @@ function OneToOne({
     // A visit of a treatment is paid on its order (E10, DEC-050).
     const paid: ReactNode = b.treatment ? (
         <OrderText treatment={b.treatment} canRead={!!ctx.canReadOrder} />
+    ) : b.paidAtDesk ? (
+        // Taken at the desk (P2): how, never how much.
+        paidText(b)
     ) : b.paidWith === "PAID" ? (
         price ? (
             `${price} paid`
@@ -282,6 +286,21 @@ function OneToOne({
             >
                 Cancel
             </Button>,
+        );
+    }
+    // "Take ₹X" (P2): what the desk takes now, beside checking them in.
+    if (!undo && ctx.desk?.canTake && b.take && state !== "cancelled") {
+        actions.push(
+            <TakePayment
+                key="take"
+                bookingId={b.id}
+                take={b.take}
+                currency={b.service.currency ?? null}
+                who={whoFor(b)}
+                canLink={ctx.desk.canLink}
+                variant="outline"
+                triggerClassName={btn.ghost}
+            />,
         );
     }
     if (!undo && ctx.canBook && state === "in" && canMarkNoShow(b, ctx.now)) {
@@ -527,7 +546,7 @@ function MovePanel({
                                 key={s.startAt}
                                 type="button"
                                 onClick={() => onPick(s)}
-                                className="h-8 rounded-full border border-border bg-card px-3 text-[12.5px] font-medium hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11"
+                                className="h-8 rounded-full border border-border bg-card px-3 text-[12.5px] font-medium hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:h-11"
                             >
                                 {label}
                             </button>
@@ -538,7 +557,7 @@ function MovePanel({
             <button
                 type="button"
                 onClick={onKeep}
-                className="mt-2 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground"
+                className="mt-2 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground active:bg-accent-active"
             >
                 Keep the current time
             </button>

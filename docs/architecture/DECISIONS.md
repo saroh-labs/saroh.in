@@ -202,6 +202,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: Billing (`/billing/…`), Courses (`/courses`) and Class packs appear in the workspace; contact deletion takes a person's holdings with it and cancels their future course and pack bookings; the booking capacity count includes seats an open course still holds.
 - Migration: `20260922120000_subscriptions_invoices_classes` (tables, partial indexes, RLS) and `20260922190000_one_live_subscription_per_person`; rollout flag `MODULE_COURSES` must be added in each environment.
 - Amended 2026-09-26 by [DEC-038](#dec-038-autopay-card-on-file-and-per-session-charges-run-on-the-businesss-own-payment-provider): **autopay and card-on-file come from the business's own payment provider** (mandates and provider subscriptions). Each period is still invoiced, and a pay link stays the fallback.
+- Amended 2026-09-29 by [DEC-070](#dec-070-saroh-is-for-businesses-people-working-for-themselves-and-people-showing-their-work): **invoices are no longer under Payments.** Creating, issuing, sending, voiding, crediting and recording an invoice paid need only `invoice:*`; an online pay link still needs Payments and a connected provider (`payOnline`), and without one Send sends a link to view the invoice. "With Payments off nothing new is invoiced" now reads **nothing is invoiced automatically**: renewals wait, subscribing is refused, and a pack or course is recorded without an invoice.
 
 ## DEC-020 A Member sees the diary and the people on it
 
@@ -253,6 +254,15 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: **a new `order:stage` action, held by every Member**, lets them read an order's kitchen view and move its stage (and Undo their last step). The API serves them the order without money figures. Refunds, edits to items or address, and everything else about money stay Owner/Admin (`order:write`, `payment:manage`). More widely: a role without the money reads gets no money figures anywhere — stats, takings, fees, payouts — left out by the API, not hidden by the screen.
 - Consequences: Order Detail shows a Member the stepper, items, notes and allergy banner, and no money column, refund or edit controls. A business that wants Members kept off orders makes a custom role.
 - Migration: none; built-in role permissions live in code (`organization-policy.ts`).
+
+## DEC-025 Vercel for Saroh-managed multi-tenant sites
+
+**Status: Accepted — 2026-09-24; implementation pending** — see [ADR-009](./adr/ADR-009-vercel-managed-multi-tenant-sites.md)
+
+- Context: businesses need customer-facing sites using Saroh modules without managing hosting accounts or repositories.
+- Decision: one Saroh-owned Vercel project serves `*.saroh.app` and verified custom domains from the shared Next.js application. Customer-facing server routes call the Saroh business API; only that API accesses the database. R2 remains the storage integration.
+- Consequences: content publishing is tenant-specific; runtime releases are shared. Sessions, caches and authorization must isolate tenants. Customer authentication and portal APIs still need implementation. Client-owned hosting is an optional future path, not a prerequisite; fully independent client backends are not selected.
+- Migration: no schema or infrastructure change in this decision; DNS/TLS, deployment and customer API work follows separately.
 
 ## DEC-026 A refund carries Saroh's reference, and an unsure answer holds the money
 
@@ -610,3 +620,293 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: **`customer:sensitive` is its own capability.** Owner and Admin hold it; Member and Reviewer don't; nothing implies it. `canSeeSensitive` asks for it, and every surface that shows sensitive notes follows it.
 - Consequences: custom roles saved before C13 that hold `contact:write` no longer see sensitive notes. No migration grants the capability back; a business re-grants it in Team › Roles. This is on purpose: the matrix's front-desk template exists so that it doesn't see medical notes.
 - Migration: none.
+
+## DEC-062 Joining a plan online is pay-first
+
+**Status: Accepted — 2026-09-29** · round-2 plans G (G20) and D (D12)
+
+- Context: a customer joining a plan from the site's Prices page or Plans block could either be put on the plan at once and invoiced (subscribe-then-invoice), or be put on it only once the first period is paid (pay-first).
+- Decision: **pay-first.** Starting to join makes a numberless DRAFT invoice (source SUBSCRIPTION), priced by the server from the plan as it is on sale, with the plan's terms snapshotted on it. Nobody is on the plan until the payment's webhook arrives; then, under the invoice's row lock, the subscription starts from the snapshot and the invoice is numbered PAID as its first period's invoice. An unpaid draft is voided after 24 hours, and an account has at most three open joins. This is the same shape as buying a class pack online (A11).
+- Why: an abandoned join leaves nothing behind — no member who hasn't paid, no numbered invoice to credit-note, no gap in the series (DEC-023) — and nobody books classes on a plan they haven't paid for. It also lets D12 pay the first period and set up autopay in one flow at join.
+- Consequences: a business with no online payments shows "Ask about joining" instead of Join; staff still add members by hand for "join now, pay at the desk". Renewals after the first period are invoiced as any member's are until D12/D13 add autopay.
+- Migration: `20261018100000_plan_join_online` (G20), additive.
+
+## DEC-063 A payment connection needs its webhook signing secret
+
+**Status: Accepted — 2026-09-29** · unit WHSECRET
+
+- Context: in a live test, Razorpay was connected without a webhook secret, because the setup form marked the field "optional". Every webhook was then refused. A customer paid ₹500 and the booking stayed "Awaiting payment" forever, and nothing told the merchant why.
+- Decision: **a connection needs the secret its provider signs webhooks with.** Razorpay signs with a webhook secret the merchant chooses when adding the webhook, separate from the key secret, so connecting Razorpay without one is refused with a 400: "Add the webhook signing secret from Razorpay › Webhooks, so Saroh can confirm payments." Cashfree signs with the app's client secret (the key secret already entered), so it asks for nothing more. A Cashfree connection without a saved webhook secret is now verified with the key secret; until now it refused every Cashfree webhook as well. Setup is guided steps: the API keys, then the business's webhook URL (built by the API from `BETTER_AUTH_URL`, its public origin) with Copy, the events to tick and where to find them in the dashboard, then, for Razorpay, the required secret with "Generate one". Settings › Providers shows when a payment update last arrived. Only verified deliveries are kept, so an update listed there shows the webhook works.
+- Consequences: a Razorpay connection saved before this reads "Needs attention" ("Needs its webhook signing secret — payments can't be confirmed until you add it"), with Add webhook secret reopening setup. The API flags it as `webhookSecretMissing` on the providers list. When no connected provider can confirm a payment, Payments readiness is `ATTENTION_REQUIRED` (`PAYMENTS_WEBHOOK_SECRET_MISSING`), so the ready checklist doesn't count it as ready. The flag comes from opening the sealed blob in memory. A blob that can't be opened (a seed's placeholder) isn't flagged. The API shipped before the app, so an old app's connect without the secret fails with the message above. Checkout still opens on a flagged connection. Blocking it there is a possible follow-up.
+- Migration: none.
+
+## DEC-064 Setting up autopay with nothing owed takes a ₹1 check and refunds it
+
+**Status: Accepted — 2026-09-29** · round-2 plan D (D12, D19; unit D12B) · DEC-059 unchanged
+
+- Context: a customer can turn autopay on when nothing is owed: "Set up autopay" or "Change how autopay pays" on My plan, or the pay link of an invoice already paid. Razorpay's UPI and card authorisations are real payments of at least ₹1, so a ₹0 authorisation is refused. D12 shipped a fail-safe that refused the set-up and told the customer to turn autopay on when they next pay.
+- Decision: **with nothing owed, a UPI or card set-up takes the provider's minimum (₹1 at Razorpay) to authorise, and Saroh refunds it automatically.** eMandate stays ₹0: no charge, no refund. The minimum is a constant on each provider's mandate adapter (`authorisationMinimumCents`; Razorpay UPI and card 100 paise), never a literal in a service. Every method the account has stays on offer (DEC-059).
+- Consequences:
+    - **Not revenue.** The ₹1 is recorded as a payment intent on no order and no invoice, `purpose` AUTHORISATION, tied to the mandate set-up (`checkForMandateId`), so it is auditable. It makes no invoice or credit note, and never counts in takings, This week, Home money, the calendar's money or fees, or a customer's Spent.
+    - **Automatic refund, once.** When the ₹1 is captured (the webhook, or the landing page reading it back from Razorpay when the webhook is lost), a refund job is queued on the same transaction, one per payment. It asks Razorpay to refund the full ₹1, never more than was received. An unsure answer leaves the refund pending ("being confirmed") and the job asks Razorpay before it sends again (DEC-026), so a duplicate webhook or a retry never refunds twice. `refund.processed` and `refund.failed` settle it. If the set-up fails after the capture, the ₹1 is still refunded.
+    - **The customer is told before and after.** Before they pay: "To switch on autopay, your bank needs a ₹1 check. We refund the ₹1 straight away — it's back in your account in 5–7 working days." After: "The ₹1 check is being refunded — it reaches you in 5–7 working days", then "The ₹1 check was refunded on ‹date›". My plan shows "Autopay check · ₹1 · Refunded" (or "Refund on its way").
+    - **The merchant sees it as a check.** The autopay line on Subscription Detail adds "₹1 check refunded" (or "being refunded"), never income. A refund the provider refuses reads "not refunded — refund it from your payment provider".
+    - **A refused refund is the merchant's to make** (user, 2026-09-29). Saroh does not retry a refund the provider definitively refuses; the merchant refunds the ₹1 from their provider's dashboard, and the `refund.processed` webhook marks it refunded in Saroh.
+    - The `AUTOPAY_NEEDS_A_PAYMENT` fail-safe is removed. A genuine provider refusal still marks the set-up FAILED with a clear message.
+- Migration: `20261018170000_payment_intent_authorisation_check`, additive: `PaymentIntent.purpose` and `checkForMandateId` (nullable, unique, FK to the mandate with SET NULL), with the one-target CHECK loosened only for an AUTHORISATION intent.
+
+## DEC-065 The merchant chooses when autopay debits
+
+**Status: Accepted — 2026-09-29** · round-2 plan D (unit D13B, after D13) · user: "the merchant decides when to debit, we show them the options, they can create policies around that"
+
+- Context: D13 issued each renewal invoice on the renewal date (due 7 days later) and asked for the autopay debit 26 hours after (Razorpay's 25-hour pre-debit notice plus a margin). Some businesses want the money on the renewal date itself; others want to wait for the due date.
+- Decision: **a business-wide "When autopay charges" setting, with an optional per-plan override (the plan wins when set)**, and three options:
+    - **Charge on the renewal date** (`ON_RENEWAL_DATE`): the renewal invoice, and the bank's notice with it, go out early enough that the debit lands on the renewal date — the provider's notice lead rounded up to whole days, so 2 days before for Razorpay. Every method gets the early invoice, a card or eMandate that needs no notice included, so a plan's invoices always go out on the same day; a card is still not debited before the renewal date.
+    - **Charge the day after renewal** (`DAY_AFTER_RENEWAL`, **the default** for every business and existing plan): D13 unchanged — the invoice on the renewal date, the debit about 26 hours later (at once for a method that needs no notice). Time for a Retry before the invoice is overdue.
+    - **Charge on the due date** (`ON_DUE_DATE`): the invoice on the renewal date, the debit at the start of its due date, the notice placed 2 days before. No time for a Retry before it is overdue, and the setting says so.
+- **An early invoice is dropped if the period won't be billed as invoiced.** When a subscription is cancelled (now or at period end), paused, or has a plan change booked or undone after its early invoice exists and before the renewal date, the invoice is dropped and its autopay charge cancelled before any debit: voided, or — for a GST-registered business, which never voids an issued invoice (DEC-023) — credited in full with a credit note. EARLY_INVOICE_CANCELLED goes in the subscription's log. The charge job checks again before each step, so a write that stopped the subscription some other way can't lead to a debit. A dropped early invoice doesn't count as the period's invoice: if the subscription carries on (Keep, a resume), the renewal invoices the period on the renewal date as usual. A debit already asked for (it can't be, before the renewal date) is left to settle.
+- **Changing the setting never moves a charge already queued or prepared.** The planned debit is written on the charge's intent when it is queued; the new setting applies to renewals queued from then on. Retry charges as soon as the notice allows, whatever the setting.
+- Consequences: the setting shows on the Plans tab and a plan's own on Plan Detail, only where autopay can charge (a provider that takes mandates with `RAZORPAY_AUTOPAY` on; DEC-057's spirit), to whoever holds `subscription:write`. The account's Plan tab and the pay page say "Next autopay charge: ‹date›" by the effective setting. The renewal job adds an early pass; a period with any invoice at all is never invoiced early twice.
+- Migration: `20261018200000_autopay_charge_timing`, additive — `BusinessProfile.autopayChargeTiming` (default `DAY_AFTER_RENEWAL`), `SubscriptionPlan.autopayChargeTiming` (nullable), CHECK constraints for the three values, and the one-live-invoice-per-period index widened to leave CREDITED invoices out as it does VOID ones.
+
+## DEC-066 P3: order numbers are one series per business
+
+**Status: Accepted — 2026-09-29** · user · unit P3 (#712)
+
+- Context: found on 2026-09-29. Every storefront counted its own orders from ORD-001 (`count + 1` per storefront), so a business with two storefronts had two #ORD-001s in one Orders list. The choice was a series per business, or a storefront prefix on each number.
+- Decision: **one order-number series per business (the Organization, the tenant root), across every storefront.** The `ORD-` format and its three-digit padding stay. Every order a business takes gets its number from one allocator, `nextOrderNumberInTx` (`packages/database/src/order-number.ts`): a site's checkout, New order and walk-ins, and a treatment booked online or at the desk. It increments the business's `OrderNumberSequence` row in the order's own transaction. The row lock keeps two orders from taking one number, whatever the isolation level. A failed order rolls its number back. The business's first order after P3 starts the row after its highest ORD-number. A number already taken moves the counter past the highest. A coded order's serializable transaction, and a treatment's booking, retry when another order took the next number.
+- Existing duplicates: the backfill (`packages/database/src/backfill/order-numbers.cli.ts [--dry-run] [--org <id>]`) sets each business's counter to its highest number, never lowering it. For each number two orders share, the older order keeps it and each later order takes the business's next number. The old number is kept in `Order.renumberedFrom`, and the Orders list search and global search find an order by it. Nothing links to an order by its number, only by its id. The backfill is idempotent.
+- Consequences: a business's second storefront no longer starts at ORD-001. Some orders at a business with several storefronts change number once. A customer who quotes the old number is still found. Seeds align each business's counter with their fixtures.
+- **Rollout:** additive, so the API before P3 keeps working. Run the backfill after the migration, then again once the previous API image no longer serves: while it serves, it still numbers per storefront and can repeat a number. The new API steps past any number it took. **The contract step comes later:** a unique index on the business and number, added once the previous image is gone and the backfill's second run finds nothing. It is not added now because the previous image, running beside it or restored by a rollback, would fail every order at a business's second storefront.
+- Migration: `20261019100000_order_number_sequence`, additive: `OrderNumberSequence` (organizationId key, RLS, `org_isolation`) and `Order.renumberedFrom` (nullable).
+
+## DEC-067 Round 2's open questions, settled
+
+**Status: Accepted — 2026-09-29** · user ("go with your recommendations for all the decisions") · round-2 audit
+
+- Context: the round-2 audit (2026-09-29) listed product questions left open by units B5–F18. The user accepted each recommendation below as written.
+- **B5 (Orders on a phone):** Orders gets a Filters button that opens a sheet, and a row opens a quick-view sheet, instead of the stacked selects and the full page. Neither is in the design: this is a recorded deviation, following the desk quick view's content.
+- **B6:** build the design's bulk "Print tickets (N)".
+- **B9:** a cancel is done when the provider accepts the refund. The refund line reads "Refund on its way" until the webhook confirms it; a refund the provider later fails becomes a Needs attention row (DEC-026: an unsure answer holds the money).
+- **B11:** paying at the counter voids the order's outstanding pay link, so nobody can pay twice.
+- **B14:** build "Next ‹date›" on the Orders row for appointment orders.
+- **B15:** the tag reads "Sesame", as the design shows, with the accessible name "Allergy: Sesame".
+- **C7:** keep the Packs tab on Customer Detail; it shows only when Class packs is on.
+- **C14:** hand-added customers are listed, marked "Added by hand".
+- **D16:** Download PDF shows on every issued invoice, due and overdue included; a merchant sends an invoice before it is paid.
+- **E6 (DEC-052):** half-hour starts apply to one-to-one services only.
+- **E8:** confirmed as superseded by DEC-058: a refund is never more than what was received.
+- **E20:** the calendar shows orders to anyone who can stage them (`order:stage`, e.g. Members), without money.
+- **E23:** Due counts from today, as the design shows; unpaid days before today count as Overdue.
+- **F2:** a low-star review is 3 stars or fewer.
+- **F11:** takings follow `payment:read` alone.
+- **F13:** switching a module off never switches off another one without naming it in the confirmation.
+- **F17:** a Reviewer gets no extra permissions.
+- **F18:** the current Member role stays at launch; the default bundles wait for the permission matrix answers.
+- **Cashfree:** UPI and card only, for now.
+- **Flags:** switch on in this order, each after its browser specs pass on development and a check on Northwind in production:
+    1. `MODULE_CLASS_PACKS` with the next release.
+    2. `SITE_SHOP` after `site-shop.spec.ts` and the Razorpay test-mode run.
+    3. `SITE_ACCOUNT_AREA` after `site-account.spec.ts`.
+    4. `ACCOUNT_THREAD` once A13 and A14 are live.
+- **Brand v2** (H2–H11) starts after the launch-readiness work, with the plan's default pairings and palettes.
+- Consequences: B5, B6, B11, B14, B15, E20, E23 and F13 need code; the rest are recorded behaviour. DEC-052 is amended by the E6 line above.
+
+## DEC-068 Turning a module on asks for its minimum first
+
+**Status: Accepted — 2026-09-29** · user · launch readiness
+
+- Context: today a module switches on at once and works out its readiness afterwards, so a merchant meets what is missing only when it fails in use ("No connected payment provider…"). Four entry points (Settings › Modules, Home's first run, `/onboarding/modules`, "Also sell") each behave differently, and some can enable a module Saroh hasn't rolled out.
+- Decision:
+    - **One "Turn on" sheet, used from every entry point.** It names what comes with the module, including the modules it needs, and asks only the minimum that makes it work.
+    - **The module switches on when that minimum is saved.** Everything else is "Finish setup", and the merchant lands on the module's first screen with the next step shown.
+    - **Sensible defaults are created and shown in the sheet, editable before saving:**
+
+        | Module         | Asked at turn-on (default)                                                 | Later ("Finish setup")          |
+        | -------------- | -------------------------------------------------------------------------- | ------------------------------- |
+        | Sell           | storefront name (the business name), how orders leave (Pick-up / Delivery) | first product, payment provider |
+        | Bookings       | opening hours (Mon–Sat 10–7), first service (name, duration, price)        | staff, deposits                 |
+        | Class packs    | (Bookings first)                                                           | first pack                      |
+        | Payments       | connect Razorpay now, or later (online payment stays off until connected)  | —                               |
+        | Contacts       | nothing: a default pipeline is created                                     | —                               |
+        | Website        | site name and address (`<name>.saroh.app`); a starter site is made         | publish                         |
+        | Communications | connect email now, or later                                                | —                               |
+        | Insights       | nothing                                                                    | —                               |
+
+    - **The registered address and GST details are asked before the first invoice or the first online payment**, where they matter, and on the take-money checklist. Turning a module on doesn't ask for them.
+    - **Automations is hidden until it has a screen**, the same way DEC-057 treats rollout.
+    - The API refuses to enable a module whose rollout is off, in merchant copy (DEC-057).
+- Consequences:
+    - Enable gains a setup payload per module, validated by the API. The minimum and the switch are saved in one transaction.
+    - Readiness still comes from the data. A module saved with its minimum is ACTIVE, or it shows its remaining "Finish setup" items.
+    - Existing businesses keep their modules as they are.
+
+## DEC-069 One address: the website is where customers go, storefronts become locations
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · amends DEC-018 / DEC-030 wording
+
+- Context:
+    - The address chosen at setup (`Organization.slug`) becomes the website's `Site.subdomain`, and the website is the only public front (`/`, `/shop`, `/book`, `/account`).
+    - A storefront has no public address; the site sells from one through "Sells from".
+    - Merchants meet five overlapping words (storefront, online store, the Shop kind, the Shop page, `/shop`) and an editable storefront "Web address" that goes nowhere (`Store.slug`, `Store.CustomDomain`, both unused).
+    - "Address" means four different things.
+    - The address can never change, not even for a typo.
+    - Pay links sit on another domain (`saroh.app/pay/…`).
+    - "Share your storefront" shares the site's home page.
+- Decision:
+    - **The business address is the website**, `<address>.saroh.app`, or the verified custom domain once there is one.
+        - Everything customers touch lives on it: the shop, the booking page, the account, and **pay links** (`<address>/pay/…`).
+        - `saroh.app/pay/…` stays only for a business with no site, and old links keep working.
+    - **Words:**
+        - Storefronts become **Locations**: the places the business sells from in person.
+        - **Your online shop** is the website's `/shop`, selling from one location's stock. "Sells from" is renamed to match.
+        - Each location says whether it sells in person only or online too, with a link to the shop.
+        - The four "address" meanings are named apart: _web address_, _registered address_, _location address_, and the blog's _posts path_.
+    - **The address can be changed** by the owner in Settings.
+        - The old address redirects for 90 days and stays reserved to the business, so nobody else can take it. Links already shared keep working.
+        - The reserved-word list (`RESERVED_ADDRESSES`) applies.
+    - **Selling online creates the website:** turning on selling online makes the starter site on the business's address (DEC-068's defaults), with the shop page ready to publish.
+    - **Share buttons share the link that fits** (the shop, the booking page or the site), on the custom domain when verified.
+    - **The dead storefront "Web address" and the unused `CustomDomain` table are removed** (expand/contract).
+- Consequences:
+    - The merchant-facing copy changes across Sell and Sites.
+    - Pay-link URLs move to the tenant host, and the old apex links still resolve.
+    - An address change needs a redirect table and a reserved-until date.
+    - A site created with no address because the slug was taken can no longer happen silently: creation asks for a free address instead.
+- Migration: to be planned. The address history and redirects are an additive table. `Store.slug` and `CustomDomain` are dropped in a later contract release.
+
+## DEC-070 Saroh is for businesses, people working for themselves, and people showing their work
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · ships before launch
+
+- Context:
+    - Onboarding says "Name your business", suggests Sell first and pre-selects it.
+    - Checklists nudge everyone toward a registered address, a business type and a logo "for receipts", even someone with only a website.
+    - The one site template is written for a business.
+    - Nothing at setup actually requires business details, and the Organization model is neutral. The internal strategy note says the target audience must not be built into the architecture.
+- Decision:
+    - **Setup starts with "What are you setting up?"** It has three answers and is stored as a _kind_ on the Organization, which the owner can change later in Settings:
+        - **A business** (shop, studio, practice): today's flow.
+        - **Just me** (freelancer, consultant, creator): clients, bookings, invoices.
+        - **A site for my work** (portfolio, blog, projects): website first.
+    - **The kind drives wording and defaults only, not features.** Every module stays available to every kind.
+        - It sets the words ("your business" / "you", "customers" / "clients" / "readers"), the name field ("Your name or brand"), the order of the first-run jobs, and the starter template.
+        - Sell is pre-selected only for a business.
+    - **Checklists appear only when they apply.** The registered address, business type and logo nudges appear once something that invoices or takes money is on, not for everyone.
+    - **New site templates:** Portfolio, Blog/writing, and Personal/consultant, plus a **Projects block** (image, title, summary, link) for portfolios. The starter template's copy stops assuming a business.
+    - **Invoices work on their own.** Issuing, sending and marking an invoice or receipt paid doesn't need the Payments module; an online pay link still needs a connected provider. This changes DEC-019's "invoices under Payments" for invoicing itself.
+- Consequences:
+    - PRODUCT.md and saroh-product.md widen "who it's for".
+    - An additive `Organization.kind` (default BUSINESS for everyone existing).
+    - The copy layer reads the kind.
+    - The invoices module gate moves off PAYMENTS for issue, send and record-paid.
+    - Before launch: the question, copy, first-run order, conditional checklists and invoices-without-Payments. The templates and Projects block follow right after if they aren't ready.
+
+## DEC-071 Test releases: a frozen version on a test address, then "Go live"
+
+**Status: Accepted — 2026-09-29** · user · launch readiness · amends DEC-047 (approval stays advisory unless the business turns it on)
+
+- Context:
+    - Publishing is one step: the whole draft becomes the live snapshot (ADR-002).
+    - Preview links show the draft as it is at that moment, so a reviewer's view changes as the merchant keeps editing, and Publish ships whatever the draft is now, not what was approved.
+    - Preview links live on `saroh.app/preview/<token>` and have no shop, booking, checkout or account pages.
+    - There's no scheduling, and approval never blocks publishing.
+- Decision:
+    - **"Make a test release"** freezes the current draft into a named Publication that isn't live, with an optional note. It's built by the same `buildSnapshot` and stored without repointing `currentPublicationId`.
+    - **Each test release has its own address:** `test--<address>.saroh.app`, and `test.<custom domain>` when the business has a verified one.
+        - It shows the whole site, including the shop, booking and account pages, with a "Test release" bar.
+        - Live products, prices and times are shown, but it **never takes a real order, booking or payment**.
+        - Only people with the link can open it (a token), and it's `noindex`.
+        - An address containing `--` can never be claimed by a business.
+    - **Review and approval attach to the test release** (its fingerprint), not to the moving draft.
+    - **"Go live" publishes exactly the tested version**, now or **at a scheduled time** in the business's time zone, even if the draft has moved on since.
+        - A scheduled go-live can be cancelled until it runs, and the merchant is told when it happens.
+        - Going live is a pointer flip like restore. It records the review standing (#279) and switches the live form fields (#281).
+    - **Direct publishing stays**, unless the business turns on **"Publishing needs approval"** (off by default). With it on, only an approved test release can go live. An owner can still override, and the override is recorded.
+- Consequences:
+    - A test-host lookup mode in the renderer and API.
+    - A scheduled job for go-live.
+    - A setting on the site.
+    - Shop, booking and checkout routes in test mode, with writes refused.
+    - Things that don't go through a publish stay live and outside test releases: products, prices, stock, plans and packs (they have their own publish), hours, "Sells from", posts and modules. The test release says so.
+
+## DEC-072 GST shows only when it applies
+
+**Status: Accepted — 2026-09-29** · user · extends [DEC-023](#dec-023-an-invoice-for-every-order-issued-invoices-never-change-and-gst) and D15 · [backend-billing-and-classes.md](../patterns/backend-billing-and-classes.md) GST
+
+- Context: Rye's plan renewal lines are issued with `gstRate` null. D15 already reads null as "not set", not exempt, yet Invoice Detail's paper and the PDF labelled those lines "Nil-rated".
+- Decision:
+    - **A business that isn't GST-registered charges no GST, so no GST appears anywhere** on its invoice, receipt or PDF: no rate, no tax columns, no "Nil-rated".
+    - **A registered business's line with no rate set** (`gstRate` null) shows no GST rate: no "Nil-rated", no "0%".
+    - **Only a line whose rate really is 0%** (a nil-rated or exempt supply, recorded as 0) may be labelled "Nil-rated".
+    - **A registered business's paper with no line rated** (every `gstRate` null, like Rye's renewals) shows no GST totals — no Taxable value, CGST, SGST or IGST rows and no "Prices include GST" — just the total, on the paper, the PDF and the quick look (`showsGstTotals`); one rated line, 0% included, keeps them. Its title stays D15's "Tax invoice".
+- Consequences: presentation only. Stored data and totals are unchanged (a null rate is already taxed at nothing and never counts toward a bill of supply). The rule is `lineGstNote`, once in the API for the PDF and once in the app for the paper. The draft editor's hint no longer says a line with no rate is nil-rated.
+- Migration: none.
+
+## DEC-073 Round-2 design deviations, settled
+
+**Status: Accepted — 2026-09-29** · user ("go with your recommendations for the deviations") · the round-2 check against the designs
+
+- Context: the check compared every round-2 screen with its `.dc.html` design. Most mismatches were fixed on the spot. These are the ones where the build differs on purpose, or where a fix needed a call.
+- **Kept as built:**
+    - **Payments:**
+        - the Plan Editor says "Invoiced each month with a pay link", not "by UPI Autopay or card", following D14's rule that copy is honest;
+        - Publish sits in a bottom bar on a phone (D6);
+        - "Subscribe someone" is in the header;
+        - the failed-renewals banner says only what the product does ("isn't paid and needs you");
+        - Invoice Detail offers "Copy pay link" and has no pay-link box;
+        - PDF dates carry the year;
+        - the phone gutter is 16px, from the shared PageContainer.
+    - **Orders:**
+        - the phone header's actions wrap under the title (the shared PageHeader, the same on every screen);
+        - New order's customer step is the shared picker with recent customers and Walk-in (B13/E4);
+        - the row menu follows B5;
+        - Storefront Settings has no design, and DEC-069 reworks it into Locations.
+    - **Customers:**
+        - the phone list stacks rows and scrolls its chips;
+        - Import and Add customer sit in the header (DEC-056/C14);
+        - Overview's Needs attention card and the "Average order" tile stay;
+        - the Spent note says what's true ("₹x still owed" / "Including delivery");
+        - the offers wording stays honest ("Nothing recorded yet"), since customers aren't always asked at checkout;
+        - the merge dialog keeps its Stays row, close X and counts;
+        - removal asks for the name, as the design does;
+        - C15's copy is accepted.
+    - **GST:** see DEC-072. A rate shows only when one applies.
+    - **Bookings:**
+        - Kavi's calendar shows Orders, Bookings and Invoices: treatment orders (E9) replace the Payments layer, which appears only without Commerce.
+        - Pack Detail's receipts show "name · date", because the purchase read carries no invoice number.
+        - "On the booking page" is plain text until DEC-069's share links give the app the page's address.
+        - The rail says "Class packs" (the module's name) and the pack kind says "One-to-one".
+        - The Packs summary and Extend copy say what the API does.
+        - The editor's first-pack hint names the pack's kind.
+        - E17's "Each sale" card is accepted.
+    - **Home and settings:**
+        - This week has no "Website · Live" row until DEC-069 settles which address to show.
+        - Checklist rows are two lines (title and reason), shared with Home.
+        - The phone tab bar stays Home, Sell, Calendar, Insights; the two designs disagree with each other.
+        - Mark sent is offered only on orders ready to hand over (the API's stage rule).
+    - **Site and accounts:**
+        - A past appointment with no attendance recorded still reads "Booked"; it never claims "Attended".
+        - The editor's Tablet and zoom controls stay as they are (G2/G3).
+        - A shop card adds the first option that can be sold now.
+- **Fixed to match the design, or to correct a small error:**
+    1. Order Detail's customer card reads "Needs attention: Sesame", since the card covers every kind of entry, not just allergies.
+    2. A treatment order shows Needs attention in the customer card as well as the Visits card.
+    3. The Orders quick view's close is a plain X, and the customer's name is a Saffron link.
+    4. "They asked to stop" shows only when they did ask.
+    5. A customer added by hand shows their saved address on Overview before they have an order.
+    6. C12's booking-note card uses the customer's full name, and names the roles that can see a sensitive note.
+    7. Settings › Business's "Address" tab is "Registered address" (DEC-069 names the four addresses apart).
+    8. Permission lists hide the permissions of modules hidden from the business ("Manage automations" while DEC-068 hides Automations).
+    9. Module pages (Book, Prices, Shop) draw the design's page title and lead line, and a rich-text intro lines up with the cards.
+    10. The account area has the design's compact header (logo, tab title, language) and no site footer.
+    11. Whole-rupee prices show without decimals ("₹500"), wherever the site shows a price.
+    12. A product card sums up its options ("2 sizes") instead of listing them.
+
+## DEC-074 A location's team sees and moves that location's orders
+
+**Status: Accepted — 2026-09-29** · user · amends F16
+
+- Context: F16 lets storefront staff join the team with a storefront role, but that role opens nothing in the workspace. Sell needs `order:read` or `order:stage`, so their rail is empty.
+- Decision: a storefront (location) role sees and moves the orders of **its own location only**: read and stage, with no money, refunds, pay links or cancelling. It's like the kitchen and Member view, scoped to one location. Sell appears in their rail with those orders, and other locations' orders are refused by the API.
+- Consequences: the order permissions gain a location scope for this role. The B16 permission tests extend to it.

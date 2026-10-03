@@ -3,6 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import type { ReadyChecklist as Checklist } from "@/lib/settings/ready";
+import { checklistHeading } from "@/lib/settings/ready";
 
 /**
  * "Ready to take payments" ("Saroh Settings" design): a card at the top of
@@ -11,19 +12,21 @@ import type { ReadyChecklist as Checklist } from "@/lib/settings/ready";
  * nothing is left — the page already says the rest. The steps are Home's
  * "Get ready to take money" (`readyChecklist`, F8), followed by what
  * Settings also asks for — email, business type, logo, a pipeline
- * (`settingsChecklist`, DEC-056).
+ * (`settingsChecklist`, DEC-056). Its heading follows the steps (DEC-070):
+ * with nothing that invoices or takes money, it is about the site.
  */
 export function ReadyChecklist({ list }: { list: Checklist }) {
     if (list.left.length === 0 || list.total === 0) return null;
     const pct = Math.round((100 * list.done) / list.total);
+    const heading = checklistHeading(list, "settings");
     return (
         <section
-            aria-label="Ready to take payments"
+            aria-label={heading}
             className="grid gap-2 rounded-xl border border-highlight-border bg-brand-subtle px-4 py-3"
         >
             <div className="flex flex-wrap items-baseline gap-2.5">
                 <h3 className="font-display text-[15px] font-semibold tracking-[-0.01em]">
-                    Ready to take payments
+                    {heading}
                 </h3>
                 <span className="text-[12.5px] text-foreground/80">
                     {list.done} of {list.total} done

@@ -8,11 +8,13 @@ import type {
     SignInOptions,
 } from "../account/api";
 import { SignInSheet } from "../account/sign-in-sheet";
-import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
 import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
+import { useTestRelease } from "../test-release/context";
+import { TestReleaseStopSheet } from "../test-release/test-release-stop";
+import { TEST_RELEASE_REASON } from "../test-release/words";
 import type { BookSignedIn, CreditFor, Result } from "./api";
 import {
     CREDIT_GONE,
@@ -30,6 +32,7 @@ import {
     nextChosenText,
     nextFreeStart,
     pageTitle,
+    testReleaseBookingLine,
     usePhone,
     zoneName,
 } from "./flow-helpers";
@@ -62,6 +65,8 @@ import {
 import { DetailsStep } from "./steps/details-step";
 import { DoneCard } from "./steps/done-card";
 import { ExpiredCard } from "./steps/expired-card";
+import type { FlowMessage } from "./steps/flow-message";
+import { FlowMessageLine } from "./steps/flow-message";
 import { PayStep } from "./steps/pay-step";
 import { PayingCard } from "./steps/paying-card";
 import { ServiceStep } from "./steps/service-step";
@@ -205,6 +210,10 @@ export default function BookingFlow({
     );
     const [name, setName] = useState("");
     const [sheetOpen, setSheetOpen] = useState(false);
+    // A test release (DEC-071, T6): the last step stops here instead of
+    // signing in, and nothing is booked or held.
+    const testRelease = useTestRelease() !== null;
+    const [testStop, setTestStop] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
     // Where, for a service offered either way, and the note (E7).
     const [where, setWhere] = useState<BookingWhere>("IN_PERSON");
@@ -213,7 +222,19 @@ export default function BookingFlow({
     const [payChoice, setPayChoice] = useState<BookPay | null>(null);
     const [sessionsShown, setSessionsShown] = useState(SESSIONS_SHOWN);
     const [submitting, setSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState<string | null>(null);
+    // What the page says under the steps: an error, or news that isn't one
+    // (A10's credit found, a place held) — never the red alert for the latter.
+    const [message, setMessage] = useState<FlowMessage | null>(null);
+    const setSubmitError = useCallback(
+        (text: string | null) =>
+            setMessage(text === null ? null : { text, tone: "error" }),
+        [],
+    );
+    const setNotice = useCallback(
+        (text: string) => setMessage({ text, tone: "notice" }),
+        [],
+    );
+    const submitError = message?.text ?? null;
     const [phase, setPhase] = useState<Phase>({ kind: "choose" });
     const [now, setNow] = useState<number | null>(null);
 
@@ -227,6 +248,8 @@ export default function BookingFlow({
     // land before the disabled buttons are drawn.
     const deskKey = useRef<string | null>(null);
     const leavingRef = useRef(false);
+    /** Read the hold now, rather than at the next tick (P1). */
+    const checkHoldNow = useRef<(() => void) | null>(null);
     const [leaving, setLeaving] = useState(false);
     const headingRef = useRef<HTMLHeadingElement>(null);
     // The start that went while they signed in: the next free one after it
@@ -286,7 +309,7 @@ export default function BookingFlow({
         );
         if (found) setStart(found);
         else setSubmitError(INITIAL_TIME_GONE);
-    }, [daysState, firstId, firstIsClass]);
+    }, [daysState, firstId, firstIsClass, setSubmitError]);
 
     const pickService = (id: string) => {
         if (id === serviceId) return;
@@ -487,7 +510,7 @@ export default function BookingFlow({
         const tick = () => setNow(Date.now());
         tick();
         const clock = setInterval(tick, 15_000);
-        const poll = setInterval(() => {
+        const pollOnce = () => {
             void fetchHold(apiUrl, payingToken).then((result) => {
                 // Letting the hold go answers for itself.
                 if (leavingRef.current) return;
@@ -541,10 +564,16 @@ export default function BookingFlow({
                     return p;
                 });
             });
-        }, POLL_MS);
+        };
+        const poll = setInterval(pollOnce, POLL_MS);
+        // Read at once when the window closes on a payment: its return has
+        // been checked and settled by then (P1), so the page moves on
+        // without waiting for the next tick.
+        checkHoldNow.current = pollOnce;
         return () => {
             clearInterval(clock);
             clearInterval(poll);
+            checkHoldNow.current = null;
         };
     }, [apiUrl, payingToken, bookerFirst]);
 
@@ -576,8 +605,8 @@ export default function BookingFlow({
         if (!next) return;
         setDate(dateIn(next.startAt, daysState.days.timezone));
         setStart(next);
-        setSubmitError(nextChosenText(next, daysState.days.timezone));
-    }, [daysState, serviceId, isClass]);
+        setNotice(nextChosenText(next, daysState.days.timezone));
+    }, [daysState, serviceId, isClass, setNotice]);
 
     /** The name to send: only for an account that has none yet. */
     const nameFor = (who: SignedInCustomer) =>
@@ -586,6 +615,11 @@ export default function BookingFlow({
     const confirm = async () => {
         setTouched(true);
         if (block || !service || !chosenStart || submitting) return;
+        if (testRelease) {
+            setSubmitError(null);
+            setTestStop(true);
+            return;
+        }
         // Not signed in: the sheet, and the booking once the code checks.
         if (!customer) {
             setSubmitError(null);
@@ -607,6 +641,10 @@ export default function BookingFlow({
             .catch((): Result<WaitlistJoined> => OFFLINE_RESULT);
         setSubmitting(false);
         if (!result.ok) {
+            if (result.reason === TEST_RELEASE_REASON) {
+                setTestStop(true);
+                return;
+            }
             if (result.status === 401) {
                 setCustomer(null);
                 setSubmitError(SIGNED_OUT);
@@ -620,7 +658,7 @@ export default function BookingFlow({
         const joined = result.value;
         putPlace(joined);
         if (joined.status === "OFFERED") {
-            setSubmitError(heldForYouText(joined.offeredUntil, zone));
+            setNotice(heldForYouText(joined.offeredUntil, zone));
             return;
         }
         setPhase({
@@ -650,7 +688,7 @@ export default function BookingFlow({
         }
         dropPlace(startAt);
         setStart(null);
-        setSubmitError(LEFT_WAITLIST);
+        setNotice(LEFT_WAITLIST);
     };
 
     /** Signed in from the sheet: book straight away, on what was chosen. */
@@ -672,7 +710,7 @@ export default function BookingFlow({
             if (offered) {
                 attemptKey.current = null;
                 setPayChoice("CREDIT");
-                setSubmitError(CREDIT_FOUND);
+                setNotice(CREDIT_FOUND);
                 return;
             }
         }
@@ -716,6 +754,11 @@ export default function BookingFlow({
             .catch((): Result<BookResult> => OFFLINE_RESULT);
         setSubmitting(false);
         if (!result.ok) {
+            if (result.reason === TEST_RELEASE_REASON) {
+                attemptKey.current = null;
+                setTestStop(true);
+                return;
+            }
             if (result.reason === CREDIT_GONE) {
                 // Spent or changed meanwhile (another tab, the desk): say
                 // so, keep the time, and ask again what they can pay with.
@@ -1030,13 +1073,15 @@ export default function BookingFlow({
                                     : () => void leaveHold("desk")
                             }
                             onBack={() => void leaveHold("choose")}
-                            onPaid={() =>
+                            onPaid={() => {
                                 setPhase((p) =>
                                     p.kind === "paying"
                                         ? { ...p, checkoutPaid: true }
                                         : p,
-                                )
-                            }
+                                );
+                                checkHoldNow.current?.();
+                            }}
+                            apiUrl={apiUrl}
                         />
                     ) : phase.kind === "expired" ? (
                         <ExpiredCard
@@ -1120,13 +1165,8 @@ export default function BookingFlow({
                                 />
                             ) : null}
 
-                            {submitError && phone ? (
-                                <p
-                                    role="alert"
-                                    className={destructiveAlertClasses}
-                                >
-                                    {submitError}
-                                </p>
+                            {message && phone ? (
+                                <FlowMessageLine message={message} />
                             ) : null}
                         </>
                     )}
@@ -1172,6 +1212,20 @@ export default function BookingFlow({
                 api={account.signIn}
                 purpose="book"
                 onSignedIn={(who) => void signedIn(who)}
+            />
+
+            <TestReleaseStopSheet
+                open={testStop}
+                live={testReleaseBookingLine({
+                    serviceName: service?.name ?? "",
+                    whenText,
+                    waitlist: waitMode === "join",
+                    pay,
+                    payingNow,
+                })}
+                nothing="booked"
+                back="Back"
+                onClose={() => setTestStop(false)}
             />
         </div>
     );

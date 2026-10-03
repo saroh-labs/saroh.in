@@ -14,7 +14,7 @@ import type { CreatePipelineDto, CreateStageDto, UpdateStageDto } from "./dto";
 export type PipelineWithStages = Pipeline & { stages: Stage[] };
 
 /** The default board columns, in order (0..4) — mirrors the enquiry funnel. */
-const DEFAULT_STAGES = ["New", "Contacted", "Qualified", "Won", "Lost"];
+export const DEFAULT_STAGES = ["New", "Contacted", "Qualified", "Won", "Lost"];
 
 /** Include clause that loads a pipeline's stages in board order. */
 const withStages = {

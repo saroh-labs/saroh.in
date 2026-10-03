@@ -17,10 +17,21 @@ jest.mock("@saroh/database", () => {
         site: { findFirst: jest.fn() },
         merchantPaymentProvider: {
             findMany: jest.fn(),
+            findFirst: jest.fn(),
             findUnique: jest.fn(),
         },
-        paymentIntent: { findUnique: jest.fn(), create: jest.fn() },
+        paymentIntent: {
+            findUnique: jest.fn(),
+            create: jest.fn(),
+            // D13: an autopay charge under way on the invoice.
+            findMany: jest.fn(),
+        },
         paymentAttempt: { create: jest.fn(), findFirst: jest.fn() },
+        // PAY_LINK_ON_SITE never configured: the pay link stays on the apex.
+        featureFlagOverride: { findUnique: jest.fn().mockResolvedValue(null) },
+        featureFlag: { findUnique: jest.fn().mockResolvedValue(null) },
+        // DEC-070: Payments on (no row) unless a test turns it off.
+        organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     return {
         ...actual,
@@ -60,7 +71,7 @@ import {
 const invoiceFindUnique = prisma.invoice.findUnique as jest.Mock;
 const invoiceFindFirst = prisma.invoice.findFirst as jest.Mock;
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
-const providerFindMany = prisma.merchantPaymentProvider.findMany as jest.Mock;
+const providerFindFirst = prisma.merchantPaymentProvider.findFirst as jest.Mock;
 const providerFindUnique = prisma.merchantPaymentProvider
     .findUnique as jest.Mock;
 const intentFindUnique = prisma.paymentIntent.findUnique as jest.Mock;
@@ -137,6 +148,7 @@ beforeEach(() => {
             ),
     );
     siteFindFirst.mockResolvedValue(null);
+    (prisma.paymentIntent.findMany as jest.Mock).mockResolvedValue([]);
 });
 
 describe("PublicInvoicesService.read", () => {
@@ -165,6 +177,9 @@ describe("PublicInvoicesService.read", () => {
                 "issuedAt",
                 "lines",
                 "number",
+                "payUrl",
+                // DEC-070: whether the page offers Pay.
+                "payOnline",
                 "status",
                 "tax",
                 "theme",
@@ -191,6 +206,10 @@ describe("PublicInvoicesService.read", () => {
             billedTo: "Asha Rao",
             billOfSupply: false,
             theme: null,
+            // The flag off (never configured): the apex, as before DEC-069.
+            payUrl: `https://saroh.app/pay/${TOKEN}`,
+            // No provider can open the checkout window here.
+            payOnline: false,
         });
         // Asked only for what it shows: no email, contact, ids or notes.
         const select = invoiceFindFirst.mock.calls[0][0].select;
@@ -311,7 +330,7 @@ describe("PublicInvoicesService.createIntent", () => {
     it("charges the stored total and ignores an amount in the body", async () => {
         const { service, fake } = makeService();
         invoiceFindFirst.mockResolvedValue(PAYABLE);
-        providerFindMany.mockResolvedValue([connectedRow()]);
+        providerFindFirst.mockResolvedValue(connectedRow());
         intentCreate.mockResolvedValue({ id: "pi_1" });
 
         const result = await service.createIntent(TOKEN, {
@@ -375,22 +394,60 @@ describe("PublicInvoicesService.createIntent", () => {
         expect(fake.calls).toHaveLength(0);
     });
 
-    it("uses the business's first connected provider when it has several", async () => {
+    it("uses the business's first connection that can open the checkout window, as its pay link was minted (B11, D22)", async () => {
         const { service } = makeService();
         invoiceFindFirst.mockResolvedValue(PAYABLE);
-        providerFindMany.mockResolvedValue([
-            connectedRow("CASHFREE", "2026-01-01"),
-            connectedRow("RAZORPAY", "2026-02-01"),
-        ]);
+        // An older Razorpay connection without its key id is passed over.
+        providerFindFirst.mockResolvedValue(
+            connectedRow("CASHFREE", "2026-02-01"),
+        );
         intentCreate.mockResolvedValue({ id: "pi_1" });
 
         const result = await service.createIntent(TOKEN, {});
 
-        expect(providerFindMany).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", status: "CONNECTED" },
+        expect(providerFindFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                status: "CONNECTED",
+                OR: [
+                    { provider: { not: "RAZORPAY" } },
+                    {
+                        AND: [
+                            { publicKey: { not: null } },
+                            { publicKey: { not: "" } },
+                        ],
+                    },
+                ],
+            },
             orderBy: { createdAt: "asc" },
         });
         expect(result.provider).toBe("CASHFREE");
+    });
+
+    it("refuses when no connection can open the window: the business doesn't take payment online (DEC-070)", async () => {
+        const { service } = makeService();
+        invoiceFindFirst.mockResolvedValue(PAYABLE);
+        // A Razorpay connection missing its public key id counts as none.
+        providerFindFirst.mockResolvedValue(null);
+
+        await expect(service.createIntent(TOKEN, {})).rejects.toThrow(
+            "This business doesn't take payment online.",
+        );
+        expect(intentCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses with Payments switched off, even with a provider (DEC-070)", async () => {
+        const { service } = makeService();
+        invoiceFindFirst.mockResolvedValue(PAYABLE);
+        providerFindFirst.mockResolvedValue(connectedRow("RAZORPAY"));
+        (
+            prisma.organizationModule.findFirst as jest.Mock
+        ).mockResolvedValueOnce({ id: "om_1" });
+
+        await expect(service.createIntent(TOKEN, {})).rejects.toThrow(
+            "This business doesn't take payment online.",
+        );
+        expect(intentCreate).not.toHaveBeenCalled();
     });
 
     it("takes a named provider only if the business connected it", async () => {
@@ -468,7 +525,7 @@ describe("PublicInvoicesService.createIntent — a pay-now hold (U19)", () => {
                 holdExpiresAt: new Date(Date.now() + 10 * 60_000),
             },
         });
-        providerFindMany.mockResolvedValue([connectedRow()]);
+        providerFindFirst.mockResolvedValue(connectedRow());
         intentCreate.mockResolvedValue({ id: "pi_1" });
 
         const result = await service.createIntent(TOKEN, { amount: 1 });

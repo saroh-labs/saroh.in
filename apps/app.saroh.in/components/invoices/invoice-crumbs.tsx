@@ -1,38 +1,22 @@
-import Link from "next/link";
+import { PaymentsCrumbs } from "@/components/subscriptions/payments-crumbs";
 
 /**
- * "Payments › Invoices › RC/26-27/0020", as the invoice designs head their
- * pages; the list is a link back.
+ * The bar over every invoice page in the designs, as over Subscriptions and
+ * Plan Detail: "Payments › Invoices", or "Payments › Invoices ›
+ * RC/26-27/0020" with the list as a link back. It runs the full width of the
+ * work area, so it steps out of the page container's padding.
  */
-export function InvoiceCrumbs({ current }: { current: string }) {
-    const chevron = (
-        <svg
-            aria-hidden
-            viewBox="0 0 24 24"
-            className="size-3 shrink-0"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M9 6 L15 12 L9 18" />
-        </svg>
-    );
+export function InvoiceCrumbs({ current }: { current?: string }) {
     return (
-        <nav
-            aria-label="Breadcrumb"
-            className="mb-[9px] flex items-center gap-2 text-[12px] text-muted-foreground print:hidden"
-        >
-            <span>Payments</span>
-            {chevron}
-            <Link href="/billing/invoices" className="hover:text-foreground">
-                Invoices
-            </Link>
-            {chevron}
-            <span aria-current="page" className="text-foreground">
-                {current}
-            </span>
-        </nav>
+        <div className="-mx-4 -mt-5 mb-5 sm:-mx-[26px] print:hidden">
+            <PaymentsCrumbs
+                here={current ?? "Invoices"}
+                trail={
+                    current
+                        ? [{ href: "/billing/invoices", label: "Invoices" }]
+                        : []
+                }
+            />
+        </div>
     );
 }

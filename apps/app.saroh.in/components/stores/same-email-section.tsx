@@ -59,13 +59,13 @@ export function SameEmailSection({
             <ToggleRow
                 id="storefront-same-email"
                 label="Link customers who share an email"
-                note="When someone pays here with the same email as a customer of another of your storefronts, their orders go on that customer's record. Off means you link them yourself from Customers."
+                note="When someone pays here with the same email as a customer of another of your locations, their orders go on that customer's record. Off means you link them yourself from Customers."
                 checked={on}
                 disabled={!canEdit || pending}
                 onChange={flip}
             />
             <Note>
-                Only customers who first bought from one of your storefronts are
+                Only customers who first bought from one of your locations are
                 linked, never someone you added by hand or an enquiry. If that
                 customer signs in on your website and hasn&rsquo;t confirmed
                 their email, you&rsquo;re asked instead. Customers who already

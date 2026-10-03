@@ -10,6 +10,7 @@ import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
 import { detailTabFromQuery } from "@/lib/subscriptions/plan-detail";
 import {
     getPlan,
+    getSubscriptionSettings,
     listPlanEvents,
     listPlanSubscriptions,
 } from "@/lib/subscriptions/service";
@@ -59,10 +60,13 @@ export default async function PlanPage({
     const plan = await getPlan(planId);
     if (!plan) notFound();
 
-    const [subscriptions, events, modules] = await Promise.all([
+    const [subscriptions, events, modules, settings] = await Promise.all([
         listPlanSubscriptions(plan.id),
         listPlanEvents(plan.id),
         modulesOrUnknown(),
+        // "When autopay charges" (D13B): optional, and only where autopay
+        // can charge.
+        getSubscriptionSettings(),
     ]);
     const appointments = modules
         ? modules.some(
@@ -86,6 +90,7 @@ export default async function PlanPage({
                 canWrite={may("subscription:write")}
                 initialTab={detailTabFromQuery(query.tab)}
                 nowIso={new Date().toISOString()}
+                autopay={settings?.autopay ?? null}
             />
         </PageContainer>
     );

@@ -27,6 +27,7 @@ import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 import { createHmac } from "node:crypto";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { CalendarService } from "../calendar/calendar.service";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -69,6 +70,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Rye & Co.", slug: `kitchen-org-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: "user_owner", role: "OWNER" };
     member = { organizationId: org.id, userId: "user_member", role: "MEMBER" };
     storeId = (
@@ -1047,7 +1049,11 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
             const today = DateTime.fromJSDate(now, {
                 zone: "Asia/Kolkata",
             }).toISODate();
-            const month = await calendar.month(owner, today!.slice(0, 7), now);
+            const month = await calendar.read(
+                owner,
+                { from: today!, to: today! },
+                now,
+            );
             const day = month.days.find((d) => d.date === today);
             return Number(day?.takings?.[0]?.amount ?? 0);
         };
@@ -1149,7 +1155,11 @@ describe("a later edit supersedes an unpaid difference (real database)", () => {
             const today = DateTime.fromJSDate(now, {
                 zone: "Asia/Kolkata",
             }).toISODate();
-            const month = await calendar.month(owner, today!.slice(0, 7), now);
+            const month = await calendar.read(
+                owner,
+                { from: today!, to: today! },
+                now,
+            );
             const day = month.days.find((d) => d.date === today);
             return Math.round(Number(day?.takings?.[0]?.amount ?? 0) * 100);
         };

@@ -6,6 +6,7 @@ import type { RenderedServicesList } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
 import { CtaButton, ctaClasses } from "./cta";
 
@@ -85,15 +86,9 @@ export function formatPrice(
     locale?: string,
 ): string | null {
     if (priceCents === null || !currency) return null;
-    try {
-        return new Intl.NumberFormat(locale, {
-            style: "currency",
-            currency,
-        }).format(priceCents / 100);
-    } catch {
-        // An unknown currency code: better no price than a wrong one.
-        return null;
-    }
+    // Whole amounts without decimals (DEC-073 #11); an unknown currency
+    // code is no price rather than a wrong one.
+    return siteMoney(priceCents / 100, currency, locale);
 }
 
 export default function ServicesListSection({
@@ -165,9 +160,20 @@ export default function ServicesListSection({
     if (state.kind === "ready" && state.services.length === 0) return null;
 
     const showPrices = content.showPrices !== false;
+    const showDescriptions = content.showDescriptions !== false;
+    const label = said(content.buttonLabel);
 
     return (
-        <section className="mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+        <section
+            className={
+                // Cards sit on the page's width, level with the Plans and
+                // Product grid beside them (the design's Book and Prices
+                // pages); a list keeps its reading column.
+                content.layout === "cards"
+                    ? "mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+                    : "mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+            }
+        >
             {content.heading ? (
                 <h2 className="text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight">
                     {content.heading}
@@ -195,6 +201,21 @@ export default function ServicesListSection({
                         Try again
                     </button>
                 </div>
+            ) : content.layout === "cards" ? (
+                <>
+                    <ServiceCards
+                        services={state.services}
+                        showPrices={showPrices}
+                        showDescriptions={showDescriptions}
+                        label={label}
+                        bookHref={bookHref}
+                    />
+                    {content.cta ? (
+                        <div className="mt-8">
+                            <CtaButton content={content.cta} />
+                        </div>
+                    ) : null}
+                </>
             ) : (
                 <>
                     <ul className="border-site-border mt-8 border-t">
@@ -214,7 +235,8 @@ export default function ServicesListSection({
                                         <h3 className="text-site-fg text-[calc(1.125rem*var(--site-heading-scale))] font-semibold">
                                             {service.name}
                                         </h3>
-                                        {service.description ? (
+                                        {showDescriptions &&
+                                        service.description ? (
                                             <p className="text-site-body mt-1 whitespace-pre-line leading-relaxed">
                                                 {service.description}
                                             </p>
@@ -233,12 +255,26 @@ export default function ServicesListSection({
                                         ) : null}
                                         {bookHref ? (
                                             <a
-                                                href={`${bookHref}?service=${encodeURIComponent(service.id)}`}
-                                                aria-label={`Book ${service.name}`}
+                                                href={serviceHref(
+                                                    bookHref,
+                                                    service.id,
+                                                )}
+                                                aria-label={
+                                                    label
+                                                        ? `${label}: ${service.name}`
+                                                        : `Book ${service.name}`
+                                                }
                                                 className="text-site-fg ml-3 font-semibold underline underline-offset-4"
                                             >
-                                                Book
+                                                {label ?? "Book"}
                                             </a>
+                                        ) : label ? (
+                                            // The editor's canvas has no
+                                            // booking page: the merchant's
+                                            // words show, and go nowhere.
+                                            <span className="text-site-fg ml-3 font-semibold underline underline-offset-4">
+                                                {label}
+                                            </span>
                                         ) : null}
                                     </p>
                                 </li>
@@ -253,5 +289,92 @@ export default function ServicesListSection({
                 </>
             )}
         </section>
+    );
+}
+
+/** A value with something in it, else null: an empty string says nothing. */
+function said(value: string | null | undefined): string | null {
+    const trimmed = value?.trim();
+    return trimmed === undefined || trimmed === "" ? null : trimmed;
+}
+
+/** The booking page, opened on one service. */
+function serviceHref(bookHref: string, serviceId: string): string {
+    return `${bookHref}?service=${encodeURIComponent(serviceId)}`;
+}
+
+const focusRing =
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
+
+/* The design's card button: the merchant's accent, the site's radius. */
+const cardButton =
+    "inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] bg-site-accent px-3.5 text-[13.5px] font-bold text-site-accent-fg";
+
+/**
+ * "Show as: Cards" (G16): the services side by side, as the Customer Site
+ * design draws a Book page — how long, the name, a line about it, the price
+ * and a button that opens the booking page on that service.
+ */
+function ServiceCards({
+    services,
+    showPrices,
+    showDescriptions,
+    label,
+    bookHref,
+}: {
+    services: PublicService[];
+    showPrices: boolean;
+    showDescriptions: boolean;
+    /** The merchant's button words; null keeps "Book". */
+    label: string | null;
+    bookHref?: string;
+}) {
+    const words = label ?? "Book";
+    return (
+        <ul className="mt-8 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]">
+            {services.map((service) => {
+                const price = showPrices
+                    ? formatPrice(service.priceCents, service.currency)
+                    : null;
+                return (
+                    <li
+                        key={service.id}
+                        className="border-site-border bg-site-surface text-site-fg grid min-w-0 content-start gap-1.5 overflow-hidden rounded-[calc(var(--site-radius)*1.4)] border p-4"
+                    >
+                        <span className="text-site-muted text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                            {formatDuration(service.durationMinutes)}
+                        </span>
+                        <h3 className="font-site-heading text-[calc(1.1875rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em]">
+                            {service.name}
+                        </h3>
+                        {showDescriptions && service.description ? (
+                            <p className="text-site-body whitespace-pre-line text-[13.5px] leading-normal [text-wrap:pretty]">
+                                {service.description}
+                            </p>
+                        ) : null}
+                        <span className="mt-1.5 flex items-center gap-2.5">
+                            <span className="flex-1 text-base font-bold tabular-nums">
+                                {price}
+                            </span>
+                            {bookHref ? (
+                                <a
+                                    href={serviceHref(bookHref, service.id)}
+                                    aria-label={`${words}: ${service.name}`}
+                                    className={cn(
+                                        cardButton,
+                                        "cursor-pointer transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]",
+                                        focusRing,
+                                    )}
+                                >
+                                    {words}
+                                </a>
+                            ) : (
+                                <span className={cardButton}>{words}</span>
+                            )}
+                        </span>
+                    </li>
+                );
+            })}
+        </ul>
     );
 }

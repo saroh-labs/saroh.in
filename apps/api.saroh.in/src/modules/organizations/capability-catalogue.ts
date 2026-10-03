@@ -85,6 +85,13 @@ export const CAPABILITIES: readonly Capability[] = [
         ownerOnly: true,
     },
     {
+        action: "org:address:update",
+        group: "business",
+        label: "Change the web address",
+        note: "The old address forwards to the new one for 90 days.",
+        ownerOnly: true,
+    },
+    {
         action: "audit:read",
         group: "business",
         label: "Read the activity log",
@@ -131,15 +138,15 @@ export const CAPABILITIES: readonly Capability[] = [
     },
 
     // — Sell ——————————————————————————————————————————————————
-    { action: "store:read", group: "sell", label: "See storefronts" },
-    { action: "store:create", group: "sell", label: "Add a storefront" },
-    { action: "store:write", group: "sell", label: "Change storefronts" },
-    { action: "store:delete", group: "sell", label: "Delete a storefront" },
+    { action: "store:read", group: "sell", label: "See locations" },
+    { action: "store:create", group: "sell", label: "Add a location" },
+    { action: "store:write", group: "sell", label: "Change locations" },
+    { action: "store:delete", group: "sell", label: "Delete a location" },
     {
         action: "inventory:write",
         group: "sell",
         label: "Count and move stock",
-        note: "Counts shelves, records deliveries and waste, and moves stock between storefronts. Prices and names still need Change storefronts.",
+        note: "Counts shelves, records deliveries and waste, and moves stock between locations. Prices and names still need Change locations.",
     },
     {
         action: "order:read",

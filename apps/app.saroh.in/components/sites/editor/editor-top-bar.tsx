@@ -14,7 +14,10 @@ import {
     STATUS_BADGE,
     statusReadout,
 } from "@/components/sites/editor/status-readout";
-import type { TopBarActionProps } from "@/components/sites/editor/top-bar-actions";
+import type {
+    TestReleaseActions,
+    TopBarActionProps,
+} from "@/components/sites/editor/top-bar-actions";
 import { TopBarActions } from "@/components/sites/editor/top-bar-actions";
 import type { EditorLayout } from "@/components/sites/editor/use-editor-layout";
 import type { DraftReadiness } from "@/components/sites/editor/use-publish";
@@ -22,7 +25,12 @@ import { unfinishedPhrase } from "@/components/sites/held-back-copy";
 import { PagesPanel } from "@/components/sites/pages-panel";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import type { EditorStatus } from "@/lib/sites/editor-status";
-import type { ReviewState, SiteFlags, SitePage } from "@/lib/sites/service";
+import type {
+    ModulePageKind,
+    ReviewState,
+    SiteFlags,
+    SitePage,
+} from "@/lib/sites/service";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
@@ -71,6 +79,12 @@ export function EditorTopBar({
     setPreviewing,
     layout,
     openFeedback,
+    canUpdateSite,
+    addablePageKinds,
+    needsApproval = false,
+    canOverride = false,
+    scheduled = null,
+    testRelease,
 }: {
     siteId: string;
     siteName: string;
@@ -106,6 +120,18 @@ export function EditorTopBar({
     layout: EditorLayout;
     /** Narrow: open the inspector on Feedback, with nothing selected. */
     openFeedback: () => void;
+    /** Whether this person holds `site:update`: page settings and Add a page. */
+    canUpdateSite: boolean;
+    /** The module pages the site can have now (G14), for Add a page. */
+    addablePageKinds?: ModulePageKind[];
+    /** "Publishing needs approval" is on (DEC-071, R10). */
+    needsApproval?: boolean;
+    /** An owner who can publish past it, on the record (KTD-11). */
+    canOverride?: boolean;
+    /** "Going live Fri 6:00pm · Diwali menu" (T11), when one is scheduled. */
+    scheduled?: string | null;
+    /** The Test release split; absent while test releases are off. */
+    testRelease?: TestReleaseActions;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
     const [pagesOpen, setPagesOpen] = useState(false);
@@ -130,6 +156,7 @@ export function EditorTopBar({
         pendingKnown,
         lastSavedAt,
         openNotes,
+        scheduled,
     });
     const publishHint = publishTitle({
         publishing,
@@ -140,11 +167,14 @@ export function EditorTopBar({
         neverPublished,
         pendingShort,
         pendingKnown,
+        needsApproval,
+        canOverride,
     });
     const phone = layout === "phone";
     const actions: TopBarActionProps = {
         ...{ device, setDevice, zoom, setZoom, previewing, setPreviewing },
         ...{ asking, publishing, publishHint, openNotes },
+        ...{ needsApproval, canOverride, testRelease },
         inReview: review.pending,
         askForReview: () => void askForReview(),
         publishDisabled: publishing || dirty || saving || styleDirty,
@@ -217,9 +247,12 @@ export function EditorTopBar({
                     <PopoverTrigger asChild>
                         <button
                             type="button"
-                            aria-label={`Page: ${activePage?.title ?? "Page"}. Switch or manage pages`}
+                            // A button and a list, as the design's page menu
+                            // is (G16); the popover sets aria-expanded.
+                            aria-haspopup="listbox"
+                            aria-label={`Page: ${activePage?.title ?? "Page"}. Choose another page to edit`}
                             className={cn(
-                                "flex h-[30px] min-w-0 items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11",
+                                "flex h-[30px] min-w-0 cursor-pointer items-center gap-[7px] rounded-lg border bg-card pl-[11px] pr-[9px] text-[0.84375rem] font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted data-[state=open]:bg-secondary coarse:h-11",
                                 // On a phone a long page name gives way
                                 // before the menu beside it does.
                                 !phone && "shrink-0",
@@ -236,7 +269,8 @@ export function EditorTopBar({
                     </PopoverTrigger>
                     <PopoverContent
                         align="start"
-                        className="max-h-[70vh] w-80 overflow-y-auto p-0"
+                        sideOffset={6}
+                        className="max-h-[70vh] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[10px] p-0 shadow-lg"
                     >
                         <PagesPanel
                             siteId={siteId}
@@ -251,6 +285,10 @@ export function EditorTopBar({
                                     ? unfinishedPhrase(heldBack)
                                     : undefined
                             }
+                            canUpdate={canUpdateSite}
+                            addableKinds={addablePageKinds}
+                            flags={siteFlags.flags}
+                            onClose={() => setPagesOpen(false)}
                         />
                     </PopoverContent>
                 </Popover>
@@ -352,6 +390,25 @@ function PhoneMenu({
                         setOpen(false);
                         actions.onPublish();
                     }}
+                    // A test release's sheets open over the editor, so
+                    // the menu goes away first.
+                    testRelease={
+                        actions.testRelease
+                            ? {
+                                  ...actions.testRelease,
+                                  onMake: actions.testRelease.onMake
+                                      ? () => {
+                                            setOpen(false);
+                                            actions.testRelease?.onMake?.();
+                                        }
+                                      : undefined,
+                                  onOpenList: () => {
+                                      setOpen(false);
+                                      actions.testRelease?.onOpenList();
+                                  },
+                              }
+                            : undefined
+                    }
                 />
             </PopoverContent>
         </Popover>

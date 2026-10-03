@@ -55,6 +55,18 @@ export function currentOrgContext(): string | undefined {
     return orgContextStore.getStore();
 }
 
+/**
+ * Run `fn` as if no request had an organization: no ambient org id and no
+ * context transaction, so the ambient `prisma` inside it goes to the base
+ * client with the GUC unset. For the few reads that are cross-business by
+ * nature and must see every business's rows even during one business's
+ * request — "is this web address free" (`sites/site-address.ts`). Reads
+ * made here are NOT part of the caller's transaction.
+ */
+export function outsideOrgContext<T>(fn: () => T): T {
+    return activeTxStore.exit(() => orgContextStore.exit(fn));
+}
+
 /** True when RLS enforcement is switched on via env (default OFF). */
 export function isRlsEnforcementEnabled(): boolean {
     const v = process.env.RLS_ENFORCEMENT;

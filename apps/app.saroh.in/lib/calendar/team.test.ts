@@ -255,7 +255,7 @@ describe("forPerson", () => {
         expect(rao.totals).toEqual({ bookings: 2, invoices: 0, payments: 1 });
         const layers = layersFor(month);
         expect(dayChips(rao.days[1], layers, {}, "2026-09-28")).toEqual([
-            { key: "bookings", text: "1 booking", tone: 1 },
+            { key: "bookings", text: "1 appointment", tone: 1 },
             { key: "payments", text: "1 payment", tone: 2 },
         ]);
         // Kinds follow the items, so a problem counts only the person's.
@@ -319,7 +319,7 @@ describe("forPerson", () => {
             today: "2026-09-28",
             money: wholeMoney,
         });
-        expect(summary).toBe("Bookings: 2 so far");
+        expect(summary).toBe("Appointments: 2 so far");
     });
 });
 

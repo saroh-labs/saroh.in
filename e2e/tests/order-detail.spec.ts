@@ -1,6 +1,10 @@
+// @covers accounts:/login app:/open app:/commerce/orders api:orders api:payments api:stock api:customer-workspace api:bookings
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import type { Fulfilment } from "../fixtures/own-data";
+import { ADDRESS, makeOrder } from "../fixtures/own-data";
+import { useSession } from "../fixtures/sessions";
 import {
     demoUser,
     ignoreHTTPSErrors,
@@ -26,7 +30,6 @@ const RYE = "seed_sc_rc_org";
 /** #1063: Priya Raman, whose note names sesame; the loaf may contain it. */
 const PRIYA = "seed_sc_rc_customer_priya";
 const NORTHWIND = "seed_org";
-const NW_STORE = "seed_store";
 
 const member = {
     email: "nisha.kulkarni@saroh.dev",
@@ -34,13 +37,7 @@ const member = {
 };
 
 async function signIn(page: Page, who = demoUser) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page, who);
 }
 
 /**
@@ -77,51 +74,19 @@ async function priyaOrderToday(page: Page): Promise<string> {
 const shown = (page: Page, text: string | RegExp) =>
     page.getByText(text).locator("visible=true").first();
 
-const ADDRESS = {
-    line1: "14 Lake View Road",
-    city: "Pune",
-    state: "Maharashtra",
-    postalCode: "411001",
-};
-
 /**
- * A paid order to walk through the kitchen: collected at the counter, or
- * (B10) delivered by the business or shipped by a courier.
+ * A paid order to walk through the kitchen, made for the test: collected at
+ * the counter, or (B10) delivered by the business or shipped by a courier.
+ * Its line is the untracked `ORDER_LINE`, so it never holds a unit of a
+ * shelf another test counts (it used to take the seed's trolley, whose
+ * stock ran out once specs ran side by side).
  */
 async function freshOrder(
     page: Page,
-    fulfilment: "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING" = "PICKUP",
+    fulfilment: Fulfilment = "PICKUP",
     { paid = true }: { paid?: boolean } = {},
 ): Promise<string> {
-    const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
-    const made = await page.request.post(
-        `${urls.API_URL}/stores/${NW_STORE}/orders`,
-        {
-            headers,
-            data: {
-                customerId: "seed_customer_6",
-                items: [
-                    {
-                        productId: "seed_product_11",
-                        variantId: "seed_variant_11_0",
-                        quantity: 1,
-                    },
-                ],
-                ...(fulfilment === "PICKUP"
-                    ? {}
-                    : { fulfilment, address: ADDRESS }),
-            },
-        },
-    );
-    expect(made.ok()).toBe(true);
-    const { id } = (await made.json()) as { id: string };
-    if (!paid) return id;
-    const marked = await page.request.patch(
-        `${urls.API_URL}/stores/${NW_STORE}/orders/${id}`,
-        { headers, data: { paymentStatus: "PAID" } },
-    );
-    expect(marked.ok()).toBe(true);
-    return id;
+    return (await makeOrder(page.request, { fulfilment, paid })).id;
 }
 
 /** Walk an order to Ready through the API, as the kitchen would have. */
@@ -129,16 +94,7 @@ async function readyOrder(
     page: Page,
     fulfilment: "LOCAL_DELIVERY" | "SHIPPING",
 ): Promise<string> {
-    const id = await freshOrder(page, fulfilment);
-    const headers = { "x-organization-id": NORTHWIND, origin: urls.APP_URL };
-    for (const to of ["PREPARING", "READY"]) {
-        const moved = await page.request.post(
-            `${urls.API_URL}/organizations/${NORTHWIND}/orders/${id}/stage`,
-            { headers, data: { to } },
-        );
-        expect(moved.ok()).toBe(true);
-    }
-    return id;
+    return (await makeOrder(page.request, { fulfilment, stage: "READY" })).id;
 }
 
 test.describe("order detail", () => {
@@ -241,6 +197,9 @@ test.describe("order detail", () => {
         const orderId = await priyaOrderToday(page);
         await page.goto(`/commerce/orders/${orderId}`);
         const card = page.getByRole("region", { name: "Customer" });
+        // "Needs attention: Sesame", as the design reads (DEC-073); a
+        // screen reader hears the kind too.
+        await expect(card.getByText("Needs attention:")).toBeVisible();
         await expect(
             card.getByRole("list", { name: "Needs attention" }),
         ).toContainText("Allergy: Sesame");
@@ -374,9 +333,12 @@ test.describe("order detail", () => {
         const panel = page.getByRole("region", { name: "Edit order" });
         const add = panel.getByLabel("Add an item");
         await expect(add).toBeVisible();
-        // The first thing on offer that isn't sold out.
+        // The first of the seed's own products on offer that isn't sold out:
+        // never another test's "E2E …" product, which it may be taking away
+        // at this moment, nor the line the order already has.
         const choice = await add
             .locator("option:not([disabled]):not([value=''])")
+            .filter({ hasNotText: /^E2E / })
             .first()
             .getAttribute("value");
         expect(choice).toBeTruthy();
@@ -523,28 +485,7 @@ test.describe("shipping on order detail", () => {
         await page.goto(`/open/${NORTHWIND}`);
         // An unpaid order: made, never marked paid. Northwind's Cashfree
         // connection can open a checkout, so a link can be made.
-        const headers = {
-            "x-organization-id": NORTHWIND,
-            origin: urls.APP_URL,
-        };
-        const made = await page.request.post(
-            `${urls.API_URL}/stores/${NW_STORE}/orders`,
-            {
-                headers,
-                data: {
-                    customerId: "seed_customer_6",
-                    items: [
-                        {
-                            productId: "seed_product_11",
-                            variantId: "seed_variant_11_0",
-                            quantity: 1,
-                        },
-                    ],
-                },
-            },
-        );
-        expect(made.ok()).toBe(true);
-        const { id } = (await made.json()) as { id: string };
+        const id = await freshOrder(page, "PICKUP", { paid: false });
         await page.goto(`/commerce/orders/${id}`);
 
         const money = page.getByRole("region", { name: "Money" });
@@ -721,6 +662,7 @@ const KAVI = "seed_sc_kavi_org";
 interface TreatmentRead {
     id: string;
     orderId: string;
+    attention?: { entries: { label: string }[] } | null;
     visits?: {
         total: number;
         attended: number;
@@ -782,6 +724,31 @@ test.describe("visits on a treatment's order (B14)", () => {
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
     });
 
+    test("a treatment's customer card says their Needs attention too (DEC-073)", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${KAVI}`);
+        const noted = (await kaviTreatments(page)).find(
+            (t) => (t.attention?.entries.length ?? 0) > 0,
+        );
+        expect(
+            noted,
+            "Kavi Dental seeds a patient with Needs attention",
+        ).toBeDefined();
+        const label = noted?.attention?.entries[0]?.label;
+        if (!noted || !label) return;
+        await page.goto(`/commerce/orders/${noted.id}`);
+        const card = page.getByRole("region", { name: "Customer" });
+        await expect(card.getByText("Needs attention:")).toBeVisible();
+        await expect(
+            card.getByRole("list", { name: "Needs attention" }),
+        ).toContainText(label);
+        await expect(
+            page.getByRole("region", { name: "Visits" }),
+        ).toContainText(label);
+    });
+
     test("Book visit N opens New booking for the treatment (nothing is saved)", async ({
         page,
     }) => {
@@ -803,28 +770,80 @@ test.describe("visits on a treatment's order (B14)", () => {
         await page.keyboard.press("Escape");
     });
 
-    test("Mark visit N attended, in the test run's own database", async ({
+    // @serial: it takes the first visit waiting on Kavi's seeded treatments,
+    // which the other project's copy of this test would take too.
+    test(
+        "Mark visit N attended, in the test run's own database",
+        {
+            tag: "@serial",
+        },
+        async ({ page }) => {
+            test.skip(
+                !ownSeededDatabase,
+                "Kavi is a film set: writes run in CI only",
+            );
+            await signIn(page);
+            await page.goto(`/open/${KAVI}`);
+            const due = (await kaviTreatments(page)).find(
+                (t) => t.visits?.next.attend != null,
+            );
+            test.skip(!due, "No Kavi visit has started and waits to be marked");
+            if (!due?.visits) return;
+            const n = due.visits.next.attend;
+            await page.goto(`/commerce/orders/${due.id}`);
+            await page
+                .getByRole("button", { name: `Mark visit ${n} attended` })
+                .click();
+            await expect(
+                shown(page, `Visit ${n} marked attended.`),
+            ).toBeVisible();
+            await expect(
+                page.getByRole("region", { name: "What happened" }),
+            ).toContainText(`Visit ${n} attended`);
+        },
+    );
+});
+
+/**
+ * A cancel's refund the provider has accepted reads "Refund on its way"
+ * until its webhook confirms it, never "Refunded" (B9, DEC-067). Read-only,
+ * on Northwind: it looks for such an order and skips when there is none
+ * (in test mode the provider confirms within seconds).
+ */
+test.describe("a refund on its way (B9)", () => {
+    test("Order Detail says Refund on its way, not Refunded, until the provider confirms", async ({
         page,
     }) => {
-        test.skip(
-            !ownSeededDatabase,
-            "Kavi is a film set: writes run in CI only",
-        );
         await signIn(page);
-        await page.goto(`/open/${KAVI}`);
-        const due = (await kaviTreatments(page)).find(
-            (t) => t.visits?.next.attend != null,
-        );
-        test.skip(!due, "No Kavi visit has started and waits to be marked");
-        if (!due?.visits) return;
-        const n = due.visits.next.attend;
-        await page.goto(`/commerce/orders/${due.id}`);
-        await page
-            .getByRole("button", { name: `Mark visit ${n} attended` })
-            .click();
-        await expect(shown(page, `Visit ${n} marked attended.`)).toBeVisible();
-        await expect(
-            page.getByRole("region", { name: "What happened" }),
-        ).toContainText(`Visit ${n} attended`);
+        await page.goto(`/open/${NORTHWIND}`);
+        const headers = {
+            "x-organization-id": NORTHWIND,
+            origin: urls.APP_URL,
+        };
+        const base = `${urls.API_URL}/organizations/${NORTHWIND}/orders`;
+        const list = await page.request.get(`${base}?v=2&tab=refunded`, {
+            headers,
+        });
+        expect(list.ok()).toBe(true);
+        const { rows } = (await list.json()) as { rows: { id: string }[] };
+        let found: string | null = null;
+        for (const row of rows.slice(0, 20)) {
+            const res = await page.request.get(`${base}/${row.id}`, {
+                headers,
+            });
+            const read = (await res.json()) as {
+                money: { refundsOnTheWay?: unknown[] } | null;
+            };
+            if ((read.money?.refundsOnTheWay ?? []).length > 0) {
+                found = row.id;
+                break;
+            }
+        }
+        test.skip(!found, "No refund waiting on its provider on Northwind.");
+
+        await page.goto(`/commerce/orders/${found}`);
+        const money = page.getByRole("region", { name: "Money" });
+        await expect(money.getByText(/^Refund on its way · /)).toBeVisible();
+        await expect(money.getByText("Refunded in full")).toHaveCount(0);
     });
 });

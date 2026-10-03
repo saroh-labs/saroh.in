@@ -32,9 +32,37 @@ export const OWNER_PASSWORD = "demo-password-123";
 export const REVIEWER_EMAIL = "reviewer@saroh.dev";
 export const REVIEWER_PASSWORD = "demo-password-123";
 
+/**
+ * Farah, on Northwind Store's counter: on the team as "Storefront team"
+ * (F16), with a Viewer's role on Northwind Store and not on Online. She
+ * sees and moves Northwind Store's orders and never Online's (DEC-074);
+ * the browser spec `storefront-team-orders.spec.ts` signs in as her.
+ */
+export const STOREFRONT_TEAM_EMAIL = "farah.storefront@saroh.dev";
+export const STOREFRONT_TEAM_PASSWORD = "demo-password-123";
+
+/**
+ * Someone just starting out (DEC-070, K2). Browser specs about setting up
+ * ("What are you setting up?") sign in as them and make businesses of their
+ * own, never touching the demo owner's. They also own one business per kind
+ * with nothing turned on, for reading a first run (K3, `seed/founder.ts`).
+ */
+export const FOUNDER_EMAIL = "founder@saroh.dev";
+export const FOUNDER_PASSWORD = "demo-password-123";
+
 export const ORG_SLUG = "demo-org";
 export const ORG_NAME = "Northwind Supply";
-export const STORE_SLUG = "demo-store";
+/**
+ * The registered address Northwind's invoices print (DEC-068). Not
+ * GST-registered: its state is the address's, Karnataka. A browser spec that
+ * changes it puts these values back.
+ */
+export const NORTHWIND_ADDRESS = {
+    addressLine1: "Plot 12, Peenya Industrial Area",
+    city: "Bengaluru",
+    postalCode: "560058",
+    gstState: "29",
+} as const;
 export const CURRENCY = "INR";
 
 /**
@@ -942,9 +970,12 @@ export const SIDE_BUSINESSES: readonly {
  * is composed at render time from NEXT_PUBLIC_ROOT_DOMAIN, which is why moving
  * tenants from saroh.in to saroh.app needed no data migration at all.
  *
- * No section here carries an image. The shipped starter template points at
- * `/templates/starter/*.jpg`, and those files do not exist in any app's
- * `public/` — seeding them would put broken images in the editor.
+ * No section here carries an image. `starter@1` pointed at
+ * `/templates/starter/*.jpg`, files no app's `public/` has, so seeding its
+ * sections would have put broken images in the editor. `starter@2` (DEC-070,
+ * what a new site starts from) carries no image at all. These sites are
+ * written from explicit sections, not from a template, so neither version
+ * changes them.
  */
 export const SITES: readonly SeedSite[] = [
     {

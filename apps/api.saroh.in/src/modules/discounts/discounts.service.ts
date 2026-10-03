@@ -195,7 +195,7 @@ export class DiscountsService {
         if (!organizationId) {
             fieldError(
                 BadRequestException,
-                "This storefront is not part of a business, so it cannot take a code",
+                "This location is not part of a business, so it cannot take a code",
                 "discountCode",
             );
         }

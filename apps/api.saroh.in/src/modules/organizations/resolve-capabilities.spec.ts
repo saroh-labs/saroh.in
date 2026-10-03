@@ -366,6 +366,8 @@ describe("resolveCapabilities with a person's extras", () => {
 
     it("never treats org:delete as an extra", () => {
         expect(isNeverExtra("org:delete")).toBe(true);
+        // Nor changing the web address (DEC-069): the Owner's alone.
+        expect(isNeverExtra("org:address:update")).toBe(true);
         expect(isNeverExtra("order:refund")).toBe(false);
     });
 });

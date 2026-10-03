@@ -20,9 +20,16 @@ import {
 import { CommunicationsService } from "../communications/communications.service";
 import type { InvoiceTemplate } from "../communications/transactional";
 import { authorize } from "../organizations/organization-policy";
+import {
+    AUTOPAY_CHARGE_IN_PROGRESS,
+    autopayChargeInProgress,
+    chargeUnderWayOn,
+} from "../payments/charge-under-way";
+import { assertBusinessDetails } from "./business-details";
 import { isPastDue } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
-import { payLinkUrl } from "./pay-link-url";
+import { payLinkUrlFor } from "./pay-link-url";
+import { invoicePayOnline } from "./pay-online";
 import type {
     InvoiceSendView,
     InvoiceSentView,
@@ -79,7 +86,9 @@ function sendable(row: SendRow): boolean {
 /**
  * Send an invoice, or a reminder, with its pay link (round-2 D17), through
  * the business's own connected provider — Saroh's email is never used
- * (default 38), and there is no WhatsApp share (default 106).
+ * (default 38), and there is no WhatsApp share (default 106). A business
+ * that doesn't take payment online sends the same link as a view link
+ * (DEC-070): the invoice and its PDF, without a Pay button.
  *
  * The channel rule is {@link sendChannels}. A send mints a fresh pay link,
  * as "New link" does, so the one shared before stops working; the token is
@@ -87,9 +96,9 @@ function sendable(row: SendRow): boolean {
  * happens on one transaction under the invoice's row lock, so two clicks
  * can't send twice or both pass the one-reminder-a-day rule.
  *
- * Not here yet: D13's "Autopay charge in progress" refusal. D13 adds the
- * mandate charge, and with it the check that an invoice with a PENDING
- * mandate intent is neither sent nor reminded about (409).
+ * While an autopay charge is under way on the invoice (D13) it is neither
+ * sent nor reminded about: the flag says `AUTOPAY_PENDING` and the API
+ * answers 409 "Autopay charge in progress".
  */
 @Injectable()
 export class InvoiceSendService {
@@ -151,8 +160,10 @@ export class InvoiceSendService {
      * - `thread` when the account thread is live (the `ACCOUNT_THREAD` flag
      *   and A13's poster) and the contact has an active site account;
      * - both, one, or neither: with neither there is no Send.
-     * A pay link needs a connected payment provider, so without one there
-     * is nothing to send.
+     *
+     * No payment provider is needed (DEC-070): `payOnline` says whether the
+     * link sent is a pay link (Payments on, a provider that can take it) or
+     * a link to view the invoice. The workspace reads it and never guesses.
      */
     async sendChannels(
         db: Db,
@@ -160,18 +171,22 @@ export class InvoiceSendService {
         row: SendRow,
         now: Date,
     ): Promise<InvoiceSendView> {
-        const nextReminderAt = await this.nextReminderAt(db, row.id, now);
+        const [nextReminderAt, payOnline] = await Promise.all([
+            this.nextReminderAt(db, row.id, now),
+            invoicePayOnline(db, organizationId),
+        ]);
         const none = (reason: SendBlocker): InvoiceSendView => ({
             channels: [],
             reason,
+            payOnline,
             nextReminderAt,
         });
         if (!sendable(row)) return none("NOT_OWED");
+        if (await chargeUnderWayOn(db, organizationId, row.id)) {
+            return none("AUTOPAY_PENDING");
+        }
 
-        const [payments, emailOn, to, threadOn] = await Promise.all([
-            db.merchantPaymentProvider.count({
-                where: { organizationId, status: "CONNECTED" },
-            }),
+        const [emailOn, to, threadOn] = await Promise.all([
             this.comms.emailConnected(db, organizationId),
             this.comms.transactionalAddress(db, organizationId, {
                 kind: "INVOICE_BILL_TO",
@@ -179,7 +194,6 @@ export class InvoiceSendService {
             }),
             this.threadOpen(db, organizationId, row.contactId),
         ]);
-        if (payments === 0) return none("NO_PAYMENT_PROVIDER");
 
         const channels: SendChannel[] = [];
         if (emailOn && to) channels.push("email");
@@ -192,6 +206,7 @@ export class InvoiceSendService {
             ...(channels.includes("email") && to
                 ? { emailTo: to.address }
                 : {}),
+            payOnline,
             nextReminderAt,
         };
     }
@@ -214,6 +229,8 @@ export class InvoiceSendService {
         authorize(ctx, "invoice:write");
         const organizationId = ctx.organizationId;
         const now = new Date();
+        // It asks to be paid: the business details first (DEC-068).
+        await assertBusinessDetails(prisma, organizationId);
 
         return prisma.$transaction(async (tx) => {
             // The invoice's lock serializes sends, reminders and pay links.
@@ -226,6 +243,9 @@ export class InvoiceSendService {
             this.assertSendable(row);
 
             const view = await this.sendChannels(tx, organizationId, row, now);
+            if (view.reason === "AUTOPAY_PENDING") {
+                throw autopayChargeInProgress();
+            }
             if (view.channels.length === 0) {
                 throw new ConflictException(blockerMessage(view.reason));
             }
@@ -268,18 +288,26 @@ export class InvoiceSendService {
                                 ? formatDay(row.dueAt, zone)
                                 : null,
                             overdue: isPastDue(row, now),
+                            payOnline: view.payOnline,
                         },
                         recipient: { kind: "INVOICE_BILL_TO", invoiceId: id },
-                        // A fresh link, as "New link" makes; the old one stops.
+                        // A fresh link, as "New link" makes; the old one
+                        // stops. With no way to pay online it is a view
+                        // link: the same page, without a Pay button. On the
+                        // business's own address (DEC-069, L7), read on
+                        // this transaction as the message is composed.
                         secretLink: async () =>
-                            payLinkUrl(
+                            payLinkUrlFor(
+                                organizationId,
                                 (
                                     await this.invoices.createPayLinkInTx(
                                         tx,
                                         ctx,
                                         id,
+                                        { requireProvider: view.payOnline },
                                     )
                                 ).token,
+                                tx,
                             ),
                         invoiceId: id,
                         createdByUserId: ctx.userId,
@@ -418,12 +446,12 @@ export class InvoiceSendService {
 /** The sentence a 409 says when nothing can carry the invoice. */
 export function blockerMessage(reason: SendBlocker | undefined): string {
     switch (reason) {
-        case "NO_PAYMENT_PROVIDER":
-            return "Connect a payment provider to send a pay link.";
         case "NO_EMAIL_PROVIDER":
             return "Connect an email provider in Settings to send invoices. You can copy the pay link instead.";
         case "NO_EMAIL_ADDRESS":
             return "There's no email address to send this to. You can copy the pay link instead.";
+        case "AUTOPAY_PENDING":
+            return AUTOPAY_CHARGE_IN_PROGRESS;
         default:
             return "This invoice isn't owed, so there's nothing to send.";
     }

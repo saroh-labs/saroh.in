@@ -1,5 +1,6 @@
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import type {
+    ModulePageKind,
     ReviewState,
     Section,
     SiteCommentView,
@@ -9,6 +10,7 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import type { TestReleasesRead } from "@/lib/sites/test-releases";
 
 /** What the editor's page (`app/(editor)/sites/[siteId]/page.tsx`) hands it. */
 export interface SiteEditorProps {
@@ -63,4 +65,27 @@ export interface SiteEditorProps {
      * only then are blocks that sell, the Product grid (G12), offered.
      */
     shopOpen?: boolean;
+    /**
+     * Whether Class packs is rolled out and on for the business: only then
+     * is the Class packs block offered (DEC-057).
+     */
+    packsOpen?: boolean;
+    /**
+     * The module pages the site can have now (G14): the page menu's "Add a
+     * page" offers these, then a blank page. Empty without `site:update`.
+     */
+    addablePageKinds?: ModulePageKind[];
+    /**
+     * The site's test releases (DEC-071, T11): `off` while they aren't on
+     * for the business, which hides every control for them.
+     */
+    initialTestReleases?: TestReleasesRead;
+    /** `site:publish`: go live with a release, schedule and cancel. */
+    canPublish?: boolean;
+    /** "Publishing needs approval" is on for the site (R10). */
+    publishNeedsApproval?: boolean;
+    /** An owner who can publish past it, on the record (KTD-11). */
+    canOverride?: boolean;
+    /** When the live version went live; null before the first publish. */
+    livePublishedAt?: string | null;
 }

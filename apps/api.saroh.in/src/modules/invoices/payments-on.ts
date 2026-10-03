@@ -7,10 +7,14 @@ import type { Prisma } from "@saroh/database";
  * Appointments (`bookings/appointments-open.ts`) — because enforcement ships
  * dark and the backfill may not have written rows yet.
  *
- * With Payments off, nothing new is invoiced (ADR-003: disabling stops new
- * activity): renewals wait (one set to end still ends), a pack or course is
- * recorded without one, and subscribing someone is refused — a subscription
- * is only its invoices.
+ * With Payments off, nothing is invoiced automatically (ADR-003: disabling
+ * stops new activity): renewals wait (one set to end still ends), a pack or
+ * course is recorded without one, and subscribing someone is refused — a
+ * subscription is only its invoices.
+ *
+ * Invoicing by hand is not Payments' (DEC-070, amending DEC-019): a
+ * business creates, issues, sends and records an invoice paid with Payments
+ * off. Only taking the money online needs it (`pay-online.ts`).
  */
 export const PAYMENTS_SWITCHED_OFF = {
     moduleKey: "PAYMENTS",

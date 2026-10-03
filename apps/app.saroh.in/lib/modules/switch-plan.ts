@@ -36,6 +36,26 @@ export function enabledDependents(modules: Node[], key: string): string[] {
 }
 
 /**
+ * What turning `key` off turns off with it (F13, DEC-067): every module that
+ * is on and needs it, in the order to turn them off — and only ones the
+ * business can see (`shown`), so each is named in the confirmation. One
+ * Saroh hasn't rolled out (DEC-057) is left as it is, never switched off
+ * unnamed; `kept` lists them, for a test to say so.
+ */
+export function offPlan(
+    shown: Node[],
+    all: Node[],
+    key: string,
+): { off: string[]; kept: string[] } {
+    const visible = new Set(shown.map((m) => m.key));
+    const every = enabledDependents(all, key);
+    return {
+        off: every.filter((k) => visible.has(k)),
+        kept: every.filter((k) => !visible.has(k)),
+    };
+}
+
+/**
  * Every module `key` needs, directly or through another, that is not on — in
  * the order to turn them on: a module after everything it needs.
  */
@@ -117,6 +137,7 @@ const SETUP_ACTION: Record<string, string> = {
     CRM_NO_PIPELINE: "Create a pipeline",
     WEBSITE_NO_SITE: "Create a site",
     WEBSITE_NO_PUBLICATION: "Publish your site",
+    WEBSITE_SHOP_NOT_CHOSEN: "Choose location",
     APPOINTMENTS_NO_SERVICE: "Add a service",
     APPOINTMENTS_NO_AVAILABILITY: "Set availability",
     COURSES_NO_COURSE: "Make a course",
@@ -126,6 +147,7 @@ const SETUP_ACTION: Record<string, string> = {
     COMMERCE_NO_CATALOG: "Add a product",
     PAYMENTS_NO_PROVIDER: "Connect a provider",
     PAYMENTS_PROVIDER_DISABLED: "Go to Providers",
+    PAYMENTS_WEBHOOK_SECRET_MISSING: "Add webhook secret",
     COMMUNICATIONS_NO_PROVIDER: "Connect a provider",
     COMMUNICATIONS_PROVIDER_DISABLED: "Go to Providers",
 };
@@ -141,17 +163,4 @@ const REFUSAL_ACTION: Record<string, string> = {
 
 export function refusalActionLabel(code: string): string | null {
     return REFUSAL_ACTION[code] ?? null;
-}
-
-/**
- * The modules Saroh has rolled out (DEC-057). One whose rollout is off is
- * never shown to the business, in Settings or anywhere else; the business's
- * own setting and its data are kept.
- */
-export function rolledOut<T extends Pick<ModuleView, "blockers">>(
-    modules: readonly T[],
-): T[] {
-    return modules.filter(
-        (m) => !m.blockers.some((b) => b.code === "ROLLOUT_DISABLED"),
-    );
 }

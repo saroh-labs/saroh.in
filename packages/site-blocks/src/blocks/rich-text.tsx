@@ -22,9 +22,18 @@ import type { RenderedRichText } from "@saroh/block-contract";
  */
 export default function RichTextSection({
     content,
+    align = "column",
 }: {
     content: RenderedRichText;
+    /**
+     * `column`: the centred reading column every page has always had.
+     * `cards`: on a module page (DEC-073 #9), where the text is the page's
+     * intro above its cards: it takes the cards' width and left edge, and
+     * its lines keep a readable length.
+     */
+    align?: "column" | "cards";
 }) {
+    const cards = align === "cards";
     const text =
         content.format === "html" ? (
             <div
@@ -49,7 +58,11 @@ export default function RichTextSection({
      */
     const image = content.image?.src ? content.image : null;
     if (!image) {
-        return (
+        return cards ? (
+            <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+                <div className="max-w-[65ch]">{text}</div>
+            </section>
+        ) : (
             <section className="mx-auto w-full max-w-screen-md px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
                 {text}
             </section>
@@ -63,7 +76,13 @@ export default function RichTextSection({
      */
     const left = content.imageSide === "left";
     return (
-        <section className="mx-auto w-full max-w-screen-lg px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+        <section
+            className={
+                cards
+                    ? "mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+                    : "mx-auto w-full max-w-screen-lg px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+            }
+        >
             <div className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
                 {/* Remote publication images from arbitrary tenant origins —
                     a plain <img>, as the hero's, avoids next/image's

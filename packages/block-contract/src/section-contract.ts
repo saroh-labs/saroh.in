@@ -468,6 +468,23 @@ const contactV1 = z
     );
 
 /**
+ * How a list section lays out its items (G16, R12): `cards` side by side, or
+ * `list`, one per row with the photo, where there is one, on the left. The
+ * Site Editor's "Show as". Each bound block says what ABSENT means, and it is
+ * always the look the block had before the option existed, so a page
+ * published before G16 draws exactly as it did.
+ */
+export const LIST_LAYOUTS = ["cards", "list"] as const;
+export type ListLayout = (typeof LIST_LAYOUTS)[number];
+const listLayout = z.enum(LIST_LAYOUTS).optional();
+
+/**
+ * A list section's button words (G16), "Leave empty to keep each item's own
+ * button". ABSENT means the block's own, and 40 characters is a button.
+ */
+const buttonLabel = z.string().trim().max(40).optional();
+
+/**
  * servicesList v1 — the merchant's real Services, read live (#255).
  *
  * The first block that shows module data. It stores only WHICH services and in
@@ -482,6 +499,10 @@ const contactV1 = z
  *
  * `cta` is the usual button (#207), typically "Book now" pointing at the page
  * with the booking block. Up to 24 services: past that it is a catalogue.
+ *
+ * Display options (G16): `layout` (ABSENT: `list`, the rows it has always
+ * drawn), `showDescriptions` (ABSENT: shown) and `buttonLabel`, the words on
+ * each service's own button (ABSENT: "Book").
  */
 const servicesListV1 = z.object({
     variant,
@@ -498,6 +519,13 @@ const servicesListV1 = z.object({
         ),
     showPrices: z.boolean().optional(),
     cta: ctaSchemaV2.optional(),
+    /**
+     * Display options (G16), each ABSENT meaning what the block drew before:
+     * one service per row (`list`), with its description, and a "Book" link.
+     */
+    layout: listLayout,
+    showDescriptions: z.boolean().optional(),
+    buttonLabel,
 });
 
 /**
@@ -540,6 +568,11 @@ const visitUsV1 = z.object({
  * `count` is 3 or 6 — a row, or two. ABSENT means 3. `showExcerpts` and
  * `showImages` default to on, so ABSENT means shown. With no posts live the
  * block renders nothing on the site; the editor's canvas says why.
+ *
+ * Display options (G16): `layout` (ABSENT: `cards`) and `buttonLabel`, words
+ * such as "Read" at the foot of each post's card (ABSENT: none, the card
+ * itself is the link). Photos are `showImages` and descriptions
+ * `showExcerpts`.
  */
 const journalV1 = z.object({
     variant,
@@ -548,6 +581,9 @@ const journalV1 = z.object({
     count: z.union([z.literal(3), z.literal(6)]).optional(),
     showExcerpts: z.boolean().optional(),
     showImages: z.boolean().optional(),
+    /** Display options (G16): ABSENT, cards and no button of their own. */
+    layout: listLayout,
+    buttonLabel,
 });
 
 /**
@@ -569,8 +605,73 @@ const plansV1 = z.object({
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
     highlight: z.enum(["first", "none"]).optional(),
+    buttonLabel,
+    showDescriptions: z.boolean().optional(),
+    /** Display options (G16): ABSENT, cards with their prices. */
+    layout: listLayout,
+    showPrices: z.boolean().optional(),
+});
+
+/**
+ * packs v1 — the business's class packs on sale, read live (G20).
+ *
+ * A bound block like `plans` (ADR-004): it stores the section title and how
+ * the packs show, never a pack. They are read when the page is served
+ * (`GET public/sites/:siteId/packs`): only packs on sale (published and
+ * active), with their published values, never a draft or an unpublished
+ * change, and nothing at all while Class packs is off for the business.
+ *
+ * `buttonLabel` is the card's button; ABSENT means the block's own default
+ * ("Buy", or "Ask about this pack" where the business can't take payment
+ * online). `showDescriptions` defaults to on, so ABSENT means shown. With no
+ * pack on sale the block renders nothing on the site; the editor's canvas
+ * says why.
+ */
+const packsV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
     buttonLabel: z.string().trim().max(40).optional(),
     showDescriptions: z.boolean().optional(),
+});
+
+/** How many projects a Projects block carries, at most (K11). */
+export const PROJECTS_MAX = 24;
+
+/**
+ * projects v1 — the merchant's own work: a photo, a title, a line about it
+ * and a link to more (K11, DEC-070).
+ *
+ * A STATIC block, not a bound one (KTD-13). A project is the merchant's own
+ * words and photo; there is no Project model to read, and
+ * `Organization.projects` is ADR-001's internal grouping, not portfolio
+ * work, so nothing here binds to it. What a merchant types is what a visitor
+ * reads, as with `features`.
+ *
+ * Every part of an item but the title is optional: a project with no photo
+ * draws without a gap where one would be, and one with no link has no
+ * "View project". The photo is the hero's shape, the address the media
+ * library served, so the library's "on a published site" guard finds it in a
+ * snapshot. Its description is asked for before publishing, not on save
+ * (`site-flags.ts`), for the reason the text block's photo gives: the photo
+ * is chosen first and the draft saves in between.
+ *
+ * `link` is a `linkHref`, so `javascript:` is refused when it is authored.
+ * Looks are `cards` and `list` (`LIST_LAYOUTS`), in `BLOCK_META`.
+ * Up to {@link PROJECTS_MAX}: past that it is a page of its own.
+ */
+const projectItemSchema = z.object({
+    image: imageSchema.optional(),
+    title: z.string().trim().min(1).max(120),
+    summary: z.string().max(600).optional(),
+    link: linkHref.optional(),
+});
+
+const projectsV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    items: z.array(projectItemSchema).min(1).max(PROJECTS_MAX),
 });
 
 /** How many products a Product grid shows, at most, and when it isn't set. */
@@ -616,6 +717,15 @@ const productGridV1 = z.object({
         .optional(),
     count: z.number().int().min(1).max(PRODUCT_GRID_MAX).optional(),
     showPrices: z.boolean().optional(),
+    /**
+     * Display options (G16), each ABSENT meaning what the grid drew before:
+     * cards, each with its photo and its line, and no button (the card
+     * itself opens the product).
+     */
+    layout: listLayout,
+    showPhotos: z.boolean().optional(),
+    showDescriptions: z.boolean().optional(),
+    buttonLabel,
 });
 
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
@@ -719,6 +829,8 @@ export const SECTION_TYPES = [
     "journal",
     "plans",
     "productGrid",
+    "packs",
+    "projects",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -865,6 +977,21 @@ const REGISTRY: Record<string, SectionContract> = {
         // A title, which products by id, a count and a switch; the products
         // themselves are read live.
         schema: productGridV1,
+        sanitizedFields: [],
+    },
+    [key("packs", 1)]: {
+        type: "packs",
+        version: 1,
+        // A title and display options; the packs are read live.
+        schema: packsV1,
+        sanitizedFields: [],
+    },
+    [key("projects", 1)]: {
+        type: "projects",
+        version: 1,
+        // Plain text, photos and links checked by `linkHref`; nothing here
+        // is authored HTML.
+        schema: projectsV1,
         sanitizedFields: [],
     },
 };

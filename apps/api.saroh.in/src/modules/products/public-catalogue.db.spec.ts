@@ -98,8 +98,15 @@ async function product(
         stockTracked?: boolean;
         variants?: { title: string; price?: string }[];
         description?: string;
+        /** What the options are ("Size"). */
+        optionName?: string;
     } = {},
 ) {
+    const option = over.optionName
+        ? await prisma.productOption.create({
+              data: { organizationId, name: over.optionName },
+          })
+        : null;
     const p = await prisma.product.create({
         data: {
             organizationId,
@@ -111,6 +118,7 @@ async function product(
             stockTracked: over.stockTracked ?? true,
             description: over.description ?? null,
             supplierCode: "SECRET-SUP-1",
+            optionId: option?.id ?? null,
         },
     });
     const variants = [];
@@ -204,6 +212,7 @@ describe("public catalogue (G11)", () => {
         ryeSite = await site(rye, online);
 
         sourdough = await product(rye, "Sourdough", {
+            optionName: "Size",
             variants: [
                 { title: "Small", price: "250.00" },
                 { title: "Large", price: "450.00" },
@@ -251,9 +260,24 @@ describe("public catalogue (G11)", () => {
             priceFrom: true,
             image: null,
             variantTitles: ["Small", "Large"],
+            // The card's "2 sizes" (DEC-073 #12).
+            optionName: "Size",
             blurb: "Slow rye. Baked at dawn.",
             soldOut: false,
+            listingId: expect.any(String),
+            bagVariantId: expect.any(String),
         });
+        // The card's Add to bag takes the first option that can be sold
+        // now: Small is sold out here, so Large.
+        const page = await catalogue.product(ryeSite, "sourdough", "visitor");
+        expect(card?.listingId).toBe(page.listingId);
+        expect(card?.bagVariantId).toBe(
+            page.variants.find((v) => v.title === "Large")?.id,
+        );
+        // A product without options adds itself.
+        expect(
+            shop.products.find((p) => p.slug === "focaccia")?.bagVariantId,
+        ).toBeNull();
     });
 
     it("serves a product page with only the variants sold here, and their stock words", async () => {
@@ -620,7 +644,13 @@ describe("public catalogue (G11)", () => {
                 await prisma.$executeRawUnsafe(
                     `REVOKE USAGE ON SCHEMA public FROM ${ROLE}`,
                 );
-                await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ${ROLE}`);
+                // A role is the whole server's: while another test database
+                // on it still grants this one something (a parallel run, or
+                // one stopped half-way), it can't be dropped. This database
+                // is clean either way, and the next run's CREATE tolerates it.
+                await prisma.$executeRawUnsafe(`DO $$ BEGIN
+                DROP ROLE IF EXISTS ${ROLE};
+            EXCEPTION WHEN dependent_objects_still_exist THEN NULL; END $$`);
             });
 
             /** Run `fn` in one transaction as the probe role, in `orgId`'s context. */

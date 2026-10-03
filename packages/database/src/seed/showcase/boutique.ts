@@ -96,13 +96,21 @@ export async function seedBoutique(
             createdAt,
         },
     });
+    // The registered address its invoices print (DEC-068).
+    const profile = {
+        timezone: TIMEZONE,
+        addressLine1: "14 Commercial Street",
+        city: "Bengaluru",
+        postalCode: "560001",
+        gstState: "29",
+    };
     await prisma.businessProfile.upsert({
         where: { organizationId: orgId },
-        update: { timezone: TIMEZONE },
+        update: profile,
         create: {
             id: sid("profile"),
             organizationId: orgId,
-            timezone: TIMEZONE,
+            ...profile,
         },
     });
     await prisma.membership.upsert({
@@ -166,14 +174,14 @@ export async function seedBoutique(
     });
 
     // --- the storefront
+    // Keyed by its fixed id: a location has no slug (DEC-069, L14).
     await prisma.store.upsert({
-        where: { slug: BOUTIQUE.slug },
+        where: { id: storeId },
         update: { name: BOUTIQUE_NAME, organizationId: orgId },
         create: {
             id: storeId,
             organizationId: orgId,
             name: BOUTIQUE_NAME,
-            slug: BOUTIQUE.slug,
             description:
                 "Skincare for everyone, and dresses made to be lived in.",
             createdAt,

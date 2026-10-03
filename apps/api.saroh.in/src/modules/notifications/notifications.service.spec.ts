@@ -212,7 +212,7 @@ describe("what each person sees of the inbox (F14)", () => {
     it("leaves out notices about what their role can't read", async () => {
         findMany.mockResolvedValue([]);
         // An invented role with the inbox and the team, but no orders,
-        // bookings or money.
+        // bookings or money, and no say in what goes live.
         await new NotificationsService().list(
             ctx({
                 role: "MEMBER",
@@ -226,6 +226,8 @@ describe("what each person sees of the inbox (F14)", () => {
                 "booking.moved",
                 "booking.cancelled",
                 "payment.failed",
+                "site.live",
+                "site.not_live",
             ],
         });
     });

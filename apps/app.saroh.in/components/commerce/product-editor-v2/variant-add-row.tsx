@@ -174,7 +174,7 @@ export function OptionChoice({
             </div>
             <Link
                 href={productSettingsHref("options")}
-                className="text-[12px] text-brand hover:text-foreground"
+                className="text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
             >
                 Manage options
             </Link>

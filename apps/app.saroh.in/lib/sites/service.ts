@@ -142,6 +142,21 @@ export interface TestimonialsContent {
     items: TestimonialItem[];
 }
 
+/** One piece of work in a projects section (mirror of the section contract). */
+export interface ProjectItem {
+    image?: ImageValue;
+    title: string;
+    summary?: string;
+    /** A web address, an email or phone link, or a path on this site. */
+    link?: string;
+}
+
+/** `projects` — the merchant's own work, typed in (K11). Up to 24. */
+export interface ProjectsContent {
+    title?: string;
+    items: ProjectItem[];
+}
+
 /** `contact` — where to find the business and how to reach it. */
 export interface ContactContent {
     heading?: string;
@@ -164,7 +179,14 @@ export interface ServicesListContent {
     serviceIds: string[];
     showPrices?: boolean;
     cta?: CtaValue;
+    /** Display options (G16). Absent: a list, descriptions shown, "Book". */
+    layout?: ListLayout;
+    showDescriptions?: boolean;
+    buttonLabel?: string;
 }
+
+/** "Show as" (G16): side by side, or one per row. */
+export type ListLayout = "cards" | "list";
 
 /**
  * `visitUs` — which shop's address and hours to show (G8). The place itself is
@@ -188,6 +210,9 @@ export interface JournalContent {
     count?: 3 | 6;
     showExcerpts?: boolean;
     showImages?: boolean;
+    /** Display options (G16). Absent: cards, and no button of their own. */
+    layout?: ListLayout;
+    buttonLabel?: string;
 }
 
 /**
@@ -200,6 +225,9 @@ export interface PlansContent {
     highlight?: "first" | "none";
     buttonLabel?: string;
     showDescriptions?: boolean;
+    /** Display options (G16). Absent: cards, with prices. */
+    layout?: ListLayout;
+    showPrices?: boolean;
 }
 
 /**
@@ -215,6 +243,25 @@ export interface ProductGridContent {
     productIds?: string[];
     count?: number;
     showPrices?: boolean;
+    /**
+     * Display options (G16). Absent: cards with photos and lines, and no
+     * button (the card opens the product).
+     */
+    layout?: ListLayout;
+    showPhotos?: boolean;
+    showDescriptions?: boolean;
+    buttonLabel?: string;
+}
+
+/**
+ * `packs` — how the business's class packs on sale show (G20). The packs
+ * themselves are read live by the site, never stored here.
+ * `showDescriptions` absent means shown.
+ */
+export interface PacksContent {
+    title?: string;
+    buttonLabel?: string;
+    showDescriptions?: boolean;
 }
 
 /** The field types an enquiry form supports (mirror of the section contract). */
@@ -278,7 +325,9 @@ export interface SectionContentByType {
     visitUs: VisitUsContent;
     journal: JournalContent;
     plans: PlansContent;
+    packs: PacksContent;
     productGrid: ProductGridContent;
+    projects: ProjectsContent;
 }
 
 /**
@@ -408,6 +457,13 @@ export interface SiteFooter {
     value: string;
 }
 
+/**
+ * A module page's kind (G14): one page per kind per site, beside the
+ * free-form pages. Mirrors the API's `MODULE_PAGE_KINDS`, in menu order.
+ */
+export type ModulePageKind = "SHOP" | "BOOK" | "PRICES" | "JOURNAL" | "CONTACT";
+export type PageKind = "FREE" | ModulePageKind;
+
 export interface SitePage {
     id: string;
     path: string;
@@ -415,6 +471,13 @@ export interface SitePage {
     isHome: boolean;
     /** Hidden pages stay in the draft and are left out of the snapshot (#197). */
     hidden: boolean;
+    /**
+     * FREE, or the module page this is (G14). Absent from an API older than
+     * G14, which only ever had free-form pages.
+     */
+    kind?: PageKind;
+    /** "Show in menu" (G14). Absent means on, as it was before G14. */
+    inMenu?: boolean;
 }
 
 /**
@@ -438,6 +501,14 @@ export interface SiteDetail extends SiteSummary {
     canEdit: boolean;
     /** Everything this caller may do here (#275). */
     can: SiteCapabilities;
+    /**
+     * "Publishing needs approval" (DEC-071, R10): on, Publish and restore are
+     * refused and only an approved test release goes live, unless an owner
+     * overrides. Absent from an older API, which reads as off.
+     */
+    publishNeedsApproval?: boolean;
+    /** This caller is an owner who can publish: may go live past it (KTD-11). */
+    canOverride?: boolean;
     pages: SitePage[];
     /** Always present on a detail read; null only before the first publish. */
     pendingSectionChanges: number | null;
@@ -480,6 +551,24 @@ export interface SiteDetail extends SiteSummary {
      * API older than G11: either way the settings show no row.
      */
     sellsFrom?: SellsFrom | null;
+    /**
+     * The shop could serve (SITE_SHOP, Commerce on) and a storefront with
+     * products could be chosen, but Sells from is unanswered, so `/shop`
+     * isn't live yet (P4). Absent from an older API: not said.
+     */
+    shopAwaitsSellsFrom?: boolean;
+    /**
+     * The module pages this caller could add now (G14): kinds whose module is
+     * on and that the site doesn't have yet, in menu order. Empty without
+     * `site:update`; a module that isn't rolled out is never listed
+     * (DEC-057). Absent from an API older than G14.
+     */
+    addablePageKinds?: ModulePageKind[];
+    /**
+     * Whether Add block offers the Class packs block: Class packs rolled out
+     * and on (DEC-057). Absent from an older API, which reads as not.
+     */
+    packsBlockOffered?: boolean;
 }
 
 /** The storefront a site sells from, and the open ones with products. */
@@ -550,6 +639,18 @@ export type SitesResult<T> =
            * else's work — so the screen offers to reload rather than to retry.
            */
           conflict?: boolean;
+          /**
+           * An address to offer instead of one the API refused (G14's
+           * `details.suggestion`): taken, or one of the site's own routes.
+           * Offered, never applied.
+           */
+          suggestion?: string;
+          /**
+           * The API's `details.code` for a refusal a screen answers in its
+           * own way: `APPROVAL_REQUIRED` while "Publishing needs approval"
+           * is on (DEC-071, T9).
+           */
+          code?: string;
       };
 
 // ---------------------------------------------------------------------------
@@ -580,7 +681,7 @@ async function sitesBase(): Promise<string | null> {
 function readError(
     data: unknown,
     fallback: string,
-): { error: string; index?: number } {
+): { error: string; index?: number; suggestion?: string; code?: string } {
     const body = (typeof data === "object" && data !== null ? data : {}) as {
         message?: unknown;
         error?: unknown;
@@ -599,11 +700,18 @@ function readError(
         typeof inner?.details === "object" && inner.details !== null
             ? inner.details
             : {}
-    ) as { index?: unknown };
+    ) as { index?: unknown; suggestion?: unknown; code?: unknown };
 
     return {
         error: message ?? fallback,
         index: typeof details.index === "number" ? details.index : undefined,
+        // `APPROVAL_REQUIRED` (DEC-071, T9): the screen offers the way on.
+        ...(typeof details.code === "string" ? { code: details.code } : {}),
+        // An address the API offers instead of a refused one (G14).
+        ...(typeof details.suggestion === "string" &&
+        details.suggestion.startsWith("/")
+            ? { suggestion: details.suggestion }
+            : {}),
     };
 }
 
@@ -625,6 +733,35 @@ export async function listSites(): Promise<SiteSummary[]> {
     const base = await sitesBase();
     if (!base) return [];
     return getList<SiteSummary>(base);
+}
+
+/** What `/sites/new` starts from (DEC-069, L5). */
+export interface NewSiteDefaults {
+    siteName: string;
+    /** The business's own address, or a free one like it; may be empty. */
+    address: string;
+}
+
+/**
+ * The name and address a new site is offered (`GET …/sites/new-defaults`).
+ * Null when it can't be read (an API from before it, or a failure): the form
+ * then starts empty, and the API still gives the site the business's own
+ * address or says which one to use.
+ */
+export async function getNewSiteDefaults(): Promise<NewSiteDefaults | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    try {
+        const res = await apiFetch(`${base}/new-defaults`);
+        if (!res.ok) return null;
+        const data = (await res.json()) as Partial<NewSiteDefaults> | null;
+        return {
+            siteName: typeof data?.siteName === "string" ? data.siteName : "",
+            address: typeof data?.address === "string" ? data.address : "",
+        };
+    } catch {
+        return null;
+    }
 }
 
 /** A site + its pages, or null when missing / no active org (throws on a real
@@ -671,6 +808,7 @@ export async function createSite(
         };
     }
     const failure = toFailure(data, "Could not create the site");
+    const suggestion = addressSuggestionOf(data);
     return {
         ok: false,
         error: failure.error,
@@ -678,7 +816,29 @@ export async function createSite(
             failure.field === "name" || failure.field === "subdomain"
                 ? failure.field
                 : undefined,
+        // A free address offered for one in use (DEC-069, L5).
+        ...(suggestion ? { suggestion } : {}),
     };
+}
+
+/**
+ * The free web address a refusal offers (`details.suggestion` on the 409
+ * for an address in use), or null. Unlike a page's suggested path it has no
+ * leading `/`.
+ */
+export function addressSuggestionOf(body: unknown): string | null {
+    const b = (typeof body === "object" && body !== null ? body : {}) as {
+        error?: unknown;
+        details?: unknown;
+    };
+    const inner =
+        typeof b.error === "object" && b.error !== null
+            ? (b.error as { details?: unknown })
+            : b;
+    const details = inner.details;
+    if (typeof details !== "object" || details === null) return null;
+    const said = (details as { suggestion?: unknown }).suggestion;
+    return typeof said === "string" && /^[a-z0-9-]+$/.test(said) ? said : null;
 }
 
 /**
@@ -756,10 +916,18 @@ export async function saveDraftSections(
 /** Publish an immutable snapshot of the site's current drafts. */
 export async function publishSite(
     siteId: string,
+    /**
+     * An owner going live past "Publishing needs approval" (DEC-071, T9):
+     * refused from anyone else, and recorded when it goes through.
+     */
+    override = false,
 ): Promise<SitesResult<{ publicationId?: string; bypassed: boolean }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
-    const res = await apiFetch(`${base}/${siteId}/publish`, { method: "POST" });
+    const res = await apiFetch(`${base}/${siteId}/publish`, {
+        method: "POST",
+        ...(override ? { body: JSON.stringify({ override: true }) } : {}),
+    });
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
         bypassed?: boolean;
@@ -821,10 +989,27 @@ export interface SitePublication {
     /** Set when this publish went past an outstanding change request (#199). */
     bypass: { at: string; by: string } | null;
     /**
-     * Which route this publish took: APPROVED, BYPASSED or NONE (#278). Null on
-     * versions published before it was recorded.
+     * Set when an owner went live past "Publishing needs approval" (DEC-071,
+     * T9). Optional: an older API image doesn't send it.
+     */
+    override?: { at: string; by: string } | null;
+    /**
+     * Which route this publish took: APPROVED, BYPASSED, OVERRIDDEN or NONE
+     * (#278, T9). Null on versions published before it was recorded.
      */
     reviewRoute: string | null;
+    /**
+     * The test release this version went live from (DEC-071, T12); null for
+     * a direct publish or a restore. Optional for an older API image.
+     */
+    testRelease?: PublicationRelease | null;
+}
+
+/** A test release, as the version it went live as names it (T12). */
+export interface PublicationRelease {
+    id: string;
+    number: number;
+    name: string;
 }
 
 /** Every publish of a site, newest first. Empty if it has never been published. */
@@ -867,6 +1052,8 @@ export interface SitePublicationDetail {
     templateVersion: number;
     snapshot: PublishedSnapshot;
     renderability: { renderable: boolean; unrenderable: UnrenderableSection[] };
+    /** The test release this version went live from (T12). */
+    testRelease?: PublicationRelease | null;
 }
 
 /**
@@ -891,12 +1078,17 @@ export async function getPublication(
 export async function restorePublication(
     siteId: string,
     publicationId: string,
+    /** An owner's restore past "Publishing needs approval" (DEC-071, Q3). */
+    override = false,
 ): Promise<SitesResult<{ publicationId: string; bypassed: boolean }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(
         `${base}/${siteId}/publications/${publicationId}/restore`,
-        { method: "POST" },
+        {
+            method: "POST",
+            ...(override ? { body: JSON.stringify({ override: true }) } : {}),
+        },
     );
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
@@ -939,14 +1131,21 @@ export interface SiteCommentView {
 /**
  * What the latest verdict on a site was. `BYPASSED` is not a reviewer's word:
  * it is the record that someone published over a request for changes (#199).
- * A union rather than a string so every place that words a verdict has to
- * word all three — a new outcome is a type error, not a line that quietly
- * renders as "asked for changes".
+ * Nor is `OVERRIDDEN`: an owner went live past "Publishing needs approval"
+ * (DEC-071, T9). A union rather than a string so every place that words a
+ * verdict has to word them all — a new outcome is a type error, not a line
+ * that quietly renders as "asked for changes", or a lookup that throws.
  */
 export type ApprovalOutcome =
-    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED";
+    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED" | "OVERRIDDEN";
 
 export interface ReviewState {
+    /**
+     * What is being reviewed (DEC-071, T12): a test release, or null for the
+     * draft. The two never mix: a verdict on a release is about its frozen
+     * bytes and leaves the draft's review as it was (KTD-10).
+     */
+    testRelease?: PublicationRelease | null;
     openNotes: number;
     latestApproval: {
         outcome: ApprovalOutcome;
@@ -973,7 +1172,11 @@ export interface ReviewState {
  * showing nothing is a worse outcome than the editor refusing to open, and
  * notes are not what the merchant came here to do.
  */
-export async function listComments(siteId: string): Promise<SiteCommentView[]> {
+export async function listComments(
+    siteId: string,
+    /** A test release's own notes instead of the draft's (T8, T12). */
+    testReleaseId?: string,
+): Promise<SiteCommentView[]> {
     const base = await sitesBase();
     if (!base) return [];
     /*
@@ -984,11 +1187,25 @@ export async function listComments(siteId: string): Promise<SiteCommentView[]> {
      * resource (404 → empty) from a failure, and the segment boundary explains
      * the failure.
      */
-    return getList<SiteCommentView>(`${base}/${siteId}/comments`);
+    return getList<SiteCommentView>(
+        `${base}/${siteId}/comments${releaseQuery(testReleaseId)}`,
+    );
 }
 
-export async function getReviewState(siteId: string): Promise<ReviewState> {
+/** `?testReleaseId=…`, or nothing for the draft. */
+function releaseQuery(testReleaseId: string | undefined): string {
+    return testReleaseId
+        ? `?testReleaseId=${encodeURIComponent(testReleaseId)}`
+        : "";
+}
+
+export async function getReviewState(
+    siteId: string,
+    /** A test release's review instead of the draft's (T8, T12). */
+    testReleaseId?: string,
+): Promise<ReviewState> {
     const empty: ReviewState = {
+        testRelease: null,
         openNotes: 0,
         pending: false,
         approvalIsStale: false,
@@ -1006,10 +1223,11 @@ export async function getReviewState(siteId: string): Promise<ReviewState> {
      * `pending` yet is a missing field, not a failure.
      */
     const data = await getJson<Partial<ReviewState>>(
-        `${base}/${siteId}/review`,
+        `${base}/${siteId}/review${releaseQuery(testReleaseId)}`,
     );
     if (!data) return empty;
     return {
+        testRelease: data.testRelease ?? null,
         openNotes: typeof data.openNotes === "number" ? data.openNotes : 0,
         latestApproval: data.latestApproval ?? null,
         outstanding: data.outstanding === true,
@@ -1028,7 +1246,13 @@ export async function getReviewState(siteId: string): Promise<ReviewState> {
  */
 export async function createComment(
     siteId: string,
-    input: { pageId: string; sectionKey: string; body: string },
+    input: {
+        pageId: string;
+        /** On a test release, the section's position on its frozen page (T8). */
+        sectionKey: string;
+        body: string;
+        testReleaseId?: string;
+    },
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
@@ -1051,7 +1275,7 @@ export async function createComment(
  */
 export type ReviewerVerdict = Exclude<
     ApprovalOutcome,
-    "REQUESTED" | "BYPASSED"
+    "REQUESTED" | "BYPASSED" | "OVERRIDDEN"
 >;
 
 /**
@@ -1063,12 +1287,16 @@ export type ReviewerVerdict = Exclude<
 export async function createApproval(
     siteId: string,
     outcome: ReviewerVerdict,
+    /** A verdict on a test release's frozen bytes, not the draft (T8, T12). */
+    testReleaseId?: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/approvals`, {
         method: "POST",
-        body: JSON.stringify({ outcome }),
+        body: JSON.stringify(
+            testReleaseId ? { outcome, testReleaseId } : { outcome },
+        ),
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
@@ -1115,11 +1343,14 @@ export async function getPageForReview(
  */
 export async function requestReview(
     siteId: string,
+    /** Put a test release up for review instead of the draft (T8, T12). */
+    testReleaseId?: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/review/request`, {
         method: "POST",
+        ...(testReleaseId ? { body: JSON.stringify({ testReleaseId }) } : {}),
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
@@ -1171,7 +1402,9 @@ export type FlagType =
     // The checkout (G13): the shop can't take an online order now.
     | "shopCantTakeOrders"
     // A Product grid (G12) naming products that aren't on sale there.
-    | "productsNotOnSale";
+    | "productsNotOnSale"
+    // The site has no web address (DEC-069, L5): the one flag that blocks.
+    | "addressMissing";
 
 export interface Flag {
     type: FlagType;
@@ -1179,6 +1412,8 @@ export interface Flag {
     pageId: string | null;
     sectionIndex: number | null;
     field: string | null;
+    /** The API refuses to publish until this is fixed (only `addressMissing`). */
+    blocking?: boolean;
 }
 
 export interface SiteFlags {
@@ -1212,13 +1447,36 @@ export async function getSiteFlags(siteId: string): Promise<SiteFlags> {
 }
 
 /**
+ * A page to add (G14): a free-form page names its title and address; a
+ * module page names its `kind` and may leave both to the kind's defaults
+ * (a Book or Shop page's address is always its route's).
+ */
+export type CreatePageInput =
+    | { kind?: "FREE"; title: string; path: string; inMenu?: boolean }
+    | {
+          kind: ModulePageKind;
+          title?: string;
+          path?: string;
+          inMenu?: boolean;
+      };
+
+/** What a page change may carry; an omitted field is left alone. */
+export interface UpdatePageInput {
+    title?: string;
+    path?: string;
+    hidden?: boolean;
+    /** "Show in menu" (G14). */
+    inMenu?: boolean;
+}
+
+/**
  * Add a page to a site. The API decides what a legal path is and whether it is
  * free — the form does not pre-check, because a client-side answer that
  * disagreed with the server's would be worse than one round trip.
  */
 export async function createPage(
     siteId: string,
-    input: { title: string; path: string },
+    input: CreatePageInput,
 ): Promise<SitesResult<SitePage>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
@@ -1232,11 +1490,14 @@ export async function createPage(
     return { ok: false, ...readError(data, "Could not add the page.") };
 }
 
-/** Rename a page, move it, or both. An omitted field is left alone. */
+/**
+ * Rename a page, move it, hide it or take it out of the menu. An omitted
+ * field is left alone.
+ */
 export async function updatePage(
     siteId: string,
     pageId: string,
-    input: { title?: string; path?: string; hidden?: boolean },
+    input: UpdatePageInput,
 ): Promise<SitesResult<SitePage>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };

@@ -164,7 +164,7 @@ describe("Closing a storefront that holds stock (DB)", () => {
                     counted: 2,
                 }),
             ),
-        ).rejects.toThrow("This storefront is closed");
+        ).rejects.toThrow("This location is closed");
         await expect(
             tx((t) =>
                 move(t, actor, {
@@ -173,7 +173,7 @@ describe("Closing a storefront that holds stock (DB)", () => {
                     units: 1,
                 }),
             ),
-        ).rejects.toThrow("This storefront is closed");
+        ).rejects.toThrow("This location is closed");
         const after = await prisma.stockLevel.findUniqueOrThrow({
             where: { id: shelf.id },
         });

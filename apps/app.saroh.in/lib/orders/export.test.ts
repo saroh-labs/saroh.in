@@ -40,7 +40,7 @@ const order: OrderRow = {
 };
 
 const HEAD =
-    "Order,Placed,Customer,Email,Phone,Storefront,Fulfilment,Step,Late,Payment,Items,Products,Unpaid,Total,Currency";
+    "Order,Placed,Customer,Email,Phone,Location,Fulfilment,Step,Late,Payment,Items,Products,Unpaid,Total,Currency";
 
 describe("ordersToCsv", () => {
     it("writes the design's columns: type, step, late and payment", () => {

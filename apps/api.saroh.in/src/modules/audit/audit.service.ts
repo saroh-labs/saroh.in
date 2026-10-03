@@ -76,6 +76,20 @@ export const AuditAction = {
     // channel, and on or off as it was and became. Their own choice, about
     // no one else, so it carries the value.
     MemberAlertsUpdate: "member.alerts.update",
+    // The owner changed the business's web address (DEC-069, plan L2),
+    // written in the change's own transaction. Metadata: `from` and `to`,
+    // the addresses — public by nature, never a person's detail.
+    OrganizationAddressChanged: "organization.address_changed",
+    // "Publishing needs approval" turned on or off for a site (DEC-071,
+    // T9), owner only, written in the same transaction as the switch.
+    // Metadata: `from` and `to`, the setting as it was and became.
+    SitePublishApprovalOn: "site.publish_approval.on",
+    SitePublishApprovalOff: "site.publish_approval.off",
+    // An owner put a version live past "Publishing needs approval" without
+    // an approval covering it (DEC-071, KTD-11), written by `putLive` with
+    // the publication. Metadata: how it went live (`source`), and the test
+    // release when it was one. The target is the new publication.
+    SitePublishOverride: "site.publish_approval.override",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

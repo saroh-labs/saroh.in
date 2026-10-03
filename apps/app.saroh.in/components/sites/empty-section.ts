@@ -100,6 +100,15 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { heading: "", items: [{ quote: "", name: "" }] },
             };
+        case "projects":
+            // Like `features`: one empty project, because the contract needs
+            // one, and no invented work (K11) — the merchant fills in theirs.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "", items: [{ title: "" }] },
+            };
         case "servicesList":
             // Empty until the merchant picks a service; the editor lists
             // theirs, or says there are none yet.
@@ -126,6 +135,14 @@ export function emptySection(type: SectionType): Section {
                 type,
                 contractVersion: 1,
                 content: { title: "Our products" },
+            };
+        case "packs":
+            // Nothing to choose: the packs on sale, read live.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "Class packs" },
             };
         case "plans":
             // Nothing to choose: the plans on sale, read live.

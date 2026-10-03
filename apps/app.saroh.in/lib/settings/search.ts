@@ -4,6 +4,7 @@ import {
     settingsPagesFor,
 } from "@/components/shared/nav-items";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
+import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
 
 /**
  * Search settings ("Saroh Settings" design): the things a person comes to
@@ -20,6 +21,20 @@ import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
  */
 
 type SettingsHref = (typeof SETTINGS_PAGES)[number]["href"];
+
+/**
+ * A settings page's name in the words of what is being set up (DEC-070,
+ * K5): Business is "Your details" for Just me and A site for my work. The
+ * rest keep their names.
+ */
+export function settingsPageLabel(
+    page: { href: string; label: string },
+    kind: unknown,
+): string {
+    return page.href === "/settings/organization"
+        ? kindWords(kind).settingsTab
+        : page.label;
+}
 
 /** The query a settings page reads its own tab from. */
 export const BUSINESS_TAB_PARAM = "section";
@@ -42,6 +57,12 @@ export interface SettingsEntry {
      * lands on the type of business.
      */
     words?: readonly string[];
+    /**
+     * The module the setting belongs to. Offered only while this person
+     * has it here: never for one Saroh hasn't rolled out (DEC-057), nor
+     * one that is off.
+     */
+    module?: string;
 }
 
 const business = (label: string, value: string): SettingsEntry => ({
@@ -62,6 +83,16 @@ const team = (label: string, value: string): SettingsEntry => ({
  */
 export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Business name", "identity"),
+    {
+        ...business("What you're setting up", "identity"),
+        // Each answer by its name, and what it is examples of (DEC-070).
+        words: [
+            ...KIND_CHOICES.map((c) => c.label),
+            ...KIND_CHOICES.flatMap((c) =>
+                c.examples.split(",").map((w) => w.trim()),
+            ),
+        ],
+    },
     business("Logo", "identity"),
     business("Legal name", "identity"),
     {
@@ -74,7 +105,12 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     business("Time zone", "identity"),
     business("Trading since", "identity"),
-    business("Workspace address", "identity"),
+    {
+        ...business("Web address", "identity"),
+        // The four addresses are named apart (DEC-069); the words it went
+        // by before still find it.
+        words: ["Workspace address", "Saroh address", "Subdomain", "saroh.app"],
+    },
     business("Contact email", "contact"),
     business("Phone on your website", "contact"),
     business("Website", "contact"),
@@ -86,7 +122,12 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("GST on delivery", "tax"),
     business("Delivery SAC", "tax"),
     business("Opening hours", "hours"),
-    business("Registered address", "address"),
+    {
+        ...business("Registered address", "address"),
+        // The tab and its row were once a bare "Address"; it is the one
+        // invoices print.
+        words: ["Address on invoices"],
+    },
     business("PIN code", "address"),
     business("State", "address"),
     business("Country", "address"),
@@ -99,8 +140,12 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         ...team("People on the team", "people"),
         unless: "member:invite",
     },
-    { label: "Modules — Sell, Payments, Website…", page: "/settings/modules" },
-    { label: "Contacts pipeline", page: "/settings/modules" },
+    // Names no module: the ones Saroh hasn't rolled out aren't named (DEC-057).
+    {
+        label: "Modules — turn parts of Saroh on or off",
+        page: "/settings/modules",
+    },
+    { label: "Contacts pipeline", page: "/settings/modules", module: "CRM" },
     { label: "Plan and billing", page: "/settings/billing" },
     { label: "Change plan", page: "/settings/billing" },
     { label: "Invoices from Saroh", page: "/settings/billing" },
@@ -112,12 +157,26 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
         page: "/settings/providers",
     },
     { label: "Email and WhatsApp sender", page: "/settings/providers" },
-    { label: "Payment provider", page: "/settings/providers" },
+    {
+        label: "Payment provider",
+        page: "/settings/providers",
+        module: "PAYMENTS",
+    },
 ];
 
 export interface SettingsActor {
     role: NavRole | null;
     actions?: readonly string[] | null;
+    /**
+     * The modules this person has here (the rail's). `null` or absent is
+     * unknown, and every setting is offered, as the rail fails open.
+     */
+    modules?: readonly string[] | null;
+    /**
+     * What is being set up (DEC-070), for the words a page is named in.
+     * Absent reads as a business.
+     */
+    kind?: unknown;
 }
 
 /**
@@ -160,7 +219,10 @@ export function searchSettings(
     { limit = 8, byPage = true }: { limit?: number; byPage?: boolean } = {},
 ): SettingsHit[] {
     const pages = new Map(
-        settingsPagesFor(actor).map((page) => [page.href, page.label]),
+        settingsPagesFor(actor).map((page) => [
+            page.href,
+            settingsPageLabel(page, actor.kind),
+        ]),
     );
     const needle = query.trim().toLowerCase();
     const hits: SettingsHit[] = [];
@@ -168,6 +230,13 @@ export function searchSettings(
         const where = pages.get(entry.page);
         if (where === undefined) continue;
         if (entry.action && !holds(actor, entry.action)) continue;
+        if (
+            entry.module &&
+            actor.modules &&
+            !actor.modules.includes(entry.module)
+        ) {
+            continue;
+        }
         // An actor we cannot judge holds everything, so of a pair they are
         // offered the first half — never both, never neither.
         if (entry.unless && holds(actor, entry.unless)) continue;

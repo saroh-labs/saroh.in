@@ -12,6 +12,8 @@
  * the inbox, or reconciliation.
  */
 
+import type { ReportedMandateChange } from "../../payments/mandate-rules";
+
 /** Case-insensitive header bag as delivered on the HTTP request. */
 export type WebhookHeaders = Record<string, string | string[] | undefined>;
 
@@ -21,7 +23,20 @@ export type WebhookHeaders = Record<string, string | string[] | undefined>;
  * not make (Razorpay `refund.failed`, Cashfree CANCELLED/FAILED/REJECTED).
  */
 export type WebhookOutcome =
-    "SUCCEEDED" | "FAILED" | "REFUNDED" | "REFUND_FAILED" | "IGNORED";
+    | "SUCCEEDED"
+    | "FAILED"
+    | "REFUNDED"
+    | "REFUND_FAILED"
+    | "MANDATE"
+    | "PRE_DEBIT"
+    | "IGNORED";
+
+/**
+ * A mandate's state as a verified webhook reports it (D11): Razorpay's
+ * `token.confirmed` → ACTIVE, `token.paused` → PAUSED, `token.cancelled` →
+ * CANCELLED, `token.rejected` → FAILED. Defined beside the mandate rules.
+ */
+export type WebhookMandateChange = ReportedMandateChange;
 
 /**
  * A provider-agnostic view of one verified webhook event. All money-state
@@ -60,6 +75,30 @@ export interface NormalizedWebhookEvent {
      * dashboard.
      */
     refundReference?: string;
+    /** On `MANDATE`: what became of the mandate. */
+    mandate?: WebhookMandateChange;
+    /**
+     * On `PRE_DEBIT`: the charge order's notice (Razorpay
+     * `order.notification.delivered` / `.failed`), found by
+     * `providerIntentId`.
+     */
+    preDebitStatus?: "DELIVERED" | "FAILED";
+    /**
+     * An authorisation's own payment names the mandate it made (D19):
+     * Razorpay's token webhooks carry no customer, order or link, so the
+     * token id reaches a PENDING mandate only through the payment (or the
+     * paid registration link) that set it up. Applied beside `outcome`,
+     * whatever that is.
+     */
+    mandateLink?: WebhookMandateLink;
+}
+
+/** A set-up (by any of its references) → the provider's mandate id. */
+export interface WebhookMandateLink {
+    providerMandateId: string;
+    providerCustomerId?: string;
+    /** The set-up's references as the payment carries them (link, order). */
+    setupReferences: string[];
 }
 
 export interface VerifySignatureInput {

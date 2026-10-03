@@ -44,6 +44,8 @@ const CLASS_LEVEL: Record<string, string> = {
     // E3: business closures and the time-off preview.
     "staff/closures.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
+    // DEC-071 T2: a site's test releases and their links.
+    "sites/test-releases.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",
@@ -71,7 +73,6 @@ const CLASS_LEVEL: Record<string, string> = {
     // #514: stock levels, the log, counts, moves and checks.
     "stock/stock.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
-    "invoices/invoices.controller.ts": "PAYMENTS",
     "subscriptions/subscriptions.controller.ts": "PAYMENTS",
     // Both of its controllers: the packs, and using one on a booking (E12).
     "class-packs/class-packs.controller.ts": "CLASS_PACKS",
@@ -84,6 +85,8 @@ const CLASS_LEVEL: Record<string, string> = {
  */
 const METHOD_LEVEL: Record<string, string> = {
     "payments/payments.controller.ts": "PAYMENTS",
+    // DEC-070: invoicing needs no module; only the pay link is Payments'.
+    "invoices/invoices.controller.ts": "PAYMENTS",
     "communications/communications.controller.ts": "COMMUNICATIONS",
 };
 
@@ -116,6 +119,9 @@ const NEVER: Record<string, string> = {
     "notifications/notification-preferences.controller.ts": "cross-cutting",
     "media/media.controller.ts": "shared by more than one module",
     "organizations/organizations.controller.ts": "tenancy, not a capability",
+    // DEC-069 (L2): the web address is the business's whichever modules
+    // are on, and share buttons across modules read its links.
+    "organizations/web-address.controller.ts": "tenancy, not a capability",
     "organizations/organization-roles.controller.ts":
         "roles decide who may switch modules; a module switch must never lock the owner out of roles",
     "projects/projects.controller.ts": "tenancy",
@@ -186,6 +192,19 @@ const NEVER: Record<string, string> = {
     // unless Class packs is rolled out and switched on (DEC-057, E12).
     "class-packs/account-packs.controller.ts":
         "a signed-in customer buying a pack — Class packs checked by the service, dark with the account area",
+    // G20: the Prices page's Class packs section. Class packs being off is
+    // checked by the service (`packsOffered`), which answers 404, as a
+    // site with no packs.
+    "class-packs/public-packs.controller.ts":
+        "a published site's Class packs section — Class packs checked by the service",
+    // G20: joining a plan from the site. Payments being off is checked by
+    // the service (`paymentsOffered`), which answers 404.
+    "subscriptions/account-plan-join.controller.ts":
+        "a signed-in customer joining a plan — Payments checked by the service, dark with the account area",
+    // D12: autopay on the customer's own plan. Payments being off, or a
+    // provider without autopay, is checked by the service (409).
+    "subscriptions/account-autopay.controller.ts":
+        "a signed-in customer's own autopay — Payments and the provider checked by the service, dark with the account area",
     // A13: the customer's message thread. Every business can be written
     // to; it ships dark with the account area (SITE_ACCOUNT_AREA), not with
     // a module, on both sides.
@@ -202,6 +221,10 @@ const NEVER: Record<string, string> = {
     // payment already made still lands through the webhook.
     "orders/public-checkout.controller.ts":
         "a published site's bag and checkout — Commerce checked by the service",
+    // P4: a site order's confirmation page. Never module-gated: an order
+    // already paid is shown to whoever placed it, Commerce on or off.
+    "orders/checkout-confirmation.controller.ts":
+        "a placed site order's confirmation — shown to its customer only",
     // G9: a site's Plans block. Payments being off is checked by the
     // service (`paymentsOffered`), which answers 404, as a site with no plans.
     "subscriptions/public-plans.controller.ts":
@@ -210,6 +233,11 @@ const NEVER: Record<string, string> = {
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
+    // P1: the buyer's browser reports a payment the moment the provider's
+    // window closes. Never module-gated: a payment already taken is settled
+    // whatever the business has switched off since.
+    "webhooks/checkout-return.controller.ts":
+        "a buyer's checkout return — settles a payment already taken",
     "billing/billing-webhook.controller.ts": "billing webhook inbox",
     "waitlist/waitlist.controller.ts": "public waitlist",
 };
@@ -266,9 +294,11 @@ describe("module enforcement rollout (#117)", () => {
     // The half that matters most: these are the routes that must keep working
     // when a merchant switches a capability off.
     /*
-     * Invoices sit under Payments but need no provider: an invoice paid in
-     * cash is recorded by hand (ADR-007). Without the opt-out, switching
-     * enforcement on would refuse every business that never connected one.
+     * Invoice pay links and subscriptions sit under Payments but need no
+     * provider to reach: an invoice paid in cash is recorded by hand
+     * (ADR-007), and the pay link's service says what it needs. Without the
+     * opt-out, switching enforcement on would refuse every business that
+     * never connected one.
      */
     it.each([
         "invoices/invoices.controller.ts",
@@ -308,6 +338,22 @@ describe("module enforcement rollout (#117)", () => {
             ),
         );
         expect(orgPart).toContain('@RequireModule("INSIGHTS")');
+    });
+
+    /*
+     * DEC-070: a business invoices with Payments off — create, issue, send,
+     * void, credit, record paid, download. Only the pay link, a way to take
+     * money online, stays under Payments, and it alone carries the gate.
+     */
+    it("gates only the invoice pay link on Payments (DEC-070)", () => {
+        const text = source("invoices/invoices.controller.ts");
+        expect(text.match(/@RequireModule\(/g)).toHaveLength(1);
+        const payLink = text.slice(
+            text.indexOf('@Post(":invoiceId/pay-link")'),
+        );
+        const handler = payLink.slice(0, payLink.indexOf("async payLink("));
+        expect(handler).toContain('@RequireModule("PAYMENTS")');
+        expect(handler).toContain("@IgnoreModuleReadiness()");
     });
 
     it("refunds and payment status stay reachable with Payments off", () => {

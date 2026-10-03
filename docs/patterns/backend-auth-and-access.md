@@ -165,7 +165,8 @@ what the API allows.
   `Membership` in the store's business, in the same transaction, in the
   narrow **"Storefront team"** role (key `storefront-team`: `org:read`,
   `member:read`, `module:read`, `media:read`, `store:read`,
-  `product-review:read` — no customers, bookings, orders or money), unless
+  `product-review:read`, and since DEC-074 `order:stage` for its own
+  storefronts — no customers, bookings or money), unless
   the person already holds a role, which is never lowered or replaced. The
   rule is `joinTeamFromStorefront` in `@saroh/database`
   (`backfill/store-members-to-memberships.ts`, shared with the one-off
@@ -176,6 +177,14 @@ what the API allows.
   their `StoreMembers` rows in that business's storefronts, in the removal's
   serializable transaction. What anyone does inside a storefront still comes
   from their storefront role.
+- **Current** (DEC-074) — **A location's team works only its storefronts'
+  orders.** Storefront team holds `order:stage` (migration
+  `20261019120000_storefront_team_orders` added it to existing roles), and
+  every order lookup spreads `orderLocationWhere(ctx)` /
+  `orderLocationSql` (`orders/order-location.ts`), keyed on the role, like
+  `reviewerScope`: another storefront's order is a 404 to read, and every
+  move asks `assertOrdersAtOwnLocation` (a 403). A new order read or move
+  spreads the same; Home, the calendar and New order alerts follow it.
 - **Current** — **The last OWNER cannot be demoted or removed.** The S1-006
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so
@@ -195,9 +204,25 @@ what the API allows.
   modules and stays dark until `MODULE_ENFORCEMENT` is set;
   `module-annotations.spec.ts` pins what is gated and what must never be
   (refunds, consent withdrawal, public checkout, published sites, webhooks).
+- **Current** (DEC-070) — **What is being set up never decides access.**
+  `Organization.kind` (BUSINESS, SOLO, WORK) picks words and defaults only.
+  It is served on the `org:read` summary and the organization list, changed
+  with `org:update`, and read elsewhere only through `organizationKind(db,
+orgId)` (`organizations/organization-kind.ts`).
+  `organization-kind.readers.spec.ts` scans the source and fails on a read off
+  its allow-list, in `common/guards`, a `capabilities/module-*` file, an
+  entitlement, or inside an `assert*`.
 - **Current** — **Three control planes, never conflated** (ADR-003): feature flags
   are Saroh's rollout, entitlements are what a plan permits, modules are what an
   Organization has chosen.
+- **Current** (DEC-068) — **Turning a module on creates its minimum in the
+  switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
+  checks `module:manage` and then the action for each thing it creates
+  (`store:create`, `service:write`, `pipeline:manage`, `site:create`); without
+  `setup` it behaves as before. The API never turns a dependency on — the app
+  enables each first. Whether Saroh has rolled a module out is one function,
+  `moduleRolledOut`, which also treats a `hidden` module (Automations) as not
+  rolled out. `modules/capabilities/README.md` has the payloads.
 - **Current** — **State-changing requests are origin-checked.** `OriginGuard`
   rejects an untrusted **or missing** `Origin` (falling back to `Referer`) on
   POST, PUT, PATCH and DELETE (#50). **A frontend's server-side call to the

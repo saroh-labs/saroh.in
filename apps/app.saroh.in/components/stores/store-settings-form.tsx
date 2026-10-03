@@ -21,14 +21,12 @@ import { updateStore } from "@/lib/stores/actions";
 interface StoreFields {
     id: string;
     name: string;
-    slug: string;
     description: string | null;
     logo: string | null;
 }
 
 const formSchema = z.object({
     name: z.string().min(1, { message: "Name is required" }),
-    slug: z.string().min(1, { message: "Slug is required" }),
     description: z.string().optional(),
     logo: z.string().optional(),
 });
@@ -40,7 +38,6 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
         resolver: zodResolver(formSchema),
         defaultValues: {
             name: store.name,
-            slug: store.slug,
             description: store.description ?? "",
             logo: store.logo ?? "",
         },
@@ -50,23 +47,18 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
     async function onSubmit(values: FormValues) {
         const res = await updateStore(store.id, {
             name: values.name,
-            slug: values.slug,
             description: trimmedOr(values.description, null),
             logo: trimmedOr(values.logo, null),
         });
         if (!res.ok) {
-            if (
-                res.field === "name" ||
-                res.field === "slug" ||
-                res.field === "logo"
-            ) {
+            if (res.field === "name" || res.field === "logo") {
                 form.setError(res.field, { message: res.error });
             } else {
                 showError(res.error);
             }
             return;
         }
-        showSuccess("Store settings saved");
+        showSuccess("Details saved");
     }
 
     return (
@@ -81,19 +73,6 @@ export function StoreSettingsForm({ store }: { store: StoreFields }) {
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Name</FormLabel>
-                            <FormControl>
-                                <Input disabled={isSubmitting} {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="slug"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Web address</FormLabel>
                             <FormControl>
                                 <Input disabled={isSubmitting} {...field} />
                             </FormControl>

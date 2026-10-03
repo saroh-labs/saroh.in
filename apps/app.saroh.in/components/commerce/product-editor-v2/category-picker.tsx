@@ -146,7 +146,7 @@ export function CategoryPicker({
                 </Command>
                 <Link
                     href={manageHref}
-                    className="block px-[9px] pb-[3px] pt-[7px] text-[11.5px] text-brand hover:text-foreground"
+                    className="block px-[9px] pb-[3px] pt-[7px] text-[11.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                 >
                     Manage categories
                 </Link>

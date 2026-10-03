@@ -197,7 +197,7 @@ describe("provider rows", () => {
         );
         const [razorpay, cashfree] = view.connected;
         expect(razorpay.note).toBe("Takes online payments at Rye & Co.");
-        expect(cashfree.note).toMatch(/no storefront's checkout uses it yet/);
+        expect(cashfree.note).toMatch(/no location's checkout uses it yet/);
         expect(view.available.some((e) => e.type === "Payments")).toBe(false);
     });
 
@@ -226,6 +226,108 @@ describe("provider rows", () => {
             });
             expect(view.available.map((e) => e.name)).not.toContain("Razorpay");
         }
+    });
+
+    it("says a Razorpay connection without its webhook signing secret needs attention (DEC-063)", () => {
+        const view = buildProvidersView(
+            input({
+                payments: [
+                    {
+                        ...pay("RAZORPAY", "CONNECTED", "rzp_live_A1"),
+                        webhookSecretMissing: true,
+                    },
+                ],
+            }),
+        );
+        const [razorpay] = view.connected;
+        expect(razorpay.state).toBe("ATTENTION");
+        expect(razorpay.note).toBe(
+            "Needs its webhook signing secret — payments can't be confirmed until you add it.",
+        );
+        expect(razorpay.fix).toBe("Add webhook secret");
+        // The same setup dialog, opened on Razorpay, is the fix.
+        expect(razorpay.setup).toEqual({
+            kind: "payments",
+            provider: "RAZORPAY",
+        });
+    });
+
+    it("asks for the key id first when both are missing, and nothing of a healthy one", () => {
+        const both = buildProvidersView(
+            input({
+                payments: [
+                    {
+                        ...pay("RAZORPAY", "CONNECTED", null),
+                        webhookSecretMissing: true,
+                    },
+                ],
+            }),
+        ).connected[0];
+        expect(both.fix).toBe("Add key id");
+        expect(both.note).toMatch(/^Needs its key id/);
+
+        const healthy = buildProvidersView(
+            input({
+                payments: [
+                    {
+                        ...pay("RAZORPAY", "CONNECTED", "rzp_live_A1"),
+                        webhookSecretMissing: false,
+                    },
+                ],
+            }),
+        ).connected[0];
+        expect(healthy.state).toBe("CONNECTED");
+        expect(healthy.fix).toBeNull();
+
+        // A disconnected one is not flagged — nothing is taken through it.
+        const off = buildProvidersView(
+            input({
+                payments: [
+                    {
+                        ...pay("RAZORPAY", "DISABLED", "rzp_live_A1"),
+                        webhookSecretMissing: true,
+                    },
+                ],
+            }),
+        ).connected[0];
+        expect(off.state).toBe("DISCONNECTED");
+    });
+
+    it("says when a payment update last arrived, or that none has (DEC-063)", () => {
+        const now = new Date("2026-09-29T10:00:00Z");
+        const hook = (
+            provider: "RAZORPAY" | "CASHFREE",
+            lastReceivedAt: string | null,
+        ) => ({
+            provider,
+            url: `https://api.saroh.in/public/webhooks/${provider.toLowerCase()}/org_1`,
+            events: [],
+            secretRequired: provider === "RAZORPAY",
+            lastReceivedAt,
+        });
+        const view = buildProvidersView(
+            input({
+                payments: [
+                    pay("RAZORPAY", "CONNECTED", "rzp_live_A1"),
+                    pay("CASHFREE"),
+                ],
+                webhooks: [
+                    hook("RAZORPAY", "2026-09-29T09:58:00Z"),
+                    hook("CASHFREE", null),
+                ],
+                now,
+            }),
+        );
+        expect(view.connected.map((e) => e.update)).toEqual([
+            "Last payment update from Razorpay: 2 min ago.",
+            "No payment updates received yet — check the webhook in Cashfree.",
+        ]);
+
+        // Unread: nothing is claimed either way.
+        const unread = buildProvidersView(
+            input({ payments: [pay("CASHFREE")], webhooks: null, now }),
+        );
+        expect(unread.connected[0].update).toBeNull();
     });
 
     it("never asks a Cashfree or a disconnected Razorpay connection for a public key", () => {

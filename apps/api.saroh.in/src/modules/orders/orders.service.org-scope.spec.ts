@@ -38,9 +38,18 @@ jest.mock("@saroh/database", () => {
     const product = { findFirst: jest.fn() };
     const inventory = { findUnique: jest.fn(), update: jest.fn() };
     const storeSettings = { findUnique: jest.fn() };
+    // A storefront is always a business's: its org numbers the order (P3).
+    const store = {
+        findUniqueOrThrow: jest
+            .fn()
+            .mockResolvedValue({ organizationId: "org_of_store" }),
+    };
     return {
+        // The business's next number (P3): its own specs run it on Postgres.
+        nextOrderNumberInTx: jest.fn().mockResolvedValue("ORD-001"),
         prisma: {
             order,
+            store,
             storeSettings,
             customer,
             product,
@@ -93,7 +102,9 @@ function makeService(
             ? jest.fn().mockResolvedValue({ id: STORE })
             : jest
                   .fn()
-                  .mockRejectedValue(new NotFoundException("Store not found")),
+                  .mockRejectedValue(
+                      new NotFoundException("Location not found"),
+                  ),
     } as unknown as StoresService;
     // Activation events are fire-and-forget instrumentation (#176); a stub
     // keeps these tests about order writes rather than about analytics.

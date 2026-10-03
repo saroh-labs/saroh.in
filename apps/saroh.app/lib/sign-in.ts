@@ -4,6 +4,7 @@ import type {
     SignInOptions,
     VerifyResult,
 } from "@saroh/site-blocks";
+import { isTestReleaseRefusal } from "@saroh/site-blocks";
 
 import type { SiteCall } from "./customer-session";
 import { siteAccountsFetch } from "./customer-session";
@@ -16,6 +17,9 @@ import { siteAccountsFetch } from "./customer-session";
  *   GET  public/site-accounts/options   → the challenge and the phone
  *   POST public/site-accounts/codes     → 202 · 429 limit|wait · 400 challenge · 503 unavailable
  *   POST public/site-accounts/sessions  → 201 token · 400 invalid|expired · 409 merged · 403 blocked|closed
+ *
+ * Either POST from a test host is a 409 `TEST_RELEASE` (DEC-071, T4): the
+ * sheet says signing in is off on a test release (KTD-9).
  */
 
 interface ApiError {
@@ -40,6 +44,9 @@ function seconds(value: unknown, fallback: number): number {
 }
 
 export function codeResult(status: number, body: unknown): CodeRequestResult {
+    if (isTestReleaseRefusal(status, body)) {
+        return { ok: false, reason: "test-release" };
+    }
     const details = detailsOf(body);
     if (status === 202) {
         const resend = (body as { resendAfterSeconds?: unknown } | null)
@@ -87,6 +94,9 @@ export type SessionAnswer =
     | Exclude<VerifyResult, { ok: true }>;
 
 export function sessionAnswer(status: number, body: unknown): SessionAnswer {
+    if (isTestReleaseRefusal(status, body)) {
+        return { ok: false, reason: "test-release" };
+    }
     const details = detailsOf(body);
     if (status === 201) {
         const b = (body ?? {}) as { token?: unknown; expiresAt?: unknown };

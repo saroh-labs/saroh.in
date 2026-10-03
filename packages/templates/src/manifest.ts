@@ -46,6 +46,17 @@ export interface TemplateContext {
     contactEmail?: string;
     /** Canonical website URL, if the merchant has one. */
     websiteUrl?: string;
+    /**
+     * The business's switched-on module keys (`WEBSITE`, `APPOINTMENTS`, …),
+     * so a template lays down a bound block only where its module is on
+     * (DEC-057). Absent means not known: lay down nothing that needs one.
+     */
+    modules?: string[];
+    /**
+     * The business's services a new site may list, in order. A template
+     * cannot invent an id, so a services list is laid down only from these.
+     */
+    serviceIds?: string[];
 }
 
 /**
@@ -85,6 +96,13 @@ export interface TemplateSection {
      * instantiation, so it can never reach the DB in an invalid shape.
      */
     content: TemplateContent;
+    /**
+     * Whether the section is laid down for this context. Absent means always.
+     * A template that offers one of two blocks (the real Services, or
+     * placeholder offers) names both, each with its condition; `order` counts
+     * only the sections that are laid down.
+     */
+    when?: (ctx: TemplateContext) => boolean;
 }
 
 /** One page within a template. `order` of its sections is array position. */

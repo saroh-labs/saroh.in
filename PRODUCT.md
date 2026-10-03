@@ -8,9 +8,24 @@ web
 
 ## Users
 
-**Primary: a small team with mixed roles, 2–5 people**, sharing one workspace.
-Someone is on orders, someone is on bookings, an owner oversees. Nobody is a
-full-time software operator; the tool is a means to running the business.
+Saroh is for three kinds of people (DEC-070). Setup asks "What are you
+setting up?" first, and the answer is stored as the Organization's _kind_:
+
+| Kind                   | Who                                           | What they start with           |
+| ---------------------- | --------------------------------------------- | ------------------------------ |
+| **A business**         | A shop, studio or practice                    | Selling, bookings, a website   |
+| **Just me**            | A freelancer, consultant or creator           | Clients, bookings and invoices |
+| **A site for my work** | Someone showing a portfolio, blog or projects | A website first                |
+
+**The kind changes words and defaults, never features.** Every module is
+there for every kind; the kind picks the words ("your business" or "you";
+customers, clients or readers), the order of the first things to do, and
+what the module picker suggests. It can be changed later in Settings.
+
+**A business is often a small team with mixed roles, 2–5 people**, sharing
+one workspace. Someone is on orders, someone is on bookings, an owner
+oversees. Someone working for themselves is a team of one. Nobody is a
+full-time software operator; the tool is a means to the work.
 
 They are the same people across four genuinely different scenes, all confirmed:
 
@@ -28,17 +43,23 @@ authorization model).
 
 ## Product Purpose
 
-Saroh is a modular commerce operating system: a small business runs selling,
-bookings, customers, messaging and its public website from one workspace,
-switching on only the capabilities it needs.
+Saroh is one workspace where a small business, someone working for
+themselves, or someone showing their work runs what they need of selling,
+bookings, invoices, the people they deal with, messaging and a public
+website, switching on only the capabilities they use.
 
 Success is the merchant opening the workspace and knowing what needs attention
 without hunting — then doing that thing.
 
 ## Positioning
 
-**Commerce-led, not commerce-only** (product decision, 2026-08-02). Eight
-capability modules with a typed registry, real dependencies and derived
+**Commerce leads for a business, and nothing is commerce-only** (product
+decision 2026-08-02, widened by DEC-070 on 2026-09-29). For a business,
+Sell comes first and is suggested at setup. Just me starts with bookings
+and invoicing a client, and A site for my work starts with the website;
+Sell is still there for both, last rather than gone. Invoicing needs no
+module: only taking money online needs Payments. Capability
+modules with a typed registry, real dependencies and derived
 readiness states; a merchant enables what they need and the interface changes
 shape accordingly.
 
@@ -78,8 +99,23 @@ The name **Saroh** and its wordmark stay. Everything else — palette,
 typography, shape, density, motion — is explicitly open (confirmed 2026-08-04).
 
 **Merchant sites must stay neutral.** `saroh.app` renders merchants'
-storefronts and must never inherit Saroh's brand. The `--site-*` token layer is
+sites and must never inherit Saroh's brand. The `--site-*` token layer is
 separate by design and stays that way.
+
+## Vocabulary
+
+The words a merchant reads (DEC-069). Code identifiers keep their older names.
+
+| Say                    | Means                                                                     | Never say                         |
+| ---------------------- | ------------------------------------------------------------------------- | --------------------------------- |
+| **Location**           | A place the business sells from in person (`Store`, "storefront" in code) | storefront, store                 |
+| **Your online shop**   | The website's `/shop`, selling from one location's stock                  | online store, storefront          |
+| **Customers visit**    | A location with an address, hours and collection (`SHOP` kind)            | shop (as a kind)                  |
+| **No counter**         | A location holding stock for online orders only (`ONLINE` kind)           | online store (as a kind)          |
+| **Web address**        | The business's website address, `<address>.saroh.app` or its domain       | address, subdomain, Saroh address |
+| **Registered address** | The business's legal address, on invoices                                 | address                           |
+| **Location address**   | Where a location is, on its receipts                                      | address                           |
+| **Posts path**         | Where the blog's posts live on the site                                   | writing address                   |
 
 ## Evidence on Hand
 

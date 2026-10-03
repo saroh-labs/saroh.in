@@ -91,6 +91,87 @@ describe("ModuleLifecycleService", () => {
         );
     });
 
+    it("disable isn't held up by a dependent Saroh hasn't rolled out, and leaves it as it is (F13, DEC-067)", async () => {
+        const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        db.organizationModule.findMany.mockResolvedValue([
+            { moduleKey: "CLASS_PACKS" },
+        ]);
+        const flags = {
+            isEnabled: jest.fn((flag: string) =>
+                Promise.resolve(flag !== "MODULE_CLASS_PACKS"),
+            ),
+        };
+        const svc = new ModuleLifecycleService(
+            makeReadiness(),
+            db as never,
+            undefined,
+            flags as never,
+        );
+        await svc.disable(OWNER, "APPOINTMENTS");
+        // Only Appointments is written: the hidden Class packs keeps its
+        // own setting, never switched off without being named.
+        expect(db.organizationModule.upsert).toHaveBeenCalledTimes(1);
+        expect(db.organizationModule.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId_moduleKey: {
+                        organizationId: "org_1",
+                        moduleKey: "APPOINTMENTS",
+                    },
+                },
+                update: expect.objectContaining({ status: "DISABLED" }),
+            }),
+        );
+    });
+
+    it("enable refuses a module Saroh hasn't rolled out, in words (DEC-057)", async () => {
+        const db = makeDb();
+        const flags = {
+            isEnabled: jest.fn((flag: string) =>
+                Promise.resolve(flag !== "MODULE_WEBSITE"),
+            ),
+        };
+        const svc = new ModuleLifecycleService(
+            makeReadiness(),
+            db as never,
+            undefined,
+            flags as never,
+        );
+        const refused = svc.enable(OWNER, "WEBSITE");
+        await expect(refused).rejects.toBeInstanceOf(BadRequestException);
+        await expect(refused).rejects.toThrow(
+            "Website isn't available for your business yet.",
+        );
+        expect(db.organizationModule.upsert).not.toHaveBeenCalled();
+        // Rolled out: it turns on as before.
+        await svc.enable(OWNER, "COMMERCE");
+        expect(db.organizationModule.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it("a rolled-out dependent still holds the disable up, named", async () => {
+        const db = makeDb();
+        db.organizationModule.findUnique.mockResolvedValue({
+            status: "ENABLED",
+        });
+        db.organizationModule.findMany.mockResolvedValue([
+            { moduleKey: "CLASS_PACKS" },
+        ]);
+        const flags = { isEnabled: jest.fn(() => Promise.resolve(true)) };
+        const svc = new ModuleLifecycleService(
+            makeReadiness(),
+            db as never,
+            undefined,
+            flags as never,
+        );
+        await expect(svc.disable(OWNER, "APPOINTMENTS")).rejects.toThrow(
+            "Class packs needs Appointments. Turn off Class packs first.",
+        );
+        expect(db.organizationModule.upsert).not.toHaveBeenCalled();
+    });
+
     it("enable writes an ENABLED row and an audit event in one tx", async () => {
         const db = makeDb();
         const svc = new ModuleLifecycleService(makeReadiness(), db as never);
@@ -178,6 +259,50 @@ describe("ModuleLifecycleService", () => {
             ConflictException,
         );
         expect(db.organizationModule.upsert).not.toHaveBeenCalled();
+    });
+
+    it("every refusal names the module, never its key (DEC-057)", async () => {
+        const on = makeDb();
+        on.organizationModule.findUnique.mockResolvedValue({
+            id: "om_1",
+            status: "ENABLED",
+        });
+        const blocked = new ModuleLifecycleService(
+            makeReadiness([{ code: "SOMETHING", message: "x" }]),
+            on as never,
+        );
+        const said = async (p: Promise<unknown>) => {
+            const e = (await p.then(
+                () => null,
+                (err: unknown) => err,
+            )) as { getResponse(): unknown } | null;
+            expect(e).not.toBeNull();
+            return JSON.stringify(e?.getResponse());
+        };
+        const refusals = [
+            await said(blocked.disable(OWNER, "CLASS_PACKS")),
+            await said(blocked.archive(OWNER, "CLASS_PACKS")),
+        ];
+        const off = makeDb();
+        off.organizationModule.findUnique.mockResolvedValue({
+            id: "om_1",
+            status: "DISABLED",
+        });
+        refusals.push(
+            await said(
+                new ModuleLifecycleService(
+                    makeReadiness(),
+                    off as never,
+                ).selectForProject(OWNER, "proj_1", "CRM"),
+            ),
+        );
+        expect(refusals[0]).toContain("Class packs can't be turned off yet.");
+        expect(refusals[1]).toContain(
+            "Turn Class packs off before archiving it.",
+        );
+        for (const r of refusals) {
+            expect(r).not.toMatch(/"message":"[^"]*\b[A-Z]+_[A-Z_]+\b/);
+        }
     });
 
     it("disable writes a DISABLED row when safe", async () => {

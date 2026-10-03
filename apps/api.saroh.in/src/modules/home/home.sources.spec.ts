@@ -58,6 +58,8 @@ function moneyDb(opts: {
     return {
         // D9's log: no RENEWAL_FAILED or MANDATE_LIMIT_LOW before autopay.
         subscriptionEvent: { findMany: jest.fn().mockResolvedValue([]) },
+        // D13: no autopay charge under way.
+        paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
         invoice: {
             findMany,
             count: jest
@@ -98,6 +100,30 @@ describe("renewalTag", () => {
                 invoice,
                 "sub_1",
                 [signal("RENEWAL_FAILED", ago(DAY))],
+                NOW,
+            ),
+        ).toBe("Payment failed");
+    });
+
+    it("says autopay didn't charge, not Payment failed, when it stood aside for a pay-link checkout (review 3)", () => {
+        expect(
+            renewalTag(
+                invoice,
+                "sub_1",
+                [
+                    {
+                        ...signal("RENEWAL_FAILED", ago(DAY)),
+                        reason: "CHECKOUT_OPEN",
+                    },
+                ],
+                NOW,
+            ),
+        ).toBe("Autopay didn't charge — paying by link");
+        expect(
+            renewalTag(
+                invoice,
+                "sub_1",
+                [{ ...signal("RENEWAL_FAILED", ago(DAY)), reason: "DECLINED" }],
                 NOW,
             ),
         ).toBe("Payment failed");
@@ -210,6 +236,40 @@ describe("failedRenewals", () => {
         expect(action?.count).toBe(1);
         expect(action?.evidence).toHaveLength(1);
         expect(action?.evidence?.[0].tag).toBe("Payment failed");
+    });
+
+    it("says Autopay charge in progress, with the debit's day, while a charge is under way (D13)", async () => {
+        const db = moneyDb({ unpaid: [periodInvoice()] });
+        const action = await failedRenewals(
+            db as never,
+            "org_1",
+            NOW,
+            true,
+            () =>
+                Promise.resolve([
+                    {
+                        subscriptionId: "sub_1",
+                        kind: "RENEWAL_FAILED",
+                        at: ago(DAY),
+                    },
+                ]),
+            () =>
+                Promise.resolve(
+                    new Map([
+                        [
+                            "inv_sub_1",
+                            {
+                                intentId: "pi_1",
+                                at: new Date("2026-09-28T04:00:00.000Z"),
+                            },
+                        ],
+                    ]),
+                ),
+            "Asia/Kolkata",
+        );
+        expect(action?.evidence?.[0].tag).toBe(
+            "Autopay charge in progress · 28 Sep",
+        );
     });
 
     it("gives nothing for an invoice not yet due with no event", async () => {
@@ -489,6 +549,8 @@ function home(
         ...money,
         // D8's paused-subscriptions source: Payments on, so it has nothing.
         organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
+        // B9's failed refunds: none.
+        paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
         paymentIntent: {
             count: jest.fn().mockResolvedValue(0),
             findMany: jest.fn().mockResolvedValue([]),
@@ -720,8 +782,40 @@ describe("HomeService with the F1 sources", () => {
         const model = await service.build(OWNER);
 
         expect(model.actions).toEqual([]);
-        expect(db.invoice.findMany).not.toHaveBeenCalled();
+        // Overdue invoices need no module (DEC-070), so only their read
+        // runs: never the renewals' (the one read that selects the plan).
+        for (const [args] of db.invoice.findMany.mock.calls) {
+            expect(args.select.subscription).toBeUndefined();
+        }
         expect(db.site.count).not.toHaveBeenCalled();
         expect(stockChecks.openShort).not.toHaveBeenCalled();
+    });
+
+    it("lists an overdue invoice for a business with Payments off (DEC-070)", async () => {
+        const { service } = home([{ key: "PAYMENTS", readiness: "DISABLED" }], {
+            unpaid: [liveOverdue()],
+            overdue: [handOverdue()],
+        });
+        const model = await service.build(OWNER);
+
+        expect(model.actions.map((a) => a.code)).toEqual([
+            "PAYMENTS_OVERDUE_INVOICES",
+        ]);
+        expect(model.actions[0].evidence?.map((e) => e.id)).toEqual(["inv_1"]);
+    });
+
+    it("gives a Member no overdue invoices with Payments off either", async () => {
+        const { service, db } = home(
+            [{ key: "PAYMENTS", readiness: "DISABLED" }],
+            {
+                overdue: [handOverdue()],
+            },
+        );
+        const model = await service.build({
+            organizationId: "org_1",
+            organizationRole: "MEMBER",
+        });
+        expect(model.actions).toEqual([]);
+        expect(db.invoice.findMany).not.toHaveBeenCalled();
     });
 });

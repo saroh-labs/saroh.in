@@ -33,7 +33,7 @@ function opensCheckout(row: MerchantPaymentProvider): boolean {
 /** Why a connection can't take a pay link's payment, in the merchant's words. */
 function notReady(row: MerchantPaymentProvider | null, pinned: string): string {
     if (row?.status !== "CONNECTED") {
-        return `This storefront takes payment through ${label(pinned)}, which isn't connected. Connect it, or pick another in Sell › Storefronts.`;
+        return `This location takes payment through ${label(pinned)}, which isn't connected. Connect it, or pick another in Sell › Locations.`;
     }
     return `Your ${label(row.provider)} connection needs its public key id before it can take a pay link. Add it in Settings › Providers.`;
 }
@@ -68,7 +68,21 @@ export async function payLinkProvider(
         if (row?.status === "CONNECTED" && opensCheckout(row)) return row;
         throw new ConflictException(notReady(row, pinned));
     }
+    return businessPayLinkProvider(db, organizationId);
+}
 
+/**
+ * The provider for a pay link with no storefront to choose one — an
+ * invoice's (ADR-007) — or a 409 saying why there is none: the business's
+ * first connection that can open a checkout window, the same fallback an
+ * order's link takes. Invoices mint their link through it, and the invoice
+ * pay page starts its payment through it, so a Razorpay connection missing
+ * its public key id never hands out a link its page then refuses.
+ */
+export async function businessPayLinkProvider(
+    db: Pick<Prisma.TransactionClient, "merchantPaymentProvider">,
+    organizationId: string,
+): Promise<MerchantPaymentProvider> {
     const ready = await db.merchantPaymentProvider.findFirst({
         where: { organizationId, status: "CONNECTED", ...OPENS_CHECKOUT },
         orderBy: { createdAt: "asc" },

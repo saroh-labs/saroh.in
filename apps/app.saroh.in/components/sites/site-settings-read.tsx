@@ -1,6 +1,9 @@
 import { EmptyState } from "@saroh/ui/empty-state";
 
+import type { PublishApproval } from "@/lib/sites/publish-approval";
+import { publishApprovalLine } from "@/lib/sites/publish-approval";
 import type { SiteDetail } from "@/lib/sites/service";
+import type { SiteAddress } from "@/lib/sites/share-links";
 
 /**
  * The site's settings, for someone who may read them and not change them
@@ -16,20 +19,38 @@ import type { SiteDetail } from "@/lib/sites/service";
  * holds every field's state and one missed `disabled` is a request the API has
  * to refuse.
  */
-export function SiteSettingsRead({ site }: { site: SiteDetail }) {
-    const address = site.subdomain ? `${site.subdomain}.saroh.app` : null;
-
+export function SiteSettingsRead({
+    site,
+    address,
+    approval = null,
+}: {
+    site: SiteDetail;
+    /** Where the site is reached (`siteAddressOf`); null without an address. */
+    address: SiteAddress | null;
+    /** "Publishing needs approval" (DEC-071, T13); null leaves it out. */
+    approval?: PublishApproval | null;
+}) {
     return (
         <div className="space-y-8">
             <p className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
-                You can see this site&apos;s settings. Changing them — its
-                address, how it appears in search, and its own domain — is the
+                You can see this site&apos;s settings. Changing them — its posts
+                path, how it appears in search, and its own domain — is the
                 owner&apos;s or an admin&apos;s. A connected domain is not shown
                 here: reading it needs the domain permission this role lacks.
             </p>
 
-            <Section title="Address">
-                <Row label="Saroh address">{address ?? <Missing />}</Row>
+            {approval ? (
+                <Section title="Publishing">
+                    <Row label="Needs approval">
+                        {publishApprovalLine(approval.on)}
+                    </Row>
+                </Section>
+            ) : null}
+
+            <Section title="Web address">
+                <Row label="On Saroh">
+                    {address?.platformHost ?? <Missing />}
+                </Row>
             </Section>
 
             <Section title="In search results">

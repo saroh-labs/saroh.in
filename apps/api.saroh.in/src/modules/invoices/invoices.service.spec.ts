@@ -13,6 +13,16 @@ jest.mock("../customer-workspace/resolve-contact", () => ({
             }),
     ),
 }));
+// The business-details refusal (DEC-068) has its own specs
+// (`business-details.spec.ts`, `business-details.db.spec.ts`); here
+// the business has its address.
+jest.mock("./business-details", () => ({
+    ...jest.requireActual<typeof import("./business-details")>(
+        "./business-details",
+    ),
+    assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
@@ -45,6 +55,10 @@ jest.mock("@saroh/database", () => {
             },
             contact: { findFirst: jest.fn() },
             businessProfile: { findUnique: jest.fn() },
+            // DEC-070: Payments on (no row) for a pay link.
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
             __tx: tx,
         },
@@ -659,7 +673,10 @@ describe("lists and what is owed", () => {
         expect(where).toEqual({
             organizationId: "org_1",
             // A pay-now hold's unnumbered draft is not the business's (U19).
-            NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
+            NOT: {
+                source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
+                number: null,
+            },
             status: "ISSUED",
             dueAt: { lt: expect.any(Date) },
             contactId: "c_1",
@@ -672,7 +689,10 @@ describe("lists and what is owed", () => {
         const where = db.invoice.findMany!.mock.calls[0]![0].where;
         expect(where).toEqual({
             organizationId: "org_1",
-            NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
+            NOT: {
+                source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
+                number: null,
+            },
             status: "PAID",
             AND: [
                 {
@@ -701,7 +721,10 @@ describe("lists and what is owed", () => {
         // months ago and paid this morning is still found.
         expect(where).toEqual({
             organizationId: "org_1",
-            NOT: { source: { in: ["BOOKING", "PACK"] }, number: null },
+            NOT: {
+                source: { in: ["BOOKING", "PACK", "SUBSCRIPTION"] },
+                number: null,
+            },
             paidAt: { gte: new Date(since) },
             kind: { not: "CREDIT_NOTE" },
         });

@@ -47,7 +47,7 @@ export function SoldOutActions({
     }
     return (
         <ul
-            aria-label="Sold out by storefront"
+            aria-label="Sold out by location"
             className={cn("flex flex-col gap-1", className)}
         >
             {places.map((place) => (

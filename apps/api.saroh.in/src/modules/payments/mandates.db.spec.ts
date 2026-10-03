@@ -19,6 +19,7 @@ jest.mock("../../env", () => ({
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { MergeContactsDto } from "../customer-workspace/merge.dto";
 import { MergeService } from "../customer-workspace/merge.service";
@@ -54,6 +55,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Northwind", slug: `d20-${tag}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: user.id, role: "OWNER" };
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
@@ -414,6 +416,7 @@ describe("cancelFor: a privacy removal's cancel (C11)", () => {
             cancelled: 1,
             awaitingProvider: 1,
             unconfirmed: 0,
+            refused: 0,
         });
         const row = await mandateOf(m.mandateId);
         expect(row).toMatchObject({
@@ -464,6 +467,7 @@ describe("cancelFor: a privacy removal's cancel (C11)", () => {
             cancelled: 0,
             awaitingProvider: 0,
             unconfirmed: 0,
+            refused: 0,
         });
         // Only the unconfirmed one was asked again.
         expect(fake.mandateCancelCalls).toHaveLength(1);

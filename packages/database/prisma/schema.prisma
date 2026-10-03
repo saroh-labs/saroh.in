@@ -81,6 +81,15 @@ model Organization {
   lifecycleStatus  String @default("ACTIVE")
   lifecycleVersion Int    @default(1)
 
+  // What is being set up (DEC-070): BUSINESS (a shop, studio, practice),
+  // SOLO ("Just me": a freelancer, consultant, creator) or WORK ("A site for
+  // my work": a portfolio, blog, projects). It changes Saroh's words and
+  // defaults only, never a feature, gate or entitlement. The API reads it
+  // through `organizations/organization-kind.ts`, and a source scan pins who
+  // may. Every business before it is BUSINESS. A CHECK constraint holds the
+  // values.
+  kind String @default("BUSINESS")
+
   suspendedAt         DateTime?
   suspendedByUserId   String?
   suspensionReason    String?
@@ -164,6 +173,9 @@ model Organization {
   siteApprovals    SiteApproval[]
   sitePreviewLinks SitePreviewLink[]
   publications     Publication[]
+  // Frozen candidates of a site and their links (DEC-071).
+  siteTestReleases     SiteTestRelease[]
+  siteTestReleaseLinks SiteTestReleaseLink[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -291,18 +303,22 @@ model Organization {
   customerThreadMessages CustomerThreadMessage[]
 
   // Autopay mandates at the business's own provider (round-2 D11, D20).
-  paymentMandates PaymentMandate[]
+  paymentMandates         PaymentMandate[]
   // A class pack's history and its holders' extensions (round-2 E13).
-  packEvents     PackEvent[]
-  packExtensions PackExtension[]
+  packEvents              PackEvent[]
+  packExtensions          PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
-  customerNotices CustomerNotice[]
+  customerNotices         CustomerNotice[]
   // Places in line for full classes (round-2 A12).
-  classWaitlistEntries ClassWaitlistEntry[]
+  classWaitlistEntries    ClassWaitlistEntry[]
   // Bulk kitchen moves held on the server, then committed (round-2 B6).
-  orderStageBatches OrderStageBatch[]
+  orderStageBatches       OrderStageBatch[]
   // Each person's alert choices here (round-2 F14).
   notificationPreferences NotificationPreference[]
+  // Its one order-number series, across every storefront (P3, DEC-066).
+  orderNumberSequence     OrderNumberSequence?
+  // Web addresses it used to have, held for it after a change (DEC-069, L1).
+  addressReservations     AddressReservation[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -315,7 +331,7 @@ model BusinessProfile {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   legalName    String?
-  type         String? // individual, partnership, llp, pvt, public, trust; `company` = pvt until F10b (business-type.ts)
+  type         String? // individual, partnership, llp, pvt, public, trust; an old `company` = pvt until the F10b backfill rewrites it; accepted until Z4 (business-type.ts)
   country      String?
   taxId        String?
   contactEmail String?
@@ -388,6 +404,14 @@ model BusinessProfile {
   // account shows no Pause and the API refuses a customer's pause (403).
   // Staff pause either way. No profile yet reads as on.
   membersCanPause Boolean @default(true)
+
+  // When autopay debits a renewal (round-2 D13B, DEC-065): ON_RENEWAL_DATE
+  // (the invoice and bank notice go out early so the debit lands on the
+  // renewal date), DAY_AFTER_RENEWAL (D13: invoice on the renewal date,
+  // debit about a day later) or ON_DUE_DATE (debit on the invoice's due
+  // date). A plan's `autopayChargeTiming` wins when set. A CHECK constraint
+  // holds the values. No profile yet reads as DAY_AFTER_RENEWAL.
+  autopayChargeTiming String @default("DAY_AFTER_RENEWAL")
 }
 
 // Membership: links a User to an Organization with a role (renamed from
@@ -581,7 +605,10 @@ model Store {
 
   // Basic info
   name        String
-  slug        String  @unique
+  // Dead: the storefront "Web address" went nowhere (DEC-069). L14 made it
+  // nullable and stopped reading and writing it; existing rows keep theirs.
+  // L15 drops the column (a later release).
+  slug        String? @unique
   description String?
   logo        String?
 
@@ -1046,7 +1073,7 @@ model StoreAllergen {
   createdAt DateTime @default(now())
 
   products     ProductAllergen[]
-  // Customers' notes that name it (U8). Removing it is refused while any do.
+  // Customers' notes that named it (U8). Unused since Z2a: dropped with Z2.
   contactNotes ContactNoteAllergen[]
 
   // Needs attention Allergy entries that name it (C1). Removing it is
@@ -1567,7 +1594,7 @@ model Order {
   payLinkCreatedAt DateTime?
 
   // A treatment's visits (E9, DEC-050): one booking per visit.
-  bookings Booking[]
+  bookings    Booking[]
   // The key the site's checkout sheet sent when it started this order (G13):
   // a double tap or a retry with the same key finds this order and its
   // intent instead of making a second. Null on every order not started at a
@@ -1589,6 +1616,13 @@ model Order {
   // a contact needs an email.
   walkInName  String?
   walkInPhone String?
+
+  // The number the order had before the P3 backfill (DEC-066) renumbered it:
+  // two storefronts of one business had each counted from ORD-001, so the
+  // later of two orders with one number took the business's next one. Kept
+  // so a customer quoting the old number still finds it (search, the Orders
+  // list). Null for every order never renumbered.
+  renumberedFrom String?
 
   @@unique([storeId, orderId])
   @@unique([storeId, checkoutKey])
@@ -2611,9 +2645,9 @@ model ContactNote {
   @@index([organizationId])
 }
 
-// One allergen a note names. NoAction on the allergen, as ProductAllergen:
-// removing an allergen from the list is refused in the API while a note names
-// it, so an allergy is never dropped from a customer's record in passing.
+// One allergen a note named. Nothing reads or writes it since Z2a (notes are
+// text only; allergies are ContactAttention entries), and it is dropped with
+// Z2. Removing an allergen clears any rows still naming it (NoAction).
 model ContactNoteAllergen {
   noteId         String
   note           ContactNote   @relation(fields: [noteId], references: [id], onDelete: Cascade)
@@ -2904,6 +2938,15 @@ model Site {
   approvals      SiteApproval[]
   previewLinks   SitePreviewLink[]
   publications   Publication[]     @relation("SitePublications")
+  // Frozen candidates of this site, served on its test host (DEC-071).
+  testReleases     SiteTestRelease[]
+  testReleaseLinks SiteTestReleaseLink[]
+
+  // "Publishing needs approval" (DEC-071, amends DEC-047). Off: approval is
+  // advisory and a bypass is recorded. On: Publish, restore and Go live
+  // succeed only for an approved test release, unless an owner overrides,
+  // and the override is recorded. Only an owner turns it on or off.
+  publishNeedsApproval Boolean @default(false)
   // Who may review this site (#276).
   reviewers      SiteReviewer[]
 
@@ -2927,6 +2970,10 @@ model Site {
   // Customers signed in on this site (ADR-011): a session is good only on the
   // site, and so the host, it was made for.
   customerSessions CustomerSession[]
+
+  // Addresses this site used to be served at, which forward to it while
+  // their redirect lasts (DEC-069, L1).
+  addressReservations AddressReservation[]
 
   // The storefront this site sells from (G11): what `/shop`, the Product
   // grid and checkout read. Set on its own only when the business has
@@ -3050,12 +3097,19 @@ model SiteComment {
   resolvedAt       DateTime?
   resolvedByUserId String?
 
+  // The test release the note was written while viewing (DEC-071), so the
+  // release view lists its own notes. Null on a note about the draft. The
+  // note is still pinned to a page and a section key, as every note is.
+  testReleaseId String?
+  testRelease   SiteTestRelease? @relation(fields: [testReleaseId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([siteId, resolvedAt])
   @@index([pageId, sectionKey])
   @@index([organizationId])
+  @@index([testReleaseId])
 }
 
 /**
@@ -3074,7 +3128,7 @@ model SiteApproval {
   byUserId String
   by       User   @relation(fields: [byUserId], references: [id], onDelete: Cascade)
 
-  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED.
+  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED | OVERRIDDEN.
   //
   // REQUESTED is the merchant asking for a review (#278) — the act that makes a
   // review pending, which the model previously had no way to express: a review
@@ -3086,6 +3140,10 @@ model SiteApproval {
   // site goes live while a review is still outstanding, the fact is appended
   // here — who, when, and which publication — because the epic's rule is that
   // bypassing is recorded, not prevented.
+  //
+  // OVERRIDDEN is written by an owner going live past "Publishing needs
+  // approval" (DEC-071): the rule was on, nothing was approved, and the owner
+  // went live anyway. Like BYPASSED it names its publication.
   outcome String
 
   // Which draft this row is about (#278): a hash of the snapshot publishing
@@ -3102,11 +3160,19 @@ model SiteApproval {
   publicationId String?
   publication   Publication? @relation(fields: [publicationId], references: [id], onDelete: SetNull)
 
+  // The test release a request or verdict is about (DEC-071). Its
+  // `draftFingerprint` is then the release's fingerprint, not the moving
+  // draft's, so the verdict holds for that frozen version. Null on a review
+  // of the draft.
+  testReleaseId String?
+  testRelease   SiteTestRelease? @relation(fields: [testReleaseId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([siteId, createdAt])
   @@index([organizationId])
   @@index([publicationId])
+  @@index([testReleaseId])
 }
 
 /**
@@ -3267,18 +3333,154 @@ model Publication {
   // this" and "nobody was ever asked" read identically in version history.
   // Null on rows published before this column existed, which is honest: we do
   // not know which route they took.
+  //
+  // OVERRIDDEN too (DEC-071): an owner went live past "Publishing needs
+  // approval".
   reviewRoute String?
 
+  // LIVE | TEST (DEC-071, CHECKed in the migration). A LIVE row is a version
+  // the public has been served. A TEST row is a test release's frozen
+  // snapshot: built and stored exactly as a publish stores it, and never
+  // pointed at by a site. Going live appends a LIVE copy of it, so
+  // `Site.currentPublication` is always LIVE, and every reader that means
+  // "published" filters on `kind: 'LIVE'`.
+  kind String @default("LIVE")
+
+  // The row this one was copied from: the TEST row a go-live put live
+  // (DEC-071). Null on an ordinary publish.
+  sourcePublicationId String?
+  sourcePublication   Publication?  @relation("PublicationSource", fields: [sourcePublicationId], references: [id], onDelete: SetNull)
+  copies              Publication[] @relation("PublicationSource")
+
   // Back-relation for Site.currentPublication (the live pointer above).
-  currentForSite Site?          @relation("SiteCurrentPublication")
+  currentForSite Site?            @relation("SiteCurrentPublication")
   // The same, for a post (#232).
-  currentForPost Post?          @relation("PostCurrentPublication")
+  currentForPost Post?            @relation("PostCurrentPublication")
   // Bypass records naming this publication (#199).
   approvals      SiteApproval[]
+  // The test release this TEST row freezes, and the one this LIVE copy put
+  // live (DEC-071).
+  testRelease    SiteTestRelease? @relation("TestReleaseSnapshot")
+  wentLiveFor    SiteTestRelease? @relation("TestReleaseLiveCopy")
 
   @@index([siteId, publishedAt])
+  @@index([siteId, kind, publishedAt])
   @@index([organizationId])
   @@index([postId])
+  @@index([sourcePublicationId])
+}
+
+/**
+ * A test release (DEC-071): a named, non-live candidate of a site, served
+ * whole at `test--<address>.saroh.app` to whoever holds one of its links.
+ *
+ * The frozen snapshot is an ordinary `Publication` with `kind = 'TEST'`, so
+ * publications stay append-only. Everything about the release that changes
+ * (its name and note, a schedule, going live, being discarded) lives here.
+ * Going live appends a LIVE copy of the snapshot (`livePublicationId`); the
+ * site never points at the TEST row.
+ *
+ * User ids are plain columns, as `Publication.publishedByUserId` is: removing
+ * a person from Saroh never takes a release, or its record, with them.
+ */
+model SiteTestRelease {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The frozen TEST publication.
+  publicationId String      @unique
+  publication   Publication @relation("TestReleaseSnapshot", fields: [publicationId], references: [id], onDelete: Cascade)
+
+  // 1, 2, 3 ... per site, for "Test release 2".
+  number Int
+  name   String
+  note   String?
+
+  // `draftFingerprint` of the frozen snapshot. A review of the release is
+  // bound to it, and a go-live checks approval against it.
+  fingerprint String
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  // Lifecycle: facts with a time. Neither set means the release is ready.
+  discardedAt       DateTime?
+  wentLiveAt        DateTime?
+  // The LIVE copy going live appended.
+  livePublicationId String?      @unique
+  livePublication   Publication? @relation("TestReleaseLiveCopy", fields: [livePublicationId], references: [id], onDelete: SetNull)
+
+  // A scheduled go-live. `goLiveAt` is the instant (UTC); `goLiveZone` is the
+  // business's zone it was chosen in, for saying it back in local time.
+  goLiveAt                   DateTime?
+  goLiveZone                 String?
+  scheduledByUserId          String?
+  // The live publication when it was scheduled. If the site has been
+  // published since, the scheduled go-live does not run (KTD-14).
+  scheduledOverPublicationId String?
+  // An owner scheduled it past "Publishing needs approval".
+  scheduleOverride           Boolean   @default(false)
+  // The PENDING `site.go_live` Job, deleted on cancel.
+  goLiveJobId                String?
+  // What the last scheduled attempt did (LIVE | NOT_LIVE), and why not.
+  lastGoLiveOutcome          String?
+  lastGoLiveReason           String?
+
+  links     SiteTestReleaseLink[]
+  approvals SiteApproval[]
+  comments  SiteComment[]
+
+  @@unique([siteId, number])
+  // The target of (testReleaseId, organizationId) foreign keys.
+  @@unique([id, organizationId])
+  // One live schedule per site: a release waiting to go live that has
+  // neither gone live nor been discarded.
+  @@unique([siteId], map: "SiteTestRelease_one_schedule_per_site", where: raw("\"goLiveAt\" IS NOT NULL AND \"wentLiveAt\" IS NULL AND \"discardedAt\" IS NULL"))
+  @@index([organizationId])
+}
+
+/**
+ * A link that opens one test release on its test host (DEC-071), with the
+ * token scheme of `SitePreviewLink` (#284): 32 random bytes, only the SHA-256
+ * hex stored, the raw token returned once. Its own table, so a draft preview
+ * token can never open a test host and a test token can never open
+ * `/preview/<token>`.
+ *
+ * SHARE is a link someone made to send; OPEN is a short one minted for the
+ * person opening the release from the workspace. A link stops working when it
+ * expires, is revoked, or its release is discarded or has gone live.
+ */
+model SiteTestReleaseLink {
+  id            String          @id @default(cuid())
+  testReleaseId String
+  testRelease   SiteTestRelease @relation(fields: [testReleaseId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // SHA-256 (hex) of the link's secret, never the secret itself.
+  tokenHash String @unique
+
+  // SHARE | OPEN (CHECKed in the migration).
+  purpose String
+
+  createdByUserId String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  lastUsedAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([testReleaseId, revokedAt])
+  @@index([siteId])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -3675,6 +3877,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_subscription_renew", where: raw("type = 'subscription.renew' AND status = 'PENDING'"))
   // One waiting run of the booking-hold sweep (U19), like the renewal chain.
   @@unique([type], map: "Job_one_pending_booking_release_holds", where: raw("type = 'booking.release-holds' AND status = 'PENDING'"))
+  // One waiting run of the pending payment sweep (P1), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_payments_confirm_pending", where: raw("type = 'payments.confirm-pending' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -3979,6 +4183,10 @@ model Booking {
 
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
+  // One live booking per visit of a treatment (E9): two people booking
+  // visit 2 at once can't both win. A cancelled visit leaves it, so the
+  // visit can be booked again; bookings with no order coexist.
+  @@unique([orderId, visitNumber], map: "Booking_one_live_visit", where: raw("status <> 'CANCELLED'"))
   @@index([organizationId])
   @@index([serviceId, startAt])
   @@index([contactId])
@@ -3998,10 +4206,6 @@ model Booking {
   @@index([organizationId, startAt])
   // What an account booked (the double-booking check, and unlinking).
   @@index([customerAccountId, startAt])
-  // One live booking per visit of a treatment (E9): two people booking
-  // visit 2 at once can't both win. A cancelled visit leaves it, so the
-  // visit can be booked again; bookings with no order coexist.
-  @@unique([orderId, visitNumber], map: "Booking_one_live_visit", where: raw("status <> 'CANCELLED'"))
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a
@@ -4232,7 +4436,8 @@ model MerchantPaymentProvider {
 
 // PaymentIntent — an intent to collect a SERVER-CALCULATED amount for an Order
 // or, through its pay link, an Invoice (ADR-007, U13). Exactly one of
-// `orderId` / `invoiceId` is set: the migration adds a CHECK constraint
+// `orderId` / `invoiceId` is set — or neither, on an autopay check
+// (`purpose` AUTHORISATION, DEC-064): the migrations add a CHECK constraint
 // ("PaymentIntent_one_target") that Prisma cannot express here.
 model PaymentIntent {
   id             String       @id @default(cuid())
@@ -4270,12 +4475,40 @@ model PaymentIntent {
   // provider reported none — never an estimate.
   feeCents Int?
 
+  // A charge through an autopay mandate (D11, D13). Such a charge is two
+  // steps: the provider's order is made with a pre-debit notice, and the
+  // debit is asked for only once the notice is delivered and `debitAfter`
+  // has passed. `preDebitStatus`: PENDING | DELIVERED | FAILED | NOT_NEEDED;
+  // null on every other intent. `preDebitRef` is the provider's notice id.
+  viaMandateId   String?
+  viaMandate     PaymentMandate? @relation("MandateCharges", fields: [viaMandateId], references: [id], onDelete: SetNull)
+  debitAfter     DateTime?
+  preDebitStatus String?
+  preDebitRef    String?
+
+  // Why the money was taken. Null: a sale (an order's or an invoice's
+  // payment). AUTHORISATION: the ₹1 check a provider takes to authorise
+  // autopay when nothing is owed (DEC-064, D12B) — not revenue, on no order
+  // or invoice, refunded automatically; `checkForMandateId` is the set-up
+  // it authorised (one check per set-up).
+  purpose           String?
+  checkForMandateId String?         @unique
+  checkForMandate   PaymentMandate? @relation("MandateAuthorisationCheck", fields: [checkForMandateId], references: [id], onDelete: SetNull)
+
+  // When Saroh last asked the provider about this intent's order (P1): the
+  // sweep that settles a capture whose webhook never came asks an open
+  // intent again only after a pause that grows with its age
+  // (webhooks/payment-lookup.service.ts). Null: never asked.
+  lastLookupAt DateTime?
+
   @@unique([orderId, idempotencyKey])
   @@unique([invoiceId, idempotencyKey])
   @@index([organizationId])
   @@index([orderId])
   @@index([invoiceId])
   @@index([provider, providerIntentId])
+  @@index([viaMandateId])
+  @@index([status, createdAt])
 }
 
 // PaymentAttempt — one interaction with the provider for an intent.
@@ -5033,11 +5266,6 @@ model SubscriptionPlan {
   // Every change to it, newest last (D2).
   events SubscriptionPlanEvent[]
 
-  // The composite key its events point at, so an event can't name another
-  // business's plan.
-  @@unique([id, organizationId])
-  @@index([organizationId])
-
   // Drafts (round-2 D5, `common/drafts/`). A live plan's unpublished changes:
   // only the fields that differ from the published columns, which buyers
   // keep reading. Null when there are none. A DRAFT plan writes its columns
@@ -5051,6 +5279,17 @@ model SubscriptionPlan {
   // Bumped by every draft save, publish, discard and plan write, so an
   // editor holding an older revision is refused instead of overwriting (#285).
   draftRevision      Int       @default(0)
+
+  // When autopay debits this plan's renewals (round-2 D13B, DEC-065): one
+  // of BusinessProfile.autopayChargeTiming's values, or null to use the
+  // business's setting. Set straight from Plan Detail, not through a draft:
+  // it is billing, never shown to buyers. A CHECK constraint holds the values.
+  autopayChargeTiming String?
+
+  // The composite key its events point at, so an event can't name another
+  // business's plan.
+  @@unique([id, organizationId])
+  @@index([organizationId])
 }
 
 // One change to a plan: who made it, when, and each changed field's value
@@ -5326,10 +5565,27 @@ model Invoice {
   // Account-thread posts that sent it or reminded about it (D17, A13).
   threadMessages CustomerThreadMessage[]
 
+  // A pack bought online (round-2 A11): the pack and its terms — name,
+  // credits, validity, price — as they were when the customer started
+  // paying, on the source PACK draft. The payment's webhook numbers the
+  // invoice and makes the purchase from this, so a pack changed or archived
+  // meanwhile still sells on what was shown. Null on every other invoice.
+  packTerms Json?
+
+  // A plan joined online from the site's Prices page (round-2 G20): the plan
+  // and its terms — name, price, how often, classes a month — as they were
+  // when the customer started paying, on a source SUBSCRIPTION draft with no
+  // number. The payment's webhook numbers the invoice and starts the
+  // subscription from this, as `packTerms` does for a pack. Null on every
+  // other invoice.
+  planTerms Json?
+
   @@unique([organizationId, number])
   // One live invoice per subscription period: the renewal job's idempotency
-  // key. Voided invoices are left out, so a voided period can be reissued.
-  @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID'"))
+  // key. Voided and fully credited invoices are left out, so such a period
+  // can be reissued: a GST business credits an early renewal invoice a
+  // cancel or pause drops (D13B, DEC-065) where others void it.
+  @@unique([subscriptionId, periodStart], map: "Invoice_one_live_per_period", where: raw("status <> 'VOID' AND status <> 'CREDITED'"))
   // One invoice per order and per booking (ADR-008): the idempotency key of
   // the payment reconciliation. Corrections are other kinds.
   @@unique([orderId], map: "Invoice_one_per_order", where: raw("kind = 'INVOICE'"))
@@ -5346,16 +5602,10 @@ model Invoice {
   @@index([organizationId, status, paidAt])
   @@index([organizationId, paidAt])
   @@index([organizationId, issuedAt])
-
-  // A pack bought online (round-2 A11): the pack and its terms — name,
-  // credits, validity, price — as they were when the customer started
-  // paying, on the source PACK draft. The payment's webhook numbers the
-  // invoice and makes the purchase from this, so a pack changed or archived
-  // meanwhile still sells on what was shown. Null on every other invoice.
-  packTerms Json?
-
   // The sweep that discards online pack drafts nobody paid (A11).
   @@index([createdAt], map: "Invoice_open_pack_drafts_idx", where: raw("status = 'DRAFT' AND source = 'PACK'"))
+  // The sweep that discards online plan joins nobody paid (G20).
+  @@index([createdAt], map: "Invoice_open_plan_joins_idx", where: raw("status = 'DRAFT' AND source = 'SUBSCRIPTION'"))
 }
 
 model InvoiceLine {
@@ -5407,6 +5657,47 @@ model InvoiceSequence {
   updatedAt      DateTime     @updatedAt
 
   @@id([organizationId, series])
+}
+
+// The last order number a business issued (P3, DEC-066): one series per
+// business, across every storefront, where each storefront used to count
+// from ORD-001. Allocated with one insert-or-increment statement in the
+// order's own transaction (`nextOrderNumberInTx`, @saroh/database), so two
+// orders never take one number and a failed order gives its number back.
+// The first order after P3 seeds the row from the business's highest
+// ORD-number; the P3 backfill (backfill/order-numbers.ts) seeds it too.
+model OrderNumberSequence {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lastNumber     Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+}
+
+// A web address a business used to have (DEC-069, L1). After a change the
+// old address stays the business's until `reservedUntil`: nobody else can
+// claim it, and while `redirectUntil` lasts visitors to it are sent to the
+// site's new address. An address the business only reserved at setup, and
+// never served a site at, is held with no redirect (`redirectUntil` null).
+//
+// Expiry is decided when a row is read, so no job clears it: a row past
+// `reservedUntil` counts as free, and whoever claims the address next deletes
+// it in the claiming transaction (`releaseExpired`, sites/site-address.ts).
+// One unique address means one holder at a time.
+model AddressReservation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  address        String       @unique
+  // The site the address served, which it forwards to. Null for an address
+  // that never served one, or when that site is gone.
+  siteId         String?
+  site           Site?        @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  redirectUntil  DateTime?
+  reservedUntil  DateTime
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([siteId])
 }
 
 // A fixed series of dated sessions on one service, sold once.
@@ -5498,8 +5789,6 @@ model ClassPack {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([organizationId])
-
   // Drafts (round-2 E14, `common/drafts/`, as a plan's in D5). A live pack's
   // unpublished changes: only the fields that differ from the published
   // columns (and services), which sales keep reading. Null when there are
@@ -5527,6 +5816,7 @@ model ClassPack {
   // The composite key a pack event points at, so an event can't name
   // another business's pack.
   @@unique([id, organizationId])
+  @@index([organizationId])
 }
 
 model ClassPackService {
@@ -5567,10 +5857,6 @@ model PackPurchase {
 
   createdAt DateTime @default(now())
 
-  @@index([organizationId])
-  @@index([contactId])
-  @@index([packId])
-
   // How the sale was paid (round-2 E13): CASH | UPI | CARD | BANK | ONLINE |
   // NONE. A record of what the desk took, never a restriction on how anyone
   // pays (DEC-059). Null: sold before it was recorded.
@@ -5580,6 +5866,9 @@ model PackPurchase {
 
   // The composite key an extension points at (one business's purchase).
   @@unique([id, organizationId])
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([packId])
 }
 
 // A holder's pack given more days (round-2 E13, default 46): at most 30 at a
@@ -5908,7 +6197,7 @@ model PaymentMandate {
   status            String    @default("PENDING")
   activatedAt       DateTime?
   cancelledAt       DateTime?
-  // CUSTOMER | STAFF | SUBSCRIPTION_ENDED | PRIVACY_REMOVAL | MERGED | PROVIDER
+  // CUSTOMER | STAFF | SUBSCRIPTION_ENDED | PRIVACY_REMOVAL | MERGED | PROVIDER | REPLACED
   cancelReason      String?
   // When the provider confirmed the cancel. Null on a CANCELLED row: Saroh
   // stopped charging it, and is still confirming with the provider.
@@ -5917,11 +6206,42 @@ model PaymentMandate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Set-up, status and limit (D11). What the customer authorised: the
+  // method they picked (UPI | CARD | EMANDATE; never a card or bank
+  // detail), the most one charge may take, in minor units, and how often.
+  method              String?
+  maxAmountCents      Int?
+  currency            String          @default("INR")
+  // AS_PRESENTED: Saroh says when to charge (renewal dates move).
+  frequency           String?
+  // The provider's set-up object (Razorpay: the registration link or the
+  // authorisation order), so a webhook finds the row before the token is
+  // named; and when an unanswered set-up stops being worth waiting for.
+  setupReference      String?
+  setupExpiresAt      DateTime?
+  // When the provider says the authority ends.
+  expiresAt           DateTime?
+  pausedAt            DateTime?
+  failedAt            DateTime?
+  // The provider's reason code for a FAILED set-up, sanitised; never shown raw.
+  failureReason       String?
+  // Charges taken through it (D13).
+  intents             PaymentIntent[] @relation("MandateCharges")
+  // Where the customer set it up (D12): PAY_LINK | PRICES | ACCOUNT, and
+  // the site account that did, so the log can say "Autopay set up by
+  // ‹name›, from the Prices page". Null on a mandate set up by staff.
+  setupSource         String?
+  setupAccountId      String?
+  // The ₹1 check taken to authorise it when nothing was owed (DEC-064).
+  authorisationChecks PaymentIntent[] @relation("MandateAuthorisationCheck")
+
   // A subscription has at most one ACTIVE mandate.
   @@unique([subscriptionId], map: "PaymentMandate_one_active_per_subscription", where: raw("status = 'ACTIVE'"))
+  @@unique([organizationId, provider, providerMandateId])
   @@index([organizationId])
   @@index([organizationId, subscriptionId, status])
   @@index([organizationId, contactId, status])
+  @@index([organizationId, provider, setupReference])
 }
 
 /// One notice about a customer's own booking or order, handled once
@@ -5982,9 +6302,9 @@ model OrderStageBatch {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  status   OrderStageBatchStatus @default(HELD)
+  status      OrderStageBatchStatus @default(HELD)
   // When the job commits it, unless "Send now" or "Undo all" came first.
-  commitAt DateTime
+  commitAt    DateTime
   // Who asked. Not a foreign key, like OrderEvent.actorUserId: the steps
   // are written in their name.
   actorUserId String

@@ -5,9 +5,25 @@ jest.mock("../../site-accounts/account-area", () => ({
 jest.mock("../../sites/sells-from", () => ({
     shopRolloutOn: jest.fn(() => Promise.resolve(true)),
 }));
+// A live site whose shop waits on "Sells from" (P4), switched per test; the
+// real rows are read in sells-from-awaiting.db.spec.ts.
+jest.mock("../../sites/sells-from-awaiting", () => ({
+    ...jest.requireActual<typeof import("../../sites/sells-from-awaiting")>(
+        "../../sites/sells-from-awaiting",
+    ),
+    siteAwaitingSellsFrom: jest.fn(() => Promise.resolve(null)),
+}));
+// Whether a connection lacks its webhook secret, without opening a sealed
+// blob: a row whose blob says "no-webhook-secret" lacks it (DEC-063). The
+// real check is pinned in payments/webhook-setup.spec.ts.
+jest.mock("../../payments/webhook-setup", () => ({
+    lacksWebhookSecret: (row: { encryptedCredentials: string }) =>
+        row.encryptedCredentials === "no-webhook-secret",
+}));
 
 import { accountAreaOn } from "../../site-accounts/account-area";
 import { shopRolloutOn } from "../../sites/sells-from";
+import { siteAwaitingSellsFrom } from "../../sites/sells-from-awaiting";
 import { ModuleReadinessRegistry } from "./module-readiness.registry";
 
 const accountArea = accountAreaOn as jest.Mock;
@@ -17,6 +33,7 @@ const shopRollout = shopRolloutOn as jest.Mock;
 function dbWith(counts: Record<string, number>) {
     const model = (name: string) => ({
         count: jest.fn().mockResolvedValue(counts[name] ?? 0),
+        findMany: jest.fn().mockResolvedValue([]),
     });
     return {
         publication: model("publication"),
@@ -77,6 +94,48 @@ describe("ModuleReadinessRegistry", () => {
             (await registry({ publication: 1 }).evaluate("WEBSITE", input))
                 .readiness,
         ).toBe("ACTIVE");
+    });
+
+    it("Website: only a LIVE publication makes it published, never a test release's (DEC-071)", async () => {
+        const db = dbWith({ publication: 1 }) as unknown as {
+            publication: { count: jest.Mock };
+        };
+        await new ModuleReadinessRegistry(db as never).evaluate(
+            "WEBSITE",
+            input,
+        );
+        expect(db.publication.count).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", kind: "LIVE" },
+        });
+    });
+
+    it("Website: live, but its shop waits on Sells from → the step to choose it (P4)", async () => {
+        const waiting = siteAwaitingSellsFrom as jest.Mock;
+        waiting.mockResolvedValueOnce("site_1");
+        const result = await registry({ publication: 1 }).evaluate(
+            "WEBSITE",
+            input,
+        );
+        expect(result).toEqual({
+            readiness: "SETUP_REQUIRED",
+            blockers: [
+                {
+                    code: "WEBSITE_SHOP_NOT_CHOSEN",
+                    message:
+                        "Choose which location your online shop sells from — until then your shop page isn't live.",
+                    severity: "SETUP",
+                    actionHref: "/sites/site_1/settings#sells-from",
+                },
+            ],
+        });
+
+        // Not live yet: publishing comes first, and the shop isn't asked.
+        waiting.mockClear();
+        expect(
+            (await registry({ site: 1 }).evaluate("WEBSITE", input)).blockers[0]
+                .code,
+        ).toBe("WEBSITE_NO_PUBLICATION");
+        expect(waiting).not.toHaveBeenCalled();
     });
 
     it("CRM: pipeline required for ACTIVE", async () => {
@@ -201,15 +260,30 @@ describe("ModuleReadinessRegistry", () => {
  * the state that mattered here: providers exist, none of them are connected.
  */
 function dbWithProviders(opts: {
-    payments?: { total: number; connected: number };
+    payments?: { total: number; connected: number; blobs?: string[] };
     communications?: { total: number; connected: number };
 }) {
-    const provider = (counts?: { total: number; connected: number }) => ({
+    const provider = (counts?: {
+        total: number;
+        connected: number;
+        blobs?: string[];
+    }) => ({
         count: jest.fn((args?: { where?: { status?: string } }) =>
             Promise.resolve(
                 args?.where?.status === "CONNECTED"
                     ? (counts?.connected ?? 0)
                     : (counts?.total ?? 0),
+            ),
+        ),
+        // The connected rows, each with its sealed blob (DEC-063).
+        findMany: jest.fn(() =>
+            Promise.resolve(
+                (counts?.blobs ?? []).map((blob) => ({
+                    provider: "RAZORPAY",
+                    encryptedCredentials: blob,
+                    credentialsIv: "iv",
+                    credentialsAuthTag: "tag",
+                })),
             ),
         ),
     });
@@ -276,6 +350,40 @@ describe("provider readiness reflects provider STATUS, not row count", () => {
             expect(result.blockers[0]?.severity).toBe("SETUP");
         },
     );
+
+    it("PAYMENTS: connected without a webhook secret can't confirm a payment (DEC-063)", async () => {
+        const result = await new ModuleReadinessRegistry(
+            dbWithProviders({
+                payments: {
+                    total: 1,
+                    connected: 1,
+                    blobs: ["no-webhook-secret"],
+                },
+            }),
+        ).evaluate("PAYMENTS", input);
+
+        expect(result.readiness).toBe("ATTENTION_REQUIRED");
+        expect(result.blockers[0]?.code).toBe(
+            "PAYMENTS_WEBHOOK_SECRET_MISSING",
+        );
+        expect(result.blockers[0]?.severity).toBe("ATTENTION");
+        expect(result.blockers[0]?.actionHref).toBe("/settings/providers");
+        expect(result.blockers[0]?.message).toMatch(/webhook signing secret/);
+    });
+
+    it("PAYMENTS: one connection that can confirm a payment is enough", async () => {
+        const result = await new ModuleReadinessRegistry(
+            dbWithProviders({
+                payments: {
+                    total: 2,
+                    connected: 2,
+                    blobs: ["no-webhook-secret", "sealed-with-secret"],
+                },
+            }),
+        ).evaluate("PAYMENTS", input);
+
+        expect(result.readiness).toBe("ACTIVE");
+    });
 
     it("makes ATTENTION_REQUIRED reachable at all", async () => {
         // Before this change no adapter emitted severity ATTENTION, so the
@@ -437,7 +545,7 @@ describe("deactivationImpact (F13)", () => {
             ["PAYMENTS_UNPAID_INVOICES", null],
         ]);
         expect(items[1]?.message).toBe(
-            "We couldn't count your unpaid invoices. They stay open, and their pay links still work.",
+            "We couldn't count your unpaid invoices. They stay open, and their links show the invoice with no Pay button until it's back on.",
         );
     });
 
@@ -533,7 +641,7 @@ describe("deactivationImpact (F13)", () => {
             [
                 "PAYMENTS_UNPAID_INVOICES",
                 1,
-                "1 unpaid invoice stays open, and its pay link still works.",
+                "1 unpaid invoice stays open, and its link shows the invoice with no Pay button until it's back on.",
             ],
             [
                 "PAYMENTS_SITE_PLANS",
@@ -587,7 +695,7 @@ describe("deactivationImpact (F13)", () => {
             impactDb({ stores: ["A", "B", "C"] }),
             "COMMERCE",
         );
-        expect(many[0]?.message).toBe("Your 3 storefronts stop taking orders.");
+        expect(many[0]?.message).toBe("Your 3 locations stop taking orders.");
     });
 
     it("Commerce says nothing about a shop while the shop isn't rolled out", async () => {

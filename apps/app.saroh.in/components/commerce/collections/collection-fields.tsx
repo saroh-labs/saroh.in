@@ -130,7 +130,7 @@ export function CategoryField({
                     There are no categories yet.{" "}
                     <Link
                         href={productSettingsHref("categories")}
-                        className="text-brand hover:text-foreground"
+                        className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                     >
                         Manage categories
                     </Link>

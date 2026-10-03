@@ -11,6 +11,8 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
+import type { OrganizationKind } from "./organization-kind";
+import { kindRead } from "./organization-kind";
 import { isBuiltInRole, resolveCapabilities } from "./organization-policy";
 
 /** A user's Organization membership as surfaced to the switcher/list UI. */
@@ -35,6 +37,11 @@ export interface UserOrganization {
      * is not taking changes.
      */
     lifecycleStatus: string;
+    /**
+     * What is being set up (DEC-070), so the words fit before a business
+     * is opened. Words and defaults only.
+     */
+    kind: OrganizationKind;
 }
 
 /** Minimal Organization identity returned alongside a resolved context. */
@@ -42,6 +49,11 @@ export interface OrganizationSummary {
     id: string;
     name: string;
     slug: string;
+    /**
+     * What is being set up (DEC-070). On the `org:read` summary because a
+     * Member's Home needs the words too; words and defaults only.
+     */
+    kind: OrganizationKind;
 }
 
 /**
@@ -143,6 +155,7 @@ export class OrganizationContextService {
                         name: true,
                         slug: true,
                         lifecycleStatus: true,
+                        kind: true,
                     },
                 },
             },
@@ -202,6 +215,7 @@ export class OrganizationContextService {
                     ),
                 ],
                 lifecycleStatus: membership.organization.lifecycleStatus,
+                kind: kindRead(membership.organization.kind),
             };
         });
     }
@@ -214,12 +228,12 @@ export class OrganizationContextService {
     async getSummary(organizationId: string): Promise<OrganizationSummary> {
         const organization = await prisma.organization.findUnique({
             where: { id: organizationId },
-            select: { id: true, name: true, slug: true },
+            select: { id: true, name: true, slug: true, kind: true },
         });
         if (!organization) {
             throw new NotFoundException("Organization not found");
         }
-        return organization;
+        return { ...organization, kind: kindRead(organization.kind) };
     }
 
     /**

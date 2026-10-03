@@ -1,22 +1,39 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 
 import type { SignInOptions } from "@saroh/site-blocks";
-import { AccountEntry, ShopBag, SiteTheme } from "@saroh/site-blocks";
+import {
+    AccountEntry,
+    ShopBag,
+    SiteChromeFrame,
+    SiteTheme,
+    TestReleaseProvider,
+} from "@saroh/site-blocks";
 
+import { TestReleaseBar } from "@/components/test-release-bar";
+import { TestReleaseGate } from "@/components/test-release-gate";
 import { accountAreaOn } from "@/lib/account-area";
+import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import {
+    getMovedTo,
     getPublicationForHost,
     getSiteForHost,
     shareImages,
 } from "@/lib/publication";
+import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
+import { classifySiteHost } from "@/lib/site-host-mode";
+import { relayFor } from "@/lib/site-relay";
+import { shareable } from "@/lib/test-metadata";
+import { getTestRelease, rootDomain } from "@/lib/test-release";
+import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import {
@@ -43,9 +60,14 @@ export async function generateMetadata({
     params: Promise<{ domain: string }>;
 }): Promise<Metadata | null> {
     const { domain } = await params;
+    const mode = classifySiteHost(domain, rootDomain()).mode;
     const snapshot = await getPublicationForHost(domain);
     if (!snapshot) {
-        return null;
+        // A test host whose link opens nothing still says what it is, and
+        // is never indexed (DEC-071, R3).
+        return mode === "test"
+            ? shareable({ mode }, { title: "Test release" })
+            : null;
     }
 
     /*
@@ -65,29 +87,33 @@ export async function generateMetadata({
     const description = seoDescription?.trim() ? seoDescription : undefined;
     const images = shareImages(snapshot.site);
 
-    return {
-        title,
-        description,
-        openGraph: {
+    // A test release's host has no share card and is never indexed (R3).
+    return shareable(
+        { mode },
+        {
             title,
             description,
-            images,
-            // og:url and og:site_name (#220): the canonical address the
-            // platforms key their cache on, and the name Slack puts above the
-            // card. Resolved against `metadataBase`.
-            url: "/",
-            siteName: name,
+            openGraph: {
+                title,
+                description,
+                images,
+                // og:url and og:site_name (#220): the canonical address the
+                // platforms key their cache on, and the name Slack puts above the
+                // card. Resolved against `metadataBase`.
+                url: "/",
+                siteName: name,
+            },
+            twitter: {
+                // Without an image this degrades to a plain summary card, so the
+                // card type follows the picture rather than always claiming one.
+                card: images ? "summary_large_image" : "summary",
+                title,
+                description,
+                images,
+            },
+            metadataBase: new URL(`https://${domain}`),
         },
-        twitter: {
-            // Without an image this degrades to a plain summary card, so the
-            // card type follows the picture rather than always claiming one.
-            card: images ? "summary_large_image" : "summary",
-            title,
-            description,
-            images,
-        },
-        metadataBase: new URL(`https://${domain}`),
-    };
+    );
 }
 
 /*
@@ -111,9 +137,35 @@ export default async function SiteLayout({
     children: React.ReactNode;
 }) {
     const { domain } = await params;
+
+    /*
+     * A test release's host (DEC-071, T5) shows its release behind the bar,
+     * or says why it can't: never a 404 that reads like a broken site, and
+     * never the live site in its place (R12).
+     */
+    const test = classifySiteHost(domain, rootDomain());
+    const release =
+        test.mode === "test" ? await getTestRelease(test.host) : null;
+    if (release && !release.ok) {
+        return (
+            <TestReleaseGate
+                reason={release.reason}
+                liveUrl={release.liveUrl}
+            />
+        );
+    }
+
     const resolved = await getSiteForHost(domain);
 
     if (!resolved) {
+        // Nothing live here. An old address still forwarding sends the
+        // visitor to the same page on the new one; anything else 404s.
+        // Never on a test host: `test--<address>` names a release, not an
+        // old address (DEC-071), so it 404s rather than forwarding.
+        if (test.mode !== "test") {
+            const movedTo = await movedHere(domain);
+            if (movedTo) redirect(movedTo);
+        }
         notFound();
     }
     const { snapshot, siteId } = resolved;
@@ -164,6 +216,7 @@ export default async function SiteLayout({
                     start: startCheckout,
                     standing: checkoutStanding,
                 }}
+                apiUrl={publicApiUrl()}
                 account={{
                     customer,
                     options: signInOptions ?? {
@@ -197,25 +250,91 @@ export default async function SiteLayout({
         />
     ) : undefined;
 
+    /*
+     * On a test host every flow stops short of a real order, booking,
+     * payment, enquiry or sign-in (DEC-071, T6): the blocks read the
+     * provider and show their stop, and the server actions refuse on their
+     * own (`testMode()`). Keyed on the host, not on the release, so a test
+     * host is never treated as live whatever the lookup returned.
+     */
+    const testRelease =
+        test.mode === "test"
+            ? { name: resolved.release?.name ?? "Test release" }
+            : null;
+
     return (
-        <div className="min-h-screen bg-site-bg text-site-body">
-            <SiteTheme variables={snapshot.site.styleVariables} />
-            <SiteHeader
-                name={snapshot.site.name}
-                navigation={snapshot.site.navigation ?? []}
-                // A module page leaves the menu while its module is off (G15).
-                modules={resolved.modules}
-                action={action}
-                account={account}
-                bag={bag}
-            />
-
-            <div>{children}</div>
-
-            <SiteFooter
-                footer={snapshot.site.footer}
-                name={snapshot.site.name}
-            />
-        </div>
+        <TestReleaseProvider release={testRelease}>
+            <div
+                className="min-h-screen bg-site-bg text-site-body"
+                data-test-release={resolved.release ? "" : undefined}
+            >
+                {resolved.release ? (
+                    <>
+                        <TestReleaseBar
+                            name={resolved.release.name}
+                            liveUrl={release?.ok ? release.liveUrl : null}
+                        />
+                        {/* The site's sticky header sits below the bar, not
+                        under it: the bar keeps this variable at its height. */}
+                        <style>{HEADER_BELOW_BAR}</style>
+                    </>
+                ) : null}
+                <SiteTheme variables={snapshot.site.styleVariables} />
+                {/* The account area draws its own compact header and no
+                footer (DEC-073 #10): the frame leaves these out there. */}
+                <SiteChromeFrame
+                    account={accountAreaOn()}
+                    header={
+                        <SiteHeader
+                            name={snapshot.site.name}
+                            navigation={snapshot.site.navigation ?? []}
+                            // A module page leaves the menu while its module is
+                            // off (G15).
+                            modules={resolved.modules}
+                            action={action}
+                            // A Shop entry in the menu while /shop serves (P4).
+                            shopServes={shopServes}
+                            account={account}
+                            bag={bag}
+                        />
+                    }
+                    footer={
+                        <SiteFooter
+                            footer={snapshot.site.footer}
+                            name={snapshot.site.name}
+                        />
+                    }
+                >
+                    {children}
+                </SiteChromeFrame>
+            </div>
+        </TestReleaseProvider>
     );
+}
+
+/**
+ * Where a host with no live site forwards to, or null (DEC-069, plan L3).
+ *
+ * After a change of web address the old one forwards for 90 days. Asked
+ * only here, on a miss (KTD-5), so a live site never pays for the read.
+ * The path and query come from the middleware's header, and only a path on
+ * this host is kept (`lib/request-path.ts`).
+ *
+ * `redirect()` answers 307, never 308: a browser must not cache a hop that
+ * stops being true after 90 days, when the address may be someone else's.
+ * The customer lands signed out on the new host, since the session cookie
+ * is host-only (`__Host-`, `lib/customer-session.ts`); the account area
+ * already handles a visitor who is signed out.
+ */
+async function movedHere(domain: string): Promise<string | null> {
+    const requestHeaders = await headers();
+    let relay: string | null = null;
+    try {
+        relay = relayFor(requestHeaders, domain);
+    } catch {
+        // No SITE_RELAY_SECRET here: read unsigned rather than not at all.
+    }
+    const to = await getMovedTo(domain, relay);
+    if (!to) return null;
+    return movedLocation(to, requestHeaders.get(REQUEST_PATH_HEADER));
 }

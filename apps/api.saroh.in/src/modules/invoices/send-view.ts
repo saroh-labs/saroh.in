@@ -9,15 +9,16 @@ export type SendChannel = "email" | "thread";
 /**
  * Why an invoice can't be sent, when it can't:
  * - `NOT_OWED`: paid, void, credited, an order's paper or a credit note;
- * - `NO_PAYMENT_PROVIDER`: no provider, so no pay link to send;
  * - `NO_EMAIL_PROVIDER`: no email provider connected, and no thread;
- * - `NO_EMAIL_ADDRESS`: a provider, but nowhere to send it, and no thread.
+ * - `NO_EMAIL_ADDRESS`: a provider, but nowhere to send it, and no thread;
+ * - `AUTOPAY_PENDING`: an autopay charge is under way on it (D13), so no
+ *   pay link goes out until it is answered.
+ *
+ * A missing payment provider no longer blocks a send (DEC-070): the link
+ * goes as a view link, and `payOnline` says so.
  */
 export type SendBlocker =
-    | "NOT_OWED"
-    | "NO_PAYMENT_PROVIDER"
-    | "NO_EMAIL_PROVIDER"
-    | "NO_EMAIL_ADDRESS";
+    "NOT_OWED" | "NO_EMAIL_PROVIDER" | "NO_EMAIL_ADDRESS" | "AUTOPAY_PENDING";
 
 /**
  * The one flag Invoice Detail and Home's Send reminder (F4) both read, so
@@ -29,6 +30,12 @@ export interface InvoiceSendView {
     reason?: SendBlocker;
     /** Where the email would go. */
     emailTo?: string;
+    /**
+     * The link sent is a pay link: Payments is on and a provider can take
+     * the money (DEC-070). False: a link to view the invoice, so the button
+     * says "Send invoice", not "Send with pay link".
+     */
+    payOnline: boolean;
     /** A send or reminder went in the last day: the next reminder can go from here. */
     nextReminderAt: string | null;
 }

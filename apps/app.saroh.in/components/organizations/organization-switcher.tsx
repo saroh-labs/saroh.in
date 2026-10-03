@@ -110,7 +110,7 @@ export function OrganizationSwitcher({
                 onClick={() => onSelect(org.id)}
                 disabled={pending}
                 className={cn(
-                    "flex w-full items-center gap-[9px] rounded-lg px-[9px] py-[7px] text-left transition-colors duration-fast hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                    "flex w-full items-center gap-[9px] rounded-lg px-[9px] py-[7px] text-left transition-colors duration-fast hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-foreground/[0.07]",
                     on && "bg-foreground/[0.03]",
                 )}
             >
@@ -152,7 +152,7 @@ export function OrganizationSwitcher({
                     type="button"
                     disabled={pending}
                     aria-label={`Change business — currently ${active.name}`}
-                    className="flex min-w-0 items-center gap-[9px] rounded-lg px-[9px] py-1.5 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-60 coarse:min-h-11"
+                    className="flex min-w-0 items-center gap-[9px] rounded-lg px-[9px] py-1.5 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active disabled:opacity-60 coarse:min-h-11"
                 >
                     <BusinessTile name={active.name} active size={30} />
                     <span className="flex min-w-0 items-baseline gap-2">
@@ -208,7 +208,9 @@ export function OrganizationSwitcher({
                         className="flex items-center gap-[9px] rounded-lg px-[9px] py-2 text-[12.5px] text-neutral-600 transition-colors duration-fast hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:text-muted-foreground"
                     >
                         <Plus aria-hidden className="size-4" />
-                        New business
+                        {/* Setup asks what it is (DEC-070): not always a
+                            business. */}
+                        Set up another
                     </Link>
                 </div>
             </PopoverContent>

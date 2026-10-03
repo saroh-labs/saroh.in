@@ -102,6 +102,42 @@ const GALLERY_IMAGES = [
 ] as const;
 
 /**
+ * The Projects fixture's work, shared by both of its looks (K11): what changes
+ * between cards and list is the arrangement, never the content. The third
+ * has no photo and the second no link, so the catalog shows that a project
+ * missing either draws without a gap.
+ */
+const PROJECT_ITEMS = [
+    {
+        image: {
+            src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23dfe4ea'/%3E%3Crect x='120' y='120' width='560' height='360' rx='12' fill='%23ffffff'/%3E%3Crect x='160' y='170' width='220' height='24' rx='6' fill='%234b5b6b'/%3E%3Crect x='160' y='220' width='480' height='200' rx='8' fill='%23b7c3cf'/%3E%3C/svg%3E",
+            alt: "The new booking page for a physiotherapy clinic, on a laptop",
+            width: 800,
+            height: 600,
+        },
+        title: "A booking site for a physio clinic",
+        summary:
+            "Three clinics, one page to book from. Online bookings doubled in the first month.",
+        link: "https://example.com/physio-clinic",
+    },
+    {
+        image: {
+            src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23efe3d3'/%3E%3Crect x='250' y='90' width='300' height='420' rx='10' fill='%23c9784a'/%3E%3Crect x='290' y='150' width='220' height='30' rx='6' fill='%23fff6ea'/%3E%3C/svg%3E",
+            alt: "The cover of a printed menu, in terracotta",
+            width: 800,
+            height: 600,
+        },
+        title: "Menus and signs for a bakery",
+        summary: "A printed menu, a window sign and a price board.",
+    },
+    {
+        title: "Writing: how I price a small job",
+        summary: "A short piece on quoting for work that takes a day or less.",
+        link: "/blog/pricing-a-small-job",
+    },
+] as const;
+
+/**
  * Every block's catalog entry.
  *
  * Typed per key so each block's fixtures are checked against ITS OWN rendered
@@ -540,6 +576,64 @@ export const BLOCK_META = {
                 productIds: ["sample-sourdough", "sample-croissant"],
                 count: 2,
                 showPrices: false,
+            },
+        },
+    },
+    packs: {
+        label: "Class packs",
+        description:
+            "The business's class packs on sale, with how many classes, how long they last and the price, read live.",
+        variants: soleVariant(
+            "Cards with how many classes and for how long, the pack's name, its price per class and price, and a button.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component sample packs.
+            default: { variant: "default", title: "Class packs" },
+        },
+        cases: {
+            // No descriptions, the merchant's own button.
+            plain: {
+                variant: "default",
+                title: "Packs",
+                buttonLabel: "Get this pack",
+                showDescriptions: false,
+            },
+        },
+    },
+    projects: {
+        label: "Projects",
+        description:
+            "Your own work, each with a photo, a title, a line about it and a link to more.",
+        /*
+         * `cards` is first because it is the least demanding look, and the
+         * first entry is what an unrecognised variant falls back to (#254).
+         * The ids are `LIST_LAYOUTS`, the words the other list blocks' Show
+         * as uses (G16).
+         */
+        variants: [
+            {
+                id: "cards",
+                label: "Cards",
+                description:
+                    "Projects side by side, each with its photo on top. Best when most have a photo.",
+            },
+            {
+                id: "list",
+                label: "List",
+                description:
+                    "One project per row, the photo on the left. Better for a longer line about each.",
+            },
+        ] as const,
+        fixtures: {
+            cards: {
+                variant: "cards",
+                title: "Selected work",
+                items: PROJECT_ITEMS.map((item) => ({ ...item })),
+            },
+            list: {
+                variant: "list",
+                title: "Selected work",
+                items: PROJECT_ITEMS.map((item) => ({ ...item })),
             },
         },
     },

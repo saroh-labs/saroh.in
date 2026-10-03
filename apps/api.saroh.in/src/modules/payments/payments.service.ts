@@ -12,6 +12,7 @@ import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
 import type {
@@ -32,7 +33,7 @@ import { assertOrganizationOpen } from "../organizations/organization-lifecycle.
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
-import { payLinkProvider } from "./pay-link-provider";
+import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
 import type {
     MerchantProvider,
     ProviderCredentials,
@@ -45,6 +46,10 @@ import {
     RefundCallError,
 } from "./providers/provider.port";
 import { needsPublicKey, publicKeyFor } from "./public-key";
+import type { SealedCredentials } from "./webhook-secret";
+import { webhookSecretFrom } from "./webhook-secret";
+import type { WebhookSetup } from "./webhook-setup";
+import { lacksWebhookSecret, readWebhookSetup } from "./webhook-setup";
 
 /** Validated input for {@link PaymentsService.connectProvider}. */
 export interface ConnectProviderInput {
@@ -52,7 +57,10 @@ export interface ConnectProviderInput {
     publicKey?: string;
     keyId: string;
     keySecret: string;
-    /** Optional webhook signing secret (S5-003) — sealed, never echoed. */
+    /**
+     * Webhook signing secret (S5-003) — sealed, never echoed. Required for
+     * Razorpay at the HTTP boundary (`ConnectProviderDto`, DEC-063).
+     */
     webhookSecret?: string;
 }
 
@@ -274,6 +282,12 @@ export interface RedactedProvider {
     provider: string;
     status: string;
     publicKey: string | null;
+    /**
+     * Saved without the webhook signing secret its provider signs with
+     * (DEC-063): a payment through it can't be confirmed. Only this yes or
+     * no — never the secret.
+     */
+    webhookSecretMissing: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -374,6 +388,7 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
         provider: row.provider,
         status: row.status,
         publicKey: row.publicKey ?? null,
+        webhookSecretMissing: lacksWebhookSecret(row),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -425,6 +440,10 @@ export class PaymentsService {
         // both it and the secret are checked before anything is stored
         // (DEC-054). Throws 400 before any write.
         const publicKey = publicKeyFor({ ...input, provider });
+
+        // Taking money online starts here, and every payment it takes is
+        // invoiced: the business details before the keys are kept (DEC-068).
+        await assertBusinessDetails(prisma, ctx.organizationId);
 
         // Seal { keyId, keySecret, webhookSecret? } as one blob. Plaintext
         // (incl. the webhook secret) is NEVER persisted or logged.
@@ -538,8 +557,20 @@ export class PaymentsService {
             iv: row.credentialsIv,
             authTag: row.credentialsAuthTag,
         });
-        const parsed = JSON.parse(json) as { webhookSecret?: string };
-        return parsed.webhookSecret ?? null;
+        // Razorpay's own webhook secret; Cashfree's key secret when none
+        // was saved, since Cashfree signs with it (DEC-063).
+        const parsed = JSON.parse(json) as SealedCredentials;
+        return webhookSecretFrom(name, parsed);
+    }
+
+    /**
+     * Each provider's webhook as setup shows it (DEC-063): the address to
+     * register, the events to tick, whether a signing secret is asked for,
+     * and when a verified payment update last arrived. `payment:read`.
+     */
+    async webhookSetup(ctx: OrganizationContext): Promise<WebhookSetup[]> {
+        authorize(ctx, "payment:read");
+        return readWebhookSetup(ctx.organizationId);
     }
 
     /**
@@ -1446,14 +1477,17 @@ export class PaymentsService {
             },
             options.idempotencyKey,
             // A pinned provider must be connected; otherwise the business's
-            // first connected one. An invoice has no storefront to say which,
-            // and two connected providers must not leave it unpayable.
+            // first connection that can open the checkout window — the rule
+            // its pay link was minted by (B11, D22). An invoice has no
+            // storefront to say which, and two connected providers must not
+            // leave it unpayable.
             () =>
-                this.resolveConnectedProvider(
-                    invoice.organizationId,
-                    options.provider,
-                    { firstWhenSeveral: true },
-                ),
+                options.provider
+                    ? this.resolveConnectedProvider(
+                          invoice.organizationId,
+                          options.provider,
+                      )
+                    : businessPayLinkProvider(prisma, invoice.organizationId),
         );
     }
 
@@ -1543,7 +1577,7 @@ export class PaymentsService {
         }
         if (order.store.settings?.pausedAt) {
             throw new ConflictException(
-                "This storefront is paused and is not taking payments.",
+                "This location is paused and is not taking payments.",
             );
         }
         await assertOrganizationOpen(customer.organizationId);
@@ -1904,7 +1938,6 @@ export class PaymentsService {
     private async resolveConnectedProvider(
         organizationId: string,
         pinned?: string,
-        { firstWhenSeveral = false }: { firstWhenSeveral?: boolean } = {},
     ): Promise<MerchantPaymentProvider> {
         if (pinned) {
             const name = pinned.toUpperCase();
@@ -1938,7 +1971,7 @@ export class PaymentsService {
                 "No connected payment provider for this organization",
             );
         }
-        if (connected.length > 1 && !firstWhenSeveral) {
+        if (connected.length > 1) {
             throw new ConflictException(
                 "Multiple providers connected — specify which provider to use",
             );
@@ -2034,7 +2067,7 @@ export class PaymentsService {
         // accept a payment posted straight at this endpoint.
         if (order.store.settings?.pausedAt) {
             throw new ConflictException(
-                "This storefront is paused and is not taking payments.",
+                "This location is paused and is not taking payments.",
             );
         }
         const {

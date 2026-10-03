@@ -159,6 +159,12 @@ export default async function BookingsPage({
                     book: may("booking:write"),
                     hours: may("service:write"),
                     order: may("order:read"),
+                    // "Take ₹X" (P2): the pair a pay link needs, and the
+                    // link itself only with a provider connected.
+                    desk: {
+                        canTake: may("booking:write") && may("invoice:write"),
+                        canLink: people.payLink,
+                    },
                 }}
                 newBooking={
                     may("booking:write") ? (

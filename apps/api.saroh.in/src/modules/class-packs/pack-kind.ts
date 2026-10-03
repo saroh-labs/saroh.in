@@ -31,6 +31,15 @@ export const PACK_PAID_BY = [
 ] as const;
 export type PackPaidBy = (typeof PACK_PAID_BY)[number];
 
+/**
+ * The desk says the money was taken: its invoice is written after money,
+ * so nothing may refuse it (DEC-068). NONE, or nothing said, is a sale
+ * still to be paid.
+ */
+export function paidAlready(paidBy: PackPaidBy | null | undefined): boolean {
+    return !!paidBy && paidBy !== "NONE";
+}
+
 /** A validity shorter than a week is refused (default 46). */
 export const MIN_VALIDITY_DAYS = 7;
 

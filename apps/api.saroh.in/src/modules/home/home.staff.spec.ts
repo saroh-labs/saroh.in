@@ -294,6 +294,50 @@ describe("Home for a staff member (F11)", () => {
         expect(calls.some((c) => c.table === "storeMembers")).toBe(false);
     });
 
+    it("offers a staff member no setup rows they can't act on", async () => {
+        const availability = {
+            listViews: jest.fn().mockResolvedValue([
+                {
+                    key: "COMMERCE",
+                    label: "Commerce",
+                    readiness: "ACTIVE",
+                    blockers: [],
+                },
+                {
+                    key: "CRM",
+                    label: "CRM",
+                    readiness: "SETUP_REQUIRED",
+                    blockers: [
+                        {
+                            code: "CRM_NO_PIPELINE",
+                            message:
+                                "Create a pipeline to start tracking leads.",
+                        },
+                    ],
+                },
+            ]),
+        } as unknown as ModuleAvailabilityService;
+        const codes = async (input: HomeInput) =>
+            (
+                await new HomeService(
+                    availability,
+                    fakeDb({ roles: [] }).db as never,
+                ).build(input)
+            ).actions.map((a) => a.code);
+
+        expect(await codes(member())).not.toContain("CRM_SETUP");
+        // Someone given module:manage (a custom role, or an extra) may.
+        expect(await codes(member(["module:manage"]))).toContain("CRM_SETUP");
+        // An Owner's Home keeps it.
+        expect(
+            await codes({
+                organizationId: ORG,
+                userId: "user_priya",
+                organizationRole: "OWNER",
+            }),
+        ).toContain("CRM_SETUP");
+    });
+
     it("follows the person's own capabilities: no money without payment:read", async () => {
         const all = new Set(["COMMERCE", "PAYMENTS", "APPOINTMENTS"]);
         expect(weekScope(member(), all)?.takings).toBe(false);

@@ -14,6 +14,7 @@ import { getSiteForHost, postsPrefix, shareImages } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
 import { getSignInOptions } from "@/lib/sign-in";
+import { shareable } from "@/lib/test-metadata";
 
 import PostPage, {
     generateMetadata as postMetadata,
@@ -65,7 +66,7 @@ export async function generateMetadata({
     const cover = product.images.find((i) => i.kind !== "video");
     const images = cover ? [cover.url] : shareImages(resolved.snapshot.site);
     const url = `/shop/${product.slug}`;
-    return {
+    return shareable(resolved, {
         title,
         description,
         openGraph: { title, description, images, url, siteName: name },
@@ -76,7 +77,7 @@ export async function generateMetadata({
             images,
         },
         metadataBase: new URL(`https://${domain}`),
-    };
+    });
 }
 
 export default async function ShopProductPage({
@@ -126,5 +127,11 @@ export default async function ShopProductPage({
                 businessName={business}
             />
         );
-    return <ProductPage product={product} preview={false} action={action} />;
+    // The page's own width, as the header's and every block's: at a desk
+    // the product sits under the menu rather than across the whole screen.
+    return (
+        <div className="mx-auto w-full max-w-screen-xl">
+            <ProductPage product={product} preview={false} action={action} />
+        </div>
+    );
 }

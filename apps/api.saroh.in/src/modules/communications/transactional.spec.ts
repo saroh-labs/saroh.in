@@ -2,7 +2,10 @@
 // say, that everything typed is escaped, and that the pay link is only ever
 // a slot in the stored body. Pure.
 import {
+    autopayCancelledSentence,
     fillSecretLink,
+    renderAutopayCancelled,
+    renderAutopaySetupLink,
     renderTransactional,
     SECRET_LINK_SLOT,
 } from "./transactional";
@@ -53,6 +56,25 @@ describe("renderTransactional", () => {
         expect(body).not.toContain("due");
     });
 
+    it("offers to take the payment only when the link is a pay link (DEC-070)", () => {
+        for (const payOnline of [true, undefined]) {
+            const { body } = renderTransactional("INVOICE_SENT", {
+                ...vars,
+                payOnline,
+            });
+            expect(body).toContain("You can pay it by UPI or card here:");
+        }
+        const view = renderTransactional("INVOICE_REMINDER", {
+            ...vars,
+            payOnline: false,
+        });
+        expect(view.body).toContain(
+            "You can view it and download a copy here:",
+        );
+        expect(view.body).not.toContain("UPI or card");
+        expect(view.body).toContain(`href="${SECRET_LINK_SLOT}"`);
+    });
+
     it("escapes what a person or business typed", () => {
         const { body } = renderTransactional("INVOICE_SENT", {
             ...vars,
@@ -71,5 +93,84 @@ describe("fillSecretLink", () => {
         const filled = fillSecretLink(body, "https://saroh.app/pay/abc");
         expect(filled).not.toContain(SECRET_LINK_SLOT);
         expect(filled.match(/https:\/\/saroh\.app\/pay\/abc/g)).toHaveLength(2);
+    });
+});
+
+describe("renderAutopaySetupLink (D14)", () => {
+    const link = {
+        business: "Pulse & Co.",
+        firstName: "Meera",
+        plan: "Monthly unlimited",
+        method: "UPI app",
+        limit: "₹1,800.00",
+        check: "₹1.00",
+        expiresOn: "6 Oct 2026",
+    };
+
+    it("names the plan, the method, the limit, the ₹1 check and when the link stops", () => {
+        const { subject, body } = renderAutopaySetupLink(link);
+        expect(subject).toBe(
+            "Turn on autopay for Monthly unlimited with Pulse & Co.",
+        );
+        expect(body).toContain("<p>Hi Meera,</p>");
+        expect(body).toContain(
+            "paid from your UPI app, up to ₹1,800.00 a time",
+        );
+        expect(body).toContain("your bank needs a ₹1.00 check");
+        expect(body).toContain("The link works until 6 Oct 2026.");
+        expect(body).toContain("Pulse &amp; Co.");
+        // The link is only ever a slot in the stored body.
+        expect(body).toContain(`href="${SECRET_LINK_SLOT}"`);
+    });
+
+    it("says no check for a method that takes none, and escapes what was typed", () => {
+        const { body } = renderAutopaySetupLink({
+            ...link,
+            check: null,
+            method: "bank account",
+            plan: "<b>Gold</b>",
+            firstName: null,
+        });
+        expect(body).not.toContain("check");
+        expect(body).toContain("<p>Hello,</p>");
+        expect(body).toContain("&lt;b&gt;Gold&lt;/b&gt;");
+        expect(body).not.toContain("<b>Gold</b>");
+    });
+});
+
+describe("the autopay-cancelled note (D14)", () => {
+    const vars = {
+        business: "Pulse & Co.",
+        firstName: "Meera",
+        plan: "Monthly unlimited",
+    };
+
+    it("says it stopped, the plan carries on, and how the next renewal is paid", () => {
+        const { subject, body } = renderAutopayCancelled(vars);
+        expect(subject).toBe("Autopay for Monthly unlimited is off");
+        expect(body).toContain("<p>Hi Meera,</p>");
+        expect(body).toContain(
+            "Pulse &amp; Co. has turned off autopay for Monthly unlimited. Nothing more will be taken automatically.",
+        );
+        expect(body).toContain("an invoice with a link to pay it");
+        // Nothing secret: no link slot at all.
+        expect(body).not.toContain(SECRET_LINK_SLOT);
+    });
+
+    it("escapes what was typed, and greets someone with no name", () => {
+        const { body } = renderAutopayCancelled({
+            ...vars,
+            firstName: null,
+            plan: "<b>Gold</b>",
+        });
+        expect(body).toContain("<p>Hello,</p>");
+        expect(body).toContain("&lt;b&gt;Gold&lt;/b&gt;");
+        expect(body).not.toContain("<b>Gold</b>");
+    });
+
+    it("the thread line is plain text, never HTML", () => {
+        expect(autopayCancelledSentence(vars)).toBe(
+            "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.",
+        );
     });
 });

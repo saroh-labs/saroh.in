@@ -1,12 +1,27 @@
-import { Controller, Get, Header, Headers, Ip, Param } from "@nestjs/common";
+import {
+    Controller,
+    Get,
+    Header,
+    Headers,
+    HttpException,
+    HttpStatus,
+    Ip,
+    Param,
+    Query,
+} from "@nestjs/common";
 import { listTemplates } from "@saroh/templates";
 
 import { hashClientIp } from "../../common/client-ip";
+import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { PublicVisit } from "./public-visit.service";
 import { PublicVisitService } from "./public-visit.service";
+import type { SiteMoved } from "./site-moved";
+import { siteMovedTo } from "./site-moved";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
+import type { TestReleaseView } from "./test-release-lookup";
+import { resolveTestRelease, TEST_TOKEN_HEADER } from "./test-release-lookup";
 
 /**
  * PUBLIC site read API (S2-005), mounted at `/public/sites` with NO guards —
@@ -22,6 +37,17 @@ import { SitesService } from "./sites.service";
  */
 @Controller("public/sites")
 export class PublicSitesController {
+    /**
+     * A speed bump on the test-host lookup, per visitor when the renderer
+     * relays one (ADR-011), else per caller. A token is 32 random bytes, so
+     * this is not what stops guessing; it keeps the route cheap. Generous,
+     * because every page a tester opens reads it.
+     */
+    private readonly testReleaseLimiter = new FixedWindowRateLimiter(
+        300,
+        60_000,
+    );
+
     constructor(
         private readonly sites: SitesService,
         private readonly previewLinks: SitePreviewLinksService,
@@ -53,6 +79,52 @@ export class PublicSitesController {
     @Get("by-subdomain/:subdomain")
     bySubdomain(@Param("subdomain") subdomain: string) {
         return this.sites.getPublicationBySubdomain(subdomain);
+    }
+
+    /**
+     * Where an old web address forwards to (DEC-069, plan L2): `{ to }`, the
+     * site's origin now, while the address's 90 days last; else a 404. The
+     * renderer asks only when a host has no live site. Declared before the
+     * `:siteId/…` reads, so an address such as `posts` is never taken for a
+     * site id. Rate-limited per visitor, like the Visit us read.
+     */
+    @Get("moved/:address")
+    @Header("Cache-Control", "no-store")
+    moved(
+        @Param("address") address: string,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<SiteMoved> {
+        return siteMovedTo(address, visitorKey(ip, relay));
+    }
+
+    /**
+     * A TEST release on its test host (DEC-071, T3): the frozen snapshot a
+     * link opens on `test--<address>.saroh.app` or `test.<custom domain>`.
+     *
+     * The host rides in the query and the token in `x-saroh-test-token`,
+     * never in the path, so access logs do not carry it (the header is
+     * redacted). 404 for a live host, an unknown token, a token for another
+     * site, or a business with test releases off; 410 naming why for a link
+     * that has stopped working. Declared before `:siteId/...`, which it
+     * cannot match anyway (one segment).
+     */
+    @Get("test-release")
+    @Header("Cache-Control", "no-store")
+    async testRelease(
+        @Query("host") host: string | undefined,
+        @Headers(TEST_TOKEN_HEADER) token: string | undefined,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<TestReleaseView> {
+        const key = visitorKey(ip, relay);
+        if (key && !this.testReleaseLimiter.take(key)) {
+            throw new HttpException(
+                "Too many requests. Try again in a minute.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
+        return resolveTestRelease(host ?? "", token);
     }
 
     /**

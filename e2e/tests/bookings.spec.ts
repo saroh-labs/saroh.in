@@ -1,29 +1,96 @@
+// @covers accounts:/login app:/open app:/bookings app:/bookings/availability app:/services app:/services/new app:/customers api:bookings api:staff api:customer-workspace api:contacts
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import {
+    aService,
+    bookOwn,
+    makeContact,
+    northwind,
+    stamp as ownStamp,
+} from "../fixtures/own-data";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
- * The bookings calendar and its editors (U15, U16) on Pulse Fitness, the
- * showcase gym. Every test leaves the gym as it found it: held changes are
- * undone before the page closes (leaving would send them), and what a test
- * makes — extra hours, a booking, its contact — is removed afterwards.
+ * The bookings calendar and its editors (U15, U16), read on Pulse Fitness,
+ * the showcase gym: nothing is saved there. Held changes are undone before
+ * the page closes (leaving would send them).
+ *
+ * What saves — an allergy on a booked customer, extra hours and a booking
+ * into them, a new service — does it on Northwind, on a customer, booking,
+ * staff member or service the test makes for itself.
  */
 
 const ORG = "seed_sc_pulse_org";
+const NORTHWIND = "seed_org";
 const orgHeader = { "x-organization-id": ORG, origin: urls.APP_URL };
 const api = (path: string) => `${urls.API_URL}/organizations/${ORG}${path}`;
 const IST_OFFSET_MS = 330 * 60_000;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
     await page.goto(`/open/${ORG}`);
+}
+
+/**
+ * Northwind as a diary of one: its "E2E Diary" staff member, taking one of
+ * the seed's services, with no weekly hours (so every hour is closed). One
+ * an earlier run archived is brought back rather than another made.
+ */
+async function diaryOfOne(request: APIRequestContext): Promise<{
+    id: string;
+    name: string;
+    service: { id: string; name: string };
+}> {
+    const nw = northwind(request);
+    const name = "E2E Diary";
+    const service = await aService(request);
+    const { staff } = await nw.get<{
+        staff: { id: string; name: string }[];
+    }>("/staff");
+    const found = staff.find((p) => p.name === name);
+    if (found) {
+        await nw.patch(`/staff/${found.id}`, { status: "ACTIVE" });
+        await nw.put(`/staff/${found.id}/services`, {
+            serviceIds: [service.id],
+        });
+        return { id: found.id, name, service };
+    }
+    const made = await nw.post<{ id: string }>("/staff", {
+        name,
+        serviceIds: [service.id],
+    });
+    return { id: made.id, name, service };
+}
+
+/**
+ * Two days, in India, on which `serviceId` runs by its own weekly rules,
+ * `after` days ahead or later: the desk books into the first, the phone into
+ * the second. A one-to-one start is the person's hours intersected with the
+ * service's rules (ADR-008), so hours opened on a day the service does not
+ * run offer it nothing — Northwind's seeded services run Mon–Fri, and a
+ * fixed "three days ahead" was a Saturday every Wednesday.
+ */
+async function serviceDays(
+    request: APIRequestContext,
+    serviceId: string,
+    after: number,
+): Promise<[string, string]> {
+    const rules = await northwind(request).get<{ dayOfWeek: number }[]>(
+        `/services/${serviceId}/rules`,
+    );
+    const runs = new Set(rules.map((r) => r.dayOfWeek));
+    expect(
+        runs.size,
+        "the service runs on some day of the week",
+    ).toBeGreaterThan(0);
+    const days: string[] = [];
+    for (let d = after; days.length < 2; d++) {
+        const day = istDay(d);
+        if (runs.has(new Date(`${day}T00:00:00Z`).getUTCDay())) days.push(day);
+    }
+    return [days[0], days[1]];
 }
 
 /** "YYYY-MM-DD" in India, `days` from today. */
@@ -44,22 +111,6 @@ interface Diary {
         startAt: string;
         contact: { id: string; firstName: string | null } | null;
     }[];
-}
-
-/** An upcoming one-to-one with a person and a contact, within the week. */
-async function upcomingWithContact(request: APIRequestContext) {
-    const from = new Date().toISOString();
-    const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
-    return (await diaries(request, from, to))
-        .filter((d) => d.person)
-        .flatMap((d) => d.bookings)
-        .find(
-            (b) =>
-                b.status === "CONFIRMED" &&
-                !b.outcome &&
-                b.bookerName &&
-                b.contact,
-        );
 }
 
 /** Open a booking's peek from the agenda of its day. */
@@ -124,33 +175,38 @@ test.describe("bookings calendar", () => {
 
     test("the peek shows Needs attention and opens the customer's page", async ({
         page,
-    }) => {
-        await signIn(page);
-        const found = await upcomingWithContact(page.request);
-        test.skip(!found?.contact, "No upcoming booking with a contact");
-        if (!found?.contact) return;
-        const contactId = found.contact.id;
-
-        // An Allergy entry for this test only, taken off again afterwards.
-        const made = await page.request.post(
-            api(`/customers/${contactId}/attention`),
-            {
-                headers: orgHeader,
-                data: { kind: "ALLERGY", label: "E2E sesame" },
-            },
-        );
-        test.skip(!made.ok(), "The contact already has an allergy entry");
-        const entry = (await made.json()) as { id: string };
+    }, testInfo) => {
+        // On Northwind, with a customer and a booking of its own: an allergy
+        // added to one of Pulse's members would be on a film set.
+        await useSession(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const s = ownStamp(testInfo);
+        const who = await makeContact(page.request, {
+            firstName: "Peek",
+            lastName: s,
+            email: `peek-${s}@example.test`,
+        });
+        const booked = await bookOwn(page.request, who.id);
         try {
-            const sheet = await openPeek(page, found);
+            await northwind(page.request).post(
+                `/customers/${who.id}/attention`,
+                {
+                    kind: "ALLERGY",
+                    label: "E2E sesame",
+                },
+            );
+            const sheet = await openPeek(page, {
+                startAt: booked.startAt,
+                bookerName: who.name,
+            });
             await expect(sheet.getByText("Needs attention")).toBeVisible();
             await expect(sheet.getByText(/Allergy: E2E sesame/)).toBeVisible();
             await sheet.getByRole("link", { name: /^Open .+'s page$/ }).click();
-            await expect(page).toHaveURL(new RegExp(`/customers/${contactId}`));
+            await expect(page).toHaveURL(new RegExp(`/customers/${who.id}`));
         } finally {
-            await page.request.delete(
-                api(`/customers/${contactId}/attention/${entry.id}`),
-                { headers: orgHeader },
+            // Its time, back for everyone else.
+            await northwind(page.request).delete(
+                `/services/bookings/${booked.id}`,
             );
         }
     });
@@ -194,6 +250,9 @@ test.describe("bookings calendar", () => {
     test("cancel from the quick look, then Undo: nothing is sent", async ({
         page,
     }) => {
+        // The page's own clock, so the hold can be run out rather than
+        // slept through. Installed before the page loads; it keeps time.
+        await page.clock.install();
         await signIn(page);
         // A future one-to-one booking with a person, within the week.
         const from = new Date().toISOString();
@@ -226,173 +285,171 @@ test.describe("bookings calendar", () => {
         await expect(sheet.getByText("Booked", { exact: true })).toBeVisible();
         await page.keyboard.press("Escape");
 
-        // Past the hold, the booking is still booked.
-        await page.waitForTimeout(9_000);
+        // Past the hold (use-held.ts, HOLD_MS 8s), the booking is still
+        // booked and nothing was sent. Running the page's clock on fires
+        // whatever timer is still held, at once.
+        const sent: string[] = [];
+        page.on("request", (r) => {
+            if (r.method() !== "GET") sent.push(r.url());
+        });
+        await page.clock.runFor(9_000);
+        expect(sent).toEqual([]);
         const after = (await diaries(page.request, from, to))
             .flatMap((d) => d.bookings)
             .find((b) => b.id === found.id);
         expect(after?.status).toBe("CONFIRMED");
     });
 
-    test("open extra hours on a closed stretch, then book into the new gap", async ({
-        page,
-    }) => {
-        test.setTimeout(120_000);
-        await signIn(page);
-        const day = istDay(2);
-        const staff = (await (
-            await page.request.get(api("/staff"), { headers: orgHeader })
-        ).json()) as {
-            staff: {
-                id: string;
-                name: string;
-                status: string;
-                extraHours: { id: string; date: string }[];
-            }[];
-        };
-        const person = staff.staff.find((p) => p.status === "ACTIVE");
-        test.skip(!person, "Nobody on Pulse's diary");
-        if (!person) return;
-
-        let bookingId: string | null = null;
-        let contactId: string | null = null;
-        try {
-            await page.goto(`/bookings?date=${day}`);
-            // Closed time answers the keyboard too: it opens from the first
-            // closed half hour.
-            await page
-                .getByRole("button", {
-                    name: new RegExp(`^Open hours for ${person.name}`),
-                })
-                .click({ position: { x: 40, y: 300 } });
-            const dialog = page.getByRole("dialog");
-            await expect(dialog).toContainText(`Open ${person.name} from`);
-            const at = /from (\d\d:\d\d)/.exec(
-                (await dialog.getByRole("heading").first().innerText()) || "",
-            )?.[1];
-            const open = dialog.getByRole("button", {
-                name: "Open for bookings",
-            });
-            test.skip(
-                await open.isDisabled(),
-                "That stretch is already working time on this seed",
+    // @serial: Northwind takes bookings without a team, so this makes it a
+    // diary of one for the test (a staff member it archives again), which
+    // every booking test beside it would otherwise see.
+    test(
+        "open extra hours on a closed stretch, then book into the new gap",
+        {
+            tag: "@serial",
+        },
+        async ({ page }) => {
+            test.setTimeout(120_000);
+            await useSession(page);
+            await page.goto(`/open/${NORTHWIND}`);
+            const nw = northwind(page.request);
+            const person = await diaryOfOne(page.request);
+            // A day per project: the desk run leaves its cancelled booking
+            // drawn on its day, over the closed time the phone would open.
+            // Both are days the service runs, whatever today is.
+            const [deskDay, phoneDay] = await serviceDays(
+                page.request,
+                person.service.id,
+                2,
             );
-            await open.click();
-            await expect(
-                page.getByText(/^Opened .* only\.$/).first(),
-            ).toBeVisible();
+            const day = test.info().project.name.startsWith("phone")
+                ? phoneDay
+                : deskDay;
+            // Digits: the form capitalises each word of a new name.
+            const customer = `E2E Walk-in ${Date.now()}`;
 
-            // The new hours may join hours next to them: find the free gap
-            // that holds the time just opened.
-            const mins = (t: string) =>
-                Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-            const gaps = page.getByRole("button", {
-                name: new RegExp(`^Book ${person.name} at`),
-            });
-            // The toast can land before the diary redraws, so wait for the gap.
-            const holding = async () =>
-                (
-                    await gaps.evaluateAll((els) =>
-                        els.map((e) => e.getAttribute("aria-label") ?? ""),
+            let bookingId: string | null = null;
+            let contactId: string | null = null;
+            try {
+                await page.goto(`/bookings?date=${day}`);
+                // Closed time answers the keyboard too: it opens from the first
+                // closed half hour.
+                await page
+                    .getByRole("button", {
+                        name: new RegExp(`^Open hours for ${person.name}`),
+                    })
+                    .click({ position: { x: 40, y: 300 } });
+                const dialog = page.getByRole("dialog");
+                await expect(dialog).toContainText(`Open ${person.name} from`);
+                const at = /from (\d\d:\d\d)/.exec(
+                    (await dialog.getByRole("heading").first().innerText()) ||
+                        "",
+                )?.[1];
+                const open = dialog.getByRole("button", {
+                    name: "Open for bookings",
+                });
+                await expect(open).toBeEnabled();
+                await open.click();
+                await expect(
+                    page.getByText(/^Opened .* only\.$/).first(),
+                ).toBeVisible();
+
+                // The new hours may join hours next to them: find the free gap
+                // that holds the time just opened.
+                const mins = (t: string) =>
+                    Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+                const gaps = page.getByRole("button", {
+                    name: new RegExp(`^Book ${person.name} at`),
+                });
+                // The toast can land before the diary redraws, so wait for the gap.
+                const holding = async () =>
+                    (
+                        await gaps.evaluateAll((els) =>
+                            els.map((e) => e.getAttribute("aria-label") ?? ""),
+                        )
+                    ).findIndex((l) => {
+                        const [, a = "", b = ""] =
+                            /at (\d\d:\d\d), free until (\d\d:\d\d)/.exec(l) ??
+                            [];
+                        return (
+                            at !== undefined &&
+                            mins(a) <= mins(at) &&
+                            mins(at) < mins(b)
+                        );
+                    });
+                await expect.poll(holding).toBeGreaterThanOrEqual(0);
+                const index = await holding();
+                await gaps.nth(index).click();
+                const book = page.getByRole("dialog");
+                await expect(
+                    book.getByText("Finding when each can start…"),
+                ).toBeHidden();
+                const chip = book
+                    .getByRole("radiogroup", { name: "Service" })
+                    .locator("button[role=radio]:not([disabled])")
+                    .first();
+                await expect(chip).toBeVisible();
+                await chip.click();
+                // The shared customer picker (E4): type, then add them new.
+                await book.getByLabel("Find the customer").fill(customer);
+                await book
+                    .getByRole("button", {
+                        name: `+ Add \u201c${customer}\u201d as a new customer`,
+                    })
+                    .click();
+                await expect(book.getByLabel("Name")).toHaveValue(customer);
+                await book
+                    .getByLabel("Email")
+                    .fill(
+                        `${customer.replace(/\W+/g, ".").toLowerCase()}@example.test`,
+                    );
+                await book
+                    .getByRole("button", { name: "Add customer" })
+                    .click();
+                await expect(
+                    book.getByRole("radio", { name: `${customer} · new` }),
+                ).toBeChecked();
+                await book
+                    .getByRole("radio", { name: "Pays at the session" })
+                    .click();
+                await book.getByRole("button", { name: "Book it" }).click();
+                await expect(
+                    page
+                        .getByText(new RegExp(`^Booked ${customer} with`))
+                        .first(),
+                ).toBeVisible();
+
+                // The whole of the booked day, in India.
+                const from = new Date(`${day}T00:00:00+05:30`).toISOString();
+                const to = new Date(
+                    Date.parse(from) + 86_400_000,
+                ).toISOString();
+                const made = (
+                    await nw.get<{ diaries: Diary[] }>(
+                        `/services/bookings?from=${from}&to=${to}`,
                     )
-                ).findIndex((l) => {
-                    const [, a = "", b = ""] =
-                        /at (\d\d:\d\d), free until (\d\d:\d\d)/.exec(l) ?? [];
-                    return (
-                        at !== undefined &&
-                        mins(a) <= mins(at) &&
-                        mins(at) < mins(b)
-                    );
-                });
-            await expect.poll(holding).toBeGreaterThanOrEqual(0);
-            const index = await holding();
-            const gap = gaps.nth(index);
-            await gap.click();
-            const book = page.getByRole("dialog");
-            await expect(
-                book.getByText("Finding when each can start…"),
-            ).toBeHidden();
-            const chip = book
-                .getByRole("radiogroup", { name: "Service" })
-                .locator("button[role=radio]:not([disabled])")
-                .first();
-            test.skip(
-                (await chip.count()) === 0,
-                "No service this person takes starts inside the new hours",
-            );
-            await chip.click();
-            // The shared customer picker (E4): type, then add them new.
-            await book.getByLabel("Find the customer").fill("E2E Walk-in");
-            await book
-                .getByRole("button", {
-                    name: "+ Add \u201cE2E Walk-in\u201d as a new customer",
-                })
-                .click();
-            await expect(book.getByLabel("Name")).toHaveValue("E2E Walk-in");
-            await book.getByLabel("Email").fill("e2e.walkin@example.com");
-            await book.getByRole("button", { name: "Add customer" }).click();
-            await expect(
-                book.getByRole("radio", { name: "E2E Walk-in · new" }),
-            ).toBeChecked();
-            await book
-                .getByRole("radio", { name: "Pays at the session" })
-                .click();
-            await book.getByRole("button", { name: "Book it" }).click();
-            await expect(
-                page.getByText(/^Booked E2E Walk-in with/).first(),
-            ).toBeVisible();
-
-            const made = (
-                await diaries(
-                    page.request,
-                    new Date(Date.now()).toISOString(),
-                    new Date(Date.now() + 4 * 86_400_000).toISOString(),
-                )
-            )
-                .flatMap((d) => d.bookings)
-                .find((b) => b.bookerName === "E2E Walk-in");
-            expect(made).toBeTruthy();
-            bookingId = made?.id ?? null;
-        } finally {
-            // Put the gym back: the booking, its contact, the extra hours.
-            if (bookingId) {
-                const res = await page.request.get(
-                    api(`/services/bookings/${bookingId}`),
-                    { headers: orgHeader },
+                ).diaries
+                    .flatMap((d) => d.bookings)
+                    .find((b) => b.bookerName === customer);
+                expect(made).toBeTruthy();
+                bookingId = made?.id ?? null;
+                contactId = made?.contact?.id ?? null;
+            } finally {
+                // Northwind as it was: the booking, its customer, the hours, and
+                // no team.
+                if (bookingId)
+                    await nw.delete(`/services/bookings/${bookingId}`);
+                if (contactId) await nw.delete(`/contacts/${contactId}`);
+                const now = await nw.get<{ extraHours: { id: string }[] }>(
+                    `/staff/${person.id}`,
                 );
-                contactId =
-                    ((await res.json()) as { contact: { id: string } | null })
-                        .contact?.id ?? null;
-                await page.request.delete(
-                    api(`/services/bookings/${bookingId}`),
-                    {
-                        headers: orgHeader,
-                    },
-                );
-            }
-            if (contactId) {
-                await page.request.delete(api(`/contacts/${contactId}`), {
-                    headers: orgHeader,
-                });
-            }
-            const now = (await (
-                await page.request.get(api(`/staff/${person.id}`), {
-                    headers: orgHeader,
-                })
-            ).json()) as { extraHours: { id: string; date: string }[] };
-            for (const x of now.extraHours) {
-                if (
-                    x.date.slice(0, 10) === day &&
-                    !person.extraHours.some((y) => y.id === x.id)
-                ) {
-                    await page.request.delete(
-                        api(`/staff/${person.id}/extra-hours/${x.id}`),
-                        { headers: orgHeader },
-                    );
+                for (const x of now.extraHours) {
+                    await nw.delete(`/staff/${person.id}/extra-hours/${x.id}`);
                 }
+                await nw.delete(`/staff/${person.id}`);
             }
-        }
-    });
+        },
+    );
 });
 
 test.describe("New booking finds the customer (E4)", () => {
@@ -551,7 +608,7 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             .then(() => true)
             .catch(() => false);
         test.skip(!opened, "Northwind doesn't take bookings");
-        const name = `E2E either ${Date.now()}`;
+        const name = `E2E either ${ownStamp(test.info())}`;
         await page.getByLabel("Name").fill(name);
         await page.getByRole("radio", { name: "Either — they choose" }).click();
         await page

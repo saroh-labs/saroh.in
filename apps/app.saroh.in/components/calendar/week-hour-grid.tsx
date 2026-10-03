@@ -147,7 +147,8 @@ export function WeekHourGrid({
                                         chip.bad
                                             ? "bg-destructive-subtle-foreground"
                                             : TONE_FILL[chip.tone],
-                                        col.past && "opacity-80",
+                                        // Quieter in colour, not see-through (4.5:1).
+                                        col.past && "saturate-50",
                                     )}
                                 >
                                     {chip.title}

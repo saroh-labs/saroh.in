@@ -7,7 +7,7 @@ import {
     CHECKOUT_SOLD_OUT,
     closeCheckoutInTx,
 } from "../orders/online-checkout";
-import { reserveOnPayment } from "../stock/reserve";
+import { reserveOnPayment, STOCK_HELD } from "../stock/reserve";
 import type { NormalizedWebhookEvent } from "./providers/webhook-provider.port";
 
 type Tx = Prisma.TransactionClient;
@@ -19,6 +19,29 @@ export interface OnlineIntent {
     provider: string;
     providerIntentId?: string | null;
     status: string;
+}
+
+/**
+ * Whether another payment of the order already held its units — so this
+ * one is the balance of a site checkout's order that costs more since it
+ * was paid (B9: a dearer way to fulfil it, or an edit), taken by its pay
+ * link. It holds nothing: the units are held once, by the payment that
+ * made it an order. The caller settles it as any order's second payment.
+ */
+export async function heldByAnotherPayment(
+    tx: Tx,
+    orderId: string,
+    paymentIntentId: string,
+): Promise<boolean> {
+    const held = await tx.paymentAttempt.findFirst({
+        where: {
+            status: STOCK_HELD,
+            paymentIntentId: { not: paymentIntentId },
+            paymentIntent: { orderId },
+        },
+        select: { id: true },
+    });
+    return held !== null;
 }
 
 /**

@@ -54,6 +54,23 @@ describe("the packs on sale", () => {
         ).toBeNull();
         expect(packsOnSaleResult(null)).toBeNull();
     });
+
+    it("keeps a pack's kind, so the sheet can say sessions (A11)", () => {
+        const pt = { ...PACK, kind: "ONE_TO_ONE" };
+        expect(
+            packsOnSaleResult({ payOnline: true, packs: [pt] })?.packs[0]?.kind,
+        ).toBe("ONE_TO_ONE");
+        // An older API sends no kind: still a pack on sale.
+        expect(
+            packsOnSaleResult({ payOnline: true, packs: [PACK] }),
+        ).not.toBeNull();
+        expect(
+            packsOnSaleResult({
+                payOnline: true,
+                packs: [{ ...PACK, kind: "SOMETHING" }],
+            }),
+        ).toBeNull();
+    });
 });
 
 describe("starting to pay for a pack", () => {

@@ -6,7 +6,8 @@
  * its storefronts both have "Breads" (by slug) or "Size" (by name), they
  * become one, and everything that named the one that goes is re-pointed:
  * products, discount categories, field categories, defaults, sub-categories,
- * variants' option values, product and customer-note allergens.
+ * variants' option values and product allergens (customer notes no longer
+ * name allergens, Z2a: an old note row naming one that goes is cleared).
  *
  * What does not merge:
  * - categories under different parents (a "Tops" under Men and one under
@@ -90,6 +91,13 @@ function byStoreOrder<T extends Ranked>(rank: Map<string, number>) {
 
 const key = (s: string) => s.trim().toLowerCase();
 
+/** A name as a slug fragment: "Hill Road" → "hill-road". */
+const slugOf = (s: string) =>
+    s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
 function groupBy<T>(rows: T[], by: (row: T) => string): T[][] {
     const out = new Map<string, T[]>();
     for (const r of rows) out.set(by(r), [...(out.get(by(r)) ?? []), r]);
@@ -118,7 +126,7 @@ export async function backfillCatalogueSettings(
                 const stores = await tx.store.findMany({
                     where: { organizationId: org.id },
                     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-                    select: { id: true, name: true, slug: true },
+                    select: { id: true, name: true },
                 });
                 const ctx: OrgRun = {
                     tx,
@@ -145,7 +153,7 @@ interface OrgRun {
     tx: TransactionClient;
     organizationId: string;
     rank: Map<string, number>;
-    stores: Map<string, { id: string; name: string; slug: string }>;
+    stores: Map<string, { id: string; name: string }>;
     report: CatalogueBackfillReport;
     now: Date;
 }
@@ -233,7 +241,10 @@ async function mergeCategories(ctx: OrgRun): Promise<void> {
             names.add(key(c.name));
             continue;
         }
-        const suffix = ctx.stores.get(c.storeId ?? "")?.slug ?? "earlier";
+        // The storefront's name, not its slug: Store.slug is no longer
+        // written (DEC-069, L14), so a new location has none.
+        const suffix =
+            slugOf(ctx.stores.get(c.storeId ?? "")?.name ?? "") || "earlier";
         let slug = c.slug;
         if (slugTaken) {
             slug = `${c.slug}-${suffix}`;
@@ -569,14 +580,8 @@ async function mergeAllergens(ctx: OrgRun): Promise<void> {
             await tx.productAllergen.deleteMany({
                 where: { allergenId: loser.id },
             });
-            const inNotes = await tx.contactNoteAllergen.findMany({
-                where: { allergenId: loser.id },
-                select: { noteId: true, organizationId: true },
-            });
-            await tx.contactNoteAllergen.createMany({
-                data: inNotes.map((n) => ({ ...n, allergenId: winner.id })),
-                skipDuplicates: true,
-            });
+            // Notes no longer name allergens (Z2a): old rows are not moved,
+            // only cleared so they don't block the delete. Gone with Z2.
             await tx.contactNoteAllergen.deleteMany({
                 where: { allergenId: loser.id },
             });

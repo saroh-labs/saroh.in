@@ -1,9 +1,10 @@
+// @covers accounts:/login app:/open app:/commerce/products api:products
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
-import { demoUser, urls } from "../playwright.config";
 
 /**
  * The Products list and its quick look (#519, #520): search reaches the
@@ -21,13 +22,7 @@ const STORE = "seed_store";
 const NW: Storefront = { organizationId: ORG, storeId: STORE };
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 test.describe("Products list", () => {

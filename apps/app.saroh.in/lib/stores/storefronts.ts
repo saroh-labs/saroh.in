@@ -169,7 +169,7 @@ export async function dismissLateRuleNotice(
 /**
  * How many storefronts the business has and how many its plan allows
  * (ADR-010). `null` when it cannot be read — Sell switched off, or the API
- * down — which offers "New storefront" and leaves the refusal to the API.
+ * down — which offers "New location" and leaves the refusal to the API.
  */
 export async function getStorefrontAllowance(): Promise<StorefrontAllowance | null> {
     const base = await orgBase();
@@ -344,6 +344,6 @@ export async function closeStorefront(
 ): Promise<CrmResult<object>> {
     return destroy(
         `/storefronts/${encodeURIComponent(storeId)}`,
-        "Could not close that storefront.",
+        "Could not close that location.",
     );
 }

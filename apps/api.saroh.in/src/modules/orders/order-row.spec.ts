@@ -41,6 +41,52 @@ function raw(over: Partial<RawOrderRow> = {}): RawOrderRow {
     };
 }
 
+describe("serializeOrderRow — a returning customer (the design's ring)", () => {
+    const view = { money: true, contact: true, now };
+    const withCount = (orders: number) =>
+        raw({
+            customer: { ...raw().customer!, _count: { orders } },
+        });
+
+    it("is returning from their second order, not on their first", () => {
+        expect(serializeOrderRow(withCount(2), view).customer?.returning).toBe(
+            true,
+        );
+        expect(serializeOrderRow(withCount(1), view).customer?.returning).toBe(
+            false,
+        );
+    });
+
+    it("says nothing where the count wasn't loaded", () => {
+        expect(
+            "returning" in (serializeOrderRow(raw(), view).customer ?? {}),
+        ).toBe(false);
+    });
+});
+
+describe("serializeOrderRow — a treatment's next visit (B14)", () => {
+    const view = { money: true, contact: true, now };
+
+    it("carries the next visit it was given, and null when none is booked", () => {
+        const startAt = new Date("2026-09-29T04:30:00.000Z");
+        const treatment = raw({ fulfilment: "APPOINTMENT_IN_PERSON" });
+        expect(
+            serializeOrderRow(treatment, {
+                ...view,
+                nextVisit: { startAt, timezone: "Asia/Kolkata" },
+            }).nextVisit,
+        ).toEqual({ startAt, timezone: "Asia/Kolkata" });
+        expect(
+            serializeOrderRow(treatment, { ...view, nextVisit: null })
+                .nextVisit,
+        ).toBeNull();
+    });
+
+    it("leaves the field out when it wasn't read (an older app never sees it)", () => {
+        expect("nextVisit" in serializeOrderRow(raw(), view)).toBe(false);
+    });
+});
+
 describe("serializeOrderRow", () => {
     it("says what a row needs, money and contact included for a full read", () => {
         const row = serializeOrderRow(raw(), {

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { OrderPayments } from "@/components/stores/order-payments";
 import type { OrderRead, OrderReadMoney } from "@/lib/orders/read";
+import { refundLines } from "@/lib/orders/refund-line";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
@@ -37,11 +38,14 @@ export function MoneyCard({
     onRetryRefund,
     busy = false,
     payLink,
+    way,
     appointment = false,
 }: {
     money: OrderReadMoney;
     /** It goes to an address (a local delivery or a shipment). */
     delivery: boolean;
+    /** How it leaves, in its type's word: "Pick-up", "Local delivery". */
+    way?: string;
     /** Fulfilled by its visits (B14): no delivery or collection row. */
     appointment?: boolean;
     paymentStatus: OrderRead["paymentStatus"];
@@ -60,7 +64,7 @@ export function MoneyCard({
     // A treatment is neither delivered nor collected (B14).
     if (!appointment) {
         rows.push([
-            delivery ? "Delivery" : "Collection",
+            way ?? (delivery ? "Delivery" : "Pick-up"),
             n(money.shipping) > 0 ? format(n(money.shipping)) : "Free",
         ]);
     }
@@ -95,6 +99,7 @@ export function MoneyCard({
               ? "Didn't go through"
               : "Not paid yet";
     const pay: [string, string][] = [["Paid by", paidBy]];
+    const refund = refundLines(money, refundStanding, format);
     if (n(money.paid) > 0) pay.push(["Taken", format(n(money.paid))]);
     if (n(money.refunded) > 0) {
         pay.push(["Refunded", format(n(money.refunded))]);
@@ -126,11 +131,23 @@ export function MoneyCard({
                     <dd className="tabular-nums">{format(n(money.total))}</dd>
                 </div>
             </dl>
-            {n(money.refunded) > 0 ? (
+            {refund.done ? (
                 <div className="pt-[3px] text-[12.5px] font-semibold text-destructive-subtle-foreground">
-                    {refundStanding === "REFUNDED"
-                        ? "Refunded in full"
-                        : `Refunded ${format(n(money.refunded))}`}
+                    {refund.done}
+                </div>
+            ) : null}
+            {/* Accepted by the provider, not confirmed yet (B9, DEC-067). */}
+            {refund.onTheWay ? (
+                <div
+                    role="status"
+                    className="pt-[3px] text-[12.5px] font-semibold text-foreground"
+                >
+                    {refund.onTheWay}
+                    <span className="block font-normal text-muted-foreground">
+                        It shows as refunded once{" "}
+                        {provider ? providerName(provider) : "the provider"}{" "}
+                        confirms it.
+                    </span>
                 </div>
             ) : null}
             {money.refundsBeingConfirmed.map((r) => (

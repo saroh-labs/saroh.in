@@ -27,10 +27,13 @@ import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { providerName } from "@/lib/payments/providers";
+import type { SiteSelling } from "@/lib/sites/sells-from";
+import { locationSelling } from "@/lib/sites/sells-from";
 import { heldStock } from "@/lib/stores/closing";
 import {
     newStorefrontHref,
     storefrontDetailsHref,
+    storefrontHref,
     storefrontPeopleHref,
 } from "@/lib/stores/links";
 import {
@@ -47,6 +50,7 @@ import type {
 } from "@/lib/stores/storefronts";
 
 import { FulfilmentSection } from "./fulfilment-section";
+import { LocationSellingLine } from "./location-selling-line";
 import { SameEmailSection } from "./same-email-section";
 import { Note, Section, ToggleRow } from "./storefront-section";
 
@@ -77,6 +81,17 @@ const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
     closed: key === "SUN",
 }));
 
+/**
+ * The two kinds of location (DEC-069, KTD-12): the `SHOP` and `ONLINE` kinds
+ * in the data, named for what they mean to the merchant.
+ */
+const KIND_LABEL: Record<StorefrontKind, string> = {
+    SHOP: "Customers visit",
+    ONLINE: "No counter",
+};
+
+const LOCATIONS_HREF = "/commerce/locations";
+
 const ordersLabel = (n: number) =>
     n === 0 ? "no orders yet" : n === 1 ? "1 order" : `${n} orders`;
 
@@ -87,8 +102,10 @@ type Saver = (
 ) => void;
 
 /**
- * Sell → Storefronts, after the "Saroh Storefront Settings" design: every
- * storefront on the left, the chosen one's own settings on the right.
+ * Sell → Locations, after the "Saroh Storefront Settings" design: every
+ * location on the left, the chosen one's own settings on the right. A
+ * location is a storefront in code and in the API (DEC-069 renamed the
+ * words, not the identifiers).
  *
  * Every control saves on its own — a switch when it is flipped, a field when
  * its Save is pressed — so there is no page-wide save to forget.
@@ -97,6 +114,7 @@ export function StorefrontsScreen({
     businessName,
     storefronts,
     selected,
+    site,
     canCreate,
     canEdit,
     canClose,
@@ -106,6 +124,12 @@ export function StorefrontsScreen({
     storefronts: StorefrontSummary[];
     /** `null` when the chosen storefront could not be read. */
     selected: StorefrontSettings | null;
+    /**
+     * The website each location's selling line reads (DEC-069): `null` for a
+     * business with no website, `undefined` when it couldn't be read — then
+     * no line is shown rather than a guess.
+     */
+    site?: SiteSelling | null;
     /** May make one, and the plan has room for another. */
     canCreate: boolean;
     canEdit: boolean;
@@ -113,11 +137,11 @@ export function StorefrontsScreen({
     /** May change how customers who share an email are linked (C15). */
     canLinkCustomers?: boolean;
 }) {
-    // A business with one storefront sees "your storefront"; the list
-    // appears once there are several (ADR-010), and New while the plan
-    // allows another (`canCreate` carries that).
+    // A business with one location sees "Location"; the list appears once
+    // there are several (ADR-010), and New while the plan allows another
+    // (`canCreate` carries that).
     const many = storefronts.length > 1;
-    const title = many ? "Storefronts" : "Storefront";
+    const title = many ? "Locations" : "Location";
     const header = (
         <PageHeader
             breadcrumb={["Sell", title]}
@@ -125,7 +149,7 @@ export function StorefrontsScreen({
             actions={
                 canCreate && storefronts.length > 0 ? (
                     <Button asChild variant="brand">
-                        <Link href={newStorefrontHref}>New storefront</Link>
+                        <Link href={newStorefrontHref}>New location</Link>
                     </Button>
                 ) : undefined
             }
@@ -137,13 +161,13 @@ export function StorefrontsScreen({
             <>
                 {header}
                 <EmptyState
-                    title="No storefront yet"
-                    description={`${businessName} has Commerce turned on but nowhere to sell from. A storefront is where a catalogue meets a checkout — a shop counter, an online store, a market stall.`}
+                    title="No location yet"
+                    description={`${businessName} has Sell turned on but nowhere to sell from. A location is a place you sell from — a shop counter, a studio, a market stall — and your online shop sells from one of them.`}
                     action={
                         canCreate ? (
                             <Button asChild variant="brand">
                                 <Link href={newStorefrontHref}>
-                                    Create a storefront
+                                    Add a location
                                 </Link>
                             </Button>
                         ) : undefined
@@ -176,13 +200,14 @@ export function StorefrontsScreen({
                             key={selected.id}
                             store={selected}
                             businessName={businessName}
+                            site={site}
                             canEdit={canEdit}
                             canClose={canClose}
                             canLinkCustomers={canEdit && canLinkCustomers}
                         />
                     ) : (
                         <FailedState
-                            title="This storefront could not be loaded"
+                            title="This location could not be loaded"
                             description="Its settings could not be read, so none are shown rather than guessed. Nothing has been changed."
                         />
                     )}
@@ -201,13 +226,13 @@ function StorefrontList({
 }) {
     return (
         <nav
-            aria-label="Storefronts"
+            aria-label="Locations"
             className="min-w-0 max-w-[280px] flex-[0_1_236px] overflow-hidden rounded-xl border border-border max-sm:max-w-none max-sm:flex-[1_1_100%]"
         >
             <p className="border-b border-border px-[15px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                 {storefronts.length === 1
-                    ? "1 storefront"
-                    : `${storefronts.length} storefronts`}
+                    ? "1 location"
+                    : `${storefronts.length} locations`}
             </p>
             <ul className="flex flex-col gap-0.5 p-1.5">
                 {storefronts.map((s) => {
@@ -215,7 +240,7 @@ function StorefrontList({
                     return (
                         <li key={s.id}>
                             <Link
-                                href={`/commerce/storefronts?storefront=${s.id}`}
+                                href={storefrontHref(s.id)}
                                 scroll={false}
                                 aria-current={on ? "page" : undefined}
                                 className={cn(
@@ -235,11 +260,7 @@ function StorefrontList({
                                     variant={s.paused ? "warning" : "neutral"}
                                     className="shrink-0"
                                 >
-                                    {s.paused
-                                        ? "Paused"
-                                        : s.kind === "SHOP"
-                                          ? "Shop"
-                                          : "Online"}
+                                    {s.paused ? "Paused" : KIND_LABEL[s.kind]}
                                 </Badge>
                             </Link>
                         </li>
@@ -261,12 +282,14 @@ interface SectionProps {
 function StorefrontDetail({
     store: initial,
     businessName,
+    site,
     canEdit,
     canClose,
     canLinkCustomers,
 }: {
     store: StorefrontSettings;
     businessName: string;
+    site: SiteSelling | null | undefined;
     canEdit: boolean;
     canClose: boolean;
     canLinkCustomers: boolean;
@@ -305,7 +328,11 @@ function StorefrontDetail({
 
     return (
         <>
-            <BasicsSection {...shared} businessName={businessName} />
+            <BasicsSection
+                {...shared}
+                businessName={businessName}
+                site={site}
+            />
             {store.kind === "SHOP" ? <PlaceSection {...shared} /> : null}
             <CheckoutSection {...shared} businessName={businessName} />
             {/* An API from before B17 sends no chips: the old toggles stay. */}
@@ -341,11 +368,15 @@ function StorefrontDetail({
 function BasicsSection({
     store,
     businessName,
+    site,
     canEdit,
     pending,
     save,
     setStore,
-}: SectionProps & { businessName: string }) {
+}: SectionProps & {
+    businessName: string;
+    site: SiteSelling | null | undefined;
+}) {
     const [name, setName] = useState(store.name);
     const trimmed = name.trim();
     const dirty = trimmed !== store.name;
@@ -356,13 +387,20 @@ function BasicsSection({
         setStore((s) => ({ ...s, kind }));
         save(
             { kind },
-            kind === "SHOP" ? "Now a shop" : "Now an online store",
+            kind === "SHOP"
+                ? "Customers visit this location now"
+                : "This location has no counter now",
             () => setStore((s) => ({ ...s, kind: before })),
         );
     };
 
     return (
         <Section title="Basics">
+            {/* Unknown (the site couldn't be read) says nothing: "in
+                person only" would be a guess. */}
+            {site !== undefined ? (
+                <LocationSellingLine selling={locationSelling(store, site)} />
+            ) : null}
             <form
                 className="grid gap-2"
                 onSubmit={(e) => {
@@ -370,7 +408,7 @@ function BasicsSection({
                     if (dirty && trimmed) save({ name: trimmed }, "Name saved");
                 }}
             >
-                <Label htmlFor="storefront-name">Storefront name</Label>
+                <Label htmlFor="storefront-name">Location name</Label>
                 <div className="flex gap-2">
                     <Input
                         id="storefront-name"
@@ -388,21 +426,22 @@ function BasicsSection({
                     ) : null}
                 </div>
                 <Note id="storefront-name-note">
-                    Customers see this at checkout and on receipts. It is not
-                    the business name — {businessName} stays the same across all
-                    of them.
+                    Customers see this at checkout and on receipts, so name the
+                    place: Hill Road, the market stall. It isn&apos;t your
+                    business name — {businessName} stays the same at every
+                    location.
                 </Note>
             </form>
 
             <div className="grid gap-2">
                 <p id="storefront-kind-label" className="text-sm font-medium">
-                    What kind of storefront is this?
+                    Do customers come here?
                 </p>
                 <ToggleGroup
                     type="single"
                     value={store.kind}
                     // Radix clears a single group when the pressed item is
-                    // pressed again; a storefront is always one or the other.
+                    // pressed again; a location is always one or the other.
                     onValueChange={(v) => {
                         if (v === "SHOP" || v === "ONLINE") setKind(v);
                     }}
@@ -412,16 +451,16 @@ function BasicsSection({
                     className={SEGMENTED}
                 >
                     <ToggleGroupItem value="SHOP" className={SEGMENT}>
-                        Shop
+                        {KIND_LABEL.SHOP}
                     </ToggleGroupItem>
                     <ToggleGroupItem value="ONLINE" className={SEGMENT}>
-                        Online store
+                        {KIND_LABEL.ONLINE}
                     </ToggleGroupItem>
                 </ToggleGroup>
                 <Note id="storefront-kind-note">
-                    A shop is a place, so it has an address, opening hours and
-                    collection. An online store is a channel and needs none of
-                    them.
+                    Customers visit: it has an address, opening hours and
+                    collection. No counter: stock kept for online orders, with
+                    no address or hours.
                 </Note>
             </div>
 
@@ -430,7 +469,7 @@ function BasicsSection({
             <div className="flex flex-wrap gap-2">
                 <Button asChild variant="outline" size="sm">
                     <Link href={storefrontDetailsHref(store.id)}>
-                        Web address, description and logo
+                        Description and logo
                     </Link>
                 </Button>
                 <Button asChild variant="outline" size="sm">
@@ -457,12 +496,12 @@ function PlaceSection({ store, canEdit, pending, save }: SectionProps) {
                     if (addressDirty) {
                         save(
                             { address: address.trim() || null },
-                            "Address saved",
+                            "Location address saved",
                         );
                     }
                 }}
             >
-                <Label htmlFor="storefront-address">Address</Label>
+                <Label htmlFor="storefront-address">Location address</Label>
                 <Textarea
                     id="storefront-address"
                     value={address}
@@ -707,7 +746,7 @@ function OpeningHours({
                     </span>
                     <div className="grid gap-2">
                         {/* One control for "which days" — the same segmented
-                            style as Shop / Online store. The chips only
+                            style as Customers visit / No counter. The chips only
                             appear for Custom, so the common answer is one
                             click and the rare one is still there. */}
                         <ToggleGroup
@@ -827,7 +866,7 @@ function OpeningHours({
                 {backwards
                     ? "A day has to close after it opens."
                     : saved
-                      ? "Shown on the receipt, in the shop's own time."
+                      ? "Shown on the receipt, in the location's own time."
                       : "Not saved yet — this is a starting week. Save it to show it on receipts."}
             </Note>
             {canEdit && (dirty || !saved) ? (
@@ -1017,12 +1056,12 @@ function Payments({
     const connected = store.providers.filter((p) => p.status === "CONNECTED");
     const summary =
         connected.length === 0
-            ? `${businessName} has no payment provider connected, so this storefront cannot take payments yet.`
+            ? `${businessName} has no payment provider connected, so this location cannot take payments yet.`
             : store.effectiveProvider
-              ? `Checkout here charges through ${providerName(store.effectiveProvider)}. A provider is connected once for ${businessName}; each storefront picks which one its checkout uses.`
+              ? `Checkout here charges through ${providerName(store.effectiveProvider)}. A provider is connected once for ${businessName}; each location picks which one its checkout uses.`
               : store.checkoutProvider
                 ? `${providerName(store.checkoutProvider)} is no longer connected, so checkout here cannot take payments. Choose another.`
-                : "More than one provider is connected, so checkout cannot pick for itself. Choose which one this storefront uses.";
+                : "More than one provider is connected, so checkout cannot pick for itself. Choose which one this location uses.";
 
     return (
         <div className="grid gap-2">
@@ -1064,7 +1103,7 @@ function Payments({
                                                 `Checkout now uses ${providerName(p.provider)}`,
                                             );
                                         }}
-                                        aria-label={`Use ${providerName(p.provider)} for this storefront`}
+                                        aria-label={`Use ${providerName(p.provider)} for this location`}
                                     >
                                         Use here
                                     </Button>
@@ -1124,7 +1163,7 @@ function BehaviourSection({
             {store.kind === "SHOP" && !chips ? (
                 <ToggleRow
                     id="storefront-collection"
-                    label="Collection from this storefront"
+                    label="Collection from this location"
                     note="Customers choose a slot and pick up in person."
                     later
                     checked={store.collectionEnabled}
@@ -1299,7 +1338,7 @@ function ClosingSection({
                         disabled={pending || closing}
                         onClick={paused ? resume : pause}
                     >
-                        {paused ? "Resume storefront" : "Pause storefront"}
+                        {paused ? "Resume location" : "Pause location"}
                     </Button>
                 ) : null}
                 {canClose ? (
@@ -1321,7 +1360,7 @@ function ClosingSection({
                 title={`Close ${store.name} permanently?`}
                 description={`This removes ${store.name} from ${businessName} for good. ${
                     orders > 0
-                        ? `Its ${kept} on the business's record, and the catalogue is untouched — it belongs to the business, not to this storefront.`
+                        ? `Its ${kept} on the business's record, and the catalogue is untouched — it belongs to the business, not to this location.`
                         : "Nothing has been sold here, so there is nothing to keep."
                 } This cannot be undone.`}
                 confirmLabel="Close permanently"
@@ -1333,7 +1372,7 @@ function ClosingSection({
                             return;
                         }
                         showSuccess(`${store.name} is closed`);
-                        router.replace("/commerce/storefronts");
+                        router.replace(LOCATIONS_HREF);
                     });
                 }}
             />

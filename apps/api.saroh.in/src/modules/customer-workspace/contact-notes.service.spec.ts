@@ -5,13 +5,13 @@ import {
 } from "@nestjs/common";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import type { ContactNoteView } from "./contact-notes.service";
-import { ContactNotesService, notedAllergens } from "./contact-notes.service";
+import { ContactNotesService, loadContactNotes } from "./contact-notes.service";
 
 /**
- * Notes about a customer (U8): text and allergens from the storefront's own
- * list, written by a role that may change contacts, audited without their
- * words, and scoped to the contact and organization they belong to.
+ * Notes about a customer (U8): text only since Z2a, written by a role that
+ * may change contacts, audited without their words, and scoped to the
+ * contact and organization they belong to. Allergens live on Needs attention
+ * (C1); `ContactNoteAllergen` is never read or written.
  */
 
 const OWNER: OrganizationContext = {
@@ -29,7 +29,6 @@ function noteRow(overrides: Record<string, unknown> = {}) {
         createdByUserId: "user_1",
         createdAt: NOW,
         updatedAt: NOW,
-        allergens: [{ allergen: { id: "alg_nuts", name: "Nuts" } }],
         ...overrides,
     };
 }
@@ -42,14 +41,16 @@ function make() {
             update: jest.fn().mockResolvedValue({}),
             delete: jest.fn().mockResolvedValue({}),
             findFirst: jest.fn().mockResolvedValue(noteRow()),
+            findMany: jest.fn().mockResolvedValue([noteRow()]),
         },
+        // Present only so a test can say nothing touches it (Z2a).
         contactNoteAllergen: {
-            createMany: jest.fn().mockResolvedValue({ count: 1 }),
-            deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+            createMany: jest.fn(),
+            deleteMany: jest.fn(),
+            findMany: jest.fn(),
         },
         storeAllergen: {
             count: jest.fn().mockResolvedValue(1),
-            // Three storefronts: two spell Nuts their own way, one has Sesame.
             findMany: jest
                 .fn()
                 .mockImplementation(
@@ -59,7 +60,6 @@ function make() {
                                 { id: "alg_nuts", name: "Nuts" },
                                 { id: "alg_sesame", name: "Sesame" },
                                 { id: "alg_nuts_stall", name: " nuts " },
-                                { id: "alg_nuts_popup", name: "NUTS" },
                             ].filter(
                                 (r) => !where.id || where.id.in.includes(r.id),
                             ),
@@ -82,8 +82,38 @@ function make() {
     return { svc: new ContactNotesService(db as never), db };
 }
 
+function untouched(db: ReturnType<typeof make>["db"]) {
+    expect(db.contactNoteAllergen.createMany).not.toHaveBeenCalled();
+    expect(db.contactNoteAllergen.deleteMany).not.toHaveBeenCalled();
+    expect(db.contactNoteAllergen.findMany).not.toHaveBeenCalled();
+}
+
 describe("ContactNotesService", () => {
-    it("writes a note with its allergens and audits it without the text", async () => {
+    it("writes a note's text and audits it without the words", async () => {
+        const { svc, db } = make();
+
+        const note = await svc.create(OWNER, "c1", {
+            body: "Collects on Saturdays",
+        });
+
+        expect(db.contactNote.create).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                contactId: "c1",
+                body: "Collects on Saturdays",
+                createdByUserId: "user_1",
+                updatedByUserId: "user_1",
+            },
+            select: { id: true },
+        });
+        const audit = db.auditEvent.create.mock.calls[0][0].data;
+        expect(audit.action).toBe("contact.note.created");
+        expect(JSON.stringify(audit)).not.toContain("Saturdays");
+        expect(note.author).toBe("Nisha");
+        untouched(db);
+    });
+
+    it("saves text only when the payload names allergens (Z2a)", async () => {
         const { svc, db } = make();
 
         const note = await svc.create(OWNER, "c1", {
@@ -91,35 +121,25 @@ describe("ContactNotesService", () => {
             allergenIds: ["alg_nuts", "alg_nuts"],
         });
 
-        expect(db.contactNote.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    organizationId: "org_1",
-                    contactId: "c1",
-                    body: "Severe nut allergy",
-                    createdByUserId: "user_1",
-                }),
-            }),
+        expect(db.contactNote.create.mock.calls[0][0].data).not.toHaveProperty(
+            "allergens",
         );
-        // Duplicates collapse to one allergen.
-        expect(db.contactNoteAllergen.createMany).toHaveBeenCalledWith({
-            data: [
-                {
-                    noteId: "note_1",
-                    allergenId: "alg_nuts",
-                    organizationId: "org_1",
-                },
-            ],
+        untouched(db);
+        // The view keeps its old fields for an app from before Z2a, empty.
+        expect(note.allergens).toEqual([]);
+        expect(note.matchAllergens).toEqual([]);
+        // Read without the join the table used to give it.
+        expect(db.contactNote.findFirst.mock.calls[0][0].select).toEqual({
+            id: true,
+            body: true,
+            createdByUserId: true,
+            createdAt: true,
+            updatedAt: true,
         });
-        const audit = db.auditEvent.create.mock.calls[0][0].data;
-        expect(audit.action).toBe("contact.note.created");
-        expect(JSON.stringify(audit)).not.toContain("nut allergy");
-        expect(note.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
     });
 
-    it("puts a note's allergens on Needs attention too, once per name (C1)", async () => {
+    it("puts allergens an older app sends on Needs attention, once per name", async () => {
         const { svc, db } = make();
-        db.storeAllergen.count.mockResolvedValue(3);
 
         await svc.create(OWNER, "c1", {
             body: "Nut allergy",
@@ -145,6 +165,7 @@ describe("ContactNotesService", () => {
                 }),
             ],
         });
+        untouched(db);
     });
 
     it("adds no second entry for an allergy already on Needs attention", async () => {
@@ -153,84 +174,64 @@ describe("ContactNotesService", () => {
             { label: "Nuts", allergen: { name: "NUTS" } },
         ]);
 
-        await svc.create(OWNER, "c1", { allergenIds: ["alg_nuts"] });
-
-        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
-    });
-
-    it("leaves Needs attention alone when an update doesn't name allergens", async () => {
-        const { svc, db } = make();
-
-        await svc.update(OWNER, "c1", "note_1", { body: "Now oat milk" });
-
-        expect(db.contactAttention.findMany).not.toHaveBeenCalled();
-        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
-    });
-
-    it("doesn't bring back an Allergy entry the team removed when the note is edited (review C-6)", async () => {
-        const { svc, db } = make();
-        // The note already names Nuts; the team removed its entry, so
-        // Needs attention has no live Allergy entry for it.
-        db.storeAllergen.count.mockResolvedValue(2);
-
-        await svc.update(OWNER, "c1", "note_1", {
-            body: "Nut allergy, and sesame",
-            allergenIds: ["alg_nuts", "alg_sesame"],
-        });
-
-        // Only the allergen the edit adds goes on Needs attention.
-        expect(db.contactAttention.createMany).toHaveBeenCalledWith({
-            data: [
-                expect.objectContaining({
-                    label: "Sesame",
-                    allergenId: "alg_sesame",
-                }),
-            ],
-        });
-    });
-
-    it("adds nothing to Needs attention when an edit keeps the same allergens (review C-6)", async () => {
-        const { svc, db } = make();
-
-        await svc.update(OWNER, "c1", "note_1", {
-            body: "Nut allergy — severe",
+        await svc.create(OWNER, "c1", {
+            body: "Nuts",
             allergenIds: ["alg_nuts"],
         });
 
         expect(db.contactAttention.createMany).not.toHaveBeenCalled();
     });
 
-    it("refuses an allergen that is not on the organization's list", async () => {
+    it("skips an allergen that is not on the organization's list", async () => {
         const { svc, db } = make();
-        db.storeAllergen.count.mockResolvedValue(0);
 
-        const refusal = await svc
-            .create(OWNER, "c1", { allergenIds: ["alg_elsewhere"] })
-            .catch((e: unknown) => e);
-
-        expect(refusal).toBeInstanceOf(BadRequestException);
-        expect((refusal as BadRequestException).getResponse()).toEqual(
-            expect.objectContaining({ field: "allergenIds" }),
-        );
-        expect(db.storeAllergen.count).toHaveBeenCalledWith({
-            where: { organizationId: "org_1", id: { in: ["alg_elsewhere"] } },
+        await svc.create(OWNER, "c1", {
+            body: "Hi",
+            allergenIds: ["alg_elsewhere"],
         });
-        expect(db.contactNote.create).not.toHaveBeenCalled();
+
+        expect(db.storeAllergen.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    id: { in: ["alg_elsewhere"] },
+                },
+            }),
+        );
+        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
+        expect(db.contactNote.create).toHaveBeenCalled();
     });
 
-    it("refuses a note with neither text nor an allergen", async () => {
+    it("leaves Needs attention alone when no allergens are sent", async () => {
         const { svc, db } = make();
 
-        const refusal = await svc
-            .create(OWNER, "c1", { body: "", allergenIds: [] })
-            .catch((e: unknown) => e);
+        await svc.create(OWNER, "c1", { body: "Oat milk" });
+        await svc.update(OWNER, "c1", "note_1", { body: "Now oat milk" });
 
-        expect(refusal).toBeInstanceOf(BadRequestException);
-        expect((refusal as BadRequestException).getResponse()).toEqual({
-            message: "Write a note or pick an allergen.",
-            field: "body",
-        });
+        expect(db.contactAttention.findMany).not.toHaveBeenCalled();
+        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
+        expect(db.storeAllergen.findMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a note with no text, even with allergens", async () => {
+        const { svc, db } = make();
+
+        for (const dto of [
+            { body: "" },
+            { body: "   ", allergenIds: [] },
+            { allergenIds: ["alg_nuts"] },
+        ]) {
+            const refusal = await svc
+                .create(OWNER, "c1", dto)
+                .catch((e: unknown) => e);
+            expect(refusal).toBeInstanceOf(BadRequestException);
+            expect((refusal as BadRequestException).getResponse()).toEqual({
+                message: "Write a note.",
+                field: "body",
+            });
+        }
         expect(db.contactNote.create).not.toHaveBeenCalled();
+        expect(db.contactAttention.createMany).not.toHaveBeenCalled();
     });
 
     it("refuses a Member", async () => {
@@ -255,49 +256,37 @@ describe("ContactNotesService", () => {
         ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it("keeps the allergens when an update leaves them out", async () => {
+    it("updates the text, and ignores allergens for the note", async () => {
         const { svc, db } = make();
 
-        await svc.update(OWNER, "c1", "note_1", { body: "Now oat milk too" });
+        await svc.update(OWNER, "c1", "note_1", {
+            body: "Now oat milk too",
+            allergenIds: ["alg_sesame"],
+        });
 
         expect(db.contactNote.update).toHaveBeenCalledWith({
             where: { id: "note_1" },
             data: { body: "Now oat milk too", updatedByUserId: "user_1" },
         });
-        expect(db.contactNoteAllergen.deleteMany).not.toHaveBeenCalled();
-        expect(db.storeAllergen.count).not.toHaveBeenCalled();
+        untouched(db);
     });
 
-    it("replaces the allergens when an update names them", async () => {
+    it("keeps the text when an update leaves it out", async () => {
         const { svc, db } = make();
-        db.storeAllergen.count.mockResolvedValue(2);
 
-        await svc.update(OWNER, "c1", "note_1", {
-            allergenIds: ["alg_milk", "alg_eggs"],
-        });
+        await svc.update(OWNER, "c1", "note_1", {});
 
-        expect(db.contactNoteAllergen.deleteMany).toHaveBeenCalledWith({
-            where: { noteId: "note_1" },
-        });
-        expect(db.contactNoteAllergen.createMany).toHaveBeenCalledWith({
-            data: [
-                {
-                    noteId: "note_1",
-                    allergenId: "alg_milk",
-                    organizationId: "org_1",
-                },
-                {
-                    noteId: "note_1",
-                    allergenId: "alg_eggs",
-                    organizationId: "org_1",
-                },
-            ],
+        expect(db.contactNote.update).toHaveBeenCalledWith({
+            where: { id: "note_1" },
+            data: {
+                body: "Prefers the seeded loaf",
+                updatedByUserId: "user_1",
+            },
         });
     });
 
     it("refuses an update that would leave the note empty", async () => {
         const { svc, db } = make();
-        db.contactNote.findFirst.mockResolvedValue(noteRow({ allergens: [] }));
 
         await expect(
             svc.update(OWNER, "c1", "note_1", { body: "  " }),
@@ -320,89 +309,39 @@ describe("ContactNotesService", () => {
         expect(db.contactNote.delete).not.toHaveBeenCalled();
     });
 
-    describe("across storefronts (#508 R6)", () => {
-        it("matches the named allergen on every storefront, however it is spelled", async () => {
-            const { svc, db } = make();
+    describe("loadContactNotes", () => {
+        it("lists notes with text, newest first, with no allergens", async () => {
+            const { db } = make();
 
-            const note = await svc.create(OWNER, "c1", {
-                allergenIds: ["alg_nuts"],
+            const notes = await loadContactNotes(db as never, "org_1", "c1");
+
+            expect(db.contactNote.findMany).toHaveBeenCalledWith({
+                // A note that held only allergens has no text: left out.
+                where: {
+                    organizationId: "org_1",
+                    contactId: "c1",
+                    body: { not: "" },
+                },
+                orderBy: { createdAt: "desc" },
+                select: {
+                    id: true,
+                    body: true,
+                    createdByUserId: true,
+                    createdAt: true,
+                    updatedAt: true,
+                },
             });
-
-            // One chip for the name; every storefront's "Nuts" to check against.
-            expect(note.allergens).toEqual([{ id: "alg_nuts", name: "Nuts" }]);
-            expect(note.matchAllergens).toEqual([
-                { id: "alg_nuts", name: "Nuts" },
-                { id: "alg_nuts_stall", name: " nuts " },
-                { id: "alg_nuts_popup", name: "NUTS" },
-            ]);
-            expect(db.storeAllergen.findMany).toHaveBeenCalledWith(
-                expect.objectContaining({ where: { organizationId: "org_1" } }),
-            );
-            // The note is still written with the one id it was given.
-            expect(db.contactNoteAllergen.createMany).toHaveBeenCalledWith({
-                data: [
-                    {
-                        noteId: "note_1",
-                        allergenId: "alg_nuts",
-                        organizationId: "org_1",
-                    },
-                ],
-            });
-        });
-
-        it("adds nothing for an allergen no other storefront names", async () => {
-            const { svc, db } = make();
-            db.contactNote.findFirst.mockResolvedValue(
-                noteRow({
-                    allergens: [
-                        { allergen: { id: "alg_sesame", name: "Sesame" } },
-                    ],
+            expect(notes).toEqual([
+                expect.objectContaining({
+                    id: "note_1",
+                    body: "Prefers the seeded loaf",
+                    allergens: [],
+                    matchAllergens: [],
+                    author: "Nisha",
                 }),
-            );
-
-            const note = await svc.update(OWNER, "c1", "note_1", {
-                body: "Sesame only",
-            });
-
-            expect(note.matchAllergens).toEqual([
-                { id: "alg_sesame", name: "Sesame" },
             ]);
-        });
-
-        it("skips the list read for a note with no allergens", async () => {
-            const { svc, db } = make();
-            db.contactNote.findFirst.mockResolvedValue(
-                noteRow({ allergens: [] }),
-            );
-
-            const note = await svc.create(OWNER, "c1", { body: "Oat milk" });
-
-            expect(note.matchAllergens).toEqual([]);
+            untouched(db);
             expect(db.storeAllergen.findMany).not.toHaveBeenCalled();
-        });
-
-        it("lists a name once when two notes name two storefronts' copies", () => {
-            const note = (id: string, name: string): ContactNoteView => ({
-                id: `note_${id}`,
-                body: "",
-                allergens: [{ id, name }],
-                matchAllergens: [],
-                createdByUserId: null,
-                author: null,
-                createdAt: NOW.toISOString(),
-                updatedAt: NOW.toISOString(),
-            });
-
-            expect(
-                notedAllergens([
-                    note("alg_nuts_stall", " nuts "),
-                    note("alg_nuts", "Nuts"),
-                    note("alg_sesame", "Sesame"),
-                ]),
-            ).toEqual([
-                { id: "alg_nuts_stall", name: " nuts " },
-                { id: "alg_sesame", name: "Sesame" },
-            ]);
         });
     });
 });

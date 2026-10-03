@@ -65,7 +65,7 @@ export function MembersManager({
         setEmail("");
         setRole("VIEWER");
         showSuccess(
-            "Invitation sent. When they accept, they're also added to your team, as Storefront team.",
+            "Invitation sent. When they accept, they're also added to your team, as Location team.",
         );
         router.refresh();
     }
@@ -159,8 +159,8 @@ export function MembersManager({
                         id="invite-joins-team"
                         className="basis-full text-xs text-muted-foreground"
                     >
-                        Also added to your team, as Storefront team: they see
-                        the team and your storefronts, not the business&apos;s
+                        Also added to your team, as Location team: they see the
+                        team and your locations, not the business&apos;s
                         customers, bookings or money. Someone already on the
                         team keeps their role.
                     </p>
@@ -168,7 +168,7 @@ export function MembersManager({
             )}
 
             <section className="space-y-3">
-                <h3 className="text-sm font-medium">At this storefront</h3>
+                <h3 className="text-sm font-medium">At this location</h3>
                 <ul className="divide-y rounded-xl border">
                     {members.map((m, i) => (
                         <li
@@ -279,7 +279,7 @@ export function MembersManager({
                         if (!o) setRemoving(null);
                     }}
                     title={`Remove ${removing.name}?`}
-                    description="They lose access to this storefront's catalogue, orders and customers straight away. They stay on your team; remove them there to take that away too. Bringing them back here means inviting them again."
+                    description="They lose access to this location's catalogue, orders and customers straight away. They stay on your team; remove them there to take that away too. Bringing them back here means inviting them again."
                     confirmLabel="Remove"
                     onConfirm={() => {
                         const r = removing;

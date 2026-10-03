@@ -158,7 +158,10 @@ function Body({
                     : "Nothing is due to renew."
             : tab === "failed"
               ? sub.failedCharge?.dueAt
-                  ? `Was due ${dayText(sub.failedCharge.dueAt, tz, now)} · not paid yet`
+                  ? Date.parse(sub.failedCharge.dueAt) > now.getTime()
+                      ? // Autopay didn't collect it before its due date (D13).
+                        `Autopay didn't collect it · due ${dayText(sub.failedCharge.dueAt, tz, now)}`
+                      : `Was due ${dayText(sub.failedCharge.dueAt, tz, now)} · not paid yet`
                   : "Not paid yet"
               : tab === "paused"
                 ? `${pausedText(sub, now)}. Nothing is charged while paused.`

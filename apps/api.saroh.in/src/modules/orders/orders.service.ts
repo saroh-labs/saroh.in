@@ -6,12 +6,13 @@ import {
     NotFoundException,
     Optional,
 } from "@nestjs/common";
-import { Prisma, prisma } from "@saroh/database";
+import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { formatMoney } from "../invoices/invoice-send.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
@@ -59,6 +60,7 @@ import {
 } from "./order-pricing";
 import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
+import { assertNotPayingOnlineInTx } from "./payment-in-flight";
 import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
 
 const CUSTOMER_SELECT = {
@@ -218,7 +220,7 @@ export class OrdersService {
             dto.currency !== settings.currency
         ) {
             throw new BadRequestException({
-                message: `This storefront takes orders in ${settings.currency}.`,
+                message: `This location takes orders in ${settings.currency}.`,
                 field: "currency",
             });
         }
@@ -338,11 +340,21 @@ export class OrdersService {
             },
         };
 
-        // Assign a per-store order number with a retry on the rare race where
-        // two orders claim the same number (the @@unique([storeId, orderId])).
+        // Numbered in the business's one series (P3, DEC-066), whichever
+        // storefront takes it. A storefront is always a business's.
+        const numberingOrg =
+            organizationId ??
+            (
+                await prisma.store.findUniqueOrThrow({
+                    where: { id: storeId },
+                    select: { organizationId: true },
+                })
+            ).organizationId;
+
+        // Retried when an order the API before P3 numbered took the number
+        // (the @@unique([storeId, orderId])), or a concurrent order's number
+        // broke a coded order's serializable transaction.
         for (let attempt = 0; attempt < 5; attempt++) {
-            const count = await prisma.order.count({ where: { storeId } });
-            const orderNumber = `ORD-${String(count + 1 + attempt).padStart(3, "0")}`;
             try {
                 const created = await prisma.$transaction(
                     async (tx) => {
@@ -354,6 +366,10 @@ export class OrdersService {
                             userId,
                             dto,
                         });
+                        const orderNumber = await nextOrderNumberInTx(
+                            tx,
+                            numberingOrg,
+                        );
                         const { items, ...order } = await tx.order.create({
                             data: { ...data, ...party, orderId: orderNumber },
                             select: {
@@ -439,13 +455,25 @@ export class OrdersService {
                         created.id,
                     );
                 }
-                return created.payLink
-                    ? { id: created.id, payLink: created.payLink }
+                // The business rides along with a pay link, so the
+                // controller can put it on the business's own address
+                // (DEC-069, L7).
+                return created.payLink && organizationId
+                    ? {
+                          id: created.id,
+                          organizationId,
+                          payLink: created.payLink,
+                      }
                     : { id: created.id };
             } catch (err) {
                 if (this.isUniqueOrderNumber(err) && attempt < 4) continue;
-                // A serialization failure only means something on the coded
-                // path: another order took the code's last use first.
+                // A serialization failure only happens on the coded path:
+                // another order took the code's last use first — which the
+                // next attempt's re-count says in its own words — or took
+                // the business's next number (P3). Tried again first.
+                if (applied && isSerializationFailure(err) && attempt < 4) {
+                    continue;
+                }
                 if (applied && isSerializationFailure(err)) {
                     throw new ConflictException({
                         message: `${applied.code} was just used by another order. Try again, or remove it.`,
@@ -524,6 +552,11 @@ export class OrdersService {
                     order.paymentStatus as PaymentStatus,
                     nextPayment,
                 );
+                // Not while the customer is paying it online (#622): the
+                // payment landing next would bill the order a second time.
+                if (nextPayment === "PAID") {
+                    await assertNotPayingOnlineInTx(tx, orderId);
+                }
             }
 
             // The kitchen stage follows a status set here, so the next
@@ -570,12 +603,14 @@ export class OrdersService {
             if (paymentChanging && nextPayment === "REFUNDED") {
                 await creditRestOfOrder(tx, orderId, "Refunded", userId);
             }
-            // Cancelled or refunded: its pay link stops working (B11). Paid
-            // by hand, it stays readable, so a customer who opens it is told
-            // the order is paid — and it can start no payment.
+            // Cancelled, refunded or paid at the counter: its pay link stops
+            // working (B11, DEC-067), so nobody can pay twice. The page says
+            // the link is no longer needed; a balance later owed gets a new
+            // link.
             if (
                 (statusChanging && nextStatus === "CANCELLED") ||
-                (paymentChanging && nextPayment === "REFUNDED")
+                (paymentChanging &&
+                    (nextPayment === "REFUNDED" || nextPayment === "PAID"))
             ) {
                 await retireOrderPayLinkInTx(tx, orderId);
             }
@@ -681,6 +716,9 @@ export class OrdersService {
             );
         }
         await assertPaymentsOn(prisma, organizationId, "make a pay link");
+        // A pay link takes money online: the business details first
+        // (DEC-068), before the order is made.
+        await assertBusinessDetails(prisma, organizationId);
     }
 
     /**

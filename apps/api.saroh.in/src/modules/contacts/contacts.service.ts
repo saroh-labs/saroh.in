@@ -19,6 +19,12 @@ import {
 } from "../payments/mandate-gate";
 import { MandatesService } from "../payments/mandates.service";
 import { emailHeldBy, planContactEdit } from "./contact-edit";
+import type { ContactRecords } from "./contact-records";
+import {
+    contactRecords,
+    DELETE_KEEPS_RECORDS,
+    keepsRecords,
+} from "./contact-records";
 import type { ContactSearchResult } from "./contact-search";
 import { SEARCH_LIMIT, searchContacts } from "./contact-search";
 import type { CreateContactDto, UpdateContactDto } from "./dto";
@@ -541,8 +547,13 @@ export class ContactsService {
      * class packs go with their balances, and their course seats go. Their
      * future bookings paid with one of those packs, and their course sessions
      * still to come, are cancelled in the same transaction — the seat or the
-     * credit behind them no longer exists. Invoices stay, under the name and
-     * email they were issued to.
+     * credit behind them no longer exists. A pay-now hold's unnumbered draft
+     * (not paper) stays, unlinked, with its pay link revoked.
+     *
+     * A person with orders or invoices is never deleted (DEC-042): the paper
+     * stays with who it was for, so the delete is refused (409) and staff
+     * remove their details instead (C11). Checked before autopay is touched,
+     * and again under the contact's lock.
      *
      * Returns how much went, so the workspace can say so.
      */
@@ -552,6 +563,9 @@ export class ContactsService {
     ): Promise<ContactRemoval> {
         authorize(ctx, "contact:write");
         await this.requireOwned(ctx, contactId);
+        refuseIfKeepsRecords(
+            await contactRecords(prisma, ctx.organizationId, contactId),
+        );
         // Their autopay ends at the provider before the rows that say who
         // authorised it cascade away (D20): after the delete, the
         // `mandate.cancel` job would find nothing left to ask about.
@@ -573,6 +587,10 @@ export class ContactsService {
             await tx.$queryRaw`SELECT id FROM "Contact"
                 WHERE id = ${contactId} AND "organizationId" = ${ctx.organizationId}
                 FOR UPDATE`;
+            // An order linked or an invoice issued since the first look.
+            refuseIfKeepsRecords(
+                await contactRecords(tx, ctx.organizationId, contactId),
+            );
             const stillOpen = await tx.paymentMandate.findFirst({
                 where: openMandatesWhere(ctx.organizationId, contactId),
                 select: { provider: true },
@@ -683,6 +701,15 @@ export class ContactsService {
         }
         return contact;
     }
+}
+
+/** A hard delete of someone with orders or invoices (DEC-042): 409. */
+function refuseIfKeepsRecords(records: ContactRecords): void {
+    if (!keepsRecords(records)) return;
+    throw new ConflictException({
+        message: DELETE_KEEPS_RECORDS,
+        details: { reason: "keeps_records", ...records },
+    });
 }
 
 function blankToNull(value: string | undefined): string | null {

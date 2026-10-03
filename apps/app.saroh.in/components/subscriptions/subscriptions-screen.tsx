@@ -61,6 +61,7 @@ export function SubscriptionsScreen({
     openSubscribe,
     nowIso,
     settings = null,
+    autopayOffered = false,
 }: {
     subscriptions: Subscription[];
     /** The newest read hit its cap: older cancelled ones are not here. */
@@ -81,6 +82,8 @@ export function SubscriptionsScreen({
     nowIso: string;
     /** "Members can pause from their account" (A8); null when unread. */
     settings?: SubscriptionSettings | null;
+    /** The business offers autopay (D14): the copy may say so. */
+    autopayOffered?: boolean;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -187,7 +190,7 @@ export function SubscriptionsScreen({
                                         TAB_CLASS,
                                         on
                                             ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                            : "font-medium text-muted-foreground hover:text-foreground",
+                                            : "font-medium text-muted-foreground hover:text-foreground active:text-muted-foreground",
                                     )}
                                 >
                                     {TAB_LABEL[t]}
@@ -206,7 +209,7 @@ export function SubscriptionsScreen({
                                 TAB_CLASS,
                                 onPlans
                                     ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground",
+                                    : "font-medium text-muted-foreground hover:text-foreground active:text-muted-foreground",
                             )}
                         >
                             Plans
@@ -249,6 +252,7 @@ export function SubscriptionsScreen({
                         canWrite={canWrite}
                         showClasses={showClasses}
                         settings={settings}
+                        nowIso={nowIso}
                     />
                 ) : (
                     <>
@@ -335,6 +339,7 @@ export function SubscriptionsScreen({
                     onOpenChange={onSubscribeOpenChange}
                     contacts={contacts}
                     plans={plans}
+                    autopayOffered={autopayOffered}
                 />
             ) : null}
         </>

@@ -279,10 +279,46 @@ export class CreateCommentDto {
     @MinLength(1, { message: "pageId is required" })
     pageId!: string;
 
+    /**
+     * On the draft: the section's key. On a test release: its position on
+     * the frozen page, `"0"` for the first (a snapshot keeps no keys, and a
+     * frozen page's sections never move).
+     */
     @IsString()
     @MinLength(1, { message: "sectionKey is required" })
     @MaxLength(64)
     sectionKey!: string;
+
+    /** The test release the note is about (DEC-071, T8). Absent: the draft. */
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
+}
+
+/**
+ * Which review to read: the draft's (absent), or a test release's (DEC-071,
+ * T8). A query, for the review state and the notes.
+ */
+export class ReviewTargetQueryDto {
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
+}
+
+/**
+ * Ask for a review (#278): of the draft (no body, or no `testReleaseId`),
+ * or of a test release (DEC-071, T8).
+ */
+export class RequestReviewDto {
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
 }
 
 /**
@@ -315,6 +351,16 @@ export class CreateApprovalDto {
         message: "outcome must be APPROVED or CHANGES_REQUESTED",
     })
     outcome!: "APPROVED" | "CHANGES_REQUESTED";
+
+    /**
+     * The test release the verdict is on (DEC-071, T8). The verdict is then
+     * bound to that release's frozen bytes, not the moving draft (KTD-10).
+     */
+    @IsOptional()
+    @IsString({ message: "testReleaseId must be an id" })
+    @MinLength(1, { message: "testReleaseId must be an id" })
+    @MaxLength(64)
+    testReleaseId?: string;
 }
 
 /**
@@ -410,10 +456,113 @@ export class UpdateSiteSettingsDto {
     @MinLength(1)
     @MaxLength(64)
     storefrontId?: string | null;
+
+    /**
+     * "Publishing needs approval" (DEC-071, R10). An owner's alone: 403 for
+     * anyone else, checked in the service. Never null: it is on or off.
+     */
+    @IsOptional()
+    @IsBoolean({ message: "publishNeedsApproval must be true or false" })
+    publishNeedsApproval?: boolean;
+}
+
+/**
+ * Publish, restore or go live with a test release (DEC-071, T9). The body
+ * is optional. `override` is an owner's "go live without approval" while
+ * Publishing needs approval is on; 403 from anyone else.
+ */
+export class GoLiveOptionsDto {
+    @IsOptional()
+    @IsBoolean({ message: "override must be true or false" })
+    override?: boolean;
 }
 
 /** Mint a preview link (#198). The choices are the ones the design offers. */
 export class CreatePreviewLinkDto {
     @IsIn([1, 7, 30], { message: "A preview link lasts 1, 7 or 30 days" })
     expiresInDays!: 1 | 7 | 30;
+}
+
+/** Blank means "not given", so an empty name field takes the default. */
+const trimOrUndefined = ({ value }: { value: unknown }) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+};
+
+const TEST_RELEASE_NAME_MAX = 80;
+const TEST_RELEASE_NOTE_MAX = 500;
+
+/**
+ * Make a test release (DEC-071, T2). Both optional: the name defaults to
+ * "Test release N", and the note is for whoever opens it.
+ */
+export class CreateTestReleaseDto {
+    @IsOptional()
+    @Transform(trimOrUndefined)
+    @IsString({ message: "Give the test release a name" })
+    @MaxLength(TEST_RELEASE_NAME_MAX, {
+        message: `A test release name must be at most ${TEST_RELEASE_NAME_MAX} characters`,
+    })
+    name?: string;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(TEST_RELEASE_NOTE_MAX, {
+        message: `A note must be at most ${TEST_RELEASE_NOTE_MAX} characters`,
+    })
+    note?: string | null;
+}
+
+/** Rename a test release, or change or clear its note. */
+export class UpdateTestReleaseDto {
+    // Checked whenever present: a release always has a name.
+    @ValidateIf((_o, v) => v !== undefined)
+    @Transform(trim)
+    @IsString({ message: "Give the test release a name" })
+    @MinLength(1, { message: "Give the test release a name" })
+    @MaxLength(TEST_RELEASE_NAME_MAX, {
+        message: `A test release name must be at most ${TEST_RELEASE_NAME_MAX} characters`,
+    })
+    name?: string;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(TEST_RELEASE_NOTE_MAX, {
+        message: `A note must be at most ${TEST_RELEASE_NOTE_MAX} characters`,
+    })
+    note?: string | null;
+}
+
+/** A new link to share a test release, lasting 1, 7 or 30 days. */
+export class CreateTestReleaseLinkDto {
+    @IsIn([1, 7, 30], { message: "A test release link lasts 1, 7 or 30 days" })
+    days!: 1 | 7 | 30;
+}
+
+/**
+ * Go live with a test release at a date and time (DEC-071, T10), both in
+ * the business's time zone: "2026-10-03" and "18:00". `override` is an
+ * owner's "go live without approval" while Publishing needs approval is on.
+ */
+export class ScheduleGoLiveDto {
+    @IsString({ message: "Pick a date to go live" })
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+        message: "Pick a date to go live, as YYYY-MM-DD",
+    })
+    date!: string;
+
+    @IsString({ message: "Pick a time to go live" })
+    @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+        message: "Pick a time to go live, as HH:MM",
+    })
+    time!: string;
+
+    @IsOptional()
+    @IsBoolean({ message: "override must be true or false" })
+    override?: boolean;
 }

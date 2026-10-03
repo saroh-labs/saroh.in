@@ -23,6 +23,7 @@ import { runsClasses } from "@/lib/services/booking-calendar";
 import type { BookingPeople } from "@/lib/services/booking-pay";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
+import { callName } from "@/lib/services/call-name";
 import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
 import {
     addDays,
@@ -124,7 +125,13 @@ export function CalendarScreen({
     rules: BookingRules | null;
     /** What New booking may do about the customer and a pay link (E4). */
     people: BookingPeople;
-    can: { book: boolean; hours: boolean; order?: boolean };
+    can: {
+        book: boolean;
+        hours: boolean;
+        order?: boolean;
+        /** Take payment at the desk, and send a pay link instead (P2). */
+        desk?: { canTake: boolean; canLink: boolean };
+    };
     /** The full New booking dialog, for any service at any open time. */
     newBooking: ReactNode;
     /** What the business can tell its customers with (A14). */
@@ -491,7 +498,7 @@ export function CalendarScreen({
                                 "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                                 layout === id
                                     ? "bg-card text-foreground"
-                                    : "text-primary-foreground hover:bg-primary-hover",
+                                    : "text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
                                 id === "week" && "max-[759px]:hidden",
                             )}
                         >
@@ -556,7 +563,7 @@ export function CalendarScreen({
                         {can.hours ? (
                             <Link
                                 href="/bookings/availability"
-                                className="font-semibold text-brand hover:text-foreground"
+                                className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 Add who takes bookings
                             </Link>
@@ -587,10 +594,10 @@ export function CalendarScreen({
                                                 "h-10 min-w-fit flex-1 whitespace-nowrap rounded-[8px] px-2.5 text-[13px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                                 on
                                                     ? "bg-card text-foreground shadow-sm"
-                                                    : "text-muted-foreground",
+                                                    : "text-muted-foreground hover:text-foreground active:bg-card/60",
                                             )}
                                         >
-                                            {c.name.split(" ")[0]} · {n}
+                                            {callName(c.name)} · {n}
                                         </button>
                                     );
                                 })}
@@ -657,6 +664,7 @@ export function CalendarScreen({
                     rules,
                     canBook: can.book,
                     canReadOrder: can.order ?? false,
+                    desk: can.desk,
                     notices,
                 }}
                 act={act}
@@ -797,7 +805,7 @@ function RulesNote({
                 <>
                     <Link
                         href="/bookings/availability"
-                        className="text-brand hover:text-foreground"
+                        className="text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground"
                     >
                         Change hours and rules
                     </Link>
@@ -806,7 +814,7 @@ function RulesNote({
             ) : null}
             <Link
                 href="/bookings/all"
-                className="text-brand hover:text-foreground"
+                className="text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground"
             >
                 Every booking as a list
             </Link>

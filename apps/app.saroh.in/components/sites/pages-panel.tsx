@@ -1,31 +1,50 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { Check, ChevronRight, Plus, Settings2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
+import { useId, useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { AddPagePanel, MENU_ROW } from "@/components/sites/add-page-panel";
 import { leavePageMessage } from "@/components/sites/editor/use-editor-selection";
-import { createPage, deletePage, updatePage } from "@/lib/sites/actions";
-import type { SitePage } from "@/lib/sites/service";
+import { PageSettings } from "@/components/sites/page-settings";
+import { deletePage } from "@/lib/sites/actions";
+import {
+    addPageOffers,
+    pageMenuMarks,
+    pageOptionName,
+    unseenBecause,
+} from "@/lib/sites/page-menu";
+import type { Flag, ModulePageKind, SitePage } from "@/lib/sites/service";
+
+/** Which part of the menu is open below the pages. */
+type Open = "pages" | "settings" | "add";
 
 /**
- * The page switcher under the page name in the editor's breadcrumb (#335):
- * every page on this site, which one is open, and the
- * three things you can do to the set.
+ * The page menu under the page name in the editor's breadcrumb (#335, G16),
+ * drawn as Saroh Site Editor.dc.html draws it: a list of the site's pages,
+ * the open one ticked, "Not in menu" beside a page taken out of the menu,
+ * and a page hidden from the site crossed out — as a hidden block is in the
+ * block list. A free-form page at an address one of the site's routes
+ * answers says "Can't be seen", and opening its settings says why and where
+ * to change its address.
+ *
+ * It is a button and a list, never a native select, so it can't show one
+ * page while another is open; Esc closes it (the popover's own). Below the
+ * list, the open page's settings and "Add a page" — the module pages the
+ * site can have now, then "Blank page".
  *
  * Switching pages is a NAVIGATION (`?page=<id>`), not local state. The open
  * page survives a reload, can be linked to, and Back goes where you expect —
  * and the server is the thing that loads a page's sections, so it has to know
  * which page anyway.
  *
- * Every rule about paths lives on the server. This panel does not pre-validate
- * a path or pre-check whether one is free: a client-side answer that disagreed
- * with the server's would be worse than one round trip, and there are exactly
- * two people who could be told different things.
+ * Every rule about pages lives on the server: which kinds can be added, what
+ * a legal address is and whether it is free. This panel never pre-checks;
+ * it shows the server's answer in the server's words.
  */
 export function PagesPanel({
     siteId,
@@ -33,6 +52,10 @@ export function PagesPanel({
     activePageId,
     dirty,
     unfinished,
+    canUpdate,
+    addableKinds,
+    flags,
+    onClose,
 }: {
     siteId: string;
     pages: SitePage[];
@@ -45,91 +68,48 @@ export function PagesPanel({
      * cannot help then, so the message says what will.
      */
     unfinished?: string;
+    /** Whether this person holds `site:update`, which every page change needs. */
+    canUpdate: boolean;
+    /** The module pages the API says can be added now (G14). */
+    addableKinds?: ModulePageKind[];
+    /** The site's pre-publish flags, for a page at a route's address. */
+    flags: readonly Flag[];
+    /** Close the menu (after a switch, or once a page is added). */
+    onClose: () => void;
 }) {
     const router = useRouter();
-    const [busy, setBusy] = useState(false);
+    const [open, setOpen] = useState<Open>("pages");
+    const reasonId = useId();
     // The page a Delete was last chosen for. Kept after the dialog closes so
     // its title does not blank out during the closing animation.
     const [pendingDelete, setPendingDelete] = useState<SitePage | null>(null);
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const [adding, setAdding] = useState(false);
-    const [title, setTitle] = useState("");
-    const [path, setPath] = useState("");
-    const [renaming, setRenaming] = useState<string | null>(null);
-    const [renameTitle, setRenameTitle] = useState("");
     // The confirm action stays clickable during the dialog's exit animation,
-    // so a double click can fire this twice before `busy` re-renders.
+    // so a double click can fire this twice before a re-render.
     const removeInFlight = useRef(false);
+    const listRef = useRef<HTMLDivElement>(null);
 
-    function open(pageId: string) {
-        if (pageId === activePageId) return;
+    const active = pages.find((page) => page.id === activePageId);
+    const offers = addPageOffers(addableKinds);
+
+    function openPage(pageId: string) {
+        if (pageId === activePageId) {
+            onClose();
+            return;
+        }
         // Not while this page has work that hasn't gone out yet.
         const blocked = leavePageMessage(dirty, unfinished);
         if (blocked !== null) {
             showError(blocked);
             return;
         }
+        onClose();
         router.push(`/sites/${siteId}?page=${pageId}`);
-    }
-
-    async function add() {
-        const t = title.trim();
-        const p = path.trim();
-        if (t === "" || p === "") return;
-        setBusy(true);
-        const res = await createPage(siteId, { title: t, path: p });
-        setBusy(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        setAdding(false);
-        setTitle("");
-        setPath("");
-        showSuccess(`Added ${res.data.title}.`);
-        router.push(`/sites/${siteId}?page=${res.data.id}`);
-        router.refresh();
-    }
-
-    async function rename(pageId: string) {
-        const t = renameTitle.trim();
-        if (t === "") return;
-        setBusy(true);
-        const res = await updatePage(siteId, pageId, { title: t });
-        setBusy(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        setRenaming(null);
-        router.refresh();
-    }
-
-    async function setHidden(page: SitePage, hidden: boolean) {
-        // No confirm, deliberately. Hiding is the REVERSIBLE half of the pair
-        // this panel offers — the whole reason it exists is so that taking a
-        // page off the live site does not have to be a decision the merchant
-        // is asked to be sure about. Delete keeps its confirm; this is the
-        // thing they should reach for instead.
-        setBusy(true);
-        const res = await updatePage(siteId, page.id, { hidden });
-        setBusy(false);
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        showSuccess(
-            hidden
-                ? `${page.title} is hidden. It stays here and comes off the site when you publish.`
-                : `${page.title} is visible again. It goes back on the site when you publish.`,
-        );
-        router.refresh();
     }
 
     async function remove(page: SitePage) {
         if (removeInFlight.current) return;
         removeInFlight.current = true;
-        setBusy(true);
         try {
             const res = await deletePage(siteId, page.id);
             if (!res.ok) {
@@ -137,243 +117,166 @@ export function PagesPanel({
                 return;
             }
             showSuccess(`Deleted ${page.title}.`);
+            onClose();
             if (page.id === activePageId) router.push(`/sites/${siteId}`);
             router.refresh();
         } finally {
-            setBusy(false);
             removeInFlight.current = false;
         }
     }
 
+    /** Up and Down move between pages; Home and End go to the ends. */
+    function onListKey(e: KeyboardEvent<HTMLDivElement>) {
+        const options = Array.from(
+            listRef.current?.querySelectorAll<HTMLButtonElement>(
+                '[role="option"]',
+            ) ?? [],
+        );
+        const at = options.findIndex((o) => o === document.activeElement);
+        const to =
+            e.key === "ArrowDown"
+                ? Math.min(at + 1, options.length - 1)
+                : e.key === "ArrowUp"
+                  ? Math.max(at - 1, 0)
+                  : e.key === "Home"
+                    ? 0
+                    : e.key === "End"
+                      ? options.length - 1
+                      : null;
+        if (to === null) return;
+        e.preventDefault();
+        options[to]?.focus();
+    }
+
     return (
         <>
-            <ul className="min-h-0 flex-1 overflow-y-auto p-2">
-                {pages.map((page) => (
-                    <li key={page.id}>
-                        {renaming === page.id ? (
-                            <form
-                                className="flex items-center gap-1 py-1"
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    void rename(page.id);
-                                }}
-                            >
-                                <Input
-                                    autoFocus
-                                    value={renameTitle}
-                                    onChange={(e) =>
-                                        setRenameTitle(e.target.value)
-                                    }
-                                    aria-label={`Rename ${page.title}`}
-                                    className="h-7 text-xs"
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Escape")
-                                            setRenaming(null);
-                                    }}
-                                />
-                                <Button
-                                    type="submit"
-                                    size="sm"
-                                    className="h-7 px-2 text-xs"
-                                    disabled={busy}
-                                >
-                                    Save
-                                </Button>
-                            </form>
-                        ) : (
-                            <div
+            <div
+                ref={listRef}
+                role="listbox"
+                aria-label="Page to edit"
+                onKeyDown={onListKey}
+                className="grid gap-px p-[5px]"
+            >
+                {pages.map((page) => {
+                    const current = page.id === activePageId;
+                    const marks = pageMenuMarks(page, flags);
+                    return (
+                        <button
+                            key={page.id}
+                            type="button"
+                            role="option"
+                            aria-selected={current}
+                            aria-label={pageOptionName(page, marks)}
+                            tabIndex={current ? 0 : -1}
+                            onClick={() => openPage(page.id)}
+                            className={cn(
+                                MENU_ROW,
+                                "h-[34px]",
+                                current && "bg-secondary font-semibold",
+                            )}
+                        >
+                            <span
                                 className={cn(
-                                    "group flex h-8 items-center gap-1 rounded px-2 text-xs",
-                                    page.id === activePageId
-                                        ? "bg-secondary"
-                                        : "hover:bg-muted",
+                                    "min-w-0 flex-1 truncate",
+                                    /*
+                                     * Dimmed and struck through, the same
+                                     * as a hidden block in the block list:
+                                     * two lists that look alike must mean
+                                     * alike.
+                                     */
+                                    marks.hidden &&
+                                        "text-muted-foreground line-through",
                                 )}
                             >
-                                <button
-                                    type="button"
-                                    onClick={() => open(page.id)}
-                                    aria-current={
-                                        page.id === activePageId
-                                            ? "page"
-                                            : undefined
-                                    }
-                                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                                >
-                                    <span
-                                        className={cn(
-                                            "truncate",
-                                            /*
-                                             * Dimmed and struck through, the
-                                             * same as a hidden block in the
-                                             * block list. Two lists that look
-                                             * alike must mean alike — the
-                                             * merchant should not have to learn
-                                             * a second vocabulary.
-                                             */
-                                            page.hidden &&
-                                                "text-muted-foreground line-through",
-                                        )}
-                                    >
-                                        {page.title}
-                                    </span>
-                                    {/*
-                                     * The path, not a "home" badge: the path is
-                                     * what the merchant typed and what visitors
-                                     * see, and "/" already says home.
-                                     */}
-                                    <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                                        {page.path}
-                                    </span>
-                                </button>
-                                {/*
-                                 * Dimmed, never hidden. This tray used to be
-                                 * `opacity-0` until hover, which put every row
-                                 * action behind a pointer — and two of the four
-                                 * primary scenes (§18) have none, so on a phone
-                                 * there was no way to reach them at all. §19 is
-                                 * explicit that no functionality may be
-                                 * hover-only. Presence is the affordance;
-                                 * hover and focus only raise the contrast.
-                                 */}
-                                <div className="flex shrink-0 items-center opacity-60 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-                                    {/*
-                                     * The home page has no hide control, for
-                                     * the same reason it has no delete: "/" is
-                                     * what the site's own address serves, so
-                                     * hiding it is not a thing to disable, it
-                                     * is a thing that does not exist.
-                                     */}
-                                    {page.isHome ? null : (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            aria-pressed={page.hidden}
-                                            aria-label={
-                                                page.hidden
-                                                    ? `Show ${page.title} on the site`
-                                                    : `Hide ${page.title} from the site`
-                                            }
-                                            title={
-                                                page.hidden
-                                                    ? "Hidden — left out when you publish"
-                                                    : "Visible — publishes with the site"
-                                            }
-                                            className="h-6 w-6 p-0 text-xs"
-                                            disabled={busy}
-                                            onClick={() =>
-                                                void setHidden(
-                                                    page,
-                                                    !page.hidden,
-                                                )
-                                            }
-                                        >
-                                            {/*
-                                             * Filled means on the site, hollow
-                                             * means parked — the same two marks
-                                             * the section panel uses, so the
-                                             * glyph carries the meaning rather
-                                             * than colour alone (§19).
-                                             */}
-                                            {page.hidden ? "○" : "●"}
-                                        </Button>
-                                    )}
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        aria-label={`Rename ${page.title}`}
-                                        className="h-6 w-6 p-0 text-xs"
-                                        onClick={() => {
-                                            setRenaming(page.id);
-                                            setRenameTitle(page.title);
-                                        }}
-                                    >
-                                        ✎
-                                    </Button>
-                                    {/*
-                                     * The home page has no delete control at
-                                     * all rather than a disabled one: it is not
-                                     * a permission the merchant might gain, it
-                                     * is what the site's address serves.
-                                     */}
-                                    {page.isHome ? null : (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            aria-label={`Delete ${page.title}`}
-                                            className="h-6 w-6 p-0 text-xs hover:text-destructive"
-                                            disabled={busy}
-                                            onClick={() => {
-                                                setPendingDelete(page);
-                                                setDeleteOpen(true);
-                                            }}
-                                        >
-                                            ×
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </li>
-                ))}
-            </ul>
-
-            <div className="p-2">
-                {adding ? (
-                    <form
-                        className="grid gap-1.5"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            void add();
-                        }}
-                    >
-                        <Input
-                            autoFocus
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Page name"
-                            aria-label="Page name"
-                            className="h-7 text-xs"
-                        />
-                        <Input
-                            value={path}
-                            onChange={(e) => setPath(e.target.value)}
-                            placeholder="/about"
-                            aria-label="Page path"
-                            className="h-7 font-mono text-xs"
-                        />
-                        <div className="flex gap-1">
-                            <Button
-                                type="submit"
-                                size="sm"
-                                className="h-7 flex-1 text-xs"
-                                disabled={busy}
-                            >
-                                {busy ? "Adding…" : "Add page"}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => setAdding(false)}
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    </form>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => setAdding(true)}
-                        className="w-full rounded-md border border-dashed px-2 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:border-solid hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        ＋ Add page
-                    </button>
-                )}
+                                {page.title}
+                            </span>
+                            {marks.unseen ? (
+                                <span className="shrink-0 text-[0.6875rem] font-medium text-highlight">
+                                    Can&apos;t be seen
+                                </span>
+                            ) : marks.notInMenu ? (
+                                <span className="shrink-0 text-[0.6875rem] font-medium text-muted-foreground">
+                                    Not in menu
+                                </span>
+                            ) : null}
+                            {current ? (
+                                <Check
+                                    aria-hidden
+                                    strokeWidth={2.2}
+                                    className="size-3.5 shrink-0 text-foreground"
+                                />
+                            ) : null}
+                        </button>
+                    );
+                })}
             </div>
+
+            <div className="border-t p-[5px]">
+                <Disclosure
+                    icon={<Settings2 aria-hidden className="size-3.5" />}
+                    label={
+                        active
+                            ? `Settings for ${active.title}`
+                            : "Page settings"
+                    }
+                    open={open === "settings"}
+                    onToggle={() =>
+                        setOpen(open === "settings" ? "pages" : "settings")
+                    }
+                    hint={
+                        active && unseenBecause(active.id, flags)
+                            ? "Change path"
+                            : undefined
+                    }
+                />
+                {open === "settings" && active ? (
+                    <PageSettings
+                        // Fresh fields when the page itself changes.
+                        key={`${active.id}:${active.title}:${active.path}`}
+                        siteId={siteId}
+                        page={active}
+                        canUpdate={canUpdate}
+                        unseen={unseenBecause(active.id, flags)}
+                        onChanged={() => router.refresh()}
+                        onDelete={() => {
+                            setPendingDelete(active);
+                            setDeleteOpen(true);
+                        }}
+                    />
+                ) : null}
+
+                <Disclosure
+                    icon={<Plus aria-hidden className="size-3.5" />}
+                    label="Add a page"
+                    open={open === "add"}
+                    disabled={!canUpdate}
+                    describedBy={canUpdate ? undefined : reasonId}
+                    onToggle={() => setOpen(open === "add" ? "pages" : "add")}
+                />
+                {canUpdate ? null : (
+                    <p
+                        id={reasonId}
+                        className="px-2.5 pb-1.5 text-[0.71875rem] leading-relaxed text-muted-foreground"
+                    >
+                        Adding a page needs a role that can change the
+                        website&apos;s settings.
+                    </p>
+                )}
+                {open === "add" && canUpdate ? (
+                    <AddPagePanel
+                        siteId={siteId}
+                        offers={offers}
+                        onCancel={() => setOpen("pages")}
+                        onAdded={(page) => {
+                            showSuccess(`Added ${page.title}.`);
+                            onClose();
+                            router.push(`/sites/${siteId}?page=${page.id}`);
+                            router.refresh();
+                        }}
+                    />
+                ) : null}
+            </div>
+
             {/*
              * Deleting a page destroys every section on it, and nothing here
              * restores it — the sections are not versioned the way
@@ -392,5 +295,51 @@ export function PagesPanel({
                 }}
             />
         </>
+    );
+}
+
+/** A row that opens a part of the menu below it. */
+function Disclosure({
+    icon,
+    label,
+    open,
+    onToggle,
+    disabled = false,
+    describedBy,
+    hint,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    open: boolean;
+    onToggle: () => void;
+    disabled?: boolean;
+    describedBy?: string;
+    /** A word on the right, such as "Change path". */
+    hint?: string;
+}) {
+    return (
+        <button
+            type="button"
+            aria-expanded={open}
+            aria-describedby={describedBy}
+            disabled={disabled}
+            onClick={onToggle}
+            className={cn(MENU_ROW, "h-[34px]", open && "font-semibold")}
+        >
+            <span className="shrink-0 text-muted-foreground">{icon}</span>
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            {hint ? (
+                <span className="shrink-0 text-[0.6875rem] font-medium text-highlight">
+                    {hint}
+                </span>
+            ) : null}
+            <ChevronRight
+                aria-hidden
+                className={cn(
+                    "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                    open && "rotate-90",
+                )}
+            />
+        </button>
     );
 }

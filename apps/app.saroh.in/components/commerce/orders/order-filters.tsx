@@ -22,6 +22,9 @@ const SELECT =
     "h-[34px] w-auto min-w-[128px] max-w-full rounded-[9px] px-2.5 text-[12.5px] coarse:h-11";
 const DATE_FIELD =
     "h-[34px] w-auto rounded-[9px] px-2.5 text-[12.5px] coarse:h-11";
+/** In the phone's sheet (B5): each menu the sheet's width, one to a line. */
+const SELECT_STACKED = "h-11 w-full rounded-[9px] px-3 text-[14px]";
+const DATE_FIELD_STACKED = "h-11 w-full min-w-0 rounded-[9px] px-3 text-[14px]";
 
 /**
  * The Orders list's filter bar (plan B, B4), after the "Saroh Orders
@@ -34,16 +37,25 @@ const DATE_FIELD =
  * API's `options`). When those couldn't be read the two menus are left
  * out, rather than offered empty. What counts as Needs attention is the
  * API's: a sensitive entry only for a role that may read it.
+ *
+ * On a phone (B5, DEC-067) the same filters sit in a sheet behind a Filters
+ * button, `stacked`: one full-width menu to a line, then the toggles, so a
+ * wall of menus never pushes the first order below the fold.
  */
 export function OrderFilters({
     query,
     options,
     go,
+    stacked = false,
 }: {
     query: OrdersQuery;
     options: OrderFilterOptions | null;
     go: (patch: Partial<OrdersQuery>) => void;
+    /** The phone's sheet: one menu to a line, the sheet's width. */
+    stacked?: boolean;
 }) {
+    const select = stacked ? SELECT_STACKED : SELECT;
+    const dateField = stacked ? DATE_FIELD_STACKED : DATE_FIELD;
     const steps = options ? stepOptions(options, query.fulfilment) : [];
     const stepKnown = steps.some((s) => s.key === query.step);
 
@@ -61,7 +73,11 @@ export function OrderFilters({
         <div
             role="group"
             aria-label="Filter orders"
-            className="flex flex-wrap items-center gap-2 pt-2.5"
+            className={
+                stacked
+                    ? "grid gap-2.5"
+                    : "flex flex-wrap items-center gap-2 pt-2.5"
+            }
         >
             <OptionSelect<OrdersDate | "">
                 aria-label="Date"
@@ -70,17 +86,21 @@ export function OrderFilters({
                     go({ date: v || null, from: null, to: null })
                 }
                 options={[{ value: "", label: "Any date" }, ...DATE_OPTIONS]}
-                className={SELECT}
+                className={select}
             />
             {query.date === "custom" ? (
-                <>
+                <div
+                    className={
+                        stacked ? "grid grid-cols-2 gap-2.5" : "contents"
+                    }
+                >
                     <Input
                         type="date"
                         aria-label="From"
                         value={query.from ?? ""}
                         max={query.to ?? undefined}
                         onChange={(e) => go({ from: e.target.value || null })}
-                        className={DATE_FIELD}
+                        className={dateField}
                     />
                     <Input
                         type="date"
@@ -88,9 +108,9 @@ export function OrderFilters({
                         value={query.to ?? ""}
                         min={query.from ?? undefined}
                         onChange={(e) => go({ to: e.target.value || null })}
-                        className={DATE_FIELD}
+                        className={dateField}
                     />
-                </>
+                </div>
             ) : null}
             {options && steps.length > 0 ? (
                 <OptionSelect<string>
@@ -106,7 +126,7 @@ export function OrderFilters({
                             ? [{ value: query.step, label: "That step" }]
                             : []),
                     ]}
-                    className={SELECT}
+                    className={select}
                 />
             ) : null}
             {options && options.types.length > 0 ? (
@@ -125,7 +145,7 @@ export function OrderFilters({
                             ? [{ value: query.fulfilment, label: "That way" }]
                             : []),
                     ]}
-                    className={SELECT}
+                    className={select}
                 />
             ) : null}
             <OptionSelect<OrdersPayment | "">
@@ -136,7 +156,7 @@ export function OrderFilters({
                     { value: "", label: "Any payment" },
                     ...PAYMENT_OPTIONS,
                 ]}
-                className={SELECT}
+                className={select}
             />
             <ProductFilter
                 value={query.product}
@@ -146,22 +166,29 @@ export function OrderFilters({
                         : null
                 }
                 onChange={(product) => go({ product })}
+                className={
+                    stacked
+                        ? "h-11 w-full max-w-none justify-between px-3 text-[14px]"
+                        : undefined
+                }
             />
-            <Toggle
-                label="Needs attention"
-                on={query.attention}
-                onFlip={() => go({ attention: !query.attention })}
-            />
-            <Toggle
-                label="Late"
-                on={query.late}
-                onFlip={() => go({ late: !query.late })}
-            />
-            {filtersActive(query) ? (
+            <div className={stacked ? "flex flex-wrap gap-2" : "contents"}>
+                <Toggle
+                    label="Needs attention"
+                    on={query.attention}
+                    onFlip={() => go({ attention: !query.attention })}
+                />
+                <Toggle
+                    label="Late"
+                    on={query.late}
+                    onFlip={() => go({ late: !query.late })}
+                />
+            </div>
+            {filtersActive(query) && !stacked ? (
                 <button
                     type="button"
                     onClick={() => go({ ...NO_FILTERS })}
-                    className="rounded-sm px-1 text-[12.5px] font-semibold text-brand underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                    className="rounded-sm px-1 text-[12.5px] font-semibold text-brand underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
                 >
                     Clear filters
                 </button>

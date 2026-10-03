@@ -114,6 +114,11 @@ describe("the search", () => {
         expect(text(s)).not.toContain("phone");
     });
 
+    it("finds an order by the number it had before P3 renumbered it (DEC-066)", () => {
+        const s = searchSql("ORD-001", { contact: false });
+        expect(text(s)).toContain(`o."renumberedFrom" ILIKE`);
+    });
+
     it("adds email and the phone's digits with contact:read", () => {
         const s = searchSql("+91 98765 43210", { contact: true });
         expect(text(s)).toContain("c.email ILIKE");

@@ -181,7 +181,7 @@ export class CustomersService {
             userId,
         );
         if (writable === null) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
         return writable.organizationId;
     }

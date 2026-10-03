@@ -23,7 +23,7 @@ export type HomeTone = "bad" | "due" | "info";
  * target's own endpoint; see `lib/home/inline-actions.ts` for how it runs.
  */
 export interface HomeInline {
-    kind: "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY";
+    kind: "MARK_SENT" | "RETRY" | "SEND_REMINDER" | "REPLY" | "REVIEW_REPLY";
     /** The row's button. */
     label: string;
     /** What will happen, and who is told. */
@@ -36,14 +36,28 @@ export interface HomeInline {
     sends: boolean;
     /** Whether Undo is offered (never once a message has left). */
     undoable: boolean;
-    /** The order, subscription, invoice or contact it acts on. */
+    /** The order, subscription, invoice, contact or review it acts on. */
     target: string;
     /** The customer's first name, for the words after; null without one. */
     person: string | null;
     /** MARK_SENT: the step it moves the order to. */
     stage?: string;
-    /** RETRY: how; only "PAY_LINK" until D13's autopay. */
-    via?: "PAY_LINK";
+    /**
+     * RETRY: how — a new pay link, or a new charge on their autopay (D13).
+     * The API offers no Retry while an autopay charge is under way.
+     */
+    via?: "PAY_LINK" | "MANDATE";
+}
+
+/**
+ * A step a Needs-you row opens where it is taken, beside its inline action
+ * (D14): "Send a set-up link" on a renewal whose autopay limit is too low
+ * opens Subscription Detail's own set-up sheet. Sent only to someone who may
+ * take it, while the business offers autopay.
+ */
+export interface HomeRowLink {
+    label: string;
+    href: string;
 }
 
 /**
@@ -67,6 +81,7 @@ export interface HomeNeed {
     href: string;
     moduleKey?: string;
     inline?: HomeInline;
+    link?: HomeRowLink;
 }
 
 /**
@@ -108,15 +123,6 @@ export interface HomeBooking {
     who: string | null;
     status: string;
     href: string;
-}
-
-/** A count whose `href` lands on exactly the rows it counts. */
-export interface HomeNumber {
-    key: string;
-    label: string;
-    value: number;
-    href: string;
-    moduleKey?: string;
 }
 
 /**
@@ -290,14 +296,14 @@ export interface HomeModel {
     staff: HomeStaff | null;
     /** A Reviewer's sites (F9); only on `view: "reviewer"`. */
     reviews?: HomeReviewSite[];
+    /** The ranked actions; the rail's badges read the OVERDUE ones. */
     actions: HomeAction[];
-    primaryAction: HomeAction | null;
     hasAnyModule: boolean;
+    /** The next confirmed bookings; Needs you's "Next" line reads them. */
     upcoming: HomeBooking[];
-    numbers: HomeNumber[];
     /** Empty on a healthy read; non-empty means what is shown is incomplete. */
     unavailable: HomeUnavailable[];
-    /** Needs you, flat and ranked (F3). `actions` stays for one release. */
+    /** Needs you, flat and ranked (F3). */
     needs: HomeNeed[];
     /** How many things need doing; a "3 more" row counts as three. */
     needsTotal: number;
@@ -313,10 +319,8 @@ const EMPTY: HomeModel = {
     view: "business",
     staff: null,
     actions: [],
-    primaryAction: null,
     hasAnyModule: false,
     upcoming: [],
-    numbers: [],
     unavailable: [],
     needs: [],
     needsTotal: 0,

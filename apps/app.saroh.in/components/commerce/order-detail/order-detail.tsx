@@ -14,12 +14,13 @@ import {
     allergenWords,
     allergyCheck,
     goesToAddress,
+    headerStep,
     isOpen,
-    kitchenStanding,
     STEP_LABEL,
     stepsOf,
     waiting,
 } from "@/lib/orders/lifecycle";
+import type { StepTone } from "@/lib/orders/list-row";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
 import type { Arrival } from "@/lib/orders/row-menu";
 import type { Sellable } from "@/lib/orders/sellables";
@@ -89,11 +90,12 @@ export interface OrderPermissions {
     bookingWrite?: boolean;
 }
 
-const STANDING: Record<string, { label: string; tone: PillTone }> = {
-    UNFULFILLED: { label: "Unfulfilled", tone: "brand" },
-    FULFILLED: { label: "Fulfilled", tone: "success" },
-    REFUNDED: { label: "Refunded", tone: "neutral" },
-    CANCELLED: { label: "Cancelled", tone: "neutral" },
+/** A treatment's standing (B14), in the header pill's tones. */
+const VISITS_TONE: Record<PillTone, StepTone> = {
+    brand: "new",
+    success: "done",
+    neutral: "bad",
+    danger: "bad",
 };
 
 const firstName = (name: string | null | undefined) =>
@@ -121,7 +123,7 @@ export function OrderDetail({
     arrival = null,
 }: {
     order: OrderRead;
-    /** Allergy notes; "unavailable" when they could not be read. */
+    /** Their allergies (Needs attention); "unavailable" when not read. */
     notes: AllergyNote[] | "unavailable";
     payments: OrderPaymentsSummary | null;
     can: OrderPermissions;
@@ -152,8 +154,14 @@ export function OrderDetail({
     const now = new Date(clock ?? Date.parse(order.updatedAt));
     const zone = visits?.service.timezone ?? "UTC";
     const standing = appointment
-        ? visitsStanding(visits, refundedFull, order.status === "CANCELLED")
-        : STANDING[kitchenStanding(order)];
+        ? (({ label, tone }) => ({ label, tone: VISITS_TONE[tone] }))(
+              visitsStanding(
+                  visits,
+                  refundedFull,
+                  order.status === "CANCELLED",
+              ),
+          )
+        : headerStep(order);
     const unpaid =
         order.status !== "CANCELLED" &&
         (order.paymentStatus === "FAILED" ||
@@ -192,15 +200,13 @@ export function OrderDetail({
     // who may change orders. Its address is shown once, to its maker.
     const madeAt = order.payLinkCreatedAt ?? null;
     const payLink = usePayLink({ orderId: order.id, first, madeAt });
-    // Owed: unpaid, or paid online and changed since to cost more (B9) —
-    // not a site checkout's order, whose difference is taken at the counter.
+    // Owed: unpaid, or paid online and changed since to cost more (B9), a
+    // site checkout's order too — its balance is taken by the same link.
     const owed =
         order.status !== "CANCELLED" &&
         (order.paymentStatus === "UNPAID" ||
             order.paymentStatus === "FAILED" ||
-            (order.paymentStatus === "PAID" &&
-                !order.money?.recordedByHand &&
-                !order.placedOnline)) &&
+            (order.paymentStatus === "PAID" && !order.money?.recordedByHand)) &&
         Number(order.money?.due ?? 0) > 0;
     const linkable = can.payLink && owed;
     const changes = useOrderChanges({
@@ -210,10 +216,7 @@ export function OrderDetail({
         refundTo,
         setPanel,
         startHold: kitchen.startHold,
-        onOwed:
-            can.payLink && can.payOnline && !order.placedOnline
-                ? payLink.ask
-                : undefined,
+        onOwed: can.payLink && can.payOnline ? payLink.ask : undefined,
     });
     const change = changeAccess(order, can);
 
@@ -484,9 +487,7 @@ export function OrderDetail({
                                 refundTo={refundTo}
                                 remaining={remaining}
                                 linkable={
-                                    can.payLink &&
-                                    (can.payOnline ?? false) &&
-                                    !order.placedOnline
+                                    can.payLink && (can.payOnline ?? false)
                                 }
                                 format={money ? format : null}
                                 changes={changes}
@@ -523,15 +524,12 @@ export function OrderDetail({
                                 customer={order.customer}
                                 href={customerHref ?? "/commerce/customers"}
                                 // A treatment's Needs attention is on its
-                                // Visits card (B14).
+                                // Visits card (B14) and here too, as the
+                                // design shows (DEC-073).
                                 notes={
-                                    notes === "unavailable" || appointment
-                                        ? null
-                                        : noteList
+                                    notes === "unavailable" ? null : noteList
                                 }
-                                attention={
-                                    appointment ? undefined : order.attention
-                                }
+                                attention={order.attention}
                                 contact={can.contact ?? true}
                                 address={delivery ? addressText : null}
                                 deliveryPhone={
@@ -557,6 +555,7 @@ export function OrderDetail({
                             <MoneyCard
                                 money={money}
                                 delivery={delivery}
+                                way={order.fulfilmentLabel}
                                 appointment={appointment}
                                 paymentStatus={order.paymentStatus}
                                 refundStanding={order.refundStanding}

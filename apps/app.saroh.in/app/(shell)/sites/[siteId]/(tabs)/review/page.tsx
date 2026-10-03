@@ -2,6 +2,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { FileText } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
+import type { ReleasesForReview } from "@/components/sites/site-review-view";
 import { SiteReviewView } from "@/components/sites/site-review-view";
 import { requireSession } from "@/lib/session";
 import {
@@ -10,6 +11,7 @@ import {
     getSite,
     listComments,
 } from "@/lib/sites/service";
+import { readTestReleases } from "@/lib/sites/test-releases-api";
 
 /**
  * Reading a site, for someone who may not author it (#275).
@@ -54,11 +56,20 @@ export default async function SiteReviewPage({
         );
     }
 
-    const [page, comments, review] = await Promise.all([
+    const [page, comments, review, read] = await Promise.all([
         getPageForReview(siteId, activePage.id),
         listComments(siteId),
         getReviewState(siteId),
+        // The test releases to review, each on its own page (T12). Never
+        // throws: off while the flag is off, and a failure is said.
+        readTestReleases(siteId),
     ]);
+    const releases: ReleasesForReview =
+        read.state === "on"
+            ? { state: "on", releases: read.list.releases }
+            : read.state === "failed"
+              ? { state: "failed" }
+              : null;
 
     return (
         <SiteReviewView
@@ -67,6 +78,7 @@ export default async function SiteReviewPage({
             activePageId={activePage.id}
             comments={comments}
             review={review}
+            releases={releases}
         />
     );
 }

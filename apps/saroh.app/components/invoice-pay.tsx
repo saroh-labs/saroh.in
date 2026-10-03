@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { startPayment } from "@/app/pay/[token]/actions";
+import { InvoiceAutopay } from "@/components/invoice-autopay";
+import { PrintButton } from "@/components/print-button";
 import { ProviderHandoff } from "@/components/provider-handoff";
 import type { CheckoutIntent } from "@/lib/checkout-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
-import { payDate, payMoney, payTitle } from "@/lib/invoice-pay-shape";
+import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
 
 /**
  * The invoice a pay link shows, and its Pay button (ADR-007, U13).
@@ -21,6 +23,13 @@ import { payDate, payMoney, payTitle } from "@/lib/invoice-pay-shape";
  * payment went through — "Check again" re-reads the invoice, which only the
  * provider's webhook moves to paid.
  *
+ * A plan's invoice, where the business's provider takes autopay, offers
+ * "Pay and turn on autopay" first (D12, `invoice-autopay.tsx`).
+ *
+ * A business that doesn't take payment online (`payOnline` false, DEC-070)
+ * sends the same link to view the invoice: no Pay button, a copy to print
+ * or save as PDF, and "Pay ‹business› the way they've asked you to".
+ *
  * Styled in the business's `--site-*` tokens, never Saroh's brand. Status is
  * an opaque fill with its own foreground, for the reason checkout gives: the
  * page ground is the merchant's, so a tint cannot be trusted against it.
@@ -28,9 +37,12 @@ import { payDate, payMoney, payTitle } from "@/lib/invoice-pay-shape";
 export function InvoicePay({
     token,
     invoice,
+    apiUrl,
 }: {
     token: string;
     invoice: PayInvoice;
+    /** Where an autopay window's return is posted (P1). */
+    apiUrl?: string;
 }) {
     const router = useRouter();
     const [intent, setIntent] = useState<CheckoutIntent | null>(null);
@@ -46,7 +58,22 @@ export function InvoicePay({
     const money = (a: string) => payMoney(a, invoice.currency);
     const issued = payDate(invoice.issuedAt);
     const due = payDate(invoice.dueAt);
-    const payable = invoice.status === "ISSUED" || invoice.status === "OVERDUE";
+    // While autopay is charging it (D13) there is nothing to pay here: the
+    // customer would be charged twice.
+    const charging = invoice.autopayCharging ?? null;
+    // When autopay next takes money (D13B): this invoice's queued charge,
+    // or once it's paid, the next renewal's.
+    const nextCharge = invoice.autopayNextCharge ?? null;
+    // Pay, or — where the business doesn't take payment online (DEC-070)
+    // — the invoice to keep, and pay them their own way.
+    const offer = payOffer(invoice);
+    const payable = offer === "pay";
+    // Autopay for the invoice's plan (D12): offered, or on already.
+    const autopay =
+        invoice.autopay &&
+        (invoice.autopay.on || invoice.autopay.methods.length > 0)
+            ? invoice.autopay
+            : null;
 
     function pay() {
         setError(null);
@@ -160,6 +187,19 @@ export function InvoicePay({
                             intent={intent}
                             after="Once you've paid, use “Check again” to see this invoice marked paid."
                         />
+                    ) : autopay ? (
+                        // A plan's invoice with autopay offered (D12).
+                        <InvoiceAutopay
+                            token={token}
+                            autopay={autopay}
+                            businessName={invoice.businessName}
+                            billedTo={invoice.billedTo}
+                            total={money(invoice.total)}
+                            payable
+                            onJustPay={pay}
+                            justPayBusy={pending}
+                            apiUrl={apiUrl}
+                        />
                     ) : (
                         <button
                             type="button"
@@ -183,13 +223,77 @@ export function InvoicePay({
                         Check again
                     </button>
                 </div>
+            ) : offer === "elsewhere" ? (
+                <div className="mt-6 space-y-4">
+                    <div
+                        role="status"
+                        className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
+                    >
+                        <p className="font-semibold text-site-fg">
+                            Pay {invoice.businessName} the way they&apos;ve
+                            asked you to.
+                        </p>
+                        <p className="mt-1 text-sm text-site-muted">
+                            {invoice.businessName} doesn&apos;t take payment
+                            online. Keep a copy of this invoice for your
+                            records.
+                        </p>
+                    </div>
+                    <PrintButton />
+                </div>
+            ) : charging ? (
+                <div className="mt-6 space-y-4">
+                    <div
+                        role="status"
+                        className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
+                    >
+                        <p className="font-semibold text-site-fg">
+                            {nextCharge
+                                ? `Next autopay charge: ${payDate(nextCharge.at)}`
+                                : `Autopay charge in progress · ${payDate(charging.at)}`}
+                        </p>
+                        <p className="mt-1 text-sm text-site-muted">
+                            Your autopay is paying this invoice. Your bank lets
+                            you know before it takes the money, so there&apos;s
+                            nothing to pay here.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => router.refresh()}
+                        className={cn(ctaClasses("secondary"), "w-full")}
+                    >
+                        Check again
+                    </button>
+                </div>
             ) : (
-                <div className="mt-6 rounded-xl border border-site-border bg-site-surface p-5 text-center">
-                    <p className="text-site-fg">
-                        {invoice.status === "PAID"
-                            ? `This invoice is paid. Thank you — there's nothing more to do.`
-                            : `This invoice is no longer payable. If you think that's a mistake, ask ${invoice.businessName}.`}
-                    </p>
+                <div className="mt-6 space-y-4">
+                    <div className="rounded-xl border border-site-border bg-site-surface p-5 text-center">
+                        <p className="text-site-fg">
+                            {invoice.status === "PAID"
+                                ? `This invoice is paid. Thank you — there's nothing more to do.`
+                                : `This invoice is no longer payable. If you think that's a mistake, ask ${invoice.businessName}.`}
+                        </p>
+                        {invoice.status === "PAID" && nextCharge ? (
+                            <p className="mt-1 text-sm text-site-muted">
+                                Next autopay charge: {payDate(nextCharge.at)}
+                            </p>
+                        ) : null}
+                    </div>
+                    {invoice.status === "PAID" && autopay ? (
+                        // Paid, and the plan can still turn autopay on (D12).
+                        <InvoiceAutopay
+                            token={token}
+                            autopay={autopay}
+                            businessName={invoice.businessName}
+                            billedTo={invoice.billedTo}
+                            total={money(invoice.total)}
+                            payable={false}
+                            onJustPay={pay}
+                            justPayBusy={pending}
+                            apiUrl={apiUrl}
+                        />
+                    ) : null}
                 </div>
             )}
         </section>

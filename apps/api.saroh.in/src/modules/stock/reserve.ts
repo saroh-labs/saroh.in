@@ -201,7 +201,7 @@ async function storefrontName(tx: Tx, storeId: string): Promise<string> {
         where: { id: storeId },
         select: { name: true },
     });
-    return store?.name ?? "this storefront";
+    return store?.name ?? "this location";
 }
 
 /**
@@ -301,7 +301,7 @@ async function tryHold(
             WHERE id = ${rowId} AND "onHand" - "promised" >= ${asked.units}`;
         if (moved !== 1) {
             throw new ConflictException(
-                sellRefusal(asked.line.productName, 0, "this storefront"),
+                sellRefusal(asked.line.productName, 0, "this location"),
             );
         }
     }

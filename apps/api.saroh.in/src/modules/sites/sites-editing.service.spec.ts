@@ -16,6 +16,10 @@ jest.mock("@saroh/database", () => {
             // "nothing to compare" — these tests are about the write.
             findMany: jest.fn().mockResolvedValue([]),
             update: jest.fn(),
+            // Publish's address check (L5): every site here has one.
+            findUniqueOrThrow: jest.fn().mockResolvedValue({
+                subdomain: "acme",
+            }),
         },
         page: {
             findFirst: jest.fn(),
@@ -41,6 +45,8 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             create: jest.fn(),
         },
+        // putLive's lock on the site row (KTD-14).
+        $queryRaw: jest.fn().mockResolvedValue([]),
     };
     return {
         ...actual,
@@ -614,6 +620,8 @@ describe("SitesService.restorePublication (#279)", () => {
                     // A post publish is not a version of the site (#283), so
                     // restore cannot resurrect one as the live site.
                     postId: null,
+                    // Nor is a test release's snapshot (DEC-071).
+                    kind: "LIVE",
                 },
             }),
         );
@@ -690,6 +698,25 @@ describe("SitesService.publishSite", () => {
         expect(select.pages.select.versions.select.sections.where).toEqual({
             hidden: false,
         });
+    });
+
+    it("refuses to publish a site with no web address, and writes nothing (L5)", async () => {
+        siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
+        (prisma.site.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+            subdomain: null,
+        });
+
+        await expect(
+            service.publishSite(ctx(), "site_1"),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message: expect.stringMatching(/^Choose a web address/),
+                details: { field: "subdomain", reason: "addressMissing" },
+            },
+        });
+        expect(publicationCreate).not.toHaveBeenCalled();
+        expect(siteUpdate).not.toHaveBeenCalled();
     });
 
     it("SANITIZES the footer into the snapshot, on the same boundary as richText", async () => {
@@ -1030,8 +1057,14 @@ describe("SitesService public read (drafts never leak)", () => {
         // own id — no draft tables. The id is not content: the renderer
         // resolves a host once and then asks for that site's posts by it
         // (#232), rather than repeating the host resolution per post route.
+        // Only a LIVE row is ever served on a real host (DEC-071).
         expect(siteFindFirst).toHaveBeenCalledWith({
-            where: { subdomain: "acme", deletedAt: null },
+            where: {
+                AND: [
+                    { subdomain: "acme", deletedAt: null },
+                    { currentPublication: { kind: "LIVE" } },
+                ],
+            },
             select: {
                 id: true,
                 organizationId: true,

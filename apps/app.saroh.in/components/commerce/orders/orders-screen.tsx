@@ -8,6 +8,7 @@ import { useCallback, useState, useTransition } from "react";
 
 import { SinceNotice } from "@/components/shared/since-notice";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
+import { useNarrow } from "@/lib/hooks/use-narrow";
 import type {
     OrderFilterOptions,
     OrderListPage,
@@ -20,11 +21,13 @@ import {
     previousPageHref,
 } from "@/lib/orders/list-query";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
+import type { ShareLink } from "@/lib/sites/share-links";
 
 import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";
 import { OrderExport } from "./order-export";
 import { OrderFilters } from "./order-filters";
+import { OrderFiltersSheet } from "./order-filters-sheet";
 import { OrderQuickView } from "./order-quick-view";
 import { OrderCard, OrderGridHead, OrderGridRow } from "./order-row";
 import { OrderRowMenu } from "./order-row-menu";
@@ -49,10 +52,13 @@ import { useOrderSelection } from "./use-order-selection";
  *
  * The storefront control is a FILTER, not a scope: orders belong to the
  * business. At the desk a row opens its quick view and has a row menu (B5,
- * `order-quick-view.tsx`, `order-row-menu.tsx`); on a phone the card opens
- * the order, as the design draws it. With `order:stage`, rows can be
- * selected and moved a step together (B6, `bulk-bar.tsx`). Loading, failed,
- * locked and every empty list are in `orders-states.tsx` (B7).
+ * `order-quick-view.tsx`, `order-row-menu.tsx`). On a phone (DEC-067, a
+ * recorded deviation from the design) a card opens the same quick view as
+ * a sheet from the bottom, and the filters sit behind a Filters button
+ * (`order-filters-sheet.tsx`) rather than stacked above the first order.
+ * With `order:stage`, rows can be selected and moved a step together, or
+ * their tickets printed (B6, `bulk-bar.tsx`). Loading, failed, locked and
+ * every empty list are in `orders-states.tsx` (B7).
  */
 export function OrdersScreen({
     query,
@@ -62,7 +68,7 @@ export function OrdersScreen({
     businessName,
     kitchen = false,
     filterOptions = null,
-    shareUrl = null,
+    share = null,
     can = NO_ABILITIES,
     newOrder = null,
 }: {
@@ -89,10 +95,10 @@ export function OrdersScreen({
      */
     kitchen?: boolean;
     /**
-     * The live site's address, for the first-run "Share your storefront"
-     * (B7, built in B8); null when there is none to share.
+     * The first run's share button (DEC-069, L8): the online shop while it
+     * is live, else the website; null when nothing is live to share.
      */
-    shareUrl?: string | null;
+    share?: ShareLink | null;
     /**
      * What the caller may do from a row (B5): its menu and quick view draw
      * only what they can use. The API decides again on every write.
@@ -112,6 +118,8 @@ export function OrdersScreen({
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
+    // A phone's quick view rises from the bottom (B5).
+    const narrow = useNarrow();
     const many = stores.length > 1;
     const store = stores.find((s) => s.id === query.storefront) ?? null;
     const rows = page.rows;
@@ -147,8 +155,10 @@ export function OrdersScreen({
     // null rather than an empty list, and the page says so.
     const attentionUnread = rows.some((r) => r.attention === null);
 
+    // One block on the page: the design spaces the tabs, search, filter bar
+    // and rows 14px apart, which the page's own 24px rhythm would widen.
     return (
-        <>
+        <div className="min-w-0">
             <OrdersHeading
                 actions={
                     stores.length > 0 && !kitchen ? (
@@ -195,6 +205,13 @@ export function OrdersScreen({
 
             <div className="flex flex-wrap items-center gap-2.5 pt-3.5">
                 <SearchField query={query} go={go} />
+                {/* A phone: the filters are behind one button (B5). */}
+                <OrderFiltersSheet
+                    query={query}
+                    options={filterOptions}
+                    go={go}
+                    className="min-[760px]:hidden"
+                />
                 {many ? (
                     <StorefrontFilter
                         stores={stores}
@@ -211,7 +228,7 @@ export function OrdersScreen({
                         onChange={(storefront) => go({ storefront })}
                         noun={{ one: "open order", other: "open orders" }}
                         label="Show orders taken at"
-                        note={`A filter, not a scope. The order book belongs to ${businessName}; this narrows it to one storefront.`}
+                        note={`A filter, not a scope. The order book belongs to ${businessName}; this narrows it to one location.`}
                     />
                 ) : null}
                 {range ? (
@@ -221,7 +238,10 @@ export function OrdersScreen({
                 ) : null}
             </div>
 
-            <OrderFilters query={query} options={filterOptions} go={go} />
+            {/* The desk: the filter bar, on the page. */}
+            <div className="max-[759px]:hidden">
+                <OrderFilters query={query} options={filterOptions} go={go} />
+            </div>
 
             <div aria-busy={navigating} className="pt-3.5">
                 {attentionUnread ? (
@@ -235,7 +255,7 @@ export function OrdersScreen({
                         storeName={store?.name ?? firstStore?.name ?? null}
                         options={filterOptions}
                         go={go}
-                        shareUrl={shareUrl}
+                        share={share}
                     />
                 ) : (
                     <>
@@ -278,6 +298,8 @@ export function OrdersScreen({
                                     select={
                                         selectable ? pick.row(row) : undefined
                                     }
+                                    open={row.id === peekId}
+                                    onOpen={() => setPeekId(row.id)}
                                 />
                             ))}
                         </ul>
@@ -291,6 +313,7 @@ export function OrdersScreen({
             <OrderQuickView
                 row={peek}
                 can={can}
+                side={narrow ? "bottom" : "right"}
                 onOpenChange={(open) => {
                     if (!open) setPeekId(null);
                 }}
@@ -327,7 +350,7 @@ export function OrdersScreen({
                     <PageLink href={next} label="Next" />
                 </nav>
             ) : null}
-        </>
+        </div>
     );
 }
 

@@ -4,6 +4,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { InvoicesModule } from "../invoices/invoices.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { PaymentsModule } from "../payments/payments.module";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
 import { StockModule } from "../stock/stock.module";
 import { HomeInlineService } from "./home-inline";
@@ -25,6 +26,8 @@ import { HomeService } from "./home.service";
         StockModule,
         SiteAccountsModule,
         InvoicesModule,
+        // Autopay's Retry on a failed renewal (D13).
+        PaymentsModule,
     ],
     controllers: [HomeController],
     providers: [HomeService, HomeInlineService, OrganizationGuard],

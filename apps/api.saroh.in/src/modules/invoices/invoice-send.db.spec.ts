@@ -23,6 +23,7 @@ import { HttpException } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type {
     AccountThreadPost,
@@ -68,6 +69,7 @@ beforeAll(async () => {
     const org = await prisma.organization.create({
         data: { name: "Rye & Co.", slug: `invoice-send-${process.pid}` },
     });
+    await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: "user_1", role: "OWNER" };
     contactId = (
         await prisma.contact.create({
@@ -137,6 +139,7 @@ describe("sending an invoice (real database)", () => {
         expect(before.send).toEqual({
             channels: ["email"],
             emailTo: "asha@example.com",
+            payOnline: true,
             nextReminderAt: null,
         });
 
@@ -284,6 +287,7 @@ describe("sending an invoice (real database)", () => {
         expect(read.send).toEqual({
             channels: [],
             reason: "NOT_OWED",
+            payOnline: true,
             nextReminderAt: null,
         });
     });
@@ -310,6 +314,7 @@ describe("sending an invoice (real database)", () => {
             expect(read.send).toEqual({
                 channels: [],
                 reason: "NO_EMAIL_PROVIDER",
+                payOnline: true,
                 nextReminderAt: null,
             });
             expect(await status(sending.send(owner, id))).toBe(409);

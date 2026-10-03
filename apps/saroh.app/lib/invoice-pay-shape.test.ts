@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { isPayInvoice, payDate, payMoney, payTitle } from "./invoice-pay-shape";
+import {
+    isPayInvoice,
+    payChargingOf,
+    payDate,
+    payMoney,
+    payOffer,
+    payOnlineOf,
+    payTitle,
+} from "./invoice-pay-shape";
 
 const INVOICE = {
     businessName: "Lotus Yoga",
@@ -22,6 +30,39 @@ const INVOICE = {
     billedTo: "Asha Rao",
     theme: null,
 };
+
+describe("without online payment (DEC-070)", () => {
+    const at = { at: "2026-09-10T04:30:00.000Z" };
+
+    it("reads payOnline only as a real boolean", () => {
+        expect(payOnlineOf(false)).toBe(false);
+        expect(payOnlineOf(true)).toBe(true);
+        expect(payOnlineOf("false")).toBeUndefined();
+        expect(payOnlineOf(undefined)).toBeUndefined();
+    });
+
+    it("offers Pay only when the business takes payment online", () => {
+        expect(payOffer({ status: "ISSUED", payOnline: true })).toBe("pay");
+        expect(payOffer({ status: "OVERDUE", payOnline: false })).toBe(
+            "elsewhere",
+        );
+        expect(payOffer({ status: "ISSUED", payOnline: false })).toBe(
+            "elsewhere",
+        );
+    });
+
+    it("an older API sends no payOnline: Pay, as before", () => {
+        expect(payOffer({ status: "ISSUED" })).toBe("pay");
+    });
+
+    it("settled, or charging, whatever payOnline says", () => {
+        expect(payOffer({ status: "PAID", payOnline: false })).toBe("settled");
+        expect(payOffer({ status: "VOID" })).toBe("settled");
+        expect(payOffer({ status: "ISSUED", autopayCharging: at })).toBe(
+            "charging",
+        );
+    });
+});
 
 describe("isPayInvoice", () => {
     it("accepts the API's allow-listed invoice", () => {
@@ -68,5 +109,16 @@ describe("payMoney and payDate", () => {
     it("writes the day in words, and nothing for a missing date", () => {
         expect(payDate("2026-09-08T10:00:00.000Z")).toBe("8 September 2026");
         expect(payDate(null)).toBeNull();
+    });
+});
+
+describe("an autopay charge under way (D13)", () => {
+    it("reads the day it is asked for, and anything strange as none", () => {
+        expect(payChargingOf({ at: "2026-10-02T10:00:00.000Z" })).toEqual({
+            at: "2026-10-02T10:00:00.000Z",
+        });
+        expect(payChargingOf({ at: "soon" })).toBeNull();
+        expect(payChargingOf(null)).toBeNull();
+        expect(payChargingOf(undefined)).toBeNull();
     });
 });

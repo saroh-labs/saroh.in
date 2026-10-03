@@ -52,10 +52,23 @@ const noPipeline = mod("CRM", {
 
 const keys = (items: { key: string }[]) => items.map((i) => i.key);
 
+/** A business that has written an invoice: it invoices (DEC-070). */
+const invoicing = {
+    products: 0,
+    services: 0,
+    sites: 0,
+    sitesNotLive: 0,
+    invoices: 1,
+};
+
 describe("settingsNudges (DEC-056)", () => {
     it("asks for email, the type, the logo and a pipeline, in the design's order", () => {
         const nudges = settingsNudges({
-            settings: { profile: { ...profile, type: null }, logo: null },
+            settings: {
+                profile: { ...profile, type: null },
+                logo: null,
+                setup: invoicing,
+            },
             modules: [mod("COMMUNICATIONS"), noPipeline],
             messaging: [],
         });
@@ -90,7 +103,7 @@ describe("settingsNudges (DEC-056)", () => {
                 profile,
                 logo: { url: "https://cdn/logo.png", mediaId: "m1" },
             },
-            modules: [mod("COMMUNICATIONS"), mod("CRM")],
+            modules: [mod("COMMUNICATIONS"), mod("CRM"), mod("PAYMENTS")],
             messaging: [comms("EMAIL")],
         });
         expect(nudges.every((n) => !n.left)).toBe(true);
@@ -111,7 +124,8 @@ describe("settingsNudges (DEC-056)", () => {
         expect(type).toMatchObject({
             key: "businessType",
             left: true,
-            href: "/settings/organization?section=identity",
+            // Straight to the Type field on Business › Identity.
+            href: "/settings/organization?section=identity#business-type",
         });
         // A type this app doesn't know reads as Not set; `company` is Pvt Ltd.
         expect(
@@ -123,9 +137,32 @@ describe("settingsNudges (DEC-056)", () => {
         ).toBe(false);
     });
 
+    it("is done once any of F10's six types is saved, and only then", () => {
+        const left = (type: string | null) =>
+            settingsNudges({
+                settings: { profile: { ...profile, type } },
+                modules: null,
+                messaging: null,
+            }).find((n) => n.key === "businessType")?.left;
+        for (const type of [
+            "individual",
+            "partnership",
+            "llp",
+            "pvt",
+            "public",
+            "trust",
+        ]) {
+            expect(left(type), type).toBe(false);
+        }
+        // Onboarding's "Registered" saves nothing; an unknown word is Not set.
+        expect(left(null)).toBe(true);
+        expect(left("")).toBe(true);
+        expect(left("registered")).toBe(true);
+    });
+
     it("never names a module Saroh has not rolled out (DEC-057)", () => {
         const nudges = settingsNudges({
-            settings: { profile, logo: null },
+            settings: { profile, logo: null, setup: invoicing },
             modules: [
                 mod("COMMUNICATIONS", rolledOff),
                 mod("CRM", { ...noPipeline, ...rolledOff }),
@@ -150,7 +187,7 @@ describe("settingsNudges (DEC-056)", () => {
         expect(
             keys(
                 settingsNudges({
-                    settings: { profile, logo: null },
+                    settings: { profile, logo: null, setup: invoicing },
                     modules: [
                         mod("COMMUNICATIONS", { lifecycle: "DISABLED" }),
                         mod("CRM", { lifecycle: "DISABLED" }),
@@ -163,12 +200,81 @@ describe("settingsNudges (DEC-056)", () => {
         expect(
             keys(
                 settingsNudges({
-                    settings: { profile, logo: null },
+                    settings: { profile, logo: null, setup: invoicing },
                     modules: [mod("COMMUNICATIONS")],
                     messaging: [comms("WHATSAPP")],
                 }),
             ),
         ).toEqual(["businessType", "logo"]);
+    });
+});
+
+describe("business type and logo only when money is involved (DEC-070)", () => {
+    const website = mod("WEBSITE");
+    const none = { ...invoicing, invoices: 0 };
+    const ask = (
+        modules: ModuleView[] | null,
+        setup: typeof invoicing | undefined,
+    ) =>
+        keys(
+            settingsNudges({
+                settings: {
+                    profile: { ...profile, type: null },
+                    logo: null,
+                    setup,
+                },
+                modules,
+                messaging: null,
+            }),
+        );
+
+    it("asks neither of a site with nothing that sells and no invoice", () => {
+        expect(ask([website], none)).toEqual([]);
+    });
+
+    it("asks both once the business has an invoice, a draft included", () => {
+        expect(ask([website], invoicing)).toEqual(["businessType", "logo"]);
+    });
+
+    it("asks both while anything that takes money is on", () => {
+        for (const key of [
+            "COMMERCE",
+            "APPOINTMENTS",
+            "COURSES",
+            "CLASS_PACKS",
+            "PAYMENTS",
+        ]) {
+            expect(ask([website, mod(key)], none), key).toEqual([
+                "businessType",
+                "logo",
+            ]);
+        }
+    });
+
+    it("doesn't count a selling module that is off, or not rolled out", () => {
+        expect(
+            ask(
+                [
+                    website,
+                    mod("COMMERCE", { lifecycle: "DISABLED" }),
+                    mod("APPOINTMENTS", rolledOff),
+                ],
+                none,
+            ),
+        ).toEqual([]);
+    });
+
+    it("reads the modules alone from an API older than the invoice count", () => {
+        const { invoices: _invoices, ...older } = none;
+        expect(ask([website], older as typeof invoicing)).toEqual([]);
+        expect(ask([website, mod("COMMERCE")], undefined)).toEqual([
+            "businessType",
+            "logo",
+        ]);
+    });
+
+    it("asks as before when the modules could not be read", () => {
+        expect(ask(null, none)).toEqual(["businessType", "logo"]);
     });
 });
 

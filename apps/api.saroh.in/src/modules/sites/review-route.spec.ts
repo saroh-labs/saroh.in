@@ -174,3 +174,32 @@ describe("draftFingerprint", () => {
         expect(draftFingerprint(null)).toBe(draftFingerprint({}));
     });
 });
+
+describe("two rows written in the same millisecond", () => {
+    it("reads their order from the list, not the clock: a request after an approval unsettles it", () => {
+        const at = new Date(Date.UTC(2026, 8, 12));
+        // Newest first, as readVerdicts returns them (ties broken by id).
+        const verdicts = [
+            {
+                outcome: "REQUESTED",
+                byUserId: "owner",
+                draftFingerprint: DRAFT,
+                createdAt: at,
+            },
+            {
+                outcome: "APPROVED",
+                byUserId: "reviewer",
+                draftFingerprint: DRAFT,
+                createdAt: at,
+            },
+        ];
+        expect(reviewStanding(verdicts, DRAFT, "owner")).toMatchObject({
+            outstanding: true,
+            route: ReviewRoute.Bypassed,
+        });
+        // And the other way round, the approval settles the request.
+        expect(
+            reviewStanding([...verdicts].reverse(), DRAFT, "owner"),
+        ).toMatchObject({ outstanding: false, route: ReviewRoute.Approved });
+    });
+});

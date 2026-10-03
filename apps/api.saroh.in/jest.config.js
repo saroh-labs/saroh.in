@@ -70,6 +70,8 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/readiness/module-readiness.registry.spec.ts",
         // #115 module API controller (mocked services).
         "<rootDir>/src/modules/capabilities/capabilities.controller.spec.ts",
+        // DEC-068 Turn on: the setup payload's shapes (pure, no DB).
+        "<rootDir>/src/modules/capabilities/setup/module-setup.parse.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
         // #274 the same guard with the REAL availability service, per role:
@@ -213,6 +215,9 @@ module.exports = {
         // G13: the site bag's pricing, DB-free. The real rows are in
         // public-checkout.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
+        // P4: the site's order confirmation, DB-free. Its access rules are
+        // in checkout-confirmation.db.spec.ts.
+        "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
@@ -240,6 +245,15 @@ module.exports = {
         // D18: what narrows the list by source, pack, course or order, and
         // its query (list-filter.db.spec.ts runs in integration).
         "<rootDir>/src/modules/invoices/list-filter.spec.ts",
+        // D16: the invoice's paper and its PDF, read back as text — pure
+        // (invoice-pdf.db.spec.ts runs in integration).
+        "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
+        // DEC-072: a line's GST note on the paper and the PDF — pure.
+        "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
+        "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
+        // DEC-068: which business details are missing — pure (the refusals
+        // and the flag after money are in business-details.db.spec.ts).
+        "<rootDir>/src/modules/invoices/business-details.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
@@ -262,6 +276,8 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/classes-allowance.spec.ts",
         // G9: the order a site lists plans in, and Most chosen.
         "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
+        // G20: a plan joined online — its snapshot and waiting joins. Pure.
+        "<rootDir>/src/modules/subscriptions/plan-join.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
@@ -271,6 +287,8 @@ module.exports = {
         "<rootDir>/src/modules/class-packs/redeem-pack.spec.ts",
         // A11: a pack bought online — its snapshot, words and dates. Pure.
         "<rootDir>/src/modules/class-packs/pack-checkout.spec.ts",
+        // G20: a pack as the site's Prices page shows it. Pure.
+        "<rootDir>/src/modules/class-packs/public-packs.spec.ts",
         "<rootDir>/src/modules/courses/courses.service.spec.ts",
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",

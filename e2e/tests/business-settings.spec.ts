@@ -1,7 +1,9 @@
+// @covers accounts:/login app:/open app:/settings/organization app:/settings/activity api:organizations api:audit
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, urls } from "../playwright.config";
+import { useSession } from "../fixtures/sessions";
+import { urls } from "../playwright.config";
 
 /**
  * Business settings, Tax and invoices: registering for GST (e890237c).
@@ -13,8 +15,9 @@ import { demoUser, urls } from "../playwright.config";
  * GSTIN and the address in full (Save back on), and saves.
  *
  * It runs on Northwind Supply, the base seed — Rye & Co. and Pulse Fitness
- * are kept camera-ready — and puts Northwind back as it found it: not
- * registered, no tax ID, no address, no state.
+ * are kept camera-ready. It clears Northwind's address first, so the
+ * address is missing when GST goes on, and puts Northwind back as the seed
+ * leaves it: not registered, no tax ID, its address in Karnataka.
  */
 
 const ORG = "seed_org";
@@ -23,13 +26,7 @@ const headers = { "x-organization-id": ORG, origin: urls.APP_URL };
 const settingsUrl = `${urls.API_URL}/organizations/${ORG}/settings`;
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 interface TaxRead {
@@ -48,25 +45,41 @@ async function readTax(request: APIRequestContext): Promise<TaxRead> {
     return (await res.json()) as TaxRead;
 }
 
-/** Northwind as the seed leaves it: not registered, nothing on file. */
-async function putBack(request: APIRequestContext) {
+/**
+ * Northwind's registered address as the seed writes it
+ * (`NORTHWIND_ADDRESS`, packages/database/src/seed/data.ts), state 29.
+ */
+const SEEDED_ADDRESS = {
+    line1: "Plot 12, Peenya Industrial Area",
+    city: "Bengaluru",
+    postalCode: "560058",
+};
+
+/** Northwind unregistered, with its address as given ("" clears it). */
+async function setNorthwind(
+    request: APIRequestContext,
+    address: { line1: string; city: string; postalCode: string },
+    state: string,
+) {
     const res = await request.patch(`${urls.API_URL}/organizations/${ORG}`, {
         headers,
         data: {
-            tax: { registered: false, state: "" },
+            tax: { registered: false, state },
             profile: { taxId: "", country: "" },
-            registeredAddress: {
-                line1: "",
-                line2: "",
-                city: "",
-                postalCode: "",
-            },
+            registeredAddress: { ...address, line2: "" },
         },
     });
     expect(res.ok()).toBe(true);
 }
 
-test.describe("business settings", () => {
+/** Northwind as the seed leaves it: not registered, its address on file. */
+async function putBack(request: APIRequestContext) {
+    await setNorthwind(request, SEEDED_ADDRESS, "29");
+}
+
+// @serial: GST registration and the invoice prefix are Northwind's own,
+// read by every order and invoice test running beside it.
+test.describe("business settings", { tag: "@serial" }, () => {
     test("registering for GST: Save comes back once the GSTIN and address are filled", async ({
         page,
     }) => {
@@ -78,6 +91,12 @@ test.describe("business settings", () => {
         expect(before.tax?.registered).toBe(false);
 
         try {
+            // No address on file, so GST brings its fields into the card.
+            await setNorthwind(
+                page.request,
+                { line1: "", city: "", postalCode: "" },
+                "",
+            );
             await page.goto("/settings/organization");
             await page.getByRole("tab", { name: "Tax and invoices" }).click();
             await page
@@ -141,11 +160,9 @@ test.describe("business settings", () => {
         // Put back: a cleared tax ID reads "" where the seed had none.
         const restored = await readTax(page.request);
         expect(restored.tax?.registered).toBe(false);
-        expect(restored.tax?.state ?? null).toBeNull();
+        expect(restored.tax?.state).toBe("29");
         expect(restored.profile?.taxId ?? "").toBe("");
-        expect(restored.registeredAddress?.line1 ?? null).toBeNull();
-        expect(restored.registeredAddress?.city ?? null).toBeNull();
-        expect(restored.registeredAddress?.postalCode ?? null).toBeNull();
+        expect(restored.registeredAddress).toMatchObject(SEEDED_ADDRESS);
     });
 
     /*
@@ -209,6 +226,108 @@ test.describe("business settings", () => {
     });
 });
 
+// @serial: what Northwind is set up as changes the words every screen of
+// it reads, Home's first run and the settings tab among them.
+test.describe(
+    "what you're setting up (DEC-070, K5)",
+    { tag: "@serial" },
+    () => {
+        test("change to Just me: the tab reads Your details, Activity records it, and back", async ({
+            page,
+        }) => {
+            test.setTimeout(120_000);
+            await signIn(page);
+            await page.goto(`/open/${ORG}`);
+            expect(await readKind(page.request)).toBe("BUSINESS");
+            const since = new Date().toISOString();
+            // The settings tabs are a column on the desk and a row on a phone.
+            const tab = (name: string) =>
+                page
+                    .getByRole("navigation", { name: "Settings" })
+                    .getByRole("link", { name: new RegExp(`^${name}`) })
+                    .filter({ visible: true });
+
+            try {
+                await page.goto("/settings/organization");
+                await expect(tab("Business")).toBeVisible();
+                await saveKindInUi(page, "Just me");
+
+                // The tab, the page's heading and the card speak as "you".
+                await expect(tab("Your details")).toBeVisible({
+                    timeout: 30_000,
+                });
+                await expect(tab("Business")).toHaveCount(0);
+                await expect(
+                    page.getByRole("heading", { name: "Your details" }),
+                ).toBeVisible();
+                const card = page.getByRole("region", { name: "Identity" });
+                await expect(card).toContainText("Just me");
+                await expect(card).toContainText("Your name or brand");
+                await expect.poll(() => readKind(page.request)).toBe("SOLO");
+
+                // Activity: an audited change, with before and after.
+                await expect
+                    .poll(
+                        async () =>
+                            (await readAudit(page.request)).some(
+                                (e) =>
+                                    e.createdAt >= since &&
+                                    JSON.stringify(e.metadata).includes(
+                                        '"SOLO"',
+                                    ),
+                            ),
+                        { timeout: 15_000 },
+                    )
+                    .toBe(true);
+                await page.goto("/settings/activity");
+                await expect(
+                    page
+                        .getByText(/changed what you're setting up to Just me/)
+                        .filter({ visible: true })
+                        .first(),
+                ).toBeVisible({ timeout: 30_000 });
+
+                // And back to A business, the way it was changed.
+                await page.goto("/settings/organization");
+                await saveKindInUi(page, "A business");
+                await expect(tab("Business")).toBeVisible({ timeout: 30_000 });
+                await expect
+                    .poll(() => readKind(page.request))
+                    .toBe("BUSINESS");
+            } finally {
+                await setKind(page.request, "BUSINESS");
+            }
+        });
+    },
+);
+
+async function readKind(request: APIRequestContext): Promise<string> {
+    const res = await request.get(settingsUrl, { headers });
+    expect(res.ok()).toBe(true);
+    return ((await res.json()) as { kind?: string }).kind ?? "BUSINESS";
+}
+
+async function setKind(request: APIRequestContext, kind: string) {
+    const res = await request.patch(`${urls.API_URL}/organizations/${ORG}`, {
+        headers,
+        data: { kind },
+    });
+    expect(res.ok()).toBe(true);
+}
+
+/** Identity → Edit → one of the three answers → Save, and wait for the toast. */
+async function saveKindInUi(page: Page, answer: string) {
+    await page.getByRole("button", { name: "Edit identity" }).click();
+    const card = page.getByRole("region", { name: "Identity" });
+    const choice = card.getByRole("radio", { name: new RegExp(`^${answer}`) });
+    await choice.click();
+    await expect(choice).toHaveAttribute("aria-checked", "true");
+    await card.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText(/^Identity saved/)).toBeVisible({
+        timeout: 30_000,
+    });
+}
+
 async function readPrefix(request: APIRequestContext): Promise<string> {
     const res = await request.get(settingsUrl, { headers });
     expect(res.ok()).toBe(true);
@@ -250,3 +369,21 @@ async function savePrefixInUi(page: Page, prefix: string) {
         timeout: 30_000,
     });
 }
+
+// Read only: nothing here is saved.
+test.describe("business settings tabs", () => {
+    test('the address tab is "Registered address" (DEC-069, DEC-073)', async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        await page.goto("/settings/organization");
+        await expect(
+            page.getByRole("tab", { name: "Address", exact: true }),
+        ).toHaveCount(0);
+        await page.getByRole("tab", { name: "Registered address" }).click();
+        await expect(
+            page.getByRole("region", { name: "Registered address" }),
+        ).toContainText("Printed under your legal name");
+    });
+});

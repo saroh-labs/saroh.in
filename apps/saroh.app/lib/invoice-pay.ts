@@ -1,9 +1,18 @@
 import { env } from "@/env";
 
+import type { AutopayDoneState, AutopayStartResult } from "@saroh/site-blocks";
+
+import { autopayDoneAnswer, autopayStartAnswer } from "./autopay-shape";
 import type { CheckoutIntent } from "./checkout-shape";
 import { isIntent } from "./checkout-shape";
 import type { PayInvoice } from "./invoice-pay-shape";
-import { isPayInvoice } from "./invoice-pay-shape";
+import {
+    isPayInvoice,
+    payAutopayOf,
+    payChargingOf,
+    payOnlineOf,
+    payUrlOf,
+} from "./invoice-pay-shape";
 
 export type { PayInvoice, PayInvoiceLine } from "./invoice-pay-shape";
 
@@ -37,7 +46,22 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
     if (res.ok) {
         const body: unknown = await res.json().catch(() => null);
         return isPayInvoice(body)
-            ? { ok: true, invoice: body }
+            ? {
+                  ok: true,
+                  // Autopay (D12) checked field by field; strange is none.
+                  invoice: {
+                      ...body,
+                      autopay: payAutopayOf(body.autopay),
+                      // A charge under way (D13), checked the same way.
+                      autopayCharging: payChargingOf(body.autopayCharging),
+                      // When autopay next charges (D13B): the same shape.
+                      autopayNextCharge: payChargingOf(body.autopayNextCharge),
+                      // Where the link lives (DEC-069, L6).
+                      payUrl: payUrlOf(body.payUrl),
+                      // Whether Pay is offered at all (DEC-070).
+                      payOnline: payOnlineOf(body.payOnline),
+                  },
+              }
             : { ok: false, reason: "unavailable" };
     }
     if (res.status === 404) return { ok: false, reason: "missing" };
@@ -113,4 +137,65 @@ export async function startInvoicePayment(
                     "The business can't take payment online right now. Please try again later, or pay them another way.",
             };
     }
+}
+
+/**
+ * "Pay and turn on autopay" (D12): start autopay on the invoice's plan with
+ * the method picked. Only the method and a key travel on; the API takes
+ * the amount from the invoice and the limit from the plan.
+ *
+ *   POST ${API_URL}/public/invoices/:token/autopay
+ */
+export async function startInvoiceAutopay(
+    token: string,
+    method: string,
+    idempotencyKey: string,
+): Promise<AutopayStartResult> {
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/invoices/${encodeURIComponent(token)}/autopay`,
+            {
+                method: "POST",
+                cache: "no-store",
+                headers: {
+                    accept: "application/json",
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({ method, idempotencyKey }),
+            },
+        );
+    } catch {
+        return {
+            ok: false,
+            message: "We couldn't reach the business. Try again in a moment.",
+        };
+    }
+    return autopayStartAnswer(res.status, await res.json().catch(() => null));
+}
+
+/**
+ * How autopay stands after the pay link's set-up (D12), for the page on the
+ * business's site, with the pay link to try again from.
+ *
+ *   GET ${API_URL}/public/invoices/:token/autopay
+ */
+export async function getInvoiceAutopay(
+    token: string,
+): Promise<{ state: AutopayDoneState; payUrl: string | null }> {
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/invoices/${encodeURIComponent(token)}/autopay`,
+            { cache: "no-store", headers: { accept: "application/json" } },
+        );
+    } catch {
+        return { state: { kind: "error" }, payUrl: null };
+    }
+    const body: unknown = await res.json().catch(() => null);
+    const payUrl = (body as { payUrl?: unknown } | null)?.payUrl;
+    return {
+        state: autopayDoneAnswer(res.status, body),
+        payUrl: typeof payUrl === "string" ? payUrl : null,
+    };
 }

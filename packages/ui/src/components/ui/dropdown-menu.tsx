@@ -26,7 +26,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     <DropdownMenuPrimitive.SubTrigger
         ref={ref}
         className={cn(
-            "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent",
+            "flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent",
             inset && "pl-8",
             className,
         )}
@@ -87,7 +87,7 @@ const DropdownMenuItem = React.forwardRef<
             // icon sits a fixed step from its label, and sizing svgs here stops
             // each call site repeating `size-4 shrink-0`. 7px/9px rows at 13px,
             // as the brand file's row menu draws them.
-            "relative flex cursor-default select-none items-center gap-2.5 rounded-[7px] px-[9px] py-[7px] text-[13px] outline-none transition-colors duration-fast focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground [&>svg]:size-4 [&>svg]:shrink-0",
+            "relative flex cursor-pointer select-none items-center gap-2.5 rounded-[7px] px-[9px] py-[7px] text-[13px] outline-none transition-colors duration-fast focus:bg-accent focus:text-accent-foreground active:bg-accent-active data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground [&>svg]:size-4 [&>svg]:shrink-0",
             // Destructive items live below a separator, never first, in
             // Destructive 700 on its own tint (brand file §14).
             variant === "destructive" &&
@@ -107,7 +107,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     <DropdownMenuPrimitive.CheckboxItem
         ref={ref}
         className={cn(
-            "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground",
+            "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground active:bg-accent-active data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground",
             className,
         )}
         checked={checked}
@@ -131,7 +131,7 @@ const DropdownMenuRadioItem = React.forwardRef<
     <DropdownMenuPrimitive.RadioItem
         ref={ref}
         className={cn(
-            "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground",
+            "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground active:bg-accent-active data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground",
             className,
         )}
         {...props}

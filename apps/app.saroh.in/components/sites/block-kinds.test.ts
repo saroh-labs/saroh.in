@@ -25,8 +25,16 @@ describe("the Add block groups", () => {
             "visitUs",
             "journal",
             "plans",
+            "packs",
             "productGrid",
         ]);
+    });
+});
+
+describe("the Projects block (K11)", () => {
+    it("is offered as a structure block: the merchant types it, nothing is read", () => {
+        expect(BOUND_BLOCKS.projects).toBeNull();
+        expect(addBlockGroups(SECTION_ORDER).structure).toContain("projects");
     });
 });
 
@@ -46,7 +54,7 @@ describe("where a bound block's values are changed", () => {
 
     it("keeps a business-wide screen's link as it is", () => {
         expect(boundHref(bound("visitUs"), "site_rye")).toBe(
-            "/commerce/storefronts",
+            "/commerce/locations",
         );
     });
 

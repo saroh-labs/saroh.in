@@ -14,6 +14,7 @@ import { AccountBookingsController } from "../site-accounts/account-bookings.con
 import { AccountBookingsService } from "../site-accounts/account-bookings.service";
 import { AccountWaitlistController } from "../site-accounts/account-waitlist.controller";
 import { SiteAccountsModule } from "../site-accounts/site-accounts.module";
+import { WebhooksModule } from "../webhooks/webhooks.module";
 import {
     BOOKING_NOTIFY_TYPE,
     BookingNotifyHandler,
@@ -68,6 +69,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         // account area's switch (A6), and the customer notices
         // `booking.notify` delegates to (A14).
         SiteAccountsModule,
+        // The hold release asks about a hold's payment first (P1).
+        WebhooksModule,
     ],
     controllers: [
         BookingsController,

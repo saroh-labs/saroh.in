@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
     AlignLeft,
+    Briefcase,
     CalendarClock,
     CircleHelp,
     Clock,
@@ -15,6 +16,7 @@ import {
     Quote,
     Repeat,
     Sparkles,
+    Ticket,
 } from "lucide-react";
 
 import type { SectionType } from "@/lib/sites/service";
@@ -40,5 +42,7 @@ export const SECTION_ICONS: Record<SectionType, LucideIcon> = {
     visitUs: Clock,
     journal: Newspaper,
     plans: Repeat,
+    packs: Ticket,
     productGrid: LayoutGrid,
+    projects: Briefcase,
 };

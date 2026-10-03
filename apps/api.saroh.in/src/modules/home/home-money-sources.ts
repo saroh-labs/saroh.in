@@ -1,4 +1,5 @@
 import type { prisma, Prisma } from "@saroh/database";
+import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
 import {
@@ -6,6 +7,11 @@ import {
     isPastDue,
     OWED_WHERE,
 } from "../invoices/invoice-state";
+import type { ChargeUnderWay } from "../payments/charge-under-way";
+import {
+    AUTOPAY_CHARGE_IN_PROGRESS,
+    chargesUnderWay,
+} from "../payments/charge-under-way";
 import type { HomeAction, HomeEvidence } from "./home-model";
 import { EVIDENCE_LIMIT, overdueTag, personName } from "./home-model";
 
@@ -30,6 +36,8 @@ export interface RenewalSignal {
     subscriptionId: string;
     kind: RenewalEventKind;
     at: Date;
+    /** The event's `data.reason`, when it gave one (a RENEWAL_FAILED's). */
+    reason?: string;
 }
 
 /**
@@ -66,19 +74,78 @@ export const readRenewalSignals: RenewalSignalReader = async (
             subscriptionId: { in: [...subscriptionIds] },
             kind: { in: RENEWAL_EVENT_KINDS },
         },
-        select: { subscriptionId: true, kind: true, createdAt: true },
+        select: {
+            subscriptionId: true,
+            kind: true,
+            createdAt: true,
+            data: true,
+        },
     });
-    return rows.map((r) => ({
-        subscriptionId: r.subscriptionId,
-        kind: r.kind as RenewalEventKind,
-        at: r.createdAt,
-    }));
+    return rows.map((r) => {
+        const reason = reasonOf(r.data);
+        return {
+            subscriptionId: r.subscriptionId,
+            kind: r.kind as RenewalEventKind,
+            at: r.createdAt,
+            ...(reason ? { reason } : {}),
+        };
+    });
 };
+
+function reasonOf(data: unknown): string | null {
+    if (typeof data !== "object" || data === null) return null;
+    const reason = (data as Record<string, unknown>).reason;
+    return typeof reason === "string" ? reason : null;
+}
 
 const EVENT_TAGS: Record<RenewalEventKind, string> = {
     RENEWAL_FAILED: "Payment failed",
     MANDATE_LIMIT_LOW: "Autopay limit too low",
 };
+
+/**
+ * Autopay stood aside for a pay-link checkout the customer had open
+ * (RENEWAL_FAILED with reason CHECKOUT_OPEN): nothing was declined, so not
+ * "Payment failed". Worded as the subscription's history says it.
+ */
+export const CHECKOUT_OPEN_TAG = "Autopay didn't charge — paying by link";
+
+/** The tag of a renewal above its autopay's limit (D13): it needs a new set-up (D14). */
+export const LIMIT_LOW_TAG = EVENT_TAGS.MANDATE_LIMIT_LOW;
+
+/**
+ * The tags that say autopay didn't take the renewal: such a renewal is
+ * retried before its due date (D13) — by the pay link while the customer's
+ * checkout is open, by autopay once it has closed.
+ */
+export const AUTOPAY_FAILED_TAGS: readonly string[] = [
+    ...Object.values(EVENT_TAGS),
+    CHECKOUT_OPEN_TAG,
+];
+
+/** A renewal event's tag: what happened, in the merchant's words. */
+function signalTag(signal: RenewalSignal): string {
+    if (signal.kind === "RENEWAL_FAILED" && signal.reason === "CHECKOUT_OPEN") {
+        return CHECKOUT_OPEN_TAG;
+    }
+    return EVENT_TAGS[signal.kind];
+}
+
+/**
+ * The autopay charges under way on these invoices (D13), by invoice. A
+ * parameter, so the unit specs can hand in their own.
+ */
+export type RenewalChargeReader = (
+    db: Db,
+    organizationId: string,
+    invoiceIds: readonly string[],
+) => Promise<Map<string, ChargeUnderWay>>;
+
+/** "Autopay charge in progress · 14 Oct", in the business's zone. */
+export function chargingTag(at: Date, zone: string): string {
+    const day = DateTime.fromJSDate(at, { zone }).toFormat("d LLL");
+    return `${AUTOPAY_CHARGE_IN_PROGRESS} · ${day}`;
+}
 
 /** Not cancelled: ACTIVE or PAUSED, and still owed what it billed. */
 const LIVE_SUBSCRIPTION = {
@@ -123,7 +190,9 @@ async function latestPeriodInvoices(
  * failed charge uses: the last ISSUED or PAID invoice by issue date.
  *
  * One row per subscription, oldest due first. The amount is shown only to
- * someone who reads invoices (`showAmount`).
+ * someone who reads invoices (`showAmount`). While an autopay charge is
+ * under way on it (D13) the row says "Autopay charge in progress · ‹date›"
+ * and offers no Retry (`home-inline.ts`).
  */
 export async function failedRenewals(
     db: Db,
@@ -131,6 +200,8 @@ export async function failedRenewals(
     now: Date,
     showAmount: boolean,
     readSignals: RenewalSignalReader = readRenewalSignals,
+    readCharges: RenewalChargeReader = chargesUnderWay,
+    zone = "Asia/Kolkata",
 ): Promise<HomeAction | null> {
     const unpaid = await db.invoice.findMany({
         where: {
@@ -184,17 +255,26 @@ export async function failedRenewals(
     const current = owed.filter((i) => latestOf.get(i.subscriptionId) === i.id);
     if (current.length === 0) return null;
 
-    const signals = await readSignals(
-        db,
-        organizationId,
-        current.map((i) => i.subscriptionId),
-    );
+    const [signals, charging] = await Promise.all([
+        readSignals(
+            db,
+            organizationId,
+            current.map((i) => i.subscriptionId),
+        ),
+        readCharges(
+            db,
+            organizationId,
+            current.map((i) => i.id),
+        ),
+    ]);
 
     const evidence: HomeEvidence[] = [];
     for (const inv of current) {
         const { subscriptionId } = inv;
-        const tag = renewalTag(inv, subscriptionId, signals, now);
-        if (!tag) continue;
+        const failed = renewalTag(inv, subscriptionId, signals, now);
+        if (!failed) continue;
+        const charge = charging.get(inv.id);
+        const tag = charge ? chargingTag(charge.at, zone) : failed;
         evidence.push({
             id: subscriptionId,
             title: inv.subscription.plan.name,
@@ -247,7 +327,7 @@ export function renewalTag(
         if (s.at.getTime() < since) continue;
         if (!latest || s.at > latest.at) latest = s;
     }
-    if (latest) return EVENT_TAGS[latest.kind];
+    if (latest) return signalTag(latest);
     if (isPastDue(invoice, now) && invoice.dueAt)
         return overdueTag(invoice.dueAt, now);
     return null;

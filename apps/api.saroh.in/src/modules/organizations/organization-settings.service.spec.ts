@@ -23,6 +23,7 @@ jest.mock("@saroh/database", () => {
         product: { count: jest.fn().mockResolvedValue(0) },
         service: { count: jest.fn().mockResolvedValue(0) },
         site: { count: jest.fn().mockResolvedValue(0) },
+        invoice: { count: jest.fn().mockResolvedValue(0) },
     };
     return {
         prisma: {
@@ -125,17 +126,23 @@ describe("OrganizationSettingsService", () => {
             );
         });
 
-        it("sends the checklist's facts: products, services, sites and those not live (H-5, H-6)", async () => {
+        it("sends the checklist's facts: products, services, sites, those not live and invoices (H-5, H-6, DEC-070)", async () => {
             (prisma.product.count as jest.Mock).mockResolvedValueOnce(0);
             (prisma.service.count as jest.Mock).mockResolvedValueOnce(2);
             (prisma.site.count as jest.Mock)
                 .mockResolvedValueOnce(2)
                 .mockResolvedValueOnce(1);
+            (prisma.invoice.count as jest.Mock).mockResolvedValueOnce(3);
             expect((await service.get(ctx())).setup).toEqual({
                 products: 0,
                 services: 2,
                 sites: 2,
                 sitesNotLive: 1,
+                invoices: 3,
+            });
+            // A void invoice never counts: drafts and issued paper do.
+            expect(prisma.invoice.count).toHaveBeenLastCalledWith({
+                where: { organizationId: "org_1", status: { not: "VOID" } },
             });
             // Archived never counts; a site is live only while something
             // is published on it now.
@@ -337,13 +344,13 @@ describe("OrganizationSettingsService", () => {
                 );
             });
 
-            it("keeps a private limited company as company this release, whichever spelling is sent", async () => {
+            it("stores a private limited company as pvt, whichever spelling is sent (F10b)", async () => {
                 for (const sent of ["pvt", "company"] as const) {
                     profileUpsert.mockClear();
                     await service.update(ctx(), { profile: { type: sent } });
                     expect(profileUpsert).toHaveBeenCalledWith(
                         expect.objectContaining({
-                            update: { type: "company" },
+                            update: { type: "pvt" },
                         }),
                     );
                 }
@@ -376,9 +383,9 @@ describe("OrganizationSettingsService", () => {
                 ]);
             });
 
-            it("reads a stored company back as it is, for the app to name", async () => {
+            it("answers a stored company as pvt until the backfill reaches it (F10b)", async () => {
                 const settings = await service.get(ctx());
-                expect(settings.profile?.type).toBe("company");
+                expect(settings.profile?.type).toBe("pvt");
             });
         });
 
@@ -1107,6 +1114,80 @@ describe("OrganizationSettingsService", () => {
                     custom: true,
                     counters: { FY: 0, MONTH: 0, NEVER: 0 },
                 });
+            });
+        });
+
+        describe("what is being set up (DEC-070)", () => {
+            const withKind = (kind?: string) => ({
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                ...(kind === undefined ? {} : { kind }),
+                businessProfile: null,
+            });
+
+            it("reads the kind back, and a row with none as a business", async () => {
+                orgFindUnique.mockResolvedValue(withKind("WORK"));
+                expect((await service.get(ctx())).kind).toBe("WORK");
+                orgFindUnique.mockResolvedValue(withKind());
+                expect((await service.get(ctx())).kind).toBe("BUSINESS");
+            });
+
+            it("changes it on the organization and records it as it was and became", async () => {
+                orgFindUnique
+                    .mockResolvedValueOnce(withKind("BUSINESS"))
+                    .mockResolvedValue(withKind("SOLO"));
+
+                const saved = await service.update(ctx("ADMIN"), {
+                    kind: "SOLO",
+                });
+
+                expect(saved.kind).toBe("SOLO");
+                expect(orgUpdate).toHaveBeenCalledWith({
+                    where: { id: "org_1" },
+                    data: { kind: "SOLO" },
+                });
+                expect(profileUpsert).not.toHaveBeenCalled();
+                expect(record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        action: AuditAction.ProfileUpdate,
+                        metadata: {
+                            fields: ["kind"],
+                            changes: [
+                                {
+                                    field: "kind",
+                                    before: "BUSINESS",
+                                    after: "SOLO",
+                                },
+                            ],
+                        },
+                    }),
+                );
+            });
+
+            it("writes the name and the kind in one organization update", async () => {
+                await service.update(ctx(), { name: "Asha Rao", kind: "WORK" });
+                expect(orgUpdate).toHaveBeenCalledTimes(1);
+                expect(orgUpdate).toHaveBeenCalledWith({
+                    where: { id: "org_1" },
+                    data: { name: "Asha Rao", kind: "WORK" },
+                });
+            });
+
+            it("leaves it alone when a save does not send it", async () => {
+                await service.update(ctx(), { name: "Acme Global" });
+                expect(orgUpdate).toHaveBeenCalledWith({
+                    where: { id: "org_1" },
+                    data: { name: "Acme Global" },
+                });
+            });
+
+            it("needs org:update: a Member is refused and nothing is written", async () => {
+                await expect(
+                    service.update(ctx("MEMBER"), { kind: "SOLO" }),
+                ).rejects.toBeInstanceOf(ForbiddenException);
+                expect(orgUpdate).not.toHaveBeenCalled();
+                expect(record).not.toHaveBeenCalled();
             });
         });
 

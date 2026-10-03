@@ -59,6 +59,13 @@ export const ALERTS = [
         label: "Someone joins the team",
         note: "When an invite is accepted",
     },
+    // Not in the design: a test release's scheduled go-live (DEC-071, T10).
+    // The API offers it only to who can publish, with test releases on.
+    {
+        key: "site",
+        label: "Website goes live",
+        note: "When a scheduled go-live runs, or couldn't",
+    },
 ] as const;
 export type AlertKey = (typeof ALERTS)[number]["key"];
 
@@ -144,17 +151,21 @@ export function alertGrid(read: AlertPreferencesRead): AlertGrid {
     if (read.status !== "ok") {
         return {
             columns: [...ALERT_CHANNELS],
-            rows: ALERTS.map((alert) => ({
-                key: alert.key,
-                label: alert.label,
-                note: alert.note,
-                cells: ALERT_CHANNELS.map((channel) => ({
-                    channel,
-                    on: false,
-                    disabled: true,
-                    label: `${alert.label} by ${ALERT_CHANNEL_LABELS[channel]}, can't be chosen yet`,
-                })),
-            })),
+            // The design's rows only: the Website row is offered by the API
+            // alone, to who can publish with test releases on (DEC-057).
+            rows: ALERTS.filter((alert) => alert.key !== "site").map(
+                (alert) => ({
+                    key: alert.key,
+                    label: alert.label,
+                    note: alert.note,
+                    cells: ALERT_CHANNELS.map((channel) => ({
+                        channel,
+                        on: false,
+                        disabled: true,
+                        label: `${alert.label} by ${ALERT_CHANNEL_LABELS[channel]}, can't be chosen yet`,
+                    })),
+                }),
+            ),
             notes: [
                 {
                     id: "not-available",

@@ -11,6 +11,7 @@ import { ModuleAvailabilityService } from "./module-availability.service";
 import { ModuleEnforcementGuard } from "./module-enforcement.guard";
 import { ModuleLifecycleService } from "./module-lifecycle.service";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
+import { ModuleSetupService } from "./setup/module-setup.service";
 
 /**
  * Modular capabilities (ADR-003). Provides the module lifecycle commands, the
@@ -34,6 +35,8 @@ import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
         ModuleReadinessRegistry,
         ModuleAvailabilityService,
         ModuleLifecycleService,
+        // Turning a module on with its minimum (DEC-068).
+        ModuleSetupService,
         ModuleEnforcementGuard,
         OrganizationGuard,
     ],

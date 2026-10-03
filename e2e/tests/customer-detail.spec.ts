@@ -1,20 +1,22 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-
-import type { Browser, Page } from "@playwright/test";
+// @covers accounts:/login app:/open app:/customers app:/commerce/customers site:/[slug] site:/account/messages api:organizations api:customer-workspace api:contacts api:customers api:orders api:subscriptions api:invoices api:class-packs api:bookings api:enquiry api:site-accounts pkg:site-blocks
+import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
+import { makeContact, makeOrder, northwind, stamp } from "../fixtures/own-data";
+import type { Role } from "../fixtures/sessions";
+import { useSession } from "../fixtures/sessions";
+import { ignoreHTTPSErrors, urls } from "../playwright.config";
+import { asNewVisitor, signInOnSheet } from "./site-codes";
 
 /**
  * Customer Detail (plan 2026-09-23-003, U18): one page per person, rooted on
  * the contact, with tabs by business kind — Rye & Co. (a bakery) and Pulse
- * Fitness (a gym) — plus not found, notes with an allergy, a possible match
- * that a person links, and a Member who sees no money.
+ * Fitness (a gym) — plus not found, notes, a possible match that a person
+ * links, and a Member who sees no money.
  *
- * Every change it makes is undone before it ends, so the demo businesses are
- * left as they were; desk and phone run one after the other on the same data.
+ * Rye, Pulse and Kavi are only read. Every write — a note, a link, a Needs
+ * attention entry — is on a Northwind contact the test makes for itself,
+ * so desk and phone, and every other spec, can run beside it.
  */
 
 const RYE = "seed_sc_rc_org";
@@ -22,52 +24,12 @@ const PULSE = "seed_sc_pulse_org";
 const NORTHWIND = "seed_org";
 const PRIYA = "seed_sc_rc_contact_priya";
 const PRIYA_STORE = "seed_sc_rc_customer_priya";
-/** A Northwind contact whose same-email store customer nobody has linked. */
-const KARTHIK = "seed_contact_7";
-
-const member = {
-    email: "nisha.kulkarni@saroh.dev",
-    password: "demo-password-123",
-};
-
-/**
- * Sign in once per person and keep the session: signing in before every
- * test trips the accounts sign-in throttle long before the suite ends.
- */
-const OWNER_STATE = path.join(os.tmpdir(), "e2e-customer-detail-owner.json");
-const MEMBER_STATE = path.join(os.tmpdir(), "e2e-customer-detail-member.json");
-
-async function saveSession(
-    browser: Browser,
-    who: { email: string; password: string },
-    file: string,
-) {
-    const context = await browser.newContext({ ignoreHTTPSErrors });
-    const page = await context.newPage();
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
-    await context.storageState({ path: file });
-    await context.close();
-}
 
 /** Carry the saved session into this test's browser, then open the business. */
-async function signIn(page: Page, org: string, file = OWNER_STATE) {
-    const state = JSON.parse(fs.readFileSync(file, "utf8")) as {
-        cookies: Parameters<ReturnType<Page["context"]>["addCookies"]>[0];
-    };
-    await page.context().addCookies(state.cookies);
+async function signIn(page: Page, org: string, who: Role = "owner") {
+    await useSession(page, who);
     await page.goto(`/open/${org}`);
 }
-
-test.beforeAll(async ({ browser }) => {
-    await saveSession(browser, demoUser, OWNER_STATE);
-    await saveSession(browser, member, MEMBER_STATE);
-});
 
 const tab = (page: Page, name: RegExp) => page.getByRole("tab", { name });
 
@@ -209,28 +171,34 @@ test.describe("customer detail", () => {
         ).toBeVisible();
     });
 
-    test("a note with an allergy, deleted, brought back, deleted", async ({
+    test("a note is text only; deleted, brought back, deleted (Z2a)", async ({
         page,
-    }) => {
-        await signIn(page, RYE);
-        await page.goto(`/customers/${PRIYA}?tab=notes`);
-        const text = `E2E note ${Date.now()}`;
+    }, testInfo) => {
+        // A Northwind contact of its own: Rye is a film set.
+        await signIn(page, NORTHWIND);
+        const s = stamp(testInfo);
+        const who = await makeContact(page.request, {
+            firstName: "Note",
+            lastName: s,
+            email: `note-${s}@example.test`,
+        });
+        await page.goto(`/customers/${who.id}?tab=notes`);
+        const text = `E2E note ${s}`;
         await page.getByLabel("New note").fill(text);
-        await page
-            .getByRole("group", { name: "Allergy" })
-            .getByRole("button", { name: "Mustard" })
-            .click();
+        // Allergies live on Needs attention, not on a note (Z2a).
+        await expect(page.getByRole("group", { name: "Allergy" })).toHaveCount(
+            0,
+        );
         await page.getByRole("button", { name: "Add note" }).click();
         const note = page.getByRole("article").filter({ hasText: text });
         await expect(note).toBeVisible();
-        await expect(note).toContainText("Allergy: Mustard");
+        await expect(note).not.toContainText("Allergy:");
 
         await note.getByRole("button", { name: "Delete" }).click();
         await expect(page.getByText(text)).toHaveCount(0);
         await page.getByRole("button", { name: "Undo" }).last().click();
         await expect(page.getByText(text)).toBeVisible();
 
-        // Leave the customer as found.
         await page
             .getByRole("article")
             .filter({ hasText: text })
@@ -239,59 +207,86 @@ test.describe("customer detail", () => {
         await expect(page.getByText(text)).toHaveCount(0);
     });
 
+    test("a customer added by hand shows their saved address before any order (DEC-073)", async ({
+        page,
+    }, testInfo) => {
+        await signIn(page, NORTHWIND);
+        const s = stamp(testInfo);
+        const api = northwind(page.request);
+        const { contactId } = await api.post<{ contactId: string }>(
+            "/customers",
+            {
+                email: `hand-${s}@example.test`,
+                firstName: "Hand",
+                lastName: s,
+            },
+        );
+        await api.patch(`/contacts/${contactId}`, {
+            addressLine1: `${s} Hill Road`,
+            city: "Mumbai",
+            postalCode: "400050",
+        });
+        await page.goto(`/customers/${contactId}`);
+        await expect(
+            page.getByText("No orders yet", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("region", { name: "Delivery address" }),
+        ).toContainText(`${s} Hill Road, Mumbai 400050`);
+    });
+
     test("a possible match is linked by a person, and its orders come in", async ({
         page,
-    }) => {
+    }, testInfo) => {
         await signIn(page, NORTHWIND);
-        await page.goto(`/customers/${KARTHIK}`);
+        // A pair of its own: a contact, and a storefront customer with the
+        // same email, made by an order that is left unpaid (a paid one links
+        // them by itself, C2) — so nobody has linked them yet.
+        // Short, as a real one is: the dialog does not wrap a long email on
+        // a phone, and its Link button is pushed off the screen.
+        const s = stamp(testInfo).split("-").pop() ?? "";
+        const email = `m${s}@ex.in`;
+        const who = await makeContact(page.request, {
+            firstName: "Karthik",
+            lastName: s,
+            email,
+        });
+        await makeOrder(page.request, {
+            paid: false,
+            customer: { email, name: who.name },
+        });
+
+        await page.goto(`/customers/${who.id}`);
         await expect(page.getByText("Possible match — link?")).toBeVisible();
         await page.getByRole("button", { name: "Review and link" }).click();
         const dialog = page.getByRole("dialog", {
             name: "Link a commerce customer",
         });
         await dialog.getByRole("button", { name: "Link" }).first().click();
-        try {
-            await expect(page.getByText("Possible match — link?")).toHaveCount(
-                0,
-            );
-            await tab(page, /^Orders/).click();
-            await expect(
-                page.getByRole("link", { name: /^#/ }).first(),
-            ).toBeVisible();
-        } finally {
-            // Unlink, so the demo still offers the match.
-            const detail = await page.request.get(
-                `${urls.API_URL}/organizations/${NORTHWIND}/customers/${KARTHIK}/detail`,
-            );
-            const body = (await detail.json()) as {
-                linkedCustomers?: { linkId: string }[];
-            };
-            for (const link of body.linkedCustomers ?? []) {
-                await page.request.delete(
-                    `${urls.API_URL}/organizations/${NORTHWIND}/customers/links/${link.linkId}`,
-                    { headers: { origin: urls.APP_URL } },
-                );
-            }
-        }
+        await expect(page.getByText("Possible match — link?")).toHaveCount(0);
+        await tab(page, /^Orders/).click();
+        await expect(
+            page.getByRole("link", { name: /^#/ }).first(),
+        ).toBeVisible();
     });
 });
 
 test.describe("customer detail, as a Member", () => {
     test("a Member sees no billing tabs and no money", async ({ page }) => {
-        await signIn(page, RYE, MEMBER_STATE);
+        await signIn(page, RYE, "member");
         await page.goto(`/customers/${PRIYA}`);
         await expect(
             page.getByRole("heading", { name: "Priya Raman" }),
         ).toBeVisible();
         await expect(tab(page, /^Notes/)).toBeVisible();
-        // Sell › Customers is refused to the counter (R7, #508): the crumb
-        // leads back to Contacts instead.
+        // Sell › Customers follows contact:read (B16), a Member's included:
+        // the crumb leads back there, as the rail does.
         const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });
         await expect(
-            crumbs.getByRole("link", { name: "Contacts" }),
+            crumbs.getByRole("link", { name: "Customers" }),
         ).toBeVisible();
         await expect(
-            crumbs.getByRole("link", { name: "Customers" }),
+            crumbs.getByRole("link", { name: "Contacts" }),
         ).toHaveCount(0);
         for (const name of [/^Invoices/, /^Subscriptions/, /^Orders/])
             await expect(tab(page, name)).toHaveCount(0);
@@ -303,84 +298,72 @@ test.describe("customer detail, as a Member", () => {
 });
 
 /**
- * Needs attention on Customer Detail (C5, DEC-040). Writes happen on
- * Northwind; Kavi Dental is a film set, so it is only read — by Divya on the
- * desk, a Member, who sees Rahul's latex allergy and a count in place of his
- * sensitive medical note.
+ * Needs attention on Customer Detail (C5, DEC-040). Writes happen on a
+ * Northwind contact each test makes; Kavi Dental is a film set, so it is
+ * only read — by Divya on the desk, a Member, who sees Rahul's latex allergy
+ * and a count in place of his sensitive medical note.
  */
 const KAVI = "seed_sc_kavi_org";
 const RAHUL = "seed_sc_kavi_contact_rahul";
-/** A Northwind contact nothing else here changes. */
-const NW_CONTACT = "seed_contact_2";
-const desk = { email: "divya.kamath@saroh.dev", password: member.password };
-const DESK_STATE = path.join(os.tmpdir(), "e2e-customer-detail-desk.json");
 
 /** The row by the name: the heading and the tags beside it. */
 const nameRow = (page: Page) => page.locator("h1").locator("..");
 
-/** Take every "Wheelchair" entry this suite added off the contact. */
-async function clearWheelchair(page: Page) {
-    const base = `${urls.API_URL}/organizations/${NORTHWIND}/customers/${NW_CONTACT}/attention`;
-    const res = await page.request.get(base);
-    const body = (await res.json()) as {
-        entries?: { id: string; label: string }[];
-    };
-    for (const e of body.entries ?? []) {
-        if (e.label !== "Wheelchair") continue;
-        await page.request.delete(`${base}/${e.id}`, {
-            headers: { origin: urls.APP_URL },
-        });
-    }
+/** A Northwind contact of this test's own, with nothing on Needs attention. */
+async function aContact(page: Page, testInfo: TestInfo): Promise<string> {
+    const s = stamp(testInfo);
+    return (
+        await makeContact(page.request, {
+            firstName: "Access",
+            lastName: s,
+            email: `attention-${s}@example.test`,
+        })
+    ).id;
 }
 
 test.describe("needs attention", () => {
     test("add Access 'Wheelchair': the tag shows by the name; Remove has Undo", async ({
         page,
-    }) => {
+    }, testInfo) => {
         await signIn(page, NORTHWIND);
-        await clearWheelchair(page);
-        try {
-            await page.goto(`/customers/${NW_CONTACT}`);
-            const card = page.getByRole("region", { name: "Needs attention" });
-            await card.getByRole("button", { name: "Add" }).click();
-            const sheet = page.getByRole("dialog", {
-                name: "Add to Needs attention",
-            });
-            await sheet.getByRole("radio", { name: "Access" }).click();
-            // Access isn't sensitive unless someone ticks it.
-            await expect(sheet.getByRole("checkbox")).not.toBeChecked();
-            await sheet
-                .getByLabel("Short label for the team")
-                .fill("Wheelchair");
-            await sheet
-                .getByRole("button", { name: "Add to Needs attention" })
-                .click();
-            await expect(sheet).toHaveCount(0);
+        const contact = await aContact(page, testInfo);
+        await page.goto(`/customers/${contact}`);
+        const card = page.getByRole("region", { name: "Needs attention" });
+        await card.getByRole("button", { name: "Add" }).click();
+        const sheet = page.getByRole("dialog", {
+            name: "Add to Needs attention",
+        });
+        await sheet.getByRole("radio", { name: "Access" }).click();
+        // Access isn't sensitive unless someone ticks it.
+        await expect(sheet.getByRole("checkbox")).not.toBeChecked();
+        await sheet.getByLabel("Short label for the team").fill("Wheelchair");
+        await sheet
+            .getByRole("button", { name: "Add to Needs attention" })
+            .click();
+        await expect(sheet).toHaveCount(0);
 
-            await expect(
-                nameRow(page).getByText("Access: Wheelchair"),
-            ).toBeVisible();
-            await expect(card).toContainText("Access: Wheelchair");
+        await expect(
+            nameRow(page).getByText("Access: Wheelchair"),
+        ).toBeVisible();
+        await expect(card).toContainText("Access: Wheelchair");
 
-            await card
-                .getByRole("button", { name: "Remove Access: Wheelchair" })
-                .click();
-            await expect(card).not.toContainText("Access: Wheelchair");
-            await expect(
-                nameRow(page).getByText("Access: Wheelchair"),
-            ).toHaveCount(0);
-            await page.getByRole("button", { name: "Undo" }).last().click();
-            await expect(card).toContainText("Access: Wheelchair");
-        } finally {
-            await clearWheelchair(page);
-        }
+        await card
+            .getByRole("button", { name: "Remove Access: Wheelchair" })
+            .click();
+        await expect(card).not.toContainText("Access: Wheelchair");
+        await expect(nameRow(page).getByText("Access: Wheelchair")).toHaveCount(
+            0,
+        );
+        await page.getByRole("button", { name: "Undo" }).last().click();
+        await expect(card).toContainText("Access: Wheelchair");
     });
 
     test("a save that fails keeps what was typed and says so", async ({
         page,
-    }) => {
+    }, testInfo) => {
         await signIn(page, NORTHWIND);
-        await page.goto(`/customers/${NW_CONTACT}`);
+        const contact = await aContact(page, testInfo);
+        await page.goto(`/customers/${contact}`);
         await page
             .getByRole("region", { name: "Needs attention" })
             .getByRole("button", { name: "Add" })
@@ -391,7 +374,7 @@ test.describe("needs attention", () => {
         await sheet.getByRole("radio", { name: "Access" }).click();
         await sheet.getByLabel("Short label for the team").fill("Wheelchair");
         // The Server Action's POST never reaches the server.
-        await page.route(`**/customers/${NW_CONTACT}**`, (route) =>
+        await page.route(`**/customers/${contact}**`, (route) =>
             route.request().method() === "POST"
                 ? route.abort()
                 : route.continue(),
@@ -411,11 +394,9 @@ test.describe("needs attention", () => {
     });
 
     test("a Member sees the allergy, and a count in place of the medical note", async ({
-        browser,
         page,
     }) => {
-        await saveSession(browser, desk, DESK_STATE);
-        await signIn(page, KAVI, DESK_STATE);
+        await signIn(page, KAVI, "desk");
         await page.goto(`/customers/${RAHUL}`);
         await expect(
             page.getByRole("heading", { name: "Rahul Verma" }),
@@ -443,6 +424,18 @@ test.describe("needs attention", () => {
         ).toBeVisible();
         await expect(nameRow(page).getByText("Allergy: Latex")).toBeVisible();
         await expect(page.getByRole("main")).not.toContainText("you can't see");
+
+        // His booking-page note (C12), as the design writes it (DEC-073):
+        // by his full name, and the tick names who can read it.
+        const notes = page.getByRole("region", {
+            name: /from the booking page/,
+        });
+        await expect(notes).toContainText(
+            /Rahul \S+ wrote this when booking online/,
+        );
+        await expect(notes).toContainText(
+            /only people who can see sensitive notes \([^)]*Owner[^)]*\) can read it/,
+        );
     });
 });
 
@@ -553,5 +546,95 @@ test.describe("customer detail on a 375px phone", () => {
         ).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(more).toBeFocused();
+    });
+});
+
+/**
+ * Messages (round-2 A13): a customer signed in on Northwind's site writes
+ * from the Contact page's form, the team reads it on Customer Detail's
+ * Messages tab and replies, and the reply shows in the customer's account.
+ * The account area ships dark, so this runs only on a stack started with
+ * `SITE_ACCOUNT_AREA=on` in both the api and saroh.app. It makes a new
+ * customer (a new email and address) and changes only that customer.
+ */
+test.describe("customer detail: Messages (A13)", () => {
+    test.skip(
+        process.env.SITE_ACCOUNT_AREA !== "on",
+        "SITE_ACCOUNT_AREA is off on this stack",
+    );
+
+    test("the customer writes from the Contact page, the team replies, and the reply reaches their account", async ({
+        page,
+        browser,
+    }, testInfo) => {
+        test.setTimeout(120_000);
+        const renderer = new URL(urls.RENDERER_URL);
+        const site = `${renderer.protocol}//northwind.${renderer.host}`;
+        const email = `a13-${testInfo.project.name}-${Date.now()}@example.in`;
+        const asked = `Do you have 40 pallets of shrink wrap? (${Date.now()})`;
+        const answer = `Yes — 40 are on the shelf. (${Date.now()})`;
+
+        // The customer, in a browser of their own, signed in on the site.
+        const customer = await browser.newContext({ ignoreHTTPSErrors });
+        const visitor = await customer.newPage();
+        await asNewVisitor(visitor);
+        await visitor.goto(`${site}/contact`);
+        await visitor
+            .getByRole("banner")
+            .getByRole("button", { name: "Sign in" })
+            .filter({ visible: true })
+            .click();
+        await signInOnSheet(visitor, email);
+
+        // Signed in, the Contact page's form asks only for the message.
+        await visitor.goto(`${site}/contact`);
+        await expect(
+            visitor.getByText(
+                `Signed in as ${email}. The reply comes to your Messages.`,
+            ),
+        ).toBeVisible();
+        await expect(visitor.getByLabel(/Your name/)).toHaveCount(0);
+        await visitor.getByLabel("What do you need?").fill(asked);
+        await visitor
+            .getByRole("button", { name: "Send enquiry" })
+            .filter({ visible: true })
+            .click();
+        await expect(visitor.getByRole("status")).toContainText(
+            /Sent\. .+ will reply in your Messages\./,
+        );
+
+        // The team: the customer found through the API by their email.
+        await signIn(page, NORTHWIND);
+        const found = await page.request.get(
+            `${urls.API_URL}/organizations/${NORTHWIND}/customers?q=${encodeURIComponent(email)}`,
+            { headers: { "x-organization-id": NORTHWIND } },
+        );
+        expect(found.ok()).toBe(true);
+        const { rows } = (await found.json()) as {
+            rows: { contactId: string }[];
+        };
+        expect(rows).toHaveLength(1);
+        await page.goto(`/customers/${rows[0]?.contactId ?? ""}?tab=msg`);
+        await expect(tab(page, /^Messages/)).toHaveAttribute(
+            "aria-selected",
+            "true",
+        );
+        await expect(
+            page.getByRole("list", { name: /^Messages with / }),
+        ).toContainText(asked);
+
+        const reply = page.getByRole("textbox", { name: /^Reply to / });
+        await reply.fill(answer);
+        await page.getByRole("button", { name: "Send reply" }).click();
+        await expect(
+            page.getByRole("list", { name: /^Messages with / }),
+        ).toContainText(answer, { timeout: 15_000 });
+
+        // The customer sees the reply in their account's Messages.
+        await visitor.goto(`${site}/account/messages`);
+        const thread = visitor.getByRole("list", { name: /^Messages with / });
+        await expect(thread).toContainText(asked);
+        await expect(thread).toContainText(answer);
+        await customer.close();
     });
 });

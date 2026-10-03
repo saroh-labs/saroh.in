@@ -14,12 +14,29 @@ import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
+import { payLinkUrlFor } from "../invoices/pay-link-url";
+import { invoicePayOnline, NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { hashPayToken } from "../invoices/pay-token";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
+import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
+import { nextAutopayCharge } from "../subscriptions/next-autopay-charge";
+import type {
+    AutopayCheck,
+    AutopayOutcome,
+    AutopayStart,
+} from "./autopay.service";
+import { AutopayService } from "./autopay.service";
+import type { ChargeUnderWay } from "./charge-under-way";
+import { autopayChargeInProgress, chargeUnderWayOn } from "./charge-under-way";
+import { MandateChargesService } from "./mandate-charges.service";
 import type { CreateIntentResult } from "./payments.service";
 import { PaymentsService } from "./payments.service";
-import { isSupportedProvider } from "./providers/provider.port";
+import type { MandateMethod } from "./providers/provider.port";
+import {
+    isMandateMethod,
+    isSupportedProvider,
+} from "./providers/provider.port";
 
 /**
  * What the customer's pay page shows, and nothing more (ADR-007, U13). An
@@ -51,6 +68,55 @@ export interface PublicInvoiceView {
     billOfSupply: boolean;
     /** The business's site theme as `--site-*` variables; null for defaults. */
     theme: Record<string, string> | null;
+    /**
+     * The business takes payment online (DEC-070): Payments is on and a
+     * provider can open the checkout window. False: the page shows the
+     * invoice and its PDF with no Pay button, and a payment start is a 409.
+     * Set on the pay link's read only; absent (an older API, or the account
+     * area's receipt), the page behaves as before.
+     */
+    payOnline?: boolean;
+    /**
+     * Autopay for the plan this invoice is for (D12): the pay page's
+     * allow-list gains only this. Absent or null: not a plan's invoice, the
+     * plan has ended, or the business's provider takes no autopay.
+     */
+    autopay?: PayAutopay | null;
+    /**
+     * An autopay charge is under way on this invoice (D13): the page says
+     * "Autopay charge in progress · ‹date›" (`at`: when the debit is asked
+     * for) and offers no payment, which the API would refuse (409).
+     */
+    autopayCharging?: { at: string } | null;
+    /**
+     * "Next autopay charge: ‹date›" (D13B, DEC-065): the planned debit of a
+     * charge queued on this invoice and not yet asked for, or — the invoice
+     * paid, autopay on — the next renewal's, by the business's timing.
+     */
+    autopayNextCharge?: { at: string } | null;
+    /**
+     * Where this link lives (DEC-069, plan L6): `payLinkUrlFor`'s answer,
+     * the business's own address or the apex. The renderer sends a pay
+     * page opened on another host here. Only the pay read carries it; a
+     * receipt in the account area does not.
+     */
+    payUrl?: string;
+}
+
+/** What the pay page may say about autopay (D12). */
+export interface PayAutopay {
+    /** The plan's name. */
+    plan: string;
+    /** Every method the business's provider offers, never narrowed. */
+    methods: MandateMethod[];
+    /** Autopay is on already: the method and its displayable hint. */
+    on: { method: MandateMethod | null; hint: string | null } | null;
+    /**
+     * The check each method takes to authorise when nothing is owed — the
+     * invoice already paid (DEC-064: UPI and card ₹1, refunded). Absent
+     * from an API older than D12B.
+     */
+    checks: Partial<Record<MandateMethod, AutopayCheck>>;
 }
 
 /**
@@ -149,6 +215,19 @@ function notFound(): never {
 }
 
 /**
+ * A 409 when the business doesn't take payment online (DEC-070): Payments
+ * is off, or no provider can open the checkout window. The invoice is still
+ * owed; the customer pays the business some other way.
+ */
+async function assertPaysOnline(organizationId: string): Promise<void> {
+    if (await invoicePayOnline(prisma, organizationId)) return;
+    throw new ConflictException({
+        message: NOT_PAID_ONLINE,
+        details: { reason: "not-paid-online" },
+    });
+}
+
+/**
  * The customer's side of an invoice pay link — no session, so everything
  * hangs on the token (ADR-007, U13).
  *
@@ -173,6 +252,11 @@ export class PublicInvoicesService {
             PAYS_PER_WINDOW,
             PAY_WINDOW_MS,
         ),
+        // Autopay on a plan's invoice (D12); absent where a test builds
+        // this by hand, and then the page offers none.
+        @Optional() private readonly autopay?: AutopayService,
+        // "Next autopay charge" (D13B); absent, only a queued charge's.
+        @Optional() private readonly charges?: MandateChargesService,
     ) {}
 
     async read(token: string, callerHash?: string): Promise<PublicInvoiceView> {
@@ -184,9 +268,185 @@ export class PublicInvoicesService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
-        return runInOrgContext(found.organizationId, () =>
-            invoicePaper(found.organizationId, found.id),
-        );
+        return runInOrgContext(found.organizationId, async () => {
+            const [paper, payOnline] = await Promise.all([
+                invoicePaper(found.organizationId, found.id),
+                // A link sent before Payments went off opens as a view
+                // link: it never errors (DEC-070).
+                invoicePayOnline(prisma, found.organizationId),
+            ]);
+            // Autopay only on a plan's invoice that offers it (D12), and
+            // only while the business takes payment online.
+            const [autopay, charging] = await Promise.all([
+                payOnline ? this.payAutopay(found) : null,
+                chargeUnderWayOn(prisma, found.organizationId, found.id),
+            ]);
+            const view: PublicInvoiceView = autopay
+                ? { ...paper, payOnline, autopay }
+                : { ...paper, payOnline };
+            // "Next autopay charge" (D13B): this invoice's planned debit, or
+            // once it's paid with autopay on, the next renewal's.
+            const next =
+                charging || (autopay?.on && paper.status === "PAID")
+                    ? await this.nextCharge(found, charging)
+                    : null;
+            return {
+                ...view,
+                payUrl: await payLinkUrlFor(found.organizationId, token),
+                ...(charging
+                    ? { autopayCharging: { at: charging.at.toISOString() } }
+                    : {}),
+                ...(next
+                    ? { autopayNextCharge: { at: next.toISOString() } }
+                    : {}),
+            };
+        });
+    }
+
+    /** When autopay next takes money for the invoice's plan (D13B). */
+    private async nextCharge(
+        found: { id: string; organizationId: string },
+        charging: ChargeUnderWay | null,
+    ): Promise<Date | null> {
+        const invoice = await prisma.invoice.findFirst({
+            where: { id: found.id, organizationId: found.organizationId },
+            select: {
+                subscription: {
+                    select: {
+                        id: true,
+                        organizationId: true,
+                        planId: true,
+                        pendingPlanId: true,
+                        status: true,
+                        cancelAtPeriodEnd: true,
+                        currentPeriodEnd: true,
+                        timezone: true,
+                    },
+                },
+            },
+        });
+        const sub = invoice?.subscription;
+        if (!sub) return null;
+        return nextAutopayCharge(this.charges, sub, charging, new Date());
+    }
+
+    /**
+     * Autopay for the invoice's plan, as the pay page offers it (D12): only
+     * a plan's invoice, while the plan runs, and only when the business's
+     * provider takes autopay. A provider that can't say is no autopay.
+     */
+    private async payAutopay(found: {
+        id: string;
+        organizationId: string;
+    }): Promise<PayAutopay | null> {
+        if (!this.autopay) return null;
+        const invoice = await prisma.invoice.findFirst({
+            where: { id: found.id, organizationId: found.organizationId },
+            select: {
+                source: true,
+                currency: true,
+                subscription: {
+                    select: {
+                        id: true,
+                        status: true,
+                        plan: { select: { name: true } },
+                    },
+                },
+            },
+        });
+        const sub = invoice?.subscription;
+        if (invoice?.source !== "SUBSCRIPTION" || !sub) return null;
+        if (sub.status === "CANCELLED") return null;
+        const [methods, line, checks] = await Promise.all([
+            this.autopay.offer(found.organizationId).catch(() => []),
+            this.autopay.line(found.organizationId, sub.id),
+            this.autopay
+                .checks(found.organizationId, invoice.currency)
+                .catch(() => ({})),
+        ]);
+        const on =
+            line?.state === "ON"
+                ? { method: line.method, hint: line.hint }
+                : null;
+        if (methods.length === 0 && !on) return null;
+        return { plan: sub.plan.name, methods, on, checks };
+    }
+
+    /**
+     * "Pay and turn on autopay" (D12): start autopay on the invoice's plan
+     * with the method the customer picked. For UPI and card on an unpaid
+     * invoice, the window it opens pays the invoice too. The customer comes
+     * back to the business's own site (`/autopay`), never Saroh's.
+     */
+    async startAutopay(
+        token: string,
+        body: unknown,
+        callerHash?: string,
+    ): Promise<AutopayStart> {
+        const options = parseAutopayBody(body);
+        const tokenHash = hashPayToken(token);
+        if (!this.payLimiter.take(callerHash ?? tokenHash)) {
+            throw tooManyRequests();
+        }
+        const found = await this.find(tokenHash);
+        await assertOrganizationOpen(found.organizationId);
+        const autopay = this.autopay;
+        if (!autopay) {
+            throw new ConflictException({
+                message: "Autopay isn't available with this business.",
+                details: { reason: "not-offered" },
+            });
+        }
+        return runInOrgContext(found.organizationId, async () => {
+            await assertPaysOnline(found.organizationId);
+            const origin = await siteOriginOf(found.organizationId);
+            return autopay.startForInvoice({
+                organizationId: found.organizationId,
+                invoiceId: found.id,
+                method: options.method,
+                source: "PAY_LINK",
+                ...(options.idempotencyKey
+                    ? { idempotencyKey: options.idempotencyKey }
+                    : {}),
+                returnUrl: origin
+                    ? `${origin}/autopay?pay=${encodeURIComponent(token)}`
+                    : null,
+            });
+        });
+    }
+
+    /**
+     * How autopay stands after the customer came back (D12): what the page
+     * on the business's site shows. A set-up still waiting is read back
+     * from the provider, so the page moves on by itself.
+     */
+    async autopayOutcome(
+        token: string,
+        callerHash?: string,
+    ): Promise<AutopayOutcome & { payUrl: string }> {
+        const tokenHash = hashPayToken(token);
+        if (!this.readLimiter.take(callerHash ?? tokenHash)) {
+            throw tooManyRequests();
+        }
+        const found = await this.find(tokenHash);
+        const autopay = this.autopay;
+        if (!autopay) notFound();
+        return runInOrgContext(found.organizationId, async () => {
+            const invoice = await prisma.invoice.findFirst({
+                where: { id: found.id, organizationId: found.organizationId },
+                select: { status: true, subscriptionId: true },
+            });
+            if (!invoice?.subscriptionId) notFound();
+            const outcome = await autopay.outcome(
+                found.organizationId,
+                invoice.subscriptionId,
+                invoice.status === "PAID",
+            );
+            return {
+                ...outcome,
+                payUrl: await payLinkUrlFor(found.organizationId, token),
+            };
+        });
     }
 
     /**
@@ -251,6 +511,16 @@ export class PublicInvoicesService {
                         : "This invoice is no longer payable.",
                 );
             }
+            // A view link (DEC-070): the page offers no Pay, and the API
+            // agrees. A booking's pay-now hold above was started online
+            // and keeps the provider's own refusal.
+            await assertPaysOnline(found.organizationId);
+            // One charge at a time (D13): autopay is charging it.
+            if (
+                await chargeUnderWayOn(prisma, found.organizationId, invoice.id)
+            ) {
+                throw autopayChargeInProgress();
+            }
             return this.payments.createIntentForInvoicePublic(invoice, options);
         });
     }
@@ -265,6 +535,28 @@ export class PublicInvoicesService {
         if (!row) notFound();
         return row;
     }
+}
+
+/** The autopay request: a method from the offer, and an idempotency key. */
+export function parseAutopayBody(body: unknown): {
+    method: MandateMethod;
+    idempotencyKey?: string;
+} {
+    const record =
+        typeof body === "object" && body !== null
+            ? (body as Record<string, unknown>)
+            : {};
+    const method =
+        typeof record.method === "string"
+            ? record.method.trim().toUpperCase()
+            : "";
+    if (!isMandateMethod(method)) {
+        throw new BadRequestException("Pick how autopay should pay");
+    }
+    const { idempotencyKey } = parseIntentBody({
+        idempotencyKey: record.idempotencyKey,
+    });
+    return idempotencyKey ? { method, idempotencyKey } : { method };
 }
 
 /** The two fields the public intent request may carry; the rest is ignored. */

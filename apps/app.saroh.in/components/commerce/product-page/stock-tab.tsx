@@ -142,7 +142,7 @@ export function ProductStockTab({
             <PanelFailed
                 what="stock"
                 retryHref={retryHref}
-                note="The rest of the product loaded; only its stock by storefront did not. Nothing about the stock has changed."
+                note="The rest of the product loaded; only its stock by location did not. Nothing about the stock has changed."
             />
         );
     }

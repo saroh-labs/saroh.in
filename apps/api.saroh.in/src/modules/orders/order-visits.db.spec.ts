@@ -29,8 +29,10 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingsService } from "../bookings/bookings.service";
 import { OrderKitchenService } from "./order-kitchen.service";
+import { listOrderRows } from "./order-list";
 import { quickViewOf } from "./order-row";
 import { markVisitAttended, visitNotStartedText } from "./order-visit-attend";
+import { nextVisitsFor } from "./order-visits";
 import { REOPENED_NOTE } from "./treatment-fulfil";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -382,5 +384,62 @@ describe("the order's paper is named (D15)", () => {
                 title: "Bill of supply",
             }),
         ]);
+    });
+});
+
+describe("the Orders row's next visit (B14, DEC-067)", () => {
+    const full = { money: true, contact: true };
+    const rowOf = async (id: string) => {
+        const page = await listOrderRows(orgId, {}, full);
+        return page.rows.find((r) => r.id === id);
+    };
+
+    it("names the first visit still waiting, in the clinic's zone", async () => {
+        const next = ahead(2 * DAY);
+        const t = await treatment([ago(7 * DAY), next, ahead(9 * DAY)]);
+        await markVisitAttended(owner, t.id, 1);
+        const row = await rowOf(t.id);
+        expect(row?.nextVisit).toEqual({
+            startAt: next,
+            timezone: "Asia/Kolkata",
+        });
+    });
+
+    it("is null when no visit is booked, and a cancelled booking doesn't count", async () => {
+        const t = await treatment([ahead(DAY), null, null]);
+        await prisma.booking.update({
+            where: { id: t.visits[0] },
+            data: { status: "CANCELLED" },
+        });
+        expect((await rowOf(t.id))?.nextVisit).toBeNull();
+    });
+
+    it("an order that isn't a treatment carries none", async () => {
+        orderSeq += 1;
+        const order = await prisma.order.create({
+            data: {
+                storeId,
+                organizationId: orgId,
+                orderId: `ORD-${String(orderSeq).padStart(3, "0")}`,
+                customerId,
+                currency: "INR",
+                subtotal: "100.00",
+                tax: "0.00",
+                total: "100.00",
+                fulfilment: "PICKUP",
+            },
+            select: { id: true },
+        });
+        const row = await rowOf(order.id);
+        expect(row).toBeDefined();
+        expect(row && "nextVisit" in row).toBe(false);
+    });
+
+    it("never reads another business's bookings", async () => {
+        const t = await treatment([ahead(DAY)]);
+        const visits = await nextVisitsFor(prisma, stranger.organizationId, [
+            t.id,
+        ]);
+        expect(visits.get(t.id)).toBeNull();
     });
 });

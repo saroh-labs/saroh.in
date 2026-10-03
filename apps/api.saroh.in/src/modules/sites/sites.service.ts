@@ -2,7 +2,6 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
-    InternalServerErrorException,
     NotFoundException,
 } from "@nestjs/common";
 import type { PageKind } from "@saroh/database";
@@ -12,16 +11,8 @@ import {
     Prisma,
     prisma,
 } from "@saroh/database";
-import {
-    getTemplate,
-    instantiateTemplate,
-    STARTER_TEMPLATE_ID,
-    starterTemplate,
-    TemplateInstantiationError,
-} from "@saroh/templates";
-import { randomUUID } from "node:crypto";
+import { starterTemplate } from "@saroh/templates";
 import { isDeepStrictEqual } from "node:util";
-import { addressProblem } from "./site-address";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
@@ -30,7 +21,6 @@ import {
     checkoutReadiness,
     readinessMessage,
 } from "../orders/checkout-readiness";
-import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
 import { allows, authorize } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
@@ -41,9 +31,14 @@ import type {
     UpdatePageDto,
     UpdateSiteSettingsDto,
 } from "./dto";
+import { putLive, readReviewStanding } from "./live-pointer";
 import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
 import type { PublicModulePageStates } from "./module-pages";
-import { addableModulePageKinds, publicModulePageStates } from "./module-pages";
+import {
+    addableModulePageKinds,
+    packsBlockOffered,
+    publicModulePageStates,
+} from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import type { SiteChangeKind } from "./pending-changes";
@@ -57,13 +52,22 @@ import {
 import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
-import type { ApprovalRow, ReviewRoute } from "./review-route";
-import { draftFingerprint, reviewStanding } from "./review-route";
+import {
+    assertOverrideAllowed,
+    isOwner,
+    setPublishNeedsApproval,
+} from "./publish-approval";
+import {
+    frozenPages,
+    isOnFrozenPage,
+    releaseUnderReview,
+} from "./release-under-review";
+import type { ReviewRoute } from "./review-route";
+import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
 import type { SellsFromView } from "./sells-from";
 import {
     assertSellsFromChoice,
-    automaticStorefront,
     commerceOpen,
     effectiveStorefront,
     isShopPath,
@@ -71,18 +75,37 @@ import {
     sellsFromView,
     shopRolloutOn,
 } from "./sells-from";
+import { awaitsSellsFrom, shopCouldServe } from "./sells-from-awaiting";
 import {
     assertPageInSite,
     assertPathIsFree,
     assertSiteInOrg,
-    buildTemplateContext,
     getOrCreateDraftVersion,
     reviewerScope,
 } from "./site-access";
+import type { SiteDefaults } from "./site-address";
+import { siteDefaults } from "./site-address";
+import type { CreatedSite } from "./site-create";
+import {
+    newSectionKey,
+    planSiteFromTemplate,
+    writeSiteFromTemplate,
+} from "./site-create";
 import type { Flag, FlagType } from "./site-flags";
-import { checkShop, checkSite, FLAGS_AWAITING_NAVIGATION } from "./site-flags";
+import {
+    ADDRESS_MISSING_MESSAGE,
+    checkAddress,
+    checkShop,
+    checkSite,
+    FLAGS_AWAITING_NAVIGATION,
+} from "./site-flags";
 import type { SiteFooter } from "./site-footer";
 import { parseSiteFooter } from "./site-footer";
+import {
+    isTestShapedHost,
+    siteHostMode,
+    siteRootDomain,
+} from "./site-host-mode";
 import type { SiteNavigation } from "./site-navigation";
 import { parseSiteNavigation, resolveSiteNavigation } from "./site-navigation";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
@@ -91,16 +114,6 @@ import {
     siteStyleOptions,
     siteStyleVariables,
 } from "./site-style";
-
-/** What creating a site returns to the caller: the new site's identity. */
-/**
- * Mint a section key. Opaque and random rather than derived from position or
- * content: a key that encoded either would stop being stable the moment a
- * section moved or was edited, which is exactly what it exists to survive.
- */
-function newSectionKey(): string {
-    return randomUUID();
-}
 
 /**
  * Take the key a section claims, unless something earlier in the list already
@@ -115,10 +128,7 @@ function claimKey(seen: Set<string>, claimed: string | undefined): string {
     return key;
 }
 
-export interface CreatedSite {
-    siteId: string;
-    slug: string;
-}
+export type { CreatedSite };
 
 /** A reviewer's note as the Review tab shows it. */
 export interface CommentView {
@@ -137,6 +147,12 @@ export interface CommentView {
 
 /** The site's review state — the latest verdict plus what is still open. */
 export interface ReviewState {
+    /**
+     * The test release this is the review of (T8), or null for the draft's.
+     * The two are kept apart: verdicts and notes on one never read on the
+     * other.
+     */
+    testRelease: { id: string; number: number; name: string } | null;
     openNotes: number;
     /** A review has been asked for and nobody has answered it yet (#278). */
     pending: boolean;
@@ -232,6 +248,13 @@ export interface PublishResult {
     currentPublicationId: string;
     /** True when this publish went past an outstanding change request (#199). */
     bypassed: boolean;
+    /**
+     * True when an owner published past "Publishing needs approval"
+     * (DEC-071, KTD-11); `route` is then OVERRIDDEN.
+     */
+    overridden: boolean;
+    /** Which route this publish took (#278). */
+    route: ReviewRoute;
 }
 
 /**
@@ -262,28 +285,6 @@ export interface PublicSiteView {
      * before.
      */
     modules?: PublicModulePageStates;
-}
-
-/**
- * Turn an arbitrary name/slug input into a URL-safe site slug. Pure (no DB).
- * A small local copy of the organization slugify so the sites module has no
- * cross-module import; the CMS slug rules are identical for now.
- */
-function slugify(input: string): string {
-    const collapsed = input
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9\s_-]/g, "")
-        .replace(/[\s_-]+/g, "-");
-    // Trim leading/trailing "-" by index rather than /^-+|-+$/. The collapse
-    // above already leaves at most one dash in a row, so the regex could not
-    // actually backtrack — but CodeQL cannot see that (js/polynomial-redos),
-    // and an index scan is unconditionally linear.
-    let start = 0;
-    let end = collapsed.length;
-    while (start < end && collapsed[start] === "-") start++;
-    while (end > start && collapsed[end - 1] === "-") end--;
-    return collapsed.slice(start, end);
 }
 
 /**
@@ -365,6 +366,16 @@ export interface SiteDetailView {
     canEdit: boolean;
     /** Everything this caller may do here, decided by the policy (#275). */
     can: SiteCapabilities;
+    /**
+     * "Publishing needs approval" (DEC-071, R10): on, only an approved test
+     * release goes live, unless an owner overrides.
+     */
+    publishNeedsApproval: boolean;
+    /**
+     * Whether this caller may go live past that setting, and turn it on or
+     * off: an owner who can publish (KTD-11).
+     */
+    canOverride: boolean;
     id: string;
     name: string;
     slug: string;
@@ -400,6 +411,12 @@ export interface SiteDetailView {
      * rolled out for the business is never listed (DEC-057).
      */
     addablePageKinds: ModulePageKind[];
+    /**
+     * Whether Add block offers the Class packs block: Class packs rolled out
+     * for the business and on. Off, the block is offered nowhere (DEC-057);
+     * one already on a page stays.
+     */
+    packsBlockOffered: boolean;
     /**
      * How many sections publishing would change (#190). Null before the first
      * publish. See {@link SitesService.pendingSectionChanges} — every surface
@@ -440,6 +457,13 @@ export interface SiteDetailView {
      * flag, off until checkout ships): the settings show no row then.
      */
     sellsFrom: SellsFromView | null;
+    /**
+     * The shop could serve (`SITE_SHOP`, Commerce rolled out and on) and a
+     * storefront with products could be chosen, but Sells from is
+     * unanswered, so `/shop` isn't live (P4). The Shop settings say so.
+     * False whenever the shop isn't open for the business (DEC-057).
+     */
+    shopAwaitsSellsFrom: boolean;
 }
 
 /**
@@ -452,8 +476,13 @@ export interface SiteDetailView {
  * snapshot with no pages and take the live site down. A post publish is not a
  * version of the site, so it is not offered as one — restoring one is a 404, not
  * a broken home page.
+ *
+ * A test release's frozen snapshot is a Publication too (`kind = 'TEST'`,
+ * DEC-071). It has never been live, so it is not a version either: it is not
+ * listed, opened or restored as one. Restoring one would put an unapproved
+ * candidate live by a path that skips going live.
  */
-const SITE_VERSION = { postId: null } as const;
+const SITE_VERSION = { postId: null, kind: "LIVE" } as const;
 
 export interface PublicationDetail {
     id: string;
@@ -466,6 +495,42 @@ export interface PublicationDetail {
     snapshot: unknown;
     /** Whether this build can still draw every section it holds (#283). */
     renderability: Renderability;
+    /** The test release this version went live from, if any (T12). */
+    testRelease: PublicationRelease | null;
+}
+
+/** A test release, as a version it went live as names it (T12). */
+export interface PublicationRelease {
+    id: string;
+    number: number;
+    name: string;
+}
+
+/**
+ * What a LIVE publication needs selected to say which test release it went
+ * live from (DEC-071, T12): the release that names it as its live copy, or
+ * the release whose TEST row it was copied from (KTD-2). A restore of that
+ * copy is a restore, and names neither.
+ */
+const RELEASE_NAME = { id: true, number: true, name: true } as const;
+const FROM_TEST_RELEASE = {
+    wentLiveFor: { select: RELEASE_NAME },
+    sourcePublication: {
+        select: { kind: true, testRelease: { select: RELEASE_NAME } },
+    },
+} as const;
+
+function releaseOf(p: {
+    wentLiveFor: PublicationRelease | null;
+    sourcePublication: {
+        kind: string;
+        testRelease: PublicationRelease | null;
+    } | null;
+}): PublicationRelease | null {
+    if (p.wentLiveFor) return p.wentLiveFor;
+    return p.sourcePublication?.kind === "TEST"
+        ? p.sourcePublication.testRelease
+        : null;
 }
 
 /**
@@ -602,184 +667,20 @@ export class SitesService {
         ctx: OrganizationContext,
         dto: CreateSiteFromTemplateDto,
     ): Promise<CreatedSite> {
+        const plan = await planSiteFromTemplate(ctx, dto, this.entitlements);
+        return prisma.$transaction((tx) =>
+            writeSiteFromTemplate(tx, ctx, plan, { subdomain: dto.subdomain }),
+        );
+    }
+
+    /**
+     * What `/sites/new` prefills: the business's name and its address, or a
+     * free one like it (DEC-069, L5) — the same start the Turn on sheet's
+     * Website step has. Requires `site:create`: it is the creation form's.
+     */
+    async newSiteDefaults(ctx: OrganizationContext): Promise<SiteDefaults> {
         authorize(ctx, "site:create");
-
-        // Two caps on the org's live sites (soft-deleted excluded). The
-        // product's comes first (ADR-006): one website per business for now,
-        // whatever the plan says, and upgrading would not help — so it is a
-        // 409 in plain words, not "upgrade to add more". Then the
-        // subscription's `sites` entitlement (S7-005), a 403 at the plan
-        // limit. The lower of the two wins.
-        const siteCount = await prisma.site.count({
-            where: { organizationId: ctx.organizationId, deletedAt: null },
-        });
-        if (siteCount >= MAX_WEBSITES_PER_BUSINESS) {
-            throw new ConflictException({
-                message:
-                    "This business already has its website. Change its pages, look and address from Website.",
-            });
-        }
-        await this.entitlements.check(ctx.organizationId, "sites", siteCount);
-
-        const templateId = dto.templateId ?? STARTER_TEMPLATE_ID;
-        const template = getTemplate(templateId, dto.templateVersion);
-        if (!template) {
-            throw new NotFoundException(
-                dto.templateVersion === undefined
-                    ? `Unknown template "${templateId}"`
-                    : `Unknown template "${templateId}" v${dto.templateVersion}`,
-            );
-        }
-
-        const slug = slugify(dto.slug ?? dto.name);
-        if (!slug) {
-            throw new BadRequestException(
-                "Site name must contain at least one alphanumeric character",
-            );
-        }
-
-        const context = await buildTemplateContext(ctx.organizationId);
-
-        let pages;
-        try {
-            pages = instantiateTemplate(template, context).pages;
-        } catch (error) {
-            if (error instanceof TemplateInstantiationError) {
-                // A shipped template should never emit an invalid section; if it
-                // does, that's a server bug, not bad client input.
-                throw new InternalServerErrorException(
-                    `Template "${template.id}" v${template.version} produced an invalid site`,
-                );
-            }
-            throw error;
-        }
-
-        return prisma.$transaction(async (tx) => {
-            // Fail fast on a taken slug with a clear 409 (the unique is
-            // [organizationId, slug]); the check + create share the txn.
-            const existing = await tx.site.findFirst({
-                where: {
-                    organizationId: ctx.organizationId,
-                    slug,
-                    deletedAt: null,
-                },
-                select: { id: true },
-            });
-            if (existing) {
-                throw new ConflictException(
-                    `A site with the slug "${slug}" already exists in this organization`,
-                );
-            }
-
-            /*
-             * Where the site is served (`<subdomain>.saroh.app`).
-             *
-             * Asked for: it must be a usable address, free of other sites,
-             * and not the address ANOTHER business reserved at setup — that
-             * reservation is a promise (see site-address.ts), and a site
-             * taking it would break it.
-             *
-             * Not asked for: the site takes the address its own business
-             * reserved, while no site of theirs uses it yet — so the address
-             * a merchant chose at setup is where their first website appears.
-             */
-            let subdomain = dto.subdomain;
-            if (subdomain) {
-                const problem = addressProblem(subdomain);
-                if (problem) {
-                    throw new BadRequestException({
-                        message: problem,
-                        details: { field: "subdomain" },
-                    });
-                }
-                const reserved = await tx.organization.findUnique({
-                    where: { slug: subdomain },
-                    select: { id: true },
-                });
-                if (reserved && reserved.id !== ctx.organizationId) {
-                    throw new ConflictException({
-                        message: `${subdomain}.saroh.app belongs to another business`,
-                        details: { field: "subdomain" },
-                    });
-                }
-            } else {
-                const business = await tx.organization.findUnique({
-                    where: { id: ctx.organizationId },
-                    select: { slug: true },
-                });
-                if (business?.slug && !addressProblem(business.slug)) {
-                    subdomain = business.slug;
-                }
-            }
-
-            // Subdomain is globally unique when set; reject a clash up front
-            // rather than surfacing a raw constraint error. A default that
-            // turns out to be in use is simply not taken, not an error.
-            if (subdomain) {
-                const taken = await tx.site.findUnique({
-                    where: { subdomain },
-                    select: { id: true },
-                });
-                if (taken && dto.subdomain) {
-                    throw new ConflictException({
-                        message: `The subdomain "${subdomain}" is already taken`,
-                        details: { field: "subdomain" },
-                    });
-                }
-                if (taken) subdomain = undefined;
-            }
-
-            const site = await tx.site.create({
-                data: {
-                    organizationId: ctx.organizationId,
-                    name: dto.name,
-                    slug,
-                    subdomain,
-                    // Where it sells from (G11): set only when there is
-                    // exactly one candidate, and the settings say so.
-                    storefrontId: await automaticStorefront(
-                        tx,
-                        ctx.organizationId,
-                    ),
-                },
-                select: { id: true, slug: true },
-            });
-
-            for (const page of pages) {
-                await tx.page.create({
-                    data: {
-                        siteId: site.id,
-                        organizationId: ctx.organizationId,
-                        path: page.path,
-                        title: page.title,
-                        isHome: page.isHome,
-                        versions: {
-                            create: {
-                                organizationId: ctx.organizationId,
-                                status: "DRAFT",
-                                createdByUserId: ctx.userId,
-                                sections: {
-                                    create: page.sections.map((section) => ({
-                                        organizationId: ctx.organizationId,
-                                        // Minted here so a section has a stable
-                                        // identity from the moment it exists.
-                                        key: newSectionKey(),
-                                        type: section.type,
-                                        contractVersion:
-                                            section.contractVersion,
-                                        order: section.order,
-                                        content:
-                                            section.content as Prisma.InputJsonValue,
-                                    })),
-                                },
-                            },
-                        },
-                    },
-                });
-            }
-
-            return { siteId: site.id, slug: site.slug };
-        });
+        return siteDefaults(prisma, ctx.organizationId);
     }
 
     /**
@@ -956,6 +857,7 @@ export class SitesService {
                 footer: true,
                 navigation: true,
                 storefrontId: true,
+                publishNeedsApproval: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -997,6 +899,9 @@ export class SitesService {
         return {
             ...rest,
             canEdit: allows(ctx, "section:write"),
+            // Only an owner goes live past "Publishing needs approval", and
+            // only an owner changes it (DEC-071, KTD-11).
+            canOverride: isOwner(ctx) && allows(ctx, "site:publish"),
             can: {
                 edit: allows(ctx, "section:write"),
                 publish: allows(ctx, "site:publish"),
@@ -1020,12 +925,18 @@ export class SitesService {
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
             sellsFrom,
+            // Asked only when it could be true: Commerce's gate is a read.
+            shopAwaitsSellsFrom:
+                sellsFrom !== null &&
+                awaitsSellsFrom(sellsFrom) &&
+                (await shopCouldServe(ctx.organizationId)),
             addablePageKinds: allows(ctx, "site:update")
                 ? await addableModulePageKinds(
                       ctx.organizationId,
                       site.pages.map((p) => p.kind),
                   )
                 : [],
+            packsBlockOffered: await packsBlockOffered(ctx.organizationId),
         };
     }
 
@@ -1040,6 +951,9 @@ export class SitesService {
      * Requires `site:update` — the same gate as renaming a site, because this is
      * what the public sees. Writing here does NOT publish: these values reach
      * the live site only through the next publish, exactly like a section edit.
+     *
+     * `publishNeedsApproval` is the exception to both: it is an owner's
+     * alone (403 for anyone else), and it takes effect at once.
      */
     async updateSettings(
         ctx: OrganizationContext,
@@ -1103,6 +1017,19 @@ export class SitesService {
             data.storefrontId = dto.storefrontId;
         }
 
+        /*
+         * "Publishing needs approval" (DEC-071, R10): owner only, recorded
+         * as an audit event, and in its own transaction with that record.
+         * Saved first, so an admin's 403 leaves the rest of the form unsaved
+         * rather than half of it written.
+         */
+        const needsApproval = dto.publishNeedsApproval;
+        if (needsApproval !== undefined) {
+            await prisma.$transaction((tx) =>
+                setPublishNeedsApproval(tx, ctx, siteId, needsApproval),
+            );
+        }
+
         const site = await prisma.site.update({
             where: { id: siteId },
             data,
@@ -1110,6 +1037,7 @@ export class SitesService {
                 id: true,
                 name: true,
                 storefrontId: true,
+                publishNeedsApproval: true,
                 seoTitle: true,
                 seoDescription: true,
                 socialImageUrl: true,
@@ -1259,15 +1187,20 @@ export class SitesService {
                 // rows published before it was recorded.
                 reviewRoute: true,
                 // Whether this publish went past an outstanding change
-                // request (#199): the bypass row names its publication.
+                // request (#199), or an owner went live past "Publishing
+                // needs approval" (DEC-071, T9): each record names its
+                // publication.
                 approvals: {
-                    where: { outcome: "BYPASSED" },
-                    take: 1,
+                    where: { outcome: { in: ["BYPASSED", "OVERRIDDEN"] } },
+                    orderBy: { createdAt: "asc" },
                     select: {
+                        outcome: true,
                         createdAt: true,
                         by: { select: { name: true, email: true } },
                     },
                 },
+                // The test release this version went live from (T12).
+                ...FROM_TEST_RELEASE,
             },
         });
 
@@ -1277,23 +1210,33 @@ export class SitesService {
             publications.map((p) => p.publishedByUserId),
         );
 
-        return publications.map(({ approvals, ...p }) => ({
-            ...p,
-            publishedBy: p.publishedByUserId
-                ? (publishers.get(p.publishedByUserId) ?? null)
-                : null,
-            bypass:
-                approvals.length === 0
-                    ? null
-                    : {
-                          at: approvals[0].createdAt,
-                          by: approvals[0].by.name ?? approvals[0].by.email,
-                      },
-            // Which one the public is actually being served. Marked rather than
-            // implied by position: after a restore the live version is NOT the
-            // newest by content, only by publish time.
-            isCurrent: p.id === site.currentPublicationId,
-        }));
+        const record = (
+            approvals: (typeof publications)[number]["approvals"],
+            outcome: "BYPASSED" | "OVERRIDDEN",
+        ) => {
+            const row = approvals.find((a) => a.outcome === outcome);
+            return row
+                ? { at: row.createdAt, by: row.by.name ?? row.by.email }
+                : null;
+        };
+
+        return publications.map(
+            ({ approvals, wentLiveFor, sourcePublication, ...p }) => ({
+                ...p,
+                publishedBy: p.publishedByUserId
+                    ? (publishers.get(p.publishedByUserId) ?? null)
+                    : null,
+                bypass: record(approvals, "BYPASSED"),
+                // Who went live past the setting, beside a bypass rather than
+                // in place of one (T12).
+                override: record(approvals, "OVERRIDDEN"),
+                testRelease: releaseOf({ wentLiveFor, sourcePublication }),
+                // Which one the public is actually being served. Marked rather than
+                // implied by position: after a restore the live version is NOT the
+                // newest by content, only by publish time.
+                isCurrent: p.id === site.currentPublicationId,
+            }),
+        );
     }
 
     /** One past publish, with its snapshot, for previewing. Requires `site:read`. */
@@ -1319,6 +1262,7 @@ export class SitesService {
                 templateId: true,
                 templateVersion: true,
                 snapshot: true,
+                ...FROM_TEST_RELEASE,
             },
         });
         if (!publication) {
@@ -1326,15 +1270,17 @@ export class SitesService {
                 `Publication "${publicationId}" not found`,
             );
         }
+        const { wentLiveFor, sourcePublication, ...row } = publication;
         const publishers = await this.userNames([
             publication.publishedByUserId,
         ]);
         return {
-            ...publication,
-            publishedBy: publication.publishedByUserId
-                ? (publishers.get(publication.publishedByUserId) ?? null)
+            ...row,
+            publishedBy: row.publishedByUserId
+                ? (publishers.get(row.publishedByUserId) ?? null)
                 : null,
-            renderability: checkRenderability(publication.snapshot),
+            renderability: checkRenderability(row.snapshot),
+            testRelease: releaseOf({ wentLiveFor, sourcePublication }),
         };
     }
 
@@ -1377,8 +1323,15 @@ export class SitesService {
         ctx: OrganizationContext,
         siteId: string,
         publicationId: string,
+        /**
+         * An owner restoring past "Publishing needs approval" (DEC-071, Q3):
+         * with the setting on, a restore is refused (409) unless an owner
+         * overrides, and the override is recorded. 403 from anyone else.
+         */
+        options: { override?: boolean } = {},
     ) {
         authorize(ctx, "site:publish");
+        assertOverrideAllowed(ctx, options.override);
         await assertSiteInOrg(ctx, siteId);
 
         const source = await prisma.publication.findFirst({
@@ -1414,56 +1367,39 @@ export class SitesService {
          */
         const fingerprint = draftFingerprint(source.snapshot);
 
-        return prisma.$transaction(async (tx) => {
-            const standing = await this.reviewStandingFor(
-                tx,
-                siteId,
-                ctx.organizationId,
+        return prisma.$transaction((tx) =>
+            // A restore is a publish, and goes through the one path that
+            // repoints the live site (KTD-3): it says which route it took
+            // (#278) and records a bypass (#279) like any other.
+            putLive(tx, {
+                site: { id: siteId, organizationId: ctx.organizationId },
+                snapshot: source.snapshot,
+                source: "restore",
+                actor: { userId: ctx.userId, owner: isOwner(ctx) },
+                override: options.override,
                 fingerprint,
-                ctx.userId,
-            );
-            const bypass = standing.outstanding;
-
-            const restored = await tx.publication.create({
-                data: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    pageId: source.pageId,
-                    path: source.path,
-                    snapshot: source.snapshot as Prisma.InputJsonValue,
-                    templateId: source.templateId,
-                    templateVersion: source.templateVersion,
-                    publishedByUserId: ctx.userId,
-                    // A restore is a publish, and says which route it took
-                    // (#278) like any other.
-                    reviewRoute: standing.route satisfies ReviewRoute,
+                template: {
+                    id: source.templateId,
+                    version: source.templateVersion,
                 },
-                select: { id: true, publishedAt: true },
-            });
-            await tx.site.update({
-                where: { id: siteId },
-                data: { currentPublicationId: restored.id },
-            });
-            if (bypass) {
-                // Linked to the restored publication, so version history marks
-                // this entry the way it marks a bypassed publish.
-                await tx.siteApproval.create({
-                    data: {
-                        siteId,
-                        organizationId: ctx.organizationId,
-                        byUserId: ctx.userId,
-                        outcome: "BYPASSED",
-                        publicationId: restored.id,
-                    },
-                    select: { id: true },
-                });
-            }
-            return {
-                publicationId: restored.id,
-                publishedAt: restored.publishedAt,
-                bypassed: bypass,
-            };
-        });
+                pageId: source.pageId,
+                path: source.path,
+            }).then(
+                ({
+                    publicationId,
+                    publishedAt,
+                    bypassed,
+                    overridden,
+                    route,
+                }) => ({
+                    publicationId,
+                    publishedAt,
+                    bypassed,
+                    overridden,
+                    route,
+                }),
+            ),
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1920,8 +1856,16 @@ export class SitesService {
     async publishSite(
         ctx: OrganizationContext,
         siteId: string,
+        /**
+         * An owner publishing past "Publishing needs approval" (DEC-071,
+         * R10): with the setting on, a direct publish is refused (409)
+         * unless an owner overrides, and the override is recorded. 403
+         * from anyone else.
+         */
+        options: { override?: boolean } = {},
     ): Promise<PublishResult> {
         authorize(ctx, "site:publish");
+        assertOverrideAllowed(ctx, options.override);
 
         const site = await this.loadDraftSite({
             id: siteId,
@@ -1944,68 +1888,52 @@ export class SitesService {
          */
         const fingerprint = draftFingerprint(snapshot);
 
-        // The Site does not track which template produced it; default the
-        // Publication's required (non-null) template stamp to the starter
-        // template's identity/version.
         return prisma.$transaction(async (tx) => {
             /*
-             * Asked INSIDE the transaction (#278). It used to be read before
-             * one, so a verdict posted while a publish was in flight was
-             * missed — the narrow window in which the record would have been
-             * wrong is exactly the window a reviewer racing a publisher falls
-             * into.
+             * No web address, no publish (DEC-069, L5): the one pre-publish
+             * flag that blocks (`checkAddress`). Asked here, beside the
+             * write, so an address removed mid-publish is not missed.
              */
-            const standing = await this.reviewStandingFor(
-                tx,
-                site.id,
-                ctx.organizationId,
-                fingerprint,
-                ctx.userId,
-            );
-            const bypass = standing.outstanding;
-
-            const publication = await tx.publication.create({
-                data: {
-                    siteId: site.id,
-                    organizationId: ctx.organizationId,
-                    // Which of the three routes this took, so version history
-                    // can tell "a reviewer approved it" from "nobody was
-                    // asked" (#193).
-                    reviewRoute: standing.route satisfies ReviewRoute,
-                    // Through `unknown`: SiteStyle is a precise interface, and
-                    // Prisma's InputJsonValue index signature does not accept
-                    // one directly even though the value is plain JSON.
-                    snapshot: snapshot as unknown as Prisma.InputJsonValue,
-                    templateId: starterTemplate.id,
-                    templateVersion: starterTemplate.version,
-                    publishedByUserId: ctx.userId,
-                    publishedAt,
-                },
-                select: { id: true, publishedAt: true },
-            });
-            await tx.site.update({
+            const addressed = await tx.site.findUniqueOrThrow({
                 where: { id: site.id },
-                data: { currentPublicationId: publication.id },
+                select: { subdomain: true },
             });
-            if (bypass) {
-                // Appended like every other approval event: "changes
-                // requested, then published anyway" reads as history.
-                await tx.siteApproval.create({
-                    data: {
-                        siteId: site.id,
-                        organizationId: ctx.organizationId,
-                        byUserId: ctx.userId,
-                        outcome: "BYPASSED",
-                        publicationId: publication.id,
-                    },
-                    select: { id: true },
+            if (!addressed.subdomain) {
+                throw new ConflictException({
+                    message: ADDRESS_MISSING_MESSAGE,
+                    details: { field: "subdomain", reason: "addressMissing" },
                 });
             }
+
+            /*
+             * Through the one path that repoints the live site (KTD-3). It
+             * asks the review standing INSIDE this transaction (#278): a
+             * verdict posted while a publish is in flight is not missed.
+             *
+             * The Site does not track which template produced it; default
+             * the Publication's required (non-null) template stamp to the
+             * starter template's identity/version.
+             */
+            const live = await putLive(tx, {
+                site: { id: site.id, organizationId: ctx.organizationId },
+                snapshot,
+                source: "publish",
+                actor: { userId: ctx.userId, owner: isOwner(ctx) },
+                override: options.override,
+                fingerprint,
+                template: {
+                    id: starterTemplate.id,
+                    version: starterTemplate.version,
+                },
+                publishedAt,
+            });
             return {
-                publicationId: publication.id,
-                publishedAt: publication.publishedAt,
-                currentPublicationId: publication.id,
-                bypassed: bypass,
+                publicationId: live.publicationId,
+                publishedAt: live.publishedAt,
+                currentPublicationId: live.publicationId,
+                bypassed: live.bypassed,
+                overridden: live.overridden,
+                route: live.route,
             };
         });
     }
@@ -2023,6 +1951,14 @@ export class SitesService {
     async getPublicationBySubdomain(
         subdomain: string,
     ): Promise<PublicSiteView> {
+        // A test host's label is never a live address (DEC-071, KTD-7), even
+        // if a site somehow held one: refused before anything is read.
+        const root = siteRootDomain();
+        if (isTestShapedHost(`${subdomain}.${root}`, root)) {
+            throw new NotFoundException(
+                `No published site found for subdomain "${subdomain}"`,
+            );
+        }
         return this.resolveCurrentPublication(
             { subdomain, deletedAt: null },
             `subdomain "${subdomain}"`,
@@ -2037,6 +1973,12 @@ export class SitesService {
      * {@link getPublicationBySubdomain}.
      */
     async getPublicationByHostname(hostname: string): Promise<PublicSiteView> {
+        // A test host is never served the live site (DEC-071, KTD-7).
+        if ((await siteHostMode(hostname)).mode === "test") {
+            throw new NotFoundException(
+                `No published site found for hostname "${hostname}"`,
+            );
+        }
         const domain = await prisma.domain.findUnique({
             where: { hostname: hostname.trim().toLowerCase() },
             select: { status: true, siteId: true },
@@ -2126,7 +2068,9 @@ export class SitesService {
         label: string,
     ): Promise<PublicSiteView> {
         const site = await prisma.site.findFirst({
-            where,
+            // A second lock (DEC-071, KTD-2): the live pointer only ever names
+            // a LIVE row, and a real host is never served anything else.
+            where: { AND: [where, { currentPublication: { kind: "LIVE" } }] },
             select: {
                 id: true,
                 organizationId: true,
@@ -2174,13 +2118,33 @@ export class SitesService {
     async listComments(
         ctx: OrganizationContext,
         siteId: string,
+        /**
+         * A test release's notes instead of the draft's (T8), each resolved
+         * against the release's frozen pages rather than the draft.
+         */
+        testReleaseId?: string,
     ): Promise<CommentView[]> {
         authorize(ctx, "site:read");
         await assertSiteInOrg(ctx, siteId);
+        const release = testReleaseId
+            ? await releaseUnderReview(ctx, siteId, testReleaseId, {
+                  open: false,
+              })
+            : null;
+        const frozen = release
+            ? await frozenPages(ctx.organizationId, release.id)
+            : null;
 
         const [comments, pages] = await Promise.all([
             prisma.siteComment.findMany({
-                where: { siteId, organizationId: ctx.organizationId },
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    // The draft's notes and a release's are kept apart: a
+                    // note on a release is about bytes the draft may no
+                    // longer hold.
+                    testReleaseId: release?.id ?? null,
+                },
                 orderBy: { createdAt: "desc" },
                 select: {
                     id: true,
@@ -2198,6 +2162,7 @@ export class SitesService {
                 select: {
                     id: true,
                     title: true,
+                    path: true,
                     versions: {
                         where: { status: "DRAFT" },
                         orderBy: { createdAt: "desc" },
@@ -2218,6 +2183,13 @@ export class SitesService {
             ]),
         );
         const titles = new Map(pages.map((p) => [p.id, p.title]));
+        const paths = new Map(pages.map((p) => [p.id, p.path]));
+        const attached = (pageId: string, sectionKey: string): boolean =>
+            frozen
+                ? // A release's page never changes; its path is how the
+                  // frozen snapshot names it.
+                  isOnFrozenPage(frozen, paths.get(pageId), sectionKey)
+                : (live.get(pageId)?.has(sectionKey) ?? false);
 
         return comments.map((c) => ({
             id: c.id,
@@ -2237,9 +2209,7 @@ export class SitesService {
                 name: c.author.name ?? c.author.email,
             },
             // A note whose page is gone is orphaned by definition.
-            orphaned:
-                c.pageId === null ||
-                !(live.get(c.pageId)?.has(c.sectionKey) ?? false),
+            orphaned: c.pageId === null || !attached(c.pageId, c.sectionKey),
         }));
     }
 
@@ -2317,6 +2287,13 @@ export class SitesService {
     ): Promise<{ id: string }> {
         authorize(ctx, "site:comment");
         await assertSiteInOrg(ctx, siteId);
+        // A note on a release is about what it froze (T8), and a release
+        // that is gone or live takes no more notes.
+        const release = dto.testReleaseId
+            ? await releaseUnderReview(ctx, siteId, dto.testReleaseId, {
+                  open: true,
+              })
+            : null;
         await assertPageInSite(ctx, siteId, dto.pageId);
 
         /*
@@ -2325,6 +2302,9 @@ export class SitesService {
          * screen — or a typo — was stored and then read as orphaned for ever:
          * the reviewer saw it saved, the owner saw a note about nothing, and
          * no error was ever raised. A 400 is the honest answer.
+         *
+         * On a release, the same check is made of the release's frozen page
+         * instead, whatever the draft holds now.
          */
         const page = await prisma.page.findFirst({
             where: {
@@ -2334,6 +2314,7 @@ export class SitesService {
             },
             select: {
                 title: true,
+                path: true,
                 versions: {
                     where: { status: "DRAFT" },
                     orderBy: { createdAt: "desc" },
@@ -2342,13 +2323,23 @@ export class SitesService {
                 },
             },
         });
-        const keys = new Set(
-            page?.versions.flatMap((v) => v.sections.map((x) => x.key)) ?? [],
-        );
-        if (!keys.has(dto.sectionKey)) {
-            throw new BadRequestException(
-                "That section is no longer on the page. Reload the draft and try again.",
+        if (release) {
+            const frozen = await frozenPages(ctx.organizationId, release.id);
+            if (!isOnFrozenPage(frozen, page?.path, dto.sectionKey)) {
+                throw new BadRequestException(
+                    "That section isn't on this page of the test release. Reload it and try again.",
+                );
+            }
+        } else {
+            const keys = new Set(
+                page?.versions.flatMap((v) => v.sections.map((x) => x.key)) ??
+                    [],
             );
+            if (!keys.has(dto.sectionKey)) {
+                throw new BadRequestException(
+                    "That section is no longer on the page. Reload the draft and try again.",
+                );
+            }
         }
 
         const comment = await prisma.siteComment.create({
@@ -2361,6 +2352,7 @@ export class SitesService {
                 sectionKey: dto.sectionKey,
                 authorUserId: ctx.userId,
                 body: dto.body,
+                ...(release ? { testReleaseId: release.id } : {}),
             },
             select: { id: true },
         });
@@ -2421,6 +2413,29 @@ export class SitesService {
         authorize(ctx, "site:approve");
         await assertSiteInOrg(ctx, siteId);
 
+        if (dto.testReleaseId) {
+            // A verdict on a release is about its frozen bytes, whatever
+            // the draft does next (KTD-10). Both outcomes carry them: a
+            // change request on release 2 is not about release 3.
+            const release = await releaseUnderReview(
+                ctx,
+                siteId,
+                dto.testReleaseId,
+                { open: true },
+            );
+            return prisma.siteApproval.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    byUserId: ctx.userId,
+                    outcome: dto.outcome,
+                    draftFingerprint: release.fingerprint,
+                    testReleaseId: release.id,
+                },
+                select: { id: true },
+            });
+        }
+
         return prisma.siteApproval.create({
             data: {
                 siteId,
@@ -2447,14 +2462,44 @@ export class SitesService {
     async getReviewState(
         ctx: OrganizationContext,
         siteId: string,
+        /**
+         * A test release's review instead of the draft's (T8): its verdicts,
+         * bound to its fingerprint, and its own notes. The two never mix, so
+         * approving a release leaves the draft's review as it was.
+         */
+        testReleaseId?: string,
     ): Promise<ReviewState> {
         authorize(ctx, "site:read");
         await assertSiteInOrg(ctx, siteId);
+        const release = testReleaseId
+            ? await releaseUnderReview(ctx, siteId, testReleaseId, {
+                  open: false,
+              })
+            : null;
 
         const [latest, standing, openNotes] = await Promise.all([
             prisma.siteApproval.findFirst({
-                where: { siteId, organizationId: ctx.organizationId },
-                orderBy: { createdAt: "desc" },
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    ...(release
+                        ? {
+                              // Its verdicts (by fingerprint, as the
+                              // standing reads them), and its go-live's
+                              // own record.
+                              OR: [
+                                  {
+                                      testReleaseId: { not: null },
+                                      draftFingerprint: release.fingerprint,
+                                  },
+                                  { testReleaseId: release.id },
+                              ],
+                          }
+                        : { testReleaseId: null }),
+                },
+                // Two reviews can share a millisecond; the id (a cuid, which grows)
+                // keeps "newest" deterministic.
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 select: {
                     outcome: true,
                     createdAt: true,
@@ -2463,25 +2508,39 @@ export class SitesService {
             }),
             // Asked as "what would happen if THIS caller published now",
             // because that is the question the editor's bar is answering.
-            this.currentDraftFingerprint(ctx, siteId).then((fingerprint) =>
-                this.reviewStandingFor(
-                    prisma,
-                    siteId,
-                    ctx.organizationId,
-                    fingerprint,
-                    ctx.userId,
-                ),
-            ),
+            // A release asks it of its own bytes.
+            release
+                ? readReviewStanding(prisma, {
+                      siteId,
+                      organizationId: ctx.organizationId,
+                      fingerprint: release.fingerprint,
+                      publisherUserId: ctx.userId,
+                      scope: "release",
+                  })
+                : this.currentDraftFingerprint(ctx, siteId).then(
+                      (fingerprint) =>
+                          this.reviewStandingFor(
+                              prisma,
+                              siteId,
+                              ctx.organizationId,
+                              fingerprint,
+                              ctx.userId,
+                          ),
+                  ),
             prisma.siteComment.count({
                 where: {
                     siteId,
                     organizationId: ctx.organizationId,
                     resolvedAt: null,
+                    testReleaseId: release?.id ?? null,
                 },
             }),
         ]);
 
         return {
+            testRelease: release
+                ? { id: release.id, number: release.number, name: release.name }
+                : null,
             openNotes,
             outstanding: standing.outstanding,
             // "In review" is the state a REQUESTED row creates and only a
@@ -2515,9 +2574,33 @@ export class SitesService {
     async requestReview(
         ctx: OrganizationContext,
         siteId: string,
+        /** Put a test release up for review instead of the draft (T8). */
+        testReleaseId?: string,
     ): Promise<{ id: string }> {
         authorize(ctx, "site:update");
         await assertSiteInOrg(ctx, siteId);
+
+        if (testReleaseId) {
+            // Bound to the release's bytes, so an approval of them is what
+            // settles it (KTD-10).
+            const release = await releaseUnderReview(
+                ctx,
+                siteId,
+                testReleaseId,
+                { open: true },
+            );
+            return prisma.siteApproval.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    byUserId: ctx.userId,
+                    outcome: "REQUESTED",
+                    draftFingerprint: release.fingerprint,
+                    testReleaseId: release.id,
+                },
+                select: { id: true },
+            });
+        }
 
         return prisma.siteApproval.create({
             data: {
@@ -2538,9 +2621,10 @@ export class SitesService {
 
     /**
      * A hash of the draft as publishing would write it, for binding an
-     * approval to the work it approved (#278).
+     * approval to the work it approved (#278). Test releases compare theirs
+     * against it to say "Your draft has changed since" (DEC-071).
      */
-    private async currentDraftFingerprint(
+    async currentDraftFingerprint(
         ctx: OrganizationContext,
         siteId: string,
     ): Promise<string> {
@@ -2572,9 +2656,10 @@ export class SitesService {
     }
 
     /**
-     * Where the site stands with its reviewers, as {@link reviewStanding}
-     * decides it. The query lives here; the rule lives in `review-route.ts`,
-     * where publish can apply it to its own transaction's rows.
+     * Where the draft stands with its reviewers, as `reviewStanding`
+     * decides it. The query is `readReviewStanding` in `live-pointer.ts`, the
+     * same one `putLive` asks of its own transaction; the rule lives in
+     * `review-route.ts`. A test release's verdicts are not the draft's (T8).
      */
     private async reviewStandingFor(
         client: Pick<typeof prisma, "siteApproval">,
@@ -2583,24 +2668,13 @@ export class SitesService {
         currentFingerprint: string,
         publisherUserId: string | null,
     ) {
-        const verdicts = (await client.siteApproval.findMany({
-            where: {
-                siteId,
-                organizationId,
-                // BYPASSED is publish's own record, not a verdict: it must not
-                // settle the request it was written about.
-                outcome: { in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"] },
-            },
-            orderBy: { createdAt: "desc" },
-            select: {
-                outcome: true,
-                byUserId: true,
-                draftFingerprint: true,
-                createdAt: true,
-            },
-        })) as ApprovalRow[];
-
-        return reviewStanding(verdicts, currentFingerprint, publisherUserId);
+        return readReviewStanding(client, {
+            siteId,
+            organizationId,
+            fingerprint: currentFingerprint,
+            publisherUserId,
+            scope: "draft",
+        });
     }
 
     // -----------------------------------------------------------------------
@@ -2635,6 +2709,7 @@ export class SitesService {
                 currentPublication: { select: { publishedAt: true } },
                 navigation: true,
                 storefrontId: true,
+                subdomain: true,
                 pages: {
                     select: {
                         id: true,
@@ -2765,6 +2840,9 @@ export class SitesService {
                 }),
             );
         }
+
+        // No web address (L5): the one flag that blocks, so it comes first.
+        flags.unshift(...checkAddress(site.subdomain));
 
         // The two unimplementable types travel with the result so the editor
         // can say what is NOT being checked rather than implying nine.

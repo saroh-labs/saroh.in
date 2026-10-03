@@ -24,6 +24,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { isReservedContactEmail } from "../contacts/contact-email";
@@ -268,6 +269,8 @@ async function subscribe(
 
 /** Connect the business's Razorpay (the fake), for autopay. */
 async function connect(ctx: OrganizationContext) {
+    // Connecting asks for the registered address first (DEC-068).
+    await giveBusinessDetails(ctx.organizationId);
     await payments.connectProvider(ctx, {
         provider: "RAZORPAY",
         publicKey: "rzp_test_Public1",

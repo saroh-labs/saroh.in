@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
     canSend,
+    paysOnline,
     sendConfirmLine,
+    sendLabel,
     sendOutcome,
     sentLine,
     wasSent,
@@ -113,6 +115,70 @@ describe("sendOutcome", () => {
         expect(out.message).toMatch(
             /^Not sent: Farah has turned off email from you\./,
         );
+    });
+});
+
+describe("without online payment (DEC-070)", () => {
+    const view: InvoiceSend = { ...email, payOnline: false };
+
+    it("reads the API's payOnline, never guessing from the provider", () => {
+        expect(paysOnline(view, { providerConnected: true })).toBe(false);
+        expect(
+            paysOnline(
+                { ...email, payOnline: true },
+                { providerConnected: false },
+            ),
+        ).toBe(true);
+        // An API from before DEC-070: a connected provider answered.
+        expect(paysOnline(email, { providerConnected: true })).toBe(true);
+        expect(paysOnline(null, { providerConnected: false })).toBe(false);
+        expect(paysOnline(undefined, undefined)).toBe(false);
+    });
+
+    it("names Send for what the link does", () => {
+        expect(sendLabel(true)).toBe("Send with pay link");
+        expect(sendLabel(false)).toBe("Send invoice");
+    });
+
+    it("promises no pay link in the confirm or the toast", () => {
+        const line = sendConfirmLine(view, "Farah", "₹2,400.00", false);
+        expect(line).toBe(
+            "This tells Farah by email at farah@example.com about ₹2,400.00, with a link to view it and download a copy. A link you shared before stops working.",
+        );
+        expect(line).not.toMatch(/pay link/);
+        expect(
+            sendConfirmLine(
+                { ...view, channels: ["thread"] },
+                "Farah",
+                "₹2,400.00",
+                true,
+            ),
+        ).toBe(
+            "This reminds Farah in their account on your site that ₹2,400.00 is still to pay.",
+        );
+        const sentOut = sendOutcome(
+            {
+                channels: ["email"],
+                email: { status: "QUEUED", to: "farah@example.com" },
+                thread: false,
+            },
+            "Farah",
+            false,
+            false,
+        );
+        expect(sentOut.message).toBe("Sent to farah@example.com.");
+        const suppressed = sendOutcome(
+            {
+                channels: ["email"],
+                email: { status: "SUPPRESSED", to: "farah@example.com" },
+                thread: false,
+            },
+            "Farah",
+            false,
+            false,
+        );
+        expect(suppressed.message).not.toMatch(/pay link/);
+        expect(suppressed.message).toMatch(/Download the PDF/);
     });
 });
 

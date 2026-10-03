@@ -1,5 +1,6 @@
 import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
+import { alignOrderNumberSequence } from "../order-number";
 import {
     ANALYTICS_DAYS,
     ANALYTICS_PATHS,
@@ -12,6 +13,7 @@ import {
     LEADS,
     LIVE_PAYMENT_PROVIDER,
     MODULE_STATES,
+    NORTHWIND_ADDRESS,
     ONLINE_STOCK,
     ORDERS,
     ORG_NAME,
@@ -29,9 +31,9 @@ import {
     SERVICES,
     SIDE_BUSINESSES,
     SITES,
-    STORE_SLUG,
     SUBMISSIONS,
 } from "./data";
+import { seedFounder } from "./founder";
 import type { Db } from "./helpers";
 import {
     assertHeldStock,
@@ -47,6 +49,8 @@ import {
     syncStorefrontFulfilmentTypes,
     writeSite,
 } from "./helpers";
+import { seedPreviousAddress } from "./previous-address";
+import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
  * Build a believable Northwind Supply, or remove it.
@@ -106,14 +110,17 @@ export async function seed(): Promise<void> {
     });
 
     // The zone the business keeps time in (ADR-007): renewal dates and
-    // "today" are counted in it.
+    // "today" are counted in it. And its registered address, which every
+    // invoice prints: issuing one, or connecting a provider, asks for it
+    // first (DEC-068).
     await prisma.businessProfile.upsert({
         where: { organizationId: org.id },
-        update: { timezone: "Asia/Kolkata" },
+        update: { timezone: "Asia/Kolkata", ...NORTHWIND_ADDRESS },
         create: {
             id: id("profile"),
             organizationId: org.id,
             timezone: "Asia/Kolkata",
+            ...NORTHWIND_ADDRESS,
         },
     });
 
@@ -212,6 +219,61 @@ export async function seed(): Promise<void> {
         });
     }
 
+    /*
+     * Changing the web address (DEC-069, L4) is on for everyone here, unlike
+     * the module flags above. It gates a release order in production (the
+     * renderer's forwarding goes out first), not a surface a business
+     * chooses, and the browser spec that changes an address does it on a
+     * business it sets up itself (`e2e/fixtures/own-business.ts`) — one the
+     * seed can't know to give an override. Production's row is made off in
+     * the admin console; `update: {}` leaves a row someone set alone.
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "WEB_ADDRESS_CHANGE" },
+        update: {},
+        create: {
+            id: "flag_WEB_ADDRESS_CHANGE",
+            key: "WEB_ADDRESS_CHANGE",
+            description:
+                "Lets a business's owner change its web address (DEC-069). On in the seed so a business a test sets up can change its own.",
+            enabledByDefault: true,
+        },
+    });
+
+    /*
+     * Test releases (DEC-071, KTD-16): off by default, as in production, and
+     * on for Northwind, the write sandbox, where the plan's rollout turns it
+     * on first and the browser specs make their releases. The flag row is
+     * registry (`update: {}` leaves one someone set alone); the override is
+     * Northwind's.
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "SITE_TEST_RELEASES" },
+        update: {},
+        create: {
+            id: "flag_SITE_TEST_RELEASES",
+            key: "SITE_TEST_RELEASES",
+            description:
+                "Test releases of a website: a frozen version on a test address, shared by link (DEC-071). Off by default; on for Northwind in the seed.",
+            enabledByDefault: false,
+        },
+    });
+    await prisma.featureFlagOverride.upsert({
+        where: {
+            flagKey_organizationId: {
+                flagKey: "SITE_TEST_RELEASES",
+                organizationId: org.id,
+            },
+        },
+        update: { enabled: true },
+        create: {
+            id: id("flagoverride", "site-test-releases"),
+            flagKey: "SITE_TEST_RELEASES",
+            organizationId: org.id,
+            enabled: true,
+        },
+    });
+
     // A connected-but-disabled provider: a merchant who set Razorpay up and
     // then turned it off. Kept alongside the live Cashfree connection below so
     // `/settings/providers` has a provider set that is genuinely mixed rather
@@ -239,7 +301,7 @@ export async function seed(): Promise<void> {
 
     await seedCrm(prisma, org.id, user.id, now);
     await seedAppointments(prisma, org.id, now);
-    await seedCommerce(prisma, org.id, user.id, now);
+    const storeId = await seedCommerce(prisma, org.id, user.id, now);
 
     // Billing first: the sites and the domain claim below are both entitlement-
     // gated, and an org on the FREE default may hold neither.
@@ -247,6 +309,10 @@ export async function seed(): Promise<void> {
     const sideOrgIds = await seedSideBusinesses(prisma, user.id, now);
     const siteIds = await seedWebsite(prisma, org.id, sideOrgIds, user.id, now);
     await seedReviewer(prisma, org.id, user.id, siteIds[0]);
+    // An old address of Northwind's that still forwards to its site (L3).
+    await seedPreviousAddress(prisma, org.id, siteIds[0], now);
+    await seedStorefrontTeammate(prisma, org.id, storeId);
+    await seedFounder(prisma);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);
@@ -504,14 +570,14 @@ async function seedCommerce(
     userId: string,
     now: Date,
 ): Promise<string> {
+    // Keyed by its fixed id: a location has no slug (DEC-069, L14).
     const store = await prisma.store.upsert({
-        where: { slug: STORE_SLUG },
+        where: { id: id("store") },
         update: { name: `${ORG_NAME} Store`, organizationId: orgId },
         create: {
             id: id("store"),
             organizationId: orgId,
             name: `${ORG_NAME} Store`,
-            slug: STORE_SLUG,
             description: "Packaging, storage and safety supplies.",
         },
     });
@@ -746,6 +812,9 @@ async function seedCommerce(
         organizationId: orgId,
         orderIdPrefix: SEED_PREFIX,
     });
+    // The business's one order-number series (P3, DEC-066) continues from
+    // the fixtures: the next order taken by hand follows the highest.
+    await alignOrderNumberSequence(prisma, orgId);
 
     return store.id;
 }
@@ -768,13 +837,12 @@ async function seedOnlineStorefront(
 ) {
     const storeId = id("store", "online");
     await prisma.store.upsert({
-        where: { slug: `${STORE_SLUG}-online` },
+        where: { id: storeId },
         update: { name: "Online", organizationId: a.orgId, deletedAt: null },
         create: {
             id: storeId,
             organizationId: a.orgId,
             name: "Online",
-            slug: `${STORE_SLUG}-online`,
             description: "The website's shop: delivered anywhere in India.",
         },
     });
@@ -1398,14 +1466,13 @@ export async function deleteSeeded(
         () => prisma.reviewInvitation.deleteMany({ where }),
         () => prisma.orderItem.deleteMany({ where }),
         () => prisma.order.deleteMany({ where }),
-        // A customer's link to a contact, and the allergens a note names:
-        // before the storefront, whose allergen list a note's allergens
-        // hold on to (NoAction) — so a store cannot go while a note names one.
+        // A customer's link to a contact, and the team's notes on a person
+        // (U8): they cascade from the contact, but are written with seeded
+        // ids, so removed and counted explicitly. The notes go before the
+        // allergen list: a database seeded before Z2a still has note
+        // allergens, which hold on to it (NoAction) and go with their note.
         () => prisma.customerIdentityLink.deleteMany({ where }),
-        () =>
-            prisma.contactNoteAllergen.deleteMany({
-                where: { noteId: { startsWith: prefix } },
-            }),
+        () => prisma.contactNote.deleteMany({ where }),
         // Needs attention (C1): a seeded contact's entries, and any entry
         // naming a seeded allergen, whatever made it (the backfill's rows
         // don't carry the prefix).
@@ -1468,10 +1535,9 @@ export async function deleteSeeded(
         // seeded ids, so they are removed explicitly and counted.
         () => prisma.bookingEvent.deleteMany({ where }),
         () => prisma.booking.deleteMany({ where }),
-        // Who takes bookings, their hours and the business's rules (U3), and
-        // the team's notes on a person (U8): cascade from their parents, but
-        // written with seeded ids, so removed and counted explicitly.
-        () => prisma.contactNote.deleteMany({ where }),
+        // Who takes bookings, their hours and the business's rules (U3):
+        // cascade from their parents, but written with seeded ids, so
+        // removed and counted explicitly.
         () => prisma.staffService.deleteMany({ where }),
         () => prisma.staffHours.deleteMany({ where }),
         () => prisma.staffTimeOff.deleteMany({ where }),
@@ -1515,6 +1581,9 @@ export async function deleteSeeded(
         // Cascades from either side, but removed explicitly so the count the
         // reset reports is the number of rows the seed actually wrote.
         () => prisma.siteReviewer.deleteMany({ where }),
+        // An old address held for Northwind (DEC-069, L3): it goes with
+        // its business and loses its site, but is removed and counted here.
+        () => prisma.addressReservation.deleteMany({ where }),
         () => prisma.site.deleteMany({ where }),
         () => prisma.subscription.deleteMany({ where }),
         () => prisma.plan.deleteMany({ where }),
@@ -1523,10 +1592,16 @@ export async function deleteSeeded(
         () => prisma.featureFlagOverride.deleteMany({ where }),
         () => prisma.organizationModule.deleteMany({ where }),
         () => prisma.membership.deleteMany({ where }),
+        // Farah's storefront role (DEC-074); it cascades from the store too.
+        () => prisma.storeMembers.deleteMany({ where }),
         () => prisma.businessProfile.deleteMany({ where }),
         // Keyed by its organization, so matched on that.
         () =>
             prisma.invoiceSequence.deleteMany({
+                where: { organizationId: { startsWith: prefix } },
+            }),
+        () =>
+            prisma.orderNumberSequence.deleteMany({
                 where: { organizationId: { startsWith: prefix } },
             }),
         () => prisma.organization.deleteMany({ where }),

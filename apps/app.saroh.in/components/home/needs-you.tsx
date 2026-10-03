@@ -18,7 +18,12 @@ import {
 } from "@/lib/home/needs";
 import type { HomeNeed, HomeUnavailable } from "@/lib/home/service";
 
-import { InlineButton, InlineConfirm, InlineDone } from "./inline-action";
+import {
+    InlineButton,
+    InlineConfirm,
+    InlineDone,
+    InlineLink,
+} from "./inline-action";
 import { TONE_BADGE } from "./tone";
 import type { DoneRow, InlineActions } from "./use-inline-actions";
 import { useInlineActions } from "./use-inline-actions";
@@ -114,7 +119,7 @@ export function NeedsYou({
                     type="button"
                     aria-expanded={expanded}
                     onClick={() => setExpanded((open) => !open)}
-                    className="justify-self-start rounded text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
+                    className="justify-self-start rounded text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
                 >
                     {expanded ? "Show fewer" : seeAllLabel(needs)}
                 </button>
@@ -174,6 +179,9 @@ function NeedRow({
                     >
                         {need.tag}
                     </Badge>
+                ) : null}
+                {need.link && !done && !open ? (
+                    <InlineLink link={need.link} />
                 ) : null}
                 {inline && !done && !open ? (
                     <InlineButton

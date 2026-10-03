@@ -5,6 +5,13 @@ import {
     bookingRefundKey,
 } from "../payments/booking-refund";
 import type { BookingRulesValue } from "./booking-rules";
+import type { DeskTake } from "./desk-take";
+import {
+    BOOKING_PAPER,
+    BOOKING_PAPER_SELECT,
+    deskTake,
+    paidAtDesk,
+} from "./desk-take";
 
 /*
  * What a booking's money reads as on its detail screen (E8, default 50):
@@ -53,6 +60,18 @@ export interface BookingMoney {
      * never refunds on its own (`refundableCents` is 0); the order does.
      */
     treatmentOrderId: string | null;
+    /**
+     * Taken at the desk and recorded on the booking's paper (P2): cash, UPI
+     * at the counter or a card — or its invoice marked paid by hand.
+     */
+    paidAtDeskCents: number;
+    /** How the last of it was taken (CASH, UPI, CARD, …); null when none was. */
+    deskMethod: string | null;
+    /**
+     * What "Take ₹X" takes now (P2), and whether a pay link could ask for it
+     * instead; null when the desk has nothing to take for it.
+     */
+    take: DeskTake | null;
 }
 
 /** Whether a booking's snapshot says only its deposit was paid online. */
@@ -81,13 +100,15 @@ export function bookingPrice(snapshot: unknown): {
 
 /**
  * What is still due at the visit (default 50): the price less what was paid
- * online, while the booking stands and is paid for with money — at the desk,
- * or online in part. Null for a pack's or a membership's class, and once
- * cancelled. The calendar's Due (E19) reads the same rule.
+ * online and at the desk (P2), while the booking stands and is paid for with
+ * money — at the desk, or online in part. Null for a pack's or a
+ * membership's class, and once cancelled. The calendar's Due (E19) reads the
+ * same rule.
  */
 export function bookingDueCents(
     booking: { status: string; paidWith: string | null; snapshot: unknown },
     paidOnlineCents: number,
+    paidAtDeskCents = 0,
 ): number | null {
     const { priceCents } = bookingPrice(booking.snapshot);
     const byMoney =
@@ -97,10 +118,13 @@ export function bookingDueCents(
     if (booking.status === "CANCELLED" || !byMoney || priceCents === null) {
         return null;
     }
-    return Math.max(0, priceCents - paidOnlineCents);
+    return Math.max(0, priceCents - paidOnlineCents - paidAtDeskCents);
 }
 
-type Db = Pick<Prisma.TransactionClient, "paymentIntent" | "paymentRefund">;
+type Db = Pick<
+    Prisma.TransactionClient,
+    "paymentIntent" | "paymentRefund" | "invoice"
+>;
 
 const REFUNDS_BY_DEFAULT = { refundInTimeCancels: true };
 
@@ -114,13 +138,15 @@ export async function bookingMoney(
         paidWith: string | null;
         /** A visit of a treatment (E9): the order its money is on. */
         orderId?: string | null;
+        /** A course's session (ADR-007): paid for with the course. */
+        courseEnrollmentId?: string | null;
         snapshot: unknown;
     },
     rules: Pick<BookingRulesValue, "refundInTimeCancels"> = REFUNDS_BY_DEFAULT,
 ): Promise<BookingMoney> {
     const { priceCents, currency } = bookingPrice(booking.snapshot);
     const cancelled = booking.status === "CANCELLED";
-    const [paid, refund, left] = await Promise.all([
+    const [paid, refund, left, paper] = await Promise.all([
         db.paymentIntent.aggregate({
             where: {
                 organizationId: booking.organizationId,
@@ -148,14 +174,29 @@ export async function bookingMoney(
         cancelled
             ? null
             : bookingPaymentInTx(db, booking.organizationId, booking.id),
+        db.invoice.findMany({
+            where: {
+                organizationId: booking.organizationId,
+                bookingId: booking.id,
+                ...BOOKING_PAPER,
+            },
+            select: BOOKING_PAPER_SELECT,
+        }),
     ]);
     const paidOnlineCents = paid._sum.amountCents ?? 0;
+    const desk = paidAtDesk(paper);
+    const take = deskTake(booking, {
+        priceCents,
+        paidOnlineCents,
+        paidAtDeskCents: desk.cents,
+        paper,
+    });
     return {
         priceCents,
         currency,
         paidOnlineCents,
         deposit: paidOnlineCents > 0 && paidADeposit(booking.snapshot),
-        dueCents: bookingDueCents(booking, paidOnlineCents),
+        dueCents: bookingDueCents(booking, paidOnlineCents, desk.cents),
         refund: refund
             ? {
                   amountCents: refund.amountCents,
@@ -171,5 +212,8 @@ export async function bookingMoney(
         refundableCents: left?.leftCents ?? 0,
         refundInTimeCancels: rules.refundInTimeCancels,
         treatmentOrderId: booking.orderId ?? null,
+        paidAtDeskCents: desk.cents,
+        deskMethod: desk.method,
+        take: "refusal" in take ? null : take,
     };
 }

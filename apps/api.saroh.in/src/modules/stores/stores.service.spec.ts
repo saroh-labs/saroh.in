@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -22,6 +22,7 @@ describe("slugify", () => {
 const emailA = `api-test-a-${process.pid}@example.com`;
 const emailB = `api-test-b-${process.pid}@example.com`;
 const slugPrefix = `apitest-${process.pid}`;
+const legacySlug = `${slugPrefix}-legacy`;
 
 describe("StoresService (dev DB)", () => {
     // Flag is unseeded in the test DB → isEnabled resolves false → legacy path.
@@ -29,8 +30,9 @@ describe("StoresService (dev DB)", () => {
     let userA = "";
     let userB = "";
     let orgId = "";
-    // A second business, for a slug clash that is not also a second storefront.
+    // A second business, holding a location made before L14 (with a slug).
     let otherOrgId = "";
+    let legacyStoreId = "";
     const createdStoreIds: string[] = [];
 
     beforeAll(async () => {
@@ -52,15 +54,24 @@ describe("StoresService (dev DB)", () => {
                 },
             })
         ).id;
+        legacyStoreId = (
+            await prisma.store.create({
+                data: {
+                    name: "Counter",
+                    slug: legacySlug,
+                    organizationId: otherOrgId,
+                    owners: { create: { userId: userB, role: "OWNER" } },
+                },
+            })
+        ).id;
     });
 
     afterAll(async () => {
+        const storeIds = [...createdStoreIds, legacyStoreId];
         await prisma.storeOwner.deleteMany({
-            where: { storeId: { in: createdStoreIds } },
+            where: { storeId: { in: storeIds } },
         });
-        await prisma.store.deleteMany({
-            where: { id: { in: createdStoreIds } },
-        });
+        await prisma.store.deleteMany({ where: { id: { in: storeIds } } });
         await prisma.organization.deleteMany({
             where: { id: { in: [orgId, otherOrgId] } },
         });
@@ -70,25 +81,39 @@ describe("StoresService (dev DB)", () => {
         await prisma.$disconnect();
     });
 
-    it("creates a store + OWNER atomically", async () => {
+    it("creates a store + OWNER atomically, with no slug (L14)", async () => {
         const res = await service.createForUser(userA, orgId, {
             name: "My Blog",
-            slug: `${slugPrefix}-blog`,
         });
         createdStoreIds.push(res.id);
         expect(await service.isOwner(res.id, userA)).toBe(true);
         expect(await service.isOwner(res.id, userB)).toBe(false);
+        const row = await prisma.store.findUniqueOrThrow({
+            where: { id: res.id },
+            select: { slug: true },
+        });
+        expect(row.slug).toBeNull();
     });
 
-    it("adds a second storefront to the same business (ADR-010)", async () => {
+    it("adds a second location with no unique clash (ADR-010, L14)", async () => {
+        // An older app still sends a slug; it is ignored, even one another
+        // location already holds.
         const res = await service.createForUser(userA, orgId, {
             name: "Second shop",
-            slug: `${slugPrefix}-second`,
+            slug: legacySlug,
         });
         createdStoreIds.push(res.id);
         expect(
             await prisma.store.count({ where: { organizationId: orgId } }),
         ).toBe(2);
+        expect(
+            await prisma.store.count({
+                where: { id: { in: createdStoreIds }, slug: null },
+            }),
+        ).toBe(2);
+        expect(await prisma.store.count({ where: { slug: legacySlug } })).toBe(
+            1,
+        );
     });
 
     it("stops at the plan's storefronts, with a 403", async () => {
@@ -96,33 +121,32 @@ describe("StoresService (dev DB)", () => {
         for (const n of [3, 4, 5]) {
             const res = await service.createForUser(userA, orgId, {
                 name: `Shop ${n}`,
-                slug: `${slugPrefix}-shop-${n}`,
             });
             createdStoreIds.push(res.id);
         }
         await expect(
-            service.createForUser(userA, orgId, {
-                name: "Shop 6",
-                slug: `${slugPrefix}-shop-6`,
-            }),
+            service.createForUser(userA, orgId, { name: "Shop 6" }),
         ).rejects.toMatchObject({
             status: 403,
-            response: { message: expect.stringMatching(/5 storefronts/) },
+            response: { message: expect.stringMatching(/5 locations/) },
         });
         expect(
             await prisma.store.count({ where: { organizationId: orgId } }),
         ).toBe(5);
     });
 
-    it("rejects a taken slug and creates nothing", async () => {
-        const slug = `${slugPrefix}-blog`;
+    it("an update carrying a slug succeeds and leaves the slug as it was (L14)", async () => {
         await expect(
-            service.createForUser(userB, otherOrgId, { name: "Dup", slug }),
-        ).rejects.toBeInstanceOf(ConflictException);
-        expect(await prisma.store.count({ where: { slug } })).toBe(1);
-        expect(
-            await prisma.store.count({ where: { organizationId: otherOrgId } }),
-        ).toBe(0);
+            service.updateForUser(userB, legacyStoreId, {
+                name: "Old counter",
+                slug: `${slugPrefix}-renamed`,
+            }),
+        ).resolves.toEqual({ id: legacyStoreId });
+        const row = await prisma.store.findUniqueOrThrow({
+            where: { id: legacyStoreId },
+            select: { name: true, slug: true },
+        });
+        expect(row).toEqual({ name: "Old counter", slug: legacySlug });
     });
 
     it("lists only the user's owned stores", async () => {
@@ -140,10 +164,7 @@ describe("StoresService (dev DB)", () => {
         );
         await expect(service.getForUser(id, userA)).resolves.not.toBeNull();
         await expect(
-            service.updateForUser(userB, id, {
-                name: "Hacked",
-                slug: `${slugPrefix}-hacked`,
-            }),
+            service.updateForUser(userB, id, { name: "Hacked" }),
         ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -151,7 +172,6 @@ describe("StoresService (dev DB)", () => {
         const id = createdStoreIds[0];
         await service.updateForUser(userA, id, {
             name: "My Blog",
-            slug: `${slugPrefix}-blog`,
             description: "Updated desc",
         });
         const store = await service.getForUser(id, userA);

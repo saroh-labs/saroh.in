@@ -241,10 +241,10 @@ export function variantHasStock(
 
 /** Why a product whose stock was counted or moved can't be deleted. */
 export const PRODUCT_HAS_STOCK_HISTORY =
-    "This product has a stock history, so it can't be deleted — that would erase it. Set it to Not sold instead: it leaves the storefront and its stock log stays.";
+    "This product has a stock history, so it can't be deleted — that would erase it. Set it to Not sold instead: it leaves the location and its stock log stays.";
 
 export const CLOSED_STOREFRONT =
-    "This storefront is closed, so its stock can't change.";
+    "This location is closed, so its stock can't change.";
 
 export const ALREADY_UNDONE = "This change has already been undone.";
 

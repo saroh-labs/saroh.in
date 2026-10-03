@@ -8,6 +8,11 @@ export const ReviewRoute = {
     Bypassed: "BYPASSED",
     /** Nobody was asked. The ordinary case, and not a lesser one. */
     None: "NONE",
+    /**
+     * An owner put it live past "Publishing needs approval" without an
+     * approval that covered it (DEC-071, KTD-11). Recorded, never silent.
+     */
+    Overridden: "OVERRIDDEN",
 } as const;
 
 export type ReviewRoute = (typeof ReviewRoute)[keyof typeof ReviewRoute];
@@ -127,10 +132,13 @@ export function reviewStanding(
         };
     }
 
-    // An approval settles only what came before it.
+    // An approval settles only what came before it. "Before" is the rows'
+    // order (newest first, ties broken by id), never a timestamp compare:
+    // an approval and a new request written in one millisecond tie on time.
     const settled =
         settling !== undefined &&
-        (asked === undefined || settling.createdAt >= asked.createdAt);
+        (asked === undefined ||
+            verdicts.indexOf(settling) < verdicts.indexOf(asked));
 
     return {
         outstanding: !settled,

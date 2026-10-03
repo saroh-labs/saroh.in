@@ -38,5 +38,14 @@ const site = instantiateTemplate(template!, {
 
 ## Templates
 
-- **`starter` (v1)** — a two-page site: Home (hero → rich intro → CTA →
-  gallery) and About (hero → story), all derived from the business profile.
+- **`starter` (v2)** — what a new site starts from: Home (centred hero → what
+  it does → working together → CTA) and About (hero → how it started), all
+  derived from the business profile. Its words fit a business, a person
+  working for themselves or someone showing their work (DEC-070), it carries
+  no image, and every link goes to the contact email or its own About page.
+- **`starter` (v1)** — kept for the sites built from it: company copy and a
+  gallery of `/templates/starter/*.jpg` paths that no app serves. Not listed
+  for new sites; `getTemplate("starter", 1)` still resolves it.
+
+`listTemplates()` returns the latest version of each template (the picker and
+the public catalogue); `getTemplate(id, version)` resolves any registered one.

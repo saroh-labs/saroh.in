@@ -49,6 +49,9 @@ const COMMENT = "comment_1";
 const LINK = "link_1";
 const PUBLICATION = "pub_1";
 const DTO = { marker: "dto" } as never;
+// Which review a route is about: the draft's, or a test release's (T8).
+const RELEASE = "rel_1";
+const TARGET = { testReleaseId: RELEASE } as never;
 
 type Target = "sites" | "previewLinks";
 
@@ -82,6 +85,15 @@ const ROUTES: Route[] = [
         expect: [ctx, DTO],
     },
     {
+        handler: "newDefaults",
+        method: RequestMethod.GET,
+        path: "new-defaults",
+        target: "sites",
+        call: "newSiteDefaults",
+        args: [ctx],
+        expect: [ctx],
+    },
+    {
         handler: "list",
         method: RequestMethod.GET,
         path: "/",
@@ -105,8 +117,8 @@ const ROUTES: Route[] = [
         path: ":siteId/comments",
         target: "sites",
         call: "listComments",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        args: [ctx, SITE, TARGET],
+        expect: [ctx, SITE, RELEASE],
     },
     {
         handler: "createComment",
@@ -133,8 +145,8 @@ const ROUTES: Route[] = [
         path: ":siteId/review/request",
         target: "sites",
         call: "requestReview",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        args: [ctx, SITE, TARGET],
+        expect: [ctx, SITE, RELEASE],
     },
     {
         handler: "createApproval",
@@ -178,8 +190,8 @@ const ROUTES: Route[] = [
         path: ":siteId/review",
         target: "sites",
         call: "getReviewState",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        args: [ctx, SITE, TARGET],
+        expect: [ctx, SITE, RELEASE],
     },
     {
         handler: "getFlags",
@@ -309,8 +321,9 @@ const ROUTES: Route[] = [
         path: ":siteId/publications/:publicationId/restore",
         target: "sites",
         call: "restorePublication",
-        args: [ctx, SITE, PUBLICATION],
-        expect: [ctx, SITE, PUBLICATION],
+        // An owner's override travels through (DEC-071, T9).
+        args: [ctx, SITE, PUBLICATION, { override: true }],
+        expect: [ctx, SITE, PUBLICATION, { override: true }],
     },
     {
         handler: "publish",
@@ -318,8 +331,8 @@ const ROUTES: Route[] = [
         path: ":siteId/publish",
         target: "sites",
         call: "publishSite",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        args: [ctx, SITE, { override: true }],
+        expect: [ctx, SITE, { override: true }],
     },
 ];
 

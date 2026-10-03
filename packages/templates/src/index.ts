@@ -29,5 +29,26 @@ export type {
     InstantiatedTemplate,
 } from "./instantiate";
 
-// The starter production template
-export { STARTER_TEMPLATE_ID, starterTemplate } from "./templates/starter";
+// The starter production template: `starterTemplate` is the latest (v2),
+// `starterTemplateV1` the version sites built before DEC-070 came from.
+export {
+    STARTER_TEMPLATE_ID,
+    starterTemplate,
+    starterTemplateV1,
+} from "./templates/starter";
+
+// Blog/writing (DEC-070, K13). Registered; no kind's default.
+export { WRITING_TEMPLATE_ID, writingTemplate } from "./templates/writing";
+
+// The Personal/consultant template (DEC-070, K14): the default for "Just me".
+export {
+    PERSONAL_TEMPLATE_ID,
+    personalServiceIds,
+    personalTemplate,
+} from "./templates/personal";
+
+// The Portfolio template (DEC-070, K12): the default for "A site for my work".
+export {
+    PORTFOLIO_TEMPLATE_ID,
+    portfolioTemplate,
+} from "./templates/portfolio";

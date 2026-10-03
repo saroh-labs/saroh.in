@@ -1,6 +1,16 @@
 // DB-free: "Send a pay link" for a booking (E4). The database is mocked and
 // the transaction runs its callback on the same client; the numbering and
 // the tax profile are stubbed, and the document maths is the real one.
+// The business-details refusal (DEC-068) has its own specs
+// (`business-details.spec.ts`, `business-details.db.spec.ts`); here
+// the business has its address.
+jest.mock("../invoices/business-details", () => ({
+    ...jest.requireActual<typeof import("../invoices/business-details")>(
+        "../invoices/business-details",
+    ),
+    assertBusinessDetails: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {

@@ -255,7 +255,7 @@ export function DataView<TRow>({
                                 aria-pressed={on}
                                 onClick={() => chooseFilter(f.id)}
                                 className={cn(
-                                    "flex items-center gap-[7px] rounded-t-md px-[13px] py-[9px] text-[13.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
+                                    "flex items-center gap-[7px] rounded-t-md px-[13px] py-[9px] text-[13.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active coarse:min-h-11",
                                     on
                                         ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
                                         : "font-medium text-muted-foreground hover:text-foreground",
@@ -303,7 +303,7 @@ export function DataView<TRow>({
                                         aria-pressed={on}
                                         onClick={() => chooseFilter(f.id)}
                                         className={cn(
-                                            "flex h-[32px] shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:h-11 coarse:px-3.5",
+                                            "flex h-[32px] shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active coarse:h-11 coarse:px-3.5",
                                             on
                                                 ? "bg-accent font-semibold text-accent-foreground"
                                                 : "font-medium text-muted-foreground hover:text-foreground",
@@ -538,7 +538,7 @@ export function DataView<TRow>({
                                                         // harness found these;
                                                         // reading the filter row
                                                         // by hand did not.
-                                                        "inline-flex items-center gap-1 uppercase hover:text-foreground coarse:min-h-11",
+                                                        "inline-flex items-center gap-1 rounded-sm uppercase hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
                                                         active &&
                                                             "text-foreground",
                                                     )}
@@ -598,7 +598,8 @@ export function DataView<TRow>({
                                         }
                                         className={cn(
                                             "wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035] data-[state=selected]:bg-brand-subtle",
-                                            onRowClick && "cursor-pointer",
+                                            onRowClick &&
+                                                "cursor-pointer active:bg-foreground/[0.07]",
                                         )}
                                     >
                                         {selectable ? (
@@ -770,7 +771,7 @@ export function DataView<TRow>({
                                         "--wk-i": rowIndex,
                                     } as React.CSSProperties
                                 }
-                                className="wk-item relative flex items-center gap-2 pr-3 transition-colors hover:bg-accent/50"
+                                className="wk-item relative flex items-center gap-2 pr-3 transition-colors hover:bg-accent/50 active:bg-accent"
                             >
                                 {/*
                                  * An OVERLAY link, not a wrapper.
@@ -860,8 +861,8 @@ export function DataView<TRow>({
                                 className={cn(
                                     "h-8 rounded-lg px-3 text-[12.5px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground",
                                     action.tone === "destructive"
-                                        ? "bg-[#B3261E] text-white hover:bg-[#8F1E18]"
-                                        : "border border-primary-foreground/30 hover:bg-primary-foreground/10",
+                                        ? "bg-[#B3261E] text-white hover:bg-[#8F1E18] active:bg-[#741812]"
+                                        : "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/20",
                                 )}
                             >
                                 {action.label}
@@ -870,7 +871,7 @@ export function DataView<TRow>({
                         <button
                             type="button"
                             onClick={clearSelection}
-                            className="h-8 rounded-lg px-2.5 text-[12.5px] font-medium opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
+                            className="h-8 rounded-lg px-2.5 text-[12.5px] font-medium opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground active:bg-primary-foreground/10 active:opacity-100"
                         >
                             Clear
                         </button>

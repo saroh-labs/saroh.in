@@ -1,3 +1,4 @@
+// @covers site:/shop api:products api:orders api:payments api:site-accounts api:sites pkg:site-blocks
 import { expect, test } from "@playwright/test";
 
 import { urls } from "../playwright.config";

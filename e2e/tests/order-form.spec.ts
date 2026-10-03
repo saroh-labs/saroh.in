@@ -1,9 +1,10 @@
+// @covers accounts:/login app:/open app:/commerce/orders app:/commerce/orders/new api:orders api:products api:customers api:contacts api:stores
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
-import { demoUser, urls } from "../playwright.config";
 
 /**
  * New order v2 (plan B, B13): the sheet on the Orders list, at the counter
@@ -14,13 +15,7 @@ const RYE = "seed_sc_rc_org";
 const RYE_STORE = "seed_sc_rc_store";
 
 async function signIn(page: Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(demoUser.email);
-    await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page);
 }
 
 /**
@@ -72,7 +67,12 @@ const NW: Storefront = { organizationId: "seed_org", storeId: "seed_store" };
 
 /** Pick-up where the storefront offers it; else its first way, addressed. */
 async function leaves(sheet: Locator) {
-    const pickUp = sheet.getByRole("radio", { name: "Pick-up" });
+    // The choices draw once the lines are priced: wait for them before
+    // counting, or a slow quote reads as "no Pick-up" and takes the
+    // delivery branch.
+    const ways = sheet.getByRole("radiogroup", { name: "How it leaves" });
+    await expect(ways.getByRole("radio").first()).toBeVisible();
+    const pickUp = ways.getByRole("radio", { name: "Pick-up" });
     if (await pickUp.count()) {
         await pickUp.click();
         return;
@@ -110,10 +110,9 @@ test.describe("a walk-in who gives a phone, paid in cash", () => {
         const bread = `E2E Counter Bread ${testInfo.project.name}`;
         const cake = `E2E Counter Cake ${testInfo.project.name}`;
         const name = `Asha ${testInfo.project.name}`;
-        const phone =
-            testInfo.project.name === "phone"
-                ? "+91 90000 22202"
-                : "+91 90000 22201";
+        const phone = testInfo.project.name.startsWith("phone")
+            ? "+91 90000 22202"
+            : "+91 90000 22201";
         await signIn(page);
         await page.goto(`/open/${NW.organizationId}`);
         try {

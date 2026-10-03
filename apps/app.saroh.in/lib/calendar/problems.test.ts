@@ -162,6 +162,21 @@ describe("the fix beside each problem", () => {
         );
     });
 
+    it("a failed renewal offers Retry charge to someone who may write subscriptions (D13)", () => {
+        expect(
+            problemAction("renewal_failed", {
+                can: { remind: false, retry: true },
+                shop: true,
+            }),
+        ).toBe("Retry charge");
+        expect(
+            problemAction("renewal_failed", {
+                can: { remind: true, retry: false },
+                shop: false,
+            }),
+        ).toBe("Open membership");
+    });
+
     it("a reminder is not offered to someone who can't send one", () => {
         expect(
             problemAction("invoice_overdue", {

@@ -1,5 +1,4 @@
 import {
-    BadRequestException,
     ConflictException,
     ForbiddenException,
     Injectable,
@@ -24,7 +23,6 @@ import {
 import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
-import { slugify } from "./slug";
 
 /** Staff roles allowed to mutate a store (VIEWER is read-only). */
 const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
@@ -89,7 +87,7 @@ export class StoresService {
             where: { id: storeId, deletedAt: null },
         });
         if (!store) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
 
         if (!(await this.useOrgPath(store.organizationId))) {
@@ -302,7 +300,7 @@ export class StoresService {
             },
         });
         if (!store) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
         return store;
     }
@@ -342,7 +340,7 @@ export class StoresService {
         });
         if (existing >= MAX_STOREFRONTS_PER_BUSINESS) {
             throw new ConflictException({
-                message: `This business has ${existing} storefronts, as many as Saroh allows. Close one it no longer sells from to add another.`,
+                message: `This business has ${existing} locations, as many as Saroh allows. Close one it no longer sells from to add another.`,
             });
         }
         try {
@@ -359,21 +357,7 @@ export class StoresService {
                 await this.entitlements.getEntitlements(organizationId),
             );
             throw new ForbiddenException({
-                message: `Your plan includes ${limit === 1 ? "one storefront" : `${limit} storefronts`}. A bigger plan adds more.`,
-            });
-        }
-
-        const slug = slugify(dto.slug ?? dto.name);
-        if (!slug) {
-            throw new BadRequestException({
-                message: "Could not derive a slug from the name",
-                field: "slug",
-            });
-        }
-        if (!(await this.isSlugAvailable(slug))) {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
+                message: `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
             });
         }
 
@@ -381,84 +365,48 @@ export class StoresService {
         // the business's, rather than reading as the column default (USD)
         // until someone saves its settings.
         const currency = await businessCurrency(prisma, organizationId);
-        try {
-            const store = await prisma.store.create({
-                data: {
-                    name: dto.name,
-                    slug,
-                    description: dto.description ?? null,
-                    organization: { connect: { id: organizationId } },
-                    // Nested create runs in one transaction → no orphan store.
-                    owners: { create: { userId, role: "OWNER" } },
-                    // Its settings say what it offers from the start (B2a), the
-                    // same as a storefront with no settings row reads.
-                    ...(currency
-                        ? {
-                              settings: {
-                                  create: {
-                                      currency,
-                                      fulfilmentTypes: NEW_STOREFRONT_TYPES,
-                                  },
+        // No slug: the storefront "Web address" is gone (DEC-069, L14). A
+        // `slug` an older app still sends is ignored.
+        const store = await prisma.store.create({
+            data: {
+                name: dto.name,
+                description: dto.description ?? null,
+                organization: { connect: { id: organizationId } },
+                // Nested create runs in one transaction → no orphan store.
+                owners: { create: { userId, role: "OWNER" } },
+                // Its settings say what it offers from the start (B2a), the
+                // same as a storefront with no settings row reads.
+                ...(currency
+                    ? {
+                          settings: {
+                              create: {
+                                  currency,
+                                  fulfilmentTypes: NEW_STOREFRONT_TYPES,
                               },
-                          }
-                        : {}),
-                },
-            });
-            return { id: store.id };
-        } catch {
-            // Unique-constraint backstop for a slug race between the check
-            // above and the insert.
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
-        }
+                          },
+                      }
+                    : {}),
+            },
+        });
+        return { id: store.id };
     }
 
     /** Update a store's core fields — owner or a write-capable member. */
     async updateForUser(userId: string, storeId: string, dto: UpdateStoreDto) {
         if (!(await this.canWrite(storeId, userId))) {
-            throw new NotFoundException("Store not found");
+            throw new NotFoundException("Location not found");
         }
 
-        const slug = slugify(dto.slug);
-        const current = await prisma.store.findUnique({
+        // `dto.slug` (an older app still sends it) is ignored: the slug
+        // is no longer read or written (DEC-069, L14). A row keeps its own.
+        await prisma.store.update({
             where: { id: storeId },
-            select: { slug: true },
+            data: {
+                name: dto.name,
+                description: dto.description ?? null,
+                logo: dto.logo ?? null,
+            },
         });
-        if (
-            current &&
-            current.slug !== slug &&
-            !(await this.isSlugAvailable(slug))
-        ) {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
-        }
-
-        try {
-            await prisma.store.update({
-                where: { id: storeId },
-                data: {
-                    name: dto.name,
-                    slug,
-                    description: dto.description ?? null,
-                    logo: dto.logo ?? null,
-                },
-            });
-            return { id: storeId };
-        } catch {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
-        }
-    }
-
-    /** Store slugs are globally unique (Store.slug @unique). */
-    private async isSlugAvailable(slug: string): Promise<boolean> {
-        const existing = await prisma.store.findUnique({ where: { slug } });
-        return !existing;
+        return { id: storeId };
     }
 }

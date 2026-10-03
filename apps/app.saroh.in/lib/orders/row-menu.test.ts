@@ -466,6 +466,22 @@ describe("quickPayment", () => {
         expect(quickPayment(read({ money: null }), f)).toBeNull();
     });
 
+    it("a cancel's refund the provider hasn't confirmed reads Refund on its way (B9)", () => {
+        expect(
+            quickPayment(
+                read({
+                    refundStanding: "REFUNDED",
+                    money: money && {
+                        ...money,
+                        refunded: money.paid,
+                        refundsOnTheWay: [{ id: "r1", amount: money.paid }],
+                    },
+                }),
+                f,
+            ),
+        ).toBe("Refund on its way");
+    });
+
     it("says how it stands", () => {
         expect(quickPayment(read(), f)).toBe("Paid");
         expect(

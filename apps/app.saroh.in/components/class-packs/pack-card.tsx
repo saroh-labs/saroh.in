@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useId } from "react";
 
 import { Pill } from "@/components/subscriptions/pill";
+import type { CardNote } from "@/lib/class-packs/pack-card-notes";
 import type { PackCardView } from "@/lib/class-packs/pack-cards";
 
 const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
@@ -21,6 +22,7 @@ const EYEBROW =
  */
 export function PackCard({
     card,
+    notes = [],
     canWrite,
     canSell,
     busy,
@@ -28,6 +30,8 @@ export function PackCard({
     onArchive,
 }: {
     card: PackCardView;
+    /** Running out, bought at an older price, ran out unused (the design). */
+    notes?: CardNote[];
     canWrite: boolean;
     canSell: boolean;
     busy: boolean;
@@ -97,6 +101,22 @@ export function PackCard({
                     </div>
                 </div>
             </div>
+            {notes.length > 0 ? (
+                <ul className="mt-2 flex flex-col gap-1 text-[12.5px] leading-[1.45]">
+                    {notes.map((n) => (
+                        <li
+                            key={n.text}
+                            className={
+                                n.tone === "accent"
+                                    ? "font-semibold text-brand"
+                                    : "text-muted-foreground"
+                            }
+                        >
+                            {n.text}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
             {card.why ? (
                 <p
                     id={whyId}

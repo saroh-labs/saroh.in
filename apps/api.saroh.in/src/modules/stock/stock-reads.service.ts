@@ -209,7 +209,7 @@ export class StockReadsService {
                   })
                 : 1,
         ]);
-        if (store === 0) throw new NotFoundException("Store not found");
+        if (store === 0) throw new NotFoundException("Location not found");
         if (product === 0) throw new NotFoundException("Product not found");
         if (variant === 0) throw new NotFoundException("Variant not found");
         if (cursor === 0) throw new NotFoundException("Stock change not found");

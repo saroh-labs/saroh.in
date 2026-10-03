@@ -246,9 +246,70 @@ creates or renews meanwhile is left unset or stale:
   under this release, so a plan whose classes changed during the rollback
   reaches those members one renewal late.
 
-**Before deploying this release again, run the backfill once more** (step 4) and check step 6. After Z1 has removed the fallback, rolling back below
-this release means running the backfill before re-deploying, or members
-the old API added would read as unlimited.
+**Before deploying this release again, run the backfill once more** (step 4)
+and check step 6. After Z1, rolling back below this release means running
+the backfill before re-deploying: until it runs, each member the old API
+added is served their plan's number and logged as
+`subscription_allowance_unset` (see Z1).
+
+## Z1: the classes allowance has no fallback (after CP-2; a manual gate)
+
+Plan: the waves plan's "Deferred to follow-up work", Z1; payments plan
+§D10 ("A later release removes the fallback once a query shows no live
+subscription with a null `classesPerPeriodSetAt`"). No migration: the
+columns stay. From this release a subscription's own `classesPerPeriod` is
+the only designed read (`subscriptions/classes-allowance.ts`). A row with a
+null `classesPerPeriodSetAt` is no longer an expected state: the API logs
+`subscription_allowance_unset` at ERROR with the subscription's id and,
+rather than fail or read unlimited, serves the plan's classes as they
+stand (what D10's plan documents for such a row). Any volume of that event
+means an API below D10 wrote rows: run the D10 backfill.
+
+### Before deploying (a gate: do not deploy until both pass)
+
+1. **Run the D10 backfill once more** against production, from a checkout
+   of this release (read the D10 section, step 4, for what it does; it
+   writes only live rows still unset, and is safe while any image serves):
+
+    ```bash
+    DATABASE_URL=... DATABASE_TARGET_CONFIRM=<database> \
+      pnpm --filter @saroh/database exec tsx src/backfill/classes-per-period.cli.ts
+    ```
+
+    It **must print `set now: 0, still unset: 0`**:
+
+    ```text
+    [classes-per-period] <database>: live subscriptions unset: 0, set now: 0, still unset: 0
+    ```
+
+    If "set now" is not 0, something below D10 wrote rows since the last
+    run (a rollback, or an old image still serving): find out what, stop it,
+    and run again until it prints 0 and 0. Record the line in the release
+    issue.
+
+2. **The query finds no unset row** (read-only; must return 0):
+
+    ```sql
+    SELECT count(*) FROM "CustomerSubscription"
+    WHERE status <> 'CANCELLED' AND "classesPerPeriodSetAt" IS NULL;
+    ```
+
+### Deploy
+
+The usual API deploy; wait for `/health/ready`. No workspace change.
+
+### Verify
+
+3. No `subscription_allowance_unset` event in the API's logs in the first
+   hour (any one means run the backfill, then find what wrote the row).
+4. Step 2's query still returns 0.
+
+### Rollback
+
+Deploy the previous API tag. It reads the same columns the same way for
+every set row, so nothing moves. Rolling back **below D10** (not this
+release) is what makes unset rows: run the backfill before deploying D10
+or later again, and expect the ERROR event until it has run.
 
 ## D5: the plan draft writers (wave 3; CP-3 keeps them apart from D7)
 
@@ -273,8 +334,8 @@ one is a 409 naming who saved since. The rules are in
   D7 never asks, so if D7 is rolled back after drafts exist, its Plans tab
   doesn't draw a draft as a live card. D7's Plans tab asks with
   `include=drafts`.
-- **The old form's `PATCH :planId` stays** until follow-up Z6 (a checkpoint
-  after D7). It refuses a draft, and a change through it moves the draft
+- **The old form's `PATCH :planId` stays** until follow-up Z6 (one release
+  after D7 reaches production, see below). It refuses a draft, and a change through it moves the draft
   revision, so an editor open on the plan is told instead of saving over it.
 
 ### Verify
@@ -299,14 +360,45 @@ the drafts first:
 SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
 ```
 
-### Release #708 carries D5 and D7 together (user, 2026-09-29)
+### D5 went out in #708; D7's Plan Editor ships with batch 2026-09-29 (corrected 2026-09-29)
 
-CP-3 wasn't released on its own, so D5's writers and D7's Plan Editor reach
-production in one release. The API still deploys before the apps. Rolling
-the API back below D5 after this release: **roll the Vercel apps back with
-it**, and first archive or delete any DRAFT plan (the query above), so the
-old Plans list doesn't draw one as a live card. Nothing can sell a draft
-either way (D21).
+An earlier note here said release #708 carried D5 and D7 together. It
+didn't: #708 carried **D5 only**. D7 (`r2/d7`) was never merged into it, so
+CP-3 held after all. D7's app ships in the **next** release, batch
+2026-09-29 (`r2/d7-int`).
+
+- **D5 is live since #708.** Its draft writers are in production and nothing
+  calls them yet.
+- **Between #708 and this batch nothing draws a draft.** The #708 app still
+  has `PlanDialog` and its Plans tab calls `GET subscription-plans` without
+  `include=drafts`, and the API leaves drafts out of that list. Nothing in
+  that app creates a draft either, so none should exist. Nothing can sell
+  one anyway (D21).
+- **This batch is app-only for D7.** Its API change is a comment on the old
+  `PATCH :planId`. D5's API is already in production, so the usual "API
+  before app" order is already met. The Plans tab now asks for
+  `include=drafts`, New plan and Edit open `/billing/plans/new` and
+  `/billing/plans/[planId]/edit`, and `PlanDialog` is gone. The editor's
+  "how it's paid" line mentions autopay only when
+  `GET subscriptions/autopay` says the business offers it (D14's honest
+  copy).
+- **Rolling the workspace back below D7** is safe while no DRAFT plan
+  exists. Once one does, the older app can't see it or finish it (its list
+  leaves drafts out and its `PATCH :planId` refuses them), though nothing
+  sells it. Before rolling back, check the count, and publish or delete any
+  drafts from the editor first:
+
+    ```sql
+    SELECT count(*) FROM "SubscriptionPlan" WHERE status = 'DRAFT';
+    ```
+
+- **Rolling the API back below D5 (#708)** still needs the app rolled back
+  below D7 with it, and the drafts cleared first (the query above). An API
+  without D5 has no draft routes, and its unfiltered list would show a
+  draft as a live card.
+- **Z6 (remove D5's temporary `PATCH :planId`)** can go one release after
+  this batch reaches production, once no live app image calls it. Not done
+  yet.
 
 ## E14: pack drafts (wave 4; the Pack Editor, E18, ships in a later release)
 
@@ -356,8 +448,8 @@ SELECT count(*) FROM "ClassPack" WHERE status = 'DRAFT';
 ## E20: the calendar reads a range (wave 3)
 
 `GET organizations/:org/calendar` takes `from`/`to` (local dates, both
-inclusive, at most 62 days) as well as `month` (`calendar/range.ts`). No
-migration.
+inclusive, at most 62 days) as well as `month` until Z3 (below)
+(`calendar/range.ts`). No migration.
 
 - **API before app.** The new workspace asks for `from`/`to`, which the old
   API refuses (400), so deploy the API first. The old workspace sends
@@ -386,6 +478,21 @@ business joined>` opens the joined month, with no error page.
 
 Roll the workspace back first (it asks for `from`/`to`), then the API.
 Nothing is stored.
+
+### Z3: the `month` alias is removed (done, batch 2026-09-29)
+
+E20 went to production in #708, so no workspace that sends `month` is live.
+The API now answers `from`/`to` only; `?month=` is a 400 ("property month
+should not exist"). Before this release, confirmed that nothing calls the
+alias: the workspace reads `calendar?from=&to=` (`lib/calendar/service.ts`;
+its own `/calendar?month=` is a page URL, not the API), and neither
+`saroh.app`, `site-blocks` nor `e2e` reads the calendar. No migration.
+
+- **Rolling the API back** below this release is fine: the E20 API answers
+  both.
+- **Rolling the workspace back below E20 now breaks the calendar** (it
+  would send `month`, which this API refuses). Roll the API back with it,
+  to #708 or earlier.
 
 ## E9: a treatment sold as one order (wave 2)
 
@@ -565,6 +672,219 @@ Deploy the previous API. A `mandate.cancel` job left PENDING dead-letters on
 the old image (no handler); its mandate is already CANCELLED in Saroh and is
 never charged. The table stays; the old image never reads it.
 
+## D19: Razorpay autopay (off until a test-mode run passes)
+
+The Razorpay adapter can set up, read, charge and cancel mandates, and
+Razorpay's `token.*`, `invoice.expired`, `order.notification.*` and
+recurring `payment.*` webhooks settle through the inbox.
+
+- **No migration.** A new rollout flag, `RAZORPAY_AUTOPAY`: no business is
+  offered autopay through Razorpay while it is off, and never configured
+  it is off. **Leave it without a row in production** until a Razorpay
+  test-mode run on a development business has authorised a UPI mandate
+  and settled one charge (waves plan, boundary 6), and D12 (the set-up
+  screens) is live.
+- **Either order.** Nothing creates a mandate until D12, and the webhook
+  mapping only moves rows a set-up made, so the old app, and the old API
+  on these deliveries (it ignores `token.*`), are safe.
+- **The business's Razorpay webhook** must also send `token.confirmed`,
+  `token.rejected`, `token.paused`, `token.cancelled`,
+  `order.notification.delivered`, `order.notification.failed`,
+  `invoice.paid` and `invoice.expired` before its flag is turned on.
+
+### Verify
+
+With the flag on for one development business, its customer authorises a
+UPI mandate from the set-up link and the mandate reads ACTIVE with a masked
+handle; one charge's notice is delivered, the debit is asked after
+`payment_after`, and `payment.captured` marks the invoice PAID.
+
+### Rollback
+
+Turn the flag's override off: no new set-ups, and from D13 no renewal is
+charged either (it is invoiced with a pay link; a charge already queued is
+let go before its debit). Mandates already made can still be cancelled.
+
+## D13: renewals charge the mandate (wave 6a; after CP-5)
+
+A renewal whose subscription has an ACTIVE mandate queues its charge in the
+renewal's transaction (a CREATED `PaymentIntent` under
+`inv_<invoiceId>_<attempt>` and a `subscription.charge` job); the job makes
+the provider's order with its pre-debit notice, debits once the notice is
+delivered and `debitAfter` has passed, and the payment's webhook pays the
+invoice (CHARGED). A decline writes RENEWAL_FAILED and opens the pay link
+again; an invoice above the limit writes MANDATE_LIMIT_LOW and is not
+charged; Retry charges again (a new key) or makes a pay link.
+
+- **No migration.** It writes the columns D11 added.
+- **CP-5 is met** (D20 in production, #708), so no mandate is charged after
+  its subscription ends.
+- **Gate.** Nothing is charged unless the provider's charging is on for the
+  business (`RAZORPAY_AUTOPAY` for Razorpay,
+  `payments/mandate-charge-gate.ts`); off, a renewal is invoiced with a pay
+  link exactly as before, and a charge already queued is let go before its
+  debit.
+- **API before app, either is safe.** `POST subscriptions/:id/retry` takes an
+  optional `via` (absent: a pay link, as the previous app sends it) and
+  answers `url: null` for an autopay retry. New read fields
+  (`autopayCharge`, `retryVia`, `online.autopayCharge`,
+  `autopayCharging`, send reason `AUTOPAY_PENDING`) are ignored by the
+  previous app and site. The previous app on the new API shows no
+  "Autopay charge in progress" line, but its pay link and Send are refused
+  (409) while a charge is under way, so nobody pays twice.
+- **Lead time.** By default the renewal invoice is raised on the renewal
+  date as before and falls due 7 days later; the debit is asked for 26
+  hours after (Razorpay's 25-hour notice plus a margin), leaving room for
+  one Retry by autopay before it is overdue. D13B (below) lets the merchant
+  choose otherwise.
+
+### D13B: the merchant chooses when autopay debits (DEC-065)
+
+"When autopay charges" on the Plans tab (and per plan on Plan Detail):
+on the renewal date (invoice and notice 2 days early), the day after
+renewal (the default, D13 unchanged) or on the due date.
+
+- **Migration** `20261018200000_autopay_charge_timing`, additive: the
+  business's setting (default `DAY_AFTER_RENEWAL`, so nothing changes until
+  a merchant picks), the plan's nullable override, CHECK constraints, and
+  `Invoice_one_live_per_period` rebuilt to leave CREDITED invoices out as
+  it does VOID ones (a SHARE lock on "Invoice" while it builds; writes
+  wait). The previous API never reads the columns and treats a CREDITED
+  invoice as live, so it never issues beside one.
+- **API before app, either is safe.** New fields (`autopay` on the
+  settings read, `autopayChargeTiming` on plans, `autopayNextCharge` on the
+  account and pay page) are ignored by the previous app and site;
+  `PATCH …/subscriptions/settings` still takes `membersCanPause` alone.
+  The previous app shows no setting, so every business stays on the
+  default until the new app ships.
+- **Gate.** The setting shows only where autopay can charge (a connected
+  provider that takes mandates, `RAZORPAY_AUTOPAY` on). The early pass only
+  touches subscriptions with an ACTIVE mandate whose provider's charging is
+  on.
+- **Early invoices.** Under "on the renewal date" the renewal job invoices
+  two days early. A cancel, pause or plan change before the renewal date
+  voids that invoice (a GST business gets a credit note) and cancels its
+  charge before any debit; the customer may already have had the bank's
+  notice, which the provider can't take back.
+- **A changed setting never moves a queued charge**: its planned debit is
+  on its intent.
+
+#### Verify
+
+With `RAZORPAY_AUTOPAY` on for a development business and a UPI mandate
+ACTIVE: pick "Charge on the renewal date" on the Plans tab; move the test
+subscription's `currentPeriodEnd` to 47 hours ahead; after the next renewal
+run the invoice is ISSUED with the renewal date as its period start and
+its charge's intent has `debitAfter` = the renewal date. Cancel it at
+period end: the invoice reads VOID, the intent CANCELLED, and the log says
+"Voided the early renewal invoice". Charges planned ahead:
+
+```sql
+SELECT i.status, i."debitAfter", inv."periodStart", inv.status AS invoice
+FROM "PaymentIntent" i JOIN "Invoice" inv ON inv.id = i."invoiceId"
+WHERE i."viaMandateId" IS NOT NULL AND i.purpose IS NULL
+  AND i.status = 'CREATED' AND i."debitAfter" IS NOT NULL
+ORDER BY i."debitAfter";
+```
+
+#### Rollback
+
+Deploy the previous API and app; leave the columns. The old image runs a
+queued charge's steps when they fall due but ignores its planned debit: it
+asks for the debit 26 hours after preparing (a card at once), so no charge
+is lost but one may come earlier than the merchant chose. An early invoice already issued stays
+the period's invoice and is charged as D13 would; a cancel or pause on the
+old image doesn't void it, so void those by hand (the SQL above, where
+`periodStart` is still ahead). Dropping the columns is a later contract
+step.
+
+### Verify
+
+With `RAZORPAY_AUTOPAY` on for a development business and a UPI mandate
+ACTIVE: renew its subscription (move `currentPeriodEnd` into the past on a
+test row); the invoice reads "Autopay charge in progress · ‹date›" on
+Subscription Detail and Invoice Detail, "Copy pay link" and Send are gone,
+and `POST …/pay-link` answers 409. After the notice is delivered and
+`payment_after` passes, the debit goes and `payment.captured` marks the
+invoice PAID with a CHARGED event. Charges waiting or stuck (expect only
+recent rows):
+
+```sql
+SELECT i.status, i."preDebitStatus", i."debitAfter", i."updatedAt"
+FROM "PaymentIntent" i
+WHERE i."viaMandateId" IS NOT NULL AND i.purpose IS NULL
+  AND i.status IN ('CREATED', 'REQUIRES_PAYMENT', 'PROCESSING')
+ORDER BY i."updatedAt";
+```
+
+### Rollback
+
+Deploy the previous API. Queued `subscription.charge` jobs dead-letter on
+the old image (no handler); their intents stay CREATED or REQUIRES_PAYMENT
+and are never debited (the old image has no charge path), but the old
+image doesn't know them and would let a pay link be made alongside — so
+first turn the flag's override off and let queued charges be let go, or
+mark open charge intents CANCELLED. A debit already asked for (PROCESSING)
+is still settled by its payment webhook on the old image.
+
+## D14: autopay in the workspace (wave 8)
+
+Subscription Detail's Plan card says how autopay stands and how it was set
+up, "Autopay limit too low", a cancel still being confirmed and a charge
+under way, and — with `subscription:write` — offers "Send a set-up link"
+and "Cancel autopay". The Subscriptions list marks a row "UPI Autopay ·
+…". The plan and subscribe dialogs promise autopay only where the
+business offers it (`GET subscriptions/autopay`); otherwise "It renews
+with an invoice each period".
+
+- **No migration.** `setupSource` gains `SETUP_LINK` and the log gains
+  `MANDATE_LINK_SENT` (both strings); `AUTOPAY_SET_UP_LINK` is a new
+  Message template.
+- **Behind `RAZORPAY_AUTOPAY`.** Off, nothing offers or promises autopay:
+  no "Send a set-up link", and `POST …/autopay/link` answers 403. A
+  mandate already made still shows on its subscription and can still be
+  cancelled (the flag's own rule).
+- **API before app, either is safe.** New read fields (`autopayCard`,
+  `autopayOn`) are ignored by the previous app, which keeps D12's line.
+  The new app on the previous API sees no card: today's line, no actions,
+  and the copy says "renews with an invoice" (the offer read 404s, so it
+  reads as not offered).
+- **Telling the customer (batch 2026-09-29, fix-pay).** "Cancel autopay"
+  on autopay the customer had on emails them through D17's path
+  (`AUTOPAY_CANCELLED`, a new Message template: the business's own email
+  provider, their bill-to or account address; a revoked consent suppresses
+  it) and posts in their account thread only where it is live
+  (`SITE_ACCOUNT_AREA` and `ACCOUNT_THREAD`). The cancel's answer gains
+  `told`; the previous app ignores it. A set-up never approved tells
+  nobody.
+- **Home's "Autopay limit too low" row** offers "Send a set-up link" beside
+  Retry by pay link (fix-pay): a row link to Subscription Detail with
+  `?do=autopay-link`, which opens the set-up sheet there. Only for
+  `subscription:write`, only while autopay is offered. The previous app
+  ignores the row's `link`; the new app on the previous API shows Retry
+  only.
+- **The Plan Editor** warns "Autopay covers up to ₹X; N members will need
+  to authorise again" when the price typed is above the autopay limit of
+  members booked to switch to the plan (D13, fix-pay). The plan's draft
+  read gains `autopayLimits`; an older API sends none and no warning shows.
+
+### Verify
+
+With the flag on for a development business: on a subscription without
+autopay, "Send a set-up link" → pick UPI → the link opens Razorpay's
+registration page for UPI (₹1 check, refunded); approving it turns the
+card to "Autopay on · UPI · …, set up by ‹name› from a set-up link ‹you›
+sent". "Cancel autopay" → "Autopay cancelled"; the next renewal is
+invoiced with a pay link and no `subscription.charge` job is queued. With
+the flag off, neither button shows and the dialogs say "renews with an
+invoice each period".
+
+### Rollback
+
+Deploy the previous API and app. PENDING mandates made by a set-up link
+stay and lapse after a week; one approved in the meantime is an ordinary
+ACTIVE mandate (D12's rules).
+
 ## Date-range indexes (review follow-up)
 
 **Migration** `20261015100000_calendar_range_indexes`: `Order
@@ -601,6 +921,388 @@ reminder; Undo within ten seconds sends nothing. A Member sees no buttons.
 ### Rollback
 
 Deploy the previous API or app; nothing is stored.
+
+## Z5: Home's old fields are removed (done, batch 2026-09-29)
+
+F3, F5, F6 and F7 served `GET /home`'s old fields beside the new ones for
+one release (default 130). B2d and those units are in production (#708), so
+Z5 removes the two no live app reads: **`primaryAction`** and **`numbers`**
+(with the reads behind them only: the CRM lead and contact counts, and the
+upcoming bookings count). No migration.
+
+- **Confirmed unused** before removing: neither is read by `app.saroh.in`
+  (in this branch or in #708's), `saroh.app`, `site-blocks` or `e2e` (only
+  the permissions API mock sent them; it no longer does).
+- **Kept on purpose:** `actions` (the workspace rail's badges read its
+  OVERDUE rows, `components/shared/app-shell.tsx`), `upcoming` (Needs you's
+  "Next" line) and `hasAnyModule` (the first-run screen). They are not
+  legacy while the app reads them.
+
+### Rollback
+
+Rolling the API back below this release is fine (it sends the two fields
+again, which the app ignores). **Rolling the workspace back below F5/F6
+(to an app from before #708) now breaks Home**: that app draws the numbers
+band from `home.numbers`, which this API no longer sends. Roll the API back
+with it.
+
+## F10b: a private limited company is stored as `pvt` (follow-up to F10)
+
+F10 (#708) shipped the readers: every API and app since reads `company` and
+`pvt` alike as Private limited, and still stored and sent `company`
+(boundary 9). F10b:
+
+- **The API stores `pvt`** for either spelling (`business-type.ts`), and
+  answers a row still stored as `company` as `pvt`. It still **accepts**
+  `company`, so an F10 app keeps saving; follow-up Z4 drops that a release
+  later.
+- **The app sends `pvt`.** It still reads `company` as Private limited
+  until Z4, in case the API is rolled back to F10 before the backfill runs.
+- **No migration.** A backfill CLI rewrites the stored rows
+  (`packages/database/src/backfill/business-type-pvt.ts`): only
+  `BusinessProfile.type = 'company'`, to `pvt`. Idempotent; prints counts
+  only.
+
+### Deploy
+
+1. **The API first.** F10's app sends `company`, which this API takes.
+2. **Then run the backfill** once the old image has stopped serving (it
+   stores `company` until then):
+
+    ```bash
+    DATABASE_URL=<production url> DATABASE_TARGET_CONFIRM=<database> \
+      pnpm --filter @saroh/database exec tsx src/backfill/business-type-pvt.cli.ts
+    ```
+
+    It prints
+    `[business-type-pvt] <database>: stored as company: <n>, rewritten to pvt: <n>, still company: <n>`.
+    "Still company" must be 0; if not, run it again.
+
+3. **Then the workspace** (`app.saroh.in`), which sends `pvt`.
+
+### Verify
+
+```sql
+SELECT count(*) FROM "BusinessProfile" WHERE type = 'company';  -- 0
+SELECT count(*) FROM "BusinessProfile" WHERE type = 'pvt';
+```
+
+A business that was `company` shows Private limited company in Settings, and
+saving another type records `type: pvt → <new>` in Activity.
+
+### Rollback
+
+Rolling the API back to F10 is safe: F10 reads `pvt` rows and stores
+`company` again, so re-run the backfill after re-deploying F10b. Rolling the
+app back to F10 is safe (it sends `company`, which this API maps to `pvt`).
+Below F10, the API refuses `pvt` and would not name those rows: don't, once
+the backfill has run. Z4 must wait until the query above reads 0 in
+production.
+
+## P1: a payment confirmed without its webhook (#710)
+
+A booking paid in Razorpay's test mode stayed "Awaiting payment" because
+its webhook never came (no secret configured), and the 15-minute hold ran
+out with the money taken. From this release the webhook is the backup,
+not the only way money is seen (`webhooks/payment-lookup.service.ts`):
+
+- **The checkout's signed return.** Every merchant-site window (booking
+  page, shop bag, plan join, pack purchase, the autopay window) posts what
+  the provider handed back to `POST /public/payments/return`. The API
+  checks Razorpay's `razorpay_signature` with the business's own key
+  secret (a bad one is a 400 and writes nothing), then **reads the payment
+  from Razorpay** — its order, `captured` status and amount must match the
+  intent — and settles it through the webhook's own reconciliation. A
+  Cashfree return is only the cue to ask Cashfree. Rate-limited per caller
+  and per provider order.
+- **The pending sweep** (`payments.confirm-pending`, every minute): open
+  intents are asked about from 3 minutes old, every 3 minutes while young,
+  then every 30 minutes, then every 6 hours, for 3 days. The hold release
+  asks about a hold's payment before letting it go; a provider that can't
+  answer keeps the hold up to an hour past its time.
+- **`payments reconcile`** for one business (below).
+
+Whichever of these and the webhook comes first settles the payment; the
+rest change nothing. A capture on a hold already released goes the
+existing way: confirmed when its place is still free, otherwise recorded
+as owed back (Home raises it until a refund is recorded).
+
+**Migration** `20261018230000_payment_intent_last_lookup`: nullable
+`PaymentIntent.lastLookupAt`, an index on `PaymentIntent (status,
+createdAt)`, and the partial unique index that keeps one waiting run of the
+sweep. Additive; the old API never reads or writes them.
+
+### Order
+
+**API first, then saroh.app.** The new pages post the return; on the old
+API that route is a 404, and the page waits for the webhook as before. The
+old pages never post it, and the new API's sweep still settles their
+payments.
+
+### Reconcile a stuck payment (the 2026-09-29 test booking)
+
+After the API is deployed, inside the API's own container (it needs the
+same database and the key that opens provider credentials):
+
+    node apps/api.saroh.in/dist/cli/payments-reconcile.cli.js <organization id or slug>
+
+It asks the provider about every open payment intent of that business and
+settles what the provider has. It prints counts only:
+
+    [payments-reconcile] open intents asked: <n>, settled: <n>, already settled: <n>, not paid: <n>, amount mismatch: <n>, no connection: <n>, provider errors: <n>
+
+Safe to run more than once and beside live webhooks; a second run asks
+only about what is still open. Exit 1 means a provider couldn't answer for
+some intent — run it again later. For the Northwind 15:00 booking: its hold
+was released, so the capture is recorded as owed back unless the slot was
+still free — then the booking is confirmed. Check Bookings and Home after.
+
+### Verify
+
+In Razorpay test mode on Northwind, with the webhook secret left unset:
+book a pay-now slot and pay. The booking page reads "You're booked" within
+a few seconds of the window closing, and the booking shows Paid online. Then
+set the webhook up and pay another: still one payment recorded (Order or
+invoice timeline shows one capture).
+
+### Rollback
+
+Deploy the previous API and app. Nothing to undo: the column and indexes
+stay, unread. A payment the new API settled stays settled.
+
+## Z2a: notes are text only (batch 2026-09-29; before Z2)
+
+Nothing reads or writes `ContactNoteAllergen` any more; the table stays
+until Z2, two deploys after this one. Allergies live on Needs attention
+(C1). No migration.
+
+- **API.** A note saves its text only and needs some ("Write a note.").
+  `allergenIds` is still accepted from an app from before Z2a: the note
+  never keeps them, and each one on the business's list goes on the
+  person's Needs attention (as C1 did), so an allergy picked there is not
+  lost. The note view still sends `allergens` / `matchAllergens`, always
+  empty, and leaves out old notes with no text (they held only allergens).
+  Customer Detail's `allergens` now lists Needs attention's Allergy
+  entries. Removing an allergen is refused only while a Needs attention
+  entry names it; old note rows naming it are cleared in the same
+  transaction (the table's foreign key is NoAction). The #529 catalogue
+  backfill clears, rather than moves, old note rows naming an allergen it
+  merges away.
+- **App.** The Notes tab has no allergen picker or chips. Order Detail's
+  fallback for an order read from before B15 reads the contact's Needs
+  attention, not the notes; the unchecked banner now says "Couldn't check
+  ‹first›'s allergies".
+- **Database package.** The C1 backfill (`contact-attention.ts` and its
+  CLI) is removed; the seed and the showcase write no note allergens, and
+  the showcase check counts today's allergy orders from Needs attention.
+
+### Before deploying
+
+The C1 backfill ran with the phase-1 release (`ROUND_2_PHASE_1_ROLLOUT.md`).
+Confirm no note allergen is missing from Needs attention (any state):
+
+```sql
+SELECT count(*) FROM "ContactNoteAllergen" na
+JOIN "ContactNote" n ON n.id = na."noteId"
+JOIN "StoreAllergen" a ON a.id = na."allergenId"
+WHERE NOT EXISTS (
+  SELECT 1 FROM "ContactAttention" e
+  LEFT JOIN "StoreAllergen" ea ON ea.id = e."allergenId"
+  WHERE e."contactId" = n."contactId" AND e.kind = 'ALLERGY'
+    AND lower(trim(coalesce(ea.name, e.label))) = lower(trim(a.name))
+);  -- 0
+```
+
+If it is not 0, run the C1 backfill from a checkout of a commit before Z2a
+(`src/backfill/contact-attention.cli.ts`), then check again.
+
+### Deploy
+
+API first, then the workspace. The previous app keeps working on this API:
+its picker's allergens go on Needs attention, and its chips are empty.
+
+### Rollback
+
+Rolling the API back is safe: the old API reads note allergens, and notes
+written since have none (their allergens are on Needs attention, which it
+also reads). Rolling the app back is safe while this API serves.
+
+### Z2 (two deploys later)
+
+Drop the table and model, the `ContactNoteDto.allergenIds` field, the
+empty `allergens` / `matchAllergens` on the note view, and the two
+`contactNoteAllergen.deleteMany` calls (`allergens.service.ts`,
+`backfill/catalogue-settings.ts`).
+
+## P3: order numbers are one series per business (#712, DEC-066)
+
+Every order — site checkout, New order and walk-ins, treatments booked
+online or at the desk — takes its number from the business's
+`OrderNumberSequence` row, locked and incremented in the order's own
+transaction (`nextOrderNumberInTx`). `ORD-001` format unchanged. Migration
+`20261019100000_order_number_sequence`, additive only: the table (RLS,
+`org_isolation`) and a nullable `Order.renumberedFrom`, which the Orders
+search and global search also match.
+
+### Deploy
+
+1. Migrate and deploy the API (saroh-deploy). A business's first order on
+   the new API starts after its highest `ORD-` number across its
+   storefronts, so the counter needs no backfill to be correct.
+2. Backfill, dry run first, then for real:
+
+    ```bash
+    … pnpm --filter @saroh/database exec tsx src/backfill/order-numbers.cli.ts --dry-run
+    … pnpm --filter @saroh/database exec tsx src/backfill/order-numbers.cli.ts
+    ```
+
+    It seeds each business's counter to its highest number (never lowers
+    one) and renumbers duplicates within a business: the oldest order keeps
+    its number, later ones take the next, and their old number goes into
+    `renumberedFrom`. Idempotent; a second run prints nothing to change.
+
+3. Deploy the workspace.
+
+### Rollback
+
+Safe. The previous image still numbers per storefront and can run beside
+this one; the allocator steps past any number it takes. Rolling back
+reintroduces per-storefront duplicates for new orders until this API is
+back; run the backfill again afterwards.
+
+### Later (the contract step)
+
+Once no previous image can run, run the backfill once more (it must print
+nothing to change), then add a unique index on (organization, number). It
+is in the waves plan's follow-up table as Z7.
+
+## WHSECRET: a payment connection needs its webhook signing secret (DEC-063)
+
+Razorpay signs its webhooks with a secret the merchant chooses when adding
+the webhook in its dashboard, separate from the key secret. Setup marked it
+"optional", so a connection could be saved without it, and every webhook
+for that business was then refused. From this release:
+
+- **Connecting Razorpay without the webhook secret is refused** (400: "Add
+  the webhook signing secret from Razorpay › Webhooks, so Saroh can confirm
+  payments."). Setup is guided steps: the keys, the business's webhook URL
+  with Copy and the events to tick, then the secret with "Generate one".
+  Cashfree signs with the key secret already entered and asks for nothing
+  more; a Cashfree connection with no saved webhook secret is now verified
+  with its key secret (until now every Cashfree webhook was refused too).
+- **No migration and no backfill.** The secret is the merchant's to add:
+  Saroh never had it. The flag comes from opening the sealed credentials in
+  memory (`webhook-setup.ts`, `lacksWebhookSecret`); a blob that can't be
+  opened (a seed's placeholder) isn't flagged.
+
+### What happens to existing connections
+
+A Razorpay connection saved before this, with no webhook secret, keeps its
+status (CONNECTED) and keeps taking payments:
+
+- **Settings › Providers** shows it as **Needs attention**: "Needs its
+  webhook signing secret — payments can't be confirmed until you add it",
+  with **Add webhook secret**, which reopens setup. The providers list
+  carries `webhookSecretMissing: true` for it.
+- **Payments readiness drops to `ATTENTION_REQUIRED`**
+  (`PAYMENTS_WEBHOOK_SECRET_MISSING`) when no connected provider can
+  confirm a payment, so the ready checklist reads "Finish connecting
+  payments — Add your webhook signing secret" and doesn't count payments as
+  ready. A business with a second, working connection stays `ACTIVE`.
+- **Checkout still opens on it.** Its payments are still confirmed without
+  the webhook since P1 (the checkout's signed return and the pending sweep,
+  above), so customers who pay are not left "Awaiting payment". What stays
+  unconfirmed without the webhook is what only the webhook reports: a
+  refund's `refund.processed` / `refund.failed`, and autopay's mandate
+  events. Blocking checkout on a connection with no secret is a follow-up,
+  not this release (waves plan, follow-up Z8): it can't be a query filter
+  (the secret is sealed), and turning it on at deploy would stop those
+  businesses taking online payments until each adds its secret.
+
+**API before app, either is safe.** The previous app's connect form sends
+the secret only when typed: on the new API a Razorpay connect without it is
+the 400 above, whose message says what to add. The previous app ignores
+`webhookSecretMissing` and the new readiness code (it shows a generic
+"needs attention" for `ATTENTION_REQUIRED`).
+
+### Before deploying: count the connections affected (read-only)
+
+The secret is sealed, so SQL can't read it. This counts the connected
+Razorpay accounts and, among them, those that **have never had a verified
+payment update**: the webhook inbox keeps only deliveries whose signature
+checked out, so every connection without a secret is in the second number
+(a new connection with no payments yet is too). Run it against production,
+read-only, and record both numbers in the release issue:
+
+```sql
+SELECT count(*) AS connected_razorpay,
+       count(*) FILTER (
+           WHERE NOT EXISTS (
+               SELECT 1 FROM "WebhookEvent" w
+               WHERE w."organizationId" = m."organizationId"
+                 AND w.provider = 'RAZORPAY'
+           )
+       ) AS never_confirmed_by_webhook
+FROM "MerchantPaymentProvider" m
+WHERE m.provider = 'RAZORPAY' AND m.status = 'CONNECTED';
+```
+
+The exact number is what the new API flags. After the deploy, count the
+businesses whose Settings › Providers reads Needs attention for Razorpay;
+the providers list for each (`GET organizations/:org/payment-providers`)
+carries `webhookSecretMissing`.
+
+### Telling merchants
+
+Before the deploy, list who to tell (read-only; names and ids only, no
+credentials):
+
+```sql
+SELECT o.id, o.name, o.slug
+FROM "MerchantPaymentProvider" m
+JOIN "Organization" o ON o.id = m."organizationId"
+WHERE m.provider = 'RAZORPAY' AND m.status = 'CONNECTED'
+  AND NOT EXISTS (
+      SELECT 1 FROM "WebhookEvent" w
+      WHERE w."organizationId" = m."organizationId"
+        AND w.provider = 'RAZORPAY'
+  )
+ORDER BY o.name;
+```
+
+- **In Saroh, from the deploy:** Settings › Providers' Needs attention row
+  and its **Add webhook secret**, and the ready checklist's "Finish
+  connecting payments". Nothing else is sent by Saroh.
+- **By the team, the same day:** write to each business's owner (from the
+  list above, after the deploy only those the API flags): "Saroh confirms
+  your Razorpay payments through a webhook. Open Settings › Providers in
+  Saroh, choose Add webhook secret on Razorpay, and follow the steps: add
+  the webhook URL shown there in Razorpay › Webhooks, tick the events
+  listed, and paste the same secret into both. Until then payments still
+  go through, but refunds aren't confirmed in Saroh automatically."
+- Record who was told and when in the release issue.
+
+### Verify
+
+1. With Razorpay test keys on a development business: connecting without a
+   webhook secret is refused with the message above; with one, it connects.
+2. A connection saved without a secret (the old way) reads Needs attention
+   with Add webhook secret, and Payments readiness is
+   `ATTENTION_REQUIRED` with `PAYMENTS_WEBHOOK_SECRET_MISSING`.
+3. Add the secret through Add webhook secret, register the URL in
+   Razorpay's test dashboard, pay a test booking: Settings › Providers
+   reads "Last payment update from Razorpay: …" a moment ago, and
+   readiness is `ACTIVE`.
+4. After a day, the "never confirmed" query's second number has dropped by
+   each business that added its secret and has since taken a payment.
+
+### Rollback
+
+Deploy the previous API and app. Nothing was written: secrets merchants
+added in the meantime stay sealed in their connections and keep working,
+since the previous API already verifies with a saved webhook secret.
+(A Cashfree connection without one goes back to refusing its webhooks; P1
+still confirms its payments.)
 
 ## Before switching a flag on (advisory)
 

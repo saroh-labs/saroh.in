@@ -1,6 +1,9 @@
+// @covers accounts:/login app:/open app:/commerce/orders app:/commerce/orders/tickets api:orders api:payments api:customer-workspace
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { makeOrder } from "../fixtures/own-data";
+import { useSession } from "../fixtures/sessions";
 import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
 
 /**
@@ -9,12 +12,18 @@ import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
  * said in words, the age or "Late", the unpaid line, and paging by the API's
  * cursor — against the seeded stack.
  *
- * Read-only: nothing here writes. Northwind Supply is the generic dev
- * business; Rye & Co. is a film set and is only read, by its Member.
+ * Counts, pages and "the first row" are read on Rye & Co., as its owner:
+ * a film set, which no test writes to, so what the API said a moment ago is
+ * still what the screen draws. Northwind's orders are made and moved by the
+ * order specs running beside this one. The writes here — a step and its
+ * Undo, a new pay link — go to Northwind, on orders each test makes itself
+ * (`fixtures/own-data.ts`).
  */
 
 const NORTHWIND = "seed_org";
 const RYE = "seed_sc_rc_org";
+/** Where lists and counts are read: nothing changes them mid-test. */
+const LISTS = RYE;
 
 const member = {
     email: "nisha.kulkarni@saroh.dev",
@@ -39,13 +48,7 @@ interface ListPage {
 }
 
 async function signIn(page: Page, who = demoUser) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
-    await page.getByLabel("Email").fill(who.email);
-    await page.getByLabel("Password", { exact: true }).fill(who.password);
-    await page.getByRole("button", { name: "Log in" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
-        timeout: 30_000,
-    });
+    await useSession(page, who);
 }
 
 async function memberPage(browser: Browser): Promise<Page> {
@@ -79,6 +82,27 @@ const orders = (page: Page) =>
  */
 const cards = (page: Page) => (page.viewportSize()?.width ?? 1440) < 760;
 
+/**
+ * The filter bar at this width (B4, B5). At the desk it is on the page; on a
+ * phone it sits in a sheet behind the Filters button, which this opens. The
+ * button is drawn once per layout (hidden at the desk), so only the visible
+ * one is pressed.
+ */
+async function filterBar(page: Page) {
+    if (cards(page)) {
+        await page
+            .getByRole("button", { name: /^Filters/ })
+            .filter({ visible: true })
+            .click();
+        return page
+            .getByRole("dialog", { name: "Filter orders" })
+            .getByRole("group", { name: "Filter orders" });
+    }
+    return page
+        .getByRole("group", { name: "Filter orders" })
+        .filter({ visible: true });
+}
+
 const tab = (page: Page, name: string) =>
     page.getByRole("navigation", { name: "Orders" }).getByRole("link", {
         name: new RegExp(`^${name}`),
@@ -89,9 +113,9 @@ test.describe("orders list", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const all = await list(page, NORTHWIND);
-        const open = await list(page, NORTHWIND, "&tab=open");
+        await page.goto(`/open/${LISTS}`);
+        const all = await list(page, LISTS);
+        const open = await list(page, LISTS, "&tab=open");
 
         await page.goto("/commerce/orders");
         await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
@@ -127,7 +151,7 @@ test.describe("orders list", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto(`/open/${LISTS}`);
         const q = "no-such-order-b7";
         await page.goto(`/commerce/orders?q=${q}`);
         await expect(
@@ -142,8 +166,8 @@ test.describe("orders list", () => {
 
     test("an empty tab says what would land there", async ({ page }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const refunded = await list(page, NORTHWIND, "&tab=refunded");
+        await page.goto(`/open/${LISTS}`);
+        const refunded = await list(page, LISTS, "&tab=refunded");
         test.skip(refunded.rows.length > 0, "Northwind has refunds here.");
 
         await page.goto("/commerce/orders?tab=refunded");
@@ -156,10 +180,10 @@ test.describe("orders list", () => {
 
     test("a late Pick-up order reads Late, in words", async ({ page }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto(`/open/${LISTS}`);
         const late = await list(
             page,
-            NORTHWIND,
+            LISTS,
             "&tab=open&late=true&fulfilment=PICKUP",
         );
         const order = late.rows.at(0);
@@ -184,8 +208,8 @@ test.describe("orders list", () => {
 
     test("pages by the cursor, and back", async ({ page }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const first = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const first = await list(page, LISTS);
         test.skip(!first.nextCursor, "Fewer than one page of orders here.");
 
         await page.goto("/commerce/orders");
@@ -206,12 +230,12 @@ test.describe("orders list", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");
-        const filter = page.getByRole("button", { name: /Storefront filter/ });
+        const filter = page.getByRole("button", { name: /Location filter/ });
         const row = orders(page).getByRole("listitem").first();
         // Counting the filter before the list is drawn counts nothing.
         await expect(row).toBeVisible();
@@ -226,13 +250,13 @@ test.describe("orders list", () => {
         }
     });
 
-    test("on a phone the rows stack, and the whole row opens the order", async ({
+    test("on a phone the rows stack, and the whole row opens its quick view (B5)", async ({
         page,
     }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");
@@ -244,15 +268,71 @@ test.describe("orders list", () => {
         }));
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
 
-        // Tap the card away from the name: the link's hit area is the card.
-        // The filter bar (B4) can push the first card under the tab bar, so
-        // bring it to the middle of the screen, clear of the fixed tab bar.
+        // The filters are behind one button now (B5), so the first card
+        // starts above the fold rather than under a wall of menus.
+        const top = await card.boundingBox();
+        expect(top).not.toBeNull();
+        expect((top?.y ?? 9999) + 40).toBeLessThan(844 - 53);
+
+        // Tap the card away from the name: the button's hit area is the
+        // card, and it opens the quick view as a sheet, not the page.
         await card.evaluate((el) => el.scrollIntoView({ block: "center" }));
         const box = await card.boundingBox();
         expect(box).not.toBeNull();
         if (!box) return;
         await page.mouse.click(box.x + box.width - 12, box.y + box.height - 8);
+        const sheet = page.getByRole("dialog");
+        await expect(sheet).toBeVisible();
+        await expect(page).toHaveURL(/\/commerce\/orders(\?|$)/);
+        await expect(sheet).toContainText(`#${rows[0]?.orderId ?? ""}`);
+        const full = sheet.getByRole("link", { name: /Open full page/ });
+        await expect(full).toBeVisible();
+        await full.click();
         await expect(page).toHaveURL(/\/commerce\/orders\/[^/?]+/);
+    });
+
+    test("on a phone the filters open from one button, and say how many are on (B5)", async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await signIn(page);
+        await page.goto(`/open/${LISTS}`);
+        await page.goto("/commerce/orders");
+
+        // No filter menus on the page itself at this width.
+        await expect(
+            page.getByRole("group", { name: "Filter orders" }),
+        ).toHaveCount(0);
+        const button = page
+            .getByRole("button", { name: /^Filters/ })
+            .filter({ visible: true });
+        await expect(button).toHaveCount(1);
+        await expect(button).toHaveAttribute("aria-label", "Filters");
+        await expect(button).toHaveCSS("cursor", "pointer");
+
+        await button.click();
+        const sheet = page.getByRole("dialog", { name: "Filter orders" });
+        await expect(sheet).toBeVisible();
+        const bar = sheet.getByRole("group", { name: "Filter orders" });
+        await expect(bar.getByRole("combobox", { name: "Date" })).toBeVisible();
+        await bar.getByRole("button", { name: "Late" }).click();
+        await expect(page).toHaveURL(/late=true/);
+        await expect(bar.getByRole("button", { name: "Late" })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
+
+        await sheet.getByRole("button", { name: "Done" }).click();
+        await expect(sheet).toHaveCount(0);
+        await expect(button).toHaveAttribute("aria-label", "Filters, 1 on");
+
+        // Clear filters, from the sheet, empties the address.
+        await button.click();
+        await page
+            .getByRole("dialog", { name: "Filter orders" })
+            .getByRole("button", { name: "Clear filters" })
+            .click();
+        await expect(page).not.toHaveURL(/late=/);
     });
 
     test("the kitchen sees the pill and progress, and no money", async ({
@@ -313,13 +393,104 @@ async function filterOptions(page: Page, org: string): Promise<FilterOptions> {
     return (await res.json()) as FilterOptions;
 }
 
+/**
+ * A treatment's row says its next visit (B14, DEC-067): "Next 19 Sep,
+ * 10:00", or "Next visit not booked". Kavi Dental is a film set: read only.
+ */
+test.describe("a treatment's next visit on the row (B14)", () => {
+    const KAVI = "seed_sc_kavi_org";
+
+    test("each open treatment's row says when its next visit is", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${KAVI}`);
+        const { rows } = await list(page, KAVI, "&tab=open");
+        const treatments = (
+            rows as (Row & {
+                nextVisit?: { startAt: string; timezone: string } | null;
+            })[]
+        ).filter(
+            (r) =>
+                r.fulfilmentType.startsWith("APPOINTMENT_") &&
+                r.nextVisit !== undefined,
+        );
+        test.skip(treatments.length === 0, "No open treatments on Kavi.");
+
+        await page.goto("/commerce/orders?tab=open");
+        for (const t of treatments.slice(0, 3)) {
+            const row = orders(page)
+                .getByRole("listitem")
+                .filter({ hasText: `#${t.orderId}` });
+            await expect(row).toContainText(
+                t.nextVisit
+                    ? /Next (today|yesterday|\d{1,2} \w{3})/
+                    : "Next visit not booked",
+            );
+            await expect(row).not.toContainText(/\bLate\b/);
+        }
+    });
+
+    test("at the desk, a row's status never runs into its Placed column", async ({
+        page,
+    }) => {
+        test.skip(cards(page), "The phone draws cards, not columns.");
+        await signIn(page);
+        // Kavi's rows carry "Next 2 Oct, 10:45" and an unpaid line; Rye's a
+        // "Handed to courier" pill: the longest words the column holds.
+        for (const org of [KAVI, RYE]) {
+            await page.goto(`/open/${org}`);
+            await page.goto("/commerce/orders");
+            await expect(
+                orders(page).getByRole("listitem").first(),
+            ).toBeVisible();
+            await expect
+                .poll(() =>
+                    page.evaluate(() => {
+                        const hits: string[] = [];
+                        const list = [
+                            ...document.querySelectorAll(
+                                'ul[aria-label="Orders"]',
+                            ),
+                        ].find((l) => (l as HTMLElement).offsetParent !== null);
+                        for (const li of list?.querySelectorAll(
+                            ":scope > li",
+                        ) ?? []) {
+                            const cells = [...li.children];
+                            // From the end: status, placed, total, the menu.
+                            if (cells.length < 4) continue;
+                            const status = cells[cells.length - 4];
+                            const placed = cells[cells.length - 3];
+                            const range = document.createRange();
+                            range.selectNodeContents(placed);
+                            const p = range.getBoundingClientRect();
+                            for (const el of status.querySelectorAll("*")) {
+                                if (el.children.length > 0) continue;
+                                const r = el.getBoundingClientRect();
+                                const meets =
+                                    r.width > 0 &&
+                                    r.right > p.left + 0.5 &&
+                                    r.left < p.right &&
+                                    r.bottom > p.top &&
+                                    r.top < p.bottom;
+                                if (meets) hits.push(String(el.textContent));
+                            }
+                        }
+                        return hits;
+                    }),
+                )
+                .toEqual([]);
+        }
+    });
+});
+
 test.describe("orders list filters (B4)", () => {
     test("step, fulfilment and date filters survive a reload", async ({
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const options = await filterOptions(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const options = await filterOptions(page, LISTS);
         const type = options.types.at(0);
         const step = options.steps.find(
             (s) => type && s.types.includes(type.type),
@@ -330,13 +501,13 @@ test.describe("orders list filters (B4)", () => {
         const address = `step=${step.key}&fulfilment=${type.type.toLowerCase()}&date=month`;
         const expected = await list(
             page,
-            NORTHWIND,
+            LISTS,
             `&step=${step.key}&fulfilment=${type.type}&date=month`,
         );
         await page.goto(`/commerce/orders?${address}`);
         await page.reload();
         await expect(page).toHaveURL(new RegExp(`step=${step.key}`));
-        const bar = page.getByRole("group", { name: "Filter orders" });
+        const bar = await filterBar(page);
         await expect(bar.getByRole("combobox", { name: "Step" })).toContainText(
             step.label,
         );
@@ -346,6 +517,7 @@ test.describe("orders list filters (B4)", () => {
         await expect(bar.getByRole("combobox", { name: "Date" })).toContainText(
             "This month",
         );
+        if (cards(page)) await page.keyboard.press("Escape");
         await expect(tab(page, "All")).toContainText(
             String(expected.counts.all),
         );
@@ -364,8 +536,8 @@ test.describe("orders list filters (B4)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const empty = await list(page, NORTHWIND, "&step=teleported");
+        await page.goto(`/open/${LISTS}`);
+        const empty = await list(page, LISTS, "&step=teleported");
         expect(empty.counts.all).toBe(0);
 
         await page.goto("/commerce/orders?step=teleported&date=today");
@@ -382,9 +554,9 @@ test.describe("orders list filters (B4)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
+        await page.goto(`/open/${LISTS}`);
         await page.goto("/commerce/orders");
-        const bar = page.getByRole("group", { name: "Filter orders" });
+        const bar = await filterBar(page);
         const late = bar.getByRole("button", { name: "Late" });
         await expect(late).toHaveAttribute("aria-pressed", "false");
         await late.click();
@@ -398,7 +570,9 @@ test.describe("orders list filters (B4)", () => {
         await expect(attention).toHaveAttribute("aria-pressed", "true");
         await page.reload();
         await expect(
-            bar.getByRole("button", { name: "Needs attention" }),
+            (await filterBar(page)).getByRole("button", {
+                name: "Needs attention",
+            }),
         ).toHaveAttribute("aria-pressed", "true");
     });
 
@@ -410,11 +584,12 @@ test.describe("orders list filters (B4)", () => {
         await page.goto(`/open/${RYE}`);
         await page.goto("/commerce/orders?attention=true");
         const tag = page
-            .getByRole("img", { name: /Needs attention: Allergy: Sesame/ })
+            .getByRole("img", { name: /^Allergy: Sesame/ })
             .locator("visible=true")
             .first();
         await expect(tag).toBeVisible();
-        await expect(tag).toHaveText(/Allergy: Sesame/);
+        // The tag reads "Sesame", as the design shows (DEC-067).
+        await expect(tag).toHaveText(/^Sesame( \+\d+)?$/);
         await expect(
             page.getByRole("img", { name: /Needs attention couldn't/ }),
         ).toHaveCount(0);
@@ -429,8 +604,8 @@ test.describe("orders list filters (B4)", () => {
 test.describe("orders quick view and row menu (B5)", () => {
     test.beforeEach(async ({ page }, testInfo) => {
         test.skip(
-            testInfo.project.name === "phone",
-            "The quick view and row menu are drawn from 760px only; a phone's card opens the order's page.",
+            testInfo.project.name.startsWith("phone"),
+            "The row menu is drawn from 760px only; a phone's card opens the same quick view as a sheet, tested above.",
         );
         await page.setViewportSize({ width: 1440, height: 900 });
     });
@@ -450,8 +625,8 @@ test.describe("orders quick view and row menu (B5)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         const top = rows.at(0);
         test.skip(!top, "No orders here.");
         if (!top) return;
@@ -467,6 +642,19 @@ test.describe("orders quick view and row menu (B5)", () => {
         await expect(
             panel.getByRole("link", { name: /Open full page/ }),
         ).toBeVisible();
+        // As the design draws it (DEC-073): Close is a plain X, and a
+        // customer with a record is a Saffron link to it.
+        const close = panel.getByRole("button", { name: "Close quick view" });
+        await expect(close).toBeVisible();
+        await expect(close).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+        const customer = panel
+            .getByRole("definition")
+            .getByRole("link")
+            .first();
+        if (await customer.count()) {
+            await expect(customer).toHaveAttribute("href", /\/customers\//);
+            await expect(customer).toHaveClass(/text-brand/);
+        }
 
         await page.keyboard.press("Escape");
         await expect(panel).toHaveCount(0);
@@ -479,8 +667,8 @@ test.describe("orders quick view and row menu (B5)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         const top = rows.at(0);
         test.skip(!top, "No orders here.");
         if (!top) return;
@@ -506,16 +694,12 @@ test.describe("orders quick view and row menu (B5)", () => {
     }) => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(
-            page,
-            NORTHWIND,
-            "&tab=open&step=preparing",
-        );
-        const target = rows.find((r) => r.fulfilmentType === "PICKUP");
-        test.skip(!target, "Needs a Pick-up order at Preparing on Northwind.");
-        if (!target) return;
+        // A Pick-up order of its own at Preparing: the newest, so the top of
+        // the list's first page. Open, not "Preparing": once it is Ready a
+        // Preparing list drops the row, and its quick view with it.
+        const target = await makeOrder(page.request, { stage: "PREPARING" });
 
-        await page.goto("/commerce/orders?tab=open&step=preparing");
+        await page.goto("/commerce/orders?tab=open");
         await openerOf(page, target.orderId).click();
         const panel = quickView(page);
         await panel.getByRole("button", { name: "Mark ready" }).click();
@@ -525,7 +709,6 @@ test.describe("orders quick view and row menu (B5)", () => {
             "Ready",
         );
         await page.keyboard.press("Escape");
-        // Put it back, so the next run finds it where it was.
         await page.getByRole("button", { name: "Undo" }).click();
         await expect(
             page.getByText(`#${target.orderId} is back to preparing.`),
@@ -536,8 +719,8 @@ test.describe("orders quick view and row menu (B5)", () => {
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         const top = rows.at(0);
         test.skip(!top, "No orders here.");
         if (!top) return;
@@ -598,14 +781,8 @@ test.describe("orders quick view and row menu (B5)", () => {
     }) => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(
-            page,
-            NORTHWIND,
-            "&tab=open&payment=UNPAID",
-        );
-        const target = rows.at(0);
-        test.skip(!target, "Needs an unpaid open order on Northwind.");
-        if (!target) return;
+        // An unpaid open order of its own: the newest, on the first page.
+        const target = await makeOrder(page.request, { paid: false });
 
         // A link made first, through the API, as Order Detail would.
         const first = await page.request.post(
@@ -656,7 +833,7 @@ test.describe("orders quick view and row menu (B5)", () => {
 test.describe("orders bulk kitchen moves (B6)", () => {
     test.beforeEach(async ({ page }, testInfo) => {
         test.skip(
-            testInfo.project.name === "phone",
+            testInfo.project.name.startsWith("phone"),
             "Drawn at the desk here; the phone's cards carry the same box.",
         );
         await page.setViewportSize({ width: 1440, height: 900 });
@@ -676,18 +853,11 @@ test.describe("orders bulk kitchen moves (B6)", () => {
     }) => {
         await signIn(page);
         await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(
-            page,
-            NORTHWIND,
-            "&tab=open&step=preparing",
-        );
-        const picked = rows
-            .filter((r) => r.fulfilmentType === "PICKUP")
-            .slice(0, 2);
-        test.skip(
-            picked.length < 2,
-            "Needs two Pick-up orders at Preparing on Northwind.",
-        );
+        // Two Pick-up orders of its own at Preparing, newest on the list.
+        const picked = [
+            await makeOrder(page.request, { stage: "PREPARING" }),
+            await makeOrder(page.request, { stage: "PREPARING" }),
+        ];
 
         await page.goto("/commerce/orders?tab=open&step=preparing");
         for (const r of picked) {
@@ -719,12 +889,69 @@ test.describe("orders bulk kitchen moves (B6)", () => {
         }
     });
 
+    test("Print tickets (N) opens the selected orders' tickets, oldest first, one to a page", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
+        const picked = rows
+            .filter(
+                (r) => (r as Row & { ticketName?: string | null }).ticketName,
+            )
+            .slice(0, 2);
+        test.skip(picked.length < 2, "Needs two orders with a ticket.");
+
+        await page.goto("/commerce/orders");
+        for (const r of picked) {
+            await rowOf(page, r.orderId)
+                .getByRole("checkbox", {
+                    name: `Select order number ${r.orderId}`,
+                })
+                .click();
+        }
+        const print = bar(page).getByRole("link", {
+            name: "Print tickets (2)",
+        });
+        await expect(print).toBeVisible();
+        await expect(print).toHaveAttribute("target", "_blank");
+        await expect(print).toHaveCSS("cursor", "pointer");
+        const href = await print.getAttribute("href");
+        expect(href).toContain("/commerce/orders/tickets?ids=");
+
+        // The print dialog is the browser's: count the call, don't open it.
+        await page.addInitScript(() => {
+            (window as unknown as { printed: number }).printed = 0;
+            window.print = () => {
+                (window as unknown as { printed: number }).printed += 1;
+            };
+        });
+        await page.goto(href ?? "/");
+        await expect(
+            page.getByRole("heading", { name: "2 tickets" }),
+        ).toBeVisible();
+        const tickets = page
+            .getByRole("list", { name: "Tickets" })
+            .getByRole("article");
+        await expect(tickets).toHaveCount(2);
+        // Oldest first: the list is newest first, so the order flips.
+        const oldest = [...picked].reverse();
+        await expect(tickets.first()).toContainText(`#${oldest[0]?.orderId}`);
+        await expect
+            .poll(() =>
+                page.evaluate(
+                    () => (window as unknown as { printed: number }).printed,
+                ),
+            )
+            .toBe(1);
+    });
+
     test("select every row by keyboard, and Clear empties the selection", async ({
         page,
     }) => {
         await signIn(page);
-        await page.goto(`/open/${NORTHWIND}`);
-        const { rows } = await list(page, NORTHWIND);
+        await page.goto(`/open/${LISTS}`);
+        const { rows } = await list(page, LISTS);
         test.skip(rows.length === 0, "No orders here.");
 
         await page.goto("/commerce/orders");

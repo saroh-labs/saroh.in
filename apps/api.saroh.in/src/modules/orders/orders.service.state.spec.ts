@@ -40,13 +40,27 @@ jest.mock("@saroh/database", () => {
     const $queryRaw = jest.fn().mockResolvedValue([]);
     // A status change is a step on the order's timeline (ADR-008).
     const orderEvent = { create: jest.fn() };
+    // Marking paid first asks whether it is being paid online (#622): here
+    // no visit is held and no payment is going through.
+    const booking = { findFirst: jest.fn().mockResolvedValue(null) };
+    const paymentIntent = { findFirst: jest.fn().mockResolvedValue(null) };
     return {
         prisma: {
             order,
             inventory,
             orderEvent,
+            booking,
+            paymentIntent,
             $transaction: jest.fn((cb) =>
-                cb({ order, inventory, orderItem, orderEvent, $queryRaw }),
+                cb({
+                    order,
+                    inventory,
+                    orderItem,
+                    orderEvent,
+                    booking,
+                    paymentIntent,
+                    $queryRaw,
+                }),
             ),
         },
     };
@@ -188,6 +202,30 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             ORDER,
             { method: "RECORDED" },
         );
+        // Paid at the counter: its pay link stops working, so nobody can
+        // pay twice (B11, DEC-067).
+        expect(
+            (prisma.order as unknown as { updateMany: jest.Mock }).updateMany,
+        ).toHaveBeenCalledWith({
+            where: { id: ORDER, payTokenHash: { not: null } },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
+        });
+    });
+
+    it("re-recording an order already paid leaves its link alone", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PENDING",
+            paymentStatus: "PAID",
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "PAID",
+        });
+        expect(
+            (prisma.order as unknown as { updateMany: jest.Mock }).updateMany,
+        ).not.toHaveBeenCalled();
     });
 
     it("a refund recorded by hand credits what is left of the invoice", async () => {

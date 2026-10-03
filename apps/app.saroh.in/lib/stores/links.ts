@@ -4,20 +4,20 @@
  */
 const q = (id: string) => `?storefront=${encodeURIComponent(id)}`;
 
-export const newStorefrontHref = "/commerce/storefronts/new";
+export const newStorefrontHref = "/commerce/locations/new";
 
 export function storefrontHref(storeId: string): string {
-    return `/commerce/storefronts${q(storeId)}`;
+    return `/commerce/locations${q(storeId)}`;
 }
 
 /** Its address, description and logo. */
 export function storefrontDetailsHref(storeId: string): string {
-    return `/commerce/storefronts/${encodeURIComponent(storeId)}/details`;
+    return `/commerce/locations/${encodeURIComponent(storeId)}/details`;
 }
 
 /** Who may work on it, and invitations to it. */
 export function storefrontPeopleHref(storeId: string): string {
-    return `/commerce/storefronts/${encodeURIComponent(storeId)}/people`;
+    return `/commerce/locations/${encodeURIComponent(storeId)}/people`;
 }
 
 /** The Categories tab of Product settings (#470) — the business's (#529). */

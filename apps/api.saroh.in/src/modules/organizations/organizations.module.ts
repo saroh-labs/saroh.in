@@ -13,6 +13,8 @@ import { OrganizationSettingsService } from "./organization-settings.service";
 import { OrganizationsController } from "./organizations.controller";
 import { PublicInvitationsController } from "./public-invitations.controller";
 import { StorefrontTeamNoticeService } from "./storefront-team-notice.service";
+import { WebAddressController } from "./web-address.controller";
+import { WebAddressService } from "./web-address.service";
 
 /**
  * Organization onboarding and settings (S1-003 / S1-004).
@@ -40,6 +42,8 @@ import { StorefrontTeamNoticeService } from "./storefront-team-notice.service";
         OrganizationMembersController,
         PublicInvitationsController,
         OrganizationRolesController,
+        // DEC-069 (L2): the web address, its links, and changing it.
+        WebAddressController,
     ],
     providers: [
         OrganizationOnboardingService,
@@ -47,6 +51,7 @@ import { StorefrontTeamNoticeService } from "./storefront-team-notice.service";
         OrganizationMembersService,
         OrganizationRolesService,
         StorefrontTeamNoticeService,
+        WebAddressService,
     ],
     // The members service is exported for the admin console, whose operators
     // change a person's place in a business under the business's own rules.

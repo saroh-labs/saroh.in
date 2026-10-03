@@ -31,7 +31,7 @@ import type { HelpTopic } from "@/lib/help/links";
 import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
 import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
-import { searchSettings } from "@/lib/settings/search";
+import { searchSettings, settingsPageLabel } from "@/lib/settings/search";
 
 import type { NavAction, NavRole } from "./nav-items";
 import {
@@ -184,12 +184,12 @@ const ACTIONS: {
         href: "/billing/invoices/new",
         label: "New invoice",
         icon: ReceiptText,
-        moduleKey: "PAYMENTS",
+        // Invoicing needs no module (DEC-070): only the permission.
         action: "invoice:write",
     },
     {
-        href: "/commerce/storefronts/new",
-        label: "New storefront",
+        href: "/commerce/locations/new",
+        label: "New location",
         icon: Store,
         moduleKey: "COMMERCE",
         limit: "storefront",
@@ -227,8 +227,17 @@ export function CommandMenu({
     sites = [],
     storefronts = null,
     stockTracked = null,
+    roleKey = null,
+    kind,
 }: {
     moduleKeys?: string[] | null;
+    /**
+     * What is being set up (DEC-070): the Business settings page is "Your
+     * details" for Just me and A site for my work.
+     */
+    kind?: string;
+    /** The role as stored; see `navFor`. */
+    roleKey?: string | null;
     /** The actor's role here; `null` = unknown, and the palette fails open. */
     role?: NavRole | null;
     /**
@@ -244,7 +253,7 @@ export function CommandMenu({
     sites?: { id: string; name: string }[];
     /**
      * How many storefronts the business has and may have; `null` = unknown,
-     * and "New storefront" is offered.
+     * and "New location" is offered.
      */
     storefronts?: StorefrontAllowance | null;
     /** The business tracks stock; off, Sell › Stock is not offered. */
@@ -257,6 +266,7 @@ export function CommandMenu({
     const [searching, setSearching] = useState(false);
     const groups = navFor({
         role,
+        roleKey,
         actions: permissions,
         moduleKeys,
         sites,
@@ -502,10 +512,21 @@ export function CommandMenu({
                  * "GSTIN" goes to Business, on its tax tab.
                  */}
                 {(() => {
-                    const actor = { role, actions: permissions };
-                    const pages = settingsPagesFor(actor).filter(
-                        (page) => matches("Settings") || matches(page.label),
-                    );
+                    const actor = {
+                        role,
+                        actions: permissions,
+                        modules: moduleKeys,
+                        kind,
+                    };
+                    const pages = settingsPagesFor(actor)
+                        .map((page) => ({
+                            ...page,
+                            label: settingsPageLabel(page, kind),
+                        }))
+                        .filter(
+                            (page) =>
+                                matches("Settings") || matches(page.label),
+                        );
                     const settings = needle
                         ? searchSettings(needle, actor, {
                               limit: 5,

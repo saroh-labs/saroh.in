@@ -5,6 +5,7 @@
  */
 import { prisma } from "@saroh/database";
 
+import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { pausesWaitingOnPayments } from "../home/home-pause-sources";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -26,6 +27,7 @@ async function makeOrg(slug: string): Promise<OrganizationContext> {
     const created = await prisma.organization.create({
         data: { name: slug, slug: `${slug}-${process.pid}` },
     });
+    await giveBusinessDetails(created.id);
     return { organizationId: created.id, userId: "user_1", role: "OWNER" };
 }
 
@@ -1141,6 +1143,8 @@ describe("retrying a failed charge (review S-5, real database)", () => {
             data: {
                 organizationId: shop.organizationId,
                 provider: "RAZORPAY",
+                // A pay link needs one that opens checkout (B11, D22).
+                publicKey: "rzp_test_Retry1",
                 encryptedCredentials: "x",
                 credentialsIv: "x",
                 credentialsAuthTag: "x",

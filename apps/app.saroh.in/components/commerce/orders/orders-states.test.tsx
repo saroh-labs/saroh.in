@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { readOrdersQuery } from "@/lib/orders/list-query";
+import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
 
 import {
     OrderLocked,
@@ -113,24 +114,42 @@ describe("OrdersEmpty", () => {
         expect(html).not.toContain('role="alert"');
     });
 
-    it("offers Share your storefront on the first run only when a site is live (B8)", () => {
-        const share = (params: Record<string, string>, url: string | null) =>
+    it("shares the online shop, else the website, on the first run only (L8)", () => {
+        const links = (shop: string | null, site: string | null) => ({
+            links: { site, shop, book: null },
+        });
+        const share = (
+            params: Record<string, string>,
+            read: ReturnType<typeof links> | null,
+        ) =>
             renderToStaticMarkup(
                 <OrdersEmpty
                     query={readOrdersQuery(params)}
                     storeName="Hill Road"
                     go={noop}
-                    shareUrl={url}
+                    share={shareLink(read, ORDERS_FIRST_RUN)}
                 />,
             );
-        expect(share({}, "https://rye.saroh.app")).toContain(
-            "Share your storefront",
+        // The shop is live: it is what gets shared.
+        const shop = share(
+            {},
+            links("https://rye.saroh.app/shop", "https://rye.saroh.app"),
         );
-        // No live site: nothing to share, so no button.
-        expect(share({}, null)).not.toContain("Share your storefront");
+        expect(shop).toContain("Share your online shop");
+        expect(shop).not.toContain("Share your website");
+        // Only the website is live.
+        expect(share({}, links(null, "https://rye.saroh.app"))).toContain(
+            "Share your website",
+        );
+        // Nothing live, or the read unknown: nothing to share, so no button.
+        expect(share({}, links(null, null))).not.toContain("Share your");
+        expect(share({}, null)).not.toContain("Share your");
         // Another empty view keeps its own way back.
-        const open = share({ tab: "open" }, "https://rye.saroh.app");
-        expect(open).not.toContain("Share your storefront");
+        const open = share(
+            { tab: "open" },
+            links("https://rye.saroh.app/shop", "https://rye.saroh.app"),
+        );
+        expect(open).not.toContain("Share your");
         expect(open).toContain("View all orders");
     });
 

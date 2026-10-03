@@ -249,3 +249,38 @@
         margin: 18mm;
     }
 }
+
+/* =============================================================================
+   PRINTING TICKETS (plan B, B6)
+   =============================================================================
+
+   Several orders' tickets from the Orders list, one to a page: dark ink on
+   white paper whatever the screen shows, as the invoice pins its own, and
+   a page break after each ticket but the last. */
+@media print {
+    body:has(.ticket-print) * {
+        background-color: transparent !important;
+    }
+    .ticket-print,
+    .ticket-print * {
+        color: #1c1c1a !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    .ticket-print .border-foreground {
+        border-color: #1c1c1a !important;
+    }
+    .ticket-print .border-border {
+        border-color: #d9d6cc !important;
+    }
+    .ticket-print .text-muted-foreground {
+        color: #5c5850 !important;
+    }
+    .ticket-print .ticket-page {
+        break-after: page;
+        break-inside: avoid;
+    }
+    .ticket-print .ticket-page:last-child {
+        break-after: auto;
+    }
+}

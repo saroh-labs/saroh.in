@@ -17,6 +17,12 @@ Readiness (`SETUP_REQUIRED`/`ACTIVE`/`ATTENTION_REQUIRED`) is derived, never sto
 | `MODULE_*` rollout flags | FeatureFlag registry (per module) | off     | Saroh-side kill switch per module surface                                                                                                                                                     |
 | `MODULE_ENFORCEMENT`     | env (api)                         | unset   | When `1`/`true`, `ModuleEnforcementGuard` actually refuses unavailable modules. Runtime kill-switch (live `process.env` read, mirrors `RLS_ENFORCEMENT`). Declared in `turbo.json` globalEnv. |
 
+A module can also be **hidden** in code (`hidden: true` in `module-registry.ts`,
+DEC-068): it reads as rolled out to nobody, whatever its flag says, so no flag
+change shows it. Automations is hidden until it has a screen; a business that
+already had it on keeps its setting, and its rules keep running. To show it,
+remove `hidden` in a release.
+
 The frontend nav (`filterNavGroups`) is **fail-open**: while no module reports
 available it shows the full nav, so dark rollout never empties the app.
 

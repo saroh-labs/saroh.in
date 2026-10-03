@@ -114,6 +114,11 @@ export function problemChip(
 export interface ProblemCan {
     /** `invoice:write`: send the invoice's reminder (D17). */
     remind: boolean;
+    /**
+     * `subscription:write`: retry a failed renewal (D13) — by their autopay
+     * or a new pay link, as its subscription offers.
+     */
+    retry?: boolean;
 }
 
 /**
@@ -126,11 +131,11 @@ export function problemAction(
     { can, shop }: { can: ProblemCan; shop: boolean },
 ): string {
     switch (kind) {
-        // "Retry charge" charges the customer's autopay mandate, which D13
-        // builds. Until it is live the failed renewal opens its subscription
-        // (waves plan, release boundary 6); D13 adds the retry here, for
-        // whoever may write subscriptions.
+        // "Retry charge" opens the subscription, where Retry charges their
+        // autopay again or makes a new pay link (D13), for whoever may
+        // write subscriptions; anyone else opens it to read.
         case "renewal_failed":
+            if (can.retry) return "Retry charge";
             return shop ? "Open subscription" : "Open membership";
         case "invoice_overdue":
             return can.remind ? "Send a reminder" : "Open invoice";

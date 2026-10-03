@@ -65,7 +65,7 @@ export function currencyMismatch(input: {
     storefront: string;
     storefrontCurrency: string;
 }): string {
-    return `${input.product} is priced in ${input.productCurrency}, but ${input.storefront} sells in ${input.storefrontCurrency}. A business sells in one currency at every storefront.`;
+    return `${input.product} is priced in ${input.productCurrency}, but ${input.storefront} sells in ${input.storefrontCurrency}. A business sells in one currency at every location.`;
 }
 
 /**
@@ -91,7 +91,7 @@ export async function assertSameCurrency(
         message: currencyMismatch({
             product: input.product.name,
             productCurrency: input.product.currency,
-            storefront: store?.name ?? "this storefront",
+            storefront: store?.name ?? "this location",
             storefrontCurrency: currency,
         }),
         field: input.field ?? "storeId",

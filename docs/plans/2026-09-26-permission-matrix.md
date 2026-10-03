@@ -87,7 +87,7 @@ Rules that hold whatever is chosen in §9:
 | Capability | Scope | Status | Implies | Used by |
 |---|---|---|---|---|
 | `order:read` | Orders list, quick view, Order Detail and a customer's Orders tab — the whole order, money included, and whether a pay link is live (never the link: §1 rule 2) | exists | — | Orders, Order Detail, Customer Detail |
-| `order:stage` | Move an order through its steps, undo the last step, print the ticket, record the courier and tracking number; **bulk moves: hold, Send now, cancel the hold and Undo all** (B6) | exists; relabel "Move orders through their steps and print" (design `order:fulfil`) | `order:read` (F18) | Orders, Order Detail, Home Today |
+| `order:stage` | Move an order through its steps, undo the last step, print the ticket, record the courier and tracking number; **bulk moves: hold, Send now, cancel the hold and Undo all** (B6); **the Calendar's orders layer, without money** (E20, DEC-067) | exists; relabel "Move orders through their steps and print" (design `order:fulfil`) | `order:read` (F18) | Orders, Order Detail, Home Today, Calendar |
 | `order:create` | Take a new order (New order, walk-in), and make its pay link (shown once); "New pay link" on an order, which stops the old one | new; today `order:write` | `order:read` | New order v2, row menu "New pay link" |
 | `order:edit` | Change items, address or how it's fulfilled until handover; make a new pay link, which stops the old one ("New pay link", never "Copy") | new; today `order:write` | `order:read` | Order Detail Edit, Change how it's fulfilled, row menu |
 | `order:refund` | Refund and cancel (a cancel is a full refund) | new; today `payment:manage` | `order:read` | Order Detail refund and cancel, row menu |
@@ -172,6 +172,13 @@ business's customers or diary. Their work inside the storefront still comes
 from their storefront role. It is an ordinary custom role the owner can
 widen, and the owner is told who was added (Activity, and a one-time Team
 notice with Change role).
+
+**A location's team moves its orders (DEC-074, amends F16).** Storefront team
+also holds `order:stage`, narrowed to the storefronts its holder works on
+(`StoreMembers`): list, read (no money, no customer email or phone) and move
+their orders; another storefront's order is a 404 to read and a 403 to move;
+no `order:read`, create, edit, refund, pay link or export
+(`orders/order-location.ts`, `order-permissions.db.spec.ts`).
 
 ## 3. Why each split exists, and the splits dropped
 
