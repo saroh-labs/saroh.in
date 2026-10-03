@@ -8,11 +8,13 @@
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
     },
     "portless": "admin.saroh",
     "dependencies": {
         "@saroh/auth": "workspace:*",
+        "@saroh/pricing-catalog": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "lucide-react": "catalog:",
@@ -24,13 +26,16 @@
     "devDependencies": {
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
+        "@testing-library/react": "^16.1.0",
         "@types/node": "catalog:",
         "@types/react": "19.2.15",
         "@types/react-dom": "catalog:react19",
         "eslint": "catalog:",
         "eslint-config-next": "catalog:",
+        "jsdom": "^25.0.1",
         "postcss": "catalog:",
         "tailwindcss": "catalog:",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "vitest": "^4.1.11"
     }
 }
