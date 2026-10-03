@@ -304,6 +304,16 @@ describe("checkout from Free", () => {
         await expect(
             checkout.changePlan(ctx, { plan: "free", cycle: "month" }),
         ).rejects.toMatchObject({ status: 409 });
+        // Yearly rows have no provider plan while yearly isn't offered.
+        await prisma.pricingProviderPlan.deleteMany({
+            where: { plan: { interval: "year" } },
+        });
+        await expect(
+            checkout.changePlan(ctx, { plan: "b", cycle: "year" }),
+        ).rejects.toMatchObject({
+            status: 409,
+            message: "Plan B isn't offered yearly.",
+        });
         expect(fake.createCalls).toHaveLength(0);
     });
 

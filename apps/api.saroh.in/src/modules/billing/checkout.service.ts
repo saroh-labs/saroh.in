@@ -387,6 +387,10 @@ export class CheckoutService {
             },
             select: { status: true, providerPlanId: true },
         });
+        // Yearly rows get a provider plan only while yearly is offered.
+        if (!providerPlan && view.cycle === "year") {
+            throw new ConflictException(`${target.name} isn't offered yearly.`);
+        }
         if (providerPlan?.status !== "SYNCED" || !providerPlan.providerPlanId) {
             throw new ConflictException(
                 `${target.name} ${view.cycle === "year" ? "yearly" : "monthly"} can't be bought yet. Try again in a few minutes.`,
