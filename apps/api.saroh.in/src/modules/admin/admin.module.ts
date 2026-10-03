@@ -9,6 +9,8 @@ import { DomainsModule } from "../domains/domains.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { HealthModule } from "../health/health.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { AdminPricingController } from "../pricing/admin-pricing.controller";
+import { PricingModule } from "../pricing/pricing.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
@@ -45,6 +47,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         DomainsModule,
         HealthModule,
         WebhooksModule,
+        PricingModule,
     ],
     controllers: [
         AdminController,
@@ -53,6 +56,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminPeopleController,
         AdminMachineryController,
         AdminWaitlistController,
+        AdminPricingController,
     ],
     providers: [
         IdempotencyService,
