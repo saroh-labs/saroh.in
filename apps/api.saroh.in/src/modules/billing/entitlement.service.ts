@@ -74,15 +74,24 @@ export class EntitlementService {
     async liveOverrides(
         organizationId: string,
     ): Promise<EntitlementOverrideRow[]> {
-        return prisma.entitlementOverride.findMany({
+        const rows = await prisma.entitlementOverride.findMany({
             where: {
                 organizationId,
+                // Only raises: the catalogue's other kinds (grant, remove,
+                // limit, price, plan) are read through the catalogue (U12).
+                kind: "raise",
                 revokedAt: null,
                 expiresAt: { gt: new Date() },
+                value: { not: null },
             },
             select: { id: true, key: true, value: true, expiresAt: true },
             orderBy: { value: "desc" },
         });
+        return rows.flatMap((r) =>
+            r.value === null || r.expiresAt === null
+                ? []
+                : [{ ...r, value: r.value, expiresAt: r.expiresAt }],
+        );
     }
 
     /**

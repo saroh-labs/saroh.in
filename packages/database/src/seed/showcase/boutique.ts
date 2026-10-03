@@ -158,7 +158,13 @@ export async function seedBoutique(
         });
     }
     const plan = await prisma.plan.findUniqueOrThrow({
-        where: { key_version: { key: PLAN.key, version: PLAN.version } },
+        where: {
+            key_version_interval: {
+                key: PLAN.key,
+                version: PLAN.version,
+                interval: PLAN.interval,
+            },
+        },
         select: { id: true },
     });
     await prisma.subscription.upsert({
