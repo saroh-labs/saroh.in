@@ -10,7 +10,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WaitlistContent } from "@/content/waitlist";
-import { WAITLIST } from "@/content/waitlist";
+import { launchOfferLines, NO_OFFER, WAITLIST } from "@/content/waitlist";
 import { WAITLIST_MESSAGES } from "@/lib/waitlist";
 
 import { WaitlistForm } from "./waitlist-form";
@@ -49,11 +49,10 @@ function answer(body: unknown, status = 200) {
     });
 }
 
-function renderForm(
-    props: Partial<Parameters<typeof WaitlistForm>[0]> = {},
-    content: WaitlistContent = WAITLIST,
-) {
-    return render(<WaitlistForm content={content} src="direct" {...props} />);
+/** The form on `/waitlist` with `query` in the address bar. */
+function renderForm(query = "", content: WaitlistContent = WAITLIST) {
+    window.history.replaceState(null, "", `/waitlist${query}`);
+    return render(<WaitlistForm content={content} />);
 }
 
 function fill({
@@ -114,7 +113,7 @@ describe("WaitlistForm", () => {
             position: 7,
             ref: "abcdefgh",
         });
-        renderForm({ plan: "grow", src: "pricing", referral: "hjkmnpqr" });
+        renderForm("?plan=grow&src=pricing&ref=hjkmnpqr");
         fill();
         await submit();
 
@@ -222,17 +221,14 @@ describe("WaitlistForm", () => {
             position: 3,
             ref: "abcdefgh",
         });
-        renderForm(
-            {},
-            {
-                openingDate: "2030-03-05",
-                offer: {
-                    headline: "Offer A",
-                    terms: "Terms A.",
-                    doneLine: "Line A.",
-                },
+        renderForm("", {
+            openingDate: "2030-03-05",
+            offer: {
+                headline: "Offer A",
+                terms: "Terms A.",
+                doneLine: "Line A.",
             },
-        );
+        });
         expect(screen.getByText("Offer A")).toBeTruthy();
         expect(screen.getByText(/once on 5 Mar/)).toBeTruthy();
 
@@ -241,5 +237,58 @@ describe("WaitlistForm", () => {
         await screen.findByText(
             /on Tuesday 5 March with your invite\. Line A\./,
         );
+    });
+    it("sends the plain source, and no plan or referral, from a bare address", async () => {
+        answer({ status: "success", created: false });
+        renderForm("?plan=nope&ref=bad");
+        fill();
+        await submit();
+
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        const body = JSON.parse(init.body as string) as Record<string, unknown>;
+        expect(body.src).toBe("direct");
+        expect(body).not.toHaveProperty("plan");
+        expect(body).not.toHaveProperty("ref");
+    });
+
+    it("shows the API's launch offer: its plan and days, in the content's words", async () => {
+        answer({
+            status: "success",
+            created: true,
+            position: 3,
+            ref: "abcdefgh",
+        });
+        renderForm("", {
+            ...WAITLIST,
+            offer: launchOfferLines({ planName: "Plan B", days: 37 }),
+        });
+
+        const lead = screen.getByText("37 days of Plan B free");
+        expect(lead.tagName).toBe("STRONG");
+        expect(lead.parentElement?.textContent).toBe(
+            "Get 37 days of Plan B free when we open.",
+        );
+        expect(screen.queryByText(new RegExp(NO_OFFER.note))).toBeNull();
+        expect(
+            screen.getByText(
+                /No card needed\. When it ends, you stay on Free unless you choose a plan\./,
+            ),
+        ).toBeTruthy();
+
+        fill();
+        await submit();
+        await screen.findByText(
+            /with your invite when we open\. Your invite comes with 37 days of Plan B free\./,
+        );
+    });
+
+    it("without an offer, says it is announced at launch, and names no plan or days", () => {
+        renderForm();
+
+        expect(
+            screen.getByText(NO_OFFER.headline).parentElement?.textContent,
+        ).toBe(`Get ${NO_OFFER.headline} when we open. ${NO_OFFER.note}`);
+        expect(screen.queryByText(/days of/)).toBeNull();
+        expect(screen.queryByText(/No card needed/)).toBeNull();
     });
 });

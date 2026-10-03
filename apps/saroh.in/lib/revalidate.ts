@@ -9,8 +9,9 @@ import { createHash, timingSafeEqual } from "node:crypto";
 export const REVALIDATE_HEADER = "x-saroh-revalidate";
 
 /**
- * The pages that read the catalogue. Fixed: the hook takes no path, so a
- * caller can only ever refresh these.
+ * The pages that read the catalogue, and the waitlist, whose launch offer
+ * names a catalogue plan (`GET /public/waitlist/offer`). Fixed: the hook
+ * takes no path, so a caller can only ever refresh these.
  */
 export const REVALIDATE_PATHS: readonly {
     path: string;
@@ -20,6 +21,7 @@ export const REVALIDATE_PATHS: readonly {
     { path: "/" },
     { path: "/features/[slug]", type: "page" },
     { path: "/solutions/[slug]", type: "page" },
+    { path: "/waitlist" },
 ];
 
 /** Compares in constant time, whatever the lengths. */

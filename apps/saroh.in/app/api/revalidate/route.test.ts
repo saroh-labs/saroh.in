@@ -41,6 +41,7 @@ describe("POST /api/revalidate", () => {
             ["/", undefined],
             ["/features/[slug]", "page"],
             ["/solutions/[slug]", "page"],
+            ["/waitlist", undefined],
         ]);
         expect(res.headers.get("cache-control")).toBe("no-store");
     });

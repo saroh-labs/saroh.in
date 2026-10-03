@@ -6,9 +6,12 @@
  * and both are open until the owner sets them:
  * - `openingDate` is null until the open launch is scheduled (OQ-12), and
  *   the header says "Opening soon" instead of a date.
- * - `offer` is null until the launch offer is settled; the form then says
- *   "Offer details announced at launch". The repo is public: no plan
- *   lengths, prices or terms are written here until they are announced.
+ * - `offer` is null here. The page reads the launch offer from the API
+ *   (`GET /public/waitlist/offer`, `lib/launch-offer.ts`) — the same
+ *   `LAUNCH_OFFER_DAYS` and plan the opening-day invites carry — and builds
+ *   its lines with `launchOfferLines`. With none, the form says "Offer
+ *   details announced at launch". The repo is public: the words are here,
+ *   the plan's name and the number of days only ever come from the API.
  */
 
 /** A kind of business, as the API stores it (`WAITLIST_KINDS`) and the form names it. */
@@ -52,6 +55,30 @@ export interface WaitlistOffer {
     terms: string;
     /** The done state's line after the email promise. */
     doneLine: string;
+}
+
+/** The launch offer as the API answers it: the plan's name and the days. */
+export interface LaunchOfferTerms {
+    planName: string;
+    days: number;
+}
+
+/**
+ * The offer's lines from the API's numbers (OQ-1, DEC-075): the plan free
+ * for the offer's length, no card, and Free afterwards unless the business
+ * chooses a plan — what an invite's offer does (a time-bound plan override
+ * that lapses to Free).
+ */
+export function launchOfferLines({
+    planName,
+    days,
+}: LaunchOfferTerms): WaitlistOffer {
+    const offer = `${days} days of ${planName} free`;
+    return {
+        headline: offer,
+        terms: "No card needed. When it ends, you stay on Free unless you choose a plan.",
+        doneLine: `Your invite comes with ${offer}.`,
+    };
 }
 
 export interface WaitlistContent {
