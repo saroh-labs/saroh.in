@@ -142,9 +142,11 @@ export interface FaqItem {
 }
 
 /**
- * A plan as a teaser shows it. Prices and limits are NOT content: until the
- * catalogue (U2/U3) feeds the site, every price renders `PRICE_PLACEHOLDER`
- * and every summary `PLAN_DETAILS_PLACEHOLDER` (the public-repo rule).
+ * A plan as the site names it when there is no catalogue to read. Prices and
+ * limits are NOT content: they come from the published pricing catalogue
+ * (`lib/pricing.ts`), and without one every price renders
+ * `PRICE_PLACEHOLDER` and every summary `PLAN_DETAILS_PLACEHOLDER` (the
+ * public-repo rule).
  */
 export interface PlanTeaser {
     plan: PlanId;
@@ -152,9 +154,9 @@ export interface PlanTeaser {
     featured: boolean;
 }
 
-/** The price a teaser shows until the catalogue is wired. */
+/** The price shown when there is no catalogue to read. */
 export const PRICE_PLACEHOLDER = "—";
 /** The line beside a placeholder price. */
 export const PRICE_NOTE = "Pricing announced at launch";
-/** What a plan includes, until the catalogue is wired. */
+/** What a plan includes, when there is no catalogue to read. */
 export const PLAN_DETAILS_PLACEHOLDER = "Plan details announced at launch";

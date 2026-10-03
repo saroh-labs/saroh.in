@@ -1,7 +1,7 @@
 "use client";
 
 import { track } from "@/lib/analytics";
-import type { LaunchMode, PlanId } from "@/lib/links";
+import type { LaunchMode } from "@/lib/links";
 import { cta } from "@/lib/links";
 
 import type { ButtonSize, ButtonVariant } from "./button";
@@ -15,6 +15,8 @@ import { ButtonLink } from "./button";
 export function CtaLink({
     src,
     plan,
+    planName,
+    paid,
     trialDays,
     mode,
     variant = "primary",
@@ -25,7 +27,10 @@ export function CtaLink({
 }: {
     /** Where on the site this button is, e.g. `nav`, `home-hero`. */
     src: string;
-    plan?: PlanId;
+    plan?: string;
+    /** The plan's name and whether it costs anything, from the catalogue. */
+    planName?: string;
+    paid?: boolean;
     trialDays?: number;
     mode?: LaunchMode;
     variant?: ButtonVariant;
@@ -35,7 +40,7 @@ export function CtaLink({
     short?: boolean;
     onNavigate?: () => void;
 }) {
-    const action = cta({ src, plan, trialDays, mode });
+    const action = cta({ src, plan, planName, paid, trialDays, mode });
     return (
         <ButtonLink
             href={action.href}

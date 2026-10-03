@@ -14,6 +14,22 @@ const nextConfig = {
      * automations have no page of their own: they belong to Sell and
      * Contacts, and What it will not do says what is not built.
      */
+    /*
+     * A pricing draft preview (plans catalogue U24, KTD-10) is never cached,
+     * indexed or passed on as a referrer, whatever the page itself sends.
+     */
+    async headers() {
+        const preview = [
+            { key: "Cache-Control", value: "no-store" },
+            { key: "X-Robots-Tag", value: "noindex, nofollow" },
+            { key: "Referrer-Policy", value: "no-referrer" },
+        ];
+        return [
+            { source: "/pricing/draft", headers: preview },
+            { source: "/pricing/preview", headers: preview },
+        ];
+    },
+
     async redirects() {
         const job = {
             website: "/website",

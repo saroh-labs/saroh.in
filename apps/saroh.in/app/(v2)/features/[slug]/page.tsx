@@ -12,11 +12,14 @@ import { FeatureSteps } from "@/components/v2/feature/feature-steps";
 import { featureHref, features, isFeatureSlug } from "@/content/features";
 import { shots } from "@/content/shots";
 import { FEATURE_SLUGS } from "@/content/types";
+import { freePlanLine } from "@/lib/plan-teasers";
+import { readLivePricing } from "@/lib/pricing";
 
 /**
  * The eight feature pages (plan U22): ONE template, the Features design,
  * and eight data sets in `content/features.ts`. Built at build time; any
- * other slug is a 404.
+ * other slug is a 404. The hero's free-plan line reads the pricing
+ * catalogue, so the pages refresh with it (KTD-10).
  */
 export const dynamicParams = false;
 
@@ -69,9 +72,10 @@ export default async function FeaturePage({ params }: Props) {
     const { slug } = await params;
     if (!isFeatureSlug(slug)) notFound();
     const feature = features[slug];
+    const catalog = await readLivePricing();
     return (
         <>
-            <FeatureHero feature={feature} />
+            <FeatureHero feature={feature} freeLine={freePlanLine(catalog)} />
             <FeatureSteps feature={feature} />
             <FeaturePoints feature={feature} />
             <FeatureWorksWith feature={feature} />

@@ -27,6 +27,16 @@ import { z } from "zod";
  * each visitor rather than this server. Development and test sign with the
  * API's fixed dev value; unset anywhere else, joins still go through but are
  * all counted as one, and an error is logged.
+ *
+ * `API_URL` also feeds the pricing pages (plan U24): `/pricing`, the plan
+ * teasers and the free-plan line read `GET {API_URL}/public/pricing`. Unset,
+ * they show the "Pricing announced at launch" placeholder.
+ *
+ * `PRICING_REVALIDATE_SECRET` (server-only, 32+ characters) is the shared
+ * secret the API sends in `x-saroh-revalidate` when it calls
+ * `POST /api/revalidate` after a pricing version is published or goes live
+ * (KTD-10). The same value is set in the API. Unset, the hook refuses every
+ * call and the pages refresh on their five-minute timer only.
  */
 export const env = createEnv({
     client: {
@@ -36,6 +46,9 @@ export const env = createEnv({
     server: {
         API_URL: z.string().url().optional(),
         SITE_RELAY_SECRET: z.string().min(32).optional(),
+        PRICING_REVALIDATE_SECRET: z.string().min(32).optional(),
+        /** Set by Next itself: "phase-production-build" while building. */
+        NEXT_PHASE: z.string().optional(),
     },
     shared: {
         NODE_ENV: z.enum(["development", "test", "production"]).optional(),
@@ -43,6 +56,8 @@ export const env = createEnv({
     runtimeEnv: {
         API_URL: process.env.API_URL,
         SITE_RELAY_SECRET: process.env.SITE_RELAY_SECRET,
+        PRICING_REVALIDATE_SECRET: process.env.PRICING_REVALIDATE_SECRET,
+        NEXT_PHASE: process.env.NEXT_PHASE,
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,

@@ -29,6 +29,9 @@
     --mk-on-ink-line: 40 7% 33.7%; /* #5C5850 — outline button on Ink */
     --mk-on-ink-hover: 40 7% 16.9%; /* #2E2C28 */
     --mk-on-ink-accent: 38 81% 69%; /* #F0C170 — a plan's fit line on Ink */
+    --mk-tint: 40 72.4% 94.3%; /* #FBF4E6 — the highlighted plan's column */
+    --mk-soon: 40.5 90.2% 92%; /* #FDF1D8 — the "Coming soon" pill */
+    --mk-line-row: 42 23.8% 91.8%; /* #EFECE5 — rules between table rows */
 
     /* The design's three shadows: cards on hover, screenshots, the hero. */
     --mk-shadow-card: 0 10px 30px rgba(28, 28, 26, 0.08);

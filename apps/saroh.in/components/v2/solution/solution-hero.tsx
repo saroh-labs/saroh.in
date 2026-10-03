@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { FREE_PLAN_LINE, TOUR_VIDEO } from "@/content/home";
+import { TOUR_VIDEO } from "@/content/home";
 import type { Solution } from "@/content/types";
 
 import { ButtonLink } from "../button";
@@ -13,7 +13,14 @@ import { ScreenshotFrame } from "../screenshot-frame";
  * the sub, the start button (and "See it in action" once a video is set,
  * deviation D-3), the free-plan line, then the hero shot and its note.
  */
-export function SolutionHero({ solution }: { solution: Solution }) {
+export function SolutionHero({
+    solution,
+    freeLine,
+}: {
+    solution: Solution;
+    /** The free-plan line, from the catalogue (`freePlanLine`). */
+    freeLine: string;
+}) {
     return (
         <>
             <Container
@@ -53,7 +60,7 @@ export function SolutionHero({ solution }: { solution: Solution }) {
                     ) : null}
                 </div>
                 <p className="m-0 text-mk-note text-muted-foreground">
-                    {FREE_PLAN_LINE}
+                    {freeLine}
                 </p>
             </Container>
             <Container className="pt-14">

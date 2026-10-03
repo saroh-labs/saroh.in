@@ -12,13 +12,13 @@ afterEach(cleanup);
 /** A currency sign (written as an escape: no sign in the repo) or a digit. */
 const NO_PRICE = new RegExp("\\u20B9|\\d");
 
-/** The Solutions design's pricing block (plan U23), on the placeholder. */
+/** The Solutions design's pricing block (plan U23), with no catalogue. */
 describe("SolutionPricing", () => {
     it("gyms: Grow featured with its fit line, Free second, no price", () => {
         const { container } = render(
             <SolutionPricing
                 title="Pricing for gyms and studios"
-                plans={solutionPlanTeasers(solutions.gyms.pricing)}
+                plans={solutionPlanTeasers(null, solutions.gyms.pricing)}
                 footnote={null}
                 src="solutions-gyms-pricing"
             />,

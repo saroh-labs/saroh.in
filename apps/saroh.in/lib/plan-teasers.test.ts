@@ -1,5 +1,7 @@
+import { formatInr } from "@saroh/pricing-catalog";
 import { describe, expect, it } from "vitest";
 
+import { FREE_PLAN_LINE } from "@/content/home";
 import { solutions } from "@/content/solutions";
 import {
     PLAN_DETAILS_PLACEHOLDER,
@@ -7,42 +9,116 @@ import {
     PRICE_PLACEHOLDER,
 } from "@/content/types";
 
-import { solutionPlanTeasers } from "./plan-teasers";
+import {
+    freePlanLine,
+    homePlanTeasers,
+    planTeaser,
+    planTeaserFootnote,
+    sentenceList,
+    solutionPlanTeasers,
+} from "./plan-teasers";
+import { fakeCatalog } from "./pricing.fixture";
 
 /** A currency sign (written as an escape: no sign in the repo) or a digit. */
 const NO_PRICE = new RegExp("\\u20B9|\\d");
 
-/** A solution page's two plan cards (plan U23), on the placeholder. */
+/** The plan teasers (plans catalogue U23, U24), from a fake catalogue. */
 describe("solutionPlanTeasers", () => {
     it("gyms: Grow featured with the fit line, then Free", () => {
-        const [first, second] = solutionPlanTeasers(solutions.gyms.pricing);
+        const [first, second] = solutionPlanTeasers(
+            fakeCatalog(),
+            solutions.gyms.pricing,
+        );
         expect(first).toMatchObject({
             plan: "grow",
-            name: "Grow",
+            name: "Plan B",
+            price: formatInr(11_100),
+            priceNote: "a month",
             featured: true,
             fit: solutions.gyms.pricing.fit,
+            what: "Everything in Plan A, plus thing one plus, more items, visits and extra (coming soon).",
         });
         expect(second).toMatchObject({
             plan: "free",
-            name: "Free",
+            name: "Plan A",
             featured: false,
+            paid: false,
+            what: "Thing one, few items and some visits.",
         });
         expect(second.fit).toBeUndefined();
     });
 
     it.each(["shops", "clinics"] as const)("%s shows Pro second", (slug) => {
-        const [, second] = solutionPlanTeasers(solutions[slug].pricing);
-        expect(second.name).toBe("Pro");
+        const [, second] = solutionPlanTeasers(
+            fakeCatalog(),
+            solutions[slug].pricing,
+        );
+        expect(second.name).toBe("Plan C");
     });
 
-    it("shows the placeholder, never a price", () => {
+    it("without a catalogue: the placeholder, never a price", () => {
         for (const s of Object.values(solutions)) {
-            for (const t of solutionPlanTeasers(s.pricing)) {
+            for (const t of solutionPlanTeasers(null, s.pricing)) {
                 expect(t.price).toBe(PRICE_PLACEHOLDER);
                 expect(t.priceNote).toBe(PRICE_NOTE);
                 expect(t.what).toBe(PLAN_DETAILS_PLACEHOLDER);
                 expect(JSON.stringify(t)).not.toMatch(NO_PRICE);
             }
         }
+        expect(planTeaserFootnote(null)).toBeNull();
+    });
+
+    it("a plan the catalogue doesn't offer gets the placeholder card", () => {
+        const t = planTeaser(
+            fakeCatalog((c) => {
+                c.plans[2].retired = true;
+            }),
+            "pro",
+        );
+        expect(t).toMatchObject({ name: "Pro", price: PRICE_PLACEHOLDER });
+    });
+
+    it("the footnote qualifies real prices", () => {
+        expect(planTeaserFootnote(fakeCatalog())).toBe(
+            "Billed monthly. Prices before GST.",
+        );
+    });
+});
+
+describe("homePlanTeasers", () => {
+    it("every offered plan, in catalogue order, the highlighted one featured", () => {
+        expect(
+            homePlanTeasers(fakeCatalog()).map((t) => [t.name, t.featured]),
+        ).toEqual([
+            ["Plan A", false],
+            ["Plan B", true],
+            ["Plan C", false],
+        ]);
+        expect(homePlanTeasers(null).map((t) => t.price)).toEqual([
+            PRICE_PLACEHOLDER,
+            PRICE_PLACEHOLDER,
+            PRICE_PLACEHOLDER,
+        ]);
+    });
+});
+
+describe("freePlanLine", () => {
+    it("names the free plan's own lines for the chosen modules", () => {
+        expect(freePlanLine(fakeCatalog())).toBe(
+            `Free to start: thing one, few items and some visits. ${FREE_PLAN_LINE.tail}`,
+        );
+    });
+
+    it("falls back to the placeholder line", () => {
+        expect(freePlanLine(null)).toBe(FREE_PLAN_LINE.fallback);
+        expect(FREE_PLAN_LINE.fallback).not.toMatch(NO_PRICE);
+    });
+});
+
+describe("sentenceList", () => {
+    it("joins with commas and a final and", () => {
+        expect(sentenceList([])).toBe("");
+        expect(sentenceList(["a"])).toBe("a");
+        expect(sentenceList(["a", "b", "c"])).toBe("a, b and c");
     });
 });
