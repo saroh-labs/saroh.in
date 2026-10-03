@@ -38,6 +38,9 @@ const config: Config = {
                     "on-ink-line": mk("on-ink-line"),
                     "on-ink-hover": mk("on-ink-hover"),
                     "on-ink-accent": mk("on-ink-accent"),
+                    tint: mk("tint"),
+                    soon: mk("soon"),
+                    "line-row": mk("line-row"),
                     scrim: "var(--mk-scrim)",
                 },
             },
@@ -85,6 +88,18 @@ const config: Config = {
                     { lineHeight: "1.1", letterSpacing: "-0.03em" },
                 ],
                 "mk-price": ["42px", { letterSpacing: "-0.03em" }],
+                "mk-price-lg": [
+                    "46px",
+                    { lineHeight: "1", letterSpacing: "-0.03em" },
+                ],
+                "mk-pricing-hero": [
+                    "clamp(42px, 5.6vw, 68px)",
+                    { lineHeight: "1", letterSpacing: "-0.045em" },
+                ],
+                "mk-h2-xs": [
+                    "clamp(28px, 3vw, 34px)",
+                    { letterSpacing: "-0.03em" },
+                ],
                 "mk-card-lg": ["22px", { letterSpacing: "-0.02em" }],
                 "mk-card": ["21px", { letterSpacing: "-0.02em" }],
                 "mk-lead": ["19px", { lineHeight: "1.6" }],

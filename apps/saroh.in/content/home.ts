@@ -5,8 +5,8 @@
  * the copy every page's CTA band shares.
  *
  * The free-plan line and the plan teasers follow the public-repo rule: no
- * prices, no limits. They render the placeholders until the catalogue feeds
- * the site (U24).
+ * prices, no limits. Their figures come from the pricing catalogue
+ * (`lib/plan-teasers.ts`), with the placeholders as the fallback.
  */
 import type { PlanTeaser, ShotRef } from "./types";
 import { PLAN_DETAILS_PLACEHOLDER } from "./types";
@@ -49,11 +49,20 @@ export const home = {
 } as const;
 
 /**
- * The line under every hero's buttons (Home and the feature pages). The
- * design's line names Free's limits; until the catalogue feeds the site it
- * says only what each plan is for.
+ * The line under every hero's buttons (Home, the feature and solution
+ * pages): "Free to start: one website, … and …. Grow adds orders,
+ * subscriptions and invoicing." The middle is the free plan's own card lines
+ * for these modules, read from the pricing catalogue
+ * (`lib/plan-teasers.ts` `freePlanLine`), so no limit is written here. With
+ * no catalogue the line is `fallback`.
  */
-export const FREE_PLAN_LINE = `Free to start. Grow adds orders, subscriptions and invoicing. ${PLAN_DETAILS_PLACEHOLDER}.`;
+export const FREE_PLAN_LINE = {
+    lead: "Free to start",
+    /** Catalogue module ids, in the order the line names them. */
+    modules: ["website", "products", "bookings"],
+    tail: "Grow adds orders, subscriptions and invoicing.",
+    fallback: `Free to start. Grow adds orders, subscriptions and invoicing. ${PLAN_DETAILS_PLACEHOLDER}.`,
+} as const;
 
 /** Home's pricing teaser and the plan order everywhere: Grow is featured. */
 export const PLAN_TEASERS: PlanTeaser[] = [

@@ -17,12 +17,18 @@ import {
     solutions,
 } from "@/content/solutions";
 import { SOLUTION_SLUGS } from "@/content/types";
-import { PLAN_TEASER_FOOTNOTE, solutionPlanTeasers } from "@/lib/plan-teasers";
+import {
+    freePlanLine,
+    planTeaserFootnote,
+    solutionPlanTeasers,
+} from "@/lib/plan-teasers";
+import { readLivePricing } from "@/lib/pricing";
 
 /**
  * `/solutions/shops`, `/solutions/gyms`, `/solutions/clinics` (plan U23): ONE
  * template, the Solutions design, fed by `content/solutions.ts`. Any other
- * slug is a 404.
+ * slug is a 404. Prices and the free-plan line come from the published
+ * pricing catalogue, refreshed every five minutes and on publish (KTD-10).
  */
 export const dynamicParams = false;
 
@@ -53,10 +59,11 @@ export default async function SolutionPage({ params }: Props) {
     if (!isSolutionSlug(slug)) notFound();
     const s = solutions[slug];
     const segments = segmentViews(s.segments, (f) => features[f].name);
+    const catalog = await readLivePricing();
 
     return (
         <>
-            <SolutionHero solution={s} />
+            <SolutionHero solution={s} freeLine={freePlanLine(catalog)} />
 
             <Container as="section" aria-labelledby="changes-title">
                 <SectionHeading
@@ -78,8 +85,8 @@ export default async function SolutionPage({ params }: Props) {
 
             <SolutionPricing
                 title={s.pricing.title}
-                plans={solutionPlanTeasers(s.pricing)}
-                footnote={PLAN_TEASER_FOOTNOTE}
+                plans={solutionPlanTeasers(catalog, s.pricing)}
+                footnote={planTeaserFootnote(catalog)}
                 src={`solutions-${slug}-pricing`}
             />
 

@@ -9,7 +9,7 @@ import type { LaunchMode, PlanId } from "@/lib/links";
  * a fixed set of values, which is how that is kept true.
  */
 export interface AnalyticsEvents {
-    cta_click: { plan?: PlanId; page: string; mode: LaunchMode };
+    cta_click: { plan?: string; page: string; mode: LaunchMode };
     waitlist_join: { kind: string; src: string; plan?: PlanId; ref?: boolean };
     referral_copy: Record<string, never>;
     pricing_toggle: { control: "yearly" | "gst"; value: boolean };

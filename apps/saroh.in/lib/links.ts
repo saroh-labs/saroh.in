@@ -30,8 +30,16 @@ const PLAN_NAME: Record<PlanId, string> = {
 export interface CtaInput {
     /** Where on the site the click came from, e.g. `nav`, `home-hero`. */
     src: string;
-    /** The plan the button names, when it names one. */
-    plan?: PlanId;
+    /**
+     * The plan the button names, when it names one: a site plan id, or any
+     * id the pricing catalogue offers (the pricing page draws whatever plans
+     * the catalogue has).
+     */
+    plan?: string;
+    /** The plan's name, from the catalogue; defaults to the site's own name. */
+    planName?: string;
+    /** Whether the plan costs anything; defaults to "it isn't Free". */
+    paid?: boolean;
     /** Open mode: the trial length a plan card offers, when a trial is on. */
     trialDays?: number;
     /** Defaults to the site's mode; tests and previews pass one. */
@@ -44,7 +52,7 @@ export interface Cta {
     shortLabel: string;
     href: string;
     mode: LaunchMode;
-    plan?: PlanId;
+    plan?: string;
 }
 
 /**
@@ -60,10 +68,18 @@ export interface Cta {
 export function cta({
     src,
     plan,
+    planName,
+    paid: paidIn,
     trialDays,
     mode = LAUNCH_MODE,
 }: CtaInput): Cta {
-    const paid = plan !== undefined && plan !== "free";
+    const paid = plan !== undefined && (paidIn ?? plan !== "free");
+    const name =
+        plan === undefined
+            ? ""
+            : (planName ??
+              (PLAN_NAME as Record<string, string | undefined>)[plan] ??
+              plan);
     if (mode === "waitlist") {
         const q = new URLSearchParams();
         if (plan) q.set("plan", plan);
@@ -71,9 +87,7 @@ export function cta({
         return {
             mode,
             plan,
-            label: paid
-                ? `Get early access · ${PLAN_NAME[plan]}`
-                : "Join the waitlist",
+            label: paid ? `Get early access · ${name}` : "Join the waitlist",
             shortLabel: paid ? "Early access" : "Join waitlist",
             href: `/waitlist?${q.toString()}`,
         };
@@ -86,7 +100,7 @@ export function cta({
         label =
             trialDays && trialDays > 0
                 ? `Start ${trialDays}-day trial`
-                : `Choose ${PLAN_NAME[plan]}`;
+                : `Choose ${name}`;
     }
     return {
         mode,

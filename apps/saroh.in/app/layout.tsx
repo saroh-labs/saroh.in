@@ -1,8 +1,9 @@
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import Script from "next/script";
 import "./site.css";
+
+import { GoogleAnalytics } from "./google-analytics";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
 // build never fetches fonts from a network: Geist for all UI, body copy,
@@ -89,17 +90,7 @@ export default function RootLayout({
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} ${fontWordmark.variable} font-sans antialiased`}
             >
-                <Script
-                    async
-                    src="https://www.googletagmanager.com/gtag/js?id=G-L19ZLH2N5K"
-                ></Script>
-                <Script id="google-analytics">
-                    {` window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-L19ZLH2N5K');`}
-                </Script>
+                <GoogleAnalytics />
                 <a
                     href="#main"
                     className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[90] focus:rounded-lg focus:bg-foreground focus:px-[13px] focus:py-[9px] focus:text-[13px] focus:text-background"

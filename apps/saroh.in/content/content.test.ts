@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { faqs, HOME_FAQ, solutionFaq } from "./faq";
 import { features } from "./features";
-import { PLAN_TEASERS } from "./home";
+import { CTA_BAND, FREE_PLAN_LINE, home, PLAN_TEASERS } from "./home";
 import { shots } from "./shots";
 import { segmentViews, solutions } from "./solutions";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "./types";
@@ -222,6 +222,9 @@ describe("no prices or plan limits", () => {
         solutions,
         faqs,
         PLAN_TEASERS,
+        FREE_PLAN_LINE,
+        home,
+        CTA_BAND,
     });
 
     it("has no rupee sign", () => {

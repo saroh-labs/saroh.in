@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { FREE_PLAN_LINE, TOUR_VIDEO } from "@/content/home";
+import { TOUR_VIDEO } from "@/content/home";
 import type { Feature } from "@/content/types";
 
 import { ButtonLink } from "../button";
@@ -14,10 +14,17 @@ import { ScreenshotFrame } from "../screenshot-frame";
  * then the page's screenshot, which enlarges on click.
  *
  * "See it in action · 2 min" shows only once a tour video is configured
- * (KTD-12, deviation D-3). The free-plan line names no limits until the
- * catalogue feeds the site (the public-repo rule).
+ * (KTD-12, deviation D-3). The free-plan line comes from the pricing
+ * catalogue, the placeholder line without one (the public-repo rule).
  */
-export function FeatureHero({ feature }: { feature: Feature }) {
+export function FeatureHero({
+    feature,
+    freeLine,
+}: {
+    feature: Feature;
+    /** The free-plan line, from the catalogue (`freePlanLine`). */
+    freeLine: string;
+}) {
     return (
         <>
             <Container
@@ -58,7 +65,7 @@ export function FeatureHero({ feature }: { feature: Feature }) {
                     ) : null}
                 </div>
                 <div className="text-mk-note text-muted-foreground">
-                    {FREE_PLAN_LINE}
+                    {freeLine}
                 </div>
             </Container>
             <Container className="pt-14">

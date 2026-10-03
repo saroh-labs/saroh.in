@@ -6,9 +6,9 @@ import { CtaLink } from "../cta-link";
 /**
  * One plan card from the Solutions design's pricing block. Featured: Ink,
  * the page's Saffron fit line and the Saffron button; otherwise white with
- * an outlined button. It draws only what `teaser` says, so the catalogue
- * (U24) can replace the placeholder words without touching this card or the
- * page. The button's label and address come from the one CTA builder.
+ * an outlined button. It draws only what `teaser` says (the catalogue's
+ * words, or the placeholder: `lib/plan-teasers.ts`). The button's label and
+ * address come from the one CTA builder. Home's pricing teaser uses it too.
  */
 export function PlanTeaserCard({
     teaser,
@@ -65,6 +65,8 @@ export function PlanTeaserCard({
             <CtaLink
                 src={src}
                 plan={teaser.plan}
+                planName={teaser.name}
+                paid={teaser.paid}
                 size="md"
                 variant={featured ? "saffron" : "secondary"}
                 className={cn(
