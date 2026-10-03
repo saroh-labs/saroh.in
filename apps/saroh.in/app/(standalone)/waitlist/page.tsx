@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import Link from "next/link";
 
 import { WaitlistForm } from "@/components/v2/waitlist/waitlist-form";
+import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
 import type { WaitlistContent } from "@/content/waitlist";
 import {
     HERO_KINDS,
@@ -147,9 +148,25 @@ export default async function WaitlistPage() {
                     </span>{" "}
                     · {WAITLIST_FOOTER.meaning}
                 </span>
-                <span className="font-mono text-[12px]">
-                    {WAITLIST_FOOTER.social}
-                </span>
+                <nav
+                    aria-label="Saroh elsewhere"
+                    className="font-mono text-[12px]"
+                >
+                    {SAROH_HANDLE}
+                    {SAROH_SOCIAL.map((link) => (
+                        <span key={link.href}>
+                            {" · "}
+                            <a
+                                href={link.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="cursor-pointer rounded-sm text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                            >
+                                {link.label}
+                            </a>
+                        </span>
+                    ))}
+                </nav>
             </footer>
         </div>
     );

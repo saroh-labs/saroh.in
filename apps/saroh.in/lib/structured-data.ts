@@ -1,6 +1,7 @@
 import type { Catalog } from "@saroh/pricing-catalog";
 import { offeredPlans } from "@saroh/pricing-catalog";
 
+import { SAROH_SOCIAL } from "@/content/social";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 /**
@@ -20,6 +21,7 @@ export function organizationLd(): JsonLdObject {
         name: SITE_NAME,
         url: SITE_URL,
         logo: `${SITE_URL}/icon1.png`,
+        sameAs: SAROH_SOCIAL.map((link) => link.href),
     };
 }
 
