@@ -30,14 +30,20 @@ import { EntitlementService } from "./entitlement.service";
 import { PlansService } from "./plans.service";
 
 const tag = `${process.pid}-${Date.now()}`;
-const MIGRATION = path.resolve(
-    __dirname,
-    "../../../../../packages/database/prisma/migrations/20261021100000_pricing_catalogue/migration.sql",
+const MIGRATIONS = [
+    "20261021100000_pricing_catalogue",
+    "20261021170000_coupon_razorpay_offer",
+].map((name) =>
+    path.resolve(
+        __dirname,
+        `../../../../../packages/database/prisma/migrations/${name}/migration.sql`,
+    ),
 );
 
-/** Add each of the migration's CHECK constraints the database doesn't have. */
+/** Add each of the migrations' CHECK constraints the database doesn't have. */
 async function ensureMigrationChecks(): Promise<number> {
-    const statements = readFileSync(MIGRATION, "utf8")
+    const statements = MIGRATIONS.map((file) => readFileSync(file, "utf8"))
+        .join(";\n")
         .replace(/--[^\n]*/g, "")
         .split(";")
         .map((s) => s.trim())
