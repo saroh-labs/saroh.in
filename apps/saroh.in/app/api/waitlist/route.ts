@@ -9,8 +9,8 @@
 // directly: that keeps the API origin out of the browser bundle, avoids a CORS
 // preflight on the conversion path, gives one place to sign the visitor's
 // address for the API's rate limit (`lib/waitlist-forward.ts`), and one place
-// to translate the API's response into the `{status}` shape both the V2 page
-// and the V1 form read.
+// to translate the API's response into the `{status}` shape the waitlist
+// form reads.
 
 import { NextResponse } from "next/server";
 

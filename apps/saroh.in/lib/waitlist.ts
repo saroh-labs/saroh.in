@@ -89,7 +89,7 @@ export interface WaitlistRequest {
     ref?: string;
 }
 
-/** What `/api/waitlist` answers (the `{status}` contract the V1 form reads too). */
+/** What `/api/waitlist` answers (the `{status}` contract). */
 export type WaitlistResponse =
     | {
           status: "success";

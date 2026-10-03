@@ -8,12 +8,6 @@ export const SIGN_IN_URL = `${ACCOUNTS}/login`;
 /** Sign-up, used only in open mode (`cta`). */
 export const SIGN_UP_URL = `${ACCOUNTS}/signup`;
 
-/**
- * V1's one ask while signup is gated (#261, PRODUCT.md): every "start" button
- * on a V1 page points at the waitlist card that closes it. V2 pages use `cta`.
- */
-export const WAITLIST_HREF = "#waitlist";
-
 export type LaunchMode = "waitlist" | "open";
 export type PlanId = "free" | "grow" | "pro";
 

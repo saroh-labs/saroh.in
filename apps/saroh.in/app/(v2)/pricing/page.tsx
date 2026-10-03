@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 
-import {
-    PRICING_COPY,
-    PricingPage,
-} from "@/components/v2/pricing/pricing-page";
+import { JsonLd } from "@/components/v2/json-ld";
+import { PricingPage } from "@/components/v2/pricing/pricing-page";
+import { PRICING_COPY, PRICING_DESCRIPTION } from "@/content/pricing";
 import { readLivePricing } from "@/lib/pricing";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
+import { pageMetadata } from "@/lib/seo";
+import { softwareApplicationLd } from "@/lib/structured-data";
 
 /**
  * `/pricing` (plans catalogue U24): the Pricing design, drawn from the
@@ -16,30 +17,24 @@ import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
  */
 export const revalidate = 300;
 
-const DESCRIPTION =
-    "Start free with your site and your first bookings. Move to Grow for orders, subscriptions and invoices, and to Pro for your own look and a bigger team.";
-
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
     title: `Pricing — ${PRICING_COPY.title} · Saroh`,
-    description: DESCRIPTION,
-    alternates: { canonical: "/pricing" },
-    openGraph: {
-        type: "website",
-        siteName: "Saroh",
-        url: "/pricing",
-        title: `Pricing — ${PRICING_COPY.title}`,
-        description: DESCRIPTION,
-    },
-    twitter: {
-        title: `Pricing — ${PRICING_COPY.title}`,
-        description: DESCRIPTION,
-    },
-};
+    socialTitle: `Pricing — ${PRICING_COPY.title}`,
+    description: PRICING_DESCRIPTION,
+    path: "/pricing",
+});
 
 export default async function PricingRoute() {
     const catalog = await readLivePricing();
     const model = catalog
         ? pricingPageModel(catalog)
         : placeholderPricingModel();
-    return <PricingPage model={model} />;
+    return (
+        <>
+            <JsonLd
+                data={softwareApplicationLd(catalog, PRICING_DESCRIPTION)}
+            />
+            <PricingPage model={model} />
+        </>
+    );
 }

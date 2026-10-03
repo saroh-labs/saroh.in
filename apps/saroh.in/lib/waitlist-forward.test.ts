@@ -136,7 +136,7 @@ describe("joinBody", () => {
         ).toBe("direct");
     });
 
-    it("keeps the V1 form's email-only signup and its old source", () => {
+    it("still takes an email-only signup from a V1 page left open, with its old source", () => {
         expect(joinBody({ email: "a@b.in" })).toEqual({
             email: "a@b.in",
             source: "saroh.in",

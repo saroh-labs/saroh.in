@@ -1,17 +1,10 @@
+import { PRICING_COPY } from "@/content/pricing";
 import type { PricingPageModel } from "@/lib/pricing-model";
 
 import { Container } from "../container";
 import { CtaBand } from "../cta-band";
 import { Eyebrow } from "../eyebrow";
 import { PricingPlans } from "./pricing-plans";
-
-/** The words the Pricing design fixes; everything else comes from the catalogue. */
-export const PRICING_COPY = {
-    eyebrow: "Pricing",
-    title: "Start free. Pay when you start selling.",
-    intro: "Put your site up and take your first bookings for nothing. Move to Grow when you want orders, subscriptions and invoices, and to Pro when you want your own look and a bigger team.",
-    closer: "Your site can be up tonight, for free.",
-} as const;
 
 /**
  * The Pricing design, for a model (`lib/pricing-view.ts`): the published

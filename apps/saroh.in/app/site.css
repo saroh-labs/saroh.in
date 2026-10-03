@@ -9,7 +9,6 @@
  */
 :root {
     color-scheme: light;
-    --marketing-canvas: 42 23% 89%; /* #E9E5DC — V1 pages only */
 
     /*
      * Marketing Site V2 values the ADR-005 tokens do not already hold (plan

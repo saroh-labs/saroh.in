@@ -82,8 +82,10 @@ const text = (value: unknown, max: number): string | undefined =>
 
 /**
  * The API body for what the page posted, or null when it is not a join.
- * The V2 form sends `business` and `kind` (and `src` for its source); the
- * V1 form sends an email only, recorded with its old source "saroh.in".
+ * The V2 form sends `business` and `kind` (and `src` for its source). An
+ * email alone, the V1 form's body, is still taken, with its old source
+ * "saroh.in": U26 removed that form, but a V1 page left open in a browser
+ * across the release can still post it.
  */
 export function joinBody(posted: unknown): JoinBody | null {
     if (typeof posted !== "object" || posted === null) return null;
