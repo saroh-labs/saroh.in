@@ -229,10 +229,9 @@ export class AddonsService {
 
     private async view(sub: Sub | null, now: Date): Promise<AddonsView> {
         const why = cantBuy(sub, now);
-        const catalog =
-            sub && sub.plan.key.startsWith(CATALOG_PLAN_KEY_PREFIX)
-                ? await catalogueOfVersion(prisma, sub.plan.version)
-                : null;
+        const catalog = sub?.plan.key.startsWith(CATALOG_PLAN_KEY_PREFIX)
+            ? await catalogueOfVersion(prisma, sub.plan.version)
+            : null;
         const planId = sub ? catalogPlanIdForKey(sub.plan.key) : null;
         return {
             canBuy: !why && Boolean(catalog),
