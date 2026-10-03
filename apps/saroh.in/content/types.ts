@@ -8,7 +8,6 @@
  */
 import type { PlanId } from "@/lib/links";
 
-import type { FaqId } from "./faq";
 import type { ShotKey } from "./shots";
 
 export type { PlanId, ShotKey };
@@ -121,6 +120,21 @@ export interface Solution {
     faq: FaqId;
     closer: string;
 }
+
+/** Every question on the site, by id (`faq.ts` holds the words). */
+export const FAQ_IDS = [
+    "start-free",
+    "gst",
+    "gst-solutions",
+    "pay",
+    "team",
+    "medical-notes",
+    "hindi",
+    "shops-counter-online",
+    "gyms-pack-and-membership",
+    "clinics-medical-notes",
+] as const;
+export type FaqId = (typeof FAQ_IDS)[number];
 
 export interface FaqItem {
     q: string;

@@ -8,7 +8,7 @@
  * drops the sentence giving Grow's team size. Both come back from the
  * catalogue when it feeds the site (U24).
  */
-import type { FaqItem } from "./types";
+import type { FaqId, FaqItem } from "./types";
 
 export const faqs = {
     "start-free": {
@@ -51,9 +51,9 @@ export const faqs = {
         q: "Who can read a patient's medical notes?",
         a: "Only people whose role allows sensitive notes, such as your dentists and the owner. Allergies and access needs show wherever a patient's name appears, so the desk still knows to take care.",
     },
-} satisfies Record<string, FaqItem>;
+} satisfies Record<FaqId, FaqItem>;
 
-export type FaqId = keyof typeof faqs;
+export type { FaqId };
 
 /** Home's six questions (`#faq`), in the design's order. */
 export const HOME_FAQ: FaqId[] = [
