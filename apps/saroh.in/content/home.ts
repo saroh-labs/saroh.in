@@ -6,7 +6,10 @@
  *
  * The free-plan line and the plan teasers follow the public-repo rule: no
  * prices, no limits. Their figures come from the pricing catalogue
- * (`lib/plan-teasers.ts`), with the placeholders as the fallback.
+ * (`lib/plan-teasers.ts`), with the placeholders as the fallback. What each
+ * plan includes is set in the admin (DEC-075, D3), so no line here says
+ * what Free leaves out or what a paid plan adds: "Move up when you need
+ * more."
  */
 import type { PlanTeaser, ShotRef } from "./types";
 import { PLAN_DETAILS_PLACEHOLDER } from "./types";
@@ -28,43 +31,41 @@ export const home = {
         { initial: "H", rest: "andled." },
     ] satisfies HeroWord[],
     headlineLabel: "Services, Appointments, Retail, Orders. Handled.",
-    sub: "Your site, bookings, orders and GST invoices in one place. Enter anything once and every part knows. And every morning, one screen shows you what needs you.",
-    hero: {
-        shot: "s-home",
-        alt: "The Saroh dashboard at Rye & Co.: late orders, a failed renewal and what's due today, most urgent first",
-    } satisfies ShotRef,
-    chips: [
-        "UPI Autopay",
-        "GST invoices",
-        "Bills of supply",
-        "English and हिंदी",
-    ],
+    sub: "Your site, bookings, orders and GST invoices in one place. Add a product, a service or a customer once, and your site, orders and invoices use it. And every morning, one screen shows you what needs you.",
+    hero: { shot: "s-home" } satisfies ShotRef,
+    /**
+     * "UPI Autopay" is the merchant's choice on their own Razorpay account
+     * (DEC-075, D1). "English and हिंदी" is gone until a business's own
+     * content can be in more than one language (D13).
+     */
+    chips: ["UPI Autopay", "GST invoices", "Bills of supply"],
     worksFor: "Works for",
     featuresEyebrow: "Everything in Saroh",
-    featuresTitle: "Eight parts that know about each other.",
+    featuresTitle: "Eight parts, one workspace.",
     solutionsTitle: "Solutions",
     pricingTitle: "Pricing",
     pricingCompare: "Compare every plan",
     faqTitle: "Questions",
     /** The dark CTA band's title (the design's "band" closer). */
-    closer: "Tomorrow morning, know what needs you.",
+    closer: "Every morning, know what needs you.",
     metaTitle: "Saroh — Services, Appointments, Retail, Orders. Handled.",
 } as const;
 
 /**
  * The line under every hero's buttons (Home, the feature and solution
- * pages): "Free to start: one website, … and …. Grow adds orders,
- * subscriptions and invoicing." The middle is the free plan's own card lines
- * for these modules, read from the pricing catalogue
- * (`lib/plan-teasers.ts` `freePlanLine`), so no limit is written here. With
- * no catalogue the line is `fallback`.
+ * pages): "Free to start: one website, … and …. Move up when you need
+ * more." The middle is the free plan's own card lines for these modules,
+ * read from the pricing catalogue (`lib/plan-teasers.ts` `freePlanLine`), so
+ * no limit is written here, and the tail names no paid plan's contents: the
+ * split is set in the admin (DEC-075, D3). With no catalogue the line is
+ * `fallback`.
  */
 export const FREE_PLAN_LINE = {
     lead: "Free to start",
     /** Catalogue module ids, in the order the line names them. */
     modules: ["website", "products", "bookings"],
-    tail: "Grow adds orders, subscriptions and invoicing.",
-    fallback: `Free to start. Grow adds orders, subscriptions and invoicing. ${PLAN_DETAILS_PLACEHOLDER}.`,
+    tail: "Move up when you need more.",
+    fallback: `Free to start. Move up when you need more. ${PLAN_DETAILS_PLACEHOLDER}.`,
 } as const;
 
 /** Home's pricing teaser and the plan order everywhere: Grow is featured. */
@@ -76,7 +77,7 @@ export const PLAN_TEASERS: PlanTeaser[] = [
 
 /** The dark CTA band every page closes with; each page brings its title. */
 export const CTA_BAND = {
-    body: "Set up your site and bookings tonight, free. Move to Grow when you're ready to take orders and send invoices.",
+    body: "Set up your site and bookings for free, and move up when you need more.",
     note: "No card needed to start.",
 } as const;
 

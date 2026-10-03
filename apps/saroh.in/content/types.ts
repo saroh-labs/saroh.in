@@ -29,17 +29,22 @@ export type FeatureSlug = (typeof FEATURE_SLUGS)[number];
 export const SOLUTION_SLUGS = ["shops", "gyms", "clinics"] as const;
 export type SolutionSlug = (typeof SOLUTION_SLUGS)[number];
 
-/** A screenshot as one place shows it: the manifest key and this place's alt. */
+/**
+ * A screenshot as one place shows it: the manifest key, and optionally this
+ * place's own alt. Leave `alt` out: the frame then reads the manifest's
+ * (`shots.ts`), which for a captured shot describes what the image really
+ * shows (claims ledger §9). A place's own alt would say what the design
+ * drew, which the real screen may not show.
+ */
 export interface ShotRef {
     shot: ShotKey;
-    /** The design's caption for the shot where it appears here. */
-    alt: string;
+    alt?: string;
 }
 
 export interface FeatureStep extends ShotRef {
     title: string;
     body: string;
-    /** The business it is shown at, e.g. "Rye & Co., a bakery". */
+    /** The demo business it is shown at, e.g. "Rye & Co. (demo bakery)". */
     who: string;
 }
 
@@ -129,7 +134,6 @@ export const FAQ_IDS = [
     "pay",
     "team",
     "medical-notes",
-    "hindi",
     "shops-counter-online",
     "gyms-pack-and-membership",
     "clinics-medical-notes",

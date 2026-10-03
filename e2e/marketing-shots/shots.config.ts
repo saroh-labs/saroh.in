@@ -16,8 +16,10 @@
  * and Northwind is the only demo business with Insights turned on that has
  * data in it (see `gap`).
  *
- * Captions are the design's words, with its money amounts left out (the repo
- * carries no amounts); the design files have them in full.
+ * `caption` keeps the design's words, with its money amounts left out (the
+ * repo carries no amounts), for the claims ledger. `alt` says what the image
+ * really shows, and names each demo business as a demo (DEC-075, D14): it is
+ * the caption every page shows.
  *
  * Read-only: every step here only navigates, scrolls, flips a view that keeps
  * its state in the page, or hides a notice with CSS. Nothing is saved, and no
@@ -87,7 +89,7 @@ export interface Shot {
     viewport: Viewport;
     steps?: Step[];
     clip?: Clip;
-    /** Alt text, from the design. */
+    /** Alt text: what the image shows, the business named as a demo. */
     alt: string;
     /** The design's caption or who-line for the shot, for the claims ledger. */
     caption: string;
@@ -108,7 +110,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/",
         viewport: DESK,
-        alt: "Home at Rye & Co.: what needs doing today, from late orders to a failed renewal",
+        alt: "Home at Rye & Co. (demo bakery): what needs doing today, from late orders to a failed renewal",
         caption:
             "Home at Rye & Co.: nine things that need Priya, from late orders to a failed renewal",
         gap: 'The owner is "Demo", not Priya, and the list holds 16 things, not nine.',
@@ -120,7 +122,7 @@ export const SHOTS: Shot[] = [
         route: "/commerce/orders",
         viewport: DESK,
         steps: [LATE_RULE_NOTICE],
-        alt: "The Orders list at Rye & Co.: each order's step, how long it has waited, when it was placed and its total",
+        alt: "The Orders list at Rye & Co. (demo bakery): each order's step, how long it has waited, when it was placed and its total",
         caption:
             "The Orders list at Rye & Co.: each order's step, how long it has waited, when it was placed and its total",
     },
@@ -131,7 +133,7 @@ export const SHOTS: Shot[] = [
         // Order #1074: Priya Raman's, placed today, a loaf that may contain sesame.
         route: "/commerce/orders/seed_sc_rc_order_73",
         viewport: DESK,
-        alt: "An order at Rye & Co.: how long it has waited, a sesame allergy warning, items, customer and money",
+        alt: "An order at Rye & Co. (demo bakery): how long it has waited, a sesame allergy warning, items, customer and money",
         caption:
             "Order #1020: waiting 16 minutes, a sesame allergy warning, items, customer and money",
         gap: "The seed's allergy order is #1074 and it has waited hours, not 16 minutes; #1020 is an old, collected order.",
@@ -143,7 +145,7 @@ export const SHOTS: Shot[] = [
         // RC/26-27/0087, written by hand to Kiln & Co. Café.
         route: "/billing/invoices/seed_sc_rc_invoice_trade_3",
         viewport: DESK,
-        alt: "A GST tax invoice from Rye & Co. to a café, with the business's details and tax",
+        alt: "A GST tax invoice from Rye & Co. (demo bakery) to a café, with the business's details and tax",
         caption:
             "A GST invoice made from an order, with the business's details and tax / A GST tax invoice from Rye & Co. to Third Wave Café",
         gap: "No café is called Third Wave Café in the seed (this is Kiln & Co. Café), and this invoice was written by hand, not made from an order.",
@@ -185,7 +187,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/billing/subscriptions",
         viewport: DESK,
-        alt: "Subscriptions at Rye & Co. with one failed renewal flagged",
+        alt: "Subscriptions at Rye & Co. (demo bakery) with one failed renewal flagged",
         caption: "Subscriptions at Rye & Co. with one failed renewal flagged",
     },
     {
@@ -194,7 +196,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/billing/invoices",
         viewport: DESK,
-        alt: "Invoices at Rye & Co.: each order's GST invoice, paid or due, with what's overdue flagged",
+        alt: "Invoices at Rye & Co. (demo bakery): each order's GST invoice, paid or due, with what's overdue flagged",
         caption:
             "Invoices at Rye & Co.: each order's GST invoice, paid or due, with a bulk order in draft",
         gap: "The café's draft sits further down the list; the first screen shows today's paid order invoices and the overdue banner.",
@@ -216,7 +218,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/commerce/products",
         viewport: DESK,
-        alt: "The Products list at Rye & Co.: what needs restocking at the top, then every product with status, stock and price",
+        alt: "The Products list at Rye & Co. (demo bakery): what needs restocking at the top, then every product with status, stock and price",
         caption:
             "The Products list at Rye & Co.: what needs restocking at the top, then every product with status, stock and price",
     },
@@ -226,7 +228,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/commerce/products/seed_sc_rc_product_0/edit",
         viewport: DESK,
-        alt: "The product editor: name, address on the shop, price and category beside visibility, variants and stock",
+        alt: "The product editor: name, link, price and category beside visibility, variants and stock",
         caption:
             "The product editor: name, address on the shop, price and category beside visibility, variants and stock",
     },
@@ -241,7 +243,7 @@ export const SHOTS: Shot[] = [
         viewport: { width: 1440, height: 1600 },
         steps: [{ click: '[role="switch"]:has-text("Team notes")' }],
         clip: { selector: "div.overflow-hidden.rounded-xl.border.shadow-sm" },
-        alt: "Rye & Co.'s shop page for the Sourdough loaf: sizes, price and Add to basket",
+        alt: "The shop page of Rye & Co. (demo bakery) for the Sourdough loaf: sizes, price and Add to basket",
         caption:
             "Rye & Co.'s shop page showing each product with its sizes, price and an Add to bag button / Rye & Co.'s own shop, built on Saroh: products with sizes, prices and Add to bag",
         gap: "Rye's website has no shop yet, so this is one product's shop page (the Customer view), not a list of products; the button reads \"Add to basket\".",
@@ -331,7 +333,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/",
         viewport: DESK,
-        alt: "Pulse Fitness's Home: overdue memberships, follow-ups and this week's takings",
+        alt: "Home at Pulse Fitness (demo gym): overdue memberships, follow-ups and this week's takings",
         caption:
             "Pulse Fitness's Home: overdue memberships, a failed renewal and today's sessions",
         gap: "The first screen is overdue memberships and follow-ups; today's sessions and the failed renewal sit further down.",
@@ -342,7 +344,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/bookings?layout=week&date={nextMonday}",
         viewport: DESK,
-        alt: "Pulse Fitness's week: personal training and classes, by the hour",
+        alt: "The week at Pulse Fitness (demo gym): personal training and classes, by the hour",
         caption:
             "Pulse Fitness's week: personal training and classes for each trainer, by the hour",
         gap: "The week view lays out by day, not by trainer; the trainer is on each booking.",
@@ -353,7 +355,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "site:/book",
         viewport: DESK,
-        alt: "Pulse Fitness's booking page with services, classes and a summary",
+        alt: "The booking page of Pulse Fitness (demo gym), with services, classes and a summary",
         caption:
             "Pulse Fitness's booking page with services, courses and a summary",
     },
@@ -363,7 +365,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/courses",
         viewport: DESK,
-        alt: "Courses at Pulse: a four-week strength course with the places taken",
+        alt: "Courses at Pulse Fitness (demo gym): a four-week strength course with the places taken",
         caption:
             "Courses at Pulse: a six-week beginners' course and a 5K course with places filled",
         gap: 'The seed has one course, "Strength foundations — four weeks".',
@@ -384,7 +386,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/customers/seed_sc_pulse_contact_182",
         viewport: DESK,
-        alt: "Asha Verma's page at Pulse: classes left on her membership and her next booking",
+        alt: "Asha Verma's page at Pulse Fitness (demo gym): classes left on her membership and her next booking",
         caption:
             "Farah Khan's page at Pulse: a six-week course, classes left and her next booking",
         gap: "Farah Khan is a Kavi Dental patient in the seed; Asha Verma is on Pulse's four-week course, and the page shows her membership and next booking, not the course.",
@@ -395,7 +397,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/billing/subscriptions",
         viewport: DESK,
-        alt: "Memberships at Pulse with their next charge",
+        alt: "Memberships at Pulse Fitness (demo gym) with their next charge",
         caption: "Memberships at Pulse with their next charge",
     },
     {
@@ -404,7 +406,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/billing/invoices",
         viewport: DESK,
-        alt: "Pulse Fitness's invoices with the overdue ones flagged",
+        alt: "Invoices at Pulse Fitness (demo gym), with the overdue ones flagged",
         caption: "Pulse Fitness's invoices with four overdue",
         gap: "The seed has 17 overdue, not four.",
     },
@@ -414,7 +416,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "site:/",
         viewport: DESK,
-        alt: "Pulse Fitness's own site on Saroh: what's on today and Book a free trial",
+        alt: "The site of Pulse Fitness (demo gym): what's on today and Book a free trial",
         caption:
             "Pulse Fitness's site with classes today and a link to memberships",
         gap: 'Whether classes show under "On today" depends on the hour the shot is taken; Memberships is in the site\'s menu.',
@@ -427,7 +429,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/",
         viewport: DESK,
-        alt: "Kavi Dental's Home: a patient's note from the booking page, overdue bills and the week so far",
+        alt: "Home at Kavi Dental (demo clinic): a patient's note from the booking page, overdue bills and the week so far",
         caption:
             "Kavi Dental's Home: today's patients with their dentist, chair and flags",
         gap: "Home leads with what needs the desk (a booking note, overdue bills), not today's patient list; the seed has no chairs.",
@@ -438,7 +440,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/commerce/orders/seed_sc_kavi_order_rahul_rct",
         viewport: DESK,
-        alt: "A root canal at Kavi Dental: visit 1 attended, visit 2 booked, visit 3 still to book",
+        alt: "A root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book",
         caption:
             "Order #D301, a root canal: visit 1 attended, visit 2 today, visit 3 still to book",
         gap: "The order is #ORD-001 and visit 2 is booked for a coming day, not today.",
@@ -459,7 +461,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/commerce/customers",
         viewport: DESK,
-        alt: "Kavi Dental's patients with medical and allergy tags",
+        alt: "Patients at Kavi Dental (demo clinic), with medical and allergy tags",
         caption: "Kavi Dental's patients with medical and allergy tags",
     },
     {
@@ -468,7 +470,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "site:/book",
         viewport: DESK,
-        alt: "Kavi Dental's booking page with check-ups, a root canal over three visits and a video consult",
+        alt: "The booking page of Kavi Dental (demo clinic), with check-ups, a root canal over three visits and a video consult",
         caption:
             "Kavi Dental's booking page with check-ups, a root canal over three visits and a video consult",
     },
@@ -478,7 +480,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/billing/invoices",
         viewport: DESK,
-        alt: "Kavi Dental's bills of supply with the overdue ones flagged",
+        alt: "Bills of supply at Kavi Dental (demo clinic), with the overdue ones flagged",
         caption: "Kavi Dental's bills of supply with one overdue",
         gap: "The seed has 16 overdue, not one.",
     },
@@ -488,7 +490,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "site:/",
         viewport: DESK,
-        alt: "Kavi Dental's own site on Saroh: free times today and Book an appointment",
+        alt: "The site of Kavi Dental (demo clinic): free times today and Book an appointment",
         caption:
             "Kavi Dental's own site on Saroh: free times today and Book an appointment",
     },

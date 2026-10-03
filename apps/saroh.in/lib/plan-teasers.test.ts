@@ -121,7 +121,7 @@ describe("startFreeFaq", () => {
     it("words the answer from the free and the first paid plan", () => {
         expect(startFreeFaq(fakeCatalog(), faqs["start-free"])).toEqual({
             q: faqs["start-free"].q,
-            a: `The Plan A plan is ${formatInr(0)} a month: thing one, few items and some visits. Move to Plan B (${formatInr(11_100)} a month) when you want to take orders, run subscriptions, send invoices or add your team.`,
+            a: `The Plan A plan is ${formatInr(0)} a month: thing one, few items and some visits. Move to Plan B (${formatInr(11_100)} a month) when you need more.`,
         });
     });
 
