@@ -358,6 +358,8 @@ organizations/:org/customers`: everyone who has paid (an order through a
 
 - **Current** — UI, marketing, docs and comments match what ships, and a
   configured-but-broken capability says so (`PRODUCT.md`, principle 2).
+  Every claim on saroh.in has a row in `docs/architecture/MARKETING_CLAIMS.md`
+  (claim, what backs it, status); a new claim gets its row first.
 - **Current** — There are no customers, testimonials or case studies. Never
   fabricate them.
 - **Current** — Signup is waitlist-only. Social publishing is not a current

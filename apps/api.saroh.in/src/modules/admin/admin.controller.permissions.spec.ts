@@ -209,12 +209,22 @@ describe("Waitlist permissions", () => {
         return route ? permissionsOf(route.handler) : undefined;
     };
 
-    it("needs personal data and its own permission to invite", () => {
-        expect(perms("invite")).toEqual([
-            AdminPermission.OrganizationPiiRead,
-            AdminPermission.WaitlistInvite,
-        ]);
-    });
+    it.each(["waitlistSummary", "listWaitlist"] as const)(
+        "needs waitlist read for %s",
+        (method) => {
+            expect(perms(method)).toEqual([AdminPermission.WaitlistRead]);
+        },
+    );
+
+    it.each(["invite", "removeFromWaitlist"] as const)(
+        "needs waitlist read and its own permission to %s",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.WaitlistRead,
+                AdminPermission.WaitlistInvite,
+            ]);
+        },
+    );
 });
 
 describe("AdminController staff identity", () => {

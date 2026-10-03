@@ -1,22 +1,28 @@
 import {
     Body,
     Controller,
+    Headers,
     HttpCode,
     HttpException,
     HttpStatus,
     Ip,
     Post,
 } from "@nestjs/common";
-import { hashClientIp } from "../../common/client-ip";
 
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { JoinWaitlistDto } from "./dto";
 import { WaitlistService } from "./waitlist.service";
 
+/** What a join answers. A repeat (`created: false`) carries no place or link. */
+export type JoinWaitlistResponse =
+    | { ok: true; created: true; position: number; ref: string | null }
+    | { ok: true; created: false };
+
 /**
  * PUBLIC waitlist API, mounted at `/public/waitlist` with NO guards — this is
- * what the marketing site's form POST reaches. Mirrors the guardless enquiry
- * (S3-002) and public-payments surfaces.
+ * what the marketing site's `/api/waitlist` route forwards to. Mirrors the
+ * guardless enquiry (S3-002) and public-payments surfaces.
  *
  * Write-only by design: there is no GET here. The list of people waiting is an
  * operator concern and does not belong on an unauthenticated controller.
@@ -24,22 +30,31 @@ import { WaitlistService } from "./waitlist.service";
 @Controller("public/waitlist")
 export class WaitlistController {
     /**
-     * Per-IP speed bump. Same in-process, non-durable limiter the enquiry
+     * Per-visitor speed bump. Same in-process, non-durable limiter the enquiry
      * surface uses — a cheap abuse brake, not a guarantee (see its docstring:
      * behind N replicas a client gets N× the limit). A waitlist is a low-value
-     * target, so this is proportionate; a distributed limiter stays a later
-     * concern shared with enquiry.
+     * target, so this is proportionate.
      */
     private readonly limiter = new FixedWindowRateLimiter(5, 60_000);
 
     constructor(private readonly waitlist: WaitlistService) {}
 
+    /**
+     * The limit counts the visitor: the address saroh.in's server signs into
+     * `x-saroh-relay` (from its platform's own header, never a client-sent
+     * `X-Forwarded-For`), else the caller's own. A relay that does not check
+     * counts the caller, so forging one buys nothing.
+     */
     @Post()
     @HttpCode(HttpStatus.OK)
-    async join(@Body() dto: JoinWaitlistDto, @Ip() ip: string) {
+    async join(
+        @Body() dto: JoinWaitlistDto,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<JoinWaitlistResponse> {
         // The raw IP is hashed immediately and never leaves this handler — it
         // is used as the rate-limit key and stored only as a digest.
-        const ipHash = hashClientIp(ip);
+        const ipHash = visitorKey(ip, relay);
 
         if (ipHash && !this.limiter.take(ipHash)) {
             throw new HttpException(
@@ -48,12 +63,24 @@ export class WaitlistController {
             );
         }
 
-        const { created } = await this.waitlist.join({
+        const result = await this.waitlist.join({
             email: dto.email,
+            business: dto.business,
+            kind: dto.kind,
+            city: dto.city,
+            plan: dto.plan,
             source: dto.source,
+            ref: dto.ref,
             ipHash,
         });
 
-        return { ok: true, created };
+        return result.created
+            ? {
+                  ok: true,
+                  created: true,
+                  position: result.position,
+                  ref: result.refCode,
+              }
+            : { ok: true, created: false };
     }
 }
