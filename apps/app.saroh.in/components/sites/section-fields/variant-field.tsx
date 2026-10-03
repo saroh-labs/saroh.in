@@ -2,7 +2,7 @@
 
 import {
     BLOCK_META,
-    latestContractVersion,
+    liftToLatest,
     resolveVariant,
 } from "@saroh/block-contract";
 import {
@@ -45,13 +45,21 @@ import { Field } from "./field";
  *
  * Touching a section also moves it to the newest contract, the way writing a
  * button lifts a hero to v2 (#207) — that is what turns a `gallery@1` carrying
- * `layout` into a `gallery@2` carrying `variant`.
+ * `layout` into a `gallery@2` carrying `variant`. The content moves with the
+ * version (`liftToLatest`): lifting only the number left a starter hero's v1
+ * button without the `action` v2 requires, so a hero switched to Split could
+ * never save.
  */
 export function withVariant(section: Section, id: string): Section {
+    const lifted = liftToLatest(
+        section.type,
+        section.contractVersion,
+        section.content as Record<string, unknown>,
+    );
     return {
         ...section,
-        contractVersion: latestContractVersion(section.type),
-        content: { ...section.content, variant: id },
+        contractVersion: lifted.version,
+        content: { ...lifted.content, variant: id },
     } as Section;
 }
 
