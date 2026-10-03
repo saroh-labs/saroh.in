@@ -4,9 +4,16 @@ import localFont from "next/font/local";
 import Link from "next/link";
 
 import { WaitlistForm } from "@/components/v2/waitlist/waitlist-form";
-import { HERO_KINDS, WAITLIST, WAITLIST_FOOTER } from "@/content/waitlist";
+import type { WaitlistContent } from "@/content/waitlist";
+import {
+    HERO_KINDS,
+    launchOfferLines,
+    WAITLIST,
+    WAITLIST_FOOTER,
+} from "@/content/waitlist";
+import { readLaunchOffer } from "@/lib/launch-offer";
 import { pageMetadata } from "@/lib/seo";
-import { openingShort, waitlistContext } from "@/lib/waitlist";
+import { openingShort } from "@/lib/waitlist";
 
 /*
  * The footer's one Devanagari word, सारोह, in Noto Sans Devanagari 500 (the
@@ -45,19 +52,27 @@ const HERO: [string, string][] = [
 ];
 
 /**
+ * Static, refreshed every five minutes (ISR), the window the launch offer
+ * is cached for, and at once when the API calls `/api/revalidate`.
+ */
+export const revalidate = 300;
+
+/**
  * The waitlist (Waitlist design, plan U30): the site's one ask until
  * launch. It has its own header and footer, as the design draws them, so it
- * sits outside the `(v2)` chrome. `?plan=` and `?src=` come from the CTA
- * builder (`lib/links.ts`), `?ref=` from a referral link.
+ * sits outside the `(v2)` chrome. The launch offer is the API's (U31); with
+ * none, the form says it is announced at launch. The page reads no query, so
+ * it stays static: the form reads `?plan=`, `?src=` (the CTA builder,
+ * `lib/links.ts`) and `?ref=` (a referral link) in the browser as it sends.
  */
-export default async function WaitlistPage({
-    searchParams,
-}: {
-    searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-    const { plan, src, ref } = waitlistContext(await searchParams);
-    const opening = WAITLIST.openingDate
-        ? `Opens ${openingShort(WAITLIST.openingDate)}`
+export default async function WaitlistPage() {
+    const offer = await readLaunchOffer();
+    const content: WaitlistContent = {
+        ...WAITLIST,
+        offer: offer ? launchOfferLines(offer) : WAITLIST.offer,
+    };
+    const opening = content.openingDate
+        ? `Opens ${openingShort(content.openingDate)}`
         : "Opening soon";
 
     return (
@@ -116,12 +131,7 @@ export default async function WaitlistPage({
                 </div>
 
                 <div className="flex flex-col gap-5 rounded-mk-card border border-border bg-white p-[clamp(20px,3vw,32px)] shadow-[0_4px_12px_rgba(28,28,26,0.10)]">
-                    <WaitlistForm
-                        content={WAITLIST}
-                        plan={plan}
-                        src={src}
-                        referral={ref}
-                    />
+                    <WaitlistForm content={content} />
                 </div>
             </main>
 

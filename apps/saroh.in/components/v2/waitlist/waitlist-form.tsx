@@ -8,13 +8,13 @@ import type { WaitlistContent } from "@/content/waitlist";
 import { NO_OFFER, WAITLIST_CONTACT, WAITLIST_KINDS } from "@/content/waitlist";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
-import type { PlanId } from "@/lib/links";
 import type { WaitlistResponse, WaitlistValues } from "@/lib/waitlist";
 import {
     EMPTY_WAITLIST,
     openingDay,
     referralLink,
     WAITLIST_MESSAGES,
+    waitlistContext,
     waitlistSchema,
 } from "@/lib/waitlist";
 
@@ -47,18 +47,12 @@ const SEND_FAILED: Record<string, string> = {
  * done state (D-8). If the send fails, the form stays filled with a retry
  * message under the button. GA hears `waitlist_join` with the kind, source,
  * plan and whether a referral link was used — never the email or name.
+ *
+ * The plan, source and referral come from the page's address (`?plan=`,
+ * `?src=`, `?ref=`), read here as the join is sent, so the page itself
+ * reads no query and stays static.
  */
-export function WaitlistForm({
-    content,
-    plan,
-    src,
-    referral,
-}: {
-    content: WaitlistContent;
-    plan?: PlanId;
-    src: string;
-    referral?: string;
-}) {
+export function WaitlistForm({ content }: { content: WaitlistContent }) {
     const [joined, setJoined] = useState<WaitlistJoined | null>(null);
     const form = useForm<WaitlistValues>({
         resolver: zodResolver(waitlistSchema),
@@ -79,6 +73,13 @@ export function WaitlistForm({
 
     const onSubmit = handleSubmit(async (values) => {
         const parsed = waitlistSchema.parse(values);
+        const {
+            plan,
+            src,
+            ref: referral,
+        } = waitlistContext(
+            Object.fromEntries(new URLSearchParams(window.location.search)),
+        );
         let result: WaitlistResponse;
         try {
             const response = await fetch("/api/waitlist", {

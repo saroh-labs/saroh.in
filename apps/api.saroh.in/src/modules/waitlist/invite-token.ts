@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
+import type { Catalog } from "@saroh/pricing-catalog";
+
 /**
  * The opening-day invite's link and the launch offer it carries (marketing
  * plan U31, KTD-17, OQ-1). Pure, so the rules are tested on their own.
@@ -51,6 +53,29 @@ export interface LaunchOffer {
 export function launchOffer(days: number | undefined): LaunchOffer | null {
     if (days === undefined || !Number.isInteger(days) || days < 1) return null;
     return { planKey: LAUNCH_OFFER_PLAN, days };
+}
+
+/**
+ * The launch offer as saroh.in's waitlist page shows it (`GET
+ * /public/waitlist/offer`): the plan's id and its name in the live
+ * catalogue, and the offer's length. Null when the instance gives no offer,
+ * or the live catalogue (`catalog`, null before one is installed) has no
+ * such plan, so the page never names a plan that isn't there.
+ */
+export interface PublicLaunchOffer {
+    planId: string;
+    planName: string;
+    days: number;
+}
+
+export function publicLaunchOffer(
+    offer: LaunchOffer | null,
+    catalog: Pick<Catalog, "plans"> | null,
+): PublicLaunchOffer | null {
+    if (!offer || !catalog) return null;
+    const plan = catalog.plans.find((p) => p.id === offer.planKey);
+    if (!plan) return null;
+    return { planId: plan.id, planName: plan.name, days: offer.days };
 }
 
 /** When an offer taken at `now` ends. */

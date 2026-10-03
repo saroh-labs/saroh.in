@@ -113,9 +113,7 @@ describe("open mode (U27)", () => {
     it("the waitlist page still renders", async () => {
         const { default: WaitlistPage } =
             await import("../(standalone)/waitlist/page");
-        const page = await WaitlistPage({
-            searchParams: Promise.resolve({}),
-        });
+        const page = await WaitlistPage();
         const { container } = render(page);
         expect(container.querySelector("form")).not.toBeNull();
     });
