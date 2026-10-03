@@ -2199,6 +2199,38 @@ PROCESSING (`subscriptions.charge.db.spec.ts`, `mandate-charges.db.spec.ts`).
 gate. A "may we still charge?" check never decides whether to look.
 **Category**: payments · autopay · jobs
 
+## Autopay — a declined pay-link try stopped autopay, and nothing started it again
+
+**Problem**: review 3 found that one declined card on an invoice's pay link
+stopped autopay for that renewal. The queued charge stood aside
+(RENEWAL_FAILED, CHECKOUT_OPEN) because the FAILED pay-link intent counted
+as an open checkout for three days from its `createdAt`; Retry by autopay
+was refused for those days; and once they passed nothing queued the charge
+again, so the renewal stayed unpaid until the merchant pressed Retry.
+**Root cause**: two halves. `openCheckoutWhere()` gave a FAILED try the
+same three-day life as a checkout still waiting, though Razorpay's retry
+happens in the open window, minutes after. And a stand-aside was terminal:
+the charge was CANCELLED with no step written to come back, so the rule that
+let the checkout lapse had nobody to tell.
+**Fix**: `charge-under-way.ts` measures every window from the checkout's
+last activity — made, or its newest PaymentAttempt, and for a FAILED one
+when it failed (`updatedAt`; an open intent's `updatedAt` is not used, the
+pending sweep's `lastLookupAt` bumps it). A FAILED try keeps the checkout
+open for `FAILED_CHECKOUT_MS` (an hour); an open one for `CHECKOUT_LIFE_MS`.
+The query takes the caller's `now`, so the charge job's clock reaches it.
+When a charge stands aside, `stoodAside` writes a `PREPARE` with `resume`
+and a new key for `checkoutOpenUntil()`, the moment the checkout closes;
+that run queues the charge again under the subscription's lock
+(`queueInTx`, keeping a planned D13B debit), or puts it off again if a new
+checkout opened. Every step and the debit's claim still re-ask for an open
+checkout, so it can't charge twice (`subscriptions.charge.db.spec.ts`,
+"a pay-link checkout's window").
+**Rule**: a refusal that waits on something lapsing must schedule its own
+retry for the moment it lapses — "the screen will offer Retry" is not a way
+back. And a window on customer activity is measured from their last
+activity, never from when the object was made.
+**Category**: payments · autopay · jobs
+
 ## Invoices — number-format specs failed on 1 October
 
 **Problem**: `numbering.spec.ts` and `invoice-number.test.ts` began failing

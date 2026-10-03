@@ -147,49 +147,176 @@ export async function subscriptionChargesUnderWay(
  * queues, prepares nor debits a charge on the invoice, and Retry offers the
  * pay link, not autopay (`mandateRetryable`).
  *
- * A checkout is open only within its life, {@link CHECKOUT_LIFE_MS} from
- * when it was made. A pay link's Razorpay order carries no expiry of its own
- * (`createOrderIntent` sends none), and a "pay and authorise" order's
- * expires with its set-up (`SETUP_TTL_MS`, a day), inside it. So the life is
- * the pending sweep's window (`LOOKUP_WINDOW_MS`): the time Saroh still asks
- * the provider about the order, and settles a late capture. One abandoned
- * longer no longer keeps autopay off the invoice for good; a payment on it
- * after that is settled by its webhook, as owed back if autopay took the
- * invoice first.
+ * Every window is measured from the checkout's **last activity**: when it
+ * was made, or its newest PaymentAttempt — and, for a FAILED one, when it
+ * failed (`updatedAt`: nothing writes a FAILED intent after). Not an open
+ * intent's `updatedAt`: the pending sweep stamps `lastLookupAt` on it every
+ * few hours, which is Saroh asking, not the customer paying.
  *
- * A checkout whose attempt FAILED counts too, within the same life: a
- * Razorpay checkout retries on the same order, and the customer can still
- * pay it. Nothing looks a FAILED intent up (the sweep asks open ones only),
- * so no "no capture" answer can close it sooner; its life does.
+ * - **Open** (CREATED, REQUIRES_PAYMENT, PROCESSING): within
+ *   {@link CHECKOUT_LIFE_MS}. A pay link's Razorpay order carries no expiry
+ *   of its own (`createOrderIntent` sends none), and a "pay and authorise"
+ *   order's expires with its set-up (`SETUP_TTL_MS`, a day), inside it. So
+ *   the life is the pending sweep's window (`LOOKUP_WINDOW_MS`): the time
+ *   Saroh still asks the provider about the order, and settles a late
+ *   capture.
+ * - **FAILED**: within {@link FAILED_CHECKOUT_MS} only. A Razorpay checkout
+ *   retries on the same order, in the same session — the customer's next
+ *   try comes while the window is still open in front of them, not days
+ *   later. Counting a declined try for the whole life made one declined card
+ *   stop autopay for three days (review 3).
  *
- * Measured against the wall clock, not a caller's `now`: `createdAt` is the
- * database's.
+ * Past its window a checkout no longer keeps autopay off the invoice; a
+ * payment on it after that is settled by its webhook, as owed back if
+ * autopay took the invoice first. A charge that stood aside for one is
+ * queued again when the window ends (`checkoutOpenUntil`, the charge job's
+ * `stoodAside`).
+ *
+ * `now` is the caller's clock (the job's run, or the request's), so the
+ * specs can move it; the timestamps compared are the database's.
  */
 export const CHECKOUT_LIFE_MS = LOOKUP_WINDOW_MS;
 
-/** The where of a pay-link checkout open now (above). */
+/**
+ * How long a FAILED pay-link try keeps the checkout open: an hour from its
+ * last activity. Razorpay's modal retry is in the same session — a UPI
+ * request is approved or lapses within minutes, a card's 3-D Secure page
+ * likewise — so an hour covers a slow retry and a customer who looks away,
+ * with room to spare. Longer only delays autopay for nothing: a UPI
+ * charge resumed after it still waits `PRE_DEBIT_LEAD_HOURS` (26) on its
+ * notice, and a card's debit an hour later lands the same day. Shorter
+ * risks the double charge this rule exists for: autopay debiting while the
+ * customer is still in the window, about to try again.
+ */
+export const FAILED_CHECKOUT_MS = 60 * 60 * 1000;
+
+/** The pay-link intents that are checkouts at all (not autopay's). */
+const PAY_LINK_SALE = {
+    viaMandateId: null,
+    purpose: null,
+} satisfies Prisma.PaymentIntentWhereInput;
+
+/** Last activity after `since`: made, or a try recorded, since then. */
+function activeSince(
+    since: Date,
+    failed: boolean,
+): Prisma.PaymentIntentWhereInput[] {
+    return [
+        failed ? { updatedAt: { gt: since } } : { createdAt: { gt: since } },
+        { attempts: { some: { createdAt: { gt: since } } } },
+    ];
+}
+
+/** The where of a pay-link checkout open at `now` (above). */
 export function openCheckoutWhere(
     now: Date = new Date(),
 ): Prisma.PaymentIntentWhereInput {
+    const at = now.getTime();
     return {
-        viaMandateId: null,
-        purpose: null,
-        status: { in: [...OPEN_MANDATE_CHARGE, "FAILED"] },
-        createdAt: { gt: new Date(now.getTime() - CHECKOUT_LIFE_MS) },
+        ...PAY_LINK_SALE,
+        OR: [
+            {
+                status: { in: OPEN_MANDATE_CHARGE },
+                OR: activeSince(new Date(at - CHECKOUT_LIFE_MS), false),
+            },
+            {
+                status: "FAILED",
+                OR: activeSince(new Date(at - FAILED_CHECKOUT_MS), true),
+            },
+        ],
     };
 }
 
-/** Whether a pay-link checkout is open on the invoice (above). */
+/**
+ * When one checkout stops counting as open (above): its last activity
+ * plus its window. Kept beside {@link openCheckoutWhere}, which asks the
+ * same in SQL; `subscriptions.charge.db.spec.ts` holds the two together.
+ */
+export function checkoutClosesAt(row: {
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+    lastAttemptAt: Date | null;
+}): Date {
+    const failed = row.status === "FAILED";
+    const own = failed ? row.updatedAt : row.createdAt;
+    const last =
+        row.lastAttemptAt && row.lastAttemptAt > own ? row.lastAttemptAt : own;
+    return new Date(
+        last.getTime() + (failed ? FAILED_CHECKOUT_MS : CHECKOUT_LIFE_MS),
+    );
+}
+
+/** Whether a pay-link checkout is open on the invoice at `now` (above). */
 export async function checkoutOpenOn(
     db: Db,
     organizationId: string,
     invoiceId: string,
+    now: Date = new Date(),
 ): Promise<boolean> {
     const open = await db.paymentIntent.findFirst({
-        where: { organizationId, invoiceId, ...openCheckoutWhere() },
+        where: { organizationId, invoiceId, ...openCheckoutWhere(now) },
         select: { id: true },
     });
     return open !== null;
+}
+
+/**
+ * Which of these invoices have a pay-link checkout open at `now`: one
+ * query for them all (Home and the subscriptions list ask for many).
+ */
+export async function checkoutsOpenOn(
+    db: Db,
+    organizationId: string,
+    invoiceIds: readonly string[],
+    now: Date = new Date(),
+): Promise<Set<string>> {
+    if (invoiceIds.length === 0) return new Set();
+    const rows = await db.paymentIntent.findMany({
+        where: {
+            organizationId,
+            invoiceId: { in: [...invoiceIds] },
+            ...openCheckoutWhere(now),
+        },
+        distinct: ["invoiceId"],
+        select: { invoiceId: true },
+    });
+    return new Set(rows.flatMap((r) => (r.invoiceId ? [r.invoiceId] : [])));
+}
+
+/**
+ * When the checkouts open on the invoice at `now` have all closed, or null
+ * when none is open: the moment a charge that stood aside for them may be
+ * queued again.
+ */
+export async function checkoutOpenUntil(
+    db: Db,
+    organizationId: string,
+    invoiceId: string,
+    now: Date = new Date(),
+): Promise<Date | null> {
+    const rows = await db.paymentIntent.findMany({
+        where: { organizationId, invoiceId, ...openCheckoutWhere(now) },
+        select: {
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            attempts: {
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: { createdAt: true },
+            },
+        },
+    });
+    let until: Date | null = null;
+    for (const row of rows) {
+        const closes = checkoutClosesAt({
+            ...row,
+            lastAttemptAt: row.attempts[0]?.createdAt ?? null,
+        });
+        if (!until || closes > until) until = closes;
+    }
+    return until;
 }
 
 /** The 409 every other way to pay answers while a charge is under way. */

@@ -122,6 +122,15 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   asked, so a run delivered twice debits once. A redelivery that finds the
   debit already claimed (`ALREADY`, PROCESSING) writes the `LOOK` step: the
   run before it may have died between the claim and its next step.
+- **A charge that stands aside comes back on its own** (review 3). When a
+  step refuses for a pay-link checkout the customer has open
+  (CHECKOUT_OPEN), `stoodAside` writes, on the same transaction as its
+  RENEWAL_FAILED, a `PREPARE` with `resume: true` and the next charge key,
+  due when the checkout stops counting as open (`checkoutOpenUntil`). Its
+  run finds no intent under that key and queues the charge again through
+  `queueInTx` under the subscription's row lock (Retry's lock), unless a
+  charge is already under way or a new checkout opened (then it writes
+  itself again for that one's end).
 
 ## Team alerts — **Current** (F14)
 

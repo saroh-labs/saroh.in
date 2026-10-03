@@ -18,6 +18,11 @@ import type { Prisma } from "@saroh/database";
  * - `LOOK`: what the provider made of the debit, when its webhook hasn't
  *   said — the same look-up Retry does first (DEC-026).
  *
+ * A charge that stands aside for a pay-link checkout the customer has open
+ * writes a `PREPARE` with `resume` and a new key, for the moment that
+ * checkout stops counting as open (`checkoutOpenUntil`), so autopay takes
+ * the invoice up again without the merchant.
+ *
  * **Lead time: the merchant's choice** (D13B, DEC-065,
  * `autopay-timing.ts`). By default (DAY_AFTER_RENEWAL, D13 as it shipped)
  * the renewal invoice is raised on the renewal date and falls due
@@ -47,6 +52,13 @@ export interface ChargeJobPayload {
     step: ChargeStep;
     /** How many times this step has already found "not yet". */
     tries?: number;
+    /**
+     * A PREPARE written when a charge stood aside for a pay-link checkout
+     * (`stoodAside`), to run when that checkout closes: its key names no
+     * intent yet, and the run queues the charge afresh if autopay may still
+     * take the invoice then.
+     */
+    resume?: boolean;
 }
 
 /** The charge key: one per invoice and attempt, so a retry is a new order. */
@@ -91,6 +103,7 @@ export function chargePayloadOf(payload: unknown): ChargeJobPayload | null {
         key: p.key,
         step,
         tries: typeof p.tries === "number" ? p.tries : 0,
+        ...(p.resume === true ? { resume: true } : {}),
     };
 }
 
@@ -98,6 +111,12 @@ export function chargePayloadOf(payload: unknown): ChargeJobPayload | null {
  * Write a step's job, unless that step of this charge is already waiting
  * (a job run twice must not fork the chain). Always a new row: the worker
  * completes the run that wrote it.
+ *
+ * "This charge" is its key and its mandate: a resume step (`stoodAside`)
+ * holds the next key before any intent has it, and Retry by autopay mints
+ * that same key. On the same mandate the waiting step serves Retry's
+ * charge; on a mandate set up since, it isn't Retry's, so Retry's own
+ * PREPARE is written.
  */
 export async function enqueueChargeStepInTx(
     tx: Pick<Prisma.TransactionClient, "job">,
@@ -113,6 +132,12 @@ export async function enqueueChargeStepInTx(
             AND: [
                 { payload: { path: ["key"], equals: payload.key } },
                 { payload: { path: ["step"], equals: payload.step } },
+                {
+                    payload: {
+                        path: ["mandateId"],
+                        equals: payload.mandateId,
+                    },
+                },
             ],
         },
         select: { id: true },
