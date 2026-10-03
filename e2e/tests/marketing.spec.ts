@@ -123,7 +123,7 @@ async function resolves(request: APIRequestContext, url: string) {
     if (first.status() === 200) return "200";
     if (![301, 308].includes(first.status()))
         return `${first.status()} (not 200 or one redirect)`;
-    const to = new URL(first.headers().location ?? "", url).toString();
+    const to = new URL(first.headers().location, url).toString();
     const second = await head(request, to);
     return second.status() === 200
         ? "200"
@@ -429,7 +429,7 @@ test.describe("links, redirects and the sitemap", () => {
             const source = r.source.replace(/:(\w+)/g, "no-such-$1");
             const first = await head(request, `${WEB}${source}`);
             expect(first.status(), `${source}`).toBe(r.statusCode);
-            const to = new URL(first.headers().location ?? "", WEB);
+            const to = new URL(first.headers().location, WEB);
             expect(to.pathname, `${source} goes to`).toBe(r.destination);
             const landed = await head(request, to.toString());
             expect(landed.status(), `${source} → ${to.pathname}`).toBe(200);
@@ -467,7 +467,7 @@ test.describe("links, redirects and the sitemap", () => {
         const preview = await head(request, `${WEB}/pricing/preview`);
         expect(preview.status()).toBe(303);
         expect(preview.headers()["x-robots-tag"]).toContain("noindex");
-        expect(new URL(preview.headers().location ?? "", WEB).pathname).toBe(
+        expect(new URL(preview.headers().location, WEB).pathname).toBe(
             "/pricing",
         );
     });
