@@ -2493,3 +2493,42 @@ so both editors share it.
 `editor.isDestroyed` first, and a surface built around one editor is keyed
 by `editorKey(editor)`. Pinned by `e2e/tests/post-editor.spec.ts`.
 **Category**: frontend · Tiptap · `apps/app.saroh.in/components/sites/rich-text-editor.tsx`
+
+## Frontend — a hero switched to Split never saved
+
+**Problem**: In the site editor, choosing the "Split" look for a starter
+site's hero and pasting a photo left the hero "Not finished yet, so not
+saved" with every field filled, and Publish stayed disabled. Found while
+filming the demo videos.
+**Root cause**: Choosing a look lifts a section to the newest contract
+(`withVariant`, `section-fields/variant-field.tsx`), but only the version
+number moved. A starter hero is v1, its button `{ label, href }`; v2 wants
+`cta.action`, so the lifted hero failed its contract on the button and the
+editor held it back with the generic message. Split also needs an image,
+which made it look like an image problem.
+**Fix**: `liftToLatest` (`packages/block-contract/src/section-contract.ts`)
+moves the content with the version: a hero's or cta block's `href` button
+becomes a `url` action, a v1 gallery's `layout` becomes its variant.
+`withVariant` uses it.
+**Rule**: Never bump `contractVersion` without lifting the content to that
+version — `liftToLatest` is the one place that does it. Pinned by
+`lift-to-latest.test.ts` and `variant-field.test.ts`.
+**Category**: frontend · site editor · `packages/block-contract/src/section-contract.ts`
+
+## Frontend — blocks squeezed in the editor's phone and tablet preview
+
+**Problem**: At phone width in the site editor, a testimonials card wrapped
+one word to a line; features, galleries and contact grids were as cramped.
+The live site on a phone was fine.
+**Root cause**: The device preview was a narrower `div` in a desktop-wide
+window, and the site blocks lay out with viewport breakpoints (`sm:`,
+`lg:`), which read the window: three columns inside 375px.
+**Fix**: At phone and tablet width the canvas renders the page into a
+same-origin iframe through a portal (`components/sites/editor/device-frame.tsx`),
+so the breakpoints read the frame. One renderer and React tree; the editor's
+stylesheets and root classes are mirrored in, keys are re-sent to the
+editor's window, and canvas lookups go through `queryCanvas`.
+**Rule**: Code that searches the canvas for a block uses `queryCanvas`, and
+code that looks up an element by id from a click uses the click target's
+`ownerDocument` — at phone or tablet width the page is in another document.
+**Category**: frontend · site editor · `apps/app.saroh.in/components/sites/editor/device-frame.tsx`

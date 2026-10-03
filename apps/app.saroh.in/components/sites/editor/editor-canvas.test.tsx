@@ -140,6 +140,21 @@ function submitForm() {
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     vi.stubGlobal("fetch", vi.fn());
+    // jsdom has no layout, and no ResizeObserver for the device frame's height.
+    vi.stubGlobal(
+        "ResizeObserver",
+        class {
+            observe() {
+                // Nothing to measure: jsdom has no layout.
+            }
+            unobserve() {
+                // Nothing was observed.
+            }
+            disconnect() {
+                // Nothing was observed.
+            }
+        },
+    );
     scrolled = vi.fn<Element["scrollIntoView"]>();
     Element.prototype.scrollIntoView = scrolled;
     (
@@ -190,6 +205,25 @@ describe("the canvas in Preview", () => {
         expect(back.textContent).toContain("Esc");
         act(() => back.click());
         expect(setPreviewing).toHaveBeenCalledWith(false);
+    });
+
+    it("draws the page in a frame of its own at phone width, so the blocks' breakpoints read the phone's", () => {
+        render({ device: "phone" });
+        const frame = host.querySelector<HTMLIFrameElement>(
+            "iframe[data-device-frame]",
+        );
+        expect(frame?.title).toBe("The page at phone width");
+        // The page is in the frame's document, not the canvas's.
+        expect(frame?.contentDocument?.body.textContent).toContain(
+            "Welcome in",
+        );
+        expect(host.textContent).not.toContain("Welcome in");
+    });
+
+    it("draws the page straight on the canvas at desktop width", () => {
+        render({ device: "desktop" });
+        expect(host.querySelector("iframe[data-device-frame]")).toBeNull();
+        expect(host.textContent).toContain("Welcome in");
     });
 
     it("keeps the device width and the zoom", () => {

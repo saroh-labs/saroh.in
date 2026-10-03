@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import { useState } from "react";
 
+import { queryCanvas } from "@/components/sites/editor/device-frame";
 import type { EditorInspectorTab } from "@/components/sites/editor/use-editor-selection";
 import type { SectionType } from "@/lib/sites/service";
 
@@ -39,9 +40,13 @@ export function useAddBlock({
         setInspector("block");
         // After the render that draws it.
         requestAnimationFrame(() => {
-            canvasRef.current
-                ?.querySelector(`[data-block-index="${at}"]`)
-                ?.scrollIntoView({ block: "center", behavior: "smooth" });
+            const canvas = canvasRef.current;
+            if (canvas) {
+                queryCanvas(
+                    canvas,
+                    `[data-block-index="${at}"]`,
+                )?.scrollIntoView({ block: "center", behavior: "smooth" });
+            }
         });
     }
 

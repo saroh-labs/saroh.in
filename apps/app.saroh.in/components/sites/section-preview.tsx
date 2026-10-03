@@ -298,7 +298,11 @@ export function DraftPreview({
                     return;
                 }
                 if (target?.kind === "anchor") {
-                    const el = document.getElementById(target.id);
+                    // The page's own document: at phone or tablet width
+                    // it is the device frame's, not the editor's.
+                    const el = e.currentTarget.ownerDocument.getElementById(
+                        target.id,
+                    );
                     if (el && e.currentTarget.contains(el)) {
                         el.scrollIntoView({ block: "start" });
                     }

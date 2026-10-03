@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Device } from "@/components/sites/editor-constants";
 import { DEVICE_WIDTH } from "@/components/sites/editor-constants";
+import { DeviceFrame } from "@/components/sites/editor/device-frame";
 import type {
     EditorInspectorTab,
     EditorRailTab,
@@ -186,6 +187,38 @@ export function EditorCanvas({
         notSentTimer.current = setTimeout(() => setNotSent(false), 5000);
     }
 
+    const page = (
+        <DraftPreview
+            siteId={siteId}
+            siteAddress={address}
+            sections={sections}
+            pages={pages}
+            page={pages.find((p) => p.id === pageId) ?? null}
+            style={style}
+            styleOptions={styleOptions}
+            chrome={canvasChrome}
+            {...(previewing
+                ? {
+                      onOpenPage: openPage,
+                      onFormBlocked: formBlocked,
+                  }
+                : {
+                      selectedIndex,
+                      onSelect: (index: number) => {
+                          setRail("sections");
+                          setSelectedIndex(index);
+                      },
+                      selectedChrome,
+                      onSelectChrome: selectChrome,
+                      notesByKey,
+                      onOpenNotes: (index: number) => {
+                          setSelectedIndex(index);
+                          setInspector("feedback");
+                      },
+                  })}
+        />
+    );
+
     return (
         <div
             ref={canvasRef}
@@ -307,36 +340,18 @@ export function EditorCanvas({
                      * One renderer either way. Preview only leaves out
                      * what makes the page editable: selecting, the lock
                      * on the header and footer, and the notes' pins.
+                     *
+                     * At phone or tablet width it is drawn in a frame of
+                     * its own (`DeviceFrame`), so the blocks' breakpoints
+                     * read the device's width, not the editor window's.
                      */}
-                    <DraftPreview
-                        siteId={siteId}
-                        siteAddress={address}
-                        sections={sections}
-                        pages={pages}
-                        page={pages.find((p) => p.id === pageId) ?? null}
-                        style={style}
-                        styleOptions={styleOptions}
-                        chrome={canvasChrome}
-                        {...(previewing
-                            ? {
-                                  onOpenPage: openPage,
-                                  onFormBlocked: formBlocked,
-                              }
-                            : {
-                                  selectedIndex,
-                                  onSelect: (index: number) => {
-                                      setRail("sections");
-                                      setSelectedIndex(index);
-                                  },
-                                  selectedChrome,
-                                  onSelectChrome: selectChrome,
-                                  notesByKey,
-                                  onOpenNotes: (index: number) => {
-                                      setSelectedIndex(index);
-                                      setInspector("feedback");
-                                  },
-                              })}
-                    />
+                    {device === "desktop" ? (
+                        page
+                    ) : (
+                        <DeviceFrame title={`The page at ${device} width`}>
+                            {page}
+                        </DeviceFrame>
+                    )}
                 </div>
             </div>
 
