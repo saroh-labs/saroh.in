@@ -1,5 +1,11 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import {
+    CATALOG_PLAN_KEY_PREFIX,
+    catalogPlanIdForKey,
+    LEGACY_PLAN_KEYS,
+    orderOverrides,
+} from "@saroh/pricing-catalog";
 
 /**
  * A plan's typed limit map: numeric caps (e.g. `sites: 3`) and feature flags
@@ -30,19 +36,24 @@ export const FREE_ENTITLEMENTS: EntitlementMap = {
  * more X?" / "may this org use feature Y?". Other modules call this BEFORE
  * creating a site/member/etc.; the limit is NEVER trusted from the client.
  *
- * `getEntitlements` resolves the org's `Subscription` → its `Plan.entitlements`;
- * with no active subscription it returns {@link FREE_ENTITLEMENTS}. `check`
+ * `getEntitlements` resolves the org's `Subscription` → its `Plan.entitlements`
+ * (or, with a live `plan` override, the plan that names — U5) and applies live
+ * raises; with no active subscription and no plan override it returns
+ * {@link FREE_ENTITLEMENTS}. `check`
  * enforces a numeric cap (throws `ForbiddenException` when the org is already at
  * or over the limit); `can` reflects a boolean feature flag. This class is
  * pure-ish — trivially unit-testable against a mocked Prisma.
  */
 @Injectable()
 export class EntitlementService {
+    private readonly logger = new Logger(EntitlementService.name);
+
     /**
-     * The org's effective entitlements: its active plan's limit map, or
-     * {@link FREE_ENTITLEMENTS} when the org has no subscription or its
-     * subscription is CANCELLED. Reads ONLY billing models (`Subscription` +
-     * `Plan`) — never a merchant payment record.
+     * The org's effective entitlements: its plan's limit map (see
+     * {@link getPlanEntitlements}: a live `plan` override first, then the
+     * active subscription, else {@link FREE_ENTITLEMENTS}), with live raises
+     * on top. Reads ONLY billing models (`Subscription`, `Plan`,
+     * `EntitlementOverride`) — never a merchant payment record.
      */
     async getEntitlements(organizationId: string): Promise<EntitlementMap> {
         const [planValues, overrides] = await Promise.all([
@@ -52,18 +63,126 @@ export class EntitlementService {
         return applyOverrides(planValues, overrides);
     }
 
-    /** What the plan alone grants (or the free floor), before any override. */
+    /**
+     * What the business's plan grants (or the free floor), before any raise.
+     *
+     * "Its plan" is the subscription's, unless a live `plan` override puts it
+     * on another one (plans catalogue U5, KTD-6/7): that is how existing
+     * businesses are grandfathered, and how a launch offer or a single
+     * business's move will work. The override wins over the subscription
+     * (OVERRIDE_ORDER applies `plan` first, then everything else on top),
+     * so raises still apply to what it gives.
+     *
+     * Until U12 moves enforcement onto the catalogue, this path reads the
+     * legacy `Plan.entitlements` keys (`sites`, `customDomain`, …), so an
+     * override's catalogue plan is read through the legacy rows that map to
+     * it — see {@link legacyPlanEntitlements}.
+     */
     async getPlanEntitlements(organizationId: string): Promise<EntitlementMap> {
-        const subscription = await prisma.subscription.findUnique({
-            where: { organizationId },
-            include: { plan: true },
-        });
+        const [subscription, planOverride] = await Promise.all([
+            prisma.subscription.findUnique({
+                where: { organizationId },
+                include: { plan: true },
+            }),
+            this.livePlanOverride(organizationId),
+        ]);
+        const own =
+            subscription && subscription.status !== "CANCELLED"
+                ? subscription.plan
+                : null;
 
-        if (!subscription || subscription.status === "CANCELLED") {
-            return { ...FREE_ENTITLEMENTS };
+        if (planOverride) {
+            const onOverride = await this.legacyPlanEntitlements(
+                planOverride.planKey,
+                own,
+            );
+            if (onOverride) return onOverride;
+            // Fail safe: an override naming a plan this path can't read
+            // changes nothing, rather than reading the business as Free.
+            this.logger.warn(
+                `plan_override_unresolved org=${organizationId} override=${planOverride.id} plan=${planOverride.planKey}`,
+            );
         }
 
-        return asEntitlementMap(subscription.plan.entitlements);
+        if (!own) return { ...FREE_ENTITLEMENTS };
+        return asEntitlementMap(own.entitlements);
+    }
+
+    /**
+     * The `plan` override that applies to this business now, if any: not
+     * revoked, not past its end (null lasts until removed). With several, the
+     * newest wins, as `orderOverrides` orders them. Expiry is read, not swept,
+     * like a raise: a grandfathered business leaves Grow the instant its date
+     * passes, with no job to miss.
+     */
+    async livePlanOverride(
+        organizationId: string,
+    ): Promise<LivePlanOverride | null> {
+        const now = new Date();
+        const rows = await prisma.entitlementOverride.findMany({
+            where: {
+                organizationId,
+                kind: "plan",
+                revokedAt: null,
+                planKey: { not: null },
+                OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+            },
+            select: {
+                id: true,
+                key: true,
+                planKey: true,
+                expiresAt: true,
+                createdAt: true,
+            },
+        });
+        const candidates = rows.map((r) => ({ ...r, kind: "plan" as const }));
+        // orderOverrides keeps the objects it is given, so the row's id rides
+        // along; the last one applies.
+        const ordered = orderOverrides(candidates, now);
+        const newest = ordered[ordered.length - 1] as
+            (typeof candidates)[number] | undefined;
+        if (!newest?.planKey) return null;
+        return {
+            id: newest.id,
+            planKey: newest.planKey,
+            expiresAt: newest.expiresAt,
+        };
+    }
+
+    /**
+     * A catalogue plan's limits on the legacy entitlement path (U5 → U12).
+     *
+     * - The business's own plan already maps to it (a `business`
+     *   subscription grandfathered on Grow): its own row, unchanged.
+     * - Free: the free floor, exactly what an unsubscribed business reads.
+     * - Otherwise the newest active monthly legacy row whose key maps to it
+     *   (`LEGACY_PLAN_KEYS`: `business` and `pro` → `grow`).
+     *
+     * Null when no legacy row maps to it (a catalogue-only plan such as
+     * `pro`): the caller then ignores the override.
+     */
+    private async legacyPlanEntitlements(
+        planKey: string,
+        own: { key: string; entitlements: unknown } | null,
+    ): Promise<EntitlementMap | null> {
+        if (
+            own &&
+            !own.key.startsWith(CATALOG_PLAN_KEY_PREFIX) &&
+            catalogPlanIdForKey(own.key) === planKey
+        ) {
+            return asEntitlementMap(own.entitlements);
+        }
+        if (planKey === LEGACY_PLAN_KEYS.free) return { ...FREE_ENTITLEMENTS };
+        const keys = Object.entries(LEGACY_PLAN_KEYS)
+            .filter(([, catalogue]) => catalogue === planKey)
+            .map(([legacy]) => legacy);
+        if (keys.length === 0) return null;
+        const row = await prisma.plan.findFirst({
+            where: { key: { in: keys }, active: true, interval: "month" },
+            orderBy: [{ version: "desc" }, { createdAt: "desc" }],
+            select: { entitlements: true },
+        });
+        return row ? asEntitlementMap(row.entitlements) : null;
     }
 
     /**
@@ -129,6 +248,15 @@ export class EntitlementService {
         const entitlements = await this.getEntitlements(organizationId);
         return entitlements[key] === true;
     }
+}
+
+/** The live `plan` override a business is on (U5); see `livePlanOverride`. */
+export interface LivePlanOverride {
+    id: string;
+    /** The catalogue plan id, e.g. `grow`. */
+    planKey: string;
+    /** Null lasts until removed. */
+    expiresAt: Date | null;
 }
 
 export interface EntitlementOverrideRow {
