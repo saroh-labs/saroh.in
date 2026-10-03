@@ -93,6 +93,8 @@ const ROLE_PERMISSIONS = {
         AdminPermission.PricingRead,
         AdminPermission.PricingEdit,
         AdminPermission.PricingOverride,
+        // Coupons are the Billing team's to run (owner, 2026-10-03).
+        AdminPermission.CouponsManage,
     ],
     [AdminRole.ReleaseManager]: [
         AdminPermission.PlatformRead,

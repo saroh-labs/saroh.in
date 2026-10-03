@@ -910,3 +910,24 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: F16 lets storefront staff join the team with a storefront role, but that role opens nothing in the workspace. Sell needs `order:read` or `order:stage`, so their rail is empty.
 - Decision: a storefront (location) role sees and moves the orders of **its own location only**: read and stage, with no money, refunds, pay links or cancelling. It's like the kitchen and Member view, scoped to one location. Sell appears in their rail with those orders, and other locations' orders are refused by the API.
 - Consequences: the order permissions gain a location scope for this role. The B16 permission tests extend to it.
+
+## DEC-075 Marketing claims: the owner's answers to the claims ledger
+
+**Status: Accepted — 2026-10-03** · user · answers `MARKETING_CLAIMS.md` D1, D2, D3, D13, D14
+
+- Context: the claims ledger (marketing plan U28) found site copy the product can't back, and asked the owner five questions.
+- Decision:
+    - **Autopay (D1):** UPI Autopay is the merchant's choice, made on their own Razorpay account. Saroh follows what the merchant has set up. Copy says the business _can_ have plans renew on their own, never that they always do.
+    - **Insights (D2):** build what the Insights page describes, and reword it until it ships.
+    - **What Free and Grow are for (D3):** set from the admin's Plans & modules page, not fixed in site copy. The site's plan lines read the catalogue.
+    - **Languages (D13):** "English and हिंदी" means multilingual content. It is internationalisation of the business's own content, to be built; the chip stays only once that exists.
+    - **Demo businesses (D14):** Rye & Co., Pulse Fitness, Kavi Dental and the rest are labelled as demos wherever the site shows them.
+- Consequences: the ledger's rewrites for these rows follow this entry. Insights and multilingual content become product work. The demo label goes on every screenshot caption and story that names a demo business.
+
+## DEC-076 The Billing team manages coupons
+
+**Status: Accepted — 2026-10-03** · user · amends the plans catalogue's U4
+
+- Context: U4 gave `coupons:manage` to Platform Owner only, because the plan named a "Billing lead" role that doesn't exist.
+- Decision: the Billing staff role holds `coupons:manage`, as well as Platform Owner.
+- Consequences: `admin-permissions.ts` and its spec pin Billing as a holder.

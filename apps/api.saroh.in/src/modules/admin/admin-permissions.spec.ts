@@ -59,9 +59,9 @@ describe("admin permission policy", () => {
         expect(holders(AdminPermission.PricingPublish)).toEqual([
             AdminRole.PlatformOwner,
         ]);
-        expect(holders(AdminPermission.CouponsManage)).toEqual([
-            AdminRole.PlatformOwner,
-        ]);
+        expect(holders(AdminPermission.CouponsManage)).toEqual(
+            [AdminRole.Billing, AdminRole.PlatformOwner].sort(),
+        );
     });
 
     it("lets Billing and Platform Owner make one business's catalogue exceptions", () => {
