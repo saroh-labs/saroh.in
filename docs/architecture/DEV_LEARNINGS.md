@@ -2447,3 +2447,15 @@ called with the publish's `tx`, it opened a second, nested transaction.
 `writeCatalogueVersionInTx(tx, …)` joins the caller's. Never decide by probing
 the client. The pricing db specs (`catalogue-writes.db.spec.ts`) pin it.
 **Category**: database · rule in `packages/database/src/pricing-catalogue.ts`
+
+## Seed — a catalogue version went live after the clock that read it
+
+**Problem**: every fresh showcase seed threw `no "pro" plan`, so the e2e stack
+never started on the marketing branch.
+**Root cause**: the base seed installed catalogue version 1 live from the wall
+clock, while the showcase reads the live plan at the clock rounded down to the
+half hour — earlier, so version 1 wasn't live yet when the showcase looked.
+**Fix**: the seed's version 1 is live from a fixed past date. A seed never
+dates something "now" that a later step reads at a different "now".
+`prepush --e2e` (fresh-seed path) is what caught it.
+**Category**: seed · rule in `packages/database/src/seed/`
