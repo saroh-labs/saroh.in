@@ -22,6 +22,8 @@ export const AdminPermission = {
     PlatformRead: "platform:read",
     OrganizationRead: "organization:read",
     OrganizationPiiRead: "organization:pii:read",
+    // The waitlist (U30): who is waiting, by kind, city, source and referrer.
+    WaitlistRead: "waitlist:read",
     OrganizationPeopleWrite: "organization:people:write",
     OrganizationModulesWrite: "organization:modules:write",
     OrganizationLifecycleWrite: "organization:lifecycle:write",
@@ -55,6 +57,7 @@ const ROLE_PERMISSIONS = {
         AdminPermission.PlatformRead,
         AdminPermission.OrganizationRead,
         AdminPermission.OrganizationPiiRead,
+        AdminPermission.WaitlistRead,
         AdminPermission.OrganizationPeopleWrite,
         AdminPermission.OrganizationViewAs,
         AdminPermission.WaitlistInvite,

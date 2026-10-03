@@ -41,9 +41,10 @@ export async function truncateAll(): Promise<void> {
         .filter((name) => name !== "_prisma_migrations")
         .map((name) => `"public"."${name}"`);
     if (tables.length === 0) return;
-    await prisma.$executeRawUnsafe(
-        `TRUNCATE ${tables.join(", ")} RESTART IDENTITY CASCADE`,
-    );
+    // No RESTART IDENTITY: it needs ownership of each sequence (the
+    // waitlist's position), which the RLS test role doesn't have. Specs
+    // compare positions relative to each other, never to 1.
+    await prisma.$executeRawUnsafe(`TRUNCATE ${tables.join(", ")} CASCADE`);
 }
 
 /**

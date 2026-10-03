@@ -3879,6 +3879,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_booking_release_holds", where: raw("type = 'booking.release-holds' AND status = 'PENDING'"))
   // One waiting run of the pending payment sweep (P1), like the renewal chain.
   @@unique([type], map: "Job_one_pending_payments_confirm_pending", where: raw("type = 'payments.confirm-pending' AND status = 'PENDING'"))
+  // One waiting run of the waitlist retention sweep (U30), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_waitlist_retention", where: raw("type = 'waitlist.retention' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -4980,31 +4982,67 @@ model BillingWebhookEvent {
 // business table, which is why it carries no organizationId and is exempt from
 // RLS considerations.
 //
-// `email` is stored normalized (trimmed + lowercased by the service) and is
-// unique, so a repeat submission is an idempotent no-op rather than a duplicate
-// row or a 500. `ipHash` is a sha256 of the source IP — the raw IP is never
-// stored, matching the public enquiry surface — and exists only so abuse can be
-// investigated after the fact.
+// One entry per email AND business (U30, plan KTD-17 and OQ-11), so one owner
+// can list a second business. `email` is stored as typed (trimmed and
+// lower-cased) because that is where the invite goes; `emailKey` is the same
+// address normalised for "is this the same person" — `+tags` dropped
+// everywhere, dots dropped and googlemail folded into gmail for Gmail — and
+// `businessKey` is the business name lower-cased with its spaces collapsed
+// ("" for the V1 form, which asked for an email only). The pair is unique, so
+// a repeat join is an idempotent no-op rather than a duplicate row.
+//
+// `ipHash` is a sha256 of the visitor's address — the raw IP is never stored,
+// matching the public enquiry surface — and exists so abuse can be
+// investigated and a self-referral recognised.
 model WaitlistSignup {
   id String @id @default(cuid())
 
-  email String @unique
+  email       String
+  emailKey    String
+  businessKey String @default("")
 
-  // Where the signup came from, e.g. "saroh.in". Free text, never trusted for
-  // authorization — it is analytics only.
+  // What the V2 form asks (U30). Null on entries from the V1 form.
+  businessName String?
+  // One of the form's kinds (`WAITLIST_KINDS` in the API), never free text.
+  kind         String?
+  // Optional, free text the visitor typed.
+  city         String?
+  // The plan a "Get early access · ‹Plan›" button named, if one did.
+  plan         String?
+
+  // Where the signup came from: the page's `?src=`, "direct" when none (V2),
+  // "saroh.in" from the V1 form. Free text, never trusted for authorization.
   source String?
+
+  // "#N on the list": assigned by a sequence, in the order people joined.
+  position Int @default(autoincrement())
+
+  // The stable short id in this entry's referral link (`?ref=`), never the
+  // business name (names collide, plan D-5). Null on V1 entries.
+  refCode String? @unique
+
+  // Who sent them, when the link was someone else's: a self-referral (same
+  // emailKey or same ipHash as the referrer) is not recorded.
+  referredById String?
+  referredBy   WaitlistSignup?  @relation("WaitlistReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    WaitlistSignup[] @relation("WaitlistReferrals")
 
   ipHash String?
 
   // Set when the batch containing this signup is opened, so "who is still
   // waiting" is a query rather than a spreadsheet.
   invitedAt DateTime?
+  // Set when an invitee signs up (U31). The retention sweep deletes an entry
+  // invited more than 12 months ago that never joined.
+  joinedAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([emailKey, businessKey])
   @@index([createdAt])
   @@index([invitedAt])
+  @@index([referredById])
 }
 
 /// A record of a completed or in-flight idempotent operation.
