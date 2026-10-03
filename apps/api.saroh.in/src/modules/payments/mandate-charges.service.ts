@@ -461,11 +461,18 @@ export class MandateChargesService {
          * the mandate's open charges to CANCELLED in its transaction
          * (`cancelMandatesInTx`), so a claim either lands first, or waits
          * for that and finds nothing to claim.
+         *
+         * And the provider order, read above: a PROCESSING charge always
+         * has one. This claim is the only write to PROCESSING, so
+         * `lookUp`'s "no order, no debit" (NONE) never meets a claimed
+         * charge — one would be asked for, refused and looked up again,
+         * hourly, for good.
          */
         const claimed = await prisma.paymentIntent.updateMany({
             where: {
                 id: intentId,
                 status: "REQUIRES_PAYMENT",
+                providerIntentId: { not: null },
                 viaMandate: {
                     is: {
                         status: "ACTIVE",
@@ -854,7 +861,8 @@ export class MandateChargesService {
             },
         });
         if (!intent || !OPEN_CHARGE.includes(intent.status)) return "ALREADY";
-        // No order yet: nothing can have been debited on it.
+        // No order yet: nothing can have been debited on it. Never a
+        // PROCESSING charge: the claim (`charge`) needs the order.
         if (!intent.providerIntentId) return "NONE";
         const connection = await openMandateConnection(
             this.providers,

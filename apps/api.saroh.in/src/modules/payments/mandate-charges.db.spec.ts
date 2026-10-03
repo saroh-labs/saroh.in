@@ -761,3 +761,51 @@ describe("what is never charged", () => {
         ).toEqual({ status: "REFUSED", reason: "MANDATE_NOT_ACTIVE" });
     });
 });
+
+describe("a claimed charge always has its provider order (review 3)", () => {
+    /*
+     * Only the debit's claim moves a mandate charge to PROCESSING, and only
+     * one read with its provider order: a PROCESSING charge with no
+     * `providerIntentId` would be looked up as "no debit made" (NONE),
+     * asked for again, refused, and looked up again — hourly, for good.
+     * Nothing clears `providerIntentId`, and the claim re-asks for it in
+     * its own WHERE, as it does every other gate, so the state can't
+     * exist. This pins it even if the order went between the read and
+     * the claim (the notice's round trip sits between them).
+     */
+    it("a charge whose order went during the notice's round trip is never claimed", async () => {
+        const who = await autopayMember();
+        const invoice = await invoiceFor(who);
+        const prepared = await prepare(who.mandateId, invoice.id);
+        if (prepared.status !== "PREPARED") throw new Error("not prepared");
+        // The provider would take the debit; Saroh still asks about the
+        // notice before it does.
+        fake.settlePreDebit(prepared.providerIntentId, "DELIVERED");
+        clock = new Date(clock.getTime() + 27 * HOUR);
+
+        const asked = jest
+            .spyOn(fake.mandates, "getPreDebit")
+            .mockImplementationOnce(async () => {
+                await prisma.paymentIntent.update({
+                    where: { id: prepared.intentId },
+                    data: { providerIntentId: null },
+                });
+                return "DELIVERED";
+            });
+        try {
+            const result = await charges.charge({
+                organizationId: owner.organizationId,
+                intentId: prepared.intentId,
+                now: clock,
+            });
+            expect(asked).toHaveBeenCalledTimes(1);
+            expect(result.status).not.toBe("CHARGING");
+        } finally {
+            asked.mockRestore();
+        }
+        expect(debitCalls()).toHaveLength(0);
+        expect((await intentOf(prepared.intentId)).status).not.toBe(
+            "PROCESSING",
+        );
+    });
+});
