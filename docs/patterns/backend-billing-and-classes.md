@@ -643,7 +643,9 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   `FAILED_CHECKOUT_MS` (an hour) after it failed: Razorpay's retry is in the
   same session. Pass the caller's `now`. While one is open, nothing queues,
   prepares or debits a charge and Retry offers the pay link; a charge that
-  stands aside writes RENEWAL_FAILED (CHECKOUT_OPEN) and a resume step for
+  stands aside writes RENEWAL_FAILED (CHECKOUT_OPEN: Home's tag is
+  "Autopay didn't charge — paying by link", never "Payment failed") and a
+  resume step for
   the moment the checkout closes (`checkoutOpenUntil`), so autopay comes back without the merchant.
 
 ## Courses and class packs — **Current**

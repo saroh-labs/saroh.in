@@ -723,6 +723,16 @@ describe("a decline", () => {
             invoiceId: invoice.id,
             data: { reason: "CHECKOUT_OPEN" },
         });
+        // Home says autopay didn't charge — nothing was declined (review 3).
+        const home = await failedRenewals(
+            prisma,
+            owner.organizationId,
+            new Date(),
+            true,
+        );
+        expect(
+            home?.evidence?.find((e) => e.id === who.subscriptionId)?.tag,
+        ).toBe("Autopay didn't charge — paying by link");
         await offHome(invoice.id);
     });
 

@@ -36,6 +36,8 @@ export interface RenewalSignal {
     subscriptionId: string;
     kind: RenewalEventKind;
     at: Date;
+    /** The event's `data.reason`, when it gave one (a RENEWAL_FAILED's). */
+    reason?: string;
 }
 
 /**
@@ -72,25 +74,62 @@ export const readRenewalSignals: RenewalSignalReader = async (
             subscriptionId: { in: [...subscriptionIds] },
             kind: { in: RENEWAL_EVENT_KINDS },
         },
-        select: { subscriptionId: true, kind: true, createdAt: true },
+        select: {
+            subscriptionId: true,
+            kind: true,
+            createdAt: true,
+            data: true,
+        },
     });
-    return rows.map((r) => ({
-        subscriptionId: r.subscriptionId,
-        kind: r.kind as RenewalEventKind,
-        at: r.createdAt,
-    }));
+    return rows.map((r) => {
+        const reason = reasonOf(r.data);
+        return {
+            subscriptionId: r.subscriptionId,
+            kind: r.kind as RenewalEventKind,
+            at: r.createdAt,
+            ...(reason ? { reason } : {}),
+        };
+    });
 };
+
+function reasonOf(data: unknown): string | null {
+    if (typeof data !== "object" || data === null) return null;
+    const reason = (data as Record<string, unknown>).reason;
+    return typeof reason === "string" ? reason : null;
+}
 
 const EVENT_TAGS: Record<RenewalEventKind, string> = {
     RENEWAL_FAILED: "Payment failed",
     MANDATE_LIMIT_LOW: "Autopay limit too low",
 };
 
+/**
+ * Autopay stood aside for a pay-link checkout the customer had open
+ * (RENEWAL_FAILED with reason CHECKOUT_OPEN): nothing was declined, so not
+ * "Payment failed". Worded as the subscription's history says it.
+ */
+export const CHECKOUT_OPEN_TAG = "Autopay didn't charge — paying by link";
+
 /** The tag of a renewal above its autopay's limit (D13): it needs a new set-up (D14). */
 export const LIMIT_LOW_TAG = EVENT_TAGS.MANDATE_LIMIT_LOW;
 
-/** The tags that say autopay failed: such a renewal is retried before its due date (D13). */
-export const AUTOPAY_FAILED_TAGS: readonly string[] = Object.values(EVENT_TAGS);
+/**
+ * The tags that say autopay didn't take the renewal: such a renewal is
+ * retried before its due date (D13) — by the pay link while the customer's
+ * checkout is open, by autopay once it has closed.
+ */
+export const AUTOPAY_FAILED_TAGS: readonly string[] = [
+    ...Object.values(EVENT_TAGS),
+    CHECKOUT_OPEN_TAG,
+];
+
+/** A renewal event's tag: what happened, in the merchant's words. */
+function signalTag(signal: RenewalSignal): string {
+    if (signal.kind === "RENEWAL_FAILED" && signal.reason === "CHECKOUT_OPEN") {
+        return CHECKOUT_OPEN_TAG;
+    }
+    return EVENT_TAGS[signal.kind];
+}
 
 /**
  * The autopay charges under way on these invoices (D13), by invoice. A
@@ -288,7 +327,7 @@ export function renewalTag(
         if (s.at.getTime() < since) continue;
         if (!latest || s.at > latest.at) latest = s;
     }
-    if (latest) return EVENT_TAGS[latest.kind];
+    if (latest) return signalTag(latest);
     if (isPastDue(invoice, now) && invoice.dueAt)
         return overdueTag(invoice.dueAt, now);
     return null;
