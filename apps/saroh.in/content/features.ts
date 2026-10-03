@@ -4,7 +4,7 @@
  *
  * Changes from the design's words, each for a repo rule:
  * - "storefront" reads "location" (saroh-product.md);
- * - captions name no amounts (the public-repo rule bans "₹" in the diff);
+ * - captions name no amounts (the public-repo rule: no currency in the repo);
  * - the design's `home` key is the `dashboard` slug (/features/dashboard).
  */
 import type { Feature, FeatureSlug } from "./types";

@@ -197,7 +197,7 @@ describe("no prices or plan limits", () => {
     });
 
     it("has no rupee sign", () => {
-        expect(everything).not.toMatch(/₹|Rs\.?\s?\d|INR/);
+        expect(everything).not.toMatch(/\u20B9|Rs\.?\s?\d|INR/);
     });
 
     it("puts no number beside a plan name", () => {
