@@ -29,7 +29,7 @@ test("a new post keeps its editor through the first save", async ({
     await useSession(page);
     await page.goto(`/open/${NORTHWIND_ORG}`);
     const api = northwind(page.request);
-    const [site] = await api.get<SiteRow[]>("/sites");
+    const site = (await api.get<SiteRow[]>("/sites")).at(0);
     test.skip(!site, "Northwind has no website.");
     if (!site) return;
 
