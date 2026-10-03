@@ -25,6 +25,7 @@ import type {
     WebhookHeaders,
 } from "./providers/billing-provider.port";
 import { BILLING_PROVIDER_FACTORY } from "./providers/billing-provider.port";
+import { SarohInvoicesService } from "./saroh-invoices.service";
 import { isLegalSubscriptionTransition } from "./subscription-state";
 
 type Tx = Prisma.TransactionClient;
@@ -103,6 +104,12 @@ export class BillingWebhookService {
         @Inject(BILLING_PROVIDER_FACTORY)
         private readonly factory: BillingProviderFactory,
         @Optional() private readonly audit?: AuditService,
+        /**
+         * Saroh's own invoices and billing mail (U17), written on the
+         * webhook's transaction. Always provided by `BillingModule`; a spec
+         * that builds the service by hand without it writes none.
+         */
+        @Optional() private readonly invoices?: SarohInvoicesService,
     ) {}
 
     async handle(
@@ -288,6 +295,15 @@ export class BillingWebhookService {
             const applied = await applyDueMoveInTx(tx, sub.id, now, {
                 currentPeriodEnd: event.currentPeriodEnd ?? undefined,
             });
+            if (applied.applied) {
+                await this.invoiceScheduledStart(
+                    tx,
+                    checkout,
+                    sub.id,
+                    event,
+                    now,
+                );
+            }
             return {
                 result: {
                     status: applied.applied ? "processed" : "ignored",
@@ -427,6 +443,16 @@ export class BillingWebhookService {
             where: { id: checkout.id },
             data: { status: "COMPLETED", completedAt: now },
         });
+        // Saroh's invoice for what was just charged (U17): the first period
+        // of a new plan, or an upgrade's difference.
+        await this.invoices?.invoiceCheckoutChargeInTx(tx, {
+            checkout,
+            event,
+            now,
+            source: checkout.kind === "UPGRADE" ? "UPGRADE" : "NEW",
+            periodEnd: currentPeriodEnd,
+            fromPlanName: sub?.plan.name ?? null,
+        });
         // The subscription it replaces stops now: the period it paid for is
         // covered by the new one (an upgrade's difference) or by nothing
         // further being owed.
@@ -525,6 +551,15 @@ export class BillingWebhookService {
             where: { id: sub.id },
             data: { status: target, ...stamp },
         });
+        // A charge that failed (U17): the business is told, retrying or not.
+        if (phase === "pending" || phase === "halted") {
+            await this.invoices?.paymentFailedInTx(tx, {
+                organizationId: sub.organizationId,
+                subscriptionId: sub.id,
+                providerEventId: event.providerEventId,
+                final: phase === "halted",
+            });
+        }
         // A halted subscription is ended at the provider too, so it can never
         // charge for a plan the business no longer has.
         if (phase === "halted" && sub.provider && sub.providerSubscriptionId) {
@@ -548,6 +583,23 @@ export class BillingWebhookService {
         event: ParsedBillingEvent,
         now: Date,
     ): Promise<Outcome> {
+        // What was billed, before this event moves anything (U17).
+        const before = await tx.subscription.findUnique({
+            where: { id: subscriptionId },
+            select: {
+                organizationId: true,
+                provider: true,
+                providerSubscriptionId: true,
+                plan: {
+                    select: {
+                        id: true,
+                        name: true,
+                        interval: true,
+                        priceCents: true,
+                    },
+                },
+            },
+        });
         await tx.subscription.update({
             where: { id: subscriptionId },
             data: {
@@ -560,6 +612,37 @@ export class BillingWebhookService {
         await applyDueMoveInTx(tx, subscriptionId, now, {
             currentPeriodEnd: event.currentPeriodEnd ?? undefined,
         });
+        // Saroh's invoice for the renewal charge (U17).
+        if (before) {
+            await this.invoices?.invoiceRenewalInTx(tx, {
+                organizationId: before.organizationId,
+                subscription: before,
+                event,
+                now,
+            });
+        }
         return { result: { status: "processed", changed: true } };
+    }
+
+    /** A scheduled change's first charge, once its move applied (U17). */
+    private async invoiceScheduledStart(
+        tx: Tx,
+        checkout: BillingCheckout,
+        subscriptionId: string,
+        event: ParsedBillingEvent,
+        now: Date,
+    ): Promise<void> {
+        if (!this.invoices) return;
+        const sub = await tx.subscription.findUnique({
+            where: { id: subscriptionId },
+            select: { currentPeriodEnd: true },
+        });
+        await this.invoices.invoiceCheckoutChargeInTx(tx, {
+            checkout,
+            event,
+            now,
+            source: "SCHEDULED",
+            periodEnd: sub?.currentPeriodEnd ?? null,
+        });
     }
 }

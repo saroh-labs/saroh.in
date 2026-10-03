@@ -154,6 +154,37 @@ const envSchema = z.object({
     // missing/malformed. Never logged.
     PAYMENTS_ENC_KEY: z.string().optional(),
 
+    // Saroh's own invoices to businesses for their plan (pricing catalogue
+    // U17), read at use by `billing/saroh-seller.ts`. All optional so dev and
+    // test boot without them; never hard-coded. Unset GSTIN: the paper is an
+    // "Invoice", not a tax invoice, and `saroh_invoice_seller_incomplete` is
+    // logged. Unset state: the GSTIN's first two digits.
+    SAROH_LEGAL_NAME: z.string().optional(),
+    SAROH_GSTIN: z
+        .string()
+        .regex(/^[0-9]{2}[A-Z0-9]{13}$/, "a 15-character GSTIN")
+        .optional(),
+    // GST state code of Saroh's registration ("29"): CGST + SGST for a
+    // business in the same state, IGST otherwise.
+    SAROH_GST_STATE: z
+        .string()
+        .regex(/^[0-9]{2}$/, "a two-digit GST state code")
+        .optional(),
+    // The registered address printed on the paper, one line.
+    SAROH_REGISTERED_ADDRESS: z.string().optional(),
+    // The contact address printed on the paper and the billing email's reply-to.
+    SAROH_BILLING_EMAIL: z.string().email().optional(),
+    // The SAC printed against each line.
+    SAROH_INVOICE_SAC: z
+        .string()
+        .regex(/^[0-9]{4,8}$/, "a 4–8 digit SAC")
+        .optional(),
+    // The series prefix: 1–3 capitals or digits (SRH → SRH/26-27/00001).
+    SAROH_INVOICE_PREFIX: z
+        .string()
+        .regex(/^[A-Z0-9]{1,3}$/, "1–3 capitals or digits")
+        .optional(),
+
     // Saroh STAFF break-glass bootstrap (S1-012 admin). Comma-separated emails
     // that are treated as platform admins even with no PlatformAdmin row. This
     // is ONLY how the first admin is seeded (and how access is recovered if every

@@ -40,6 +40,17 @@ requireProvider: false })`), the email says "view it and download a copy",
   doesn't take payment online." Automatic invoicing (renewals, packs,
   courses, subscribe) still stops with Payments off (`payments-on.ts`).
 
+## Saroh's own invoices — **Current** (pricing catalogue U17)
+
+Saroh billing a business for its plan is not the business's paper: it is
+`SarohInvoice` (Saroh's series, Saroh as seller from env), never an
+`Invoice` row, and never numbered from a business's `InvoiceSequence`. It
+reuses the pure GST helpers (`invoices/gst.ts`, `gst-states.ts`,
+`numbering.ts`'s financial year) and the D16 PDF renderer through its own
+paper view. Written by the billing webhook with the charge, once per
+charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
+invoices (U17)".
+
 ## Business details before money — **Current** (DEC-068, M3)
 
 Every invoice prints the business's registered address, and a

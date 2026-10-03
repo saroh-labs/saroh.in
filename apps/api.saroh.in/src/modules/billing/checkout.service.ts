@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+    BadRequestException,
     ConflictException,
     Inject,
     Injectable,
@@ -20,6 +21,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { gstinProblem, stateCode } from "../invoices/gst-states";
 import { authorize } from "../organizations/organization-policy";
 import type { ChangeKind, ChangeQuote } from "./checkout-quote";
 import { billedByProvider, quoteChange } from "./checkout-quote";
@@ -184,10 +186,16 @@ export class CheckoutService {
     /** Change plan: to Free at once or at period end, else a checkout. */
     async changePlan(
         ctx: OrganizationContext,
-        input: { plan: string; cycle: BillingCycle },
+        input: {
+            plan: string;
+            cycle: BillingCycle;
+            billingState?: string | null;
+            gstin?: string | null;
+        },
         now: Date = new Date(),
     ): Promise<ChangePlanResult> {
         authorize(ctx, "billing:manage");
+        const billTo = checkoutBillTo(input);
         const { target, quote, subscription } = await this.resolve(
             ctx.organizationId,
             input,
@@ -219,7 +227,7 @@ export class CheckoutService {
                 effectiveAt: at.toISOString(),
             };
         }
-        return this.checkout(ctx, target, quote, view, now);
+        return this.checkout(ctx, target, quote, view, now, billTo);
     }
 
     // ── Steps ───────────────────────────────────────────────────────────
@@ -376,6 +384,7 @@ export class CheckoutService {
         quote: ChangeQuote,
         view: ChangePlanQuoteView,
         now: Date,
+        billTo: CheckoutBillTo = { billToState: null, billToGstin: null },
     ): Promise<ChangePlanResult> {
         const kind = quote.kind as "NEW" | "UPGRADE" | "SCHEDULED";
         const providerPlan = await prisma.pricingProviderPlan.findUnique({
@@ -451,6 +460,7 @@ export class CheckoutService {
             startAt: kind === "NEW" ? null : quote.startAt,
             expiresAt: new Date(now.getTime() + CHECKOUT_TTL_MS),
             createdByUserId: ctx.userId,
+            ...billTo,
         };
         let row: BillingCheckout;
         try {
@@ -535,6 +545,45 @@ export class CheckoutService {
             });
         }
     }
+}
+
+/** A typed value, trimmed; blank is none. */
+function nonEmpty(value: string | null | undefined): string | null {
+    const t = value?.trim();
+    return t === undefined || t === "" ? null : t;
+}
+
+/** Who Saroh's invoice for a checkout is billed to (U17). */
+export interface CheckoutBillTo {
+    billToState: string | null;
+    billToGstin: string | null;
+}
+
+/**
+ * The state and GSTIN given at checkout, checked before anything is made at
+ * the provider: a state must be a GST state, and a GSTIN must check out and,
+ * with a state, be registered there. A GSTIN alone gives its own state.
+ */
+export function checkoutBillTo(input: {
+    billingState?: string | null;
+    gstin?: string | null;
+}): CheckoutBillTo {
+    const typedState = nonEmpty(input.billingState);
+    const state = typedState ? stateCode(typedState) : null;
+    if (typedState && !state) {
+        throw new BadRequestException(
+            "Choose the state your business is registered in.",
+        );
+    }
+    const gstin = nonEmpty(input.gstin)?.toUpperCase() ?? null;
+    if (gstin) {
+        const problem = gstinProblem(gstin, state);
+        if (problem) throw new BadRequestException(problem);
+    }
+    return {
+        billToState: state ?? (gstin ? gstin.slice(0, 2) : null),
+        billToGstin: gstin,
+    };
 }
 
 export function checkoutView(row: BillingCheckout, plan: Plan): CheckoutView {
