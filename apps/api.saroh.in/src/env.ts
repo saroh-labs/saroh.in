@@ -111,6 +111,13 @@ const envSchema = z.object({
     // fall back to a fixed public value, anywhere else preview is refused
     // until it is set. Never logged.
     PRICING_PREVIEW_SECRET: z.string().min(32).optional(),
+    // saroh.in's on-demand revalidation hook (plans catalogue KTD-10): after
+    // a publish commits, and at a scheduled version's go-live, a job POSTs to
+    // `<PRICING_SITE_URL>/api/revalidate` with the secret in `x-saroh-revalidate`. Both unset:
+    // nothing is queued, and saroh.in picks the change up on its ISR timer.
+    // The secret is byte-identical in saroh.in. Never logged.
+    PRICING_SITE_URL: z.string().url().optional(),
+    PRICING_REVALIDATE_SECRET: z.string().min(32).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.

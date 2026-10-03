@@ -48,6 +48,22 @@ describe("admin permission policy", () => {
         );
     });
 
+    it("lets Billing edit the pricing draft, and only Platform Owner publish it or manage coupons", () => {
+        const holders = (permission: AdminPermission) =>
+            Object.values(AdminRole)
+                .filter((role) => permissionsFor([role]).includes(permission))
+                .sort();
+        expect(holders(AdminPermission.PricingEdit)).toEqual(
+            [AdminRole.Billing, AdminRole.PlatformOwner].sort(),
+        );
+        expect(holders(AdminPermission.PricingPublish)).toEqual([
+            AdminRole.PlatformOwner,
+        ]);
+        expect(holders(AdminPermission.CouponsManage)).toEqual([
+            AdminRole.PlatformOwner,
+        ]);
+    });
+
     it("gives Platform Owner every control-plane permission", () => {
         expect(permissionsFor([AdminRole.PlatformOwner])).toEqual(
             ALL_ADMIN_PERMISSIONS,
