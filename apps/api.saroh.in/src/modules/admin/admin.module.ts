@@ -10,6 +10,8 @@ import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { HealthModule } from "../health/health.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AdminPricingController } from "../pricing/admin-pricing.controller";
+import { CatalogueWritesService } from "../pricing/catalogue-writes.service";
+import { CouponsService } from "../pricing/coupons.service";
 import { PricingModule } from "../pricing/pricing.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
@@ -73,6 +75,9 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminOperationsService,
         AdminHealthService,
         AdminWaitlistService,
+        // Pricing catalogue writes (U4): they audit through AdminAuditService.
+        CatalogueWritesService,
+        CouponsService,
         PlatformAdminGuard,
         PlatformPermissionGuard,
         OrganizationAccessSessionGuard,

@@ -237,9 +237,42 @@ describe("Pricing permissions", () => {
         "pricingOverview",
         "pricingImpact",
         "pricingPreviewToken",
+        "listCoupons",
     ] as const)("protects %s with pricing read", (method) => {
         expect(perms(method)).toEqual([AdminPermission.PricingRead]);
     });
+
+    it.each(["saveDraft", "discardDraft"] as const)(
+        "needs pricing read and pricing edit to %s",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.PricingRead,
+                AdminPermission.PricingEdit,
+            ]);
+        },
+    );
+
+    // A roll back republishes a snapshot, so it needs publish like publishing
+    // does: it never bypasses review.
+    it.each(["publish", "cancelVersion", "rollback"] as const)(
+        "needs pricing read and pricing publish to %s",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.PricingRead,
+                AdminPermission.PricingPublish,
+            ]);
+        },
+    );
+
+    it.each(["createCoupon", "updateCoupon", "deleteCoupon"] as const)(
+        "needs pricing read and coupons manage to %s",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.PricingRead,
+                AdminPermission.CouponsManage,
+            ]);
+        },
+    );
 });
 
 describe("AdminController staff identity", () => {

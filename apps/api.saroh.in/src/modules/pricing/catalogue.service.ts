@@ -5,7 +5,11 @@ import {
     NotFoundException,
     UnprocessableEntityException,
 } from "@nestjs/common";
-import { liveCatalogueVersion, prisma } from "@saroh/database";
+import {
+    liveCatalogueVersion,
+    prisma,
+    unsyncedCatalogueVersions,
+} from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { diff, validateCatalog } from "@saroh/pricing-catalog";
 
@@ -23,6 +27,9 @@ import { publicCatalog } from "./public-catalog";
 /** The one shared draft's row id (KTD-3). */
 export const SHARED_DRAFT_ID = "shared";
 
+/** The audit action of a draft save; its rows name the draft's editors. */
+export const DRAFT_SAVE_ACTION = "pricing.draft.save";
+
 /** A member of staff as the admin shows them beside a version or a save. */
 export interface StaffName {
     userId: string;
@@ -30,7 +37,18 @@ export interface StaffName {
     email: string | null;
 }
 
-export type VersionStatus = "live" | "scheduled" | "earlier";
+/**
+ * Waiting: its go-live has passed but its paid plans aren't at the billing
+ * provider yet, so the version before it is still live (RECOMMENDATIONS 5).
+ */
+export type VersionStatus = "live" | "scheduled" | "waiting" | "earlier";
+
+/** A version's billing-provider plans, by sync state (U15 syncs them). */
+export interface VersionSync {
+    pending: number;
+    synced: number;
+    failed: number;
+}
 
 export interface AdminVersion {
     version: number;
@@ -48,6 +66,8 @@ export interface AdminVersion {
     businesses: number;
     /** Subscriptions with a pending move to this version. */
     moving: number;
+    /** Its paid plans at the billing provider; all zero for a free-only one. */
+    sync: VersionSync;
     catalog: Catalog;
 }
 
@@ -59,6 +79,8 @@ export interface AdminDraft {
     createdAt: string;
     updatedAt: string;
     updatedBy: StaffName | null;
+    /** Everyone who has saved this draft, first save first (D-2). */
+    editors: StaffName[];
     valid: boolean;
     /** What stops it being published, in the words shown beside Publish. */
     errors: string[];
@@ -248,22 +270,44 @@ export class CatalogueService {
 
     /** `GET /admin/pricing`: live, draft, versions, counts and usage. */
     async adminPricing(now: Date): Promise<AdminPricing> {
-        const [rows, draftRow] = await Promise.all([
+        const [rows, draftRow, held, providerRows] = await Promise.all([
             prisma.pricingCatalogVersion.findMany({
                 orderBy: { version: "desc" },
             }),
             prisma.pricingCatalogDraft.findUnique({
                 where: { id: SHARED_DRAFT_ID },
             }),
+            unsyncedCatalogueVersions(prisma),
+            prisma.pricingProviderPlan.findMany({
+                where: { plan: { key: { startsWith: "catalog." } } },
+                select: { status: true, plan: { select: { version: true } } },
+            }),
         ]);
+        const heldSet = new Set(held);
+        const syncOf = new Map<number, VersionSync>();
+        for (const r of providerRows) {
+            const s = syncOf.get(r.plan.version) ?? {
+                pending: 0,
+                synced: 0,
+                failed: 0,
+            };
+            if (r.status === "SYNCED") s.synced += 1;
+            else if (r.status === "FAILED") s.failed += 1;
+            else s.pending += 1;
+            syncOf.set(r.plan.version, s);
+        }
         const versions = rows.map((r) => ({
             row: r,
             catalog: this.parseStored(r.version, r.catalog),
         }));
-        // The newest by number whose go-live has passed, as liveCatalogueVersion.
+        // The newest by number whose go-live has passed and whose paid plans
+        // are at the provider, as liveCatalogueVersion.
         const live =
-            versions.find((v) => v.row.goLiveAt.getTime() <= now.getTime()) ??
-            null;
+            versions.find(
+                (v) =>
+                    v.row.goLiveAt.getTime() <= now.getTime() &&
+                    !heldSet.has(v.row.version),
+            ) ?? null;
 
         const draftCheck = draftRow ? validateCatalog(draftRow.catalog) : null;
         const draftCatalog = draftCheck?.ok ? draftCheck.catalog : null;
@@ -281,6 +325,10 @@ export class CatalogueService {
             if (v.row.publishedByUserId) staffIds.add(v.row.publishedByUserId);
         }
         if (draftRow?.updatedByUserId) staffIds.add(draftRow.updatedByUserId);
+        const editorIds = draftRow
+            ? await this.draftEditorIds(draftRow.createdAt)
+            : [];
+        for (const id of editorIds) staffIds.add(id);
         const staff = await this.staffNames([...staffIds]);
         const nameOf = (id: string | null) =>
             id
@@ -302,7 +350,10 @@ export class CatalogueService {
                         ? "scheduled"
                         : row.version === live?.row.version
                           ? "live"
-                          : "earlier",
+                          : heldSet.has(row.version) &&
+                              row.version > (live?.row.version ?? 0)
+                            ? "waiting"
+                            : "earlier",
                 policy: row.policy,
                 note: row.note,
                 changes: Array.isArray(row.changes)
@@ -314,6 +365,11 @@ export class CatalogueService {
                 createdAt: row.createdAt.toISOString(),
                 businesses: onVersion.get(row.version) ?? 0,
                 moving: movingTo.get(row.version) ?? 0,
+                sync: syncOf.get(row.version) ?? {
+                    pending: 0,
+                    synced: 0,
+                    failed: 0,
+                },
                 catalog,
             }),
         );
@@ -326,6 +382,10 @@ export class CatalogueService {
                   createdAt: draftRow.createdAt.toISOString(),
                   updatedAt: draftRow.updatedAt.toISOString(),
                   updatedBy: nameOf(draftRow.updatedByUserId),
+                  editors: editorIds.flatMap((id) => {
+                      const n = nameOf(id);
+                      return n ? [n] : [];
+                  }),
                   valid: draftCheck?.ok ?? false,
                   errors: draftCheck && !draftCheck.ok ? draftCheck.errors : [],
                   changes:
@@ -402,6 +462,24 @@ export class CatalogueService {
             liveVersion: live?.version ?? null,
             impact,
         };
+    }
+
+    /**
+     * Who has saved the current draft, in the order they first did: the
+     * audit rows of draft saves since it was started (`createdAt`).
+     */
+    private async draftEditorIds(since: Date): Promise<string[]> {
+        const rows = await prisma.adminAuditEvent.findMany({
+            where: {
+                action: DRAFT_SAVE_ACTION,
+                outcome: "SUCCESS",
+                createdAt: { gte: since },
+            },
+            orderBy: { createdAt: "asc" },
+            select: { actorUserId: true },
+            take: 2000,
+        });
+        return [...new Set(rows.map((r) => r.actorUserId))];
     }
 
     private async staffNames(ids: string[]): Promise<Map<string, StaffName>> {

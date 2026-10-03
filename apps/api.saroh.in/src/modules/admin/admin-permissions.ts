@@ -44,6 +44,12 @@ export const AdminPermission = {
     WaitlistInvite: "waitlist:invite",
     // Plans & modules: the catalogue, its versions and impact (pricing U3).
     PricingRead: "pricing:read",
+    // Catalogue writes (pricing U4): save or discard the shared draft.
+    PricingEdit: "pricing:edit",
+    // Publish, schedule, cancel a scheduled version, roll back.
+    PricingPublish: "pricing:publish",
+    // Coupons apply the moment they are saved, outside versions.
+    CouponsManage: "coupons:manage",
 } as const;
 
 export type AdminPermission =
@@ -81,6 +87,7 @@ const ROLE_PERMISSIONS = {
         AdminPermission.SubscriptionRead,
         AdminPermission.SubscriptionOverride,
         AdminPermission.PricingRead,
+        AdminPermission.PricingEdit,
     ],
     [AdminRole.ReleaseManager]: [
         AdminPermission.PlatformRead,

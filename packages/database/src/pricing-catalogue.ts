@@ -92,13 +92,42 @@ export async function writeCatalogueVersion(
         : write(db as TransactionClient);
 }
 
+/** `Plan.key` prefix of a catalogue plan's billing rows (`catalog.<planId>`). */
+const CATALOGUE_PLAN_KEY_PREFIX = "catalog.";
+
 /**
- * The live version at `now`: the newest whose `goLiveAt` has passed. Later
- * ones are scheduled. Null before any version is installed.
+ * Versions that can't go live yet: one of their `Plan` rows has a billing
+ * provider plan that isn't SYNCED (RECOMMENDATIONS 5). A publish writes the
+ * paid rows' provider plans as PENDING; the sync job (U15) makes them SYNCED.
+ * A version with no provider rows at all (only free plans, or one installed
+ * by the migration's installer) is never held.
  */
-export function liveCatalogueVersion(db: Db, now: Date = new Date()) {
+export async function unsyncedCatalogueVersions(db: Db): Promise<number[]> {
+    const rows = await db.pricingProviderPlan.findMany({
+        where: {
+            status: { not: "SYNCED" },
+            plan: { key: { startsWith: CATALOGUE_PLAN_KEY_PREFIX } },
+        },
+        select: { plan: { select: { version: true } } },
+    });
+    return Array.from(new Set(rows.map((r) => r.plan.version))).sort(
+        (a, b) => a - b,
+    );
+}
+
+/**
+ * The live version at `now`: the newest whose `goLiveAt` has passed and whose
+ * paid plans exist at the billing provider ({@link unsyncedCatalogueVersions}).
+ * Later ones are scheduled; a held one waits, and the version before it stays
+ * live. Null before any version is installed.
+ */
+export async function liveCatalogueVersion(db: Db, now: Date = new Date()) {
+    const held = await unsyncedCatalogueVersions(db);
     return db.pricingCatalogVersion.findFirst({
-        where: { goLiveAt: { lte: now } },
+        where: {
+            goLiveAt: { lte: now },
+            ...(held.length ? { version: { notIn: held } } : {}),
+        },
         orderBy: { version: "desc" },
     });
 }
