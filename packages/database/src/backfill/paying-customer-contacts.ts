@@ -90,6 +90,12 @@ export async function linkPayingCustomer(
         reason: PayingLinkReason;
     },
     normaliseEmail: EmailNormaliser,
+    /**
+     * Ids and a time for what is made, instead of generated ones and now.
+     * Only the seed passes them: every row it writes carries its prefix so
+     * its teardown is exact, and it dates the link to the first payment.
+     */
+    fixed?: { contactId: string; linkId: string; at: Date },
 ): Promise<PayingLinkOutcome> {
     const { organizationId, customerId, reason } = input;
     const linked = () =>
@@ -130,6 +136,7 @@ export async function linkPayingCustomer(
                 lastName: blankToNull(customer.lastName),
                 phone: blankToNull(customer.phone),
                 source: `store-customer:${customerId}`,
+                ...(fixed ? { id: fixed.contactId, createdAt: fixed.at } : {}),
             },
         ],
         skipDuplicates: true,
@@ -152,6 +159,7 @@ export async function linkPayingCustomer(
                 customerId,
                 reason,
                 linkedByUserId: null,
+                ...(fixed ? { id: fixed.linkId, createdAt: fixed.at } : {}),
             },
         ],
         skipDuplicates: true,

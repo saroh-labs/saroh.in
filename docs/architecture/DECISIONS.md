@@ -939,3 +939,15 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: Saroh's own invoices (U17) need a legal seller, and the catalogue adds GST to plan prices.
 - Decision: Saroh is a product of **Virashi Softwares LLP**, which is GST-registered. Saroh's invoices are tax invoices issued by Virashi Softwares LLP under its GSTIN, and plan prices carry GST as the catalogue says.
 - Consequences: the seller details are configuration, not code (`SAROH_LEGAL_NAME`, `SAROH_GSTIN`, `SAROH_GST_STATE`, `SAROH_REGISTERED_ADDRESS`, `SAROH_INVOICE_SAC`), set on the API before the first real charge. The GSTIN and address are never committed.
+
+## DEC-078 Gate W ships the marketing site without Pricing
+
+**Status: Accepted — 2026-10-03** · user · narrows the marketing plan's Gate W
+
+- Context: Gate W was to put Marketing Site V2 live in waitlist mode with the Pricing page reading the plans catalogue. Pricing isn't finished, and no plan limit may appear on any page yet.
+- Decision:
+    - saroh.in ships without `/pricing`, the pricing draft and preview, the plan teasers on Home and the Solutions pages, and every "Compare every plan" link. Pricing leaves the nav and the footer.
+    - The line under each hero's buttons is a fixed, neutral sentence ("Free to start. Move up when you need more."), never the catalogue's card lines. No FAQ answer names a plan's limits or prices.
+    - `/pricing` is a temporary (302) redirect to `/waitlist`, so nothing caches it; old addresses that went to Pricing go to the waitlist or Home. The sitemap leaves `/pricing` out.
+    - No catalogue in production: the catalogue tables, `GET /public/pricing` and `@saroh/pricing-catalog` stay off `development` for now. `GET /public/waitlist/offer` reads only `LAUNCH_OFFER_DAYS`, answering `{ planId: "grow", planName: "Grow", days }` while it is set and 404 otherwise.
+- Consequences: DEC-075's D3 ("the site's plan lines read the catalogue") applies once Pricing ships, with the catalogue. Bringing Pricing back is its own batch: the catalogue migration, U3's public read and the package, then the page, nav, teasers and sitemap entry. Runbook: `docs/architecture/GATE_W_ROLLOUT.md`.

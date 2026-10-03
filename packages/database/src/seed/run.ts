@@ -42,6 +42,7 @@ import {
     emailFor,
     hashPassword,
     id,
+    linkSeededPayers,
     listProductAt,
     publishSeedPost,
     setStockLevel,
@@ -333,6 +334,8 @@ export async function seed(): Promise<void> {
         org.id,
         ...Object.values(sideOrgIds),
     ]);
+    // Every paying customer gets a contact, as a payment would give them.
+    await linkSeededPayers(prisma, [org.id, ...Object.values(sideOrgIds)]);
     await report(prisma, org.id);
 }
 

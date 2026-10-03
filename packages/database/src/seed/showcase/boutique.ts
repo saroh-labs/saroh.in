@@ -976,6 +976,19 @@ export async function checkBoutique(prisma: Db): Promise<void> {
             `the store needs a sold-out and a low variant to film: ${JSON.stringify(c, (_, v: unknown) => (typeof v === "bigint" ? Number(v) : v))}`,
         );
     }
+    // The Customers list is keyed on the contact: a paying customer without
+    // one is missing from it (C2), which is how it stood empty.
+    fail(
+        "paying customers with no contact, and no contact holding their email",
+        await prisma.$queryRaw<unknown[]>`
+            SELECT DISTINCT c.id FROM "Customer" c
+            JOIN "Order" o ON o."customerId" = c.id
+            WHERE o."organizationId" = ${orgId}
+              AND o."paymentStatus" IN ('PAID', 'REFUNDED')
+              AND NOT EXISTS (SELECT 1 FROM "CustomerIdentityLink" l WHERE l."customerId" = c.id)
+              AND NOT EXISTS (SELECT 1 FROM "Contact" k WHERE k."organizationId" = ${orgId}
+                              AND lower(k.email) = lower(c.email))`,
+    );
     if (failures.length > 0) {
         throw new Error(
             `Leela & Loom failed its checks:\n- ${failures.join("\n- ")}`,
