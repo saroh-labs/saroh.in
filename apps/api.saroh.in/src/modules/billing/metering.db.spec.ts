@@ -82,6 +82,12 @@ async function business(
             data: { organizationId: org.id, planId: plan.id, status: "ACTIVE" },
         });
     }
+    // An override needs the flag's definition row (FeatureFlagOverride_flagKey_fkey).
+    await prisma.featureFlag.upsert({
+        where: { key: FlagKey.PLAN_ENFORCEMENT },
+        create: { key: FlagKey.PLAN_ENFORCEMENT, enabledByDefault: false },
+        update: {},
+    });
     if (over.enforce ?? true) {
         await prisma.featureFlagOverride.create({
             data: {

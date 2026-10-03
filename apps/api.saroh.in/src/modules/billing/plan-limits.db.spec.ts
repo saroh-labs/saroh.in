@@ -94,6 +94,12 @@ async function business(planId: string, enforce = true): Promise<Business> {
     await prisma.subscription.create({
         data: { organizationId: org.id, planId: plan.id, status: "ACTIVE" },
     });
+    // An override needs the flag's definition row (FeatureFlagOverride_flagKey_fkey).
+    await prisma.featureFlag.upsert({
+        where: { key: FlagKey.PLAN_ENFORCEMENT },
+        create: { key: FlagKey.PLAN_ENFORCEMENT, enabledByDefault: false },
+        update: {},
+    });
     await prisma.featureFlagOverride.create({
         data: {
             flagKey: FlagKey.PLAN_ENFORCEMENT,
@@ -239,6 +245,7 @@ describe("orders a month (DB, U13)", () => {
                 items: [{ productId: bread, quantity: 1 }],
                 fulfilment: "PICKUP",
                 payment: { kind: "LATER" },
+                walkIn: { name: "Asha" },
             } as CreateOrderDto);
         await place();
         await place();
