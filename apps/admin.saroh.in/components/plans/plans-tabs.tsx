@@ -1,14 +1,7 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@saroh/ui/tabs";
-import type { ComponentType, ReactNode } from "react";
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useMemo,
-    useState,
-} from "react";
+import type { ComponentType } from "react";
 
 import type { PlansTab } from "@/lib/pricing-draft";
 import { PLANS_TABS, tabFrom, tabLabels } from "@/lib/pricing-draft";
@@ -17,6 +10,7 @@ import { useDraft } from "./draft-store";
 import { TabModules } from "./modules/tab-modules";
 import { TabOffers } from "./offers/tab-offers";
 import { usePlans } from "./plans-context";
+import { usePlansNav } from "./plans-nav";
 import { TabPlans } from "./plans/tab-plans";
 import { TabPublish } from "./publish/tab-publish";
 import { TabVersions } from "./versions/tab-versions";
@@ -42,55 +36,8 @@ const PANELS: Record<PlansTab, ComponentType> = {
     publish: TabPublish,
 };
 
-/** Where to land on a tab: the Modules matrix opens Plans on one plan's row. */
-export interface PlansFocus {
-    planId?: string;
-    moduleId?: string;
-}
-
-export interface PlansNav {
-    tab: PlansTab;
-    /** Open a tab, optionally on a plan or a module row. */
-    setTab: (tab: PlansTab, focus?: PlansFocus) => void;
-    /** Set by `setTab`; the tab that lands clears it once it has used it. */
-    focus: PlansFocus | null;
-    clearFocus: () => void;
-}
-
-const NavContext = createContext<PlansNav | null>(null);
-
-export function usePlansNav(): PlansNav {
-    const nav = useContext(NavContext);
-    if (!nav) throw new Error("usePlansNav is used outside PlansNavProvider");
-    return nav;
-}
-
-export function PlansNavProvider({
-    initialTab,
-    children,
-}: {
-    initialTab: PlansTab;
-    children: ReactNode;
-}) {
-    const [tab, setTabState] = useState<PlansTab>(initialTab);
-    const [focus, setFocus] = useState<PlansFocus | null>(null);
-
-    const setTab = useCallback((next: PlansTab, at?: PlansFocus) => {
-        setTabState(next);
-        setFocus(at ?? null);
-        const url = new URL(window.location.href);
-        url.searchParams.set("tab", next);
-        window.history.replaceState(window.history.state, "", url);
-    }, []);
-
-    const clearFocus = useCallback(() => setFocus(null), []);
-
-    const value = useMemo(
-        () => ({ tab, setTab, focus, clearFocus }),
-        [tab, setTab, focus, clearFocus],
-    );
-    return <NavContext.Provider value={value}>{children}</NavContext.Provider>;
-}
+export { PlansNavProvider, usePlansNav } from "./plans-nav";
+export type { PlansFocus, PlansNav } from "./plans-nav";
 
 export function PlansTabs() {
     const { tab, setTab } = usePlansNav();
