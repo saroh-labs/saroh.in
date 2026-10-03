@@ -1,6 +1,7 @@
 import { formatInr } from "@saroh/pricing-catalog";
 import { describe, expect, it } from "vitest";
 
+import { faqs } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
 import { solutions } from "@/content/solutions";
 import {
@@ -16,6 +17,7 @@ import {
     planTeaserFootnote,
     sentenceList,
     solutionPlanTeasers,
+    startFreeFaq,
 } from "./plan-teasers";
 import { fakeCatalog } from "./pricing.fixture";
 
@@ -112,6 +114,21 @@ describe("freePlanLine", () => {
     it("falls back to the placeholder line", () => {
         expect(freePlanLine(null)).toBe(FREE_PLAN_LINE.fallback);
         expect(FREE_PLAN_LINE.fallback).not.toMatch(NO_PRICE);
+    });
+});
+
+describe("startFreeFaq", () => {
+    it("words the answer from the free and the first paid plan", () => {
+        expect(startFreeFaq(fakeCatalog(), faqs["start-free"])).toEqual({
+            q: faqs["start-free"].q,
+            a: `The Plan A plan is ${formatInr(0)} a month: thing one, few items and some visits. Move to Plan B (${formatInr(11_100)} a month) when you want to take orders, run subscriptions, send invoices or add your team.`,
+        });
+    });
+
+    it("keeps the content's answer, with no figures, without a catalogue", () => {
+        const item = startFreeFaq(null, faqs["start-free"]);
+        expect(item).toBe(faqs["start-free"]);
+        expect(item.a).not.toMatch(NO_PRICE);
     });
 });
 

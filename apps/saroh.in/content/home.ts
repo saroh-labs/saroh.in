@@ -46,6 +46,9 @@ export const home = {
     pricingTitle: "Pricing",
     pricingCompare: "Compare every plan",
     faqTitle: "Questions",
+    /** The dark CTA band's title (the design's "band" closer). */
+    closer: "Tomorrow morning, know what needs you.",
+    metaTitle: "Saroh — Services, Appointments, Retail, Orders. Handled.",
 } as const;
 
 /**
