@@ -144,9 +144,15 @@ beforeEach(() => {
     vi.stubGlobal(
         "ResizeObserver",
         class {
-            observe() {}
-            unobserve() {}
-            disconnect() {}
+            observe() {
+                // Nothing to measure: jsdom has no layout.
+            }
+            unobserve() {
+                // Nothing was observed.
+            }
+            disconnect() {
+                // Nothing was observed.
+            }
         },
     );
     scrolled = vi.fn<Element["scrollIntoView"]>();
