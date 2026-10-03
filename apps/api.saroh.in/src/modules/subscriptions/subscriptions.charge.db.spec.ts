@@ -32,8 +32,10 @@ import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { failedRenewals } from "../home/home-money-sources";
 import { InvoicesService } from "../invoices/invoices.service";
 import {
-    CHECKOUT_LIFE_MS,
     chargeUnderWayOn,
+    CHECKOUT_LIFE_MS,
+    checkoutOpenOn,
+    FAILED_CHECKOUT_MS,
 } from "../payments/charge-under-way";
 import { MandateChargesService } from "../payments/mandate-charges.service";
 import { MandateSetupService } from "../payments/mandate-setup.service";
@@ -236,6 +238,37 @@ const eventsOf = async (subscriptionId: string) =>
     ).map((e) => e.kind);
 
 const calls = (op: string) => fake.mandateCalls.filter((c) => c.op === op);
+
+/**
+ * Move a pay-link checkout's whole history `by` ms into the past: made,
+ * last changed and every try — as if the customer had last touched it then.
+ */
+async function ageCheckout(intentId: string, by: number) {
+    const row = await prisma.paymentIntent.findUniqueOrThrow({
+        where: { id: intentId },
+        include: { attempts: true },
+    });
+    await prisma.paymentIntent.update({
+        where: { id: intentId },
+        data: {
+            createdAt: new Date(row.createdAt.getTime() - by),
+            updatedAt: new Date(row.updatedAt.getTime() - by),
+        },
+    });
+    for (const a of row.attempts) {
+        await prisma.paymentAttempt.update({
+            where: { id: a.id },
+            data: { createdAt: new Date(a.createdAt.getTime() - by) },
+        });
+    }
+}
+
+/** The customer's pay-link checkout on the invoice (not autopay's). */
+const checkoutOf = (invoiceId: string) =>
+    prisma.paymentIntent.findFirstOrThrow({
+        where: { invoiceId, viaMandateId: null },
+        orderBy: { createdAt: "desc" },
+    });
 
 /**
  * Paid by hand, so this renewal leaves Home's failed renewals: Home shows
@@ -595,10 +628,7 @@ describe("a decline", () => {
             where: { invoiceId: invoice.id, viaMandateId: null },
         });
         expect(checkout.status).toBe("REQUIRES_PAYMENT");
-        await prisma.paymentIntent.update({
-            where: { id: checkout.id },
-            data: { createdAt: new Date(Date.now() - CHECKOUT_LIFE_MS - HOUR) },
-        });
+        await ageCheckout(checkout.id, CHECKOUT_LIFE_MS + HOUR);
 
         // Autopay is offered again, and Retry by autopay queues a charge.
         expect(
@@ -666,7 +696,7 @@ describe("a decline", () => {
         const who = await autopayMember();
         const invoice = await renew(who.subscriptionId);
         // A checkout open on the invoice, made in the moment before the
-        // charge was queued.
+        // charge was queued (on the job's clock).
         await prisma.paymentIntent.create({
             data: {
                 organizationId: owner.organizationId,
@@ -676,6 +706,7 @@ describe("a decline", () => {
                 currency: "INR",
                 status: "REQUIRES_PAYMENT",
                 providerIntentId: `order_link_${next()}`,
+                createdAt: clock,
             },
         });
         expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
@@ -722,6 +753,219 @@ describe("a decline", () => {
         await expect(
             invoices.createPayLink(owner, invoice.id),
         ).resolves.toHaveProperty("token");
+    });
+});
+
+describe("a pay-link checkout's window (review 3)", () => {
+    /** A card member whose renewal's autopay was declined, then paying by link. */
+    async function declinedThenPayingByLink() {
+        fake.preDebitMethods.clear();
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        expect(await runDue(invoice.id)).toEqual(["DEBIT"]);
+        const [charged] = await intentsOf(invoice.id);
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: charged.providerIntentId,
+        });
+        const { token } = await invoices.createPayLink(owner, invoice.id);
+        await publicInvoices.createIntent(token, {});
+        return { who, invoice, checkout: await checkoutOf(invoice.id) };
+    }
+
+    it("a declined try on the pay link blocks autopay only for its hour", async () => {
+        const { who, invoice, checkout } = await declinedThenPayingByLink();
+        await webhook({
+            eventType: "payment.failed",
+            outcome: "FAILED",
+            providerIntentId: checkout.providerIntentId,
+        });
+        const failed = await checkoutOf(invoice.id);
+        expect(failed.status).toBe("FAILED");
+        const at = (ms: number) => new Date(failed.updatedAt.getTime() + ms);
+
+        // Within the hour the customer may still try again on its order.
+        expect(
+            await checkoutOpenOn(
+                prisma,
+                owner.organizationId,
+                invoice.id,
+                at(FAILED_CHECKOUT_MS - 60_000),
+            ),
+        ).toBe(true);
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("PAY_LINK");
+
+        // Past it, the declined try no longer keeps autopay off — not for
+        // the checkout's whole three-day life.
+        expect(
+            await checkoutOpenOn(
+                prisma,
+                owner.organizationId,
+                invoice.id,
+                at(FAILED_CHECKOUT_MS),
+            ),
+        ).toBe(false);
+        await ageCheckout(failed.id, FAILED_CHECKOUT_MS + 60_000);
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("MANDATE");
+        await expect(
+            subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
+        ).resolves.toMatchObject({ via: "MANDATE" });
+        await offHome(invoice.id);
+    });
+
+    it("an open checkout's life runs from its last try, and past it doesn't block", async () => {
+        const { who, invoice, checkout } = await declinedThenPayingByLink();
+        expect(checkout.status).toBe("REQUIRES_PAYMENT");
+
+        // Made long ago, but the customer tried on it just now: still open.
+        await ageCheckout(checkout.id, CHECKOUT_LIFE_MS + HOUR);
+        await prisma.paymentAttempt.create({
+            data: {
+                organizationId: owner.organizationId,
+                paymentIntentId: checkout.id,
+                provider: "RAZORPAY",
+                status: "CREATED",
+            },
+        });
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("PAY_LINK");
+
+        // Nothing since for its whole life: it no longer blocks.
+        await ageCheckout(checkout.id, CHECKOUT_LIFE_MS + HOUR);
+        expect(
+            (await subscriptions.get(owner, who.subscriptionId)).retryVia,
+        ).toBe("MANDATE");
+        await expect(
+            subscriptions.retryPayment(owner, who.subscriptionId, "MANDATE"),
+        ).resolves.toMatchObject({ via: "MANDATE" });
+        await offHome(invoice.id);
+    });
+
+    it("a charge that stood aside is queued again when the checkout closes, and charged once", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        const checkout = await prisma.paymentIntent.create({
+            data: {
+                organizationId: owner.organizationId,
+                invoiceId: invoice.id,
+                provider: "RAZORPAY",
+                amountCents: 120_000,
+                currency: "INR",
+                status: "REQUIRES_PAYMENT",
+                providerIntentId: `order_link_${next()}`,
+                createdAt: clock,
+            },
+        });
+        // Its last try, a little after it was made.
+        const lastTry = new Date(clock.getTime() + 10 * 60_000);
+        await prisma.paymentAttempt.create({
+            data: {
+                organizationId: owner.organizationId,
+                paymentIntentId: checkout.id,
+                provider: "RAZORPAY",
+                status: "CREATED",
+                createdAt: lastTry,
+            },
+        });
+
+        // Autopay stands aside, and writes its own way back.
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        expect(calls("prepareCharge")).toHaveLength(0);
+        expect((await intentsOf(invoice.id))[0].status).toBe("CANCELLED");
+        const [resume] = await chargeJobs(invoice.id);
+        expect(resume.payload).toMatchObject({
+            step: "PREPARE",
+            key: `inv_${invoice.id}_2`,
+            resume: true,
+        });
+        expect(resume.runAt.getTime()).toBe(
+            lastTry.getTime() + CHECKOUT_LIFE_MS,
+        );
+
+        // Not before the checkout closes.
+        clock = new Date(resume.runAt.getTime() - 60_000);
+        expect(await runDue(invoice.id)).toEqual([]);
+
+        // Then the charge is queued again, under the new key, and runs.
+        clock = resume.runAt;
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        let intents = await intentsOf(invoice.id);
+        expect(intents.map((i) => [i.idempotencyKey, i.status])).toEqual([
+            [`inv_${invoice.id}_1`, "CANCELLED"],
+            [`inv_${invoice.id}_2`, "CREATED"],
+        ]);
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        intents = await intentsOf(invoice.id);
+        const orderId = intents[1].providerIntentId ?? "";
+        fake.settlePreDebit(orderId, "DELIVERED");
+        await webhook({
+            eventType: "order.notification.delivered",
+            outcome: "PRE_DEBIT",
+            providerIntentId: orderId,
+            preDebitStatus: "DELIVERED",
+        });
+        clock = new Date(clock.getTime() + 27 * HOUR);
+        expect(await runDue(invoice.id, { twice: true })).toEqual(["DEBIT"]);
+        expect(calls("charge")).toHaveLength(1);
+        const answered = fake.answerCharge(orderId, "SUCCEEDED");
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: orderId,
+            providerPaymentRef: answered.providerPaymentRef,
+        });
+        expect(
+            (
+                await prisma.invoice.findUniqueOrThrow({
+                    where: { id: invoice.id },
+                })
+            ).status,
+        ).toBe("PAID");
+        // Nothing else waits to charge it.
+        clock = new Date(clock.getTime() + 30 * DAY);
+        await runDue(invoice.id);
+        expect(calls("charge")).toHaveLength(1);
+        expect(await intentsOf(invoice.id)).toHaveLength(2);
+    });
+
+    it("a checkout opened again before the charge comes back puts it off again", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        const open = (at: Date) =>
+            prisma.paymentIntent.create({
+                data: {
+                    organizationId: owner.organizationId,
+                    invoiceId: invoice.id,
+                    provider: "RAZORPAY",
+                    amountCents: 120_000,
+                    currency: "INR",
+                    status: "REQUIRES_PAYMENT",
+                    providerIntentId: `order_link_${next()}`,
+                    createdAt: at,
+                },
+            });
+        await open(clock);
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        const [resume] = await chargeJobs(invoice.id);
+
+        // A new checkout, a day before the first one closes.
+        const second = new Date(resume.runAt.getTime() - DAY);
+        await open(second);
+        clock = resume.runAt;
+        expect(await runDue(invoice.id)).toEqual(["PREPARE"]);
+        expect(await intentsOf(invoice.id)).toHaveLength(1);
+        const [again] = await chargeJobs(invoice.id);
+        expect(again.payload).toMatchObject({ resume: true });
+        expect(again.runAt.getTime()).toBe(second.getTime() + CHECKOUT_LIFE_MS);
+        expect(calls("prepareCharge")).toHaveLength(0);
+        await offHome(invoice.id);
     });
 });
 

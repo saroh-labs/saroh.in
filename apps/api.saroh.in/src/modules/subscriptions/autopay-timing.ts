@@ -141,6 +141,19 @@ export function chargePlan(
 }
 
 /**
+ * The plan of a charge queued again with the debit it already had planned
+ * (the charge job's resume, after it stood aside for a pay-link checkout):
+ * the setting changing since never moves it. The notice goes
+ * {@link AUTOPAY_LEAD_DAYS} days before, or now when that has passed.
+ */
+export function keptPlan(debitAt: Date, now: Date): ChargePlan {
+    const noticeFrom = new Date(
+        debitAt.getTime() - AUTOPAY_LEAD_DAYS * 24 * 60 * 60 * 1000,
+    );
+    return { debitAt, prepareAt: later(now, noticeFrom) };
+}
+
+/**
  * When the next renewal's autopay charge will go, for the customer
  * ("Next autopay charge: ‹date›"), from the renewal date and the timing.
  */

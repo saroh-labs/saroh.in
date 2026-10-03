@@ -636,6 +636,15 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   are refused with 409 "Autopay charge in progress", and the reads say
   "Autopay charge in progress · ‹date›" (`autopayCharge`,
   `online.autopayCharge`, `autopayCharging`).
+- **And the other way round: autopay stands aside for an open pay-link
+  checkout** (`openCheckoutWhere`, `checkoutOpenOn`). A pay-link intent
+  counts as open for `CHECKOUT_LIFE_MS` (3 days) after its last activity —
+  made, or its newest PaymentAttempt — and a FAILED one only for
+  `FAILED_CHECKOUT_MS` (an hour) after it failed: Razorpay's retry is in the
+  same session. Pass the caller's `now`. While one is open, nothing queues,
+  prepares or debits a charge and Retry offers the pay link; a charge that
+  stands aside writes RENEWAL_FAILED (CHECKOUT_OPEN) and a resume step for
+  the moment the checkout closes (`checkoutOpenUntil`), so autopay comes back without the merchant.
 
 ## Courses and class packs — **Current**
 

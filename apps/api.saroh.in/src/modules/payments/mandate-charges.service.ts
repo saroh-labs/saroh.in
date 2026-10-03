@@ -4,7 +4,7 @@ import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
 import type { AutopayChargeTiming } from "../subscriptions/autopay-timing";
-import { chargePlan } from "../subscriptions/autopay-timing";
+import { chargePlan, keptPlan } from "../subscriptions/autopay-timing";
 import { chargeKey, enqueueChargeStepInTx } from "../subscriptions/charge-job";
 import {
     checkoutOpenOn,
@@ -123,6 +123,8 @@ export interface PrepareChargeInput {
      * method that needs no notice. Absent: as soon as the provider allows.
      */
     notBefore?: Date | null;
+    /** The caller's clock, for the open-checkout check (the job's run). */
+    now?: Date;
 }
 
 const OPEN_CHARGE = OPEN_MANDATE_CHARGE;
@@ -253,7 +255,9 @@ export class MandateChargesService {
                 };
             }
         }
-        if (await checkoutOpenOn(prisma, organizationId, invoiceId)) {
+        if (
+            await checkoutOpenOn(prisma, organizationId, invoiceId, input.now)
+        ) {
             return made
                 ? {
                       status: "REFUSED",
@@ -470,7 +474,7 @@ export class MandateChargesService {
                 invoice: {
                     is: {
                         status: "ISSUED",
-                        paymentIntents: { none: openCheckoutWhere() },
+                        paymentIntents: { none: openCheckoutWhere(now) },
                     },
                 },
             },
@@ -506,6 +510,7 @@ export class MandateChargesService {
                     prisma,
                     organizationId,
                     intent.invoiceId ?? "",
+                    now,
                 )
             ) {
                 return refuse("CHECKOUT_OPEN");
@@ -650,9 +655,16 @@ export class MandateChargesService {
                 periodStart: Date;
                 timezone: string;
             };
+            /**
+             * A charge queued again after it stood aside for a pay-link
+             * checkout (the charge job's resume): the debit it had planned
+             * (D13B), kept. Null or absent: as Retry, at once.
+             */
+            plannedDebitAt?: Date | null;
         },
     ): Promise<QueueChargeResult> {
         const { organizationId, subscriptionId, invoiceId } = input;
+        const now = input.now ?? new Date();
         const mandate = await this.chargeableMandate(
             organizationId,
             subscriptionId,
@@ -671,7 +683,7 @@ export class MandateChargesService {
         ) {
             return { status: "NONE" };
         }
-        if (await checkoutOpenOn(tx, organizationId, invoiceId)) {
+        if (await checkoutOpenOn(tx, organizationId, invoiceId, now)) {
             return { status: "CHECKOUT_OPEN" };
         }
         if (
@@ -703,7 +715,6 @@ export class MandateChargesService {
             },
         });
         const key = chargeKey(invoiceId, earlier + 1);
-        const now = input.now ?? new Date();
         const plan = input.schedule
             ? chargePlan(input.schedule.timing, {
                   now,
@@ -711,7 +722,9 @@ export class MandateChargesService {
                   timezone: input.schedule.timezone,
                   method: mandate.method,
               })
-            : null;
+            : input.plannedDebitAt
+              ? keptPlan(input.plannedDebitAt, now)
+              : null;
         const intent = await tx.paymentIntent.create({
             data: {
                 organizationId,
