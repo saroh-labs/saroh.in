@@ -2405,3 +2405,18 @@ starts with https://`, `That isn't an address a photo can load from`), with
 action uses, never a second rule that should agree with it; and an action
 that refuses says so (`frontend-error-feedback.md`).
 **Category**: products · forms · feedback
+
+## saroh.in — `cn()` silently dropped the V2 type sizes and focus outlines
+
+**Problem**: Building the Marketing Site V2 primitives, a nav menu line set
+`text-mk-note text-muted-foreground` rendered at the body size, and every
+`focus-visible:outline focus-visible:outline-2` ring drew nothing.
+**Root cause**: tailwind-merge does not read the Tailwind config. It took the
+app's own `text-mk-*` sizes for colours and kept only the last "colour"; and
+tailwind-merge 3 follows Tailwind 4, where `outline` is a width, so `outline
+outline-2` merged to `outline-2` and the outline lost its style under our
+Tailwind 3.
+**Fix**: `apps/saroh.in/lib/cn.ts` extends tailwind-merge with the app's
+`mk-*` sizes, radii, shadows, widths and spacing; V2 focus rings write
+`focus-visible:[outline-style:solid]`. `lib/cn.test.ts` pins both.
+**Category**: frontend · rule in `apps/saroh.in/lib/cn.ts`
