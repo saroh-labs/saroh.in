@@ -2,6 +2,7 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { SAROH_SOCIAL } from "@/content/social";
 import { SIGN_IN_URL } from "@/lib/links";
 
 import { FEATURE_ITEMS, SOLUTION_ITEMS } from "./nav-items";
@@ -11,8 +12,8 @@ const LINK =
 
 /**
  * The footer (Footer design): Saroh and who it is for, then Features,
- * Solutions and Saroh (Questions, Contact, Sign in), in columns that
- * wrap at 180px.
+ * Solutions and Saroh (Questions, Contact, Sign in), then Follow
+ * (Saroh's accounts and its public code), in columns that wrap at 180px.
  */
 export function SiteFooter() {
     return (
@@ -53,6 +54,19 @@ export function SiteFooter() {
                 <a href={SIGN_IN_URL} className={LINK}>
                     Sign in
                 </a>
+            </Column>
+            <Column title="Follow">
+                {SAROH_SOCIAL.map((link) => (
+                    <a
+                        key={link.href}
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={LINK}
+                    >
+                        {link.label}
+                    </a>
+                ))}
             </Column>
         </footer>
     );

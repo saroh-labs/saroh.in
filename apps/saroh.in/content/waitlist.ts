@@ -105,5 +105,4 @@ export const WAITLIST_CONTACT = "hello@saroh.in";
 export const WAITLIST_FOOTER = {
     word: "सारोह",
     meaning: "sa (with) + aaroh (rising) · Let's rise together.",
-    social: "@sarohlabs · Instagram · X · YouTube · LinkedIn",
 };
