@@ -4,7 +4,7 @@ import { faqs, HOME_FAQ, solutionFaq } from "./faq";
 import { features } from "./features";
 import { PLAN_TEASERS } from "./home";
 import { shots } from "./shots";
-import { solutions } from "./solutions";
+import { segmentViews, solutions } from "./solutions";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "./types";
 import { contentErrors } from "./validate";
 
@@ -156,6 +156,34 @@ describe("solution pages", () => {
     it("gyms has three Bookings segments in a row", () => {
         const areas = solutions.gyms.segments.map((s) => s.feature);
         expect(areas.filter((a) => a === "bookings")).toHaveLength(3);
+    });
+
+    it("only the first segment of each area says See {feature}", () => {
+        const views = segmentViews(
+            solutions.gyms.segments,
+            (f) => features[f].name,
+        );
+        const bookings = views.filter((v) => v.feature === "bookings");
+        expect(bookings.map((v) => v.seeLink)).toEqual([true, false, false]);
+        expect(bookings.map((v) => v.label)).toEqual([
+            "Bookings · Your booking page",
+            "Bookings · Your week",
+            "Bookings · Class packs and courses",
+        ]);
+        expect(views[0]).toMatchObject({
+            label: "Dashboard",
+            featureName: "Dashboard",
+            seeLink: true,
+        });
+        for (const slug of SOLUTION_SLUGS) {
+            const linked = segmentViews(
+                solutions[slug].segments,
+                (f) => features[f].name,
+            ).filter((v) => v.seeLink);
+            expect(new Set(linked.map((v) => v.feature)).size).toBe(
+                linked.length,
+            );
+        }
     });
 });
 

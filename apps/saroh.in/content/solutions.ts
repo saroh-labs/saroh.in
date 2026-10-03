@@ -7,7 +7,12 @@
  * summaries are not here: the pricing block names plans by id and renders the
  * placeholder until the catalogue feeds the site.
  */
-import type { Solution, SolutionSlug } from "./types";
+import type {
+    FeatureSlug,
+    Solution,
+    SolutionSegment,
+    SolutionSlug,
+} from "./types";
 import { SOLUTION_SLUGS } from "./types";
 
 export const solutions: Record<SolutionSlug, Solution> = {
@@ -283,4 +288,36 @@ export const solutionHref = (slug: SolutionSlug) => `/solutions/${slug}`;
 
 export function isSolutionSlug(value: string): value is SolutionSlug {
     return (SOLUTION_SLUGS as readonly string[]).includes(value);
+}
+
+/**
+ * A segment as the page draws it: its label (the design's sub-label, or the
+ * feature's name) and whether it carries "See {feature} →". Within each
+ * area only the FIRST segment links to the feature page, so gyms' three
+ * Bookings segments show the link once.
+ */
+export interface SegmentView extends SolutionSegment {
+    label: string;
+    /** The feature's name, for "See {name} →". */
+    featureName: string;
+    /** True on the first segment of its area: it shows "See {name} →". */
+    seeLink: boolean;
+}
+
+export function segmentViews(
+    segments: SolutionSegment[],
+    featureName: (slug: FeatureSlug) => string,
+): SegmentView[] {
+    const seen = new Set<FeatureSlug>();
+    return segments.map((seg) => {
+        const first = !seen.has(seg.feature);
+        seen.add(seg.feature);
+        const name = featureName(seg.feature);
+        return {
+            ...seg,
+            label: seg.label ?? name,
+            featureName: name,
+            seeLink: first,
+        };
+    });
 }

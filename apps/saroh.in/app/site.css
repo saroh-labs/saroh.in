@@ -28,6 +28,7 @@
     --mk-on-ink-muted: 41.2 10.1% 69%; /* #B8B3A8 — notes on an Ink band */
     --mk-on-ink-line: 40 7% 33.7%; /* #5C5850 — outline button on Ink */
     --mk-on-ink-hover: 40 7% 16.9%; /* #2E2C28 */
+    --mk-on-ink-accent: 38 81% 69%; /* #F0C170 — a plan's fit line on Ink */
 
     /* The design's three shadows: cards on hover, screenshots, the hero. */
     --mk-shadow-card: 0 10px 30px rgba(28, 28, 26, 0.08);

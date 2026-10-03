@@ -1,5 +1,7 @@
 import { ChevronDown } from "lucide-react";
 
+import { cn } from "@/lib/cn";
+
 import type { FaqItem } from "@/content/types";
 
 import { Container } from "./container";
@@ -14,17 +16,23 @@ export function Faq({
     items,
     title = "Questions",
     id = "faq",
+    className,
 }: {
     items: FaqItem[];
     title?: string;
     id?: string;
+    /** E.g. the Features and Solutions designs' `pt-[120px]` (Home's is 110). */
+    className?: string;
 }) {
     return (
         <Container
             as="section"
             id={id}
             aria-labelledby={`${id}-title`}
-            className="mx-0 grid max-w-[860px] scroll-mt-6 gap-5 pt-[110px]"
+            className={cn(
+                "mx-0 grid max-w-[860px] scroll-mt-6 gap-5 pt-[110px]",
+                className,
+            )}
         >
             <h2
                 id={`${id}-title`}

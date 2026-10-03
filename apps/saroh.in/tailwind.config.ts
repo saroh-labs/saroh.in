@@ -37,6 +37,7 @@ const config: Config = {
                     "on-ink-muted": mk("on-ink-muted"),
                     "on-ink-line": mk("on-ink-line"),
                     "on-ink-hover": mk("on-ink-hover"),
+                    "on-ink-accent": mk("on-ink-accent"),
                     scrim: "var(--mk-scrim)",
                 },
             },
