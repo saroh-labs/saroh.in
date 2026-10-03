@@ -2208,6 +2208,11 @@ from today's month, and the specs pinned the month they were written in.
 **Fix**: those assertions match any month (`\d{2}`).
 **Rule**: a spec that reads the real clock asserts only what holds every
 day, or passes a fixed date in.
+**Follow-up (code review 3)**: `\d{2}` fixed the month but left the year:
+"26-27" against the real clock would fail on 1 April 2027. Both files now
+pin the clock (`jest.useFakeTimers`/`vi.useFakeTimers`, `Date` only) where
+the code reads it, and assert the exact numbers again; checked with the
+clock faked to 2 April 2027, 15 January 2027 and 31 December 2031.
 **Category**: tests · invoices
 
 ## Sites — a site lock that the publish's own UPDATE upgraded could deadlock (release review)
