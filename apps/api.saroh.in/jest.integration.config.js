@@ -68,6 +68,9 @@ module.exports = {
         // The waitlist spec mocks Prisma (pure unit test) and runs in the
         // default/unit project — keep it out of the DB-backed run.
         "<rootDir>/src/modules/waitlist/",
+        // Plans catalogue U3: pure specs run in the unit project; only the
+        // pricing *.db.spec.ts run here.
+        "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",
         // DB-free specs that mock @saroh/database and run in the unit project:
         // the discount redemption core and the storefront settings spec.
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",

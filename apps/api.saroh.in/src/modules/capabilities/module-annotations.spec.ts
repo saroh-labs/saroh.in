@@ -240,6 +240,10 @@ const NEVER: Record<string, string> = {
         "a buyer's checkout return — settles a payment already taken",
     "billing/billing-webhook.controller.ts": "billing webhook inbox",
     "waitlist/waitlist.controller.ts": "public waitlist",
+    "pricing/public-pricing.controller.ts":
+        "Saroh's own price list for saroh.in, not a tenant surface",
+    "pricing/admin-pricing.controller.ts":
+        "staff control plane (Plans & modules), not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

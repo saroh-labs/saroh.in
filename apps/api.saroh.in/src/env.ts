@@ -104,6 +104,13 @@ const envSchema = z.object({
     // The key the destination email and the code are HMAC'd under, so a
     // database read reveals neither who asked nor the code.
     SITE_ACCOUNTS_CODE_SECRET: z.string().min(32).optional(),
+    // Signs the pricing draft-preview token staff mint in the admin console
+    // (plans catalogue KTD-10): at most 15 minutes, bound to one draft
+    // revision. API only — saroh.in passes the token through, never checks
+    // it. Read at use (`pricing/pricing-secrets.ts`): development and test
+    // fall back to a fixed public value, anywhere else preview is refused
+    // until it is set. Never logged.
+    PRICING_PREVIEW_SECRET: z.string().min(32).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.

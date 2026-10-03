@@ -35,6 +35,19 @@ describe("admin permission policy", () => {
         expect(permissions).not.toContain(AdminPermission.FlagsPublish);
     });
 
+    it("lets Billing and Auditor read the pricing catalogue, and no one else below Owner", () => {
+        const readers = Object.values(AdminRole).filter((role) =>
+            permissionsFor([role]).includes(AdminPermission.PricingRead),
+        );
+        expect(readers.sort()).toEqual(
+            [
+                AdminRole.Auditor,
+                AdminRole.Billing,
+                AdminRole.PlatformOwner,
+            ].sort(),
+        );
+    });
+
     it("gives Platform Owner every control-plane permission", () => {
         expect(permissionsFor([AdminRole.PlatformOwner])).toEqual(
             ALL_ADMIN_PERMISSIONS,

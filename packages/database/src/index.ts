@@ -50,3 +50,6 @@ export * from "./backfill/order-numbers";
 // Pricing catalogue versions (plan 2026-09-29 U1): store a published
 // snapshot and its Plan rows, and read which one is live.
 export * from "./pricing-catalogue";
+// The guard every seed and backfill runs before writing, exported so a CLI
+// in the API can refuse a database nobody asked for in the same words.
+export { assertDatabaseTarget } from "./database-target";

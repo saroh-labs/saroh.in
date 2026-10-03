@@ -217,6 +217,21 @@ describe("Waitlist permissions", () => {
     });
 });
 
+describe("Pricing permissions", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it.each([
+        "pricingOverview",
+        "pricingImpact",
+        "pricingPreviewToken",
+    ] as const)("protects %s with pricing read", (method) => {
+        expect(perms(method)).toEqual([AdminPermission.PricingRead]);
+    });
+});
+
 describe("AdminController staff identity", () => {
     it("returns the server-resolved roles and permissions to the admin shell", () => {
         const controller = new AdminController(

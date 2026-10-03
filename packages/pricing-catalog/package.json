@@ -17,6 +17,13 @@
             "require": "./dist/seed.internal.js"
         }
     },
+    "typesVersions": {
+        "*": {
+            "seed": [
+                "./dist/seed.internal.d.ts"
+            ]
+        }
+    },
     "files": [
         "dist/**"
     ],

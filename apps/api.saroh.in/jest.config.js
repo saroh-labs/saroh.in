@@ -338,6 +338,10 @@ module.exports = {
         // the billing webhook inbox (signature-before-write, idempotent replay).
         // Jest-mocked Prisma + fake provider; never touch a DB or the network.
         "<rootDir>/src/modules/billing/**/*.spec.ts",
+        // Plans catalogue U3: the draft-preview token, the public view of a
+        // snapshot and the impact rules — pure. The *.db.spec.ts beside them
+        // run in the integration project.
+        "<rootDir>/src/modules/pricing/**/*.spec.ts",
         // Public waitlist capture: normalization, idempotency (including the
         // concurrent-insert P2002 race), and that a full address never reaches
         // the logs. Jest-mocked Prisma; no DB.

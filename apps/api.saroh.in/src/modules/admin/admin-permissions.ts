@@ -40,6 +40,8 @@ export const AdminPermission = {
     StaffGrant: "staff:grant",
     AuditRead: "audit:read",
     WaitlistInvite: "waitlist:invite",
+    // Plans & modules: the catalogue, its versions and impact (pricing U3).
+    PricingRead: "pricing:read",
 } as const;
 
 export type AdminPermission =
@@ -75,6 +77,7 @@ const ROLE_PERMISSIONS = {
         AdminPermission.OrganizationRead,
         AdminPermission.SubscriptionRead,
         AdminPermission.SubscriptionOverride,
+        AdminPermission.PricingRead,
     ],
     [AdminRole.ReleaseManager]: [
         AdminPermission.PlatformRead,
@@ -92,6 +95,7 @@ const ROLE_PERMISSIONS = {
         AdminPermission.FlagsRead,
         AdminPermission.StaffRead,
         AdminPermission.AuditRead,
+        AdminPermission.PricingRead,
     ],
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
 
