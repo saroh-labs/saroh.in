@@ -67,6 +67,7 @@ function PlanCard({ plan: p }: { plan: PlanCardView }) {
                 planName={p.cta.planName}
                 paid={p.cta.paid}
                 trialDays={p.cta.trialDays}
+                cycle={p.cta.cycle}
                 size="md"
                 variant={f ? "saffron" : "secondary"}
                 className={cn(

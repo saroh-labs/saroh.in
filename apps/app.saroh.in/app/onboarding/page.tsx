@@ -2,9 +2,15 @@ import { getServerSession } from "@saroh/auth/next";
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { BusinessSetupForm } from "@/components/organizations/business-setup-form";
 import { listOrganizations } from "@/lib/organizations/service";
+import {
+    checkoutIntent,
+    planIntentNote,
+} from "@/lib/saroh-billing/plan-checkout";
+import { readPlanIntent } from "@/lib/saroh-billing/plan-intent";
 import { requireSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Set up Saroh" };
@@ -23,14 +29,31 @@ export const metadata: Metadata = { title: "Set up Saroh" };
  * up — a business, just me, or a site for my work (DEC-070) — is asked, as
  * the form's first question, and the form speaks in its words. The page
  * around it stays neutral: it is drawn before the answer is given.
+ *
+ * A plan picked on saroh.in arrives from sign-up as `?plan=&cycle=` (plan
+ * U27). It is checked against the live catalogue and said in one line under
+ * the heading; once the business exists, a paid plan goes on to its checkout
+ * and anything else stays on Free, where every business starts. It is for a
+ * first business only: someone who already has one and follows a plan link
+ * here goes to their workspace rather than making another.
  */
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     await requireSession();
-    const [session, organizations] = await Promise.all([
+    const [session, organizations, query] = await Promise.all([
         getServerSession(await headers()),
         listOrganizations(),
+        searchParams,
     ]);
     const hasOrgs = organizations.length > 0;
+    if (hasOrgs && query.plan !== undefined) redirect("/");
+    const intent = hasOrgs
+        ? ({ kind: "none" } as const)
+        : await readPlanIntent(query);
+    const note = planIntentNote(intent);
 
     return (
         <SplitShell
@@ -57,9 +80,18 @@ export default async function OnboardingPage() {
                     ? "It sits beside the ones you have, and you switch between them from the top of the workspace."
                     : "Last step. You can change all of this later, and you pick what Saroh does for you once you are inside."}
             </p>
+            {note ? (
+                <p
+                    data-testid="plan-intent"
+                    className="-mt-2.5 mb-[22px] text-pretty text-[13px] leading-[1.55] text-foreground"
+                >
+                    {note}
+                </p>
+            ) : null}
             <BusinessSetupForm
                 email={session?.user.email ?? ""}
                 backTo={hasOrgs ? "/" : undefined}
+                checkout={checkoutIntent(intent)}
             />
         </SplitShell>
     );

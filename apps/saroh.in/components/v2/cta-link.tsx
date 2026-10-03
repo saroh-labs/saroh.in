@@ -18,6 +18,7 @@ export function CtaLink({
     planName,
     paid,
     trialDays,
+    cycle,
     mode,
     variant = "primary",
     size = "lg",
@@ -32,6 +33,8 @@ export function CtaLink({
     planName?: string;
     paid?: boolean;
     trialDays?: number;
+    /** The cycle a paid plan's card shows; open mode carries it to sign-up. */
+    cycle?: "month" | "year";
     mode?: LaunchMode;
     variant?: ButtonVariant;
     size?: ButtonSize;
@@ -40,7 +43,15 @@ export function CtaLink({
     short?: boolean;
     onNavigate?: () => void;
 }) {
-    const action = cta({ src, plan, planName, paid, trialDays, mode });
+    const action = cta({
+        src,
+        plan,
+        planName,
+        paid,
+        trialDays,
+        cycle,
+        mode,
+    });
     return (
         <ButtonLink
             href={action.href}

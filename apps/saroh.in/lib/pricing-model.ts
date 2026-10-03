@@ -23,7 +23,14 @@ export interface PlanCardView {
     /** "Free for good", "+ GST", "Incl. GST", "About … a month + GST". */
     sub: string;
     /** What the CTA builder needs (KTD-16). */
-    cta: { plan: string; planName: string; paid: boolean; trialDays?: number };
+    cta: {
+        plan: string;
+        planName: string;
+        paid: boolean;
+        trialDays?: number;
+        /** The cycle the card shows, carried to sign-up in open mode (U27). */
+        cycle: Cycle;
+    };
     /** "Everything in ‹previous›, plus:", or empty. */
     lead: string;
     /** "Try it free for N days", or empty. */

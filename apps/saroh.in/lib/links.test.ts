@@ -38,8 +38,24 @@ describe("cta", () => {
             cta({ src: "x", plan: "grow", trialDays: 14, mode: "open" }).label,
         ).toBe("Start 14-day trial");
         expect(cta({ src: "x", plan: "grow", mode: "open" }).href).toMatch(
-            /\/signup\?plan=grow&src=x$/,
+            /\/signup\?plan=grow&cycle=month&src=x$/,
         );
+    });
+
+    it("open mode: a paid plan carries the cycle shown; Free carries none (U27)", () => {
+        expect(
+            cta({ src: "x", plan: "pro", cycle: "year", mode: "open" }).href,
+        ).toMatch(/\/signup\?plan=pro&cycle=year&src=x$/);
+        expect(
+            cta({ src: "x", plan: "free", cycle: "year", mode: "open" }).href,
+        ).toMatch(/\/signup\?plan=free&src=x$/);
+    });
+
+    it("waitlist mode never carries a cycle", () => {
+        expect(
+            cta({ src: "x", plan: "pro", cycle: "year", mode: "waitlist" })
+                .href,
+        ).toBe("/waitlist?plan=pro&src=x");
     });
 
     it("defaults to waitlist when the switch is unset", () => {
