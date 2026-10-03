@@ -134,7 +134,9 @@ if [ -n "$TREE" ]; then
     done
 fi
 
-W=$(mktemp -d -t prepush)
+# A template with its X's works on GNU and BSD mktemp alike; `-t prepush`
+# fails on Linux ("too few X's") and left every step without a log dir.
+W=$(mktemp -d "${TMPDIR:-/tmp}/prepush.XXXXXX")
 LOG=$W/step.log
 FAILED=""
 # cached <step> [<step that also counts>…]
@@ -599,7 +601,7 @@ e2e_start() {
     [ -n "$(git status --porcelain)" ] && \
         echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
     SHA=$(git rev-parse HEAD)
-    E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
+    E2E_LOGS=$(mktemp -d "${TMPDIR:-/tmp}/prepush-e2e-logs.XXXXXX")
     [ "$E2E_STATUS" = run ] &&
         echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
     [ "$PERM_STATUS" = run ] &&
