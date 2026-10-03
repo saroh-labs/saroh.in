@@ -2459,3 +2459,17 @@ half hour — earlier, so version 1 wasn't live yet when the showcase looked.
 dates something "now" that a later step reads at a different "now".
 `prepush --e2e` (fresh-seed path) is what caught it.
 **Category**: seed · rule in `packages/database/src/seed/`
+
+## E2E — a new account was sent to production's onboarding
+
+**Problem**: the first browser test to follow a sign-up into onboarding
+(`signup-from-marketing.spec.ts`) timed out on
+`https://accounts.saroh.in/login?redirect=https://app.saroh.in/onboarding`.
+**Root cause**: the e2e stack (prepush and CI) never set
+`NEXT_PUBLIC_APP_URL`, so the production build of accounts fell back to
+`https://app.saroh.in`; turbo's strict env mode would have dropped it anyway,
+as it wasn't in `globalEnv`.
+**Fix**: set it in `scripts/prepush.sh` and CI's browser job, and list it in
+`turbo.json`. A `NEXT_PUBLIC_*` a build reads must be in `globalEnv` and in
+every stack that builds it.
+**Category**: e2e · rule in `scripts/prepush.sh`, `turbo.json`
