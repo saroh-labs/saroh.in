@@ -83,6 +83,18 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
     },
 };
 
+/**
+ * The catalogue rows that sit under one registry module, in `MODULE_MAP`'s
+ * order. Module availability (U12) reads a registry module as included when
+ * any of these is on for the business; with none, the catalogue doesn't
+ * govern it.
+ */
+export function catalogueModulesFor(registry: RegistryModuleKey): string[] {
+    return Object.entries(MODULE_MAP)
+        .filter(([, e]) => e.registry === registry)
+        .map(([moduleId]) => moduleId);
+}
+
 /** The catalogue row a legacy entitlement key belongs to, if any. */
 export function moduleForLegacyKey(key: string): string | null {
     for (const [moduleId, e] of Object.entries(MODULE_MAP)) {

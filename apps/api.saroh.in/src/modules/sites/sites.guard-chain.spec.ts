@@ -98,6 +98,7 @@ function moduleGuard(): ModuleEnforcementGuard {
         } as unknown as FeatureFlagService,
         {
             can: jest.fn().mockResolvedValue(true),
+            moduleIncluded: jest.fn().mockResolvedValue(true),
         } as unknown as EntitlementService,
         {
             evaluate: jest

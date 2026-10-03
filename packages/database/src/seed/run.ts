@@ -21,7 +21,6 @@ import {
     OWNER_EMAIL,
     OWNER_PASSWORD,
     PIPELINE_STAGES,
-    PLAN,
     POSTS,
     PRODUCTS,
     REVIEWER_EMAIL,
@@ -50,6 +49,7 @@ import {
     writeSite,
 } from "./helpers";
 import { seedPreviousAddress } from "./previous-address";
+import { seedPlanId } from "./pricing.internal";
 import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
@@ -954,36 +954,22 @@ async function seedContent(
 // --- Billing ------------------------------------------------------------
 
 /**
- * Put the org on a paid plan.
+ * Put the org on a paid plan: the catalogue's top plan (`pricing.internal.ts`).
  *
- * This is not scenery. `EntitlementService` caps an unsubscribed org at one
+ * This is not scenery. `EntitlementService` caps a business on no plan at one
  * site and refuses a custom-domain claim outright, so without a subscription
  * the website fixture below describes an organization the product would never
  * have allowed to exist.
  */
 async function seedBilling(prisma: Db, orgId: string, now: Date) {
-    const plan = await prisma.plan.upsert({
-        where: { id: id("plan") },
-        update: { name: PLAN.name, entitlements: PLAN.entitlements },
-        create: {
-            id: id("plan"),
-            key: PLAN.key,
-            version: PLAN.version,
-            name: PLAN.name,
-            priceCents: PLAN.priceCents,
-            currency: CURRENCY,
-            interval: PLAN.interval,
-            entitlements: PLAN.entitlements,
-        },
-    });
-
+    const planId = await seedPlanId(prisma, now);
     await prisma.subscription.upsert({
         where: { organizationId: orgId },
-        update: { planId: plan.id, status: "ACTIVE" },
+        update: { planId, status: "ACTIVE" },
         create: {
             id: id("subscription"),
             organizationId: orgId,
-            planId: plan.id,
+            planId,
             status: "ACTIVE",
             currentPeriodEnd: at(now, 19, 9),
         },

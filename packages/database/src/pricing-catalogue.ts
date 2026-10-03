@@ -152,3 +152,69 @@ export function scheduledCatalogueVersions(db: Db, now: Date = new Date()) {
         orderBy: { goLiveAt: "asc" },
     });
 }
+
+/**
+ * A catalogue plan's billable `Plan` row on the live version, for one cycle
+ * (`catalog.<planId>`, KTD-2). Null before any version is live, or when the
+ * live version has no such plan.
+ */
+export async function liveCataloguePlanRow(
+    db: Db,
+    planId: string,
+    interval: "month" | "year" = "month",
+    now: Date = new Date(),
+) {
+    const live = await liveCatalogueVersion(db, now);
+    if (!live) return null;
+    return db.plan.findUnique({
+        where: {
+            key_version_interval: {
+                key: `${CATALOGUE_PLAN_KEY_PREFIX}${planId}`,
+                version: live.version,
+                interval,
+            },
+        },
+        select: { id: true, key: true, version: true, active: true },
+    });
+}
+
+export type StartOnFreePlanResult =
+    | "started"
+    /** It has a subscription row already; nothing written. */
+    | "has-subscription"
+    /** No live version offers the plan, or it is retired; nothing written. */
+    | "no-plan";
+
+/**
+ * Give a business its Free subscription row (OQ-2, DEC-014): the given
+ * catalogue plan's monthly row on the live version, ACTIVE, no provider.
+ * With a row, "keep their terms" and moves have somewhere to live, and the
+ * catalogue reads the business instead of the old free floor.
+ *
+ * The caller names the plan (`free`): this package stores what it is given
+ * and carries no catalogue rules. Pass the onboarding transaction to make it
+ * part of a sign-up; it never replaces a subscription that exists.
+ */
+export async function startOnFreePlan(
+    db: Db,
+    organizationId: string,
+    options: { planId: string; now?: Date },
+): Promise<StartOnFreePlanResult> {
+    const now = options.now ?? new Date();
+    const existing = await db.subscription.findUnique({
+        where: { organizationId },
+        select: { id: true },
+    });
+    if (existing) return "has-subscription";
+    const row = await liveCataloguePlanRow(db, options.planId, "month", now);
+    if (!row?.active) return "no-plan";
+    await db.subscription.create({
+        data: {
+            organizationId,
+            planId: row.id,
+            status: "ACTIVE",
+            billingCycle: "month",
+        },
+    });
+    return "started";
+}

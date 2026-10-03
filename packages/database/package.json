@@ -39,6 +39,7 @@
         "zod": "catalog:"
     },
     "devDependencies": {
+        "@saroh/pricing-catalog": "workspace:*",
         "@types/pg": "^8.21.0",
         "better-auth": "^1.6.26",
         "config": "^4.4.2",

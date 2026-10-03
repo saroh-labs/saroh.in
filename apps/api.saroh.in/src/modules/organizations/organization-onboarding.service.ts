@@ -5,7 +5,7 @@ import {
     Logger,
     Optional,
 } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import { prisma, startOnFreePlan } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
 import {
@@ -13,6 +13,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { FREE_PLAN_ID } from "../billing/catalogue-access.service";
 import {
     addressProblem,
     addressTaken,
@@ -133,6 +134,14 @@ export class OrganizationOnboardingService {
                     userId,
                     role: "OWNER",
                 },
+            });
+
+            // Every business starts on the catalogue's Free plan (OQ-2): a
+            // subscription row on the live version, no provider. Nothing is
+            // written where no version is live yet; the business then reads
+            // the free floor until the Free-rows backfill gives it one.
+            await startOnFreePlan(tx, organization.id, {
+                planId: FREE_PLAN_ID,
             });
 
             this.logger.log(

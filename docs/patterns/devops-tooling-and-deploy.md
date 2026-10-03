@@ -419,7 +419,9 @@ On each unit's GitHub issue, comment when the unit lands on development.
 - **Current** — **The pricing catalogue's release** is
   `docs/architecture/PRICING_ROLLOUT.md`: the API that reads plan overrides
   goes out before the grandfather backfill, which runs dry first with the
-  owner's end date and the release time as its cutoff, and the catalogue
-  replaces `FREE_ENTITLEMENTS` (U12) only where the backfill has run.
+  owner's end date and the release time as its cutoff, then the Free-rows
+  backfill (U12) with the same cutoff; the catalogue replaces
+  `FREE_ENTITLEMENTS` only where both have run, and `PLAN_ENFORCEMENT` goes
+  on last.
 - **Adopted** — **Production writes need explicit approval at the time** —
   restarts, deploys, migrations, database writes. Read-only inspection does not.

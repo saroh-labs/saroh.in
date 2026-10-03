@@ -29,6 +29,8 @@ jest.mock("@saroh/database", () => {
         currentOrgContext: () => undefined,
         isRlsEnforcementEnabled: () => false,
         outsideOrgContext: <T>(fn: () => T) => fn(),
+        // Every business starts on the catalogue's Free plan (U12, OQ-2).
+        startOnFreePlan: jest.fn().mockResolvedValue("started"),
         prisma: {
             ...client,
             $transaction: jest.fn((cb: (tx: typeof client) => unknown) =>
@@ -38,7 +40,7 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { prisma } from "@saroh/database";
+import { prisma, startOnFreePlan as startOnFreePlanFn } from "@saroh/database";
 
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
@@ -56,6 +58,7 @@ const heldFindUnique = (
 const profileCreate = prisma.businessProfile.create as jest.Mock;
 const membershipCreate = prisma.membership.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
+const startOnFreePlan = startOnFreePlanFn as unknown as jest.Mock;
 
 describe("OrganizationOnboardingService.onboard", () => {
     // AuditService.record is fire-and-forget (never throws); a jest mock stands
@@ -108,6 +111,23 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(membershipCreate).toHaveBeenCalledWith({
             data: { organizationId: "org_1", userId: "user_1", role: "OWNER" },
         });
+    });
+
+    it("starts the business on the catalogue's Free plan in the same transaction (U12, OQ-2)", async () => {
+        await service.onboard("user_1", { name: "Acme" });
+
+        expect(startOnFreePlan).toHaveBeenCalledTimes(1);
+        const [tx, organizationId, options] = startOnFreePlan.mock.calls[0] as [
+            unknown,
+            string,
+            { planId: string },
+        ];
+        // The transaction's client (the mock hands its callback the inner
+        // delegates), not the bare one.
+        expect(tx).not.toBe(prisma);
+        expect(tx).toHaveProperty("membership");
+        expect(organizationId).toBe("org_1");
+        expect(options).toEqual({ planId: "free" });
     });
 
     it("stores a private limited company as pvt, and takes a new type as sent (F10b)", async () => {

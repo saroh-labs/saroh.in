@@ -93,6 +93,15 @@ export const FlagKey = {
      * production, first for one business, then for everyone.
      */
     WEB_ADDRESS_CHANGE: "WEB_ADDRESS_CHANGE",
+
+    /**
+     * The plans catalogue's kill switch (OQ-4): on, a module the business's
+     * plan doesn't include is unavailable (module availability's plan gate,
+     * U12) and, once U13 lands, the catalogue's limits are enforced. Off,
+     * the catalogue still answers every read (`GET …/billing/access`, the
+     * limits `EntitlementService` has always enforced) but locks nothing new.
+     */
+    PLAN_ENFORCEMENT: "PLAN_ENFORCEMENT",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -190,6 +199,14 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "Test releases are on for every business on every instance, have needed no kill switch for a release, and the flag's seven readers (release endpoints, test-host lookup, scheduling, the Website alert row, the editor panel, the settings row and the setting's own write) have been removed.",
+    },
+    PLAN_ENFORCEMENT: {
+        purpose:
+            "Applies the plans catalogue: a module the business's plan doesn't include is unavailable, and the plan's limits are enforced. Turn it on only after the grandfather backfill has run on that instance; off, nothing new is locked or refused (the kill switch).",
+        owner: "Release manager",
+        reviewBy: "2027-06-30",
+        removeWhen:
+            "The catalogue has been enforced for every business on every instance for a release with no need to switch it off, and its readers no longer ask it.",
     },
     WEB_ADDRESS_CHANGE: {
         purpose:
