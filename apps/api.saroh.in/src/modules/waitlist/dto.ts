@@ -85,3 +85,11 @@ export class JoinWaitlistDto {
     @MaxLength(64)
     ref?: string;
 }
+
+/** An opening-day invite's token, as onboarding sends it back (U31). */
+export class InviteTokenDto {
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(64)
+    token!: string;
+}

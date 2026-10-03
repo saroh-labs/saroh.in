@@ -407,14 +407,6 @@ export class ListWaitlistDto {
 /** Remove one entry when its owner asks (U30, KTD-17). */
 export class DeleteWaitlistDto extends OperatorReasonDto {}
 
-export class InviteWaitlistDto extends OperatorReasonDto {
-    @IsArray()
-    @ArrayMinSize(1)
-    @ArrayMaxSize(200)
-    @IsString({ each: true })
-    ids!: string[];
-}
-
 /**
  * A catalogue override on one business (plans catalogue U11): grant or
  * remove a catalogue row, or set its limit up or down. `expiresAt` is

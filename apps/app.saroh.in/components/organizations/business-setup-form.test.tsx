@@ -29,9 +29,12 @@ vi.mock("@saroh/auth/client", () => ({
 }));
 vi.mock("@/lib/accounts", () => ({ accountsLoginUrl: "/login" }));
 const startCheckout = vi.fn();
+const takeOffer = vi.fn();
 vi.mock("@/lib/saroh-billing/checkout-actions", () => ({
     startCheckoutAfterOnboarding: (...args: unknown[]) =>
         startCheckout(...args) as unknown,
+    takeLaunchOfferAfterOnboarding: (...args: unknown[]) =>
+        takeOffer(...args) as unknown,
 }));
 const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
@@ -273,6 +276,65 @@ describe("What are you setting up? (DEC-070)", () => {
             typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
             await submit();
             expect(startCheckout).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("an opening-day invite (U31)", () => {
+        const TOKEN = "t".repeat(43);
+
+        beforeEach(() => {
+            startCheckout.mockReset();
+            takeOffer.mockReset();
+            showError.mockReset();
+            // A fresh mount: the form reads its starting name once.
+            act(() => root.unmount());
+            root = createRoot(host);
+            act(() =>
+                root.render(
+                    <BusinessSetupForm
+                        email="asha@example.com"
+                        checkout={{ plan: "pro", cycle: "month", name: "Pro" }}
+                        invite={TOKEN}
+                        defaultName="Asha Salon"
+                    />,
+                ),
+            );
+        });
+
+        it("starts with the name it was listed under, and takes the offer instead of a checkout", async () => {
+            takeOffer.mockResolvedValue({ ok: true, until: "2031-01-01" });
+            act(() => radio("A business").click());
+            expect(labelled("What is it called?").value).toBe("Asha Salon");
+            await submit();
+            expect(createOrganization).toHaveBeenCalledWith(
+                expect.objectContaining({ name: "Asha Salon" }),
+            );
+            expect(takeOffer).toHaveBeenCalledWith(TOKEN);
+            expect(startCheckout).not.toHaveBeenCalled();
+            expect(showError).not.toHaveBeenCalled();
+        });
+
+        it("says so when the offer can't be applied, and the business stays", async () => {
+            takeOffer.mockResolvedValue({
+                ok: false,
+                error: "This invite has already been used. Ask for a new invite.",
+            });
+            act(() => radio("A business").click());
+            await submit();
+            expect(showError).toHaveBeenCalledWith(
+                "Asha Salon is set up, but the launch offer isn't applied yet.",
+                "This invite has already been used. Ask for a new invite.",
+            );
+        });
+
+        it("never takes the offer when the business wasn't made", async () => {
+            createOrganization.mockResolvedValue({
+                ok: false,
+                error: "Something went wrong.",
+            });
+            act(() => radio("A business").click());
+            await submit();
+            expect(takeOffer).not.toHaveBeenCalled();
         });
     });
 });

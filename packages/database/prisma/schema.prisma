@@ -5090,6 +5090,18 @@ model WaitlistSignup {
   // invited more than 12 months ago that never joined.
   joinedAt  DateTime?
 
+  // The opening-day invite (U31, KTD-17): only the SHA-256 of the link's
+  // token is kept, so the table never holds a usable link. Single use (the
+  // entry's `joinedAt`), bound to this entry's email, and it expires.
+  inviteTokenHash      String?   @unique
+  inviteExpiresAt      DateTime?
+  // When the invite email left. Null with `invitedAt` set: claimed, not sent
+  // yet (or the send was interrupted, and a later batch sends it again).
+  inviteSentAt         DateTime?
+  // The business the invitee made with it. A plain id, no FK: the entry is
+  // the waitlist's record and outlives a business that is deleted.
+  joinedOrganizationId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

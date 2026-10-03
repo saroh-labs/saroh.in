@@ -35,7 +35,10 @@ import {
     ORGANIZATION_KINDS,
 } from "@/lib/organizations/kind";
 import type { AddressAvailability } from "@/lib/organizations/service";
-import { startCheckoutAfterOnboarding } from "@/lib/saroh-billing/checkout-actions";
+import {
+    startCheckoutAfterOnboarding,
+    takeLaunchOfferAfterOnboarding,
+} from "@/lib/saroh-billing/checkout-actions";
 
 import { SetupKindChoice } from "./setup-kind-choice";
 
@@ -107,6 +110,8 @@ export function BusinessSetupForm({
     email,
     backTo,
     checkout,
+    invite,
+    defaultName,
 }: {
     /** Who is signed in — named beside the way out, so it is clear whose. */
     email: string;
@@ -117,13 +122,20 @@ export function BusinessSetupForm({
      * its checkout. Null: it starts on Free, as every business does.
      */
     checkout?: { plan: string; cycle: "month" | "year"; name: string } | null;
+    /**
+     * An opening-day invite's token (plan U31): once the business exists,
+     * it takes the launch offer. It wins over `checkout`.
+     */
+    invite?: string | null;
+    /** The name the business was listed under on the waitlist (U31). */
+    defaultName?: string;
 }) {
     const router = useRouter();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             kind: undefined,
-            name: "",
+            name: defaultName ?? "",
             address: "",
             type: undefined,
             country: "IN",
@@ -220,7 +232,17 @@ export function BusinessSetupForm({
             }
             return;
         }
-        if (checkout) {
+        if (invite) {
+            // Where the waitlist entry is marked joined and the offer
+            // starts; the API checks the invite against this account.
+            const taken = await takeLaunchOfferAfterOnboarding(invite);
+            if (!taken.ok) {
+                showError(
+                    `${values.name.trim()} is set up, but the launch offer isn't applied yet.`,
+                    taken.error,
+                );
+            }
+        } else if (checkout) {
             const started = await startCheckoutAfterOnboarding({
                 plan: checkout.plan,
                 cycle: checkout.cycle,

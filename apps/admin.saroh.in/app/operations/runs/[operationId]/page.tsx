@@ -9,9 +9,16 @@ import { AutoRefresh } from "@/components/operations/auto-refresh";
 import { Facts, Panel } from "@/components/panel";
 import { requireStaff } from "@/lib/console";
 import { formatDateTime } from "@/lib/format";
+import type { OperationDetail } from "@/lib/machinery";
 import { getOperation } from "@/lib/machinery";
 
 export const metadata = { title: "Operation" };
+
+const TITLE: Record<OperationDetail["kind"], string> = {
+    "jobs.retry": "Job retry",
+    "webhooks.replay": "Webhook replay",
+    "waitlist.invite": "Waitlist invites",
+};
 
 const ITEM: Partial<
     Record<
@@ -45,8 +52,7 @@ export default async function OperationPage({
     const finished = operation.succeeded + operation.skipped + operation.failed;
     const running =
         operation.status === "PENDING" || operation.status === "RUNNING";
-    const title =
-        operation.kind === "jobs.retry" ? "Job retry" : "Webhook replay";
+    const title = TITLE[operation.kind];
 
     return (
         <AdminShell staff={gate.staff}>

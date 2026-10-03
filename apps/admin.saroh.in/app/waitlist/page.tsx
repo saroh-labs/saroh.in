@@ -8,6 +8,7 @@ import { FilterBar, FilterSelect } from "@/components/filter-bar";
 import { Pager } from "@/components/operations/pager";
 import { Panel } from "@/components/panel";
 import { InviteBatch } from "@/components/waitlist/invite-batch";
+import { InviteState } from "@/components/waitlist/invite-state";
 import { RemoveEntry } from "@/components/waitlist/remove-entry";
 import { can, requireStaff } from "@/lib/console";
 import { formatDate, formatRelative } from "@/lib/format";
@@ -82,7 +83,15 @@ export default async function WaitlistPage({
                                     : undefined
                             }
                         />
-                        <StatCard label="Invited" value={summary.invited} />
+                        <StatCard
+                            label="Invited"
+                            value={summary.invited}
+                            hint={
+                                summary.joined > 0
+                                    ? `${summary.joined} joined`
+                                    : undefined
+                            }
+                        />
                         <StatCard
                             label="Joined the list, last week"
                             value={summary.joinedLastWeek}
@@ -96,9 +105,9 @@ export default async function WaitlistPage({
 
                 {summary && !summary.canInvite && (
                     <p className="max-w-[68ch] text-sm text-muted-foreground">
-                        This instance does not know where people create their
-                        account, so nobody can be invited yet. Set{" "}
-                        <code>ACCOUNTS_URL</code> on the API.
+                        Nobody can be invited yet.{" "}
+                        {summary.inviteBlocker ??
+                            "This instance isn't set up to send invites."}
                     </p>
                 )}
 
@@ -285,6 +294,9 @@ export default async function WaitlistPage({
                                                 {formatRelative(
                                                     row.invitedAt ??
                                                         row.createdAt,
+                                                )}
+                                                {row.invitedAt && (
+                                                    <InviteState row={row} />
                                                 )}
                                             </td>
                                             {canRemove && (

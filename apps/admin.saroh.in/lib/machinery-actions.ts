@@ -7,10 +7,12 @@ import { adminWrite } from "./control-plane";
 
 /**
  * Server Actions for the machinery (plan U7–U8). A bulk action is always a
- * dry run first and then a durable operation; the API decides both.
+ * dry run first and then a durable operation; the API decides both. The
+ * waitlist's opening-day invites (marketing U31) are one too.
  */
 
-export type OperationKind = "jobs.retry" | "webhooks.replay";
+export type OperationKind =
+    "jobs.retry" | "webhooks.replay" | "waitlist.invite";
 
 export interface PlannedItem {
     targetId: string;
@@ -30,6 +32,7 @@ export interface OperationPlan {
 const PATHS: Record<OperationKind, string> = {
     "jobs.retry": "/jobs/retry",
     "webhooks.replay": "/webhooks/replay",
+    "waitlist.invite": "/waitlist/invite",
 };
 
 export async function planOperationAction(
@@ -57,6 +60,7 @@ export async function startOperationAction(
     if (result.ok) {
         revalidatePath("/operations/jobs");
         revalidatePath("/operations/webhooks");
+        revalidatePath("/waitlist");
     }
     return result;
 }
