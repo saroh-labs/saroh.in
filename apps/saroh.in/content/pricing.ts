@@ -1,15 +1,17 @@
 /**
  * Pricing's own words (the Pricing design), apart from the page so the share
  * card and the metadata can read them without the page's client parts.
- * Everything about a plan comes from the catalogue (`lib/pricing.ts`).
+ * Everything about a plan comes from the catalogue (`lib/pricing.ts`), and
+ * what each plan includes is set in the admin (DEC-075, D3): these lines
+ * name no plan's contents.
  */
 export const PRICING_COPY = {
     eyebrow: "Pricing",
-    title: "Start free. Pay when you start selling.",
-    intro: "Put your site up and take your first bookings for nothing. Move to Grow when you want orders, subscriptions and invoices, and to Pro when you want your own look and a bigger team.",
-    closer: "Your site can be up tonight, for free.",
+    title: "Start free. Move up when you need more.",
+    intro: "Put your site up for nothing, and move to a paid plan when you need more. Each plan below says what it includes.",
+    closer: "Start your site for free.",
 } as const;
 
 /** The search-result line: what each plan is for, never what it costs. */
 export const PRICING_DESCRIPTION =
-    "Start free with your site and your first bookings. Move to Grow for orders, subscriptions and invoices, and to Pro for your own look and a bigger team.";
+    "Start free with your site, and move to a paid plan when you need more.";

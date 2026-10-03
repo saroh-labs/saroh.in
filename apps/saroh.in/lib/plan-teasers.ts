@@ -154,7 +154,7 @@ export function homePlanTeasers(catalog: Catalog | null): PlanTeaserView[] {
 
 /**
  * The line under a hero's buttons: "Free to start: one website, … and ….
- * Grow adds …", naming the free plan's card lines for the modules
+ * Move up when you need more.", naming the free plan's card lines for the modules
  * `FREE_PLAN_LINE` picks. Without a catalogue (or a free plan in it), the
  * placeholder line.
  */
@@ -177,7 +177,8 @@ export function freePlanLine(catalog: Catalog | null): string {
 /**
  * Home's "What does Start free include?", worded as the design words it once
  * there is a catalogue: the free plan's price and card lines, then the first
- * paid plan's name and price. Without a catalogue (or a free and a paid plan
+ * paid plan's name and price. What that plan adds is the catalogue's to say
+ * (its card), not this line's: the split is set in the admin (DEC-075, D3). Without a catalogue (or a free and a paid plan
  * in it), `fallback`, the content file's answer with no figures.
  */
 export function startFreeFaq(
@@ -192,6 +193,6 @@ export function startFreeFaq(
     if (!summary) return fallback;
     return {
         q: fallback.q,
-        a: `The ${free.name} plan is ${formatInr(free.pricePaise)} a month: ${lowerFirst(summary)} Move to ${next.name} (${formatInr(next.pricePaise)} a month) when you want to take orders, run subscriptions, send invoices or add your team.`,
+        a: `The ${free.name} plan is ${formatInr(free.pricePaise)} a month: ${lowerFirst(summary)} Move to ${next.name} (${formatInr(next.pricePaise)} a month) when you need more.`,
     };
 }

@@ -65,7 +65,6 @@ export function HomeHero({ freeLine }: { freeLine: string }) {
             </div>
             <ScreenshotFrame
                 shot={home.hero.shot}
-                alt={home.hero.alt}
                 variant="home"
                 priority
                 sizes="(min-width: 1280px) 640px, 100vw"

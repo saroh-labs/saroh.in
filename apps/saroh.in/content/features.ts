@@ -5,6 +5,10 @@
  * Changes from the design's words, each for a repo rule:
  * - "storefront" reads "location" (saroh-product.md);
  * - captions name no amounts (the public-repo rule: no currency in the repo);
+ * - claims the product can't back are reworded (`MARKETING_CLAIMS.md`,
+ *   DEC-075), and each "who" line names its business as a demo;
+ * - steps carry no caption of their own: the frame reads the captured alt,
+ *   which says what the screenshot really shows;
  * - the design's `home` key is the `dashboard` slug (/features/dashboard).
  */
 import type { Feature, FeatureSlug } from "./types";
@@ -21,37 +25,32 @@ export const features: Record<FeatureSlug, Feature> = {
         sub: "Every morning, the dashboard lists what's late, who's coming in, what's owed and what failed, most urgent first. Each person sees the part that's theirs, and most things can be done right from the list.",
         hero: {
             shot: "s-home",
-            alt: "Home at Rye & Co.: nine things that need Priya, from late orders to a failed renewal",
         },
         howTitle: "One screen before the first customer.",
         steps: [
             {
                 title: "The most urgent thing is at the top",
-                body: "Late orders, stock short for orders, failed renewals and overdue bills, each with the button that fixes it: Mark sent, Retry now, Send a reminder.",
-                who: "Rye & Co., a bakery",
+                body: "Late orders, stock short for orders, failed renewals and overdue bills, each with the button that fixes it: Mark sent, Send reminder, or a new pay link for a failed renewal.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "s-home",
-                alt: "Rye & Co.'s Home with late orders and a failed renewal",
             },
             {
                 title: "Today's people, in order",
-                body: "Who's booked, at what time, with whom, and whether they've paid. Anything the team should know before they arrive is shown beside their name.",
-                who: "Kavi Dental, a clinic",
+                body: "Who's booked, at what time and with whom, and who pays at the desk. Anything the team should know is beside their name.",
+                who: "Kavi Dental (demo clinic)",
                 shot: "d-home",
-                alt: "Kavi Dental's Home: today's patients with their dentist, chair and flags",
             },
             {
                 title: "Money that needs chasing",
-                body: "Overdue memberships and renewals that failed, with a reminder ready to send.",
-                who: "Pulse Fitness, a gym",
+                body: "Overdue bills with a reminder ready to send, and failed renewals with a new pay link.",
+                who: "Pulse Fitness (demo gym)",
                 shot: "g-home",
-                alt: "Pulse Fitness's Home: overdue memberships, a failed renewal and today's sessions",
             },
             {
                 title: "Zoom out to the month",
                 body: "The calendar shows every day's orders, bookings, renewals and bills, with money in, out and due.",
-                who: "Rye & Co.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "r-calendar",
-                alt: "September on the calendar with each day's money and a strip of totals",
             },
         ],
         points: [
@@ -61,11 +60,11 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "Done from the list",
-                body: "Mark an order sent or retry a payment without opening it.",
+                body: "Mark an order sent or send a reminder without opening it.",
             },
             {
                 title: "Right for each role",
-                body: "The front desk sees today's people. The owner also sees the money.",
+                body: "Someone without money access sees today's people, not the takings.",
             },
             {
                 title: "The last 24 hours",
@@ -84,7 +83,7 @@ export const features: Record<FeatureSlug, Feature> = {
             "The dashboard reads from everything else in Saroh, so it's only as busy as your day is.",
         worksWith: ["orders", "bookings", "subscriptions", "billing"],
         usedBy: ["shops", "gyms", "clinics"],
-        closer: "Tomorrow morning, know what needs you.",
+        closer: "Every morning, know what needs you.",
     },
     products: {
         slug: "products",
@@ -94,40 +93,35 @@ export const features: Record<FeatureSlug, Feature> = {
         homeBody:
             "Variants, prices, photos and stock, shared by your site and your orders.",
         headline: "Add a product once. It's right everywhere.",
-        sub: "Your site, your orders and your invoices all read the same product. Change a price and it changes in all three. Stock goes down as orders go out, and you're told before a size runs short.",
+        sub: "Your site and your orders read the same product. Change a price and the next order and its invoice use it; orders already placed keep the price agreed. Stock goes down as orders go out, and the Products list shows what's running low before a size runs out.",
         hero: {
             shot: "p-products",
-            alt: "The Products list at Rye & Co.: what needs restocking at the top, then every product with status, stock and price",
         },
         howTitle: "From the first photo to the last one sold.",
         steps: [
             {
                 title: "Add it once",
-                body: "Give it a name, a price and photos. Add sizes if it comes in more than one, each with its own price and SKU. The web address is made from the name.",
-                who: "Rye & Co.",
+                body: "Give it a name, a price and photos. Add sizes if it comes in more than one, each with its own price and SKU. Its link on your shop is made from the name.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "p-editor",
-                alt: "The product editor: name, address on the shop, price and category beside visibility, variants and stock",
             },
             {
                 title: "It's on your site straight away",
-                body: "Publish it and it appears in your shop with its photo, sizes and price. Leave it as a draft, or schedule it for Saturday morning.",
-                who: "Rye & Co.",
+                body: "Publish it and it appears in your shop with its photo, sizes and price, or keep it as a draft until it's ready.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "p-site",
-                alt: "Rye & Co.'s shop page showing each product with its sizes, price and an Add to bag button",
             },
             {
                 title: "Stock follows every order",
                 body: "Each sale takes it off the shelf, for the location it was sold at. Count in the morning, move stock between locations, and every change is kept in a log.",
-                who: "Rye & Co.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "p-stock",
-                alt: "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
             },
             {
                 title: "See everything tied to it",
                 body: "One page shows what can be sold now, the orders waiting on it, the discounts that apply, the pages it's on and its reviews.",
-                who: "Rye & Co.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "p-detail",
-                alt: "Sourdough loaf's page: 25 can be sold now, with open orders, discounts, collections, pages and reviews",
             },
         ],
         points: [
@@ -140,7 +134,7 @@ export const features: Record<FeatureSlug, Feature> = {
                 body: "The counter and your site count separately, because an order holds stock where it was placed.",
             },
             {
-                title: "Told before it runs out",
+                title: "Low stock at the top",
                 body: "Set a warning level per size. Products short for orders already placed come to the top.",
             },
             {
@@ -149,28 +143,28 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "Stock you don't count",
-                body: "Turn tracking off for things that always sell, like a gift box. They never show Sold out.",
+                body: "Turn tracking off for things that always sell, like a gift box. They don't sell out on their own; mark one sold out when you need to.",
             },
             {
                 title: "What's in it",
-                body: "Ingredients and allergens go on the product, so the shop and the ticket both show them.",
+                body: "Ingredients and allergens go on the product and on your shop page. A customer's allergy is matched to what they ordered, on the order and its kitchen ticket.",
             },
             {
-                title: "Draft, scheduled or live",
-                body: "Get it ready now and choose when customers see it.",
+                title: "Draft or live",
+                body: "Get it ready now and publish when you choose.",
             },
             {
                 title: "Reviews you can answer",
-                body: "See what customers said and reply from the product's page.",
+                body: "Ask for a review once an order is delivered, and reply from the product's page.",
             },
             {
                 title: "The right people only",
-                body: "Choose who can change prices, who can count stock and who can only look.",
+                body: "Choose who can edit products, who can count stock and who can only look.",
             },
         ],
         worksLead:
             "Products is where the rest of Saroh gets its names, prices and stock.",
-        worksWith: ["orders", "billing", "customers", "insights"],
+        worksWith: ["orders", "billing", "customers"],
         usedBy: ["shops"],
         closer: "Add your first product in two minutes.",
     },
@@ -181,33 +175,29 @@ export const features: Record<FeatureSlug, Feature> = {
         cardLine: "Every order, in one list.",
         homeBody: "One list from every location, with late orders flagged.",
         headline: "Every order in one list, and none slip.",
-        sub: "Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged, and every step tells the customer.",
+        sub: "Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged.",
         hero: {
             shot: "s-orders",
-            alt: "The Orders list at Rye & Co.: each order's step, how long it has waited, when it was placed and its total",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
                 body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. Print a ticket for the kitchen.",
-                who: "Rye & Co.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "r-order",
-                alt: "Order #1020: waiting 16 minutes, a sesame allergy warning, items, customer and money",
             },
             {
                 title: "Orders that take several visits",
                 body: "A treatment sold as three visits is fulfilled by those visits. Mark each one attended, or book the next.",
-                who: "Kavi Dental",
+                who: "Kavi Dental (demo clinic)",
                 shot: "d-order",
-                alt: "Order #D301, a root canal: visit 1 attended, visit 2 today, visit 3 still to book",
             },
             {
                 title: "Each one makes its invoice",
                 body: "Paid orders get a numbered invoice with the right tax, ready to send or print.",
-                who: "Rye & Co.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "r-invoice",
-                alt: "A GST invoice made from an order, with the business's details and tax",
             },
         ],
         points: [
@@ -225,7 +215,7 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "Change it safely",
-                body: "Edit items until preparing starts, and the address until handover. After that, refund.",
+                body: "Edit items and the address until preparing starts, and how it's fulfilled until handover. After that, refund.",
             },
             {
                 title: "Never deleted",
@@ -233,53 +223,48 @@ export const features: Record<FeatureSlug, Feature> = {
             },
         ],
         worksLead:
-            "Orders take names and prices from Products and write to Billing and Insights.",
-        worksWith: ["products", "customers", "billing", "insights"],
+            "Orders take names and prices from Products and write to Billing.",
+        worksWith: ["products", "customers", "billing"],
         usedBy: ["shops", "clinics"],
         closer: "Send today's orders in the right order.",
     },
     customers: {
         slug: "customers",
         name: "Customers",
-        navLine: "Orders, bookings, bills and notes on one page",
+        navLine: "Bookings, bills, notes and linked orders on one page",
         cardLine: "Everything about each customer.",
         homeBody:
-            "Orders, bookings, bills and notes in one record. Sensitive notes only for the right roles.",
+            "Bookings, bills, notes and linked orders on one page. Sensitive notes only for the right roles.",
         headline: "Know the person in front of you.",
-        sub: "Every customer's orders, bookings, plans, bills and notes on one page. What they usually buy, what they've spent, and anything the team should know before they arrive.",
+        sub: "Every customer's bookings, plans, bills and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything the team should know before they arrive.",
         hero: {
             shot: "r-customers",
-            alt: "The Customers list: each customer with tags, last order, orders and spend",
         },
-        howTitle: "One record for everyone you serve.",
+        howTitle: "A page for everyone who pays.",
         steps: [
             {
                 title: "Everything about them on one page",
                 body: "What they've spent, how they usually get their order, and what they buy most, down to the size.",
-                who: "Rye & Co.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "s-customer",
-                alt: "Priya Raman's page: six orders, what she has spent, a sesame allergy and what she usually buys",
             },
             {
                 title: "Members, with what they have left",
-                body: "Classes left in their pack, their membership, their course and their next booking.",
-                who: "Pulse Fitness",
+                body: "Classes left in their pack, their membership and their next booking.",
+                who: "Pulse Fitness (demo gym)",
                 shot: "g-customer",
-                alt: "Farah Khan's page at Pulse: a six-week course, classes left and her next booking",
             },
             {
                 title: "Notes they send reach the team",
                 body: "What a patient writes when booking is matched to their record. Check it, label it and add it where the team will see it.",
-                who: "Kavi Dental",
+                who: "Kavi Dental (demo clinic)",
                 shot: "d-customer",
-                alt: "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
             },
             {
                 title: "Flags only for the right people",
-                body: "Allergies and access needs show wherever their name appears. Medical notes only show to those allowed to see them.",
-                who: "Kavi Dental",
+                body: "Allergies and access needs show on their orders, kitchen tickets, today's list and bookings. Medical notes only show to those allowed to see them.",
+                who: "Kavi Dental (demo clinic)",
                 shot: "d-customers",
-                alt: "Kavi Dental's patients with medical and allergy tags",
             },
         ],
         points: [
@@ -293,11 +278,7 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "Contact details by permission",
-                body: "Some roles see names but not phone numbers.",
-            },
-            {
-                title: "Said yes to offers",
-                body: "Only the customer can say yes, and when they did is recorded.",
+                body: "A role without contact access sees names, not phone numbers or emails.",
             },
             {
                 title: "Search and filters",
@@ -305,7 +286,7 @@ export const features: Record<FeatureSlug, Feature> = {
             },
         ],
         worksLead:
-            "A customer's page gathers what every other part of Saroh knows about them.",
+            "A customer's page gathers their bookings, plans, bills and linked orders.",
         worksWith: ["orders", "bookings", "subscriptions", "billing"],
         usedBy: ["shops", "gyms", "clinics"],
         closer: "Remember every regular.",
@@ -321,37 +302,32 @@ export const features: Record<FeatureSlug, Feature> = {
         sub: "Classes, one-to-one sessions and appointments, with staff, places and hours. Customers book on your site, pay a deposit or use a credit, and you see it straight away.",
         hero: {
             shot: "g-bookings",
-            alt: "Pulse Fitness's week: personal training and classes for each trainer, by the hour",
         },
         howTitle: "From your hours to a full week.",
         steps: [
             {
                 title: "Customers book themselves",
-                body: "Your booking page shows only real free times, from your team's hours. They pick, pay what you ask at booking, and get a reminder.",
-                who: "Pulse Fitness",
+                body: "Your booking page shows only real free times, from your team's hours. They pick, and pay what you ask at booking.",
+                who: "Pulse Fitness (demo gym)",
                 shot: "g-book",
-                alt: "Pulse Fitness's booking page with services, courses and a summary",
             },
             {
                 title: "Classes and courses with places",
-                body: "Set how many places a class has. Courses run for several weeks and show who's paid and who's behind.",
-                who: "Pulse Fitness",
+                body: "Set how many places a class has. Courses run for several weeks; enrol people and see who's paid.",
+                who: "Pulse Fitness (demo gym)",
                 shot: "g-courses",
-                alt: "Courses at Pulse: a six-week beginners' course and a 5K course with places filled",
             },
             {
                 title: "Class packs",
                 body: "Sell five or ten classes at a price. Credits are used as they book, and expire when you say.",
-                who: "Pulse Fitness",
+                who: "Pulse Fitness (demo gym)",
                 shot: "g-packs",
-                alt: "Class packs: 5 and 10 classes with how many are sold and still to use",
             },
             {
                 title: "Treatments over several visits",
-                body: "A root canal is three visits of an hour. Patients book, pay a deposit or the whole amount, and tell you what you need to know.",
-                who: "Kavi Dental",
+                body: "A root canal is three visits of an hour. Patients book the first visit, pay a deposit or the whole amount, and tell you what you need to know. Your team books the rest.",
+                who: "Kavi Dental (demo clinic)",
                 shot: "d-book",
-                alt: "Kavi Dental's booking page with check-ups, a root canal over three visits and a video consult",
             },
         ],
         points: [
@@ -361,7 +337,7 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "In person or online",
-                body: "Or let the customer choose, with a video link sent for online.",
+                body: "Or let the customer choose, with your video link on the booking's confirmation page.",
             },
             {
                 title: "Deposits",
@@ -369,7 +345,7 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "Moves and cancellations",
-                body: "Customers can move a booking from their account, within your rules.",
+                body: "Your team moves a booking to another real free time.",
             },
             {
                 title: "Check-in and no-shows",
@@ -377,63 +353,60 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "Who can change what",
-                body: "The front desk can book and move. Only some can change services or hours.",
+                body: "Booking and moving is one permission; changing services and hours is another.",
             },
         ],
         worksLead:
             "Bookings put people on the calendar, money in Billing and notes on the customer.",
         worksWith: ["customers", "billing", "subscriptions", "dashboard"],
         usedBy: ["gyms", "clinics"],
-        closer: "Open your calendar to bookings tonight.",
+        closer: "Open your calendar to bookings.",
     },
     subscriptions: {
         slug: "subscriptions",
         name: "Subscriptions",
         navLine: "Plans that renew themselves",
         cardLine: "Plans that renew themselves.",
-        homeBody: "Plans that renew, with failed payments retried and shown.",
-        headline: "Regulars who pay without being asked.",
-        sub: "Memberships, weekly bread, monthly boxes. UPI Autopay or card renews on its own, each renewal makes its invoice, and a failed payment is retried and shown to you.",
+        homeBody:
+            "Plans that renew on their day, with failed payments shown and a pay link ready.",
+        headline: "Regulars on a plan, renewed on time.",
+        sub: "Memberships, weekly bread, monthly boxes. Each renewal makes its invoice on the day, and plans can renew on their own by UPI Autopay where you've set it up on your Razorpay account. A failed payment is shown to you with a new pay link.",
         hero: {
             shot: "r-subdetail",
-            alt: "Priya Raman's weekly loaf: next charge, upcoming collections, plan and changes",
         },
-        howTitle: "Set up once, paid every time.",
+        howTitle: "Set up once, renewed every time.",
         steps: [
             {
-                title: "Customers join on your site",
-                body: "Plans are listed on your site with their price and what's included. Joining sets up Autopay.",
-                who: "Pulse Fitness",
+                title: "Your plans, on your site",
+                body: "Plans are listed on your site with their price and what's included. You sign members up at the desk.",
+                who: "Pulse Fitness (demo gym)",
                 shot: "g-site",
-                alt: "Pulse Fitness's site with classes today and a link to memberships",
             },
             {
                 title: "Renewals run themselves",
-                body: "Each plan renews on its day. If a payment fails, it's retried once and flagged for you.",
-                who: "Rye & Co.",
+                body: "Each plan renews on its day. If a payment fails, it's flagged for you with a new pay link.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "s-subs",
-                alt: "Subscriptions at Rye & Co. with one failed renewal flagged",
             },
             {
                 title: "Every renewal makes its invoice",
-                body: "The invoice is made and sent when the renewal is paid.",
-                who: "Rye & Co.",
+                body: "The invoice is made on the renewal day, ready to send.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "s-billing",
-                alt: "Invoices at Rye & Co., each from an order or a renewal",
             },
         ],
         points: [
             {
                 title: "Pause, skip or change",
-                body: "Customers can pause, skip a week or change plan from their account.",
+                body: "Pause a subscription, skip a week or move it to another plan.",
             },
             {
                 title: "Price changes",
-                body: "Change a plan's price for new members and keep current members on theirs, or move them.",
+                body: "Change a plan's price for new members and keep current members on theirs, or move a member to the new price.",
             },
             {
                 title: "Failed payments",
-                body: "Retried, shown on the dashboard, and never quietly lost.",
+                body: "Shown on the dashboard with a new pay link, and never quietly lost.",
             },
             {
                 title: "Renewals on the calendar",
@@ -441,46 +414,42 @@ export const features: Record<FeatureSlug, Feature> = {
             },
         ],
         worksLead:
-            "Subscriptions charge through Billing and show on the customer's page.",
-        worksWith: ["billing", "customers", "bookings", "insights"],
+            "Subscriptions invoice through Billing and show on the customer's page.",
+        worksWith: ["billing", "customers", "bookings"],
         usedBy: ["shops", "gyms"],
         closer: "Turn regulars into renewals.",
     },
     billing: {
         slug: "billing",
         name: "Billing",
-        navLine: "Invoices and receipts made for you",
+        navLine: "Invoices made for you",
         cardLine: "Invoices made for you.",
         homeBody:
-            "Tax invoices, bills of supply and receipts, made from orders and bookings.",
+            "Tax invoices and bills of supply, made from orders, bookings and renewals.",
         headline: "Invoices you don't have to write.",
-        sub: "Every paid order, booking and renewal gets its own numbered invoice with the right tax. See what's owed, send a reminder with a pay link, and write one by hand when you need to.",
+        sub: "Every paid order gets its own numbered invoice with the right tax, and with Payments on, so do bookings paid online and every renewal. See what's owed, send a reminder with a pay link, and write one by hand when you need to.",
         hero: {
             shot: "s-billing",
-            alt: "Invoices at Rye & Co.: each order's GST invoice, paid or due, with a bulk order in draft",
         },
         howTitle: "Made, sent and paid.",
         steps: [
             {
                 title: "Made from the order",
                 body: "Your business's details, the customer, each line with its tax, and the total, numbered in order.",
-                who: "Rye & Co.",
+                who: "Rye & Co. (demo bakery)",
                 shot: "r-invoice",
-                alt: "A GST tax invoice from Rye & Co. to Third Wave Café",
             },
             {
                 title: "The right kind for your business",
-                body: "Healthcare is exempt from GST, so a clinic gets bills of supply, one for each treatment.",
-                who: "Kavi Dental",
+                body: "Mark a service GST-exempt and its invoices are bills of supply.",
+                who: "Kavi Dental (demo clinic)",
                 shot: "d-billing",
-                alt: "Kavi Dental's bills of supply with one overdue",
             },
             {
                 title: "See what's overdue",
                 body: "Overdue bills are flagged, with a reminder and a pay link ready to send.",
-                who: "Pulse Fitness",
+                who: "Pulse Fitness (demo gym)",
                 shot: "g-billing",
-                alt: "Pulse Fitness's invoices with four overdue",
             },
         ],
         points: [
@@ -490,7 +459,7 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "Bills of supply",
-                body: "For businesses that don't charge GST.",
+                body: "For GST-exempt sales, like most healthcare.",
             },
             {
                 title: "Pay links",
@@ -506,64 +475,57 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "For your accountant",
-                body: "Export the month from the calendar as a spreadsheet.",
+                body: "Export the month's money from the calendar as a CSV.",
             },
         ],
         worksLead:
             "Billing is where orders, bookings and renewals turn into money.",
-        worksWith: ["orders", "subscriptions", "bookings", "insights"],
+        worksWith: ["orders", "subscriptions", "bookings"],
         usedBy: ["shops", "gyms", "clinics"],
         closer: "Get your Sundays back.",
     },
+    /*
+     * Insights says only what today's Insights shows (DEC-075, D2): site
+     * views, visitors, enquiries and orders, views by day and the most-viewed
+     * pages, for the last 7, 30 or 90 days. The designed takings, best week,
+     * week-on-week and location split are to be built; the page names none
+     * of them until they ship. The shots come from Northwind Supply, the demo
+     * business with Insights on.
+     */
     insights: {
         slug: "insights",
         name: "Insights",
-        navLine: "How the week went, against the weeks before",
-        cardLine: "How the week went.",
-        homeBody:
-            "Takings and orders over time, per location, against the weeks before.",
-        headline: "Know how the week went, without a spreadsheet.",
-        sub: "Takings, orders and average order against the weeks before, your best week, and where the money came from: the counter, your site, each location.",
-        hero: {
-            shot: "s-insights",
-            alt: "Insights at Rye & Co.: four weeks of takings, twelve weeks of bars, and Hill Road against Online",
-        },
-        howTitle: "From today's takings to the season.",
+        navLine: "Site views, visitors, enquiries and orders",
+        cardLine: "How your site is doing.",
+        homeBody: "Site views, visitors, enquiries and orders, day by day.",
+        headline: "See how your site is doing.",
+        sub: "Site views, visitors, enquiries and orders for the last week, month or three months, with views by day and the pages people open most.",
+        hero: { shot: "s-insights" },
+        howTitle: "From this week to the last three months.",
         steps: [
             {
-                title: "Four weeks against the four before",
-                body: "Takings, orders, your best week and average order, each with how it moved. Compare with the four weeks before those, or the same time last year once you have a year.",
-                who: "Rye & Co.",
+                title: "Four numbers for your site",
+                body: "Site views, unique visitors, enquiries and orders, side by side for the days you pick.",
+                who: "Northwind Supply (demo business)",
                 shot: "i-compare",
-                alt: "Insights at Rye & Co.: takings, orders, best week and average order for four weeks",
             },
             {
-                title: "Twelve weeks at a glance",
-                body: "Each bar is a week. Your best week is marked in saffron, so you know what good looks like.",
-                who: "Rye & Co.",
+                title: "Views, day by day",
+                body: "A bar for each day shows when people came to your site.",
+                who: "Northwind Supply (demo business)",
                 shot: "i-weeks",
-                alt: "Twelve weeks of takings, from 7 Jul to 22 Sep, with 15 Sep marked as the best week",
             },
             {
-                title: "One location at a time",
-                body: "Pick the counter or your site, and every figure and bar shows just that location.",
-                who: "Rye & Co.",
+                title: "The pages people open most",
+                body: "See which pages get the most views, so you know what people come for.",
+                who: "Northwind Supply (demo business)",
                 shot: "i-store",
-                alt: "Insights for Hill Road only: its takings and orders in four weeks",
             },
         ],
         points: [
             {
-                title: "Compared fairly",
-                body: "Against the four weeks before, or the same time last year.",
-            },
-            {
-                title: "Best week",
-                body: "Marked, so you know what good looks like.",
-            },
-            {
-                title: "By location",
-                body: "The counter and your site, side by side.",
+                title: "Pick the days",
+                body: "The last 7, 30 or 90 days.",
             },
             {
                 title: "The last 24 hours",
@@ -579,10 +541,10 @@ export const features: Record<FeatureSlug, Feature> = {
             },
         ],
         worksLead:
-            "Insights reads from Orders, Billing and Subscriptions, so the numbers match.",
-        worksWith: ["orders", "billing", "subscriptions", "dashboard"],
+            "Insights counts what happens on your site: views, visitors, enquiries and orders.",
+        worksWith: ["dashboard", "orders"],
         usedBy: ["shops", "gyms", "clinics"],
-        closer: "See how this week is going.",
+        closer: "See how your site is doing.",
     },
 };
 

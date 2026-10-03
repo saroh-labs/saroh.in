@@ -5,10 +5,11 @@
  * `<ScreenshotFrame>` draws a neutral frame of the same shape, so a page's
  * layout already matches the design.
  *
- * `alt` is the shot's default caption. Where a page shows a shot with its own
- * caption (a feature step, a solution segment), the content carries that alt.
- * No amounts in captions: the shot shows the figures, the caption says what
- * it is.
+ * `alt` is the shot's caption everywhere it is shown: feature steps and
+ * solution segments carry none of their own, so a page never describes what
+ * the design drew instead of what the image shows (claims ledger §9). Each
+ * names its business as a demo (DEC-075, D14). No amounts in captions: the
+ * shot shows the figures, the caption says what it is.
  */
 import { CAPTURED } from "./shots.captured";
 
@@ -30,104 +31,108 @@ const pending = (alt: string): Shot => ({
 
 const designed = {
     "s-home": pending(
-        "The Saroh dashboard at Rye & Co.: late orders, a failed renewal and what's due today, most urgent first",
+        "Home at Rye & Co. (demo bakery): what needs doing today, from late orders to a failed renewal",
     ),
     "s-orders": pending(
-        "The Orders list at Rye & Co.: each order's step, how long it has waited, when it was placed and its total",
+        "The Orders list at Rye & Co. (demo bakery): each order's step, how long it has waited, when it was placed and its total",
     ),
     "r-order": pending(
-        "Order #1020: waiting 16 minutes, a sesame allergy warning, items, customer and money",
+        "An order at Rye & Co. (demo bakery): how long it has waited, a sesame allergy warning, items, customer and money",
     ),
     "d-order": pending(
-        "Order #D301, a root canal: visit 1 attended, visit 2 today, visit 3 still to book",
+        "A root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book",
     ),
     "r-invoice": pending(
-        "A GST invoice made from an order, with the business's details and tax",
+        "A GST tax invoice from Rye & Co. (demo bakery) to a café, with the business's details and tax",
     ),
     "r-customers": pending(
         "The Customers list: each customer with tags, last order, orders and spend",
     ),
     "s-customer": pending(
-        "Priya Raman's page: six orders, what she has spent, a sesame allergy and what she usually buys",
+        "Priya Raman's page: her orders and spend, a sesame allergy and what she usually buys",
     ),
     "g-customer": pending(
-        "Farah Khan's page at Pulse: a six-week course, classes left and her next booking",
+        "Asha Verma's page at Pulse Fitness (demo gym): classes left on her membership and her next booking",
     ),
     "d-customer": pending(
         "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
     ),
     "d-customers": pending(
-        "Kavi Dental's patients with medical and allergy tags",
+        "Patients at Kavi Dental (demo clinic), with medical and allergy tags",
     ),
     "g-bookings": pending(
-        "Pulse Fitness's week: personal training and classes for each trainer, by the hour",
+        "The week at Pulse Fitness (demo gym): personal training and classes, by the hour",
     ),
     "g-book": pending(
-        "Pulse Fitness's booking page with services, courses and a summary",
+        "The booking page of Pulse Fitness (demo gym), with services, classes and a summary",
     ),
     "g-courses": pending(
-        "Courses at Pulse: a six-week beginners' course and a 5K course with places filled",
+        "Courses at Pulse Fitness (demo gym): a four-week strength course with the places taken",
     ),
     "g-packs": pending(
         "Class packs: 5 and 10 classes with how many are sold and still to use",
     ),
     "d-book": pending(
-        "Kavi Dental's booking page with check-ups, a root canal over three visits and a video consult",
+        "The booking page of Kavi Dental (demo clinic), with check-ups, a root canal over three visits and a video consult",
     ),
     "r-subdetail": pending(
         "Priya Raman's weekly loaf: next charge, upcoming collections, plan and changes",
     ),
     "g-site": pending(
-        "Pulse Fitness's site with classes today and a link to memberships",
+        "The site of Pulse Fitness (demo gym): what's on today and Book a free trial",
     ),
     "s-subs": pending(
-        "Subscriptions at Rye & Co. with one failed renewal flagged",
+        "Subscriptions at Rye & Co. (demo bakery) with one failed renewal flagged",
     ),
     "s-billing": pending(
-        "Invoices at Rye & Co.: each order's GST invoice, paid or due, with a bulk order in draft",
+        "Invoices at Rye & Co. (demo bakery): each order's GST invoice, paid or due, with what's overdue flagged",
     ),
-    "d-billing": pending("Kavi Dental's bills of supply with one overdue"),
-    "g-billing": pending("Pulse Fitness's invoices with four overdue"),
+    "d-billing": pending(
+        "Bills of supply at Kavi Dental (demo clinic), with the overdue ones flagged",
+    ),
+    "g-billing": pending(
+        "Invoices at Pulse Fitness (demo gym), with the overdue ones flagged",
+    ),
     "s-insights": pending(
-        "Insights at Rye & Co.: four weeks of takings, twelve weeks of bars, and Hill Road against Online",
+        "Insights: site views, visitors, enquiries and orders over the last 30 days, with views by day and top pages",
     ),
     "i-compare": pending(
-        "Insights at Rye & Co.: takings, orders, best week and average order for four weeks",
+        "Insights for 30 days: site views, unique visitors, enquiries and orders, views by day and the most-viewed pages",
     ),
-    "i-weeks": pending(
-        "Twelve weeks of takings, from 7 Jul to 22 Sep, with 15 Sep marked as the best week",
-    ),
+    "i-weeks": pending("Ninety days of site views, a bar for each day"),
     "i-store": pending(
-        "Insights for Hill Road only: its takings and orders in four weeks",
+        "Insights for the last seven days: site views, enquiries, orders and the most-viewed pages",
     ),
     "p-products": pending(
-        "The Products list at Rye & Co.: what needs restocking at the top, then every product with status, stock and price",
+        "The Products list at Rye & Co. (demo bakery): what needs restocking at the top, then every product with status, stock and price",
     ),
     "p-editor": pending(
-        "The product editor: name, address on the shop, price and category beside visibility, variants and stock",
+        "The product editor: name, link, price and category beside visibility, variants and stock",
     ),
     "p-site": pending(
-        "Rye & Co.'s shop page showing each product with its sizes, price and an Add to bag button",
+        "The shop page of Rye & Co. (demo bakery) for the Sourdough loaf: sizes, price and Add to basket",
     ),
     "p-stock": pending(
         "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
     ),
     "p-detail": pending(
-        "Sourdough loaf's page: 25 can be sold now, with open orders, discounts, collections, pages and reviews",
+        "Sourdough loaf's page: what can be sold now, with open orders, discounts, collections, the website and reviews",
     ),
     "d-home": pending(
-        "Kavi Dental's Home: today's patients with their dentist, chair and flags",
+        "Home at Kavi Dental (demo clinic): a patient's note from the booking page, overdue bills and the week so far",
     ),
     "g-home": pending(
-        "Pulse Fitness's Home: overdue memberships, a failed renewal and today's sessions",
+        "Home at Pulse Fitness (demo gym): overdue memberships, follow-ups and this week's takings",
     ),
     "r-calendar": pending(
-        "September on the calendar with each day's money and a strip of totals",
+        "This month on the calendar with each day's money and a strip of totals",
     ),
     "d-site": pending(
-        "Kavi Dental's own site on Saroh: free times today and Book an appointment",
+        "The site of Kavi Dental (demo clinic): free times today and Book an appointment",
     ),
-    "g-subs": pending("Memberships at Pulse with their next charge"),
+    "g-subs": pending(
+        "Memberships at Pulse Fitness (demo gym) with their next charge",
+    ),
 } satisfies Record<string, Shot>;
 
 /** A captured shot (U20) replaces its placeholder, alt included: the

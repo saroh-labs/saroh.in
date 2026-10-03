@@ -5,6 +5,7 @@ import { features } from "./features";
 import { CTA_BAND, FREE_PLAN_LINE, home, PLAN_TEASERS } from "./home";
 import { shots } from "./shots";
 import { segmentViews, solutions } from "./solutions";
+import type { ShotRef } from "./types";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "./types";
 import { contentErrors } from "./validate";
 
@@ -92,7 +93,7 @@ describe("feature pages", () => {
         for (const step of f.steps) {
             expect(step.title.trim()).not.toBe("");
             expect(step.body.trim()).not.toBe("");
-            expect(step.alt.trim()).not.toBe("");
+            expect(shots[step.shot].alt.trim()).not.toBe("");
         }
     });
 
@@ -188,9 +189,14 @@ describe("solution pages", () => {
 });
 
 describe("questions", () => {
-    it("Home asks the design's six", () => {
-        expect(HOME_FAQ).toHaveLength(6);
+    it("Home asks the design's questions, without the Hindi one", () => {
+        expect(HOME_FAQ).toHaveLength(5);
         for (const id of HOME_FAQ) expect(faqs[id]).toBeDefined();
+    });
+
+    it("no question claims a second language (DEC-075, D13)", () => {
+        expect(JSON.stringify(faqs)).not.toMatch(/Hindi|हिंदी/);
+        expect(home.chips.join(" ")).not.toMatch(/Hindi|हिंदी/);
     });
 
     it("a solution page asks Start free first, then its own", () => {
@@ -199,6 +205,45 @@ describe("questions", () => {
             "start-free",
             "clinics-medical-notes",
         ]);
+    });
+});
+
+/**
+ * Captions say what the image shows (claims ledger §9): a step, a segment or
+ * a hero reads the manifest's alt, never the design's own caption.
+ */
+describe("captions", () => {
+    const refs: ShotRef[] = [
+        home.hero,
+        ...Object.values(features).flatMap((f) => [f.hero, ...f.steps]),
+        ...Object.values(solutions).flatMap((s) => [s.hero, ...s.segments]),
+    ];
+
+    it("no page carries its own alt for a shot", () => {
+        for (const ref of refs) expect(ref.alt, ref.shot).toBeUndefined();
+    });
+
+    it("a caption that names a demo business says it is a demo (D14)", () => {
+        for (const [key, shot] of Object.entries(shots)) {
+            for (const name of ["Rye & Co.", "Pulse Fitness", "Kavi Dental"]) {
+                if (shot.alt.includes(name)) {
+                    expect(shot.alt, key).toMatch(
+                        new RegExp(`${name.replace(".", "\\.")} \\(demo `),
+                    );
+                }
+            }
+        }
+    });
+
+    it("every who line and hero note names a demo", () => {
+        for (const f of Object.values(features)) {
+            for (const step of f.steps) {
+                expect(step.who, `${f.slug}: ${step.title}`).toMatch(/\(demo /);
+            }
+        }
+        for (const s of Object.values(solutions)) {
+            expect(s.heroNote, s.slug).toMatch(/, a demo /);
+        }
     });
 });
 
