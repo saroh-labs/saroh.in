@@ -1,3 +1,5 @@
+import { cn } from "@/lib/cn";
+
 import { CTA_BAND, TOUR_VIDEO } from "@/content/home";
 import type { PlanId } from "@/lib/links";
 
@@ -17,6 +19,7 @@ export function CtaBand({
     plan,
     body = CTA_BAND.body,
     note = CTA_BAND.note,
+    className,
 }: {
     title: string;
     /** Analytics source for the start button, e.g. `home-band`. */
@@ -24,9 +27,11 @@ export function CtaBand({
     plan?: PlanId;
     body?: string;
     note?: string;
+    /** E.g. the Features and Solutions designs' `pt-[120px]` (Home's is 110). */
+    className?: string;
 }) {
     return (
-        <Container className="pt-[110px]">
+        <Container className={cn("pt-[110px]", className)}>
             <div className="flex flex-wrap items-end justify-between gap-10 rounded-mk-band bg-foreground p-mk-band text-background">
                 <div className="grid flex-[1_1_420px] gap-4">
                     <h2 className="m-0 font-display text-mk-band font-bold [text-wrap:balance]">

@@ -1,0 +1,95 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
+import { Container } from "@/components/v2/container";
+import { CtaBand } from "@/components/v2/cta-band";
+import { Faq } from "@/components/v2/faq";
+import { SectionHeading } from "@/components/v2/section-heading";
+import { SolutionHero } from "@/components/v2/solution/solution-hero";
+import { SolutionPricing } from "@/components/v2/solution/solution-pricing";
+import { SolutionSegment } from "@/components/v2/solution/solution-segment";
+import { faqItems, solutionFaq } from "@/content/faq";
+import { features } from "@/content/features";
+import {
+    isSolutionSlug,
+    segmentViews,
+    solutionHref,
+    solutions,
+} from "@/content/solutions";
+import { SOLUTION_SLUGS } from "@/content/types";
+import { PLAN_TEASER_FOOTNOTE, solutionPlanTeasers } from "@/lib/plan-teasers";
+
+/**
+ * `/solutions/shops`, `/solutions/gyms`, `/solutions/clinics` (plan U23): ONE
+ * template, the Solutions design, fed by `content/solutions.ts`. Any other
+ * slug is a 404.
+ */
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+    return SOLUTION_SLUGS.map((slug) => ({ slug }));
+}
+
+interface Props {
+    params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const { slug } = await params;
+    if (!isSolutionSlug(slug)) return {};
+    const s = solutions[slug];
+    const title = `Saroh for ${s.longName.toLowerCase()}`;
+    return {
+        title,
+        description: s.sub,
+        openGraph: { title, description: s.sub },
+        twitter: { title, description: s.sub },
+        alternates: { canonical: solutionHref(slug) },
+    };
+}
+
+export default async function SolutionPage({ params }: Props) {
+    const { slug } = await params;
+    if (!isSolutionSlug(slug)) notFound();
+    const s = solutions[slug];
+    const segments = segmentViews(s.segments, (f) => features[f].name);
+
+    return (
+        <>
+            <SolutionHero solution={s} />
+
+            <Container as="section" aria-labelledby="changes-title">
+                <SectionHeading
+                    id="changes-title"
+                    eyebrow="What changes"
+                    title={s.changeTitle}
+                    className="pt-[120px]"
+                />
+                <div className="grid gap-24 pt-16">
+                    {segments.map((seg, i) => (
+                        <SolutionSegment
+                            key={seg.shot}
+                            segment={seg}
+                            reverse={i % 2 === 1}
+                        />
+                    ))}
+                </div>
+            </Container>
+
+            <SolutionPricing
+                title={s.pricing.title}
+                plans={solutionPlanTeasers(s.pricing)}
+                footnote={PLAN_TEASER_FOOTNOTE}
+                src={`solutions-${slug}-pricing`}
+            />
+
+            <Faq items={faqItems(solutionFaq(s.faq))} className="pt-[120px]" />
+
+            <CtaBand
+                title={s.closer}
+                src={`solutions-${slug}-band`}
+                className="pt-[120px]"
+            />
+        </>
+    );
+}
