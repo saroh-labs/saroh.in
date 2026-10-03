@@ -55,6 +55,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { MediaPicker } from "@/components/sites/media-picker";
+import { editorKey } from "@/lib/tiptap/editor-key";
 
 /**
  * Write copy without typing markup (#208).
@@ -218,6 +219,8 @@ export function RichTextEditor({
     /* eslint-enable @typescript-eslint/no-unnecessary-condition */
     return (
         <EditorSurface
+            // A new editor gets a new surface, and so a new store.
+            key={editorKey(editor)}
             editor={editor}
             value={value}
             onChange={onChange}
@@ -244,9 +247,16 @@ function EditorSurface({
      * changes `value` under a mounted editor; without this the merchant would
      * see the previous section's copy. Guarded against echoing our own update
      * back, which would reset the cursor on every keystroke.
+     *
+     * A new post's first save moves the editor to the post's own address,
+     * and the remount has `useEditor` destroy its editor and make another.
+     * This effect reconnects first, holding the destroyed one, whose
+     * `commands` is gone — the post editor fell into the route's error
+     * boundary 2.5s after a merchant stopped typing. It waits for the new
+     * editor, which the key above gives a surface of its own.
      */
     useEffect(() => {
-        if (source) return;
+        if (source || editor.isDestroyed) return;
         if (editor.getHTML() !== value) {
             editor.commands.setContent(value, { emitUpdate: false });
         }
@@ -617,7 +627,7 @@ function EditorSurface({
                         // Leaving source view pushes whatever was typed back
                         // through the schema, so a stray tag is normalised the
                         // way a paste would be.
-                        if (!on)
+                        if (!on && !editor.isDestroyed)
                             editor.commands.setContent(value, {
                                 emitUpdate: false,
                             });

@@ -32,6 +32,7 @@ import {
     readCount,
 } from "@/lib/products/editor-labels";
 import { LIMITS, stripHtml } from "@/lib/products/editor-sections";
+import { editorKey } from "@/lib/tiptap/editor-key";
 
 /**
  * A product's description (editor v2, "Description"). Six tools up front —
@@ -128,19 +129,6 @@ export function DescriptionEditor({
             invalid={invalid}
         />
     );
-}
-
-const editorKeys = new WeakMap<Editor, number>();
-let lastEditorKey = 0;
-
-/** A key per editor instance, so a remade editor remounts the surface. */
-function editorKey(editor: Editor): number {
-    let key = editorKeys.get(editor);
-    if (key === undefined) {
-        key = ++lastEditorKey;
-        editorKeys.set(editor, key);
-    }
-    return key;
 }
 
 function DescriptionSurface({
