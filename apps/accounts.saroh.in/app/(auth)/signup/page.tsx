@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { SIGNUP_PANEL } from "@/components/auth/panel-copy";
 import { SignupForm } from "@/components/auth/signup-form";
-import { onboardingForPlan } from "@/lib/plan-intent";
+import { onboardingForInvite, onboardingForPlan } from "@/lib/plan-intent";
 import { safeDestination } from "@/lib/return-to";
 
 export const metadata: Metadata = {
@@ -26,15 +26,21 @@ export const metadata: Metadata = {
  * carrying them, and from there to that plan's checkout. An invitation's
  * `redirect` wins: an invitee joins someone else's business, and buys
  * nothing.
+ *
+ * Someone invited off the waitlist arrives with `?invite=&email=` (plan
+ * U31): the address fills the form, and the invite rides to onboarding,
+ * where it gives the business the launch offer. It wins over a plan.
  */
 export default async function SignupPage({
     searchParams,
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { redirect, email, plan, cycle } = await searchParams;
+    const { redirect, email, plan, cycle, invite } = await searchParams;
     const returnTo =
-        safeDestination(redirect) ?? onboardingForPlan(plan, cycle);
+        safeDestination(redirect) ??
+        onboardingForInvite(invite) ??
+        onboardingForPlan(plan, cycle);
     return (
         <SplitShell panel={<SplitPanel {...SIGNUP_PANEL} />}>
             <SignupForm

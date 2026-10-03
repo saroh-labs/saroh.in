@@ -8,15 +8,16 @@
  * Runs in the integration project (TEST_DATABASE_URL).
  */
 jest.mock("../../common/email", () => ({
-    sendWaitlistInvitationEmail: jest.fn(),
+    sendWaitlistLaunchInviteEmail: jest.fn(),
 }));
 
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
-import { sendWaitlistInvitationEmail } from "../../common/email";
+import { sendWaitlistLaunchInviteEmail } from "../../common/email";
 import type { AdminAuditService } from "../admin/admin-audit.service";
 import { AdminWaitlistService } from "../admin/admin-waitlist.service";
+import { WaitlistInvitesService } from "./invites.service";
 import { WaitlistRetentionHandler } from "./waitlist-retention.handler";
 import { WaitlistService } from "./waitlist.service";
 
@@ -26,7 +27,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const service = new WaitlistService();
 const audit = { write: jest.fn() };
-const admin = new AdminWaitlistService(audit as unknown as AdminAuditService);
+const admin = new AdminWaitlistService(
+    audit as unknown as AdminAuditService,
+    new WaitlistInvitesService(),
+);
 const staff: PlatformAdminInfo = {
     userId: "support_1",
     platformAdminId: "pa_1",
@@ -131,7 +135,7 @@ describe("joining", () => {
 
     it("emails nobody", async () => {
         await joined({ email: mail("quiet"), business: "Q", kind: "other" });
-        expect(sendWaitlistInvitationEmail).not.toHaveBeenCalled();
+        expect(sendWaitlistLaunchInviteEmail).not.toHaveBeenCalled();
     });
 });
 

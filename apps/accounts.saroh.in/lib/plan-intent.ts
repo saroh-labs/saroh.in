@@ -27,3 +27,24 @@ export function onboardingForPlan(
     if (c === "month" || c === "year") q.set("cycle", c);
     return `${getOnboardingUrl()}?${q.toString()}`;
 }
+
+/** An invite token's shape (32 random bytes, base64url); anything else isn't one. */
+const INVITE_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * Where a new account goes when it came from an opening-day invite (plan
+ * U31): onboarding, carrying the invite, which grants the launch offer to
+ * the business it makes instead of a checkout. It wins over a plan: an
+ * invitee was promised the offer, not asked to pay.
+ *
+ * Only carried, never trusted: the API checks the token, that it is unused
+ * and unexpired, and that it was sent to the address this account's sign-up
+ * code was checked against.
+ */
+export function onboardingForInvite(
+    invite: string | string[] | undefined,
+): string | null {
+    const token = first(invite)?.trim();
+    if (!token || !INVITE_TOKEN.test(token)) return null;
+    return `${getOnboardingUrl()}?${new URLSearchParams({ invite: token }).toString()}`;
+}

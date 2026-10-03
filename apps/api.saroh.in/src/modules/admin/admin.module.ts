@@ -13,6 +13,7 @@ import { AdminPricingController } from "../pricing/admin-pricing.controller";
 import { CatalogueWritesService } from "../pricing/catalogue-writes.service";
 import { CouponsService } from "../pricing/coupons.service";
 import { PricingModule } from "../pricing/pricing.module";
+import { WaitlistModule } from "../waitlist/waitlist.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
@@ -51,6 +52,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         HealthModule,
         WebhooksModule,
         PricingModule,
+        WaitlistModule,
     ],
     controllers: [
         AdminController,

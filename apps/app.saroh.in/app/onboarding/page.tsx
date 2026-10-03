@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 
 import { BusinessSetupForm } from "@/components/organizations/business-setup-form";
 import { listOrganizations } from "@/lib/organizations/service";
+import { readInviteIntent } from "@/lib/saroh-billing/invite-intent";
+import { inviteNote, inviteToTake } from "@/lib/saroh-billing/launch-offer";
 import {
     checkoutIntent,
     planIntentNote,
@@ -36,6 +38,11 @@ export const metadata: Metadata = { title: "Set up Saroh" };
  * and anything else stays on Free, where every business starts. It is for a
  * first business only: someone who already has one and follows a plan link
  * here goes to their workspace rather than making another.
+ *
+ * An opening-day invite arrives as `?invite=` (plan U31). It wins over a
+ * plan: the business takes the launch offer instead of a checkout, and the
+ * name it was listed under on the waitlist fills the form. Unlike a plan it
+ * works for another business too — one owner may have listed two (OQ-11).
  */
 export default async function OnboardingPage({
     searchParams,
@@ -49,11 +56,15 @@ export default async function OnboardingPage({
         searchParams,
     ]);
     const hasOrgs = organizations.length > 0;
-    if (hasOrgs && query.plan !== undefined) redirect("/");
-    const intent = hasOrgs
-        ? ({ kind: "none" } as const)
-        : await readPlanIntent(query);
-    const note = planIntentNote(intent);
+    const invite = await readInviteIntent(query);
+    if (hasOrgs && query.plan !== undefined && invite.kind === "none") {
+        redirect("/");
+    }
+    const intent =
+        hasOrgs || invite.kind !== "none"
+            ? ({ kind: "none" } as const)
+            : await readPlanIntent(query);
+    const note = inviteNote(invite) ?? planIntentNote(intent);
 
     return (
         <SplitShell
@@ -92,6 +103,12 @@ export default async function OnboardingPage({
                 email={session?.user.email ?? ""}
                 backTo={hasOrgs ? "/" : undefined}
                 checkout={checkoutIntent(intent)}
+                invite={inviteToTake(invite)}
+                defaultName={
+                    invite.kind === "ready"
+                        ? (invite.businessName ?? undefined)
+                        : undefined
+                }
             />
         </SplitShell>
     );
