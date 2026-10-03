@@ -7,7 +7,7 @@ import {
 } from "@saroh/pricing-catalog";
 
 import { FREE_PLAN_LINE, PLAN_TEASERS } from "@/content/home";
-import type { PlanId } from "@/content/types";
+import type { FaqItem, PlanId } from "@/content/types";
 import {
     PLAN_DETAILS_PLACEHOLDER,
     PRICE_NOTE,
@@ -172,4 +172,26 @@ export function freePlanLine(catalog: Catalog | null): string {
     });
     if (!parts.length) return fallback;
     return `${lead}: ${sentenceList(parts)}. ${tail}`;
+}
+
+/**
+ * Home's "What does Start free include?", worded as the design words it once
+ * there is a catalogue: the free plan's price and card lines, then the first
+ * paid plan's name and price. Without a catalogue (or a free and a paid plan
+ * in it), `fallback`, the content file's answer with no figures.
+ */
+export function startFreeFaq(
+    catalog: Catalog | null,
+    fallback: FaqItem,
+): FaqItem {
+    const plans = catalog ? offeredPlans(catalog) : [];
+    const free = plans.find((p) => p.pricePaise === 0);
+    const next = plans.find((p) => p.pricePaise > 0);
+    if (!catalog || !free || !next) return fallback;
+    const summary = planSummary(catalog, free.id);
+    if (!summary) return fallback;
+    return {
+        q: fallback.q,
+        a: `The ${free.name} plan is ${formatInr(free.pricePaise)} a month: ${lowerFirst(summary)} Move to ${next.name} (${formatInr(next.pricePaise)} a month) when you want to take orders, run subscriptions, send invoices or add your team.`,
+    };
 }

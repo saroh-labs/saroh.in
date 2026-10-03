@@ -3,7 +3,7 @@ import { SiteNav } from "@/components/site/site-nav";
 import { Toaster } from "sonner";
 
 /**
- * The V1 pages' chrome (/, /sell, /website, /bookings, /contacts, /insights,
+ * The V1 pages' chrome (/sell, /website, /bookings, /contacts, /insights,
  * /how-it-works, /coming-soon), kept working until the V2 pages replace them
  * (U26 deletes this group). Light only, like the rest of the site.
  */
