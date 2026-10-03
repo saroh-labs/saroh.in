@@ -386,11 +386,26 @@ export class ListWaitlistDto {
     @MaxLength(120)
     source?: string;
 
+    /** One of the form's kinds (U30), or "none" for entries without one. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(40)
+    kind?: string;
+
+    /** A city as typed, matched without case, or "none". */
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    city?: string;
+
     @IsOptional()
     @IsString()
     @MaxLength(200)
     cursor?: string;
 }
+
+/** Remove one entry when its owner asks (U30, KTD-17). */
+export class DeleteWaitlistDto extends OperatorReasonDto {}
 
 export class InviteWaitlistDto extends OperatorReasonDto {
     @IsArray()
