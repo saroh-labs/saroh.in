@@ -2405,3 +2405,45 @@ starts with https://`, `That isn't an address a photo can load from`), with
 action uses, never a second rule that should agree with it; and an action
 that refuses says so (`frontend-error-feedback.md`).
 **Category**: products · forms · feedback
+
+## saroh.in — `cn()` silently dropped the V2 type sizes and focus outlines
+
+**Problem**: Building the Marketing Site V2 primitives, a nav menu line set
+`text-mk-note text-muted-foreground` rendered at the body size, and every
+`focus-visible:outline focus-visible:outline-2` ring drew nothing.
+**Root cause**: tailwind-merge does not read the Tailwind config. It took the
+app's own `text-mk-*` sizes for colours and kept only the last "colour"; and
+tailwind-merge 3 follows Tailwind 4, where `outline` is a width, so `outline
+outline-2` merged to `outline-2` and the outline lost its style under our
+Tailwind 3.
+**Fix**: `apps/saroh.in/lib/cn.ts` extends tailwind-merge with the app's
+`mk-*` sizes, radii, shadows, widths and spacing; V2 focus rings write
+`focus-visible:[outline-style:solid]`. `lib/cn.test.ts` pins both.
+**Category**: frontend · rule in `apps/saroh.in/lib/cn.ts`
+
+## Tests — the first sequence in the schema broke every suite under RLS
+
+**Problem**: With the waitlist's `position` column in, the whole integration
+suite passed plainly but every file failed under `TEST_RLS=on`: "must be owner
+of sequence WaitlistSignup_position_seq".
+**Root cause**: `test/truncate.ts` ran `TRUNCATE … RESTART IDENTITY`, which
+needs ownership of each sequence. Until then no table had one, so the RLS test
+role (granted USAGE/SELECT/UPDATE on sequences, not ownership) never hit it.
+**Fix**: truncate without `RESTART IDENTITY`; specs compare positions to each
+other, never to 1. The RLS gate (`int-rls` in `pnpm prepush --all`) is what
+catches a recurrence.
+**Category**: tests · rule in `apps/api.saroh.in/test/truncate.ts`
+
+## E2E — a new account was sent to production's onboarding
+
+**Problem**: the first browser test to follow a sign-up into onboarding
+(on the marketing branch's open sign-up work) timed out on
+`https://accounts.saroh.in/login?redirect=https://app.saroh.in/onboarding`.
+**Root cause**: the e2e stack (prepush and CI) never set
+`NEXT_PUBLIC_APP_URL`, so the production build of accounts fell back to
+`https://app.saroh.in`; turbo's strict env mode would have dropped it anyway,
+as it wasn't in `globalEnv`.
+**Fix**: set it in `scripts/prepush.sh` and CI's browser job, and list it in
+`turbo.json`. A `NEXT_PUBLIC_*` a build reads must be in `globalEnv` and in
+every stack that builds it.
+**Category**: e2e · rule in `scripts/prepush.sh`, `turbo.json`
