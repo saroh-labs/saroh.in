@@ -2429,3 +2429,26 @@ and their one possible match.
 what that path makes on the side. Run the same rule from the seed, with
 seed ids. `checkBoutique` now fails if a paying customer has no contact.
 **Category**: seed · customers · `packages/database/src/seed/helpers.ts`
+## Frontend — every new post fell into "Couldn't load your website"
+
+**Problem**: Writing a new post, the editor turned into the route's error
+page ("Couldn't load your website") about 2.5 seconds after typing stopped.
+Opening New post from the posts list did the same. Reloading the page
+brought the post back. Found while filming the demo videos.
+**Root cause**: The first autosave of a new post `router.replace`s to the
+post's own address (`components/sites/post-editor.tsx`), and the remount has
+Tiptap's `useEditor` destroy its editor and create another. `EditorSurface`'s
+sync effect in `components/sites/rich-text-editor.tsx` reconnected first,
+still holding the destroyed editor, and called `editor.commands.setContent`.
+Tiptap's `destroy()` sets `commandManager` to null, so the `commands` getter
+threw `Cannot read properties of null (reading 'commands')`. The product
+description editor had hit the same thing in its sheet and was fixed there
+(entry above), but the fix never reached the shared rich-text editor.
+**Fix**: The sync effect and the HTML toggle skip a destroyed editor, and the
+surface is keyed by editor instance, so the new editor gets a fresh surface
+and `useEditorState` store. `editorKey` moved to `lib/tiptap/editor-key.ts`
+so both editors share it.
+**Rule**: Any effect or handler that touches a Tiptap editor checks
+`editor.isDestroyed` first, and a surface built around one editor is keyed
+by `editorKey(editor)`. Pinned by `e2e/tests/post-editor.spec.ts`.
+**Category**: frontend · Tiptap · `apps/app.saroh.in/components/sites/rich-text-editor.tsx`
