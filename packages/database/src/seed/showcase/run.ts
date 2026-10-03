@@ -8,7 +8,6 @@ import {
     ANALYTICS_PATHS,
     CONTACTS as BASE_CONTACTS,
     OWNER_EMAIL,
-    PLAN,
     SEED_PREFIX,
 } from "../data";
 import type { Db } from "../helpers";
@@ -24,6 +23,7 @@ import {
     utcDay,
     writeSite,
 } from "../helpers";
+import { seedPlanId } from "../pricing.internal";
 import { deleteSeeded } from "../run";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
 import { RYE, seedBakery } from "./bakery";
@@ -415,20 +415,11 @@ async function enableModules(
 }
 
 /**
- * The base seed's Business plan, so the entitlements (sites, team members)
- * allow what the showcase creates.
+ * The catalogue plan the base seed uses (`pricing.internal.ts`), so the
+ * entitlements (sites, team members) allow what the showcase creates.
  */
 async function subscribe(ctx: Context, key: string, orgId: string) {
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({
-        where: {
-            key_version_interval: {
-                key: PLAN.key,
-                version: PLAN.version,
-                interval: PLAN.interval,
-            },
-        },
-        select: { id: true },
-    });
+    const plan = { id: await seedPlanId(ctx.prisma, ctx.now) };
     await ctx.prisma.subscription.upsert({
         where: { organizationId: orgId },
         update: { planId: plan.id, status: "ACTIVE" },

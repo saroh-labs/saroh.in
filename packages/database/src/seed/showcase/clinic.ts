@@ -1,8 +1,8 @@
 import type { Prisma } from "@prisma/client";
 
-import { PLAN } from "../data";
 import type { Db } from "../helpers";
 import { writeSite } from "../helpers";
+import { seedPlanId } from "../pricing.internal";
 import {
     KAVI,
     KAVI_ADDRESS,
@@ -140,16 +140,7 @@ export async function seedClinic(
             },
         });
     }
-    const plan = await prisma.plan.findUniqueOrThrow({
-        where: {
-            key_version_interval: {
-                key: PLAN.key,
-                version: PLAN.version,
-                interval: PLAN.interval,
-            },
-        },
-        select: { id: true },
-    });
+    const plan = { id: await seedPlanId(prisma, now) };
     await prisma.subscription.upsert({
         where: { organizationId: orgId },
         update: { planId: plan.id, status: "ACTIVE" },

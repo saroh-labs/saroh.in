@@ -3,21 +3,24 @@
  * gives every business that joined before the release and has no plan of its
  * own one time-bound `plan` override, and a second run writes nothing; and
  * EntitlementService reads a live plan override ahead of the subscription's
- * plan, through the legacy rows that map to it, until it ends.
+ * plan — through the catalogue since U12, on a made-up live version — until
+ * it ends. A `business` or `pro` subscriber never resolves as Free.
  *
  * The override rows satisfy the migration's CHECK (`EntitlementOverride_kind_shape`:
  * a `plan` override carries a `planKey`), so the spec holds in RLS mode, where
- * the CHECKs exist. Every number here is made up. Resolution through the
- * catalogue itself is U12's spec; over-limit read-only is U13's.
+ * the CHECKs exist. Every number here is made up. The rest of catalogue
+ * resolution is `catalogue-access.db.spec.ts`; over-limit read-only is U13's.
  */
 import {
     backfillPricingGrandfather,
     FREE_PLAN_KEYS,
     GRANDFATHER_ACTOR,
     prisma,
+    writeCatalogueVersion,
 } from "@saroh/database";
-import { LEGACY_PLAN_KEYS } from "@saroh/pricing-catalog";
+import { LEGACY_PLAN_KEYS, planRows } from "@saroh/pricing-catalog";
 
+import { fakeLegacyMappedCatalog } from "../../../test/fixtures/pricing-catalog";
 import { EntitlementService, FREE_ENTITLEMENTS } from "./entitlement.service";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -29,7 +32,8 @@ const LEGACY_ROWS: Record<string, Record<string, number | boolean>> = {
     pro: { sites: 31, teamMembers: 32, customDomain: true },
     free: { sites: 1, teamMembers: 1, customDomain: false },
 };
-// Above any version another spec might leave, so these rows are the newest.
+// Above any version another spec might leave, so these rows are the newest
+// and this catalogue version is the live one.
 const VERSION = 900_000 + Math.floor(Math.random() * 9_000);
 
 async function org(name: string, createdAt?: Date) {
@@ -83,6 +87,14 @@ describe("grandfathering (DB, U5)", () => {
     const until = new Date(Date.now() + 30 * DAY);
 
     beforeAll(async () => {
+        const catalog = fakeLegacyMappedCatalog();
+        await writeCatalogueVersion(prisma, {
+            version: VERSION,
+            catalog,
+            goLiveAt: new Date(Date.now() - DAY),
+            policy: "keep",
+            planRows: planRows(catalog, VERSION),
+        });
         for (const [key, entitlements] of Object.entries(LEGACY_ROWS)) {
             await prisma.plan.create({
                 data: {
@@ -110,6 +122,9 @@ describe("grandfathering (DB, U5)", () => {
 
     afterAll(async () => {
         await prisma.plan.deleteMany({ where: { version: VERSION } });
+        await prisma.pricingCatalogVersion.deleteMany({
+            where: { version: VERSION },
+        });
     });
 
     describe("the backfill", () => {
@@ -222,15 +237,19 @@ describe("grandfathering (DB, U5)", () => {
     });
 
     describe("EntitlementService", () => {
-        it("puts a grandfathered business on Grow's legacy limits, not the free floor", async () => {
+        it("puts a grandfathered business on Grow, not the free floor", async () => {
             const o = await org("Grandfathered");
             await planOverride(o.id, "grow");
 
             const got = await service.getEntitlements(o.id);
             expect(got).not.toEqual(FREE_ENTITLEMENTS);
-            // business and pro both map to grow; the newest active monthly
-            // row of the two is read (same version here, so the later one).
-            expect([LEGACY_ROWS.business, LEGACY_ROWS.pro]).toContainEqual(got);
+            // The fake catalogue's Grow (Plan B): its cap, its rows, and a
+            // custom domain because it has a price.
+            expect(got).toMatchObject({
+                products: 222,
+                invoicing: true,
+                customDomain: true,
+            });
         });
 
         it("honours a plan override over the subscription's own plan", async () => {
@@ -238,21 +257,36 @@ describe("grandfathering (DB, U5)", () => {
             await subscribe(o.id, "business");
             await planOverride(o.id, "free");
 
-            expect(await service.getPlanEntitlements(o.id)).toEqual(
-                FREE_ENTITLEMENTS,
-            );
+            expect(await service.getPlanEntitlements(o.id)).toMatchObject({
+                invoicing: false,
+                products: 11,
+                customDomain: false,
+                sites: 1,
+            });
         });
 
         it.each(["business", "pro"])(
-            "keeps a %s subscriber on its own row: a paying customer never resolves as Free",
+            "reads a %s subscriber as Grow on its own row: a paying customer never resolves as Free",
             async (key) => {
-                const o = await org(`Legacy ${key}`);
-                await subscribe(o.id, key);
-                await planOverride(o.id, "grow");
+                const own = LEGACY_ROWS[key]!;
+                const plain = await org(`Legacy ${key}`);
+                await subscribe(plain.id, key);
+                const grandfathered = await org(`Legacy ${key} kept`);
+                await subscribe(grandfathered.id, key);
+                await planOverride(grandfathered.id, "grow");
 
-                expect(await service.getEntitlements(o.id)).toEqual(
-                    LEGACY_ROWS[key],
-                );
+                for (const o of [plain, grandfathered]) {
+                    const got = await service.getEntitlements(o.id);
+                    expect(got).not.toEqual(FREE_ENTITLEMENTS);
+                    // Its own row for what no catalogue row sells; Grow's
+                    // rows for the rest.
+                    expect(got).toMatchObject({
+                        sites: own.sites,
+                        customDomain: true,
+                        invoicing: true,
+                        products: 222,
+                    });
+                }
             },
         );
 

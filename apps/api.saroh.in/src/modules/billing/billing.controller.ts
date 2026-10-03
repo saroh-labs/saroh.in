@@ -5,6 +5,8 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { BillingAccessView } from "./catalogue-access";
+import { CatalogueAccessService } from "./catalogue-access.service";
 import { CancelSubscriptionDto, SubscribeDto } from "./dto";
 import { PlansService } from "./plans.service";
 import type { SubscriptionWithPlan } from "./subscriptions.service";
@@ -44,7 +46,18 @@ export class PlansController {
 @Controller("organizations/:organizationId/billing")
 @UseGuards(BetterAuthGuard, OrganizationGuard)
 export class BillingController {
-    constructor(private readonly subscriptions: SubscriptionsService) {}
+    constructor(
+        private readonly subscriptions: SubscriptionsService,
+        private readonly access: CatalogueAccessService,
+    ) {}
+
+    /** What the business's plan gives it, row by row (plans catalogue U12). */
+    @Get("access")
+    getAccess(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<BillingAccessView> {
+        return this.access.view(ctx);
+    }
 
     @Get("subscription")
     getSubscription(

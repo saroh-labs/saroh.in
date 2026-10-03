@@ -11,15 +11,20 @@
  *   2. rollout      — ROLLOUT_DISABLED (generic unavailable; leaks no flag)
  *   3. configured   — ORG_MODULE_DISABLED (OWNER/ADMIN → Settings → Modules)
  *   4. selected     — PROJECT_MODULE_UNSELECTED (OWNER/ADMIN → Project settings)
- *   5. entitled     — ENTITLEMENT_REQUIRED (only after the above pass)
+ *   5. entitled     — ENTITLEMENT_REQUIRED (only after the above pass): the
+ *                     descriptor's `entitlementKey`, and the plans catalogue
+ *                     (U12): with PLAN_ENFORCEMENT on, a module none of whose
+ *                     catalogue rows the business's plan includes
  *   6. readiness    — setup/health blockers
  */
 import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { catalogueModulesFor } from "@saroh/pricing-catalog";
 
 import type { OrgRole } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import type { OrgAction } from "../organizations/organization-actions";
 import { can } from "../organizations/organization-policy";
 import type {
@@ -153,12 +158,18 @@ export class ModuleAvailabilityService {
               })) > 0
             : true;
 
-        const entitled = descriptor.entitlementKey
-            ? await this.entitlements.can(
-                  input.organizationId,
-                  descriptor.entitlementKey,
-              )
-            : true;
+        const entitled =
+            (descriptor.entitlementKey
+                ? await this.entitlements.can(
+                      input.organizationId,
+                      descriptor.entitlementKey,
+                  )
+                : true) &&
+            (!rolloutAllowed ||
+                (await this.includedInPlan(
+                    input.organizationId,
+                    input.moduleKey,
+                )));
 
         const gates = {
             key: input.moduleKey,
@@ -212,6 +223,29 @@ export class ModuleAvailabilityService {
             })),
             gatesPassed: true,
         };
+    }
+
+    /**
+     * The plans catalogue's step (U12, KTD-8): after the rollout gate
+     * (DEC-057 first — a module rolled out off is hidden whatever the plan
+     * says), a module whose catalogue rows the business's plan all leaves
+     * off is not entitled. Only behind the PLAN_ENFORCEMENT kill switch
+     * (OQ-4), and only for a module some catalogue row sits under.
+     */
+    private async includedInPlan(
+        organizationId: string,
+        moduleKey: ModuleKey,
+    ): Promise<boolean> {
+        if (catalogueModulesFor(moduleKey).length === 0) return true;
+        if (
+            !(await this.flags.isEnabled(
+                FlagKey.PLAN_ENFORCEMENT,
+                organizationId,
+            ))
+        ) {
+            return true;
+        }
+        return this.entitlements.moduleIncluded(organizationId, moduleKey);
     }
 
     /** Evaluate every module — the read model the product shell consumes. */

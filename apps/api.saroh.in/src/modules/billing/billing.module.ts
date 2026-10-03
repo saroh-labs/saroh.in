@@ -6,6 +6,7 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
+import { CatalogueAccessService } from "./catalogue-access.service";
 import { EntitlementService } from "./entitlement.service";
 import { PlansService } from "./plans.service";
 import { billingProviderFactoryProvider } from "./providers/provider.factory";
@@ -25,7 +26,9 @@ import { SubscriptionsService } from "./subscriptions.service";
  * adapters in prod) backs both via `BILLING_PROVIDER_FACTORY`.
  *
  * {@link EntitlementService} is exported for other modules to call before
- * creating a limited resource (a site/member/etc.).
+ * creating a limited resource (a site/member/etc.); it and
+ * `GET …/billing/access` read {@link CatalogueAccessService} (plans catalogue
+ * U12), exported for metering (U13).
  *
  * NOTE: this module is intentionally NOT self-registering — the app owner wires
  * it into `AppModule`.
@@ -36,11 +39,17 @@ import { SubscriptionsService } from "./subscriptions.service";
     providers: [
         PlansService,
         SubscriptionsService,
+        CatalogueAccessService,
         EntitlementService,
         BillingWebhookService,
         billingProviderFactoryProvider,
         OrganizationGuard,
     ],
-    exports: [EntitlementService, SubscriptionsService, PlansService],
+    exports: [
+        CatalogueAccessService,
+        EntitlementService,
+        SubscriptionsService,
+        PlansService,
+    ],
 })
 export class BillingModule {}
