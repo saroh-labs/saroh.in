@@ -47,7 +47,7 @@ const input: CatalogInput = {
         {
             id: "grow",
             name: "Grow",
-            pricePaise: 100_000,
+            pricePaise: 150_000,
             tagline: "For a business that sells, books and bills.",
             cta: "Choose Grow",
             featured: true,
