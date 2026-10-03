@@ -37,7 +37,7 @@ export function CompareTable({
             </h2>
             <div
                 role="region"
-                aria-labelledby="compare-title"
+                aria-label="Plan comparison table"
                 tabIndex={0}
                 className="relative min-w-0 overflow-x-auto rounded-[18px] border border-border bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
             >

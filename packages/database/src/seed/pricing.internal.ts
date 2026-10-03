@@ -27,10 +27,19 @@ import type { Db } from "./helpers";
 export const SEED_PLAN_ID = "pro";
 
 /**
+ * When the seed's version 1 went live: long before any seed's `now`. The
+ * base seed runs on the wall clock and the showcase on the clock rounded
+ * down to the half hour, so a version live from the base seed's `now` was
+ * not yet live at the showcase's, and every fresh showcase seed failed
+ * (plan U29, found running `prepush --e2e`).
+ */
+const SEED_LIVE_FROM = new Date("2020-01-01T00:00:00.000Z");
+
+/**
  * Install the seed catalogue as version 1 if no version exists. Two seeds
  * racing for version 1 meet the unique index; the loser reads it.
  */
-async function ensureCatalogue(prisma: Db, now: Date): Promise<void> {
+async function ensureCatalogue(prisma: Db): Promise<void> {
     const any = await prisma.pricingCatalogVersion.findFirst({
         select: { id: true },
     });
@@ -39,7 +48,7 @@ async function ensureCatalogue(prisma: Db, now: Date): Promise<void> {
         await writeCatalogueVersion(prisma, {
             version: 1,
             catalog: SEED_CATALOG,
-            goLiveAt: now,
+            goLiveAt: SEED_LIVE_FROM,
             policy: "keep",
             note: SEED_NOTE,
             changes: [],
@@ -57,7 +66,7 @@ async function ensureCatalogue(prisma: Db, now: Date): Promise<void> {
  * plan, rather than seeding a business onto nothing.
  */
 export async function seedPlanId(prisma: Db, now: Date): Promise<string> {
-    await ensureCatalogue(prisma, now);
+    await ensureCatalogue(prisma);
     const row = await liveCataloguePlanRow(prisma, SEED_PLAN_ID, "month", now);
     if (!row) {
         throw new Error(

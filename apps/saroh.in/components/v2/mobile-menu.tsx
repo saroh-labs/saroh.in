@@ -66,7 +66,7 @@ export function MobileMenu({
                 type="button"
                 aria-label="Menu"
                 aria-expanded={open}
-                aria-controls="nav-sheet"
+                aria-controls={open ? "nav-sheet" : undefined}
                 onClick={() => setOpen(true)}
                 className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-[10px] border border-border-strong bg-transparent text-foreground hover:bg-mk-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
             >
@@ -178,7 +178,7 @@ function Accordion({
             <button
                 type="button"
                 aria-expanded={open}
-                aria-controls={`nav-sheet-${id}`}
+                aria-controls={open ? `nav-sheet-${id}` : undefined}
                 onClick={onToggle}
                 className={cn(
                     ROW,
