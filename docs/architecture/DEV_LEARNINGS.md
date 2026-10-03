@@ -2348,3 +2348,23 @@ locks, in the real one's order and isolation level, or calls the real code;
 and every pair of transactions that lock the same rows is run in both
 orders (`backend-data-and-money.md`, lock order for a site).
 **Category**: sites · locks · concurrency · tests
+
+## Products — "Add photo" was on for an address its click then dropped (code review 3)
+
+**Symptom**: found in review. In the photo field's "From an address" panel,
+an address such as `https://[bad]/a.jpg` turned "Add photo" on, and the
+click did nothing: no photo, no message. `HTTPS://…` did the opposite: the
+button stayed off for an address the click would have added.
+**Cause**: the button's state came from one rule (a `^https://\S+$` regex)
+and the click from another (`mediaSrc`, which #774 made the only way an
+address is stored). The two disagreed at the edges, and the click's refusal
+was silent.
+**Fix**: `AddressPanel` derives "Add photo" from `mediaSrc(url)` starting
+with `https://`, the same value it stores, and `photoAddressProblem` says
+what's wrong beside the field (`Use the https:// address`, `An address
+starts with https://`, `That isn't an address a photo can load from`), with
+`aria-invalid` and `aria-describedby`. `address-panel.test.tsx` pins it.
+**Rule**: a control's enabled state is computed by the same function its
+action uses, never a second rule that should agree with it; and an action
+that refuses says so (`frontend-error-feedback.md`).
+**Category**: products · forms · feedback
