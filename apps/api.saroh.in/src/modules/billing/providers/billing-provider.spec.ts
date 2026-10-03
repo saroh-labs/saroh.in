@@ -371,6 +371,53 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         }
     });
 
+    it("refuses a coupon rather than charge the full amount, asking nothing (U16, unverified)", async () => {
+        const { provider, calls } = recorded([]);
+        const error = await provider
+            .createSubscription({
+                planKey: "catalog.b",
+                planId: "row_b",
+                priceCents: 22_200,
+                currency: "INR",
+                interval: "month",
+                organizationId: "org_1",
+                providerPlanId: "plan_b",
+                discount: { code: "TEST-OFF", amountPaise: 131, charges: 2 },
+            })
+            .catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(BillingProviderError);
+        expect((error as BillingProviderError).kind).toBe("REFUSED");
+        expect(calls).toHaveLength(0);
+    });
+
+    it("puts an item on a subscription's next charge, GST included, with Saroh's reference (U16)", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "ao_1" } },
+        ]);
+        await expect(
+            provider.charges.addToNextCharge({
+                providerSubscriptionId: "sub_9",
+                reference: "row_1",
+                name: "More things (add-on)",
+                amountPaise: 262,
+                currency: "INR",
+            }),
+        ).resolves.toEqual({ providerChargeId: "ao_1" });
+        expect(calls[0]).toEqual({
+            url: "https://api.razorpay.com/v1/subscriptions/sub_9/addons",
+            method: "POST",
+            body: {
+                item: {
+                    name: "More things (add-on)",
+                    amount: 262,
+                    currency: "INR",
+                    description: "saroh_ref:row_1",
+                },
+                quantity: 1,
+            },
+        });
+    });
+
     it("reads when an event happened, its phase and the period it paid to", () => {
         const event = new RazorpayBillingProvider().parseWebhook({
             event: "subscription.charged",

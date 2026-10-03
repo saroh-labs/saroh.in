@@ -8,6 +8,8 @@ import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { AddonsSyncHandler, BILLING_ADDONS_SYNC_TYPE } from "./addon-charges";
+import { AddonsService } from "./addons.service";
 import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
@@ -67,6 +69,10 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  * {@link BillingEmailHandler} sends them and the failed-payment and
  * trial-ending mail.
  *
+ * Trials, yearly and coupons (U16) are part of {@link CheckoutService};
+ * add-ons are {@link AddonsService}, billed on the provider subscription's
+ * next charge by {@link AddonsSyncHandler} (`billing.addons.sync`).
+ *
  * NOTE: this module is intentionally NOT self-registering — the app owner wires
  * it into `AppModule`.
  */
@@ -92,6 +98,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         MovesApplyHandler,
         SarohInvoicesService,
         BillingEmailHandler,
+        AddonsService,
+        AddonsSyncHandler,
         billingProviderFactoryProvider,
         OrganizationGuard,
     ],
@@ -113,10 +121,11 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         private readonly sweep: MovesApplyHandler,
         private readonly limitNotice: PlanLimitNoticeHandler,
         private readonly billingEmail: BillingEmailHandler,
+        private readonly addonsSync: AddonsSyncHandler,
     ) {}
 
     /**
-     * Registers the five jobs and starts the sweep's chain — the renewal
+     * Registers the six jobs and starts the sweep's chain — the renewal
      * job's shape (ADR-007): never under test, where no worker runs, and
      * never throwing, so a database not up yet cannot stop the boot.
      */
@@ -129,6 +138,10 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         this.registry.register(BILLING_MOVES_APPLY_TYPE, this.sweep.handle);
         this.registry.register(PLAN_LIMIT_NOTICE_TYPE, this.limitNotice.handle);
         this.registry.register(BILLING_EMAIL_TYPE, this.billingEmail.handle);
+        this.registry.register(
+            BILLING_ADDONS_SYNC_TYPE,
+            this.addonsSync.handle,
+        );
         if (env.NODE_ENV === "test") return;
         await this.sweep.schedule(new Date());
         this.chainCheck = setInterval(() => {

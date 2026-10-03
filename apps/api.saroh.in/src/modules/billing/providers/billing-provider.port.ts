@@ -63,6 +63,13 @@ export interface CreateSubscriptionInput {
      * the rest of the period), GST included, in paise. Worked out by Saroh.
      */
     upfront?: { name: string; amountPaise: number } | null;
+    /**
+     * A coupon (U16): `amountPaise` (GST included, worked out by Saroh) off
+     * each of the subscription's first `charges` charges. A provider that
+     * can't take one off refuses (`BillingProviderError` REFUSED) rather
+     * than charge the full amount.
+     */
+    discount?: { code: string; amountPaise: number; charges: number } | null;
     /** Saroh's reference for this attempt (the checkout id), for the notes. */
     reference?: string;
 }
@@ -136,6 +143,28 @@ export interface ProviderPlanCapability {
     }>;
 }
 
+/** A one-off item for a provider subscription's next charge (U16 add-ons). */
+export interface NextChargeItem {
+    providerSubscriptionId: string;
+    /** Saroh's reference (the `SubscriptionAddonCharge` id), in its notes. */
+    reference: string;
+    name: string;
+    /** GST included, in paise (KTD-18). */
+    amountPaise: number;
+    currency: string;
+}
+
+/**
+ * Putting one-off items on a provider subscription's next charge (U16): how
+ * add-ons are billed, after the period they cover. Optional on the port: a
+ * provider without it can't bill add-ons, and their charges wait.
+ */
+export interface ProviderChargeCapability {
+    addToNextCharge(
+        item: NextChargeItem,
+    ): Promise<{ providerChargeId: string }>;
+}
+
 /**
  * A provider call that failed, classified: `REFUSED` is an answer it would
  * give again (a 4xx), `UNKNOWN` may have worked (network, timeout, 5xx, 429).
@@ -192,6 +221,8 @@ export interface BillingProvider {
     ): Promise<void>;
     /** Provider plan objects for the catalogue (U15); absent: can't sell them. */
     readonly plans?: ProviderPlanCapability;
+    /** Items on the next charge (U16 add-ons); absent: can't bill them. */
+    readonly charges?: ProviderChargeCapability;
     /**
      * Constant-time HMAC verify over the RAW bytes using Saroh's PLATFORM
      * webhook secret (from `process.env`). Never throws on mismatch — returns

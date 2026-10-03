@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 import { unsyncedCatalogueVersions } from "@saroh/database";
 
+import { clearAddonsInTx } from "./addon-charges";
 import { periodEnd } from "./checkout-quote";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 
@@ -183,7 +184,8 @@ export async function applyDueMoveInTx(
             });
         }
     } else if (target.priceCents === 0) {
-        // Free bills nothing: no provider, no period.
+        // Free bills nothing: no provider, no period, no add-ons (U16).
+        await clearAddonsInTx(tx, sub.id);
         data.provider = null;
         data.providerSubscriptionId = null;
         data.providerCustomerId = null;

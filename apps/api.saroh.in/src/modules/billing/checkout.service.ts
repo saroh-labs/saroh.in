@@ -3,13 +3,20 @@ import { randomUUID } from "node:crypto";
 import {
     BadRequestException,
     ConflictException,
+    HttpException,
+    HttpStatus,
     Inject,
     Injectable,
     Logger,
     Optional,
     ServiceUnavailableException,
 } from "@nestjs/common";
-import type { BillingCheckout, Plan, Prisma } from "@saroh/database";
+import type {
+    BillingCheckout,
+    Plan,
+    PricingCoupon,
+    Prisma,
+} from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { BillingCycle } from "@saroh/pricing-catalog";
 import { catalogPlanIdForKey } from "@saroh/pricing-catalog";
@@ -21,10 +28,14 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { gstinProblem, stateCode } from "../invoices/gst-states";
 import { authorize } from "../organizations/organization-policy";
+import { findUsableCoupon } from "../pricing/coupons.service";
+import { clearAddonsInTx } from "./addon-charges";
 import type { ChangeKind, ChangeQuote } from "./checkout-quote";
-import { billedByProvider, quoteChange } from "./checkout-quote";
+import { billedByProvider, COUPON_KINDS, quoteChange } from "./checkout-quote";
+import { catalogueOfVersion, hadTrial, planTrialDays } from "./offers";
 import { PlansService } from "./plans.service";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
@@ -38,6 +49,19 @@ type Tx = Prisma.TransactionClient;
 
 /** How long a checkout waits to be authorised before it lapses. */
 export const CHECKOUT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Coupon tries a minute (U16): per business, and per address across
+ * businesses. In-process, like every limiter here (`FixedWindowRateLimiter`):
+ * a speed bump against guessing codes, not a guarantee.
+ */
+export const COUPON_TRIES_PER_ORG = 10;
+export const COUPON_TRIES_PER_ADDRESS = 30;
+
+/** Who is asking, for the coupon limit: the caller's address, hashed. */
+export interface CheckoutClient {
+    addressKey?: string | null;
+}
 
 /** `GET …/billing/change-plan`: what a change would be, and cost. */
 export interface ChangePlanQuoteView {
@@ -56,6 +80,16 @@ export interface ChangePlanQuoteView {
     startAt: string | null;
     /** When it is on the plan; null: once authorised. */
     effectiveAt: string | null;
+    /** A trial's end, when its first charge is taken (U16); else null. */
+    trialEndsAt: string | null;
+    /**
+     * The coupon (U16): its code, what it takes off each of the first
+     * `charges` charges before GST, and that first charge after it.
+     */
+    coupon: { code: string; discountPaise: number; charges: number } | null;
+    firstChargePaise: number;
+    firstChargeGstPaise: number;
+    firstChargeTotalPaise: number;
 }
 
 /** A checkout as the business sees it; never the provider's link. */
@@ -68,6 +102,9 @@ export interface CheckoutView {
     pricePaise: number;
     chargeNowPaise: number;
     chargeNowGstPaise: number;
+    /** A coupon's discount off each of the first `discountCharges` charges. */
+    discountPaise: number;
+    discountCharges: number;
     startAt: string | null;
     expiresAt: string;
     createdAt: string;
@@ -82,7 +119,7 @@ export type ChangePlanResult =
           effectiveAt: string;
       }
     | {
-          kind: "NEW" | "UPGRADE" | "SCHEDULED";
+          kind: "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL";
           quote: ChangePlanQuoteView;
           checkout: CheckoutView;
           /**
@@ -139,12 +176,27 @@ const SUB_SELECT = {
  *   cheaper plan or the other cycle starts at the period's end. A new
  *   checkout replaces an open one.
  *
- * Nothing here enforces limits (U13) or offers trials, yearly coupons or
- * add-ons (U16).
+ * - **Offers** (U16): a paid plan's free trial where it would be NEW and
+ *   the business never had one (TRIAL: on the plan once authorised, the
+ *   first charge at the trial's end); a coupon on a checkout that starts a
+ *   plan, checked as usable (`findUsableCoupon`), rate-limited, and carried
+ *   on the checkout for the provider and the webhook (which redeems it with
+ *   the first discounted charge). Yearly is the plan's yearly row, sold
+ *   only while the catalogue offers yearly.
+ *
+ * Nothing here enforces limits (U13); add-ons are `AddonsService`.
  */
 @Injectable()
 export class CheckoutService {
     private readonly logger = new Logger(CheckoutService.name);
+    private readonly couponTriesByOrg = new FixedWindowRateLimiter(
+        COUPON_TRIES_PER_ORG,
+        60_000,
+    );
+    private readonly couponTriesByAddress = new FixedWindowRateLimiter(
+        COUPON_TRIES_PER_ADDRESS,
+        60_000,
+    );
 
     constructor(
         private readonly plans: PlansService,
@@ -155,16 +207,18 @@ export class CheckoutService {
 
     async quote(
         ctx: OrganizationContext,
-        input: { plan: string; cycle: BillingCycle },
+        input: { plan: string; cycle: BillingCycle; coupon?: string | null },
         now: Date = new Date(),
+        client: CheckoutClient = {},
     ): Promise<ChangePlanQuoteView> {
         authorize(ctx, "billing:read");
-        const { target, quote } = await this.resolve(
+        this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
+        const { target, quote, coupon } = await this.resolve(
             ctx.organizationId,
             input,
             now,
         );
-        return this.quoteView(target, quote);
+        return this.quoteView(target, quote, coupon);
     }
 
     async current(ctx: OrganizationContext): Promise<CheckoutsView> {
@@ -191,17 +245,20 @@ export class CheckoutService {
             cycle: BillingCycle;
             billingState?: string | null;
             gstin?: string | null;
+            coupon?: string | null;
         },
         now: Date = new Date(),
+        client: CheckoutClient = {},
     ): Promise<ChangePlanResult> {
         authorize(ctx, "billing:manage");
         const billTo = checkoutBillTo(input);
-        const { target, quote, subscription } = await this.resolve(
+        this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
+        const { target, quote, subscription, coupon } = await this.resolve(
             ctx.organizationId,
             input,
             now,
         );
-        const view = this.quoteView(target, quote);
+        const view = this.quoteView(target, quote, coupon);
         if (quote.kind === "NONE") {
             throw new ConflictException(`You're already on ${target.name}.`);
         }
@@ -227,14 +284,35 @@ export class CheckoutService {
                 effectiveAt: at.toISOString(),
             };
         }
-        return this.checkout(ctx, target, quote, view, now, billTo);
+        return this.checkout(ctx, target, quote, view, now, billTo, coupon);
     }
 
     // ── Steps ───────────────────────────────────────────────────────────
 
+    /** A coupon in the request counts against both limits (U16). */
+    private limitCouponTries(
+        organizationId: string,
+        code: string | null | undefined,
+        client: CheckoutClient,
+        now: Date,
+    ): void {
+        if (!code?.trim()) return;
+        const at = now.getTime();
+        const byOrg = this.couponTriesByOrg.take(`org:${organizationId}`, at);
+        const byAddress = client.addressKey
+            ? this.couponTriesByAddress.take(`ip:${client.addressKey}`, at)
+            : true;
+        if (!byOrg || !byAddress) {
+            throw new HttpException(
+                "Too many coupon tries. Wait a minute and try again.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
+    }
+
     private async resolve(
         organizationId: string,
-        input: { plan: string; cycle: BillingCycle },
+        input: { plan: string; cycle: BillingCycle; coupon?: string | null },
         now: Date,
     ) {
         let target = await this.plans.resolveCatalogue(
@@ -259,11 +337,48 @@ export class CheckoutService {
             where: { organizationId },
             select: SUB_SELECT,
         });
-        const quote = quoteChange({ subscription, target, now });
-        return { target, quote, subscription };
+        const planId = catalogPlanIdForKey(target.key) ?? input.plan;
+        // The live version's offers: the plan's trial, while the business
+        // may still have one (U16).
+        const catalog = await catalogueOfVersion(prisma, target.version);
+        const trialDays =
+            catalog && !(await hadTrial(prisma, organizationId))
+                ? planTrialDays(catalog, planId)
+                : null;
+        let coupon: PricingCoupon | null = null;
+        const code = input.coupon?.trim();
+        if (code) {
+            const plain = quoteChange({ subscription, target, now, trialDays });
+            if (!COUPON_KINDS.includes(plain.kind)) {
+                throw new BadRequestException({
+                    message:
+                        "A coupon can be used when you start a paid plan, not on this change.",
+                    details: { field: "coupon" },
+                });
+            }
+            coupon = await findUsableCoupon({
+                code,
+                organizationId,
+                planId,
+                planName: target.name,
+                now,
+            });
+        }
+        const quote = quoteChange({
+            subscription,
+            target,
+            now,
+            trialDays,
+            coupon,
+        });
+        return { target, quote, subscription, coupon };
     }
 
-    private quoteView(target: Plan, quote: ChangeQuote): ChangePlanQuoteView {
+    private quoteView(
+        target: Plan,
+        quote: ChangeQuote,
+        coupon: PricingCoupon | null = null,
+    ): ChangePlanQuoteView {
         return {
             plan: {
                 id: catalogPlanIdForKey(target.key) ?? target.key,
@@ -280,6 +395,18 @@ export class CheckoutService {
             chargeNowTotalPaise: quote.chargeNowTotalPaise,
             startAt: quote.startAt?.toISOString() ?? null,
             effectiveAt: quote.effectiveAt?.toISOString() ?? null,
+            trialEndsAt: quote.trialEndsAt?.toISOString() ?? null,
+            coupon:
+                coupon && quote.discountCharges > 0
+                    ? {
+                          code: coupon.code,
+                          discountPaise: quote.discountPaise,
+                          charges: quote.discountCharges,
+                      }
+                    : null,
+            firstChargePaise: quote.firstChargePaise,
+            firstChargeGstPaise: quote.firstChargeGstPaise,
+            firstChargeTotalPaise: quote.firstChargeTotalPaise,
         };
     }
 
@@ -320,10 +447,12 @@ export class CheckoutService {
                 });
                 return now;
             }
+            // A trial paid nothing ahead, so it ends now (U16).
             if (
                 live?.provider &&
                 live.providerSubscriptionId &&
                 billedByProvider(live) &&
+                live.status !== "TRIALING" &&
                 periodEnd
             ) {
                 await tx.subscription.update({
@@ -352,6 +481,7 @@ export class CheckoutService {
                     atCycleEnd: false,
                 });
             }
+            await clearAddonsInTx(tx, sub.id);
             await tx.subscription.update({
                 where: { id: sub.id },
                 data: {
@@ -385,8 +515,10 @@ export class CheckoutService {
         view: ChangePlanQuoteView,
         now: Date,
         billTo: CheckoutBillTo = { billToState: null, billToGstin: null },
+        coupon: PricingCoupon | null = null,
     ): Promise<ChangePlanResult> {
-        const kind = quote.kind as "NEW" | "UPGRADE" | "SCHEDULED";
+        const kind = quote.kind as "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL";
+        const discounted = Boolean(coupon) && quote.discountCharges > 0;
         const providerPlan = await prisma.pricingProviderPlan.findUnique({
             where: {
                 planId_provider: {
@@ -427,12 +559,32 @@ export class CheckoutService {
                                   amountPaise: quote.chargeNowTotalPaise,
                               }
                             : null,
+                    discount:
+                        discounted && coupon
+                            ? {
+                                  code: coupon.code,
+                                  amountPaise: quote.discountTotalPaise,
+                                  charges: quote.discountCharges,
+                              }
+                            : null,
                     reference: id,
                 });
         } catch (error) {
             this.logger.warn(
                 `billing_checkout_provider_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
             );
+            // A provider that can't take a coupon off refuses it (U16).
+            if (
+                discounted &&
+                error instanceof BillingProviderError &&
+                error.kind === "REFUSED"
+            ) {
+                throw new ConflictException({
+                    message:
+                        "That coupon can't be used with payments just now. Try without it.",
+                    details: { field: "coupon" },
+                });
+            }
             if (error instanceof BillingProviderError) {
                 throw new ServiceUnavailableException(
                     "We couldn't start the payment just now. Try again in a minute.",
@@ -457,6 +609,9 @@ export class CheckoutService {
             pricePaise: target.priceCents,
             chargeNowPaise: quote.chargeNowPaise,
             chargeNowGstPaise: quote.chargeNowGstPaise,
+            couponId: discounted ? (coupon?.id ?? null) : null,
+            discountPaise: discounted ? quote.discountPaise : 0,
+            discountCharges: discounted ? quote.discountCharges : 0,
             startAt: kind === "NEW" ? null : quote.startAt,
             expiresAt: new Date(now.getTime() + CHECKOUT_TTL_MS),
             createdByUserId: ctx.userId,
@@ -600,6 +755,8 @@ export function checkoutView(row: BillingCheckout, plan: Plan): CheckoutView {
         pricePaise: row.pricePaise,
         chargeNowPaise: row.chargeNowPaise,
         chargeNowGstPaise: row.chargeNowGstPaise,
+        discountPaise: row.discountPaise,
+        discountCharges: row.discountCharges,
         startAt: row.startAt?.toISOString() ?? null,
         expiresAt: row.expiresAt.toISOString(),
         createdAt: row.createdAt.toISOString(),
