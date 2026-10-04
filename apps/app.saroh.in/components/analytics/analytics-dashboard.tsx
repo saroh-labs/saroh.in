@@ -12,6 +12,7 @@ import type {
     DailyPoint,
     TopPage,
 } from "@/lib/analytics/service";
+import { NUMBER_LOCALE } from "@/lib/format/locale";
 
 /** A single headline metric card (delegates to the shared @saroh/ui StatCard). */
 function StatCard({
@@ -27,7 +28,7 @@ function StatCard({
     return (
         <UIStatCard
             label={label}
-            value={value.toLocaleString()}
+            value={value.toLocaleString(NUMBER_LOCALE)}
             className="wk-item"
             style={{ "--wk-i": index } as React.CSSProperties}
         />
@@ -71,7 +72,7 @@ function DailyViewsChart({ daily }: { daily: DailyPoint[] }) {
                                  * it because until this workspace had analytics
                                  * data the card showed its empty state instead.
                                  */
-                                className="flex h-full flex-1 flex-col"
+                                className="flex h-full min-w-0 flex-1 flex-col"
                                 title={`${d.date}: ${d.views} views, ${d.uniques} unique`}
                             >
                                 {/*
@@ -155,11 +156,11 @@ function TopPagesTable({ pages }: { pages: TopPage[] }) {
                                 key={p.path}
                                 className="flex items-center justify-between py-2 text-sm"
                             >
-                                <span className="truncate pr-4 font-mono text-muted-foreground">
+                                <span className="min-w-0 truncate pr-4 font-mono text-muted-foreground">
                                     {p.path}
                                 </span>
                                 <span className="font-medium tabular-nums">
-                                    {p.views.toLocaleString()}
+                                    {p.views.toLocaleString(NUMBER_LOCALE)}
                                 </span>
                             </div>
                         ))}
@@ -171,15 +172,22 @@ function TopPagesTable({ pages }: { pages: TopPage[] }) {
 }
 
 /**
- * The site/enquiry/sales analytics dashboard (S7-003), rendered purely from the
+ * The website's analytics (S7-003), under Insights' takings, rendered purely from the
  * org-safe daily aggregates. Every number here is scoped to the active
  * organization by the API (`analytics:read`); this component only presents.
  */
 export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
     const { summary, daily, topPages } = view;
     return (
-        <div className="grid gap-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        // One column that may shrink: a grid item's min-content (thirty
+        // day columns, a long page path) otherwise widened the page at 320px.
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+            {/*
+             * No "Orders" tile here any more (DEC-075): it counted
+             * `order.paid` events, which nothing emits, so it read 0 beside
+             * the real orders the takings above count from Orders itself.
+             */}
+            <div className="grid gap-4 sm:grid-cols-3">
                 <StatCard
                     label="Site views"
                     value={summary.siteViews}
@@ -195,7 +203,6 @@ export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
                     value={summary.enquiries}
                     index={2}
                 />
-                <StatCard label="Orders" value={summary.orders} index={3} />
             </div>
             <DailyViewsChart daily={daily} />
             <TopPagesTable pages={topPages} />

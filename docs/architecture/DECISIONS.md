@@ -951,3 +951,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - `/pricing` is a temporary (302) redirect to `/waitlist`, so nothing caches it; old addresses that went to Pricing go to the waitlist or Home. The sitemap leaves `/pricing` out.
     - No catalogue in production: the catalogue tables, `GET /public/pricing` and `@saroh/pricing-catalog` stay off `development` for now. `GET /public/waitlist/offer` reads only `LAUNCH_OFFER_DAYS`, answering `{ planId: "grow", planName: "Grow", days }` while it is set and 404 otherwise.
 - Consequences: DEC-075's D3 ("the site's plan lines read the catalogue") applies once Pricing ships, with the catalogue. Bringing Pricing back is its own batch: the catalogue migration, U3's public read and the package, then the page, nav, teasers and sitemap entry. Runbook: `docs/architecture/GATE_W_ROLLOUT.md`.
+
+## DEC-079 The workspace groups numbers the Indian way
+
+**Status: Accepted — 2026-10-04** · user · replaces the `en-GB` grouping in `lib/format/locale.ts`
+
+- Context: the workspace formatted every number and amount with `en-GB`, so ₹20,44,971 read as ₹2,044,971. Saroh's merchants read money in lakh and crore.
+- Decision: numbers and money in `app.saroh.in` format with `NUMBER_LOCALE = "en-IN"` (lakh and crore grouping, "45K" and "45L" compact). Dates stay on `DISPLAY_LOCALE = "en-GB"` ("3 Aug 2026"). Both stay pinned constants, never the runtime's locale, so server and browser render the same string.
+- Consequences: a per-user or per-business locale, when it comes, replaces both constants. Merchant sites keep their own locale (`packages/site-blocks`).

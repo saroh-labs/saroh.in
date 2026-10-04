@@ -942,18 +942,25 @@ export const ENQUIRY_FIELDS: readonly SeedFormField[] = [
  * site and the other two the fixture has always carried — a live campaign site
  * and a draft still being written — each belong to a business of their own.
  * They show both site states, and give the business switcher something to
- * switch between. Website only: nothing else is seeded for them.
+ * switch between. Website only, besides `modules`: nothing else is seeded
+ * for them.
+ *
+ * Whitefield also has Insights on and has never taken money (DEC-075):
+ * Insights' first run, "No takings yet", read by `insights.spec.ts`.
  */
 export const SIDE_BUSINESSES: readonly {
     key: string;
     slug: string;
     name: string;
+    /** Modules on beside Website, with their rollout overrides. */
+    modules?: readonly "INSIGHTS"[];
 }[] = [
     { key: "monsoon", slug: "monsoon", name: "Monsoon Stock-Up" },
     {
         key: "whitefield",
         slug: "trade-counter-whitefield",
         name: "Trade Counter Whitefield",
+        modules: ["INSIGHTS"],
     },
 ];
 

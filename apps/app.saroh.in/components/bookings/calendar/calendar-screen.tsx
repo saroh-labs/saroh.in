@@ -495,7 +495,7 @@ export function CalendarScreen({
                             aria-checked={layout === id}
                             onClick={() => go(id, date)}
                             className={cn(
-                                "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 coarse:min-h-11",
                                 layout === id
                                     ? "bg-card text-foreground"
                                     : "text-primary-foreground hover:bg-primary-hover active:bg-primary-active",

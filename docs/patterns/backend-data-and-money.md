@@ -289,5 +289,5 @@
 ## Seed — **Current**
 
 `pnpm --filter @saroh/database db:seed` lays down "Northwind Supply". Seeded data
-can hide a missing producer: analytics rollups exist locally only because the
-seed writes them.
+can hide a missing producer: analytics rollups existed locally only because the
+seed wrote them, long before anything scheduled them (DEC-075).
