@@ -2,7 +2,7 @@
 import fs from "node:fs";
 
 import AxeBuilder from "@axe-core/playwright";
-import type { Page, TestInfo } from "@playwright/test";
+import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { useSession } from "../fixtures/sessions";
@@ -47,11 +47,36 @@ interface Screen {
     org: string;
     /** The address, or how to find it (a detail page picks a real record). */
     path: string | ((page: Page) => Promise<string>);
+    /**
+     * What this screen draws once its content has arrived. Any `main` is
+     * the shell's, there before the page is: a scan of it alone measures a
+     * skeleton, or nothing, and passes.
+     */
+    ready: (page: Page) => Locator;
 }
 
+const h1 = (name: string | RegExp) => (page: Page) =>
+    page.getByRole("heading", { level: 1, name });
+/**
+ * A Settings page's own title. The layout's tabs draw before the page does,
+ * so they say nothing about whether the page has arrived.
+ */
+const h2 = (name: string) => (page: Page) =>
+    page.getByRole("heading", { level: 2, name, exact: true });
+
 const SCREENS: Screen[] = [
-    { name: "Home", org: RYE, path: "/" },
-    { name: "Orders", org: RYE, path: "/commerce/orders" },
+    {
+        name: "Home",
+        org: RYE,
+        path: "/",
+        ready: (page) => page.getByRole("region", { name: "Needs you" }),
+    },
+    {
+        name: "Orders",
+        org: RYE,
+        path: "/commerce/orders",
+        ready: h1("Orders"),
+    },
     {
         name: "Order detail",
         org: RYE,
@@ -65,20 +90,88 @@ const SCREENS: Screen[] = [
             expect(rows.length).toBeGreaterThan(0);
             return `/commerce/orders/${rows[0]?.id ?? ""}`;
         },
+        // The order's number, "#…".
+        ready: h1(/^#/),
     },
-    { name: "Customers", org: RYE, path: "/commerce/customers" },
-    { name: "Customer detail", org: RYE, path: `/customers/${PRIYA}` },
-    { name: "Calendar", org: PULSE, path: "/calendar" },
-    { name: "Bookings", org: PULSE, path: "/bookings" },
-    { name: "Products", org: RYE, path: "/commerce/products" },
-    { name: "Invoices", org: PULSE, path: "/billing/invoices" },
-    { name: "Subscriptions", org: PULSE, path: "/billing/subscriptions" },
-    { name: "Settings: business", org: RYE, path: "/settings/organization" },
-    { name: "Settings: team", org: RYE, path: "/settings/people" },
-    { name: "Settings: modules", org: RYE, path: "/settings/modules" },
-    { name: "Settings: plan and billing", org: RYE, path: "/settings/billing" },
-    { name: "Settings: your profile", org: RYE, path: "/settings/profile" },
-    { name: "Settings: activity", org: RYE, path: "/settings/activity" },
+    {
+        name: "Customers",
+        org: RYE,
+        path: "/commerce/customers",
+        ready: h1("Customers"),
+    },
+    {
+        name: "Customer detail",
+        org: RYE,
+        path: `/customers/${PRIYA}`,
+        ready: h1("Priya Raman"),
+    },
+    {
+        name: "Calendar",
+        org: PULSE,
+        path: "/calendar",
+        ready: (page) =>
+            page.getByRole("group", { name: "Show on the calendar" }),
+    },
+    {
+        name: "Bookings",
+        org: PULSE,
+        path: "/bookings",
+        ready: (page) => page.getByRole("radiogroup", { name: "Layout" }),
+    },
+    {
+        name: "Products",
+        org: RYE,
+        path: "/commerce/products",
+        ready: h1("Products"),
+    },
+    {
+        name: "Invoices",
+        org: PULSE,
+        path: "/billing/invoices",
+        ready: h1("Invoices"),
+    },
+    {
+        name: "Subscriptions",
+        org: PULSE,
+        path: "/billing/subscriptions",
+        ready: h1("Subscriptions"),
+    },
+    {
+        name: "Settings: business",
+        org: RYE,
+        path: "/settings/organization",
+        ready: h2("Business"),
+    },
+    {
+        name: "Settings: team",
+        org: RYE,
+        path: "/settings/people",
+        ready: h2("Team"),
+    },
+    {
+        name: "Settings: modules",
+        org: RYE,
+        path: "/settings/modules",
+        ready: h2("Modules"),
+    },
+    {
+        name: "Settings: plan and billing",
+        org: RYE,
+        path: "/settings/billing",
+        ready: h2("Plan and billing"),
+    },
+    {
+        name: "Settings: your profile",
+        org: RYE,
+        path: "/settings/profile",
+        ready: h2("Your profile"),
+    },
+    {
+        name: "Settings: activity",
+        org: RYE,
+        path: "/settings/activity",
+        ready: h2("Activity"),
+    },
 ];
 
 /**
@@ -111,8 +204,12 @@ function allowed(
 }
 
 /** The page has drawn its content: no skeleton, nothing busy. */
-async function settled(page: Page) {
+async function settled(page: Page, ready: Locator) {
     await expect(page.locator("main").first()).toBeVisible();
+    // The screen's own content first: before it lands, "no skeleton" holds
+    // on a page that has not started drawing one, and axe, the cursor and
+    // the focus walk all pass on the shell alone.
+    await expect(ready.filter({ visible: true }).first()).toBeVisible();
     await expect(page.locator(".skeleton-sweep:visible")).toHaveCount(0);
     await expect(page.locator("[aria-busy=true]:visible")).toHaveCount(0);
 }
@@ -365,7 +462,7 @@ test.describe("every main screen is accessible and says what is clickable", () =
                     ? screen.path
                     : await screen.path(page);
             await page.goto(path);
-            await settled(page);
+            await settled(page, screen.ready(page));
             await audit(page, screen.name, testInfo);
         });
     }

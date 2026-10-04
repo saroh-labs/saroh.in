@@ -298,6 +298,13 @@ test.describe("orders list", () => {
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
         await page.goto("/commerce/orders");
+        // The list's own toolbar first: before it is drawn, "no filter
+        // menus" holds on an empty page.
+        await expect(
+            page
+                .getByRole("button", { name: /^Filters/ })
+                .filter({ visible: true }),
+        ).toBeVisible();
 
         // No filter menus on the page itself at this width.
         await expect(

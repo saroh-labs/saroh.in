@@ -798,27 +798,25 @@ function RulesNote({
     rules: BookingRules | null;
     canHours: boolean;
 }) {
+    // The links sit on their own row, each a whole tap target on a phone:
+    // inline in the sentence, "Change hours and rules" wrapped across two
+    // lines and shared one with "Every booking as a list".
+    const link =
+        "inline-flex items-center text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground coarse:min-h-11";
     return (
-        <p className="mt-3 text-[11.5px] text-muted-foreground">
-            {rulesSentence(rules)}{" "}
-            {canHours ? (
-                <>
-                    <Link
-                        href="/bookings/availability"
-                        className="text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground"
-                    >
+        <div className="mt-3 text-[11.5px] text-muted-foreground">
+            <p>{rulesSentence(rules)}</p>
+            <div className="mt-1 flex flex-wrap gap-x-4">
+                {canHours ? (
+                    <Link href="/bookings/availability" className={link}>
                         Change hours and rules
                     </Link>
-                    {" · "}
-                </>
-            ) : null}
-            <Link
-                href="/bookings/all"
-                className="text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground"
-            >
-                Every booking as a list
-            </Link>
-        </p>
+                ) : null}
+                <Link href="/bookings/all" className={link}>
+                    Every booking as a list
+                </Link>
+            </div>
+        </div>
     );
 }
 

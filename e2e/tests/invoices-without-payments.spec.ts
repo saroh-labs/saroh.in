@@ -127,6 +127,11 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                 const rail = page.getByRole("navigation", {
                     name: "Primary",
                 });
+                // The rail is drawn: before it is, no Payments row says
+                // nothing.
+                await expect(
+                    rail.getByRole("link", { name: /^Invoices/ }),
+                ).toBeVisible();
                 await expect(
                     rail.getByRole("link", { name: /^Payments/ }),
                 ).toHaveCount(0);

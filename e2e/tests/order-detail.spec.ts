@@ -528,6 +528,14 @@ test.describe("shipping on order detail", () => {
         const id = await readyOrder(page, "LOCAL_DELIVERY");
         await page.goto(`/commerce/orders/${id}`);
 
+        // The order's next step is drawn: before it is, no courier button
+        // says nothing.
+        await expect(
+            page.getByRole("button", {
+                name: "Send out for delivery",
+                exact: true,
+            }),
+        ).toBeVisible();
         await expect(
             page.getByRole("button", { name: "Hand to courier" }),
         ).toHaveCount(0);
