@@ -163,6 +163,19 @@ export function NotificationsInbox({
                                 >
                                     {row}
                                 </Link>
+                            ) : n.type === "plan.limit" ? (
+                                // A plan limit's notice (U13): opening it is
+                                // reading it, and it opens the way to more.
+                                <Link
+                                    href="/settings/billing#change-plan"
+                                    aria-label={label}
+                                    className={rowClass}
+                                    onClick={() => {
+                                        if (isUnread) markOne(n.id, true);
+                                    }}
+                                >
+                                    {row}
+                                </Link>
                             ) : isUnread ? (
                                 <button
                                     type="button"

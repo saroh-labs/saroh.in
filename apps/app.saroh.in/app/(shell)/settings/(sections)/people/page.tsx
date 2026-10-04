@@ -1,5 +1,7 @@
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { TeamScreen } from "@/components/organizations/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
+import { rowNotice } from "@/lib/billing/access";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
 import {
@@ -9,6 +11,7 @@ import {
 } from "@/lib/organizations/members";
 import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";
 
@@ -70,6 +73,10 @@ export default async function PeoplePage() {
         // they can't be read, holds nothing back.
         modulesOrUnknown(),
     ]);
+    // The plan's team limit (U14): people plus open invites, as the API counts.
+    const team = canManage
+        ? rowNotice(await billingAccessOrNull(), "members")
+        : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);
 
     return (
@@ -85,6 +92,10 @@ export default async function PeoplePage() {
                 catalogue={catalogue}
                 myActions={organization?.actions ?? null}
                 joinedFromStorefronts={joinedFromStorefronts}
+                teamLimit={team?.on ? { full: team.full, why: team.why } : null}
+                limitNotice={
+                    canManage ? <PlanLimitNotice moduleId="members" /> : null
+                }
             />
         </SettingsPanel>
     );

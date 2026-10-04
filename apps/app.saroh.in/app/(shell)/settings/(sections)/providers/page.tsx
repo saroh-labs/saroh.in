@@ -1,5 +1,6 @@
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { ProviderList } from "@/components/providers/provider-list";
 import {
     SettingsPanel,
@@ -65,6 +66,7 @@ export default async function ProvidersSettingsPage() {
                 />
             }
         >
+            <PlanLimitNotice moduleId="integrations" />
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are
                 different facts about the same screen (#177, §30). */}

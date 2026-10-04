@@ -1,5 +1,6 @@
 import { PartialNotice } from "@saroh/ui/data-state";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { CollectionsPanel } from "@/components/commerce/collections/collections-panel";
 import { PageContainer } from "@/components/shared/page-container";
 import { SinceNotice } from "@/components/shared/since-notice";
@@ -183,7 +184,12 @@ export default async function CataloguePage({
                 page={page}
                 stores={stores.map((s) => ({ id: s.id, name: s.name }))}
                 tabs={tabs}
-                notice={notice}
+                notice={
+                    <>
+                        {notice}
+                        <PlanLimitNotice moduleId="products" />
+                    </>
+                }
                 ratings={ratings}
                 choices={choices}
                 canWrite={canWrite}

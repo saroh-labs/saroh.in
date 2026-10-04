@@ -1,11 +1,16 @@
 import { getServerSession } from "@saroh/auth/next";
 import { cookies, headers } from "next/headers";
 
+import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { CommandMenu } from "@/components/shared/command-menu";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
+import {
+    lockedNavHrefs,
+    planLockedModuleKeys,
+} from "@/components/shared/nav-locks";
 import { TabBar } from "@/components/shared/tab-bar";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
@@ -15,6 +20,7 @@ import {
     listOrganizations,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
@@ -64,16 +70,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const [unread, moduleKeys, home, sites, storefronts, stock] =
+    const [unread, modules, home, sites, storefronts, stock, billing] =
         await Promise.all([
             unreadNotificationCount(),
-            listModules()
-                .then((modules) =>
-                    modules
-                        .filter((m) => m.readiness !== "DISABLED")
-                        .map((m) => m.key),
-                )
-                .catch(() => null),
+            listModules().catch(() => null),
             // The rail's work counts come from the same ranked read model Home uses,
             // so the two can never disagree. Non-fatal: a rail without badges is a
             // working rail, and this renders on every page.
@@ -102,7 +102,25 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              * already withholds): the nav fails open.
              */
             getStockTracking().catch(() => null),
+            /*
+             * What the plan locks (U14), for the rail's locks. An aid: null
+             * when it can't be read or the role may not (the page and the
+             * API still say so).
+             */
+            billingAccessOrNull(),
         ]);
+    // Available modules, plus those shut only by the plan: locked, not off,
+    // so they stay in the rail with a lock and a way up (U14).
+    const planLocked = modules ? planLockedModuleKeys(modules) : [];
+    const moduleKeys = modules
+        ? [
+              ...modules
+                  .filter((m) => m.readiness !== "DISABLED")
+                  .map((m) => m.key),
+              ...planLocked,
+          ]
+        : null;
+    const lockedHrefs = lockedNavHrefs(planLocked, billing);
     const stockTracked = stock?.tracked ?? null;
 
     /*
@@ -195,6 +213,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     roleKey={roleKey}
                     actions={actions}
                     counts={counts}
+                    locked={lockedHrefs}
                     stockTracked={stockTracked}
                     storefronts={storefronts?.used ?? null}
                 />
@@ -224,6 +243,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     </div>
                 </div>
             </div>
+            {/* A write the plan refused, shown as its notice (U14). */}
+            <PlanRefusalHost />
             {/* Below 760px, the rail's place is taken by this. */}
             <TabBar
                 unread={unread}

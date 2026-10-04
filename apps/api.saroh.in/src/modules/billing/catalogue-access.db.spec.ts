@@ -351,6 +351,8 @@ describe("access from the catalogue (DB, U12)", () => {
         const view = await access.view(owner(o.id));
         expect(view).toMatchObject({
             source: "catalogue",
+            // PLAN_ENFORCEMENT is off here: the app shows no lock or notice.
+            enforced: false,
             version: V1,
             plan: { id: "free", name: "Plan A" },
             pricePaise: 0,

@@ -11,6 +11,7 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
 import {
     makePayLink,
@@ -202,6 +203,12 @@ function Form({
             ...(paidWith ? { paidWith } : {}),
             ...booker,
         });
+        if (!res.ok && res.plan) {
+            // At the plan's bookings-a-month limit (U13): its notice.
+            setSaving(false);
+            showPlanRefusal(res.plan);
+            return;
+        }
         if (!res.ok) {
             setSaving(false);
             // Most often the gap filled while this was open: say so here,

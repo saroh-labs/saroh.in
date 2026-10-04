@@ -47,6 +47,8 @@ export interface AddonView {
     totalPaise: number;
     /** How many the business holds. */
     quantity: number;
+    /** What those cost a month before GST: `quantity` × `pricePaise` (U14). */
+    heldPaise: number;
     /** Whether it can be bought on the business's plan, and if not why. */
     available: boolean;
     why: string | null;
@@ -59,6 +61,8 @@ export interface AddonsView {
     why: string | null;
     max: number;
     addons: AddonView[];
+    /** Every add-on held, a month before GST: the cards' sum (U14). */
+    heldPaise: number;
 }
 
 const SUB_SELECT = {
@@ -233,14 +237,16 @@ export class AddonsService {
             ? await catalogueOfVersion(prisma, sub.plan.version)
             : null;
         const planId = sub ? catalogPlanIdForKey(sub.plan.key) : null;
+        const addons =
+            catalog && planId && sub
+                ? addonViews(catalog, planId, sub, Boolean(why))
+                : [];
         return {
             canBuy: !why && Boolean(catalog),
             why,
             max: MAX_ADDON_QUANTITY,
-            addons:
-                catalog && planId && sub
-                    ? addonViews(catalog, planId, sub, Boolean(why))
-                    : [],
+            addons,
+            heldPaise: addons.reduce((t, a) => t + a.heldPaise, 0),
         };
     }
 }
@@ -266,6 +272,7 @@ function addonViews(
             gstPaise: gstPaise(a.pricePaise),
             totalPaise: withGstPaise(a.pricePaise),
             quantity,
+            heldPaise: quantity * a.pricePaise,
             available: !blocked && !problem,
             why: problem,
         };

@@ -20,8 +20,8 @@
  * starts at midnight there, not in UTC.
  */
 import type { Prisma } from "@saroh/database";
-import type { LimitPeriod } from "@saroh/pricing-catalog";
-import { MODULE_MAP } from "@saroh/pricing-catalog";
+import type { LimitPeriod, LimitWords } from "@saroh/pricing-catalog";
+import { LIMIT_WORDS, MODULE_MAP } from "@saroh/pricing-catalog";
 import { DateTime, IANAZone } from "luxon";
 
 import {
@@ -46,48 +46,17 @@ export function isMeteredLimitKey(key: unknown): key is MeteredLimitKey {
     return typeof key === "string" && METERED.has(key);
 }
 
-/** How each limit reads to the merchant, for `limitNotice`'s sentences. */
-export interface MeterWords {
-    /** The counted thing, after a number: "5 products". */
-    what: string;
-    /** What stops at the limit, the notice's first sentence. */
-    paused: string;
-    /** Counted per calendar month in the business's zone, not in total. */
-    monthly: boolean;
-}
+/** How each limit reads to the merchant: `@saroh/pricing-catalog`'s words. */
+export type MeterWords = LimitWords;
 
-export const METER_WORDS: Readonly<Record<MeteredLimitKey, MeterWords>> = {
-    products: {
-        what: "products",
-        paused: "You can't add more products.",
-        monthly: false,
-    },
-    ordersPerMonth: {
-        what: "orders a month",
-        paused: "New orders at the counter are paused until next month; your site keeps taking them.",
-        monthly: true,
-    },
-    bookingsPerMonth: {
-        what: "bookings a month",
-        paused: "New bookings are paused until next month.",
-        monthly: true,
-    },
-    blogPosts: {
-        what: "blog posts",
-        paused: "You can't put more posts live.",
-        monthly: false,
-    },
-    teamMembers: {
-        what: "team members",
-        paused: "You can't invite more people.",
-        monthly: false,
-    },
-    integrations: {
-        what: "connections",
-        paused: "You can't connect more tools.",
-        monthly: false,
-    },
-};
+/**
+ * The words for each limit key, shared with the merchant app's notices
+ * (`LIMIT_WORDS`), so a refusal and the screen behind it say the same.
+ */
+export const METER_WORDS: Readonly<Record<MeteredLimitKey, MeterWords>> =
+    Object.fromEntries(
+        METERED_LIMIT_KEYS.map((k) => [k, LIMIT_WORDS[k]]),
+    ) as Record<MeteredLimitKey, MeterWords>;
 
 /** The catalogue rows whose limit metering counts, by row id. */
 export function meteredModules(): Map<string, MeteredLimitKey> {

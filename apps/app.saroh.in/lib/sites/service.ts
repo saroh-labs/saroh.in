@@ -1,5 +1,7 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
+import type { PlanRefusal } from "@/lib/billing/refusal";
+import { planRefusalOf } from "@/lib/billing/refusal";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
 // Re-exported so callers keep one import site for "everything about a site",
@@ -651,6 +653,8 @@ export type SitesResult<T> =
            * is on (DEC-071, T9).
            */
           code?: string;
+          /** Its plan refused it (U13): shown as the notice (U14). */
+          plan?: PlanRefusal;
       };
 
 // ---------------------------------------------------------------------------
@@ -681,7 +685,13 @@ async function sitesBase(): Promise<string | null> {
 function readError(
     data: unknown,
     fallback: string,
-): { error: string; index?: number; suggestion?: string; code?: string } {
+): {
+    error: string;
+    index?: number;
+    suggestion?: string;
+    code?: string;
+    plan?: PlanRefusal;
+} {
     const body = (typeof data === "object" && data !== null ? data : {}) as {
         message?: unknown;
         error?: unknown;
@@ -702,9 +712,12 @@ function readError(
             : {}
     ) as { index?: unknown; suggestion?: unknown; code?: unknown };
 
+    const plan = planRefusalOf(inner?.details, message);
     return {
         error: message ?? fallback,
         index: typeof details.index === "number" ? details.index : undefined,
+        // Its plan refused it (U13): themes, review (U14).
+        ...(plan ? { plan } : {}),
         // `APPROVAL_REQUIRED` (DEC-071, T9): the screen offers the way on.
         ...(typeof details.code === "string" ? { code: details.code } : {}),
         // An address the API offers instead of a refused one (G14).

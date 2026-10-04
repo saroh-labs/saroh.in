@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import {
     liveCatalogueVersion,
     prisma,
@@ -21,6 +21,8 @@ import {
 } from "@saroh/pricing-catalog";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import { authorize } from "../organizations/organization-policy";
 import type {
     BillingAccessView,
@@ -203,6 +205,11 @@ export function newestPlanOverride(
 @Injectable()
 export class CatalogueAccessService {
     private readonly logger = new Logger(CatalogueAccessService.name);
+
+    constructor(
+        @Optional()
+        private readonly flags: FeatureFlagService = new FeatureFlagService(),
+    ) {}
 
     async resolve(
         organizationId: string,
@@ -419,7 +426,10 @@ export class CatalogueAccessService {
      */
     async view(ctx: OrganizationContext): Promise<BillingAccessView> {
         authorize(ctx, "billing:read");
-        const a = await this.resolve(ctx.organizationId);
+        const [a, enforced] = await Promise.all([
+            this.resolve(ctx.organizationId),
+            this.flags.isEnabled(FlagKey.PLAN_ENFORCEMENT, ctx.organizationId),
+        ]);
         const planOverride = a.planOverride
             ? {
                   planKey: a.planOverride.planKey,
@@ -429,6 +439,7 @@ export class CatalogueAccessService {
         if (a.source !== "catalogue") {
             return {
                 source: "legacy",
+                enforced,
                 version: null,
                 plan: null,
                 pricePaise: null,
@@ -439,6 +450,7 @@ export class CatalogueAccessService {
         }
         return {
             source: "catalogue",
+            enforced,
             version: a.version,
             plan: { id: a.planId, name: a.planName },
             pricePaise: a.pricePaise,

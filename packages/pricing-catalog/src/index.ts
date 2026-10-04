@@ -9,6 +9,7 @@ export * from "./access";
 export * from "./card-lines";
 export * from "./diff";
 export * from "./limit-notice";
+export * from "./limit-words";
 export * from "./module-map";
 export * from "./moves";
 export * from "./overrides";

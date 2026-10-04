@@ -2,6 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
@@ -154,6 +155,7 @@ export default async function BookingsPage({
                 services={services}
                 rules={rules}
                 notices={notices}
+                limitNotice={<PlanLimitNotice moduleId="bookings" />}
                 people={people}
                 can={{
                     book: may("booking:write"),

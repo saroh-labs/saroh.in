@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
+import type { PlanRefusal } from "@/lib/billing/refusal";
 
 /**
  * A site's writing (ADR-004, #209) — posts and post categories.
@@ -85,7 +86,14 @@ const RESULT_FIELDS = ["title", "slug", "name", "categoryId"] as const;
 export type ResultField = (typeof RESULT_FIELDS)[number];
 
 export type Result<T = { id: string }> =
-    { ok: true; data: T } | { ok: false; error: string; field?: ResultField };
+    | { ok: true; data: T }
+    | {
+          ok: false;
+          error: string;
+          field?: ResultField;
+          /** Its plan refused it (U13): shown as the notice (U14). */
+          plan?: PlanRefusal;
+      };
 
 /** No active organization: the same shape a failed write returns. */
 function noOrg<T = { id: string }>(): Result<T> {

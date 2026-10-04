@@ -249,6 +249,12 @@ export interface ModuleAccessView {
 export interface BillingAccessView {
     /** `legacy`: the catalogue doesn't reach this business yet; no rows. */
     source: "catalogue" | "legacy";
+    /**
+     * Whether its limits and locks are enforced (`PLAN_ENFORCEMENT`, OQ-4).
+     * Off, nothing is refused, so the merchant app shows no lock or "you'll
+     * be stopped" notice (U14); usage still reads.
+     */
+    enforced: boolean;
     version: number | null;
     plan: { id: string; name: string } | null;
     /** What it pays a month before GST (paise): a custom price, else its plan's. */

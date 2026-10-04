@@ -1,6 +1,7 @@
 import { showError } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { updateSiteStyle } from "@/lib/sites/actions";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
@@ -72,7 +73,9 @@ export function useEditorStyle({
                         onSaved();
                     } else {
                         failedStyleJson.current = payloadJson;
-                        showError(res.error);
+                        // Themes and fonts aren't in the plan (U13).
+                        if (res.plan) showPlanRefusal(res.plan);
+                        else showError(res.error);
                     }
                 })
                 .catch(() => {

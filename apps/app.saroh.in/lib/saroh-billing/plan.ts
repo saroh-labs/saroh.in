@@ -7,11 +7,10 @@ import { formatCount, formatMoney } from "@/lib/format/money";
  *
  * Pure: shapes and the words the page says. The reads are in `./service.ts`.
  *
- * What is REAL today: the plan catalogue (`GET /billing/plans`) and this
- * business's subscription (`GET /organizations/:id/billing/subscription`),
- * both on api.saroh.in. What is NOT: invoices Saroh has billed, the usage line
- * under the plan, and changing plan from here — see {@link NotAvailableYet}
- * and the seams in `./service.ts`.
+ * This is "Your plan" for a business the plans catalogue doesn't reach yet
+ * (`GET …/billing/access` says `legacy`): read off its subscription alone.
+ * On the catalogue, `./plan-view.ts` draws it. The usage line under the
+ * plan is still a seam (`getPlanUsage`, {@link NotAvailableYet}).
  */
 
 /** A plan in Saroh's catalogue, as `GET /billing/plans` returns it. */
@@ -42,6 +41,8 @@ export interface SarohSubscription {
     provider: string | null;
     currentPeriodEnd: string | null;
     cancelAtPeriodEnd: boolean;
+    /** "month" | "year" (plans catalogue U16). */
+    billingCycle?: string;
     plan: SarohPlan;
 }
 
@@ -214,65 +215,4 @@ export function planSummary(
                 ? "On a trial — nothing has been charged yet."
                 : null,
     };
-}
-
-export interface PlanOption {
-    key: string;
-    name: string;
-    price: string;
-    includes: string;
-    current: boolean;
-    /**
-     * "Upgrade" to a dearer plan, "Switch" to another, "Choose" when there is
-     * no plan yet; null on the current one.
-     */
-    cta: "Upgrade" | "Switch" | "Choose" | null;
-}
-
-/**
- * The catalogue as "Change plan" lists it: cheapest first, the current plan
- * marked, and each other one offered as an upgrade or a switch by price.
- * Prices are the catalogue's own, never written here.
- */
-export function planOptions(
-    plans: readonly SarohPlan[],
-    current: SarohSubscription | null,
-): PlanOption[] {
-    const live =
-        current && current.status !== "CANCELLED" ? current.plan : null;
-    return [...plans]
-        .sort((a, b) => a.priceCents - b.priceCents)
-        .map((plan) => {
-            const isCurrent = live !== null && plan.key === live.key;
-            return {
-                key: plan.key,
-                name: plan.name,
-                price: planPrice(plan),
-                includes: planIncludes(plan.entitlements),
-                current: isCurrent,
-                cta: isCurrent
-                    ? null
-                    : live === null
-                      ? "Choose"
-                      : plan.priceCents > live.priceCents
-                        ? "Upgrade"
-                        : "Switch",
-            };
-        });
-}
-
-/**
- * An invoice Saroh billed this business — the shape the invoices seam
- * (`listSarohInvoices`) will return once the API keeps them.
- */
-export interface SarohInvoice {
-    id: string;
-    /** "SAR/26-27/0184". */
-    number: string;
-    issuedAt: string;
-    amountCents: number;
-    currency: string;
-    status: "PAID" | "DUE" | "VOID";
-    /** A short-lived link to the PDF. */
-    pdfUrl: string | null;
 }
