@@ -135,6 +135,7 @@ export function PlanChooser({
                     shown.map((row, i) => (
                         <div
                             key={row.planId}
+                            data-plan={row.planId}
                             className={cn(
                                 "flex flex-wrap items-center gap-3 px-[18px] py-[13px]",
                                 i > 0 && "border-t border-border/70",

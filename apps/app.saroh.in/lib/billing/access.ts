@@ -1,5 +1,10 @@
 import type { LimitNotice } from "@saroh/pricing-catalog";
-import { formatInr, limitNotice, limitWordsFor } from "@saroh/pricing-catalog";
+import {
+    formatInr,
+    limitNotice,
+    limitWordsFor,
+    MODULE_MAP,
+} from "@saroh/pricing-catalog";
 
 /**
  * What the business's plan gives it, as `GET organizations/:org/billing/access`
@@ -131,6 +136,16 @@ export function planLocks(view: BillingAccessView | null): PlanLock[] {
     const out: PlanLock[] = [];
     for (const m of view.modules) {
         if (m.state !== "locked" || !m.menu) continue;
+        // Only a lock the API backs: a row under a registry module, or one
+        // metering counts. A row nothing enforces yet (invoicing) locks
+        // nothing in the rail, or the rail would say what isn't so.
+        const entry = Object.prototype.hasOwnProperty.call(
+            MODULE_MAP,
+            m.moduleId,
+        )
+            ? MODULE_MAP[m.moduleId]
+            : null;
+        if (!entry || (!entry.registry && !entry.limitKey)) continue;
         const href = MENU_HREFS[m.child ? `${m.menu}/${m.child}` : m.menu];
         if (!href) continue;
         out.push({

@@ -114,10 +114,8 @@ describe("planLocks", () => {
                 row({ state: "on" }),
             ],
         });
-        expect(planLocks(view).map((l) => l.href)).toEqual([
-            "/bookings",
-            "/billing",
-        ]);
+        // Invoicing has no registry module and no meter: nothing enforces it.
+        expect(planLocks(view).map((l) => l.href)).toEqual(["/bookings"]);
         expect(planLocks({ ...view, enforced: false })).toEqual([]);
     });
 });

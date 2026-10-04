@@ -151,18 +151,24 @@ export default async function PlanBillingPage() {
 
     const addonList = addonsView ? addonRows(addonsView) : [];
     const missing = [
-        addons === null ? "add-ons" : null,
-        checkouts === null ? "a plan change waiting for payment" : null,
-    ].filter(Boolean);
+        addons === null ? "Your add-ons" : null,
+        checkouts === null
+            ? addons === null
+                ? "a plan change waiting for payment"
+                : "A plan change waiting for payment"
+            : null,
+    ].filter((m): m is string => m !== null);
+    const partial =
+        missing.length === 0
+            ? null
+            : `${missing.join(" and any ")} couldn't be read just now, so ${
+                  addons === null ? "they aren't" : "it isn't"
+              } shown here. Nothing has changed.`;
 
     return (
         <SettingsPanel header={header}>
             <div className="grid max-w-[760px] gap-4">
-                {missing.length ? (
-                    <PartialNotice>
-                        {`What you hold in ${missing.join(" and ")} couldn't be read just now, so it isn't shown. Nothing has changed.`}
-                    </PartialNotice>
-                ) : null}
+                {partial ? <PartialNotice>{partial}</PartialNotice> : null}
                 <YourPlan {...plan} />
                 <PlanChooser
                     rows={rows}
