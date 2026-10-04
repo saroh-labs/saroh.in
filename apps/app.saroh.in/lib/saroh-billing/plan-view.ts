@@ -116,7 +116,7 @@ export function billedCycle(sub: SarohSubscription | null): Cycle {
     return sub?.billingCycle === "year" ? "year" : "month";
 }
 
-/** "₹1,000 a month", "₹10,000 a year", or "₹0". */
+/** "₹111 a month", "₹1,110 a year", or "₹0". */
 export function priceWords(pricePaise: number, cycle: Cycle): string {
     return pricePaise > 0 ? `${formatInr(pricePaise)} ${per(cycle)}` : "₹0";
 }
@@ -154,7 +154,7 @@ export interface PlanNote {
 
 export interface YourPlanView {
     name: string;
-    /** "₹1,000 a month + GST", "₹0"; null on a plan given for a while. */
+    /** "₹111 a month + GST", "₹0"; null on a plan given for a while. */
     price: string | null;
     /** On a plan given for a while (a launch offer): free until this. */
     freeUntil: string | null;

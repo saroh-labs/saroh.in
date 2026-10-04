@@ -437,6 +437,36 @@ correct the adapter and this list.
 6. **`total_count`.** Required by Razorpay; sent as 120 monthly / 10 yearly
    charges so a plan runs until cancelled. Unverified: the maximum allowed.
 
+## The merchant app (U14)
+
+What a business sees of its plan, in `apps/app.saroh.in`. Code:
+`lib/billing/` (access, refusals), `lib/saroh-billing/plan-view.ts` and
+`billing-actions.ts`, `components/settings/plan-billing/`,
+`components/billing/`.
+
+- **Settings › Plan and billing** (owner only, as before): Your plan (from
+  `GET …/billing/access` and the subscription), the plan picker (from
+  `GET /public/pricing`; Monthly | Yearly only while yearly is on; "Start
+  N-day trial" only where `GET …/billing/change-plan` quotes a `TRIAL`),
+  add-ons, a coupon held for the next change, and Saroh's invoices with
+  their PDF (`/api/saroh-invoices/:id/pdf`, a proxy). Changing plan is the
+  quote, a confirm, then the browser goes to the `authorisationUrl`; a
+  move to Free needs none. `?plan=&cycle=` opens that plan's change: every
+  "Upgrade" in the app links there (`upgradeHref`).
+- **Limit notices** at 80% and 100% on Products, Orders, Bookings, Blog
+  (Posts), Team and Providers, in `limitNotice`'s words with
+  `LIMIT_WORDS` (`@saroh/pricing-catalog`, shared with the API's
+  refusals). Only while `enforced` (the access view's
+  `PLAN_ENFORCEMENT`): nothing is shown that nothing would stop.
+- **Locks**: a module shut only by the plan (`ENTITLEMENT_REQUIRED` alone)
+  stays in the rail with a lock and its page says which plan has it
+  (`PlanLocked`). A catalogue row locks a rail entry only where the API
+  backs it (a registry module, or a metered row); invoicing has neither yet.
+- **Refusals**: `PLAN_LIMIT_REACHED` and `MODULE_LOCKED` reach the screen as
+  `res.plan` (`toFailure`, `mutate`) and show as the notice with its way up
+  (`PlanRefusalHost`, `showPlanRefusal`/`reportFailure`), never the raw
+  message in a toast. A `plan.limit` notification opens Plan and billing.
+
 ## Opening-day invites and the launch offer (U31)
 
 What keeps the waitlist's promise when Saroh opens. Code:

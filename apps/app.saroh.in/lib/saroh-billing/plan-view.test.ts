@@ -44,7 +44,7 @@ const CATALOG: Catalog = parseCatalog({
             cells: {
                 a: { inc: true, text: "10", card: "10", limit: 10 },
                 b: { inc: true, text: "100", card: "100", limit: 100 },
-                c: { inc: true, text: "1,000", card: "1,000", limit: 1000 },
+                c: { inc: true, text: "222", card: "222", limit: 222 },
             },
         },
     ],

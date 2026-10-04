@@ -159,7 +159,7 @@ export function planLocks(view: BillingAccessView | null): PlanLock[] {
     return out;
 }
 
-/** "Billing and invoicing comes with Grow, ₹1,000 a month." */
+/** "Invoices comes with Plan B, ₹111 a month + GST. You're on Plan A." */
 export function upgradeLine(lock: {
     name: string;
     plan: string;
