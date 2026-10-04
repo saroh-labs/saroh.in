@@ -12,6 +12,7 @@ import type {
     DailyPoint,
     TopPage,
 } from "@/lib/analytics/service";
+import { NUMBER_LOCALE } from "@/lib/format/locale";
 
 /** A single headline metric card (delegates to the shared @saroh/ui StatCard). */
 function StatCard({
@@ -27,7 +28,7 @@ function StatCard({
     return (
         <UIStatCard
             label={label}
-            value={value.toLocaleString()}
+            value={value.toLocaleString(NUMBER_LOCALE)}
             className="wk-item"
             style={{ "--wk-i": index } as React.CSSProperties}
         />
@@ -159,7 +160,7 @@ function TopPagesTable({ pages }: { pages: TopPage[] }) {
                                     {p.path}
                                 </span>
                                 <span className="font-medium tabular-nums">
-                                    {p.views.toLocaleString()}
+                                    {p.views.toLocaleString(NUMBER_LOCALE)}
                                 </span>
                             </div>
                         ))}

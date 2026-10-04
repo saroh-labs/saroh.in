@@ -4,6 +4,7 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { NUMBER_LOCALE } from "@/lib/format/locale";
 import { newStorefrontHref } from "@/lib/stores/links";
 
 /**
@@ -77,7 +78,7 @@ export function ListFirstRun({
                     <Button asChild variant="outline">
                         <Link href="/contacts">
                             {contacts && contacts > 0
-                                ? `Open Contacts (${contacts.toLocaleString("en-GB")})`
+                                ? `Open Contacts (${contacts.toLocaleString(NUMBER_LOCALE)})`
                                 : "Open Contacts"}
                         </Link>
                     </Button>

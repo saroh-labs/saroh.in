@@ -1,4 +1,4 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { NUMBER_LOCALE } from "@/lib/format/locale";
 
 /**
  * An invoice amount, always with its two decimals: "₹2,400.00".
@@ -11,7 +11,7 @@ import { DISPLAY_LOCALE } from "@/lib/format/locale";
 export function invoiceMoney(amount: string, currency: string): string {
     const value = Number(amount);
     if (!Number.isFinite(value)) return amount;
-    return new Intl.NumberFormat(DISPLAY_LOCALE, {
+    return new Intl.NumberFormat(NUMBER_LOCALE, {
         style: "currency",
         currency,
         minimumFractionDigits: 2,
