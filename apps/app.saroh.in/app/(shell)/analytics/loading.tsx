@@ -21,7 +21,7 @@ export default function Loading() {
                 <LoadingState
                     rows={3}
                     variant="list"
-                    label="Loading takings"
+                    label="Loading sales"
                     className="rounded-[14px]"
                 />
                 <div

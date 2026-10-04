@@ -85,7 +85,7 @@ describe("weekRows", () => {
         );
         expect(rows.map((r) => [r.label, r.value, r.sub, r.bad])).toEqual([
             [
-                "Takings so far",
+                "Sales so far",
                 "₹18,450",
                 "Up 12% on the same days last week",
                 false,

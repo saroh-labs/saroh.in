@@ -972,4 +972,5 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - "Anything to watch?" speaks only on a signal (three falling weeks ending below usual; a week 30% or more below usual; a place down 30% or more on the four before) and otherwise says "Nothing unusual in the last four weeks." It waits for four weeks on record.
     - The section is full width, its sentences held to a 68ch measure. The footer says what the figures were counted from, and "How takings are counted" explains the rule.
     - A business that has never taken money sees one message with "Take an order" and "Send an invoice", not an answers card plus an empty state.
-- Consequences: "Takings" stays the word until it is tested with merchants (audit F15).
+- The word is **Sales**, not "Takings" (owner, 2026-10-04, audit F15): the section, its figures, "How sales are counted" and Home's "Sales so far". It still means money actually taken — paid, less refunds — as "How sales are counted" says. Code names (`takings*`) stay; they are not read by merchants.
+- Consequences: elsewhere the word is unchanged (a class pack's "Sales and takings" is its own screen).

@@ -225,7 +225,7 @@ describe("takingsAnswers", () => {
             8_000,
         ]);
         expect(answer(slide, "watch")).toBe(
-            "Takings have fallen three weeks running, from ₹14,000 in the week of 7 Sep to ₹8,000 last week — down 43%.",
+            "Sales have fallen three weeks running, from ₹14,000 in the week of 7 Sep to ₹8,000 last week — down 43%.",
         );
         expect(slide.find((a) => a.key === "watch")?.link).toEqual({
             href: "/commerce/orders?date=custom&from=2026-09-21&to=2026-09-27&payment=paid",
@@ -278,7 +278,7 @@ describe("takingsAnswers", () => {
             thisWeek: { ...SO_FAR, takingsMinor: 2_400_00, payments: 3 },
         });
         expect(first.map((a) => a.answer)).toEqual([
-            "Your first takings came in this week: ₹2,400 so far, from 3 payments. Each week joins the figures once it ends, on Sunday.",
+            "Your first sales came in this week: ₹2,400 so far, from 3 payments. Each week joins the figures once it ends, on Sunday.",
         ]);
     });
 
@@ -305,7 +305,7 @@ describe("takingsTiles", () => {
         expect(tiles).toEqual([
             {
                 key: "takings",
-                label: "Takings, 4 weeks",
+                label: "Sales, 4 weeks",
                 value: "₹47,000",
                 note: "Up 18% on the four before.",
                 href: last4,
@@ -314,7 +314,7 @@ describe("takingsTiles", () => {
                 key: "orders",
                 label: "Orders, 4 weeks",
                 value: "47",
-                note: "All of the takings at Hill Road.",
+                note: "All of the sales at Hill Road.",
                 href: last4,
             },
             {
@@ -349,7 +349,7 @@ describe("takingsTiles", () => {
         expect(tiles[3].note).toBe(
             "Per paid order, last four weeks, from 2 places.",
         );
-        expect(tiles[1].note).toBe("60% of takings at Hill Road.");
+        expect(tiles[1].note).toBe("60% of sales at Hill Road.");
     });
 
     it("reads N/A without a baseline, and a dash where there is nothing to show", () => {
@@ -385,7 +385,7 @@ describe("labels", () => {
     it("says the chart and the split for a screen reader", () => {
         const f = takingsFigures(takingsRead(STEADY));
         expect(chartLabel(f)).toBe(
-            "Takings for the twelve weeks 6 Jul – 27 Sep, highest in the week of 14 Sep at ₹15,000.",
+            "Sales for the twelve weeks 6 Jul – 27 Sep, highest in the week of 14 Sep at ₹15,000.",
         );
         expect(
             splitLabel([
@@ -410,7 +410,7 @@ describe("labels", () => {
             "This week so far, and the twelve whole weeks 6 Jul – 27 Sep.",
         );
         expect(sparkLabel(f)).toBe(
-            "Takings for the twelve weeks 6 Jul – 27 Sep, highest in the week of 14 Sep at ₹15,000. The last four weeks (31 Aug – 27 Sep) are drawn darkest, the four before them (3 Aug – 30 Aug) lighter.",
+            "Sales for the twelve weeks 6 Jul – 27 Sep, highest in the week of 14 Sep at ₹15,000. The last four weeks (31 Aug – 27 Sep) are drawn darkest, the four before them (3 Aug – 30 Aug) lighter.",
         );
     });
 

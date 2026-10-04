@@ -65,12 +65,12 @@ test("a business that has sold reads its answers, then the figures behind them",
     await expect(answers).toContainText(
         /From \d[\d,]* payments? in the last four weeks|No payments in the last four weeks/,
     );
-    await answers.getByText("How takings are counted").click();
+    await answers.getByText("How sales are counted").click();
     await expect(answers).toContainText(
         "A sale counts in the week it was paid, Monday to Sunday in your business's time zone.",
     );
     await expect(
-        answers.getByRole("img", { name: /^Takings for the twelve weeks/ }),
+        answers.getByRole("img", { name: /^Sales for the twelve weeks/ }),
     ).toBeVisible();
     // The best week opens its orders.
     await expect(
@@ -85,7 +85,7 @@ test("a business that has sold reads its answers, then the figures behind them",
     const figures = page.getByTestId("takings-figures");
     await expect(figures).toBeVisible();
     for (const label of [
-        "Takings, 4 weeks",
+        "Sales, 4 weeks",
         "Orders, 4 weeks",
         "Best week",
         "Average order, 4 weeks",
@@ -97,7 +97,7 @@ test("a business that has sold reads its answers, then the figures behind them",
     }
     // Twelve weeks and this week so far, each bar read by tapping it.
     const chart = figures.getByRole("group", {
-        name: /^Takings for the twelve weeks/,
+        name: /^Sales for the twelve weeks/,
     });
     await expect(chart.getByRole("button")).toHaveCount(13);
     await chart.getByRole("button").first().click();
@@ -150,7 +150,7 @@ test("a business that has never taken money is told so, not shown ₹0", async (
     // No chart and no figures for weeks that never took anything.
     await expect(page.getByTestId("takings-figures")).toHaveCount(0);
     await expect(
-        page.getByRole("img", { name: /^Takings for the twelve weeks/ }),
+        page.getByRole("img", { name: /^Sales for the twelve weeks/ }),
     ).toHaveCount(0);
     await expectNoSidewaysScroll(page);
 });

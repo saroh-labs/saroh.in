@@ -75,9 +75,9 @@ export default async function AnalyticsPage({
 
     const missing =
         takings?.status === "failed"
-            ? "Takings couldn't be loaded, so only your website's figures are shown."
+            ? "Sales couldn't be loaded, so only your website's figures are shown."
             : traffic.status === "failed"
-              ? "Your website's figures couldn't be loaded, so only takings are shown."
+              ? "Your website's figures couldn't be loaded, so only sales are shown."
               : null;
 
     return (

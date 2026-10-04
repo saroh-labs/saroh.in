@@ -162,7 +162,7 @@ function changeClause(change: TakingsChange): string {
     }
 }
 
-/** The change, as the note under "Takings, 4 weeks". */
+/** The change, as the note under "Sales, 4 weeks". */
 export function changeNote(change: TakingsChange): string {
     switch (change.kind) {
         case "UP":
@@ -254,7 +254,7 @@ function signalAnswer(
     switch (signal.kind) {
         case "SLIDE":
             return {
-                answer: `Takings have fallen three weeks running, from ${money(signal.from.takingsMinor, f.currency)} in ${weekOf(signal.from.start)} to ${money(signal.to.takingsMinor, f.currency)} last week — down ${signal.percent}%.`,
+                answer: `Sales have fallen three weeks running, from ${money(signal.from.takingsMinor, f.currency)} in ${weekOf(signal.from.start)} to ${money(signal.to.takingsMinor, f.currency)} last week — down ${signal.percent}%.`,
                 link: {
                     href: ordersHref(signal.to.start, signal.to.end),
                     label: "See last week's orders",
@@ -307,7 +307,7 @@ export function takingsAnswers(f: TakingsFigures): TakingsAnswer[] {
             {
                 key: "now",
                 question: now,
-                answer: `Your first takings came in this week: ${money(so.takingsMinor, f.currency)} so far, from ${count(so.payments, "payment", "payments")}. Each week joins the figures once it ends, on Sunday.`,
+                answer: `Your first sales came in this week: ${money(so.takingsMinor, f.currency)} so far, from ${count(so.payments, "payment", "payments")}. Each week joins the figures once it ends, on Sunday.`,
                 link: soFarLink,
             },
         ];
@@ -368,14 +368,14 @@ export function takingsTiles(f: TakingsFigures): TakingsTile[] {
         f.last4.orders === 0
             ? "No paid orders in these four weeks."
             : top && f.places.length > 1
-              ? `${top.percent}% of takings ${where(top)}.`
+              ? `${top.percent}% of sales ${where(top)}.`
               : top
-                ? `All of the takings ${where(top)}.`
+                ? `All of the sales ${where(top)}.`
                 : "Paid in these four weeks.";
     return [
         {
             key: "takings",
-            label: "Takings, 4 weeks",
+            label: "Sales, 4 weeks",
             value: money(f.last4.takingsMinor, f.currency),
             note: changeNote(f.change),
             href: last4Orders,
@@ -412,9 +412,9 @@ export function takingsTiles(f: TakingsFigures): TakingsTile[] {
     ];
 }
 
-/** The twelve weeks' chart, said: "Takings for the twelve weeks …, highest in the week of 14 Sep at ₹…." */
+/** The twelve weeks' chart, said: "Sales for the twelve weeks …, highest in the week of 14 Sep at ₹…." */
 export function chartLabel(f: TakingsFigures): string {
-    const weeks = `Takings for the twelve weeks ${spanLabel(f.twelve)}`;
+    const weeks = `Sales for the twelve weeks ${spanLabel(f.twelve)}`;
     return f.best
         ? `${weeks}, highest in ${weekOf(f.best.start)} at ${money(f.best.takingsMinor, f.currency)}.`
         : `${weeks}: nothing taken.`;
@@ -444,9 +444,9 @@ export function sourceLine(f: TakingsFigures): string {
     return `From ${count(payments, "payment", "payments")} in the last four weeks: ${count(orders, "paid order", "paid orders")} and ${count(invoices, "paid invoice", "paid invoices")}, less refunds.`;
 }
 
-/** "How takings are counted", in the merchant's words. */
+/** "How sales are counted", in the merchant's words. */
 export const HOW_TAKINGS_ARE_COUNTED: readonly string[] = [
-    "Takings are money actually taken: paid orders, and paid invoices that aren't an order's own, less refunds and credit notes. Each rupee is counted once.",
+    "Sales are money actually taken: paid orders, and paid invoices that aren't an order's own, less refunds and credit notes. Each rupee is counted once.",
     "A sale counts in the week it was paid, Monday to Sunday in your business's time zone.",
     "This week joins the twelve once it ends on Sunday. Until then it's shown on its own, against the same days of last week.",
     "The website's 7, 30 and 90 days below don't change these figures.",
@@ -470,7 +470,7 @@ export function splitLabel(places: readonly PlaceShare[]): string {
     return `${parts.join(", ")}.`;
 }
 
-/** Under the section's heading: which weeks. How they are cut is in "How takings are counted". */
+/** Under the section's heading: which weeks. How they are cut is in "How sales are counted". */
 export function takingsSubtitle(f: TakingsFigures): string {
     return `This week so far, and the twelve whole weeks ${spanLabel(f.twelve)}.`;
 }

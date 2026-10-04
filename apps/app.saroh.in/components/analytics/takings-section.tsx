@@ -56,7 +56,7 @@ export function TakingsSection({ read }: { read: SourceRead<TakingsRead> }) {
                 id="takings-heading"
                 className="font-display text-[19px] font-semibold tracking-[-0.025em]"
             >
-                Takings
+                Sales
             </h2>
             <TakingsBody read={read} />
         </section>
@@ -68,8 +68,8 @@ function TakingsBody({ read }: { read: SourceRead<TakingsRead> }) {
         return (
             <PermissionDeniedState
                 className="mt-3"
-                title="Takings need access to payments"
-                description="Your role can open Insights but not the business's payments, so its takings aren't shown here. The website's figures below are still yours to see."
+                title="Sales need access to payments"
+                description="Your role can open Insights but not the business's payments, so its sales aren't shown here. The website's figures below are still yours to see."
                 note="An owner or admin can add “See payments” to your role in Settings › Team."
             />
         );
@@ -78,7 +78,7 @@ function TakingsBody({ read }: { read: SourceRead<TakingsRead> }) {
         return (
             <FailedState
                 className="mt-3"
-                title="Takings could not be loaded"
+                title="Sales could not be loaded"
                 description="Something went wrong on our side, so this part of Insights is missing. Nothing has been changed."
                 action={
                     <Button asChild variant="outline">
@@ -198,7 +198,7 @@ function Answers({ figures }: { figures: TakingsFigures }) {
                 </p>
                 <details className="group mt-1">
                     <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-0.5 rounded-md font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                        How takings are counted
+                        How sales are counted
                         <ChevronRight
                             aria-hidden
                             className="size-4 transition-transform duration-150 group-open:rotate-90"
@@ -273,7 +273,7 @@ function Figures({ figures }: { figures: TakingsFigures }) {
                 ))}
             </ul>
             <h3 className="mb-[11px] text-[12.5px] font-semibold">
-                Takings, twelve weeks and this week so far
+                Sales, twelve weeks and this week so far
             </h3>
             <ReadoutBars
                 bars={bars}
