@@ -131,6 +131,9 @@ test.describe("calendar week", () => {
         page,
     }) => {
         await page.goto("/calendar?view=week");
+        // The week itself: counted or measured before it is drawn, there
+        // are no cards to check and nothing wide.
+        await expect(page.locator("#calendar-week")).toBeVisible();
         const cards = page.locator("#calendar-week a[href]");
         const n = await cards.count();
         for (let i = 0; i < Math.min(n, 10); i++) {

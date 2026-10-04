@@ -147,6 +147,11 @@ test.describe("every page", () => {
             for (const width of [390, 320]) {
                 await page.setViewportSize({ width, height: 844 });
                 await page.goto(`${WEB}${path}`, { waitUntil: "load" });
+                // The page is drawn before it is measured: an empty one
+                // is never wide.
+                await expect(
+                    page.locator("main, [role=main]").first(),
+                ).toBeVisible();
                 // Against the width we set: a phone viewport widens
                 // innerWidth to fit an overflow rather than scrolling.
                 await expect
@@ -350,6 +355,10 @@ test.describe("no pricing yet", () => {
     test("no page links to /pricing or shows a plan", async ({ page }) => {
         for (const path of PAGES) {
             await page.goto(`${WEB}${path}`);
+            // The page is drawn before anything is said to be missing.
+            await expect(
+                page.locator("main, [role=main]").first(),
+            ).toBeVisible();
             await expect(
                 page.locator(
                     'a[href^="/pricing"], a[href*="saroh.in/pricing"]',
