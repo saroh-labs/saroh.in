@@ -105,7 +105,7 @@ function StateCard({
                 {title}
             </h2>
             {description ? (
-                <p className="mx-auto max-w-[50ch] text-pretty text-[13.5px] leading-[1.55] text-neutral-600">
+                <p className="mx-auto max-w-[50ch] text-pretty text-[13.5px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
                     {description}
                 </p>
             ) : null}
@@ -113,7 +113,7 @@ function StateCard({
                 // Who can change it, set apart from why it happened: the
                 // design gives this its own sunken block rather than a third
                 // paragraph nobody finishes.
-                <p className="mx-auto max-w-[50ch] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[12.5px] leading-[1.5] text-neutral-600">
+                <p className="mx-auto max-w-[50ch] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
                     {note}
                 </p>
             ) : null}

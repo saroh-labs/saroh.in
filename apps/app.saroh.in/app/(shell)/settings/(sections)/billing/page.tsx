@@ -104,7 +104,7 @@ export default async function PlanBillingPage() {
     const checkoutsView = checkouts?.status === "ok" ? checkouts.data : null;
 
     const plan: YourPlanProps =
-        access && access.source === "catalogue"
+        access?.source === "catalogue"
             ? {
                   ...yourPlan({
                       access,

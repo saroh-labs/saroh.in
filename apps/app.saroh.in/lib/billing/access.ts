@@ -86,7 +86,7 @@ export function rowNotice(
     view: BillingAccessView | null,
     moduleId: string,
 ): LimitNotice {
-    if (!view || view.source !== "catalogue" || !view.enforced) return OFF;
+    if (view?.source !== "catalogue" || !view.enforced) return OFF;
     const row = accessRow(view, moduleId);
     const words = limitWordsFor(moduleId);
     if (!row || !words || row.state !== "on" || row.usage === null) return OFF;
@@ -132,7 +132,7 @@ export interface PlanLock {
  * lock nothing enforces would be a claim the API doesn't back.
  */
 export function planLocks(view: BillingAccessView | null): PlanLock[] {
-    if (!view || view.source !== "catalogue" || !view.enforced) return [];
+    if (view?.source !== "catalogue" || !view.enforced) return [];
     const out: PlanLock[] = [];
     for (const m of view.modules) {
         if (m.state !== "locked" || !m.menu) continue;

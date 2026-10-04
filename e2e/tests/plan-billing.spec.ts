@@ -71,12 +71,15 @@ test("a plan's change opens its quote, and Cancel leaves it", async ({
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    // The quote has landed: a confirm, or "nothing changes".
+    // The quote has landed: its confirm, or Close when nothing changes.
     await expect(
-        dialog.getByRole("button", {
-            name: /^(Continue to payment|Move to .+|Close)$/,
-        }),
+        dialog
+            .getByRole("button", {
+                name: /^(Continue to payment|Move to .+|Close)$/,
+            })
+            .first(),
     ).toBeVisible();
+    await expect(dialog).not.toContainText("Working out the price");
     await noOverflow(page);
     await dialog
         .getByRole("button", { name: /^(Cancel|Close)$/ })

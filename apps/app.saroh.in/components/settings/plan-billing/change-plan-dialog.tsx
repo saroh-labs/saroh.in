@@ -39,6 +39,11 @@ type Quoting =
     | { state: "ready"; quote: ChangeQuote }
     | { state: "failed"; error: string };
 
+/** A quote's answer, for the request it answers. */
+type Answer =
+    | { key: string; state: "ready"; quote: ChangeQuote }
+    | { key: string; state: "failed"; error: string };
+
 const STATE_OPTIONS = [
     { value: "", label: "As on the business's details" },
     ...GST_STATES,
@@ -68,7 +73,7 @@ export function ChangePlanDialog({
     onClose: () => void;
 }) {
     const router = useRouter();
-    const [quoting, setQuoting] = useState<Quoting>({ state: "loading" });
+    const [answer, setAnswer] = useState<Answer | null>(null);
     const [dropped, setDropped] = useState<{
         code: string;
         error: string;
@@ -80,11 +85,16 @@ export function ChangePlanDialog({
     const [attempt, setAttempt] = useState(0);
 
     const code = coupon;
+    const key = picked
+        ? `${picked.planId}:${picked.cycle}:${code}:${attempt}`
+        : "";
+    // Loading until the answer for this very request has landed.
+    const quoting: Quoting =
+        answer?.key === key && key ? answer : { state: "loading" };
 
     useEffect(() => {
         if (!picked) return;
         let live = true;
-        setQuoting({ state: "loading" });
         void quoteChangeAction({
             plan: picked.planId,
             cycle: picked.cycle,
@@ -92,28 +102,22 @@ export function ChangePlanDialog({
         }).then((res) => {
             if (!live) return;
             if (res.ok) {
-                setQuoting({ state: "ready", quote: res.data });
+                setAnswer({ key, state: "ready", quote: res.data });
             } else if (res.field === "coupon" && code) {
                 // Quoted again without it: the parent clears the code.
                 setDropped({ code, error: res.error });
                 onCouponRefused(res.error);
             } else {
-                setQuoting({ state: "failed", error: res.error });
+                setAnswer({ key, state: "failed", error: res.error });
             }
         });
         return () => {
             live = false;
         };
         // onCouponRefused is the card's setter; a new one each render.
+        // `key` stands for picked, code and attempt.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [picked, code, attempt]);
-
-    useEffect(() => {
-        if (picked) {
-            setDropped(null);
-            setGstinError(null);
-        }
-    }, [picked]);
+    }, [key]);
 
     const summary =
         quoting.state === "ready" ? quoteSummary(quoting.quote) : null;

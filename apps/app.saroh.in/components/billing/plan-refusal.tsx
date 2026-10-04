@@ -44,7 +44,12 @@ export function reportFailure(
     fallback?: string,
 ): void {
     if (res.plan) showPlanRefusal(res.plan);
-    else showError(res.error || fallback || "That didn't work. Try again.");
+    else
+        showError(
+            res.error.trim()
+                ? res.error
+                : (fallback ?? "That didn't work. Try again."),
+        );
 }
 
 export function PlanRefusalHost() {
@@ -73,7 +78,7 @@ export function PlanRefusalHost() {
                         {refusal?.body}
                     </DialogDescription>
                 </DialogHeader>
-                {full && refusal?.limit ? (
+                {full && refusal.limit ? (
                     <div
                         aria-hidden
                         className="h-[5px] overflow-hidden rounded-full bg-muted"

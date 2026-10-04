@@ -54,21 +54,28 @@ export function PlanChooser({
 
     const shown = rows?.[cycle] ?? [];
 
-    // An "Upgrade" from elsewhere in the app: open that plan's change once.
-    useEffect(() => {
-        const plan = search.get("plan");
-        if (!plan || !rows || !canChange) return;
+    // An "Upgrade" from elsewhere in the app (`?plan=&cycle=`): open that
+    // plan's change once per arrival — adjusted while rendering, as React
+    // does for state that follows a prop — then tidy the address.
+    const wanted = search.get("plan");
+    const [arrived, setArrived] = useState<string | null>(null);
+    const arrival = wanted ? search.toString() : null;
+    if (arrival !== null && arrival !== arrived && rows && canChange) {
+        setArrived(arrival);
         const want: Cycle =
             search.get("cycle") === "year" && yearly.on ? "year" : cycle;
-        const row = rows[want].find((r) => r.planId === plan);
+        const row = rows[want].find((r) => r.planId === wanted);
         if (row) {
             setCycle(want);
             setPicked({ planId: row.planId, name: row.name, cycle: want });
         }
-        router.replace(`${pathname}#change-plan`, { scroll: false });
-        // Once per arrival.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search]);
+    }
+    // Tidied away: the same link may open it again later.
+    if (arrival === null && arrived !== null) setArrived(null);
+    useEffect(() => {
+        if (wanted)
+            router.replace(`${pathname}#change-plan`, { scroll: false });
+    }, [wanted, pathname, router]);
 
     function apply() {
         const code = couponIn.trim().toUpperCase();
@@ -248,6 +255,9 @@ export function PlanChooser({
             ) : null}
 
             <ChangePlanDialog
+                // A fresh dialog per plan picked: its coupon note, invoice
+                // details and quote start over.
+                key={picked ? `${picked.planId}:${picked.cycle}` : "closed"}
                 picked={picked}
                 coupon={coupon}
                 onCouponRefused={(error) => {

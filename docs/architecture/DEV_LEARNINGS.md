@@ -2565,3 +2565,19 @@ editor's window, and canvas lookups go through `queryCanvas`.
 code that looks up an element by id from a click uses the click target's
 `ownerDocument` — at phone or tablet width the page is in another document.
 **Category**: frontend · site editor · `apps/app.saroh.in/components/sites/editor/device-frame.tsx`
+
+## Frontend — empty and off states unreadable in dark
+
+**Problem**: In dark mode the line under "No invoices from Saroh yet" (and
+every `EmptyState`, `CapabilityOffState` and `PermissionDeniedState`
+description and note) read at about 2:1 — axe `color-contrast`, found
+checking Plan and billing (U14) in dark.
+**Root cause**: `StateCard` set its description and note in `text-neutral-600`,
+Ink 600, a light-mode cut with no dark value. The `a11y.spec.ts` audit runs
+light only, so nothing caught it.
+**Fix**: `dark:text-muted-foreground` beside it, as the `neutral` Badge
+already does (`packages/ui/src/components/ui/data-state.tsx`).
+**Rule**: A raw ramp step (`text-neutral-600`) on text needs its dark pair;
+prefer a semantic token. Check a screen's empty and failed states in dark,
+not only its full one (`saroh-four-scenes`).
+**Category**: frontend · design system · `packages/ui/src/components/ui/data-state.tsx`
