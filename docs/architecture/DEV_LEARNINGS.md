@@ -2547,3 +2547,20 @@ page, so the miss sat in `development` until a run reached it.
 (`coarse:h-11`, `coarse:min-h-11` or `coarse:size-11`); the phone touch-target
 spec is the check.
 **Category**: frontend · touch targets · `e2e/tests/four-scenes.spec.ts`
+
+## E2E — the touch-target spec passed locally on a page it never measured
+
+**Symptom**: CI's phone `four-scenes` touch-target spec failed on the calendar's
+29px layout switch (PR #783) while `pnpm prepush --all` had passed the same
+spec on the same commit, in 0.3s against CI's 1.8s.
+**Root cause**: The spec measured every button straight after `page.goto`,
+before the calendar had arrived. Locally the page was measured with no
+calendar on it, so nothing was undersized; on CI's slower runner the
+calendar had already rendered. Proved by removing the fix: with a guard
+waiting for the calendar, the local run fails exactly as CI did.
+**Fix**: The spec waits for the calendar's "Layout" radiogroup before it
+measures (`e2e/tests/four-scenes.spec.ts`).
+**Rule**: A spec that measures or scans a page ("every button", "no
+undersized control", axe) first asserts that the thing it is about is
+visible. A scan of a page that hasn't arrived passes vacuously.
+**Category**: e2e · flaky-by-timing · `e2e/tests/four-scenes.spec.ts`

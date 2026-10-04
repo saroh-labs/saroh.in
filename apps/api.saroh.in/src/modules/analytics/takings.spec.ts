@@ -5,6 +5,7 @@
  */
 import type { TakingsDayRow } from "./takings";
 import {
+    foldSoFar,
     foldTakings,
     INVOICES_PLACE,
     locationPlace,
@@ -13,6 +14,7 @@ import {
     placeKind,
     placeStoreId,
     takingsWeeks,
+    todayIn,
     weekInProgress,
 } from "./takings";
 
@@ -153,5 +155,57 @@ describe("places", () => {
         expect(placeKind(locationPlace("s1"))).toBe("LOCATION");
         expect(placeStoreId(locationPlace("s1"))).toBe("s1");
         expect(placeStoreId(ONLINE_PLACE)).toBeNull();
+    });
+});
+
+describe("foldSoFar", () => {
+    it("is Monday to today, beside Monday to the same weekday last week", () => {
+        // Wednesday 30 Sep: last week's Monday to Wednesday compares.
+        const soFar = foldSoFar(
+            [
+                row("2026-09-28", ONLINE_PLACE, "100"),
+                row("2026-09-30", ONLINE_PLACE, "50.50"),
+                row("2026-09-21", ONLINE_PLACE, "80"),
+                row("2026-09-23", ONLINE_PLACE, "20"),
+                // Last Thursday is after the same weekday: left out.
+                row("2026-09-24", ONLINE_PLACE, "999"),
+                // A whole week of the twelve, not this one or the same days.
+                row("2026-09-14", ONLINE_PLACE, "777"),
+            ],
+            "INR",
+            "2026-09-28",
+            "2026-09-30",
+        );
+        expect(soFar).toEqual({
+            start: "2026-09-28",
+            through: "2026-09-30",
+            takingsMinor: 15_050,
+            orders: 2,
+            payments: 2,
+            sameDaysLastWeekMinor: 10_000,
+            sameDaysLastWeekPayments: 2,
+        });
+    });
+
+    it("counts only the figures' currency", () => {
+        const soFar = foldSoFar(
+            [
+                row("2026-09-28", ONLINE_PLACE, "100"),
+                { ...row("2026-09-28", ONLINE_PLACE, "40"), currency: "USD" },
+            ],
+            "INR",
+            "2026-09-28",
+            "2026-09-28",
+        );
+        expect(soFar.takingsMinor).toBe(10_000);
+        expect(soFar.payments).toBe(1);
+    });
+
+    it("is today in the business's zone", () => {
+        // 23:00 Sunday in Mumbai is still Sunday; 00:15 Monday is the next day.
+        expect(todayIn(NOW, ZONE)).toBe("2026-10-04");
+        expect(todayIn(new Date("2026-10-04T18:45:00.000Z"), ZONE)).toBe(
+            "2026-10-05",
+        );
     });
 });

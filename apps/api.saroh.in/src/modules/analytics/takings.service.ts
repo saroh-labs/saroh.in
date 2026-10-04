@@ -7,18 +7,20 @@ import { authorize } from "../organizations/organization-policy";
 import { businessCurrency } from "../stores/currency";
 import type { TakingsDayRow, TakingsPlace, TakingsRead } from "./takings";
 import {
+    foldSoFar,
     foldTakings,
     pickCurrency,
     placeKind,
     placeStoreId,
     takingsWeeks,
+    todayIn,
     weekInProgress,
 } from "./takings";
 import { firstSaleSql, takingsByDaySql } from "./takings.sql";
 
 /**
- * Insights' takings read (DEC-075): twelve whole weeks of money taken, for
- * the active organization only. The rule is in `takings.ts`; the words the
+ * Insights' takings read (DEC-075): twelve whole weeks of money taken, and
+ * the week in progress so far, for the active organization only. The rule is in `takings.ts`; the words the
  * page says are the app's (`lib/analytics/takings-words.ts`), written from
  * these numbers alone.
  *
@@ -40,7 +42,8 @@ export class TakingsService {
         const zone = await businessTimezone(prisma, organizationId);
         const windows = takingsWeeks(now, zone);
         const from = windows[0].start;
-        const to = windows[windows.length - 1].end;
+        // Through now: the twelve whole weeks and the one in progress.
+        const to = now;
 
         const [rows, first, businessMoney, stores] = await Promise.all([
             prisma.$queryRaw<TakingsDayRow[]>(
@@ -58,6 +61,13 @@ export class TakingsService {
 
         const { currency, others } = pickCurrency(businessMoney, rows);
         const weeks = foldTakings(windows, rows, currency);
+        const thisWeekStart = weekInProgress(now, zone);
+        const thisWeek = foldSoFar(
+            rows,
+            currency,
+            thisWeekStart,
+            todayIn(now, zone),
+        );
 
         const names = new Map(stores.map((s) => [s.id, s.name]));
         const keys = new Set(
@@ -77,7 +87,8 @@ export class TakingsService {
             currency,
             otherCurrencies: others,
             firstSaleOn: first[0]?.day ?? null,
-            thisWeekStart: weekInProgress(now, zone),
+            thisWeekStart,
+            thisWeek,
             locations: stores.filter((s) => s.deletedAt === null).length,
             places,
             weeks,

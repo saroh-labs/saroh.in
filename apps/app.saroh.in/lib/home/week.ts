@@ -9,7 +9,7 @@ import type {
 
 /**
  * Home's "This week" (round 2, F7), in words, as the Home design writes
- * them: "Takings so far · ₹18,450 · Up 12% on the same days last week".
+ * them: "Sales so far · ₹18,450 · Up 12% on the same days last week".
  * The API sends each figure only to someone who may read it, and decides
  * the comparison; this says it. Pure, so it is tested without a page.
  */
@@ -83,7 +83,7 @@ export function owedLine(owed: HomeWeekOwed): string {
 function takingsRow(t: HomeWeekTakings): WeekRow {
     return {
         key: `takings:${t.currency}`,
-        label: "Takings so far",
+        label: "Sales so far",
         value: formatMoney(t.amountMinor, t.currency) ?? "",
         sub: changeLine(t.change),
         bad: t.change.kind === "DOWN",
