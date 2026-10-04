@@ -140,7 +140,7 @@ describe("sinceLinks", () => {
         expect(links.map((l) => [l.label, l.href])).toEqual([
             ["3 new orders", `/commerce/orders?${at}`],
             ["₹500 taken", `/billing/invoices?${at}`],
-            ["US$20 taken", `/billing/invoices?${at}`],
+            ["$20 taken", `/billing/invoices?${at}`],
         ]);
         // Two currencies, two keys.
         expect(new Set(links.map((l) => l.key)).size).toBe(3);

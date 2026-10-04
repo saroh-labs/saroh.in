@@ -1,4 +1,4 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { NUMBER_LOCALE } from "@/lib/format/locale";
 
 /**
  * Pure display helpers shared by the CRM pages (S3-005). No server imports, so
@@ -64,7 +64,7 @@ export function contactName(c: {
  */
 export function formatValue(value: number | null | undefined): string | null {
     if (value === null || value === undefined) return null;
-    return (value / 100).toLocaleString(DISPLAY_LOCALE, {
+    return (value / 100).toLocaleString(NUMBER_LOCALE, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });

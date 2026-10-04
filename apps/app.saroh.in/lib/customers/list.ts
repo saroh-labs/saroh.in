@@ -1,3 +1,4 @@
+import { NUMBER_LOCALE } from "@/lib/format/locale";
 import { formatMoneyMajor } from "@/lib/format/money";
 
 /**
@@ -284,14 +285,14 @@ export function sortsFor(page: CustomersPage): CustomerSort[] {
 
 /** "1 customer", "1,204 customers". */
 export function customersText(n: number): string {
-    return `${n.toLocaleString("en-GB")} ${n === 1 ? "customer" : "customers"}`;
+    return `${n.toLocaleString(NUMBER_LOCALE)} ${n === 1 ? "customer" : "customers"}`;
 }
 
 /** "Showing 51–100 of 120". */
 export function pageText(page: CustomersPage): string {
     const from = (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.total, page.page * page.pageSize);
-    const f = (n: number) => n.toLocaleString("en-GB");
+    const f = (n: number) => n.toLocaleString(NUMBER_LOCALE);
     return `Showing ${f(from)}–${f(to)} of ${f(page.total)}`;
 }
 
@@ -401,7 +402,7 @@ export function spentText(spent: MoneyTotal[]): string {
 export function unlinkedText(n: number): string {
     return n === 1
         ? "1 paying customer isn't linked to a contact yet"
-        : `${n.toLocaleString("en-GB")} paying customers aren't linked to a contact yet`;
+        : `${n.toLocaleString(NUMBER_LOCALE)} paying customers aren't linked to a contact yet`;
 }
 
 /** What a list with no rows says, and whether Clear is the way out. */

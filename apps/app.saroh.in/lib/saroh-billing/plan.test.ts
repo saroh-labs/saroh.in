@@ -97,7 +97,7 @@ describe("planSummary", () => {
                 currency: "INR",
             }).footnote,
         ).toBe(
-            "Last month Saroh sent 214 receipts and 1 invoice for Rye & Co, and took ₹182,400 in payments.",
+            "Last month Saroh sent 214 receipts and 1 invoice for Rye & Co, and took ₹1,82,400 in payments.",
         );
     });
 

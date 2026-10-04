@@ -456,13 +456,26 @@ export class ModuleReadinessRegistry {
     private insights(): ModuleReadinessAdapter {
         return {
             key: "INSIGHTS",
+            // Activity is a visit counted or money taken: Insights' takings
+            // (DEC-075) read paid orders and paid invoices, so a business
+            // that has sold has something to see before its site is visited.
             evaluate: async ({ organizationId }) => {
                 const where = { organizationId };
-                const [events, aggregates] = await Promise.all([
+                const [events, aggregates, order, invoice] = await Promise.all([
                     this.db.analyticsEvent.count({ where }),
                     this.db.analyticsDailyAggregate.count({ where }),
+                    this.db.order.findFirst({
+                        where: { organizationId, paymentStatus: "PAID" },
+                        select: { id: true },
+                    }),
+                    this.db.invoice.findFirst({
+                        where: { organizationId, paidAt: { not: null } },
+                        select: { id: true },
+                    }),
                 ]);
-                if (events > 0 || aggregates > 0) return active();
+                if (events > 0 || aggregates > 0 || order || invoice) {
+                    return active();
+                }
                 return setup(
                     "INSIGHTS_NO_DATA",
                     "Insights become available once your modules produce activity.",

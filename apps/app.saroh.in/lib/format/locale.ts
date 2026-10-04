@@ -8,9 +8,8 @@
  * away the tree and re-rendering it on the client. Every `toLocaleDateString`
  * and `Intl.NumberFormat` in a component that server-renders is exposed to this.
  *
- * `en-GB` rather than `en-US` for day-first dates ("3 Aug 2026"), and rather
- * than `en-IN` because en-IN groups digits by lakh (1,23,456) — correct for
- * India and unreadable for anyone reading the same screen from outside it.
+ * `en-GB` rather than `en-US` for day-first dates ("3 Aug 2026"). Numbers and
+ * money use `NUMBER_LOCALE` below instead.
  *
  * This is a placeholder for a real preference, not a claim that everyone reads
  * British English. When the workspace grows a per-user locale, it replaces this
@@ -18,3 +17,11 @@
  * with the render instead of being sniffed from the environment.
  */
 export const DISPLAY_LOCALE = "en-GB";
+
+/**
+ * The locale every number and amount is grouped in: lakh and crore
+ * ("₹20,44,971"), the way Saroh's merchants read money (owner, 2026-10-04,
+ * DEC-079). Dates stay on `DISPLAY_LOCALE`. Pinned for the same hydration
+ * reason as above.
+ */
+export const NUMBER_LOCALE = "en-IN";

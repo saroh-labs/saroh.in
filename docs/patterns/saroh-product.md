@@ -351,8 +351,26 @@ organizations/:org/customers`: everyone who has paid (an order through a
   (`onboarding.completed`, `first.*.created`) are instrumented, but there is no
   usage history to cite yet. Nothing tracks a merchant's own customers, and
   nothing should.
-- **Adopted** — Insights reflects real events. Not true yet: nothing schedules
-  `analytics.aggregate` (`backend-jobs.md`).
+- **Current** (DEC-075) — **Insights answers questions about the takings
+  first**: twelve whole weeks (Monday to Sunday in the business's zone) of
+  money actually taken, written as sentences (`lib/analytics/takings-words.ts`)
+  from the same figures the bars draw (`takings-figures.ts`), then the
+  website's views. **Takings** are paid orders (net of refunds that have
+  not failed, an edit's money back not taken twice, a REFUNDED order not at
+  all) plus paid invoices that are not an order's own (net of their credit
+  notes) — ADR-008's each-rupee-once and Customers' Spent rule
+  (`analytics/takings.ts`, `takings.sql.ts` reuses `spent.sql.ts`). A sale
+  falls in the week it was paid, and a refund lowers that week. Where it was
+  sold is the Orders list's notion: `placedOnline` is online, otherwise the
+  order's location; other invoices are "by invoice". Every figure states its
+  window; a change needs the four weeks before to be on record with three
+  payments, else it says why ("N/A"); flat is "level". The read needs
+  `analytics:read` and `payment:read`, and answers before Insights' setup
+  is done (`@IgnoreModuleReadiness`).
+- **Adopted** — Insights' website figures reflect real events. The hourly
+  `analytics.rollup` (DEC-075) now builds the rollups, but the renderer still
+  sends no view beacon and nothing emits `enquiry.submitted`, so a real
+  business's views and enquiries read zero (`MARKETING_CLAIMS.md` IN13).
 
 ## Saying what is true
 

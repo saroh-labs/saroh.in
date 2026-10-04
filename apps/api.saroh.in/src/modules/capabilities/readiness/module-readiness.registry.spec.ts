@@ -29,11 +29,17 @@ import { ModuleReadinessRegistry } from "./module-readiness.registry";
 const accountArea = accountAreaOn as jest.Mock;
 const shopRollout = shopRolloutOn as jest.Mock;
 
-/** Build a fake Prisma whose every `<model>.count` returns counts[model] ?? 0. */
+/**
+ * Build a fake Prisma whose every `<model>.count` returns counts[model] ?? 0,
+ * and whose `findFirst` finds a row when that count is above zero.
+ */
 function dbWith(counts: Record<string, number>) {
     const model = (name: string) => ({
         count: jest.fn().mockResolvedValue(counts[name] ?? 0),
         findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest
+            .fn()
+            .mockResolvedValue((counts[name] ?? 0) > 0 ? { id: name } : null),
     });
     return {
         publication: model("publication"),
@@ -72,6 +78,7 @@ function dbWith(counts: Record<string, number>) {
         automationRule: model("automationRule"),
         analyticsEvent: model("analyticsEvent"),
         analyticsDailyAggregate: model("analyticsDailyAggregate"),
+        invoice: model("invoice"),
     } as never;
 }
 
@@ -82,6 +89,22 @@ function registry(counts: Record<string, number>) {
 }
 
 describe("ModuleReadinessRegistry", () => {
+    it("Insights: nothing counted → setup; a visit or money taken → active (DEC-075)", async () => {
+        expect(
+            (await registry({}).evaluate("INSIGHTS", input)).blockers[0].code,
+        ).toBe("INSIGHTS_NO_DATA");
+        for (const counts of [
+            { analyticsEvent: 1 },
+            { analyticsDailyAggregate: 1 },
+            { order: 1 },
+            { invoice: 1 },
+        ]) {
+            expect(
+                (await registry(counts).evaluate("INSIGHTS", input)).blockers,
+            ).toEqual([]);
+        }
+    });
+
     it("Website: no site → setup; publication → active", async () => {
         expect(
             (await registry({}).evaluate("WEBSITE", input)).blockers[0].code,

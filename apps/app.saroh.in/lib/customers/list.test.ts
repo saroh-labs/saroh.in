@@ -427,7 +427,7 @@ describe("a row", () => {
                 { currency: "INR", amount: "100.00" },
                 { currency: "USD", amount: "20.00" },
             ]),
-        ).toBe("₹100 + US$20");
+        ).toBe("₹100 + $20");
     });
 });
 
