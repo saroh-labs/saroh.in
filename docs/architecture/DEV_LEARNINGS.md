@@ -2447,6 +2447,7 @@ as it wasn't in `globalEnv`.
 `turbo.json`. A `NEXT_PUBLIC_*` a build reads must be in `globalEnv` and in
 every stack that builds it.
 **Category**: e2e · rule in `scripts/prepush.sh`, `turbo.json`
+
 ## Seed — the Customers list stood empty for every seeded business
 
 **Problem**: Sell → Customers read "0 customers" on Northwind and Leela &
@@ -2470,6 +2471,7 @@ and their one possible match.
 what that path makes on the side. Run the same rule from the seed, with
 seed ids. `checkBoutique` now fails if a paying customer has no contact.
 **Category**: seed · customers · `packages/database/src/seed/helpers.ts`
+
 ## Frontend — every new post fell into "Couldn't load your website"
 
 **Problem**: Writing a new post, the editor turned into the route's error
@@ -2532,3 +2534,16 @@ editor's window, and canvas lookups go through `queryCanvas`.
 code that looks up an element by id from a click uses the click target's
 `ownerDocument` — at phone or tablet width the page is in another document.
 **Category**: frontend · site editor · `apps/app.saroh.in/components/sites/editor/device-frame.tsx`
+
+## Frontend — the calendar's layout switch was 29px tall on a phone
+
+**Symptom**: CI's phone `four-scenes` touch-target spec failed on Bookings with
+"Day by person" and "Agenda" at 29px, on a batch that did not touch Bookings.
+**Root cause**: The layout radios (`calendar-screen.tsx`) were sized only by
+`py-[5px]`, with no `coarse:` height. The spec checks every control on the
+page, so the miss sat in `development` until a run reached it.
+**Fix**: `coarse:min-h-11` on each radio.
+**Rule**: Every hand-rolled button carries a `coarse:` height of 44px
+(`coarse:h-11`, `coarse:min-h-11` or `coarse:size-11`); the phone touch-target
+spec is the check.
+**Category**: frontend · touch targets · `e2e/tests/four-scenes.spec.ts`
