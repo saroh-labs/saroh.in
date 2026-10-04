@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
@@ -126,6 +127,7 @@ export default async function OrdersPage({
         <PageContainer width="full">
             {/* B17: storefronts still on the 2-hour Pick-up default. */}
             <LateRuleNotice />
+            <PlanLimitNotice moduleId="orders" className="mb-4" />
             <OrdersScreen
                 query={query}
                 page={page}

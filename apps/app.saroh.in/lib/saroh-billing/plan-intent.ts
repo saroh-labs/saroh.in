@@ -1,7 +1,7 @@
-import type { Catalog, PlanIntent } from "@saroh/pricing-catalog";
-import { parseCatalog, resolvePlanIntent } from "@saroh/pricing-catalog";
+import type { PlanIntent } from "@saroh/pricing-catalog";
+import { resolvePlanIntent } from "@saroh/pricing-catalog";
 
-import { apiFetch } from "@/lib/api/http";
+import { liveCatalogue } from "./service";
 
 /**
  * The plan a visitor picked on saroh.in, as onboarding receives it from
@@ -26,17 +26,4 @@ export async function readPlanIntent(query: {
 
 function first(value: string | string[] | undefined): string | undefined {
     return Array.isArray(value) ? value[0] : value;
-}
-
-async function liveCatalogue(): Promise<Catalog | null> {
-    try {
-        const res = await apiFetch("/public/pricing");
-        if (!res.ok) return null;
-        const body = (await res.json()) as { catalog?: unknown } | null;
-        return parseCatalog(body?.catalog);
-    } catch {
-        // Degraded, not failed: the plan goes on unchecked, and the
-        // checkout's own answer is what the owner sees (see above).
-        return null;
-    }
 }

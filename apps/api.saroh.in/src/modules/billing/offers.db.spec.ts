@@ -819,8 +819,12 @@ describe("add-ons", () => {
         if (r.kind !== "TRIAL") throw new Error("expected a trial");
         const providerSub = `fake_sub_${r.checkout.id}`;
         await deliver(providerSub, "authenticated");
-        await addons.set(ctx, "things-pack", 1);
+        const held = await addons.set(ctx, "things-pack", 1);
         expect(await prisma.subscriptionAddonCharge.count()).toBe(0);
+        // What it holds, summed on the server for Settings › Plan (U14).
+        const pack = held.addons.find((a) => a.id === "things-pack")!;
+        expect(pack.heldPaise).toBe(pack.pricePaise);
+        expect(held.heldPaise).toBe(pack.pricePaise);
 
         const ends = (await sub(ctx.organizationId)).currentPeriodEnd!;
         const next = new Date(ends.getTime() + 30 * DAY);

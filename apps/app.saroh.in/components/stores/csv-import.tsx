@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { applyImport, previewImport } from "@/lib/imports/actions";
 import type {
     ApplyResult,
@@ -182,6 +183,8 @@ export function CsvImport({
                 policy,
             });
             if (!res.ok) {
+                // More rows than the plan's products limit (U13): its notice.
+                if (res.plan) showPlanRefusal(res.plan);
                 setError(res.error);
                 if (res.fileIssues) setFileIssues(res.fileIssues);
                 return;

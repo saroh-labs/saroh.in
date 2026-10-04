@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { toFailure } from "@/lib/api/failure";
+import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
 
 import { env } from "@/env";
@@ -43,6 +44,8 @@ export type CrmResult<T> =
           error: string;
           /** What the business must add first (DEC-068); see `failure.ts`. */
           missing?: BusinessDetail[];
+          /** Its plan refused it (U13); shown as the notice (`reportFailure`). */
+          plan?: PlanRefusal;
       };
 
 /**
@@ -199,11 +202,12 @@ export async function mutate<T>(
     if (res.ok) {
         return { ok: true, data: (data ?? {}) as T };
     }
-    const { missing } = toFailure(data, fallback);
+    const { missing, plan } = toFailure(data, fallback);
     return {
         ok: false,
         error: readError(data, fallback),
         ...(missing ? { missing } : {}),
+        ...(plan ? { plan } : {}),
     };
 }
 

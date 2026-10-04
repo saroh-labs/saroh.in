@@ -13,6 +13,7 @@ import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { Chip } from "@/components/shared/chip";
 import { pickName } from "@/lib/customers/picker";
@@ -178,6 +179,8 @@ function NewOrderBody({
         setSaving(false);
         if (!res) return;
         if (!res.ok) {
+            // At the plan's orders-a-month limit (U13): its notice too.
+            if (res.plan) showPlanRefusal(res.plan);
             setFailed({ key: sent, message: res.error });
             return;
         }

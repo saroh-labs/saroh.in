@@ -18,6 +18,7 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
 import {
     makePayLink,
@@ -199,6 +200,13 @@ export function NewBookingDialog({
             startAt: picked,
         });
         setSaving(false);
+        if (!res.ok && res.plan) {
+            // At the plan's bookings-a-month limit (U13): its notice, and
+            // the time stays picked for when there's room.
+            showPlanRefusal(res.plan);
+            setAttempt(crypto.randomUUID());
+            return;
+        }
         if (!res.ok) {
             showError(res.error);
             // Most likely the time went while this was open: read again.
