@@ -3,7 +3,7 @@ import type { TakingsRead, TakingsWeek } from "./takings";
 /**
  * A takings read for tests: twelve weeks from Monday 6 Jul 2026, each
  * taking `rupees[i]` (whole rupees) at Hill Road unless `split` says
- * otherwise. The week in progress is 28 Sep.
+ * otherwise. The week in progress is 28 Sep, read on Wednesday 30 Sep.
  */
 export function takingsRead(
     rupees: readonly number[],
@@ -41,6 +41,16 @@ export function takingsRead(
         otherCurrencies: [],
         firstSaleOn: "2026-01-05",
         thisWeekStart: "2026-09-28",
+        // Wednesday, nothing in yet this week or on the same days last week.
+        thisWeek: {
+            start: "2026-09-28",
+            through: "2026-09-30",
+            takingsMinor: 0,
+            orders: 0,
+            payments: 0,
+            sameDaysLastWeekMinor: 0,
+            sameDaysLastWeekPayments: 0,
+        },
         locations: 1,
         places: [
             { key: "location:hill", kind: "LOCATION", name: "Hill Road" },

@@ -84,7 +84,7 @@ export default async function AnalyticsPage({
         <PageContainer width="wide">
             <PageHeader
                 title="Insights"
-                description="What the business took, week by week, and how your website is doing."
+                description="How this week is going, what the business took week by week, and how your website is doing."
             />
 
             {missing ? (
@@ -111,8 +111,7 @@ export default async function AnalyticsPage({
                             Your website
                         </h2>
                         <p className="mt-1 text-[13px] leading-[1.5] text-muted-foreground">
-                            Last {range.label} · site views, visitors and
-                            enquiries.
+                            Last {range.label}: visits, visitors and enquiries.
                         </p>
                     </div>
                     <div className="flex items-center gap-1">

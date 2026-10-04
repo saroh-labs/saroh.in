@@ -959,3 +959,17 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the workspace formatted every number and amount with `en-GB`, so ₹20,44,971 read as ₹2,044,971. Saroh's merchants read money in lakh and crore.
 - Decision: numbers and money in `app.saroh.in` format with `NUMBER_LOCALE = "en-IN"` (lakh and crore grouping, "45K" and "45L" compact). Dates stay on `DISPLAY_LOCALE = "en-GB"` ("3 Aug 2026"). Both stay pinned constants, never the runtime's locale, so server and browser render the same string.
 - Consequences: a per-user or per-business locale, when it comes, replaces both constants. Merchant sites keep their own locale (`packages/site-blocks`).
+
+## DEC-080 Insights answers "how is this week going?" and opens its rows
+
+**Status: Accepted — 2026-10-04** · user · extends DEC-075 after the Insights UX audit
+
+- Context: the audit of Insights (6/10) found the takings stopped at last Sunday, nothing on the page led anywhere, the phone chart's dates truncated, the best week was said three times and "Anything to watch?" restated records. The owner asked for every finding fixed, at full width.
+- Decision:
+    - The takings read carries the week in progress (`thisWeek`): Monday to today, beside the same days of last week. It leads the answers ("How is this week going?") and is drawn hatched beside the twelve, never ranked among them or used in the twelve's comparisons. A change against the same days needs 3 payments, as the months do.
+    - Every figure with rows behind it opens them: tiles, the best week, every bar, "Anything to watch?" and the week in progress go to the Orders list filtered to those days (`date=custom&payment=paid`; the list filters by the day placed, so links say "placed"). Enquiries open Leads.
+    - Bars are buttons: hover, focus or tap puts the value in a readout above the chart, with its link. No value lives only in a hover. The website's chart uses the same component and writes days "4 Sep".
+    - "Anything to watch?" speaks only on a signal (three falling weeks ending below usual; a week 30% or more below usual; a place down 30% or more on the four before) and otherwise says "Nothing unusual in the last four weeks." It waits for four weeks on record.
+    - The section is full width, its sentences held to a 68ch measure. The footer says what the figures were counted from, and "How takings are counted" explains the rule.
+    - A business that has never taken money sees one message with "Take an order" and "Send an invoice", not an answers card plus an empty state.
+- Consequences: "Takings" stays the word until it is tested with merchants (audit F15).

@@ -26,8 +26,9 @@ import { toMinor } from "../../common/money";
  * invoice's `paidAt` — in the business's own zone, weeks starting Monday
  * (DEC-033). A refund lowers the week of the sale it gave money back on,
  * so no week reads below zero and a later refund corrects the week it
- * belongs to. Only the twelve whole weeks before this one count; the week
- * in progress is not a week yet.
+ * belongs to. Only the twelve whole weeks before this one are weeks; the
+ * week in progress is read on its own, so far, beside the same days of
+ * last week (`foldSoFar`).
  *
  * **Where it was sold** is the Orders list's own notion: an order placed at
  * the website's checkout (`placedOnline`) is online, any other is its
@@ -74,6 +75,11 @@ export function takingsWeeks(
         });
     }
     return weeks;
+}
+
+/** Today's date in `zone`, `2026-10-01`. */
+export function todayIn(now: Date, zone: string): string {
+    return DateTime.fromJSDate(now, { zone }).toISODate() ?? "";
 }
 
 /** The Monday of the week `now` is in, in `zone`. */
@@ -166,12 +172,76 @@ export interface TakingsRead {
     firstSaleOn: string | null;
     /** Monday of the week in progress, which the weeks stop short of. */
     thisWeekStart: string;
+    /** The week in progress so far, beside the same days of last week. */
+    thisWeek: TakingsSoFar;
     /** Open locations (storefronts) the business has. */
     locations: number;
     /** Every place named in `weeks`. */
     places: TakingsPlace[];
     /** The twelve whole weeks, oldest first. */
     weeks: TakingsWeek[];
+}
+
+/**
+ * The week in progress, Monday to today in the business's zone. Not a
+ * week yet, so it is never compared with whole weeks — only with the same
+ * days of the week before (Monday to the same weekday), which is fair
+ * however far into the week today is.
+ */
+export interface TakingsSoFar {
+    /** Monday, `2026-09-28`. */
+    start: string;
+    /** Today, `2026-10-01`. */
+    through: string;
+    takingsMinor: number;
+    orders: number;
+    payments: number;
+    /** Last week's Monday to the same weekday as today. */
+    sameDaysLastWeekMinor: number;
+    sameDaysLastWeekPayments: number;
+}
+
+/** `2026-09-21` from `2026-09-28` less `days`, by the calendar. */
+function minusDays(date: string, days: number): string {
+    return (
+        DateTime.fromISO(date, { zone: "utc" }).minus({ days }).toISODate() ??
+        ""
+    );
+}
+
+/**
+ * The week in progress so far, in `currency` only, and the same days of
+ * the week before it from the same rows.
+ */
+export function foldSoFar(
+    rows: readonly TakingsDayRow[],
+    currency: string | null,
+    thisWeekStart: string,
+    today: string,
+): TakingsSoFar {
+    const lastStart = minusDays(thisWeekStart, 7);
+    const lastThrough = minusDays(today, 7);
+    const out: TakingsSoFar = {
+        start: thisWeekStart,
+        through: today,
+        takingsMinor: 0,
+        orders: 0,
+        payments: 0,
+        sameDaysLastWeekMinor: 0,
+        sameDaysLastWeekPayments: 0,
+    };
+    for (const row of rows) {
+        if (row.currency !== currency) continue;
+        if (row.day >= thisWeekStart && row.day <= today) {
+            out.takingsMinor += toMinor(row.amount);
+            out.orders += Number(row.orders);
+            out.payments += Number(row.payments);
+        } else if (row.day >= lastStart && row.day <= lastThrough) {
+            out.sameDaysLastWeekMinor += toMinor(row.amount);
+            out.sameDaysLastWeekPayments += Number(row.payments);
+        }
+    }
+    return out;
 }
 
 /** The week a date falls in, or undefined outside them. */

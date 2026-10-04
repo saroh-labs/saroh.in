@@ -1,181 +1,157 @@
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@saroh/ui/card";
-import { StatCard as UIStatCard } from "@saroh/ui/stat-card";
+import { ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 import type {
     AnalyticsView,
     DailyPoint,
     TopPage,
 } from "@/lib/analytics/service";
+import {
+    dayReadout,
+    dayTick,
+    pageTitle,
+    tickEvery,
+} from "@/lib/analytics/website-words";
 import { NUMBER_LOCALE } from "@/lib/format/locale";
 
-/** A single headline metric card (delegates to the shared @saroh/ui StatCard). */
-function StatCard({
+import type { ReadoutBar } from "./readout-bars";
+import { ReadoutBars } from "./readout-bars";
+
+/**
+ * The website's analytics (S7-003), under Insights' takings, rendered purely
+ * from the org-safe daily aggregates. Every number here is scoped to the
+ * active organization by the API (`analytics:read`); this component only
+ * presents — in the takings' own language (audit F6): the same tiles, the
+ * same tappable bars, days written "4 Sep".
+ */
+
+const CARD = "rounded-[14px] border border-border bg-card px-[19px] py-[18px]";
+
+/** One figure, the takings' tile, compact enough for three across a phone. */
+function Tile({
     label,
     value,
-    index,
+    href,
 }: {
     label: string;
     value: number;
-    /** Position in the tile row, so the four stagger in rather than snap. */
-    index: number;
+    href?: string;
 }) {
-    return (
-        <UIStatCard
-            label={label}
-            value={value.toLocaleString(NUMBER_LOCALE)}
-            className="wk-item"
-            style={{ "--wk-i": index } as React.CSSProperties}
-        />
+    const body = (
+        <>
+            <span className="flex items-center justify-between gap-1 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground sm:text-[11px]">
+                {label}
+                {href ? (
+                    <ChevronRight
+                        aria-hidden
+                        className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+                    />
+                ) : null}
+            </span>
+            <span className="mt-1.5 font-display text-[19px] font-semibold tabular-nums tracking-[-0.03em] text-foreground sm:text-[22px]">
+                {value.toLocaleString(NUMBER_LOCALE)}
+            </span>
+        </>
+    );
+    const shape =
+        "flex h-full min-w-0 flex-col rounded-[11px] border border-border bg-card px-[11px] py-3 sm:px-[13px]";
+    return href ? (
+        <Link
+            href={href}
+            className={`group ${shape} transition-colors duration-150 hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+        >
+            {body}
+        </Link>
+    ) : (
+        <div className={shape}>{body}</div>
     );
 }
 
-/**
- * A dependency-free daily bar chart of site views. Bars are CSS-height only
- * (no chart library, so nothing new to install), scaled to the busiest day.
- */
-function DailyViewsChart({ daily }: { daily: DailyPoint[] }) {
+/** Visits each day: the busiest marked, every day readable by tap or focus. */
+function DailyVisits({ daily }: { daily: DailyPoint[] }) {
     const max = daily.reduce((m, d) => Math.max(m, d.views), 0);
+    const busiest = daily.reduce<DailyPoint | null>(
+        (top, d) => (!top || d.views > top.views ? d : top),
+        null,
+    );
+    // About six labels on a wide screen, three on a phone.
+    const wide = tickEvery(daily.length, 6);
+    const bars: ReadoutBar[] = daily.map((d, i) => ({
+        key: d.date,
+        heightPercent:
+            max > 0 ? Math.max(2, Math.round((d.views / max) * 100)) : 2,
+        tone:
+            busiest?.date === d.date && d.views > 0
+                ? "bg-brand-700 dark:bg-brand-400"
+                : "bg-neutral-700 dark:bg-neutral-300",
+        readout: dayReadout(d),
+        ...(i % wide === 0
+            ? {
+                  tick: dayTick(d.date),
+                  tickWide: i % (wide * 2) !== 0,
+              }
+            : {}),
+    }));
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-base">Site views by day</CardTitle>
-                <CardDescription>
-                    Daily views (bar) with unique visitors in the tooltip
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                {daily.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No views recorded in this range yet.
-                    </p>
-                ) : (
-                    <div className="flex h-40 gap-1">
-                        {daily.map((d, i) => (
-                            <div
-                                key={d.date}
-                                /*
-                                 * `h-full`, and the row is no longer
-                                 * `items-end`. That combination is what broke
-                                 * this chart: `items-end` stops the flex row
-                                 * from stretching its children, so each column
-                                 * was only as tall as the date label under it
-                                 * (34px), and the bar's `height: N%` had no
-                                 * definite height to resolve against — every
-                                 * bar rendered at exactly 0px. It looked like
-                                 * an empty card with an x-axis. Nobody caught
-                                 * it because until this workspace had analytics
-                                 * data the card showed its empty state instead.
-                                 */
-                                className="flex h-full min-w-0 flex-1 flex-col"
-                                title={`${d.date}: ${d.views} views, ${d.uniques} unique`}
-                            >
-                                {/*
-                                 * The bar lives in its own flex-1 track rather
-                                 * than sharing the column with the label. Flex
-                                 * resolves this box to a definite height, which
-                                 * is what makes the percentage below legal —
-                                 * and it keeps a 100% bar from being pushed
-                                 * over the top of the card by the label's own
-                                 * height.
-                                 */}
-                                <div className="flex min-h-0 flex-1 items-end">
-                                    {/*
-                                     * `--chart-1`, not `--primary`: two of the
-                                     * three skins re-point `--primary` to their
-                                     * own action colour, which painted every
-                                     * bar in the button colour. The chart
-                                     * tokens are the series colours and stay
-                                     * chromatic on purpose (see
-                                     * @saroh/ui/globals.css).
-                                     */}
-                                    <div
-                                        className="w-full rounded-t bg-chart-1"
-                                        style={{
-                                            height: `${
-                                                max > 0
-                                                    ? Math.max(
-                                                          2,
-                                                          Math.round(
-                                                              (d.views / max) *
-                                                                  100,
-                                                          ),
-                                                      )
-                                                    : 2
-                                            }%`,
-                                        }}
-                                    />
-                                </div>
-                                {/*
-                                 * Every label at 10px across 30 days wrapped
-                                 * "07-08" onto two lines and turned the axis
-                                 * into a grey smear. Roughly six ticks is
-                                 * enough to read a month; the rest keep their
-                                 * slot (so the bars stay aligned) and render
-                                 * nothing. The full date is still on every
-                                 * bar's `title`.
-                                 */}
-                                <span className="mt-1 h-4 truncate text-center text-[11px] leading-4 text-muted-foreground">
-                                    {i % Math.ceil(daily.length / 6) === 0
-                                        ? d.date.slice(5)
-                                        : ""}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+        <div className={CARD}>
+            <h3 className="text-[12.5px] font-semibold">Visits each day</h3>
+            <p className="mb-2 mt-0.5 text-xs leading-[1.5] text-muted-foreground">
+                Tap a day to read its visits and visitors.
+            </p>
+            {daily.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    No visits recorded in this range yet.
+                </p>
+            ) : (
+                <ReadoutBars
+                    bars={bars}
+                    label={`Visits each day, ${dayTick(daily[0].date)} to ${dayTick(daily[daily.length - 1].date)}${busiest ? `, busiest ${dayReadout(busiest)}` : ""}. Choose a day to read it.`}
+                    initial={busiest?.date ?? daily[daily.length - 1].date}
+                    tall
+                />
+            )}
+        </div>
     );
 }
 
-/** The top-visited pages table. */
-function TopPagesTable({ pages }: { pages: TopPage[] }) {
+/** The pages opened most, by the name they read as, the address beside it. */
+function TopPages({ pages }: { pages: TopPage[] }) {
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-base">Top pages</CardTitle>
-                <CardDescription>
-                    Most-viewed paths in this range
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                {pages.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No page-view data yet.
-                    </p>
-                ) : (
-                    <div className="divide-y">
-                        {pages.map((p) => (
-                            <div
-                                key={p.path}
-                                className="flex items-center justify-between py-2 text-sm"
-                            >
-                                <span className="min-w-0 truncate pr-4 font-mono text-muted-foreground">
+        <div className={CARD}>
+            <h3 className="mb-2 text-[12.5px] font-semibold">
+                Pages people opened most
+            </h3>
+            {pages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    No page visits yet.
+                </p>
+            ) : (
+                <ol className="divide-y divide-foreground/10">
+                    {pages.map((p) => (
+                        <li
+                            key={p.path}
+                            className="flex items-center justify-between gap-4 py-2.5"
+                        >
+                            <span className="min-w-0">
+                                <span className="block truncate text-sm font-medium">
+                                    {pageTitle(p.path)}
+                                </span>
+                                <span className="block truncate text-xs text-muted-foreground">
                                     {p.path}
                                 </span>
-                                <span className="font-medium tabular-nums">
-                                    {p.views.toLocaleString(NUMBER_LOCALE)}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+                            </span>
+                            <span className="shrink-0 text-sm font-medium tabular-nums">
+                                {p.views.toLocaleString(NUMBER_LOCALE)}
+                                <span className="sr-only"> visits</span>
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            )}
+        </div>
     );
 }
 
-/**
- * The website's analytics (S7-003), under Insights' takings, rendered purely from the
- * org-safe daily aggregates. Every number here is scoped to the active
- * organization by the API (`analytics:read`); this component only presents.
- */
 export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
     const { summary, daily, topPages } = view;
     return (
@@ -186,26 +162,19 @@ export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
              * No "Orders" tile here any more (DEC-075): it counted
              * `order.paid` events, which nothing emits, so it read 0 beside
              * the real orders the takings above count from Orders itself.
+             * Three across on a phone too (F11): three numbers, one row.
              */}
-            <div className="grid gap-4 sm:grid-cols-3">
-                <StatCard
-                    label="Site views"
-                    value={summary.siteViews}
-                    index={0}
-                />
-                <StatCard
-                    label="Unique visitors"
-                    value={summary.uniqueVisitors}
-                    index={1}
-                />
-                <StatCard
+            <div className="grid grid-cols-3 gap-2 sm:gap-[11px]">
+                <Tile label="Visits" value={summary.siteViews} />
+                <Tile label="Visitors" value={summary.uniqueVisitors} />
+                <Tile
                     label="Enquiries"
                     value={summary.enquiries}
-                    index={2}
+                    href="/leads"
                 />
             </div>
-            <DailyViewsChart daily={daily} />
-            <TopPagesTable pages={topPages} />
+            <DailyVisits daily={daily} />
+            <TopPages pages={topPages} />
         </div>
     );
 }

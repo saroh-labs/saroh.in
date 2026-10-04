@@ -1,4 +1,9 @@
-import type { TakingsPlaceKind, TakingsRead, TakingsWeek } from "./takings";
+import type {
+    TakingsPlaceKind,
+    TakingsRead,
+    TakingsSoFar,
+    TakingsWeek,
+} from "./takings";
 
 /**
  * Insights' figures (DEC-075): everything the page shows, worked out once
@@ -18,6 +23,11 @@ import type { TakingsPlaceKind, TakingsRead, TakingsWeek } from "./takings";
  * - **Flat is level**, not growth: a change that rounds to 0% is `LEVEL`.
  * - **A week before the first sale is not a quiet week.** The usual week,
  *   the quietest and the best are read over the weeks on record only.
+ * - **The week in progress is never a whole week.** It is compared only
+ *   with the same days of the week before, and drawn hatched beside the
+ *   twelve, never ranked among them.
+ * - **"Anything to watch?" speaks only on a signal** ({@link TakingsSignal});
+ *   otherwise it says nothing unusual happened, rather than restating records.
  */
 
 /** Fewer payments than this in the four weeks before, and there is no comparing. */
@@ -40,6 +50,61 @@ export type TakingsChange =
     /** Too few payments in the four before to say. */
     | { kind: "THIN" };
 
+/** A week falling this far below the usual one is worth a look. */
+export const DIP_PERCENT = 30;
+/** A place whose takings fell this far on the four weeks before. */
+export const PLACE_DROP_PERCENT = 30;
+/** A place this small a share of the four before is too small to call. */
+export const PLACE_MIN_SHARE = 10;
+/** Weeks on record before "Anything to watch?" has a usual week to judge by. */
+export const WATCH_MIN_WEEKS = 4;
+
+/** The week in progress against the same days of last week. */
+export type SoFarChange =
+    | { kind: "AHEAD" | "BEHIND"; percent: number }
+    | { kind: "LEVEL" }
+    /** Too few payments on the same days last week to say. */
+    | { kind: "THIN" };
+
+/** The week in progress, so far. */
+export interface SoFarFigures extends TakingsSoFar {
+    change: SoFarChange;
+    /** Its height on the twelve weeks' scale, 0–100 (it may pass the best). */
+    heightPercent: number;
+}
+
+/**
+ * Something in the last four weeks worth a look, worst first:
+ * - `SLIDE`: each of the last three weeks took less than the one before,
+ *   and last week ended below the usual week;
+ * - `DIP`: a week of the last four took {@link DIP_PERCENT}% or more below
+ *   the usual week (the most recent such);
+ * - `PLACE_DROP`: one place took {@link PLACE_DROP_PERCENT}% or more less
+ *   than in the four weeks before.
+ */
+export type TakingsSignal =
+    | {
+          kind: "SLIDE";
+          from: { start: string; end: string; takingsMinor: number };
+          to: { start: string; end: string; takingsMinor: number };
+          percent: number;
+      }
+    | {
+          kind: "DIP";
+          week: { start: string; end: string; takingsMinor: number };
+          percent: number;
+      }
+    | {
+          kind: "PLACE_DROP";
+          key: string;
+          placeKind: TakingsPlaceKind;
+          name: string | null;
+          percent: number;
+      };
+
+/** Which comparison a bar belongs to, for the first answer's spark. */
+export type BarWindow = "LAST4" | "PRIOR4" | "EARLIER";
+
 /** Darker is higher, as the design bands the bars. */
 export type Band = 1 | 2 | 3;
 
@@ -53,8 +118,12 @@ export interface WeekBar {
     /** The best week of the twelve, drawn in the accent. */
     peak: boolean;
     band: Band;
-    /** Its height as a share of the best week, 0–100. */
+    /** Its height as a share of the scale (the best week, or this week if higher), 0–100. */
     heightPercent: number;
+    /** The last four weeks, the four before, or earlier. */
+    window: BarWindow;
+    /** Paid orders that week. */
+    orders: number;
 }
 
 /** One share of where the money came from. */
@@ -119,6 +188,12 @@ export interface TakingsFigures {
     averageOrderMinor: number | null;
     /** Open locations the business has. */
     locations: number;
+    /** The week in progress so far. */
+    soFar: SoFarFigures;
+    /** What "Anything to watch?" speaks about; null for nothing unusual. */
+    signal: TakingsSignal | null;
+    /** Enough weeks on record to judge what is unusual. */
+    canWatch: boolean;
 }
 
 const sumSpan = (weeks: readonly TakingsWeek[]): SpanTotals => ({
@@ -170,6 +245,104 @@ export function compareSpans(
         : { kind: "DOWN", percent: -percent };
 }
 
+/** This week so far against the same days of last week. */
+export function compareSoFar(so: TakingsSoFar): SoFarChange {
+    if (
+        so.sameDaysLastWeekPayments < MIN_PAYMENTS_TO_COMPARE ||
+        so.sameDaysLastWeekMinor <= 0
+    ) {
+        return { kind: "THIN" };
+    }
+    const percent = Math.round(
+        ((so.takingsMinor - so.sameDaysLastWeekMinor) /
+            so.sameDaysLastWeekMinor) *
+            100,
+    );
+    if (percent === 0) return { kind: "LEVEL" };
+    return percent > 0
+        ? { kind: "AHEAD", percent }
+        : { kind: "BEHIND", percent: -percent };
+}
+
+const pick = (w: TakingsWeek) => ({
+    start: w.start,
+    end: w.end,
+    takingsMinor: w.takingsMinor,
+});
+
+/** The worst thing worth a look in the last four weeks, else null. */
+export function watchSignal(
+    weeks: readonly TakingsWeek[],
+    usualMinor: number | null,
+    placesBefore: ReadonlyMap<string, number>,
+    placesNow: ReadonlyMap<string, number>,
+    named: ReadonlyMap<string, { kind: TakingsPlaceKind; name: string | null }>,
+): TakingsSignal | null {
+    const lastFour = weeks.slice(-4);
+    const lastThree = weeks.slice(-3);
+    const [a, b, c] = lastThree;
+    if (
+        lastThree.length === 3 &&
+        usualMinor &&
+        a.takingsMinor > b.takingsMinor &&
+        b.takingsMinor > c.takingsMinor &&
+        c.takingsMinor < usualMinor &&
+        a.takingsMinor > 0
+    ) {
+        return {
+            kind: "SLIDE",
+            from: pick(a),
+            to: pick(c),
+            percent: Math.round(
+                ((a.takingsMinor - c.takingsMinor) / a.takingsMinor) * 100,
+            ),
+        };
+    }
+    if (usualMinor && usualMinor > 0) {
+        const dips = lastFour.filter(
+            (w) =>
+                ((usualMinor - w.takingsMinor) / usualMinor) * 100 >=
+                DIP_PERCENT,
+        );
+        const dip = dips.at(-1);
+        if (dip) {
+            return {
+                kind: "DIP",
+                week: pick(dip),
+                percent: Math.round(
+                    ((usualMinor - dip.takingsMinor) / usualMinor) * 100,
+                ),
+            };
+        }
+    }
+    const before = Array.from(placesBefore.values()).reduce((s, v) => s + v, 0);
+    if (before > 0) {
+        const drops = Array.from(placesBefore.entries())
+            .filter(([, minor]) => (minor / before) * 100 >= PLACE_MIN_SHARE)
+            .map(([key, minor]) => ({
+                key,
+                percent: Math.round(
+                    ((minor - (placesNow.get(key) ?? 0)) / minor) * 100,
+                ),
+            }))
+            .filter((d) => d.percent >= PLACE_DROP_PERCENT)
+            .sort(
+                (x, y) => y.percent - x.percent || x.key.localeCompare(y.key),
+            );
+        const drop = drops.at(0);
+        if (drop) {
+            return {
+                kind: "PLACE_DROP",
+                key: drop.key,
+                placeKind: named.get(drop.key)?.kind ?? "LOCATION",
+                name: named.get(drop.key)?.name ?? null,
+                percent: drop.percent,
+            };
+        }
+    }
+    return null;
+}
+
 /** Darker for the top third of the best week, lighter for the bottom. */
 function bandOf(value: number, max: number): Band {
     if (max <= 0) return 3;
@@ -199,16 +372,26 @@ export function takingsFigures(read: TakingsRead): TakingsFigures {
                 : top,
         null,
     );
-    const max = best?.takingsMinor ?? 0;
-    const bars: WeekBar[] = weeks.map((w) => ({
+    const peakMinor = best?.takingsMinor ?? 0;
+    // The scale: the best week, or this week so far when it has passed it.
+    const max = Math.max(peakMinor, read.thisWeek.takingsMinor);
+    const height = (minor: number) =>
+        max > 0 ? Math.round((Math.max(0, minor) / max) * 100) : 0;
+    const bars: WeekBar[] = weeks.map((w, i) => ({
         start: w.start,
         end: w.end,
         takingsMinor: w.takingsMinor,
         onRecord: onRecord(w),
         peak: best !== null && w.start === best.start,
-        band: bandOf(w.takingsMinor, max),
-        heightPercent:
-            max > 0 ? Math.round((Math.max(0, w.takingsMinor) / max) * 100) : 0,
+        band: bandOf(w.takingsMinor, peakMinor),
+        heightPercent: height(w.takingsMinor),
+        window:
+            i >= weeks.length - 4
+                ? "LAST4"
+                : i >= weeks.length - 8
+                  ? "PRIOR4"
+                  : "EARLIER",
+        orders: w.orders,
     }));
 
     const lastFour = weeks.slice(-4);
@@ -234,13 +417,17 @@ export function takingsFigures(read: TakingsRead): TakingsFigures {
     const lastWeek = weeks.at(-1);
     const bestIndex = best ? weeks.indexOf(best) : -1;
 
-    // Where the last four weeks' money came from.
-    const byPlace = new Map<string, number>();
-    for (const w of lastFour) {
-        for (const p of w.places) {
-            byPlace.set(p.key, (byPlace.get(p.key) ?? 0) + p.takingsMinor);
+    // Where the last four weeks' money came from, and the four before's.
+    const placeTotals = (span: readonly TakingsWeek[]) => {
+        const totals = new Map<string, number>();
+        for (const w of span) {
+            for (const p of w.places) {
+                totals.set(p.key, (totals.get(p.key) ?? 0) + p.takingsMinor);
+            }
         }
-    }
+        return totals;
+    };
+    const byPlace = placeTotals(lastFour);
     const named = new Map(read.places.map((p) => [p.key, p]));
     const ordered = Array.from(byPlace.entries())
         .filter(([, minor]) => minor > 0)
@@ -306,5 +493,21 @@ export function takingsFigures(read: TakingsRead): TakingsFigures {
                 ? Math.round(last4.orderTakingsMinor / last4.orders)
                 : null,
         locations: read.locations,
+        soFar: {
+            ...read.thisWeek,
+            change: compareSoFar(read.thisWeek),
+            heightPercent: height(read.thisWeek.takingsMinor),
+        },
+        signal:
+            recorded.length >= WATCH_MIN_WEEKS
+                ? watchSignal(
+                      weeks,
+                      usualMinor,
+                      placeTotals(priorFour),
+                      byPlace,
+                      named,
+                  )
+                : null,
+        canWatch: recorded.length >= WATCH_MIN_WEEKS,
     };
 }
