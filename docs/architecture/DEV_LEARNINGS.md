@@ -2563,4 +2563,10 @@ measures (`e2e/tests/four-scenes.spec.ts`).
 **Rule**: A spec that measures or scans a page ("every button", "no
 undersized control", axe) first asserts that the thing it is about is
 visible. A scan of a page that hasn't arrived passes vacuously.
+**Sweep (4 Oct)**: the same hole was in 11 more specs (a11y's sixteen
+screens, four-scenes' viewport/overlap/tab-bar scenes, phone-reflow,
+orders-list, business-settings, calendar-week, invoices-without-payments,
+order-detail, site-account, site-review, marketing). Each now waits for its
+own landmark. Waiting found one more real bug at once: the calendar's two
+rule links overlapping on a phone.
 **Category**: e2e · flaky-by-timing · `e2e/tests/four-scenes.spec.ts`
