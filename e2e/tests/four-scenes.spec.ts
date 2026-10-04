@@ -259,6 +259,11 @@ test.describe("touch targets", () => {
 
         await signIn(page);
         await page.goto("/bookings");
+        // The calendar itself, not its failed or locked state: measuring a
+        // page without the layout switch passes vacuously.
+        await expect(
+            page.getByRole("radiogroup", { name: "Layout" }),
+        ).toBeVisible();
 
         // Guard the guard: if `pointer: coarse` does not match, every
         // `coarse:` utility is inert and this test would pass vacuously.
