@@ -16,10 +16,15 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
-import { RequireModule } from "../capabilities/require-module.decorator";
+import {
+    IgnoreModuleReadiness,
+    RequireModule,
+} from "../capabilities/require-module.decorator";
 import type { IngestResult } from "./analytics.service";
 import { AnalyticsService } from "./analytics.service";
 import { IngestAnalyticsEventDto } from "./dto";
+import type { TakingsRead } from "./takings";
+import { TakingsService } from "./takings.service";
 
 /**
  * PUBLIC analytics intake (S7-002), mounted at `/public/sites` with NO guards —
@@ -67,12 +72,30 @@ export class AnalyticsPublicController {
  * only a proven {@link OrganizationContext} via `@OrgContext()`. Reads require
  * `analytics:read` (OWNER/ADMIN-only), enforced in the service. The read is over
  * pre-computed daily aggregates, always filtered by the proven org id.
+ *
+ * Both reads answer once Insights is on, set up or not (DEC-075): Insights'
+ * readiness waits for activity, and a business with no sales and no visits
+ * yet is told so on the page — no takings is an answer, not a setup step.
  */
 @Controller("organizations/:organizationId/analytics")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
 @RequireModule("INSIGHTS")
+@IgnoreModuleReadiness()
 export class AnalyticsController {
-    constructor(private readonly analytics: AnalyticsService) {}
+    constructor(
+        private readonly analytics: AnalyticsService,
+        private readonly takings: TakingsService,
+    ) {}
+
+    /**
+     * Twelve whole weeks of takings (DEC-075, `takings.ts`): money taken,
+     * where it was sold and the orders, per week in the business's zone.
+     * Needs `payment:read` beside `analytics:read`.
+     */
+    @Get("takings")
+    getTakings(@OrgContext() ctx: OrganizationContext): Promise<TakingsRead> {
+        return this.takings.read(ctx);
+    }
 
     @Get()
     getDashboard(

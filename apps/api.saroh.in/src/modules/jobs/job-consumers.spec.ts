@@ -13,7 +13,8 @@
  *     the queue reporting delivery — but only this spec stops a gap
  *     reopening.
  *   - Registered with no producer: S7-002 built and registered the
- *     `analytics.aggregate` handler, and nothing enqueues it.
+ *     `analytics.aggregate` handler, and nothing enqueued it until the
+ *     hourly `analytics.rollup` chain (DEC-075).
  *
  * A source scan rather than booting the app, for the reason
  * module-annotations.spec.ts gives: the question is what the code as written
@@ -32,10 +33,7 @@ import { join, relative, sep } from "node:path";
 const KNOWN_WITHOUT_CONSUMER: Record<string, string> = {};
 
 /** Registered, but nothing enqueues it. Same rules as above. */
-const KNOWN_WITHOUT_PRODUCER: Record<string, string> = {
-    "analytics.aggregate":
-        "S7-002 built and registered the handler; nothing schedules it. AnalyticsDailyAggregate is written only by the seed, so a real Organization's Insights dashboard reads no rows and says no views were recorded.",
-};
+const KNOWN_WITHOUT_PRODUCER: Record<string, string> = {};
 
 const SRC = join(__dirname, "..", "..");
 const JOBS_DIR = join(SRC, "modules", "jobs");
@@ -134,6 +132,13 @@ describe("job producers and consumers agree", () => {
     it("runs a test release's scheduled go-live (DEC-071, T10): site.go_live has its handler", () => {
         expect(produced.has("site.go_live")).toBe(true);
         expect(consumed.has("site.go_live")).toBe(true);
+    });
+
+    it("rolls up Insights (DEC-075): the hourly chain queues analytics.aggregate", () => {
+        for (const type of ["analytics.rollup", "analytics.aggregate"]) {
+            expect(produced.has(type)).toBe(true);
+            expect(consumed.has(type)).toBe(true);
+        }
     });
 
     it("names every job type with a string literal or an exported constant", () => {

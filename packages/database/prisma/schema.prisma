@@ -3881,6 +3881,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_payments_confirm_pending", where: raw("type = 'payments.confirm-pending' AND status = 'PENDING'"))
   // One waiting run of the waitlist retention sweep (U30), like the renewal chain.
   @@unique([type], map: "Job_one_pending_waitlist_retention", where: raw("type = 'waitlist.retention' AND status = 'PENDING'"))
+  // One waiting run of Insights' hourly rollup chain (DEC-075), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_analytics_rollup", where: raw("type = 'analytics.rollup' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -4842,6 +4844,8 @@ model AnalyticsEvent {
   @@index([organizationId, type, occurredAt])
   @@index([organizationId, siteId, occurredAt])
   @@index([expiresAt])
+  // The hourly rollup (DEC-075) asks what arrived since its last run, across businesses.
+  @@index([receivedAt])
 }
 
 // AnalyticsDailyAggregate — pre-computed per-day rollups (S7-002 populates
