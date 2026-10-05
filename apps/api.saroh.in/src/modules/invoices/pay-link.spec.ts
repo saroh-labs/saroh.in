@@ -17,6 +17,9 @@ jest.mock("@saroh/database", () => {
         invoice: { findFirst: jest.fn(), updateMany: jest.fn() },
         // Unregistered: a receipt may be voided (ADR-008).
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+        organization: {
+            findUnique: jest.fn().mockResolvedValue({ name: "Rye & Co." }),
+        },
     };
     return {
         ...actual,

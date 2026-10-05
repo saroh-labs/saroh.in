@@ -987,3 +987,16 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - A `development`-branch build refuses to start without the dev environment's variables, as a production build does without production's.
 - For now Vercel's preview protection (a Vercel team login) stays on in front of the dev apps, since only the owner uses them, and the key is the second lock. When others need dev, the saroh.io domains come out from behind Vercel's login (a Deployment Protection Exception, or protection off for those projects) and the key alone decides.
 - Consequences: the dev API and merchant sites stay reachable without the key. A new Vercel app joining the dev environment needs the gate in its middleware and its variables on the `development` branch.
+
+## DEC-082 An issued invoice prints the seller as it was at issue
+
+**Status: Accepted — 2026-10-05** · user · extends ADR-008's frozen seller (GSTIN, state, address)
+
+- Context: an issued invoice already froze the buyer, and the seller's GSTIN, state and registered address, but its paper read the business's **name, legal name and contact email** live from settings. Renaming the business changed every old invoice, its PDF and the customer's pay and receipt links.
+- Decision:
+    - Once issued, an invoice's printed data never changes. `Invoice.sellerName`, `sellerLegalName` and `sellerEmail` are written wherever the GSTIN and address are (`documentColumns`, from `loadTaxProfile`: `Organization.name`, `BusinessProfile.legalName`, `BusinessProfile.contactEmail`). A credit note or supplementary invoice copies its original's, as it does the GSTIN.
+    - Everything that draws an issued paper reads the frozen values: Invoice Detail and the quick look, the PDF, the pay page and the customer's receipt. A frozen name marks all three as frozen; a legal name or email blank at issue stays blank.
+    - A draft, and only a draft, prints today's settings (`serializeInvoice` sends null for its frozen seller fields).
+    - Migration `20261022110000_invoice_seller_frozen` backfilled every invoice that is not a draft from today's settings — what its paper printed until then. A row still without them (written outside the API, like a seed) falls back to today's rather than print no seller.
+    - **The logo stays live**: it is branding, not a particular rule 46 asks a tax invoice to carry, and a business replacing its logo expects its paper to follow.
+- Consequences: what is sent _now_ still names the business as it is now — the invoice email's sender line, an order's pay link and the booking page are not issued paper. `printedSeller` (API `invoices/invoice-paper-view.ts`, app `lib/invoices/seller.ts`) is the one rule.

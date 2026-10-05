@@ -103,6 +103,18 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         rule: "kept",
         why: "The business's address, not theirs.",
     },
+    "Invoice.sellerName": {
+        rule: "kept",
+        why: "The business's name as printed on issue, not theirs.",
+    },
+    "Invoice.sellerLegalName": {
+        rule: "kept",
+        why: "The business's legal name as printed on issue, not theirs.",
+    },
+    "Invoice.sellerEmail": {
+        rule: "kept",
+        why: "The business's contact email as printed on issue, not theirs.",
+    },
 
     // Bookings: the time and service stay (default 26).
     "Booking.bookerName": {

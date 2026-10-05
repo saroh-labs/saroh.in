@@ -43,6 +43,10 @@ jest.mock("@saroh/database", () => {
         invoiceSequence: { upsert: jest.fn() },
         contact: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
+        // The seller's name, frozen on issue (DEC-082).
+        organization: {
+            findUnique: jest.fn().mockResolvedValue({ name: "Rye & Co." }),
+        },
     };
     return {
         ...actual,
@@ -55,6 +59,9 @@ jest.mock("@saroh/database", () => {
             },
             contact: { findFirst: jest.fn() },
             businessProfile: { findUnique: jest.fn() },
+            organization: {
+                findUnique: jest.fn().mockResolvedValue({ name: "Rye & Co." }),
+            },
             // DEC-070: Payments on (no row) for a pay link.
             organizationModule: {
                 findFirst: jest.fn().mockResolvedValue(null),
@@ -842,6 +849,8 @@ describe("GST (ADR-008)", () => {
         addressLine2: "Indiranagar",
         city: "Bengaluru",
         postalCode: "560038",
+        legalName: "Rye and Company Bakery LLP",
+        contactEmail: "hello@rye.example",
     };
     const RYE_ADDRESS =
         "14 Hill Road, Indiranagar, Bengaluru 560038, Karnataka";
@@ -1005,6 +1014,35 @@ describe("GST (ADR-008)", () => {
         ).toBeNull();
     });
 
+    it("an issued invoice reads the seller it was issued by; a draft, none of its own (DEC-082)", () => {
+        const frozen = {
+            sellerName: "Rye & Co.",
+            sellerLegalName: "Rye and Company Bakery LLP",
+            sellerEmail: "hello@rye.example",
+        };
+        // The read is the frozen columns alone: renaming the business
+        // after issue cannot reach the workspace's view of the paper.
+        expect(
+            serializeInvoice(
+                row({ status: "PAID", ...frozen }) as never,
+                new Date(),
+            ),
+        ).toEqual(expect.objectContaining(frozen));
+        // A draft prints today's settings, so it shows none of its own.
+        expect(
+            serializeInvoice(
+                row({ status: "DRAFT", ...frozen }) as never,
+                new Date(),
+            ),
+        ).toEqual(
+            expect.objectContaining({
+                sellerName: null,
+                sellerLegalName: null,
+                sellerEmail: null,
+            }),
+        );
+    });
+
     it("an unregistered business issues a receipt with no GST columns", async () => {
         tx.invoice!.findFirst!.mockResolvedValue({
             status: "DRAFT",
@@ -1029,6 +1067,8 @@ describe("GST (ADR-008)", () => {
         expect(data.number).toBe("INV-0001");
         expect(data.sellerGstin).toBeNull();
         expect(data.taxType).toBeNull();
+        // Who it is from, frozen like the GSTIN would be (DEC-082).
+        expect(data.sellerName).toBe("Rye & Co.");
         const lines = tx.invoiceLine!.createMany!.mock.calls[0]![0].data;
         expect(lines[0]).toEqual(
             expect.objectContaining({
@@ -1037,6 +1077,45 @@ describe("GST (ADR-008)", () => {
                 taxableValue: null,
             }),
         );
+    });
+
+    it("issuing freezes the seller's name, legal name and email with its GSTIN (DEC-082)", async () => {
+        registered();
+        tx.invoice!.findFirst!.mockResolvedValue({
+            status: "DRAFT",
+            contactId: "c_1",
+            dueAt: null,
+            tax: decimal("0"),
+            billToGstin: null,
+            billToState: null,
+            billToAddress: null,
+            lines: [
+                {
+                    description: "Celebration cake",
+                    quantity: 1,
+                    unitPrice: decimal("1416"),
+                    gstRate: decimal("18"),
+                    hsnSac: "19059010",
+                },
+            ],
+        });
+        await service.issue(owner, "inv_1");
+        const data = tx.invoice!.updateMany!.mock.calls[0]![0].data;
+        expect(data).toEqual(
+            expect.objectContaining({
+                status: "ISSUED",
+                sellerGstin: "29AAGCR4375J1ZU",
+                sellerAddress: RYE_ADDRESS,
+                sellerName: "Rye & Co.",
+                sellerLegalName: "Rye and Company Bakery LLP",
+                sellerEmail: "hello@rye.example",
+            }),
+        );
+        // Read from the organization the caller is acting in, not an id sent.
+        expect(tx.organization!.findUnique).toHaveBeenCalledWith({
+            where: { id: "org_1" },
+            select: { name: true },
+        });
     });
 
     it("refuses to void a registered business's issued invoice", async () => {

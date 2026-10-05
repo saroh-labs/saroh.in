@@ -46,6 +46,9 @@ function makeTx() {
             upsert: jest.fn().mockResolvedValue({ lastNumber: 7 }),
         },
         businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+        organization: {
+            findUnique: jest.fn().mockResolvedValue({ name: "Kavi Dental" }),
+        },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },
         // The class waitlist (A12): nobody in line, no place held.
         classWaitlistEntry: {

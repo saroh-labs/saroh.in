@@ -60,3 +60,26 @@ describe("TaxRows (DEC-072)", () => {
         expect(rows({})).toContain("Taxable value");
     });
 });
+
+describe("TaxRows' seller (DEC-082)", () => {
+    it("an issued receipt names the business as it was at issue", () => {
+        // `businessName` is today's: the business was renamed since.
+        const html = renderToStaticMarkup(
+            <TaxRows
+                invoice={
+                    {
+                        status: "PAID",
+                        gst: null,
+                        exempt: false,
+                        tax: "0.00",
+                        sellerName: "Rye & Co.",
+                    } as Invoice
+                }
+                money={(a) => `₹${a}`}
+                businessName="Rye Bakehouse"
+            />,
+        );
+        expect(html).toContain("No GST — Rye &amp; Co. isn&#x27;t registered");
+        expect(html).not.toContain("Rye Bakehouse");
+    });
+});

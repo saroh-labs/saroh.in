@@ -10,17 +10,52 @@ import type { InvoiceViewModel } from "./serialize";
  * line. Pure: every figure is the one frozen on the invoice when it was
  * issued, formatted, never summed here.
  *
- * Only an issued paper is drawn, so the seller's address, GSTIN and state
- * are the ones frozen on it, never today's settings. The one difference
- * from the screen: dates carry their year, since a downloaded paper
- * outlives the year it was issued in.
+ * Only an issued paper is drawn, and an issued paper prints the seller as
+ * it was at issue (DEC-082): its name, legal name, contact email, address,
+ * GSTIN and state are the ones frozen on it, never today's settings — a
+ * business renamed since changes no paper it already issued. The logo is
+ * the one exception: it is branding, not a particular the law asks for, so
+ * the PDF prints today's. The one difference from the screen: dates carry
+ * their year, since a downloaded paper outlives the year it was issued in.
  */
 
-/** What the paper prints about the business beyond what it froze. */
+/**
+ * The seller as a paper prints it: name, legal name, contact email. Passed
+ * in as today's settings; `printedSeller` swaps in what the invoice froze.
+ */
 export interface PaperBusiness {
     name: string;
     legalName: string | null;
     email: string | null;
+}
+
+/** The seller's particulars as frozen on an invoice at issue. */
+export interface FrozenSeller {
+    sellerName?: string | null;
+    sellerLegalName?: string | null;
+    sellerEmail?: string | null;
+}
+
+/**
+ * The seller an issued paper prints: the name, legal name and email frozen
+ * on it at issue (DEC-082), never today's. A frozen name marks all three as
+ * frozen — a legal name or email left blank at issue stays blank.
+ *
+ * Every issued invoice has them since `20261022110000_invoice_seller_frozen`
+ * backfilled the rest, and every issue path writes them; a row without (one
+ * written outside the API, like a seed) falls back to today's settings
+ * rather than print no seller at all.
+ */
+export function printedSeller(
+    invoice: FrozenSeller,
+    today: PaperBusiness,
+): PaperBusiness {
+    if (!invoice.sellerName) return today;
+    return {
+        name: invoice.sellerName,
+        legalName: invoice.sellerLegalName ?? null,
+        email: invoice.sellerEmail ?? null,
+    };
 }
 
 export interface PaperLine {
@@ -206,13 +241,15 @@ export function paperFooter(i: InvoiceViewModel, businessName: string): string {
 
 /**
  * The paper of an issued invoice read with its lines (`serializeInvoice`
- * with `detail`), in the business's zone.
+ * with `detail`), in the business's zone. `today` is the business's current
+ * name, legal name and email, printed only where the invoice froze none.
  */
 export function paperView(
     i: InvoiceViewModel & { number: string },
-    business: PaperBusiness,
+    today: PaperBusiness,
     timeZone: string,
 ): PaperView {
+    const business = printedSeller(i, today);
     const money = (a: string) => paperMoney(a, i.currency);
     const gst = i.gst;
     const taxed = gst && !isExemptPaper(i) ? gst : null;

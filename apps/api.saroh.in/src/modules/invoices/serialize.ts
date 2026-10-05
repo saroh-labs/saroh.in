@@ -61,6 +61,9 @@ export const INVOICE_SELECT = {
     sellerGstin: true,
     sellerState: true,
     sellerAddress: true,
+    sellerName: true,
+    sellerLegalName: true,
+    sellerEmail: true,
     placeOfSupply: true,
     taxType: true,
     cgst: true,
@@ -162,6 +165,9 @@ export interface InvoiceRow {
     sellerGstin?: string | null;
     sellerState?: string | null;
     sellerAddress?: string | null;
+    sellerName?: string | null;
+    sellerLegalName?: string | null;
+    sellerEmail?: string | null;
     placeOfSupply?: string | null;
     taxType?: string | null;
     cgst?: Money;
@@ -269,6 +275,13 @@ export interface InvoiceViewModel {
      * (CGST rule 46); null on a draft, which prints today's.
      */
     sellerAddress: string | null;
+    /**
+     * The business's name, legal name and contact email as they were when
+     * this was issued (DEC-082); null on a draft, which prints today's.
+     */
+    sellerName: string | null;
+    sellerLegalName: string | null;
+    sellerEmail: string | null;
     currency: string;
     subtotal: string;
     tax: string;
@@ -423,6 +436,10 @@ export function serializeInvoice(
         },
         sellerAddress:
             row.status === "DRAFT" ? null : (row.sellerAddress ?? null),
+        sellerName: row.status === "DRAFT" ? null : (row.sellerName ?? null),
+        sellerLegalName:
+            row.status === "DRAFT" ? null : (row.sellerLegalName ?? null),
+        sellerEmail: row.status === "DRAFT" ? null : (row.sellerEmail ?? null),
         gst: row.sellerGstin
             ? {
                   sellerGstin: row.sellerGstin,
