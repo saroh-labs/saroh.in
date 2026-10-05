@@ -33,6 +33,7 @@ export type LinkCheckView =
           fixCount: number;
           score: string;
           tags: TagRow[];
+          sample?: true;
       }
     | {
           ok: false;
@@ -55,6 +56,7 @@ export function checkView(check: LinkCheck): LinkCheckView {
         fixCount: report.fixes.length,
         score: scoreLine(report),
         tags: report.tags,
+        ...(check.sample && { sample: true as const }),
     };
 }
 
@@ -93,7 +95,9 @@ export class LinkPreviewController {
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }
-        return checkView(await this.preview.check(query.url));
+        return checkView(
+            await this.preview.check(query.url, { fresh: query.fresh === "1" }),
+        );
     }
 
     /** Unlock the fix-it report with an email (KTD-5). */

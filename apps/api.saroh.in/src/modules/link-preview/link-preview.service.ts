@@ -7,6 +7,7 @@ import { buildReport, factsFrom } from "./link-report";
 import { decodeHtml, hasAnyTag, MAX_HTML_BYTES, parseHead } from "./og-parse";
 import type { FetchDeps } from "./safe-fetch";
 import { guardedFetch, nodeTransport } from "./safe-fetch";
+import { isSampleHost, sampleFacts } from "./sample";
 import { checkTarget, systemResolver, testHostsFrom } from "./ssrf-guard";
 
 /**
@@ -43,6 +44,8 @@ export type LinkCheck =
           checkedAt: string;
           facts: LinkFacts;
           report: LinkReport;
+          /** The page's sample chip: fixed tags, nothing fetched. */
+          sample?: true;
       }
     | {
           ok: false;
@@ -106,9 +109,14 @@ export class LinkPreviewService {
 
     /**
      * Check what someone typed. The same address within {@link CACHE_MS}
-     * answers from the cache, and two checks of it at once share one fetch.
+     * answers from the cache, unless `fresh` ("Check again" after a fix);
+     * two checks of it at once share one fetch either way.
      */
-    async check(raw: string, now: number = Date.now()): Promise<LinkCheck> {
+    async check(
+        raw: string,
+        options: { now?: number; fresh?: boolean } = {},
+    ): Promise<LinkCheck> {
+        const now = options.now ?? Date.now();
         const checkedAt = new Date(now).toISOString();
         const target = checkTarget(raw, this.deps.testHosts);
         if (!target.ok) {
@@ -120,8 +128,19 @@ export class LinkPreviewService {
             };
         }
         const key = target.url.href;
+        if (isSampleHost(target.url)) {
+            const facts = sampleFacts();
+            return {
+                ok: true,
+                url: key,
+                checkedAt,
+                facts,
+                report: buildReport(facts),
+                sample: true,
+            };
+        }
 
-        const hit = this.cache.get(key);
+        const hit = options.fresh ? undefined : this.cache.get(key);
         if (hit && now - hit.at < CACHE_MS) return hit.value;
 
         const running = this.inflight.get(key);

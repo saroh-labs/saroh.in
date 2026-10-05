@@ -42,7 +42,7 @@ const RELAY_SECRET = "saroh-dev-insecure-site-relay-secret-not-for-production";
 const PUBLIC = "93.184.216.34";
 
 const resolver: Resolver = (host) =>
-    host.endsWith(".example.com") || host === "example-bakery.in"
+    host.endsWith(".example.com")
         ? Promise.resolve([{ address: PUBLIC, family: 4 } as LookupAddress])
         : Promise.reject(new Error("ENOTFOUND"));
 
@@ -52,7 +52,7 @@ const GOOD_PAGE = `<!doctype html><html><head>
 <meta property="og:title" content="Fresh bread every morning">
 <meta property="og:description" content="Sourdough from Hill Road.">
 <meta property="og:image" content="/cover.png">
-<meta property="og:url" content="https://example-bakery.in/">
+<meta property="og:url" content="https://shop.example.com/">
 </head><body>hi</body></html>`;
 
 function png(width: number, height: number): Buffer {
@@ -90,8 +90,8 @@ const html = (
 });
 
 const SITE: Record<string, Reply> = {
-    "https://example-bakery.in/": html(GOOD_PAGE),
-    "https://example-bakery.in/cover.png": {
+    "https://shop.example.com/": html(GOOD_PAGE),
+    "https://shop.example.com/cover.png": {
         status: 206,
         headers: {
             "content-type": "image/png",
@@ -151,17 +151,17 @@ describe("GET /public/tools/link-preview", () => {
     it("answers the facts, the verdicts and the score, and keeps the fixes for the unlock", async () => {
         const { controller } = setup();
         const view = await controller.check(
-            { url: "example-bakery.in" },
+            { url: "shop.example.com" },
             ip(),
             undefined,
         );
         if (!view.ok) throw new Error(view.failure);
-        expect(view.url).toBe("https://example-bakery.in/");
+        expect(view.url).toBe("https://shop.example.com/");
         expect(view.facts).toMatchObject({
-            domain: "example-bakery.in",
+            domain: "shop.example.com",
             title: "Fresh bread every morning",
             image: {
-                url: "https://example-bakery.in/cover.png",
+                url: "https://shop.example.com/cover.png",
                 width: 600,
                 height: 315,
                 bytes: 700000,
@@ -185,7 +185,7 @@ describe("GET /public/tools/link-preview", () => {
         ["huge.example.com", "too-large"],
         ["broken.example.com", "unreachable"],
         ["nowhere.invalid", "unreachable"],
-        ["ftp://example-bakery.in/", "invalid"],
+        ["ftp://shop.example.com/", "invalid"],
         ["http://169.254.169.254/latest/meta-data/", "blocked"],
         ["localhost", "blocked"],
     ])(
@@ -216,6 +216,22 @@ describe("GET /public/tools/link-preview", () => {
         }
     });
 
+    it("answers the sample chip from fixed tags, fetching nothing, through the same report", async () => {
+        const { controller, calls } = setup();
+        const view = await controller.check(
+            { url: "example-bakery.in" },
+            ip(),
+            undefined,
+        );
+        // Nothing is fetched: the sample isn't a real site.
+        expect(calls).toHaveLength(0);
+        expect(view).toMatchObject({
+            ok: true,
+            sample: true,
+            score: "Looks right on 0 of 6 apps. Fix 3 things to fix all 6.",
+        });
+    });
+
     it("says the status when the site answered with an error", async () => {
         const { controller } = setup();
         const view = await controller.check(
@@ -229,12 +245,18 @@ describe("GET /public/tools/link-preview", () => {
     it("answers the same address from the cache within a minute, and fetches again after", async () => {
         const { preview, calls } = setup();
         const t0 = Date.now();
-        await preview.check("https://example-bakery.in/", t0);
+        await preview.check("https://shop.example.com/", { now: t0 });
         const fetched = calls.length;
-        await preview.check("EXAMPLE-BAKERY.IN/#top", t0 + 30_000);
+        await preview.check("EXAMPLE-BAKERY.IN/#top", { now: t0 + 30_000 });
         expect(calls.length).toBe(fetched);
-        await preview.check("example-bakery.in", t0 + 61_000);
+        await preview.check("shop.example.com", { now: t0 + 61_000 });
         expect(calls.length).toBe(fetched * 2);
+        // "Check again" goes past the cache.
+        await preview.check("shop.example.com", {
+            now: t0 + 62_000,
+            fresh: true,
+        });
+        expect(calls.length).toBe(fetched * 3);
     });
 
     it("shares one fetch between two checks of the same address at once", async () => {
@@ -306,8 +328,8 @@ describe("POST /public/tools/link-preview/report", () => {
         const { controller } = setup();
         const result = await controller.unlock(
             {
-                email: "Owner@Example-Bakery.in",
-                url: "example-bakery.in",
+                email: "Owner@Shop.Example.com",
+                url: "shop.example.com",
                 consent: true,
             },
             ip(),
@@ -326,18 +348,18 @@ describe("POST /public/tools/link-preview/report", () => {
         expect(
             (prisma.waitlistSignup.create as jest.Mock).mock.calls[0][0].data,
         ).toMatchObject({
-            email: "owner@example-bakery.in",
-            emailKey: "owner@example-bakery.in",
+            email: "owner@shop.example.com",
+            emailKey: "owner@shop.example.com",
             businessKey: "",
             source: "link-preview",
-            checkedUrl: "https://example-bakery.in/",
+            checkedUrl: "https://shop.example.com/",
             newsConsent: true,
         });
         expect(sendLinkReportEmail).toHaveBeenCalledTimes(1);
         const [to, subject, text] = (sendLinkReportEmail as jest.Mock).mock
             .calls[0] as [string, string, string];
-        expect(to).toBe("owner@example-bakery.in");
-        expect(subject).toBe("Your link preview report for example-bakery.in");
+        expect(to).toBe("owner@shop.example.com");
+        expect(subject).toBe("Your link preview report for shop.example.com");
         expect(text).toContain("1. Use a bigger picture.");
     });
 
@@ -345,7 +367,7 @@ describe("POST /public/tools/link-preview/report", () => {
         const { gate } = setup();
         await gate.unlock({
             email: "quiet@example.com",
-            url: "example-bakery.in",
+            url: "shop.example.com",
             consent: false,
         });
         expect(
@@ -369,12 +391,12 @@ describe("POST /public/tools/link-preview/report", () => {
 
         await gate.unlock({
             email: "back@example.com",
-            url: "example-bakery.in",
+            url: "shop.example.com",
             consent: false,
         });
         const data = (prisma.waitlistSignup.update as jest.Mock).mock
             .calls[0][0].data;
-        expect(data.checkedUrl).toBe("https://example-bakery.in/");
+        expect(data.checkedUrl).toBe("https://shop.example.com/");
         expect(data).not.toHaveProperty("newsConsent");
         expect(prisma.waitlistSignup.create).not.toHaveBeenCalled();
     });
@@ -396,13 +418,13 @@ describe("POST /public/tools/link-preview/report", () => {
         for (let i = 0; i < EMAILS_PER_DAY; i += 1) {
             await gate.unlock({
                 email: "target@example.com",
-                url: "example-bakery.in",
+                url: "shop.example.com",
                 consent: false,
             });
         }
         const fourth = await gate.unlock({
             email: "Target+x@example.com",
-            url: "example-bakery.in",
+            url: "shop.example.com",
             consent: false,
         });
         expect(fourth).toMatchObject({ unlocked: true, emailed: "limited" });
@@ -415,7 +437,7 @@ describe("POST /public/tools/link-preview/report", () => {
         await expect(
             gate.unlock({
                 email: "down@example.com",
-                url: "example-bakery.in",
+                url: "shop.example.com",
                 consent: false,
             }),
         ).resolves.toMatchObject({ unlocked: true, emailed: "not-sent" });
@@ -428,7 +450,7 @@ describe("POST /public/tools/link-preview/report", () => {
             await controller.unlock(
                 {
                     email: `v${i}@example.com`,
-                    url: "example-bakery.in",
+                    url: "shop.example.com",
                     consent: false,
                 },
                 caller,
@@ -439,7 +461,7 @@ describe("POST /public/tools/link-preview/report", () => {
             controller.unlock(
                 {
                     email: "v9@example.com",
-                    url: "example-bakery.in",
+                    url: "shop.example.com",
                     consent: false,
                 },
                 caller,

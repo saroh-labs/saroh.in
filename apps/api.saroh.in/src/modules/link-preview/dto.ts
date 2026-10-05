@@ -1,5 +1,12 @@
 import { Transform } from "class-transformer";
-import { IsBoolean, IsEmail, IsString, MaxLength } from "class-validator";
+import {
+    IsBoolean,
+    IsEmail,
+    IsIn,
+    IsOptional,
+    IsString,
+    MaxLength,
+} from "class-validator";
 
 /**
  * The address to check. Generous here: an address the tool won't fetch
@@ -10,6 +17,11 @@ export class CheckLinkQueryDto {
     @IsString()
     @MaxLength(8192)
     url!: string;
+
+    /** `1`: "Check again", past the minute's cache. Text, as a query string is. */
+    @IsOptional()
+    @IsIn(["1"])
+    fresh?: "1";
 }
 
 const normalizeEmail = ({ value }: { value: unknown }): unknown =>
