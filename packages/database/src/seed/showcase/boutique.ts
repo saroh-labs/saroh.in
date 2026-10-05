@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 
 import type { Db } from "../helpers";
 import { at, id, listProductAt, setStockLevel } from "../helpers";
-import { seedPlanId } from "../pricing.internal";
+import { seedPlanId } from "../pricing";
 import type { BoutiqueProduct } from "./boutique-catalog";
 import {
     BOUTIQUE_CATEGORIES,

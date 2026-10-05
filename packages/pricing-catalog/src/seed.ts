@@ -1,14 +1,10 @@
-// INTERNAL — strip before this branch leaves local. Prices and limits are not public.
+// A SAMPLE catalogue for development, tests and the seed. These are not
+// Saroh's prices or limits: those live only in the database, entered and
+// published through the admin console's Plans screen. The numbers here are
+// made up, in the same shape (Free, Grow and Pro, amounts in paise), with
+// Pro's limits set high so no seeded demo business ever meets one.
 //
-// The first published catalogue (version 1): the design's Free, Grow and Pro
-// from `saroh-catalog.js` DEFAULT, with the admin screen's offer defaults
-// (yearly off at "pay for 10", prices shown before GST, no trials, no
-// add-ons). Amounts are paise. This file is the only place the real
-// catalogue lives: the migration creates empty tables, and version 1 is
-// written from here (`writeCatalogueVersion` in @saroh/database).
-//
-// Exported only through `@saroh/pricing-catalog/seed`, never the package
-// root, so stripping this file removes every real number at once.
+// Exported only through `@saroh/pricing-catalog/seed`, never the package root.
 
 import type { Catalog, CatalogInput } from "./schema";
 import { parseCatalog } from "./schema";
@@ -31,7 +27,7 @@ const X = (off: "locked" | "hidden" = "locked") => ({
 });
 
 export const SEED_VERSION = 1;
-export const SEED_NOTE = "First published pricing: Free, Grow and Pro.";
+export const SEED_NOTE = "Sample catalogue for development and tests.";
 
 const input: CatalogInput = {
     plans: [
@@ -47,7 +43,7 @@ const input: CatalogInput = {
         {
             id: "grow",
             name: "Grow",
-            pricePaise: 150_000,
+            pricePaise: 20_000,
             tagline: "For a business that sells, books and bills.",
             cta: "Choose Grow",
             featured: true,
@@ -56,7 +52,7 @@ const input: CatalogInput = {
         {
             id: "pro",
             name: "Pro",
-            pricePaise: 500_000,
+            pricePaise: 60_000,
             tagline: "For your own look and a bigger team.",
             cta: "Choose Pro",
             featured: false,
@@ -127,8 +123,8 @@ const input: CatalogInput = {
             pricing: "show",
             what: "Posts on your site's journal.",
             cells: {
-                free: C("5", "5 blog posts", 5),
-                grow: C("50", "50 blog posts", 50),
+                free: C("3", "3 blog posts", 3),
+                grow: C("30", "30 blog posts", 30),
                 pro: C("Included", "Blog posts, no limit"),
             },
         },
@@ -141,9 +137,9 @@ const input: CatalogInput = {
             child: "Products",
             what: "Everything you sell, with sizes, prices and stock.",
             cells: {
-                free: C("5", "5 products", 5),
-                grow: C("100", "100 products", 100),
-                pro: C("1,000", "1,000 products", 1000),
+                free: C("3", "3 products", 3),
+                grow: C("60", "60 products", 60),
+                pro: C("2,000", "2,000 products", 2000),
             },
         },
         {
@@ -156,9 +152,9 @@ const input: CatalogInput = {
             what: "Every order from your site and the counter, in one list.",
             cells: {
                 free: C(
-                    "Up to 10 a month, paid offline",
-                    "Up to 10 orders a month, paid offline",
-                    10,
+                    "Up to 8 a month, paid offline",
+                    "Up to 8 orders a month, paid offline",
+                    8,
                     "month",
                 ),
                 grow: C("Included", "Orders, paid online or offline"),
@@ -186,9 +182,9 @@ const input: CatalogInput = {
             what: "Classes, sessions and appointments customers book themselves.",
             cells: {
                 free: C(
-                    "Up to 10 a month",
-                    "Up to 10 bookings and appointments a month",
-                    10,
+                    "Up to 8 a month",
+                    "Up to 8 bookings and appointments a month",
+                    8,
                     "month",
                 ),
                 grow: C("Included", "Bookings and appointments"),
@@ -216,8 +212,8 @@ const input: CatalogInput = {
             what: "People who can sign in to your dashboard.",
             cells: {
                 free: C("1", "1 team member", 1),
-                grow: C("3", "3 team members", 3),
-                pro: C("10", "10 team members", 10),
+                grow: C("2", "2 team members", 2),
+                pro: C("20", "20 team members", 20),
             },
         },
         {
@@ -240,8 +236,8 @@ const input: CatalogInput = {
             what: "Connections to other tools.",
             cells: {
                 free: X("hidden"),
-                grow: C("Up to 5", "Up to 5 third-party connections", 5),
-                pro: C("Up to 50", "Up to 50 third-party connections", 50),
+                grow: C("Up to 3", "Up to 3 third-party connections", 3),
+                pro: C("Up to 100", "Up to 100 third-party connections", 100),
             },
         },
     ],

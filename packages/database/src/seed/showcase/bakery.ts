@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import type { Db } from "../helpers";
-import { seedPlanId } from "../pricing.internal";
+import { seedPlanId } from "../pricing";
 import type { BakeryProduct, CategoryKey, StoreKey } from "./bakery-catalogue";
 import {
     ALLERGENS,

@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import type { Db } from "../helpers";
 import { writeSite } from "../helpers";
-import { seedPlanId } from "../pricing.internal";
+import { seedPlanId } from "../pricing";
 import {
     KAVI,
     KAVI_ADDRESS,

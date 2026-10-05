@@ -1,14 +1,13 @@
-// INTERNAL — strip before this branch leaves local. Prices and limits are not public.
 /**
  * The seed's businesses on the pricing catalogue (plans catalogue U12).
  *
  * The demo businesses used to sit on a hand-made legacy `business` plan. They
  * now subscribe to a catalogue plan, so what they may do is read the way a
  * real business's is (`CatalogueAccessService`). The catalogue itself is the
- * seed catalogue, `@saroh/pricing-catalog/seed` (INTERNAL: it holds the real
- * prices and limits), installed as version 1 on a database that has none —
- * the same as `install-seed-catalogue.internal.cli.ts` in the API. A database
- * that already has versions keeps them; the businesses go on the live one.
+ * SAMPLE catalogue, `@saroh/pricing-catalog/seed` (made-up prices and limits;
+ * Saroh's real ones are entered in the admin console, never in code),
+ * installed as version 1 on a database that has none. A database that
+ * already has versions keeps them; the businesses go on the live one.
  *
  * They are put on the top plan so no catalogue lock or limit ever bites a
  * demo, a film or a browser spec (the custom roles, the team, the products).

@@ -5,7 +5,7 @@
 # CI round trip. Every step here exists because CI once caught it first —
 # docs/architecture/DEV_LEARNINGS.md has the stories.
 #
-#   pnpm prepush                 secrets, lint, types, checks, and the unit
+#   pnpm prepush                 secrets, private prices, lint, types, checks, and the unit
 #                                tests and vitest specs the branch's changes
 #                                reach (what .husky/pre-push runs)
 #   pnpm prepush --int           … plus the full unit suites and the API
@@ -143,14 +143,14 @@ cached() {
     [ "$USE_CACHE" = 1 ] && [ -n "$TREE" ] || return 1
     # Never cached: a leak lives in history, an advisory is published after
     # the tree passed, and a build is a means.
-    case "$1" in secrets | audit | int-build | deps) return 1 ;; esac
+    case "$1" in secrets | private | audit | int-build | deps) return 1 ;; esac
     for t in $SAME_CODE; do
         for s in "$@"; do [ -f "$PASSES/$t-$s" ] && return 0; done
     done
     return 1
 }
 record() {
-    case "$1" in secrets | audit | int-build | deps) return 0 ;; esac
+    case "$1" in secrets | private | audit | int-build | deps) return 0 ;; esac
     [ -n "$TREE" ] && date +%s >"$PASSES/$TREE-$1"; return 0
 }
 say() { printf '=== %-16s %s\n' "$1" "$2"; }
@@ -722,6 +722,11 @@ if command -v gitleaks >/dev/null 2>&1; then
 else
     echo "=== secrets          SKIP — install gitleaks (brew install gitleaks); CI runs it"
 fi
+
+# Saroh's real prices and limits never enter the public repo; they live in
+# the database. The values to look for live on the owner's machine only
+# (scripts/check-private-terms.sh says where). Never cached, like secrets.
+step private scripts/check-private-terms.sh "$STEP_SKIP"
 
 # CI's dependency audit (critical only), the same rule: a critical advisory
 # fails; an unreachable registry is a SKIP, which CI runs again. Never cached,

@@ -24,7 +24,7 @@ import {
     utcDay,
     writeSite,
 } from "../helpers";
-import { seedPlanId } from "../pricing.internal";
+import { seedPlanId } from "../pricing";
 import { deleteSeeded } from "../run";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
 import { RYE, seedBakery } from "./bakery";
@@ -425,7 +425,7 @@ async function enableModules(
 }
 
 /**
- * The catalogue plan the base seed uses (`pricing.internal.ts`), so the
+ * The catalogue plan the base seed uses (`pricing.ts`), so the
  * entitlements (sites, team members) allow what the showcase creates.
  */
 async function subscribe(ctx: Context, key: string, orgId: string) {
