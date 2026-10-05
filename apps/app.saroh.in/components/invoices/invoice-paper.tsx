@@ -9,6 +9,7 @@ import {
     paperTitle,
     showsGstTotals,
 } from "@/lib/invoices/paper-title";
+import { printedSeller } from "@/lib/invoices/seller";
 import type { Invoice } from "@/lib/invoices/service";
 import { billedTo, spacedCode } from "@/lib/invoices/status";
 import type { InvoiceBusiness } from "@/lib/invoices/tax";
@@ -16,8 +17,9 @@ import type { InvoiceBusiness } from "@/lib/invoices/tax";
 /**
  * The invoice as the customer receives it, after "Saroh Invoice Detail": a
  * tax invoice for a GST-registered business — the seller's logo (today's,
- * not frozen on issue: it is not a GST particular), legal name,
- * registered address (frozen on issue, like the GSTIN), GSTIN and state,
+ * not frozen on issue: it is branding, not a GST particular), its name,
+ * legal name, contact email and registered address (frozen on issue, like
+ * the GSTIN, DEC-082), GSTIN and state,
  * who it is billed to (with their GSTIN when they are registered), the place
  * of supply, HSN/SAC on every line and its rate where one is set (a rate
  * never set says nothing, DEC-072), taxable value and CGST + SGST
@@ -32,13 +34,21 @@ import type { InvoiceBusiness } from "@/lib/invoices/tax";
 export function InvoicePaper({
     invoice: i,
     business,
-    businessName,
+    businessName: todayName,
 }: {
     invoice: Invoice;
     /** Null when this role cannot read the business's settings. */
     business: InvoiceBusiness | null;
+    /** Today's name: a draft prints it; issued paper, the one it froze. */
     businessName: string;
 }) {
+    // Issued paper names the seller as it was at issue; a draft, today.
+    const seller = printedSeller(i, {
+        name: todayName,
+        legalName: business?.legalName ?? null,
+        email: business?.email ?? null,
+    });
+    const businessName = seller.name;
     const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
     const who = billedTo(i);
     const gst = i.gst ?? null;
@@ -61,14 +71,12 @@ export function InvoicePaper({
             ? (business?.address ?? null)
             : (i.sellerAddress ?? null);
     const legalName =
-        business?.legalName && business.legalName !== businessName
-            ? business.legalName
+        seller.legalName && seller.legalName !== businessName
+            ? seller.legalName
             : null;
-    const sellerLines = [
-        legalName,
-        sellerAddress,
-        business?.email ?? null,
-    ].filter((x): x is string => Boolean(x));
+    const sellerLines = [legalName, sellerAddress, seller.email].filter(
+        (x): x is string => Boolean(x),
+    );
     const address = i.billTo?.address ?? i.billToGst?.address ?? null;
     const buyerGstin = i.billTo?.gstin ?? i.billToGst?.gstin ?? null;
     const typedTax = !gst && Number(i.tax) > 0;

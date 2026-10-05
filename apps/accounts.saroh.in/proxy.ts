@@ -1,3 +1,5 @@
+import { sessionCookiePrefix } from "@saroh/auth/constants";
+import { withDevAccess } from "@saroh/auth/dev-access";
 import { getServerSession } from "@saroh/auth/next";
 import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
@@ -11,10 +13,12 @@ const authRoutePrefixes = [
     "/reset-password",
 ];
 
-export default async function proxy(req: NextRequest) {
+async function proxy(req: NextRequest) {
     const { nextUrl } = req;
     // Cheap presence check (no network); full validation hits api below.
-    const sessionCookie = getSessionCookie(req);
+    const sessionCookie = getSessionCookie(req, {
+        cookiePrefix: sessionCookiePrefix(),
+    });
 
     const isLoggedIn = !!sessionCookie;
     const isOnProtectedRoute = protectedRoutes.has(nextUrl.pathname);
@@ -37,6 +41,9 @@ export default async function proxy(req: NextRequest) {
 
     return NextResponse.next();
 }
+
+// The dev environment admits only browsers holding its key (withDevAccess).
+export default withDevAccess(proxy);
 
 export const config = {
     matcher: [

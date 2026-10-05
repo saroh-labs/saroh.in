@@ -2,8 +2,7 @@ import { cookies, headers } from "next/headers";
 
 import type { SignedInCustomer } from "@saroh/site-blocks";
 
-import { env } from "@/env";
-
+import { serverApiUrl } from "./api-url";
 import { servedHost } from "./origin";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
@@ -30,8 +29,7 @@ export const CUSTOMER_SESSION_HEADER = "x-customer-session";
  */
 export const SESSION_COOKIE_MAX_AGE_MS = 90 * 24 * 60 * 60_000;
 
-const API_URL =
-    env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+const API_URL = serverApiUrl();
 
 export interface SessionCookie {
     name: string;

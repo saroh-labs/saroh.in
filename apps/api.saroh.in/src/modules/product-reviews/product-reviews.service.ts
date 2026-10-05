@@ -10,7 +10,6 @@ import { prisma } from "@saroh/database";
 import type { EmailOutcome } from "../../common/email";
 import { sendReviewInvitationEmail } from "../../common/email";
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { env } from "../../env";
 import {
     AuditAction,
     AuditOutcome,
@@ -19,6 +18,7 @@ import {
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { PRODUCT_LINES } from "../orders/order-line";
+import { rendererBase } from "../sites/site-origin";
 import { contactReviewsWhere } from "./contact-reviews";
 import type { IneligibleReason } from "./eligibility";
 import { INELIGIBLE_MESSAGE, orderIneligibility } from "./eligibility";
@@ -137,12 +137,7 @@ function toView(r: ProductReview): ReviewView {
 }
 
 function reviewLink(token: string): string {
-    const base =
-        env.RENDERER_URL ??
-        (env.NODE_ENV === "development"
-            ? "https://saroh.app.localhost"
-            : "https://saroh.app");
-    return `${base.replace(/\/$/, "")}/review/${token}`;
+    return `${rendererBase()}/review/${token}`;
 }
 
 /**

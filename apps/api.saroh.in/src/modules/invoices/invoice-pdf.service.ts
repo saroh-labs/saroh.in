@@ -19,7 +19,10 @@ const DEFAULT_ZONE = "Asia/Kolkata";
  * organization, so another business's invoice is a 404. A draft has no
  * number and no paper yet, so it is a 409.
  *
- * The business logo prints at the top as it does on the paper, read from
+ * The seller prints as it was at issue (DEC-082): the name, legal name and
+ * email frozen on the invoice, today's settings only for a row without
+ * them (`printedSeller`). The business logo prints at the top as it does on
+ * the paper — today's, since it is branding, not frozen — read from
  * storage; a logo that cannot be read in time goes unprinted, never the
  * PDF (`invoice-pdf-logo.ts`).
  */

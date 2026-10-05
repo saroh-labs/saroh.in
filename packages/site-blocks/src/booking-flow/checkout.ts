@@ -314,9 +314,14 @@ function openCashfree(request: CheckoutRequest, settle: Settle): void {
                 return;
             }
             try {
-                // The API makes orders on Cashfree's production host, so the
-                // drop-in opens there too.
-                Cashfree({ mode: "production" })
+                // The drop-in opens where the API made the order: the API
+                // sends its `CASHFREE_ENV` as `mode`, production when absent.
+                Cashfree({
+                    mode:
+                        request.handoff.clientParams.mode === "sandbox"
+                            ? "sandbox"
+                            : "production",
+                })
                     .checkout({
                         paymentSessionId: session,
                         redirectTarget: "_modal",

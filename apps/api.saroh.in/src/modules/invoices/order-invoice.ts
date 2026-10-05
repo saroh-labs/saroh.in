@@ -41,6 +41,22 @@ export interface TaxProfile {
      * Mumbai 400050, Maharashtra"); null until the business gives one.
      */
     address: string | null;
+    /**
+     * The business's name, legal name and contact email as the paper
+     * prints them today — frozen onto each document it issues (DEC-082).
+     */
+    seller: SellerParticulars;
+}
+
+/**
+ * The seller's name, legal name and contact email as a paper prints them:
+ * frozen on the invoice at issue like the GSTIN and address, so a business
+ * renamed later never changes paper it already issued (DEC-082).
+ */
+export interface SellerParticulars {
+    sellerName: string | null;
+    sellerLegalName: string | null;
+    sellerEmail: string | null;
 }
 
 export interface OrderForInvoice {
@@ -99,6 +115,10 @@ export interface BuiltDocument {
     sellerState: string | null;
     /** The business's address, frozen with the rest of the paper. */
     sellerAddress: string | null;
+    /** Its name, legal name and email, frozen likewise (DEC-082). */
+    sellerName: string | null;
+    sellerLegalName: string | null;
+    sellerEmail: string | null;
 }
 
 export interface BillTo {
@@ -249,6 +269,7 @@ export function buildOrderInvoice(
         sellerGstin: profile.registered ? profile.gstin : null,
         sellerState: profile.registered ? profile.state : null,
         sellerAddress: profile.address,
+        ...profile.seller,
     });
 }
 
@@ -263,6 +284,7 @@ export function finish(
         | "sellerGstin"
         | "sellerState"
         | "sellerAddress"
+        | keyof SellerParticulars
     >,
 ): BuiltDocument {
     const sum = (pick: (l: GstLine) => number) =>
@@ -293,7 +315,7 @@ export interface IssuedLine {
 }
 
 /** What a correction is against: the original's GST standing and lines. */
-export interface Original {
+export interface Original extends SellerParticulars {
     sellerGstin: string | null;
     sellerState: string | null;
     sellerAddress: string | null;
@@ -315,6 +337,19 @@ function gstOf(original: Original) {
         sellerGstin: original.sellerGstin,
         sellerState: original.sellerState,
         sellerAddress: original.sellerAddress,
+        ...sellerOf(original),
+    };
+}
+
+/**
+ * The seller a correction prints: its original's, as frozen on issue — a
+ * credit note names the business as the invoice it cancels did (DEC-082).
+ */
+function sellerOf(original: SellerParticulars): SellerParticulars {
+    return {
+        sellerName: original.sellerName,
+        sellerLegalName: original.sellerLegalName,
+        sellerEmail: original.sellerEmail,
     };
 }
 
@@ -483,6 +518,7 @@ export function buildCorrection(
         | "sellerAddress"
         | "placeOfSupply"
         | "taxType"
+        | keyof SellerParticulars
     >,
     changes: {
         description: string;
@@ -504,6 +540,7 @@ export function buildCorrection(
         sellerGstin: original.sellerGstin,
         sellerState: original.sellerState,
         sellerAddress: original.sellerAddress,
+        ...sellerOf(original),
     });
 }
 
@@ -522,7 +559,10 @@ export function buildManualInvoice(
         /** The order line it bills, when it bills one (a treatment's, E9). */
         orderItemId?: string | null;
     }[],
-    profile: Pick<TaxProfile, "registered" | "gstin" | "state" | "address">,
+    profile: Pick<
+        TaxProfile,
+        "registered" | "gstin" | "state" | "address" | "seller"
+    >,
     billToState: string | null,
     typedTaxCents: number,
 ): BuiltDocument {
@@ -534,6 +574,7 @@ export function buildManualInvoice(
             sellerGstin: null,
             sellerState: null,
             sellerAddress: profile.address,
+            ...profile.seller,
         });
     }
     const pos = placeOfSupply({
@@ -549,6 +590,7 @@ export function buildManualInvoice(
         sellerGstin: profile.gstin,
         sellerState: profile.state,
         sellerAddress: profile.address,
+        ...profile.seller,
     });
 }
 

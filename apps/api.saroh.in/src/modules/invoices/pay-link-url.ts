@@ -1,10 +1,9 @@
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { env } from "../../env";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
-import { siteOriginOf } from "../sites/site-origin";
+import { rendererBase, siteOriginOf } from "../sites/site-origin";
 
 /**
  * Where a customer opens an invoice's pay link: the merchant-site renderer's
@@ -69,13 +68,4 @@ async function payOrigin(
         return null;
     }
     return siteOriginOf(organizationId, {}, db);
-}
-
-function rendererBase(): string {
-    const base =
-        env.RENDERER_URL ??
-        (env.NODE_ENV === "development"
-            ? "https://saroh.app.localhost"
-            : "https://saroh.app");
-    return base.replace(/\/$/, "");
 }

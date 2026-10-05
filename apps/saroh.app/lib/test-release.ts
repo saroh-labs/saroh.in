@@ -9,6 +9,7 @@ import { servedHost } from "@/lib/origin";
 import { classifySiteHost } from "@/lib/site-host-mode";
 import { relayFor, SITE_RELAY_HEADER } from "@/lib/site-relay";
 import { TEST_RELEASE_HEADER } from "@/lib/test-host";
+import { serverApiUrl } from "./api-url";
 
 /**
  * A test release, as its test host shows it (DEC-071, T5).
@@ -26,8 +27,7 @@ import { TEST_RELEASE_HEADER } from "@/lib/test-host";
  * a link that stopped working is a 410 naming why.
  */
 
-const API_URL =
-    env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+const API_URL = serverApiUrl();
 
 /** The header the API reads the token from (KTD-6). */
 export const TEST_TOKEN_HEADER = "x-saroh-test-token";

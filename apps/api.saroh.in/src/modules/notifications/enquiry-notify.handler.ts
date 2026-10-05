@@ -2,8 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Contact, Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { appBase } from "../../common/app-url";
 import { sendEnquiryNotificationEmail } from "../../common/email";
-import { env } from "../../env";
 
 /** The `type` this handler is registered under (matches the enquiry producer). */
 export const ENQUIRY_NOTIFY_TYPE = "enquiry.notify";
@@ -132,6 +132,6 @@ export class EnquiryNotifyHandler {
 
     /** The app dashboard origin the lead link points at. */
     private appBaseUrl(): string {
-        return (env.APP_URL ?? "https://app.saroh.in").replace(/\/$/, "");
+        return appBase();
     }
 }

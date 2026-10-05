@@ -1,5 +1,4 @@
-import { env } from "@/env";
-
+import { serverApiUrl } from "./api-url";
 import { isIntent } from "./checkout-shape";
 import type { StartResult } from "./invoice-pay";
 import { payUrlOf } from "./invoice-pay-shape";
@@ -18,8 +17,7 @@ export type { PayOrder, PayOrderLine } from "./order-pay-shape";
  *
  * No amount is ever sent: the API charges what is due on the stored order.
  */
-const API_URL =
-    env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+const API_URL = serverApiUrl();
 
 export type OrderPayLookup =
     | { ok: true; order: PayOrder }

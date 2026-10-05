@@ -12,6 +12,7 @@ import { createR2Storage } from "./r2-adapter";
 interface PresignCall {
     command: PutObjectCommand | GetObjectCommand;
     expiresIn: number | undefined;
+    signableHeaders: Set<string> | undefined;
 }
 
 function setup(overrides: Partial<R2StorageConfig> = {}) {
@@ -21,7 +22,11 @@ function setup(overrides: Partial<R2StorageConfig> = {}) {
         command: PutObjectCommand | GetObjectCommand,
         options: PresignOptions,
     ): Promise<string> => {
-        presignCalls.push({ command, expiresIn: options.expiresIn });
+        presignCalls.push({
+            command,
+            expiresIn: options.expiresIn,
+            signableHeaders: options.signableHeaders,
+        });
         return Promise.resolve("https://signed.r2.test/object?sig=abc");
     };
 
@@ -65,6 +70,7 @@ describe("createR2Storage — presigned upload", () => {
         expect(presignCalls).toHaveLength(1);
         const call = presignCalls[0];
         expect(call.expiresIn).toBe(300);
+        expect(call.signableHeaders?.has("content-type")).toBe(true);
         const command = call.command;
         // Narrow the union to assert on the Put-only fields.
         expect(command.constructor.name).toBe("PutObjectCommand");
@@ -246,5 +252,34 @@ describe("createR2Storage — port shape", () => {
         expect(typeof asPort.getPublicUrl).toBe("function");
         expect(typeof asPort.deleteObject).toBe("function");
         expect(typeof asPort.headObject).toBe("function");
+    });
+});
+
+// The fake presigner above can't see what the real one leaves out: on 5 Oct
+// 2026 the SDK's default signature covered Content-Length but not
+// Content-Type, so R2 stored a PUT sent as text/html. Sign for real (local,
+// no network) and read what the URL says it covers.
+describe("createR2Storage — the real signature", () => {
+    it("covers the content type and length an upload must be sent with", async () => {
+        const storage = createR2Storage({
+            endpoint: "https://acct.r2.cloudflarestorage.com",
+            bucket: "media-bucket",
+            accessKeyId: "key",
+            secretAccessKey: "secret",
+        });
+
+        const { url } = await storage.createSignedUploadUrl({
+            organizationId: "org-9",
+            contentType: "image/png",
+            contentLength: 4096,
+            filename: "logo.png",
+        });
+
+        const signed = new URL(url).searchParams
+            .get("X-Amz-SignedHeaders")
+            ?.split(";");
+        expect(signed).toEqual(
+            expect.arrayContaining(["content-type", "content-length", "host"]),
+        );
     });
 });

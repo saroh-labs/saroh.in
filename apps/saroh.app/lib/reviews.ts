@@ -1,5 +1,4 @@
-import { env } from "@/env";
-
+import { serverApiUrl } from "./api-url";
 import type { ReviewGoneReason, ReviewInvitation } from "./reviews-shape";
 import { goneReason, isReviewInvitation } from "./reviews-shape";
 
@@ -10,8 +9,7 @@ export type { ReviewInvitation, ReviewLine } from "./reviews-shape";
  * preview pages' pattern — because a browser on a tenant host cannot reach
  * the API (CORS), and locally the browser's API base points at production.
  */
-const API_URL =
-    env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+const API_URL = serverApiUrl();
 
 export type ReviewLookup =
     | { ok: true; invitation: ReviewInvitation }

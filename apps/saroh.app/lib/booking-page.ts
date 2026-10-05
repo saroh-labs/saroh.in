@@ -4,13 +4,11 @@ import { cache } from "react";
 import type { BookingPageData, PublicVisit } from "@saroh/site-blocks";
 import { isBookingPage, isPublicVisit } from "@saroh/site-blocks";
 
-import { env } from "@/env";
-
+import { serverApiUrl } from "./api-url";
 import { servedHost } from "./origin";
 import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 
-const API_URL =
-    env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+const API_URL = serverApiUrl();
 
 export type BookingPageLookup =
     | { ok: true; page: BookingPageData }

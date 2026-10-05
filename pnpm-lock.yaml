@@ -845,6 +845,9 @@ importers:
       '@hookform/resolvers':
         specifier: 'catalog:'
         version: 5.4.0(react-hook-form@7.71.1(react@19.2.8))
+      '@saroh/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@saroh/ui':
         specifier: workspace:*
         version: link:../../packages/ui

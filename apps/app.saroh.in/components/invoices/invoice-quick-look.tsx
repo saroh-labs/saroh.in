@@ -16,6 +16,7 @@ import {
     paperTitle,
     showsGstTotals,
 } from "@/lib/invoices/paper-title";
+import { printedSeller } from "@/lib/invoices/seller";
 import { paysOnline } from "@/lib/invoices/send";
 import type { Invoice } from "@/lib/invoices/service";
 import {
@@ -328,6 +329,12 @@ export function TaxRows({
     // A registered business's paper with no line rated: just the total
     // (DEC-072).
     if (i.gst && !isExemptPaper(i) && !showsGstTotals(i)) return null;
+    // Named as on its paper: as at issue, or today's on a draft (DEC-082).
+    const seller = printedSeller(i, {
+        name: businessName,
+        legalName: null,
+        email: null,
+    }).name;
     const rows: [string, string][] = isExemptPaper(i)
         ? [["Exempt from GST — no tax is charged", ""]]
         : i.gst
@@ -342,7 +349,7 @@ export function TaxRows({
             ]
           : Number(i.tax) > 0
             ? [["Tax", money(i.tax)]]
-            : [[`No GST — ${businessName} isn't registered`, ""]];
+            : [[`No GST — ${seller} isn't registered`, ""]];
     return (
         <div className="py-1">
             {rows.map(([k, v]) => (
