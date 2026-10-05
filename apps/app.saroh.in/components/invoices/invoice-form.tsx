@@ -365,7 +365,10 @@ export function InvoiceForm({
                 className="flex flex-wrap items-start gap-4"
                 noValidate
             >
-                <div className="grid min-w-0 flex-[3_1_440px] gap-3">
+                {/* One column that never grows past the form: an auto
+                    track took the picker's whole "name · email" as its
+                    least width, and a long email zoomed a phone out. */}
+                <div className="grid min-w-0 flex-[3_1_440px] grid-cols-[minmax(0,1fr)] gap-3">
                     <Card label="Billed to">
                         <Controller
                             control={form.control}
