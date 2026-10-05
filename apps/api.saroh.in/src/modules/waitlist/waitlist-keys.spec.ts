@@ -67,7 +67,15 @@ describe("cleanSource", () => {
 });
 
 describe("maskEmail", () => {
-    it("never shows the whole local part", () => {
-        expect(maskEmail("founder@example.test")).toBe("fo*****@example.test");
+    it("keeps the first character and a fixed mask", () => {
+        expect(maskEmail("founder@example.test")).toBe("f***@example.test");
+    });
+
+    it("shows neither a short local part nor its length", () => {
+        expect(maskEmail("ab@example.test")).toBe("a***@example.test");
+        expect(maskEmail("a@example.test")).toBe("a***@example.test");
+        expect(maskEmail("abcdefghijkl@example.test")).toBe(
+            "a***@example.test",
+        );
     });
 });

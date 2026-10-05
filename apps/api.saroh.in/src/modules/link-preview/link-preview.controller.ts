@@ -1,19 +1,17 @@
 import {
     Body,
     Controller,
-    Get,
-    Headers,
     HttpCode,
     HttpException,
     HttpStatus,
-    Ip,
     Post,
-    Query,
+    UseGuards,
 } from "@nestjs/common";
 
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
-import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
-import { CheckLinkQueryDto, UnlockReportDto } from "./dto";
+import type { SiteRelay } from "../site-accounts/site-relay";
+import { RelayContext, SiteRelayGuard } from "../site-accounts/site-relay";
+import { CheckLinkDto, UnlockReportDto } from "./dto";
 import type { LinkCheck, LinkFailure } from "./link-preview.service";
 import { LinkPreviewService } from "./link-preview.service";
 import type { AppKey, LinkFacts, TagRow } from "./link-report";
@@ -62,16 +60,24 @@ export function checkView(check: LinkCheck): LinkCheckView {
 
 /**
  * PUBLIC link preview tool (resources plan U2, KTD-3), what saroh.in's
- * `/api/link-preview` forwards to, server to server with the signed
- * visitor relay. No guards: a stranger uses it before any account exists.
+ * `/api/link-preview` forwards to, server to server. No account: a
+ * stranger uses it before one exists. But only saroh.in's server may call
+ * it — {@link SiteRelayGuard} refuses (401) a request without a valid
+ * signed `x-saroh-relay` — so nobody can call the API directly to skip the
+ * site, or pick the address their limits count.
  *
- * Both limits count the visitor (`visitorKey`: the relayed address when
- * the relay checks, else the caller), per process, like the waitlist's.
- * A check fetches someone else's site, so it is limited by the minute and
- * by the hour; a cached answer counts too, or the cache would be a way
- * round the limit.
+ * Both routes are POSTs with the address in the JSON body: a request line
+ * is logged (and lands in error reports and the host's log), a body is not,
+ * and the address someone checked is theirs.
+ *
+ * The limits count the relayed visitor, per process. A check fetches
+ * someone else's site, so it is limited by the minute and by the hour; a
+ * cached answer counts too, or the cache would be a way round the limit.
+ * An unlock checks the address again, so it takes a check as well as one
+ * of its own.
  */
 @Controller("public/tools/link-preview")
+@UseGuards(SiteRelayGuard)
 export class LinkPreviewController {
     private readonly perMinute = new FixedWindowRateLimiter(10, 60_000);
     private readonly perHour = new FixedWindowRateLimiter(60, 60 * 60_000);
@@ -82,21 +88,24 @@ export class LinkPreviewController {
         private readonly gate: LinkReportGateService,
     ) {}
 
-    @Get()
-    async check(
-        @Query() query: CheckLinkQueryDto,
-        @Ip() ip: string,
-        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
-    ): Promise<LinkCheckView> {
-        const key = visitorKey(ip, relay);
-        if (key && !(this.perMinute.take(key) && this.perHour.take(key))) {
+    private takeCheck(key: string): void {
+        if (!(this.perMinute.take(key) && this.perHour.take(key))) {
             throw new HttpException(
                 "Too many checks from this address. Try again in a minute.",
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }
+    }
+
+    @Post()
+    @HttpCode(HttpStatus.OK)
+    async check(
+        @Body() dto: CheckLinkDto,
+        @RelayContext() relay: SiteRelay,
+    ): Promise<LinkCheckView> {
+        this.takeCheck(relay.clientHash);
         return checkView(
-            await this.preview.check(query.url, { fresh: query.fresh === "1" }),
+            await this.preview.check(dto.url, { fresh: dto.fresh === true }),
         );
     }
 
@@ -105,20 +114,19 @@ export class LinkPreviewController {
     @HttpCode(HttpStatus.OK)
     async unlock(
         @Body() dto: UnlockReportDto,
-        @Ip() ip: string,
-        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+        @RelayContext() relay: SiteRelay,
     ): Promise<UnlockResult> {
-        const key = visitorKey(ip, relay);
-        if (key && !this.unlocks.take(key)) {
+        const key = relay.clientHash;
+        if (!this.unlocks.take(key)) {
             throw new HttpException(
                 "Too many requests from this address. Try again in a minute.",
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }
+        this.takeCheck(key);
         return this.gate.unlock({
             email: dto.email,
             url: dto.url,
-            consent: dto.consent,
             ipHash: key,
         });
     }

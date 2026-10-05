@@ -1,8 +1,10 @@
 /**
  * The link preview tool's email gate against a real Postgres (resources
  * plan U2, KTD-5): the email lands in the waitlist's store as one entry
- * with source link-preview, the link and the consent; a second unlock
- * updates it; and an entry from the waitlist form is left as it was.
+ * with source link-preview and the link (origin and path), never a news
+ * consent; a second unlock updates only the link; an entry from the
+ * waitlist form is left as it was; and the email caps are counted in the
+ * database, per address and per day.
  *
  * Runs in the integration project (TEST_DATABASE_URL).
  */
@@ -15,7 +17,11 @@ import { prisma } from "@saroh/database";
 import { sendLinkReportEmail } from "../../common/email";
 import { WaitlistService } from "../waitlist/waitlist.service";
 import { LinkPreviewService } from "./link-preview.service";
-import { LinkReportGateService } from "./link-report-gate.service";
+import {
+    EMAILS_PER_DAY,
+    LinkReportGateService,
+    REPORT_EMAILS_PER_DAY,
+} from "./link-report-gate.service";
 
 const tag = `${process.pid}-${Date.now()}`;
 const mail = (who: string) => `${who}-${tag}@example.test`;
@@ -45,17 +51,15 @@ beforeEach(async () => {
 });
 
 describe("unlocking the report", () => {
-    it("stores one entry, then updates it, never clearing a yes", async () => {
+    it("stores one entry, then updates only its link, never a consent", async () => {
         await gate.unlock({
             email: mail("Owner"),
             url: "example-bakery.in",
-            consent: true,
             ipHash: "h1",
         });
         await gate.unlock({
             email: mail("owner"),
-            url: "example-bakery.in/menu",
-            consent: false,
+            url: "example-bakery.in/menu?utm_source=secret",
         });
 
         const rows = await prisma.waitlistSignup.findMany();
@@ -65,7 +69,8 @@ describe("unlocking the report", () => {
             businessKey: "",
             source: "link-preview",
             checkedUrl: "https://example-bakery.in/menu",
-            newsConsent: true,
+            newsConsent: false,
+            reportEmailCount: 2,
             ipHash: "h1",
             refCode: null,
         });
@@ -80,11 +85,7 @@ describe("unlocking the report", () => {
             kind: "salon",
             source: "direct",
         });
-        await gate.unlock({
-            email: mail("both"),
-            url: "example-bakery.in",
-            consent: false,
-        });
+        await gate.unlock({ email: mail("both"), url: "example-bakery.in" });
         const rows = await prisma.waitlistSignup.findMany({
             orderBy: { position: "asc" },
             select: {
@@ -108,5 +109,61 @@ describe("unlocking the report", () => {
                 newsConsent: false,
             },
         ]);
+    });
+
+    it(`emails one address at most ${EMAILS_PER_DAY} times a UTC day`, async () => {
+        const now = new Date("2026-10-05T23:00:00Z");
+        const results = [];
+        for (let i = 0; i <= EMAILS_PER_DAY; i += 1) {
+            results.push(
+                await gate.unlock({
+                    email: mail("cap"),
+                    url: "example-bakery.in",
+                    now,
+                }),
+            );
+        }
+        expect(results.map((r) => r.unlocked && r.emailed)).toEqual([
+            ...Array<string>(EMAILS_PER_DAY).fill("sent"),
+            "limited",
+        ]);
+        // A new gate (a restart, another process) still knows.
+        const fresh = new LinkReportGateService(preview);
+        await expect(
+            fresh.unlock({ email: mail("cap"), url: "example-bakery.in", now }),
+        ).resolves.toMatchObject({ emailed: "limited" });
+        // The next UTC day starts again.
+        await expect(
+            fresh.unlock({
+                email: mail("cap"),
+                url: "example-bakery.in",
+                now: new Date("2026-10-06T00:30:00Z"),
+            }),
+        ).resolves.toMatchObject({ emailed: "sent" });
+    });
+
+    it(`sends no copy once ${REPORT_EMAILS_PER_DAY} went today, and still unlocks`, async () => {
+        const now = new Date("2026-10-05T12:00:00Z");
+        await prisma.waitlistSignup.create({
+            data: {
+                email: mail("busy"),
+                emailKey: mail("busy"),
+                source: "link-preview",
+                reportEmailDay: new Date("2026-10-05T00:00:00Z"),
+                reportEmailCount: REPORT_EMAILS_PER_DAY,
+            },
+        });
+        await expect(
+            gate.unlock({ email: mail("late"), url: "example-bakery.in", now }),
+        ).resolves.toMatchObject({ unlocked: true, emailed: "not-sent" });
+        expect(sendLinkReportEmail).not.toHaveBeenCalled();
+        // Yesterday's count doesn't hold today back.
+        await expect(
+            gate.unlock({
+                email: mail("late"),
+                url: "example-bakery.in",
+                now: new Date("2026-10-06T08:00:00Z"),
+            }),
+        ).resolves.toMatchObject({ emailed: "sent" });
     });
 });

@@ -92,6 +92,20 @@ describe("redactUrl", () => {
         );
     });
 
+    it("drops a public tool's query string: the address someone checked", () => {
+        expect(
+            redactUrl(
+                "/public/tools/link-preview?url=https%3A%2F%2Fshop.in%2Fsecret&fresh=1",
+            ),
+        ).toBe("/public/tools/link-preview");
+        expect(redactUrl("/public/tools/link-preview/report")).toBe(
+            "/public/tools/link-preview/report",
+        );
+        expect(redactUrl("/public/waitlist?src=x")).toBe(
+            "/public/waitlist?src=x",
+        );
+    });
+
     it("hides a preview link's token", () => {
         expect(redactUrl("/public/sites/preview/tok123")).toBe(
             "/public/sites/preview/[token]",

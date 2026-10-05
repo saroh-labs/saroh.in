@@ -2727,3 +2727,32 @@ media rule and the client keeps the one in use.
 (`docs/patterns/frontend-verification.md`). A phone spec that checks the
 page fits also calls `expectNothingHiddenSideways`.
 **Category**: e2e · layout · `e2e/fixtures/hidden-sideways.ts`
+
+## Link preview — a public tool that emails stranger-supplied text is a relay
+
+**Symptom**: A security review of the link preview tool (5 Oct, before
+release) found its email gate could send any text to any inbox from
+Saroh's address: the report quoted the checked page's title, description,
+site name, picture address and tags, and named its domain in the subject.
+Anyone could host a page saying what they liked, type a stranger's email,
+and have Saroh deliver it — and tick "Also send me Saroh news" on their
+behalf. The caps on it were in one process's memory, the API took calls
+without saroh.in's relay, the checked address rode in a logged query
+string, and DNS for a stranger's name ran on libuv's four-thread pool
+(`dns.lookup`), where a never-answering nameserver could stall SMTP,
+database connects, zlib and crypto for every user.
+**Root cause**: The email was designed as "the report, mailed", without
+asking who chooses its words; and the tool was built like an internal
+endpoint (in-memory limits, GET, the system resolver) though anyone on the
+internet drives it.
+**Fix**: `report-email.ts` writes our words only: a fixed subject, the
+score, fix titles from a fixed list, size advice and one link back to the
+tool. No consent is asked or stored (`newsConsent` false). Both caps (3 a
+UTC day per address, 300 a day in all) are counted in `WaitlistSignup`.
+Both routes need the signed relay (`SiteRelayGuard`), the check is a POST,
+`redactUrl` drops `/public/tools/` query strings, and the stored link is
+origin and path. DNS goes over c-ares (`dns.promises.Resolver`, 1.5 s, one
+try) and at most 8 checks run at once (`busy` past that).
+**Rule**: `docs/patterns/backend-integrations.md` — "An email a stranger can
+trigger carries only our words".
+**Category**: security · email · `apps/api.saroh.in/src/modules/link-preview/`

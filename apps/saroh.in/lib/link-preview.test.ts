@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CheckFailure, LinkFacts } from "./link-preview";
 import {
     addressProblem,
+    CARD_LIMITS,
     cardImage,
     cardText,
     checkedLine,
@@ -65,6 +66,7 @@ describe("failureMessage", () => {
         "no-tags",
         "too-large",
         "timeout",
+        "busy",
         "rate-limited",
         "unavailable",
     ];
@@ -165,6 +167,23 @@ describe("what each card is drawn from", () => {
             description: "Share description",
             siteName: "shop.in",
         });
+    });
+
+    it("caps what a card shows from the page, on one line", () => {
+        const long = {
+            ...facts,
+            title: `Win ${"big ".repeat(100)}`,
+            description: `Line one\nLine two ${"x".repeat(1000)}`,
+            siteName: "s".repeat(200),
+        };
+        const card = cardText(long, "whatsapp");
+        expect(card.title.length).toBeLessThanOrEqual(CARD_LIMITS.title);
+        expect(card.title.endsWith("…")).toBe(true);
+        expect(card.description.length).toBeLessThanOrEqual(
+            CARD_LIMITS.description,
+        );
+        expect(card.description).not.toContain("\n");
+        expect(card.siteName.length).toBeLessThanOrEqual(CARD_LIMITS.siteName);
     });
 
     it("draws no picture when it doesn't load, and the sample's as its stand-in", () => {

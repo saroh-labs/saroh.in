@@ -24,7 +24,10 @@ import { urls } from "../playwright.config";
  *   and the report gets its own `?url=`, which opens it again;
  * - a page with every tag right, one with none, and an address that
  *   doesn't answer, each in its own state;
- * - unlocking the fix-it report with an email (a stamped address);
+ * - every call is a POST with the address in the body, never `?url=`;
+ * - unlocking the fix-it report with an email (a stamped address), with
+ *   no news tickbox;
+ * - the API refuses either route called directly, without saroh.in's relay;
  * - at 390 wide, the six cards and no sideways scroll.
  */
 
@@ -129,7 +132,17 @@ test.describe("link preview checker", () => {
             page.getByRole("button", { name: "A sample bakery site" }),
         ).toBeVisible();
 
+        const call = page.waitForRequest(
+            (r) => new URL(r.url()).pathname === "/api/link-preview",
+        );
         await check(page, `http://${origin}/good`);
+        // The address goes in the body: a query string lands in logs.
+        const sent = await call;
+        expect(sent.method()).toBe("POST");
+        expect(new URL(sent.url()).search).toBe("");
+        expect(sent.postDataJSON()).toMatchObject({
+            url: `http://${origin}/good`,
+        });
         await expect(page.getByLabel("Web address")).toHaveValue(
             `${origin}/good`,
         );
@@ -160,6 +173,8 @@ test.describe("link preview checker", () => {
         );
         await expect(page.getByLabel(/, locked$/)).toHaveCount(4);
 
+        // An unverified address can't say yes to news: no tickbox.
+        await expect(page.getByRole("checkbox")).toHaveCount(0);
         await page.getByLabel("Email").fill("not-an-email");
         await page.getByRole("button", { name: "Unlock" }).click();
         await expect(page.getByRole("alert")).toHaveText(
@@ -178,6 +193,26 @@ test.describe("link preview checker", () => {
             page.getByText("Tell X to use a large card."),
         ).toBeVisible();
         await expect(page.getByLabel(/, locked$/)).toHaveCount(0);
+    });
+
+    test("the API refuses both routes without saroh.in's signed relay", async ({
+        request,
+    }) => {
+        const check = await request.post(
+            `${urls.API_URL}/public/tools/link-preview`,
+            { data: { url: `http://${origin}/good` } },
+        );
+        expect(check.status()).toBe(401);
+        const report = await request.post(
+            `${urls.API_URL}/public/tools/link-preview/report`,
+            {
+                data: {
+                    email: "direct@example.test",
+                    url: `http://${origin}/good`,
+                },
+            },
+        );
+        expect(report.status()).toBe(401);
     });
 
     test("says when a page has no tags, and when a site doesn't answer", async ({

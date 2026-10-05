@@ -232,7 +232,7 @@ describe("WaitlistService", () => {
         await service.join(V2);
 
         expect(logged.join(" ")).not.toContain("founder@example.test");
-        expect(logged.join(" ")).toContain("fo*****@example.test");
+        expect(logged.join(" ")).toContain("f***@example.test");
     });
 
     it("sends no email on join: nothing leaves the process", async () => {

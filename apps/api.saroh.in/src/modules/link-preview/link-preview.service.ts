@@ -10,6 +10,29 @@ import { guardedFetch, nodeTransport } from "./safe-fetch";
 import { isSampleHost, sampleFacts } from "./sample";
 import { checkTarget, systemResolver, testHostsFrom } from "./ssrf-guard";
 
+/** A fixed number of slots; a caller that finds none is turned away, not queued. */
+export class ConcurrencyCap {
+    private running = 0;
+
+    constructor(private readonly max: number) {}
+
+    /** A release function, or null when every slot is taken. */
+    tryAcquire(): (() => void) | null {
+        if (this.running >= this.max) return null;
+        this.running += 1;
+        let released = false;
+        return () => {
+            if (released) return;
+            released = true;
+            this.running -= 1;
+        };
+    }
+
+    get inUse(): number {
+        return this.running;
+    }
+}
+
 /**
  * The link preview check (resources plan U2, KTD-3): fetch a page the
  * guarded way, read its head, probe its picture, and say what each app
@@ -25,6 +48,14 @@ const CACHE_MAX = 500;
 
 export const LINK_PREVIEW_DEPS = Symbol("LINK_PREVIEW_DEPS");
 
+/**
+ * How many checks may fetch at once in this process, each with its picture
+ * probe. Past it a check answers `busy` at once (a typed state, never a
+ * 500): a burst of slow sites can hold sockets and timers, and nothing
+ * else in the API should wait behind a stranger's page.
+ */
+export const MAX_CONCURRENT_CHECKS = 8;
+
 export const FAILURES = [
     "invalid",
     "blocked",
@@ -33,6 +64,7 @@ export const FAILURES = [
     "no-tags",
     "too-large",
     "timeout",
+    "busy",
 ] as const;
 export type LinkFailure = (typeof FAILURES)[number];
 
@@ -91,19 +123,25 @@ export class LinkPreviewService {
         { at: number; value: LinkCheck }
     >();
     private readonly inflight = new Map<string, Promise<LinkCheck>>();
+    private readonly slots: ConcurrencyCap;
 
     constructor(
-        @Optional() @Inject(LINK_PREVIEW_DEPS) deps?: Partial<FetchDeps>,
+        @Optional()
+        @Inject(LINK_PREVIEW_DEPS)
+        deps?: Partial<FetchDeps> & { maxConcurrent?: number },
     ) {
+        this.slots = new ConcurrencyCap(
+            deps?.maxConcurrent ?? MAX_CONCURRENT_CHECKS,
+        );
         this.deps = {
             resolve: deps?.resolve ?? systemResolver,
             transport: deps?.transport ?? nodeTransport,
             testHosts:
                 deps?.testHosts ??
-                testHostsFrom(env.LINK_PREVIEW_TEST_HOSTS, [
-                    declaredNodeEnv,
-                    env.NODE_ENV,
-                ]),
+                testHostsFrom(env.LINK_PREVIEW_TEST_HOSTS, {
+                    nodeEnvs: [declaredNodeEnv, env.NODE_ENV],
+                    ci: env.CI,
+                }),
         };
     }
 
@@ -146,6 +184,13 @@ export class LinkPreviewService {
         const running = this.inflight.get(key);
         if (running) return running;
 
+        const release = this.slots.tryAcquire();
+        if (!release) {
+            // Not cached: the next try, a moment later, should really check.
+            this.logger.warn("link preview: every check slot is busy");
+            return { ok: false, url: key, checkedAt, failure: "busy" };
+        }
+
         const work = this.run(target.url, checkedAt)
             .catch((error: unknown): LinkCheck => {
                 // Not reachable by design; if it is, the visitor still gets a state.
@@ -163,7 +208,10 @@ export class LinkPreviewService {
                 this.remember(key, value, now);
                 return value;
             })
-            .finally(() => this.inflight.delete(key));
+            .finally(() => {
+                release();
+                this.inflight.delete(key);
+            });
         this.inflight.set(key, work);
         return work;
     }

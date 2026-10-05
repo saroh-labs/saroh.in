@@ -145,9 +145,14 @@ const envSchema = z.object({
     // to loopback (comma-separated, e.g. `localhost`): the browser tests
     // point it at a page served on the test machine, which the SSRF guard
     // refuses otherwise. Loopback only, never a private range. Refused at
-    // boot under NODE_ENV=production (below), and ignored by the tool
-    // wherever the declared NODE_ENV is production (`link-preview/ssrf-guard.ts`).
+    // boot under NODE_ENV=production (below), and honoured by the tool only
+    // in a test run — NODE_ENV declared `test`, or `CI` set — never under a
+    // declared production (`link-preview/ssrf-guard.ts`, `testHostsFrom`).
     LINK_PREVIEW_TEST_HOSTS: z.string().optional(),
+    // Set by CI runners (GitHub sets `true`) and by `scripts/prepush.sh`'s
+    // browser-test stack (`1`). Read only to mark a test run for test-only
+    // switches; never set it on a deployed host.
+    CI: z.string().optional(),
 
     // Payments (S5-002 — org merchant credential encryption at rest).
     // A 32-byte AES-256-GCM key, supplied as base64 or 64-hex. OPTIONAL in the

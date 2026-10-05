@@ -44,24 +44,21 @@ export function LinkPreviewTool({ initialUrl }: { initialUrl?: string }) {
     );
     const [view, setView] = useState<View>({ kind: "empty" });
     const [unlocked, setUnlocked] = useState<Unlocked | null>(null);
-    const [email, setEmail] = useState<{
-        email: string;
-        consent: boolean;
-    } | null>(null);
+    const [email, setEmail] = useState<{ email: string } | null>(null);
     const [unlockPending, setUnlockPending] = useState(false);
     const [unlockError, setUnlockError] = useState<string | null>(null);
     const [copied, setCopied] = useState<string | null>(null);
     const run = useRef(0);
 
     const unlock = useCallback(
-        async (address: string, input: { email: string; consent: boolean }) => {
+        async (address: string, input: { email: string }) => {
             setUnlockPending(true);
             setUnlockError(null);
             try {
-                const res = await fetch("/api/link-preview", {
+                const res = await fetch("/api/link-preview/report", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ...input, url: address }),
+                    body: JSON.stringify({ email: input.email, url: address }),
                 });
                 const body = (await res.json()) as UnlockResult;
                 if (body.unlocked) {
@@ -102,11 +99,16 @@ export function LinkPreviewTool({ initialUrl }: { initialUrl?: string }) {
             setCopied(null);
             let result: CheckResult;
             try {
-                const query = new URLSearchParams({ url: full });
-                if (fresh) query.set("fresh", "1");
-                const res = await fetch(
-                    `/api/link-preview?${query.toString()}`,
-                );
+                // A POST with the address in the body: a query string
+                // lands in request logs, and the address is the visitor's.
+                const res = await fetch("/api/link-preview", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        url: full,
+                        ...(fresh && { fresh }),
+                    }),
+                });
                 result = (await res.json()) as CheckResult;
             } catch {
                 result = { ok: false, url: full, failure: "unavailable" };
