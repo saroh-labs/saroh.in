@@ -5,8 +5,8 @@
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
  * The page is listed (footer, sitemap) and served only from `publishOn`
- * (plan KTD-2); the owner may move it earlier. The Terms of Service are not
- * published: they promise emails that aren't built yet.
+ * (plan KTD-2). The Terms (`content/terms.ts`) and the Refund and
+ * Cancellation Policy (`content/refunds.ts`) sit beside it.
  *
  * Written in a small Markdown (`lib/legal-markdown.ts`): `##` headings,
  * paragraphs, `- ` lists, pipe tables and `**bold**`.

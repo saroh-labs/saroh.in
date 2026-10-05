@@ -31,7 +31,9 @@ const ALL_ROUTES = [
     "/integrations",
     "/integrations/[provider]",
     "/privacy",
+    "/refunds",
     "/solutions/[slug]",
+    "/terms",
     "/tools/link-preview",
     "/waitlist",
 ];
@@ -86,11 +88,16 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         expect(indexedPaths("waitlist", after)).toContain("/help");
     });
 
-    it("Privacy is out of the footer and sitemap until its day", () => {
-        expect(shownLegal(before).map((p) => p.href)).toEqual([]);
-        expect(indexedPaths("waitlist", before)).not.toContain("/privacy");
-        expect(shownLegal(after).map((p) => p.href)).toEqual(["/privacy"]);
-        expect(indexedPaths("waitlist", after)).toContain("/privacy");
+    it("the legal pages are out of the footer and sitemap until 5 Oct in India", () => {
+        const legalBefore = at("2026-10-04T18:29:00Z");
+        const legalAfter = at("2026-10-04T18:31:00Z");
+        const legal = ["/privacy", "/terms", "/refunds"];
+        expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
+        for (const href of legal) {
+            expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);
+            expect(indexedPaths("waitlist", legalAfter)).toContain(href);
+        }
+        expect(shownLegal(legalAfter).map((p) => p.href)).toEqual(legal);
     });
 
     it("the launch entry joins the sitemap on its day", () => {

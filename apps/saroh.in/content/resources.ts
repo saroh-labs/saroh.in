@@ -73,15 +73,31 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
     },
 ];
 
-/** The footer's legal pages. Terms are not published (their text promises emails not built yet). */
+/**
+ * The footer's legal pages. Live from 5 Oct 2026 so Razorpay's review can read
+ * them (owner, 5 Oct); "Last updated" is each page's `publishOn`.
+ */
 export const LEGAL_PAGES: readonly ResourcePage[] = [
     {
         id: "privacy",
         name: "Privacy",
         line: "What Saroh collects, why, and what you can ask for.",
         href: "/privacy",
-        // The owner may move it earlier.
-        publishOn: "2026-10-17",
+        publishOn: "2026-10-05",
+    },
+    {
+        id: "terms",
+        name: "Terms",
+        line: "The agreement for using Saroh.",
+        href: "/terms",
+        publishOn: "2026-10-05",
+    },
+    {
+        id: "refunds",
+        name: "Refunds",
+        line: "Cancelling a plan, and why payments aren't refunded.",
+        href: "/refunds",
+        publishOn: "2026-10-05",
     },
 ];
 
