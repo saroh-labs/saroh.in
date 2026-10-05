@@ -20,10 +20,16 @@ export class FakeCommsProvider implements CommsProvider {
     constructor(
         readonly channel: CommsChannel = "EMAIL",
         private readonly failWith?: Error,
+        /** Whether it takes attachments (DEC-083); false plays SMTP. */
+        private readonly attaching = true,
     ) {}
 
     supports(): boolean {
         return true;
+    }
+
+    takesAttachments(): boolean {
+        return this.attaching;
     }
 
     send(input: CommsSendInput): Promise<CommsSendResult> {

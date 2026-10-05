@@ -3,15 +3,18 @@ import {
     Controller,
     Get,
     Header,
+    Headers,
     HttpCode,
     Ip,
     Param,
     Post,
+    StreamableFile,
 } from "@nestjs/common";
-import { hashClientIp } from "../../common/client-ip";
 
+import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { AutopayOutcome, AutopayStart } from "./autopay.service";
 import type { CreateIntentResult } from "./payments.service";
+import { PublicInvoicePdfService } from "./public-invoice-pdf.service";
 import type { PublicInvoiceView } from "./public-invoices.service";
 import { PublicInvoicesService } from "./public-invoices.service";
 
@@ -27,7 +30,10 @@ import { PublicInvoicesService } from "./public-invoices.service";
 
 @Controller("public/invoices")
 export class PublicInvoicesController {
-    constructor(private readonly invoices: PublicInvoicesService) {}
+    constructor(
+        private readonly invoices: PublicInvoicesService,
+        private readonly pdfs: PublicInvoicePdfService,
+    ) {}
 
     @Get(":token")
     @Header("Referrer-Policy", "no-referrer")
@@ -36,8 +42,36 @@ export class PublicInvoicesController {
     read(
         @Param("token") token: string,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicInvoiceView> {
-        return this.invoices.read(token, hashClientIp(ip));
+        return this.invoices.read(token, visitorKey(ip, relay));
+    }
+
+    /**
+     * The issued paper as a PDF (DEC-083), named for its number as the
+     * merchant's is. Drawn on request and never stored; a draft, a void
+     * invoice and a bad token are all a 404. One person's bill: private,
+     * never cached, and never sniffed into anything but a PDF.
+     */
+    @Get(":token/pdf")
+    @Header("Referrer-Policy", "no-referrer")
+    @Header("X-Robots-Tag", "noindex, nofollow")
+    @Header("Cache-Control", "private, no-store")
+    @Header("X-Content-Type-Options", "nosniff")
+    async pdf(
+        @Param("token") token: string,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<StreamableFile> {
+        const { file, fileName } = await this.pdfs.pdf(
+            token,
+            visitorKey(ip, relay),
+        );
+        return new StreamableFile(file, {
+            type: "application/pdf",
+            disposition: `attachment; filename="${fileName}"`,
+            length: file.length,
+        });
     }
 
     /**
@@ -55,8 +89,9 @@ export class PublicInvoicesController {
         @Param("token") token: string,
         @Body() body: unknown,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<CreateIntentResult> {
-        return this.invoices.createIntent(token, body, hashClientIp(ip));
+        return this.invoices.createIntent(token, body, visitorKey(ip, relay));
     }
 
     /**
@@ -75,8 +110,9 @@ export class PublicInvoicesController {
         @Param("token") token: string,
         @Body() body: unknown,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<AutopayStart> {
-        return this.invoices.startAutopay(token, body, hashClientIp(ip));
+        return this.invoices.startAutopay(token, body, visitorKey(ip, relay));
     }
 
     /** How autopay stands, for the page on the business's site after (D12). */
@@ -87,7 +123,8 @@ export class PublicInvoicesController {
     autopay(
         @Param("token") token: string,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<AutopayOutcome & { payUrl: string }> {
-        return this.invoices.autopayOutcome(token, hashClientIp(ip));
+        return this.invoices.autopayOutcome(token, visitorKey(ip, relay));
     }
 }

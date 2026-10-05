@@ -20,10 +20,13 @@
 /** The request header naming the tenant host a pay page was opened on. */
 export const TENANT_HOST_HEADER = "x-saroh-tenant-host";
 
-/** `/pay/<token>` and `/pay/o/<token>`, and nothing under or beside them. */
-const PAY_PATH = /^\/pay\/(?:o\/)?[^/]+\/?$/;
+/**
+ * `/pay/<token>` and `/pay/o/<token>`, and an invoice link's PDF
+ * (`/pay/<token>/pdf`, DEC-083) — nothing else under or beside them.
+ */
+const PAY_PATH = /^\/pay\/(?:(?:o\/)?[^/]+|[^/]+\/pdf)\/?$/;
 
-/** Whether a tenant path is one of the two pay pages. */
+/** Whether a tenant path is one of the two pay pages, or a link's PDF. */
 export function isPayPath(path: string): boolean {
     return PAY_PATH.test(path);
 }

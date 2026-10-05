@@ -142,6 +142,13 @@ Rules, rule 46.
   issued paper (tax invoice, receipt, credit note, supplementary) copies it as
   one printed line into `Invoice.sellerAddress`, like the GSTIN; a correction
   takes its original's. A draft prints today's address.
+- **A balance after a deposit** (a booking's or a treatment's) is a
+  supplementary invoice against the deposit's, so it takes the deposit's
+  paper whole: its frozen seller (GSTIN, state, address, name, legal name,
+  email), its place of supply and its CGST + SGST or IGST split. A business
+  that registered, deregistered or moved between the two still prints the
+  balance as the deposit printed, so the pair bills one supply consistently;
+  only the number follows today's prefix, in the deposit's series kind.
 
 **Consequences.** Tax settings are Owner/Admin only. The tax maths lives in one
 pure module, built test-first from worked examples.

@@ -6,6 +6,8 @@ import {
     prisma,
 } from "@saroh/database";
 
+import { env } from "../../env";
+
 /**
  * A business's address on Saroh: the `<address>.saroh.app` its website lives
  * at, reserved when the business is created.
@@ -87,7 +89,44 @@ export const RESERVED_ADDRESSES: ReadonlySet<string> = new Set([
     // A test release's label on a custom domain is `test.<domain>` (DEC-071);
     // kept here too, so `test.saroh.app` is never a business's either.
     "test",
+    // Words a page could use to pass itself off as Saroh.
+    "official",
+    "saroh-official",
+    "sarohofficial",
+    "saroh-support",
+    "sarohsupport",
+    "saroh-help",
+    "saroh-team",
+    "saroh-app",
+    "verify",
+    "verification",
 ]);
+
+/**
+ * The instance's own additions (`RESERVED_ADDRESSES_EXTRA`, comma-separated),
+ * read once: people's names stay out of the public repo. Each entry is
+ * trimmed and lower-cased, as an address is.
+ */
+let extraReserved: ReadonlySet<string> | undefined;
+function reservedExtra(): ReadonlySet<string> {
+    extraReserved ??= new Set(
+        (env.RESERVED_ADDRESSES_EXTRA ?? "")
+            .split(",")
+            .map((entry) => entry.trim().toLowerCase())
+            .filter((entry) => entry.length > 0),
+    );
+    return extraReserved;
+}
+
+/** Forget the cached extra list (tests change the env between cases). */
+export function resetReservedExtraForTests(): void {
+    extraReserved = undefined;
+}
+
+/** Is this address kept for Saroh, built-in or by this instance? */
+export function isReservedAddress(address: string): boolean {
+    return RESERVED_ADDRESSES.has(address) || reservedExtra().has(address);
+}
 
 /** Why an address cannot be used, before asking the database — or null. */
 export function addressProblem(address: string): string | null {
@@ -103,7 +142,7 @@ export function addressProblem(address: string): string | null {
     if (address.includes("--")) {
         return DOUBLE_HYPHEN_MESSAGE;
     }
-    if (RESERVED_ADDRESSES.has(address)) {
+    if (isReservedAddress(address)) {
         return "That address is kept for Saroh";
     }
     return null;

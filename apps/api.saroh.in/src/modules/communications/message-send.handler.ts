@@ -1,12 +1,15 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
-import type { Job } from "@saroh/database";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import type { Job, Message } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { IssuedInvoicePdf } from "../invoices/issued-invoice-pdf";
 import type { EncryptedSecret } from "../payments/crypto";
 import { decryptSecret } from "../payments/crypto";
 import { stampConfirmedEmail } from "./confirmation-stamp";
 import type {
+    CommsAttachment,
     CommsCredentials,
+    CommsProvider,
     CommsProviderFactory,
 } from "./providers/provider.port";
 import {
@@ -34,7 +37,25 @@ export interface MessageSendPayload {
      * back.
      */
     link?: EncryptedSecret;
+    /**
+     * Send the invoice's PDF with it (DEC-083): the message's own invoice,
+     * drawn here at send time and never stored. Only where the provider
+     * takes attachments; otherwise, or if it can't be drawn, the email goes
+     * with its link alone.
+     */
+    attach?: typeof INVOICE_PDF_ATTACHMENT;
 }
+
+/** The one attachment a message can ask for: its invoice's PDF. */
+export const INVOICE_PDF_ATTACHMENT = "INVOICE_PDF";
+
+/**
+ * The largest PDF sent as an attachment. The paper is a few hundred KB at
+ * most (its logo is capped at 2 MB by `invoice-pdf-logo.ts`); past this,
+ * the email goes with its link alone rather than risk a provider's or an
+ * inbox's limit.
+ */
+export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 /** Delivery states that are terminal-success — a re-run must NOT re-send. */
 const SENT_STATES = new Set(["SENT", "DELIVERED"]);
@@ -71,11 +92,14 @@ export class MessageSendHandler {
     constructor(
         @Inject(COMMS_PROVIDER_FACTORY)
         private readonly factory: CommsProviderFactory,
+        // The invoice PDF for an invoice email (DEC-083); absent where a
+        // test builds the handler by hand, and then nothing is attached.
+        @Optional() private readonly invoicePdfs?: IssuedInvoicePdf,
     ) {}
 
     /** Bound {@link JobHandler} to register with the {@link JobHandlerRegistry}. */
     readonly handle = async (job: Job): Promise<void> => {
-        const { messageId, deliveryId, link } =
+        const { messageId, deliveryId, link, attach } =
             job.payload as unknown as MessageSendPayload;
 
         const delivery = await prisma.delivery.findUnique({
@@ -156,6 +180,11 @@ export class MessageSendHandler {
             providerRow.provider,
         );
 
+        const attachments =
+            attach === INVOICE_PDF_ATTACHMENT
+                ? await this.invoicePdf(message, provider, providerRow.provider)
+                : [];
+
         try {
             const { providerMessageId } = await provider.send({
                 to: message.toAddress,
@@ -163,6 +192,7 @@ export class MessageSendHandler {
                 subject: message.subject ?? undefined,
                 body,
                 credentials,
+                ...(attachments.length > 0 ? { attachments } : {}),
             });
 
             await prisma.delivery.update({
@@ -199,6 +229,50 @@ export class MessageSendHandler {
             );
         }
     };
+
+    /**
+     * The invoice's PDF for its email (DEC-083), or nothing. Nothing when
+     * the provider doesn't take attachments (SMTP and SendGrid relays; see
+     * `email.provider.ts`), the invoice can't be drawn (gone, a draft, void)
+     * or the drawing fails or comes out too large: the email then goes as
+     * it always did, with its link to the invoice, and is never failed for
+     * the file. Drawn again on a retry; never stored.
+     */
+    private async invoicePdf(
+        message: Pick<Message, "id" | "organizationId" | "invoiceId">,
+        provider: CommsProvider,
+        providerName: string,
+    ): Promise<CommsAttachment[]> {
+        if (!message.invoiceId || !this.invoicePdfs) return [];
+        if (!provider.takesAttachments?.(providerName)) return [];
+        try {
+            const pdf = await this.invoicePdfs.draw(
+                message.organizationId,
+                message.invoiceId,
+            );
+            if (!pdf) return [];
+            if (pdf.file.length > MAX_ATTACHMENT_BYTES) {
+                this.logger.warn(
+                    `message.send: message ${message.id}'s invoice PDF is ${pdf.file.length} bytes; sent with its link alone.`,
+                );
+                return [];
+            }
+            return [
+                {
+                    fileName: pdf.fileName,
+                    contentType: "application/pdf",
+                    content: pdf.file,
+                },
+            ];
+        } catch (err) {
+            this.logger.warn(
+                `message.send: message ${message.id}'s invoice PDF couldn't be drawn (${
+                    err instanceof Error ? err.message : "unknown"
+                }); sent with its link alone.`,
+            );
+            return [];
+        }
+    }
 
     /** Mark the Delivery FAILED (+ sanitized error, attempts++) and Message FAILED. */
     private async recordFailure(

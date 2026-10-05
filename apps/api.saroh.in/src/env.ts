@@ -130,6 +130,10 @@ const envSchema = z.object({
     // never committed. Unset, the endpoint answers 404 and the page says the
     // offer is announced at launch.
     LAUNCH_OFFER_DAYS: z.coerce.number().int().min(1).max(366).optional(),
+    // Web addresses kept for Saroh beyond the built-in list in
+    // `sites/site-address.ts`: comma-separated, set per instance. People's
+    // names (the founders' own sites) live here, not in the public repo.
+    RESERVED_ADDRESSES_EXTRA: z.string().optional(),
     // The customer account area on merchant sites (round-2 plan A, A5):
     // `on` serves `public/site-accounts/me`, home and receipts; anything else
     // (unset included) answers 404, so the area stays dark until A6–A8 and

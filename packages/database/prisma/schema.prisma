@@ -330,12 +330,18 @@ model BusinessProfile {
   organizationId String       @unique
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  legalName    String?
-  type         String? // individual, partnership, llp, pvt, public, trust; an old `company` = pvt until the F10b backfill rewrites it; accepted until Z4 (business-type.ts)
-  country      String?
-  taxId        String?
-  contactEmail String?
-  website      String?
+  legalName         String?
+  type              String? // individual, partnership, llp, pvt, public, trust; an old `company` = pvt until the F10b backfill rewrites it; accepted until Z4 (business-type.ts)
+  // Setup's answer to "Is it registered?": true for Registered (Pvt Ltd,
+  // LLP, partnership…), which saves no `type`, false for Not registered.
+  // Null: not asked (a site for someone's work, a business set up before
+  // it was kept). True with no `type` asks for the real type before the
+  // business goes live (the take-money checklist).
+  legallyRegistered Boolean?
+  country           String?
+  taxId             String?
+  contactEmail      String?
+  website           String?
 
   // IANA zone the business keeps time in (ADR-007): the default a new
   // subscription snapshots for its renewal dates. Null until the business

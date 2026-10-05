@@ -88,7 +88,9 @@ function sendable(row: SendRow): boolean {
  * the business's own connected provider — Saroh's email is never used
  * (default 38), and there is no WhatsApp share (default 106). A business
  * that doesn't take payment online sends the same link as a view link
- * (DEC-070): the invoice and its PDF, without a Pay button.
+ * (DEC-070): the invoice and its PDF, without a Pay button. The invoice's
+ * PDF is attached to the email (DEC-083), drawn by the send job where the
+ * business's provider takes attachments — the link alone where it doesn't.
  *
  * The channel rule is {@link sendChannels}. A send mints a fresh pay link,
  * as "New link" does, so the one shared before stops working; the token is
@@ -310,6 +312,10 @@ export class InvoiceSendService {
                                 tx,
                             ),
                         invoiceId: id,
+                        // Its PDF goes with it (DEC-083): drawn by the send
+                        // job, where the business's provider takes
+                        // attachments; otherwise the link alone, as before.
+                        attachInvoicePdf: true,
                         createdByUserId: ctx.userId,
                     },
                 );

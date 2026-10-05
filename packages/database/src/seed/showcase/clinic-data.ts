@@ -16,6 +16,9 @@ export const kaviId = (...parts: (string | number)[]) =>
     id(SHOWCASE_KEY, KAVI_KEY, ...parts);
 
 export const KAVI_NAME = "Kavi Dental";
+/** Its legal name and contact email, as the profile holds them and its paper prints them (DEC-082). */
+export const KAVI_LEGAL_NAME = "Kavi Dental Care LLP";
+export const KAVI_CONTACT_EMAIL = "desk@kavidental.example.in";
 
 export const KAVI = {
     key: KAVI_KEY,

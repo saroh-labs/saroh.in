@@ -64,6 +64,13 @@ export interface OrganizationSettings {
          * set, and then the site shows no Call button.
          */
         phone: string | null;
+        /**
+         * Setup's answer to "Is it registered?": true for Registered, which
+         * saves no type, so the take-money checklist asks for the real one
+         * before the business goes live; false for Not registered; null when
+         * it wasn't asked.
+         */
+        registered: boolean | null;
     } | null;
     /**
      * When the business first sold something: the earliest order on record,
@@ -119,6 +126,7 @@ const PROFILE_SELECT = {
     website: true,
     timezone: true,
     phone: true,
+    legallyRegistered: true,
     gstRegistered: true,
     gstState: true,
     invoicePrefix: true,
@@ -142,6 +150,7 @@ interface ProfileRow {
     website: string | null;
     timezone: string | null;
     phone: string | null;
+    legallyRegistered: boolean | null;
     gstRegistered: boolean;
     gstState: string | null;
     invoicePrefix: string | null;
@@ -181,11 +190,16 @@ function splitProfile(
         addressLine2: _a2,
         city: _ci,
         postalCode: _pc,
+        legallyRegistered,
         ...profile
     } = p;
     return {
         // A row the F10b backfill hasn't reached yet still says `company`.
-        profile: { ...profile, type: businessTypeRead(profile.type) },
+        profile: {
+            ...profile,
+            type: businessTypeRead(profile.type),
+            registered: legallyRegistered ?? null,
+        },
         tax: taxView(p, counters),
         registeredAddress: addressView(p),
         logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,

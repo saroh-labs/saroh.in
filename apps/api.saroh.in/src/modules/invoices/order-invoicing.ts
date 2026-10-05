@@ -17,7 +17,6 @@ import type {
 import {
     buildCorrection,
     buildCreditNote,
-    buildManualInvoice,
     buildOrderInvoice,
     buildPaymentSupplementary,
     formatSellerAddress,
@@ -514,32 +513,21 @@ async function ensureTreatmentBalanceInvoice(
         toCents(original.total.toString()) -
         toCents((invoiced._sum.total ?? 0).toString());
     if (balanceCents <= 0) return;
-    const profile = await loadTaxProfile(tx, original.organizationId);
-    const doc = buildManualInvoice(
-        [
-            {
-                description: `Balance for ${line.service.name}`,
-                quantity: 1,
-                unitCents: balanceCents,
-                rateBps: rateToBps(line.service.gstRate?.toString() ?? null),
-                code: line.service.sacCode,
-                orderItemId: line.id,
-            },
-        ],
-        // The paper follows the deposit's: a receipt stays a receipt, and
-        // the seller is named as the deposit's paper named it (DEC-082).
+    // A supplementary invoice against the deposit's, built as every other
+    // is (ADR-008): the deposit's frozen seller — GSTIN, state, address,
+    // name, legal name, email — and its place of supply and tax split. A
+    // receipt stays a receipt and a tax invoice a tax invoice, whatever
+    // the settings say now: the two papers bill one treatment.
+    const doc = buildCorrection(asOriginal(original), [
         {
-            ...profile,
-            registered: original.sellerGstin !== null,
-            seller: {
-                sellerName: original.sellerName,
-                sellerLegalName: original.sellerLegalName,
-                sellerEmail: original.sellerEmail,
-            },
+            description: `Balance for ${line.service.name}`,
+            quantity: 1,
+            unitCents: balanceCents,
+            rateBps: rateToBps(line.service.gstRate?.toString() ?? null),
+            code: line.service.sacCode,
+            orderItemId: line.id,
         },
-        original.billToState,
-        0,
-    );
+    ]);
     await writeCorrection(tx, original, "SUPPLEMENTARY", doc, {
         status: "PAID",
         at: opts.at ?? new Date(),
