@@ -32,8 +32,8 @@ const GRID =
  * Sizes and stock (#523): a row per size with its price and — across its
  * storefronts — on hand, promised and what can be sold, then a sub-row per
  * storefront when there is more than one. Promised links to the open
- * orders holding it. The table scrolls sideways inside itself on a phone,
- * with a fade saying there is more.
+ * orders holding it. At the desk a table; on a phone (under 760px) a card
+ * per size that leads with what can be sold, so nothing hides sideways.
  */
 export function StockTable({
     product,
@@ -61,270 +61,452 @@ export function StockTable({
         return () => window.removeEventListener("resize", measure);
     }, [measure]);
 
-    const titleOf = (size: SizeStock) => {
-        const v = product.variants.find((x) => x.id === size.variantId);
-        if (v)
-            return {
-                title: v.title,
-                sku: v.sku,
-                price: v.price ?? product.price,
-            };
-        return {
-            title:
-                product.variants.length > 0
-                    ? "The whole product"
-                    : product.name,
-            sku: null,
-            price: product.variants.length > 0 ? null : product.price,
-        };
-    };
+    const titleOf = (size: SizeStock) => sizeTitle(product, size);
 
     return (
-        <div className="relative">
-            <div
-                ref={box}
-                onScroll={measure}
-                className="overflow-x-auto px-[18px] pb-1"
-            >
+        <>
+            <div className="relative max-[759px]:hidden">
                 <div
-                    className="min-w-[540px]"
-                    role="table"
-                    aria-label={`${product.name}: stock by size and location`}
+                    ref={box}
+                    onScroll={measure}
+                    className="overflow-x-auto px-[18px] pb-1"
                 >
                     <div
-                        role="row"
-                        className={cn(
-                            GRID,
-                            "border-b border-border pb-[7px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
-                        )}
+                        className="min-w-[540px]"
+                        role="table"
+                        aria-label={`${product.name}: stock by size and location`}
                     >
-                        <span role="columnheader">
-                            {product.option?.name ?? "Size"}
-                        </span>
-                        <span role="columnheader" className="text-right">
-                            Price
-                        </span>
-                        <span role="columnheader" className="text-right">
-                            On hand
-                        </span>
-                        <span role="columnheader" className="text-right">
-                            Promised
-                        </span>
-                        <span role="columnheader" className="text-right">
-                            Can sell
-                        </span>
-                        <span role="columnheader" className="pl-2">
-                            Shop shows
-                        </span>
-                    </div>
-                    {stock.sizes.map((size) => {
-                        const t = titleOf(size);
-                        const open = size.variantId;
-                        const warn = warnsAt(size, stock.split);
-                        return (
-                            <div
-                                key={size.variantId ?? "product"}
-                                className="border-b border-border"
-                            >
+                        <div
+                            role="row"
+                            className={cn(
+                                GRID,
+                                "border-b border-border pb-[7px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
+                            )}
+                        >
+                            <span role="columnheader">
+                                {product.option?.name ?? "Size"}
+                            </span>
+                            <span role="columnheader" className="text-right">
+                                Price
+                            </span>
+                            <span role="columnheader" className="text-right">
+                                On hand
+                            </span>
+                            <span role="columnheader" className="text-right">
+                                Promised
+                            </span>
+                            <span role="columnheader" className="text-right">
+                                Can sell
+                            </span>
+                            <span role="columnheader" className="pl-2">
+                                Shop shows
+                            </span>
+                        </div>
+                        {stock.sizes.map((size) => {
+                            const t = titleOf(size);
+                            const open = size.variantId;
+                            const warn = warnsAt(size, stock.split);
+                            return (
                                 <div
-                                    role="row"
-                                    onClick={
-                                        open ? () => onOpen(open) : undefined
-                                    }
-                                    className={cn(
-                                        GRID,
-                                        "-mx-1.5 items-center rounded-md px-1.5 py-[11px] text-[13px]",
-                                        open &&
-                                            "cursor-pointer hover:bg-muted/60",
-                                    )}
+                                    key={size.variantId ?? "product"}
+                                    className="border-b border-border"
                                 >
-                                    <span
-                                        role="cell"
-                                        className="grid min-w-0 gap-px"
-                                    >
-                                        {open ? (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onOpen(open);
-                                                }}
-                                                aria-label={`Open ${t.title} details`}
-                                                className="flex items-center gap-1.5 self-start rounded-sm text-left font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
-                                            >
-                                                {t.title}
-                                                <ChevronRight
-                                                    aria-hidden
-                                                    strokeWidth={2.2}
-                                                    className="size-3 text-muted-foreground"
-                                                />
-                                            </button>
-                                        ) : (
-                                            <span className="font-semibold">
-                                                {t.title}
-                                            </span>
-                                        )}
-                                        {t.sku ? (
-                                            <span className="truncate font-mono text-[11px] text-muted-foreground">
-                                                {t.sku}
-                                            </span>
-                                        ) : null}
-                                    </span>
-                                    <span
-                                        role="cell"
-                                        className="text-right tabular-nums"
-                                    >
-                                        {t.price ? money(t.price) : ""}
-                                    </span>
-                                    <span
-                                        role="cell"
-                                        className="text-right tabular-nums"
-                                    >
-                                        {size.onHand}
-                                    </span>
-                                    <span
-                                        role="cell"
-                                        className="text-right tabular-nums"
-                                    >
-                                        {size.promised}
-                                    </span>
-                                    <span
-                                        role="cell"
+                                    <div
+                                        role="row"
+                                        onClick={
+                                            open
+                                                ? () => onOpen(open)
+                                                : undefined
+                                        }
                                         className={cn(
-                                            "text-right font-semibold tabular-nums",
-                                            size.short > 0 &&
-                                                "text-destructive-subtle-foreground",
+                                            GRID,
+                                            "-mx-1.5 items-center rounded-md px-1.5 py-[11px] text-[13px]",
+                                            open &&
+                                                "cursor-pointer hover:bg-muted/60",
                                         )}
                                     >
-                                        {size.canSell}
-                                    </span>
-                                    <span
-                                        role="cell"
-                                        className="grid justify-items-start gap-0.5 pl-2"
-                                    >
-                                        {stock.split ? null : (
-                                            <ShelfBadge
-                                                tone={size.word.tone}
-                                                text={size.word.text}
-                                            />
-                                        )}
-                                        {warn ? (
-                                            <span className="text-[11px] text-muted-foreground">
-                                                {warn}
-                                            </span>
-                                        ) : null}
-                                    </span>
-                                </div>
-                                {stock.split
-                                    ? size.shelves.map((shelf) => (
-                                          <div
-                                              key={shelf.storeId}
-                                              role="row"
-                                              className={cn(
-                                                  GRID,
-                                                  "items-center pb-[9px] text-[12.5px] text-neutral-700 dark:text-muted-foreground",
-                                              )}
-                                          >
-                                              <span
-                                                  role="cell"
-                                                  className="flex min-w-0 items-center gap-[7px] pl-3.5"
+                                        <span
+                                            role="cell"
+                                            className="grid min-w-0 gap-px"
+                                        >
+                                            {open ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onOpen(open);
+                                                    }}
+                                                    aria-label={`Open ${t.title} details`}
+                                                    className="flex items-center gap-1.5 self-start rounded-sm text-left font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                                                >
+                                                    {t.title}
+                                                    <ChevronRight
+                                                        aria-hidden
+                                                        strokeWidth={2.2}
+                                                        className="size-3 text-muted-foreground"
+                                                    />
+                                                </button>
+                                            ) : (
+                                                <span className="font-semibold">
+                                                    {t.title}
+                                                </span>
+                                            )}
+                                            {t.sku ? (
+                                                <span className="truncate font-mono text-[11px] text-muted-foreground">
+                                                    {t.sku}
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                        <span
+                                            role="cell"
+                                            className="text-right tabular-nums"
+                                        >
+                                            {t.price ? money(t.price) : ""}
+                                        </span>
+                                        <span
+                                            role="cell"
+                                            className="text-right tabular-nums"
+                                        >
+                                            {size.onHand}
+                                        </span>
+                                        <span
+                                            role="cell"
+                                            className="text-right tabular-nums"
+                                        >
+                                            {size.promised}
+                                        </span>
+                                        <span
+                                            role="cell"
+                                            className={cn(
+                                                "text-right font-semibold tabular-nums",
+                                                size.short > 0 &&
+                                                    "text-destructive-subtle-foreground",
+                                            )}
+                                        >
+                                            {size.canSell}
+                                        </span>
+                                        <span
+                                            role="cell"
+                                            className="grid justify-items-start gap-0.5 pl-2"
+                                        >
+                                            {stock.split ? null : (
+                                                <ShelfBadge
+                                                    tone={size.word.tone}
+                                                    text={size.word.text}
+                                                />
+                                            )}
+                                            {warn ? (
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    {warn}
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                    </div>
+                                    {stock.split
+                                        ? size.shelves.map((shelf) => (
+                                              <div
+                                                  key={shelf.storeId}
+                                                  role="row"
+                                                  className={cn(
+                                                      GRID,
+                                                      "items-center pb-[9px] text-[12.5px] text-neutral-700 dark:text-muted-foreground",
+                                                  )}
                                               >
                                                   <span
-                                                      aria-hidden
-                                                      className="size-1.5 shrink-0 rounded-full bg-border-strong"
-                                                  />
-                                                  <span className="truncate">
-                                                      {shelfName(
-                                                          size,
-                                                          shelf,
-                                                          stock.split,
+                                                      role="cell"
+                                                      className="flex min-w-0 items-center gap-[7px] pl-3.5"
+                                                  >
+                                                      <span
+                                                          aria-hidden
+                                                          className="size-1.5 shrink-0 rounded-full bg-border-strong"
+                                                      />
+                                                      <span className="truncate">
+                                                          {shelfName(
+                                                              size,
+                                                              shelf,
+                                                              stock.split,
+                                                          )}
+                                                      </span>
+                                                  </span>
+                                                  <span role="cell" />
+                                                  <span
+                                                      role="cell"
+                                                      className="text-right tabular-nums"
+                                                  >
+                                                      {shelf.onHand}
+                                                  </span>
+                                                  <span
+                                                      role="cell"
+                                                      className="text-right tabular-nums"
+                                                  >
+                                                      {shelf.promised > 0 ? (
+                                                          <Link
+                                                              href={ordersHref}
+                                                              scroll={false}
+                                                              aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
+                                                              className="rounded-sm text-brand underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                          >
+                                                              {shelf.promised}
+                                                          </Link>
+                                                      ) : (
+                                                          <span className="text-muted-foreground">
+                                                              0
+                                                          </span>
                                                       )}
                                                   </span>
-                                              </span>
-                                              <span role="cell" />
-                                              <span
-                                                  role="cell"
-                                                  className="text-right tabular-nums"
-                                              >
-                                                  {shelf.onHand}
-                                              </span>
-                                              <span
-                                                  role="cell"
-                                                  className="text-right tabular-nums"
-                                              >
-                                                  {shelf.promised > 0 ? (
-                                                      <Link
-                                                          href={ordersHref}
-                                                          scroll={false}
-                                                          aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
-                                                          className="rounded-sm text-brand underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                      >
-                                                          {shelf.promised}
-                                                      </Link>
-                                                  ) : (
-                                                      <span className="text-muted-foreground">
-                                                          0
-                                                      </span>
-                                                  )}
-                                              </span>
-                                              <span
-                                                  role="cell"
-                                                  className={cn(
-                                                      "text-right font-semibold tabular-nums",
-                                                      shelf.word.tone === "bad"
-                                                          ? "text-destructive-subtle-foreground"
-                                                          : "text-foreground",
-                                                  )}
-                                              >
-                                                  {shelf.canSell}
-                                              </span>
-                                              <span
-                                                  role="cell"
-                                                  className="pl-2"
-                                              >
-                                                  <ShelfBadge
-                                                      tone={shelf.word.tone}
-                                                      text={shelf.word.text}
-                                                  />
-                                              </span>
-                                          </div>
-                                      ))
-                                    : null}
-                            </div>
-                        );
-                    })}
-                    <div
-                        role="row"
-                        className={cn(
-                            GRID,
-                            "items-center pb-3 pt-[11px] text-[12.5px] text-muted-foreground",
-                        )}
-                    >
-                        <span role="cell">Total</span>
-                        <span role="cell" />
-                        <span role="cell" className="text-right tabular-nums">
-                            {stock.totals.onHand}
-                        </span>
-                        <span role="cell" className="text-right tabular-nums">
-                            {stock.totals.promised}
-                        </span>
-                        <span
-                            role="cell"
-                            className="text-right font-semibold tabular-nums text-foreground"
+                                                  <span
+                                                      role="cell"
+                                                      className={cn(
+                                                          "text-right font-semibold tabular-nums",
+                                                          shelf.word.tone ===
+                                                              "bad"
+                                                              ? "text-destructive-subtle-foreground"
+                                                              : "text-foreground",
+                                                      )}
+                                                  >
+                                                      {shelf.canSell}
+                                                  </span>
+                                                  <span
+                                                      role="cell"
+                                                      className="pl-2"
+                                                  >
+                                                      <ShelfBadge
+                                                          tone={shelf.word.tone}
+                                                          text={shelf.word.text}
+                                                      />
+                                                  </span>
+                                              </div>
+                                          ))
+                                        : null}
+                                </div>
+                            );
+                        })}
+                        <div
+                            role="row"
+                            className={cn(
+                                GRID,
+                                "items-center pb-3 pt-[11px] text-[12.5px] text-muted-foreground",
+                            )}
                         >
-                            {stock.totals.canSell}
-                        </span>
-                        <span role="cell" />
+                            <span role="cell">Total</span>
+                            <span role="cell" />
+                            <span
+                                role="cell"
+                                className="text-right tabular-nums"
+                            >
+                                {stock.totals.onHand}
+                            </span>
+                            <span
+                                role="cell"
+                                className="text-right tabular-nums"
+                            >
+                                {stock.totals.promised}
+                            </span>
+                            <span
+                                role="cell"
+                                className="text-right font-semibold tabular-nums text-foreground"
+                            >
+                                {stock.totals.canSell}
+                            </span>
+                            <span role="cell" />
+                        </div>
                     </div>
                 </div>
+                {more ? (
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-card"
+                    />
+                ) : null}
             </div>
-            {more ? (
-                <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-card"
-                />
-            ) : null}
-        </div>
+            <StockCards
+                product={product}
+                stock={stock}
+                money={money}
+                ordersHref={ordersHref}
+                onOpen={onOpen}
+            />
+        </>
+    );
+}
+
+/** A size's name, code and price, or the product's when it has no sizes. */
+function sizeTitle(product: ProductDetail, size: SizeStock) {
+    const v = product.variants.find((x) => x.id === size.variantId);
+    if (v)
+        return {
+            title: v.title,
+            sku: v.sku,
+            price: v.price ?? product.price,
+        };
+    return {
+        title: product.variants.length > 0 ? "The whole product" : product.name,
+        sku: null,
+        price: product.variants.length > 0 ? null : product.price,
+    };
+}
+
+/** "Warns at 6" as it reads mid-line: "warns at 6". */
+function midLine(text: string): string {
+    return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/**
+ * The phone's Stock tab: a card per size, "800g · 18 can sell" over "22 on
+ * hand · 4 promised · ₹480 · warns at 6" and what the shop shows. The whole
+ * card opens the size, as the desk row does; with several storefronts each
+ * one gets its own line underneath.
+ */
+export function StockCards({
+    product,
+    stock,
+    money,
+    ordersHref,
+    onOpen,
+}: {
+    product: ProductDetail;
+    stock: ProductStock;
+    money: (amount: string) => string;
+    ordersHref: string;
+    onOpen: (variantId: string) => void;
+}) {
+    return (
+        <ul
+            aria-label={`${product.name}: stock by size and location`}
+            className="px-[18px] min-[760px]:hidden"
+        >
+            {stock.sizes.map((size) => {
+                const t = sizeTitle(product, size);
+                const open = size.variantId;
+                const warn = warnsAt(size, stock.split);
+                const details = [
+                    `${size.onHand} on hand`,
+                    `${size.promised} promised`,
+                    t.price ? money(t.price) : null,
+                    warn ? midLine(warn) : null,
+                ].filter(Boolean);
+                return (
+                    <li
+                        key={size.variantId ?? "product"}
+                        className={cn(
+                            "relative -mx-1.5 flex items-start gap-2 rounded-md border-b border-border px-1.5 py-3",
+                            open &&
+                                "transition-colors hover:bg-muted/60 active:bg-muted",
+                        )}
+                    >
+                        <div className="grid min-w-0 flex-1 gap-1">
+                            <p className="text-[14px]">
+                                {open ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpen(open)}
+                                        aria-label={`Open ${t.title} details`}
+                                        className="cursor-pointer rounded-sm text-left font-semibold outline-none after:absolute after:inset-0 after:rounded-md after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
+                                    >
+                                        {t.title}
+                                    </button>
+                                ) : (
+                                    <span className="font-semibold">
+                                        {t.title}
+                                    </span>
+                                )}
+                                <span aria-hidden> · </span>
+                                <span
+                                    className={cn(
+                                        "font-semibold tabular-nums",
+                                        size.short > 0 &&
+                                            "text-destructive-subtle-foreground",
+                                    )}
+                                >
+                                    {size.canSell} can sell
+                                </span>
+                            </p>
+                            {t.sku ? (
+                                <p className="truncate font-mono text-[11px] text-muted-foreground">
+                                    {t.sku}
+                                </p>
+                            ) : null}
+                            <p className="text-[12.5px] tabular-nums text-neutral-700 dark:text-muted-foreground">
+                                {details.join(" · ")}
+                            </p>
+                            {stock.split ? (
+                                <ul
+                                    aria-label={`${t.title} by location`}
+                                    className="mt-1 grid gap-1.5"
+                                >
+                                    {size.shelves.map((shelf) => (
+                                        <li
+                                            key={shelf.storeId}
+                                            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-neutral-700 dark:text-muted-foreground"
+                                        >
+                                            <span>
+                                                {shelfName(
+                                                    size,
+                                                    shelf,
+                                                    stock.split,
+                                                )}
+                                                {" · "}
+                                                <span
+                                                    className={cn(
+                                                        "font-semibold tabular-nums",
+                                                        shelf.word.tone ===
+                                                            "bad"
+                                                            ? "text-destructive-subtle-foreground"
+                                                            : "text-foreground",
+                                                    )}
+                                                >
+                                                    {shelf.canSell} can sell
+                                                </span>
+                                                {` · ${shelf.onHand} on hand · `}
+                                                {shelf.promised > 0 ? (
+                                                    <Link
+                                                        href={ordersHref}
+                                                        scroll={false}
+                                                        aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
+                                                        className="relative z-[1] inline-flex items-center rounded-sm text-brand underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                                                    >
+                                                        {shelf.promised}{" "}
+                                                        promised
+                                                    </Link>
+                                                ) : (
+                                                    "0 promised"
+                                                )}
+                                            </span>
+                                            <ShelfBadge
+                                                tone={shelf.word.tone}
+                                                text={shelf.word.text}
+                                            />
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                    Shop shows
+                                    <ShelfBadge
+                                        tone={size.word.tone}
+                                        text={size.word.text}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        {open ? (
+                            <ChevronRight
+                                aria-hidden
+                                strokeWidth={2.2}
+                                className="mt-1 size-3.5 flex-none text-muted-foreground"
+                            />
+                        ) : null}
+                    </li>
+                );
+            })}
+            <li className="py-3 text-[12.5px] text-muted-foreground">
+                Total ·{" "}
+                <span className="font-semibold tabular-nums text-foreground">
+                    {stock.totals.canSell} can sell
+                </span>
+                {` · ${stock.totals.onHand} on hand · ${stock.totals.promised} promised`}
+            </li>
+        </ul>
     );
 }
 
