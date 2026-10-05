@@ -91,7 +91,7 @@ Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Go
 
 ## How we protect it
 
-Everything travels encrypted. Each business's data is kept apart from every other's at the database itself, payment keys you connect are stored encrypted, and only people who need access have it.
+Everything travels encrypted. Each business's data is kept apart from every other's: every read and write is limited to the business it belongs to. Payment keys you connect are stored encrypted, and only people who need access have it.
 
 ## Age
 
