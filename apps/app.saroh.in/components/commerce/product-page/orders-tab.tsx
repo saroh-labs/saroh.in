@@ -4,6 +4,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
 
+import { OrderCardFrame } from "@/components/commerce/orders/order-row";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import { orderHref } from "@/lib/orders/links";
@@ -21,7 +22,9 @@ import {
 
 /**
  * The orders this product is in: the open ones first (they hold its stock),
- * or the most recent. Read-only — each order opens in Orders.
+ * or the most recent. Read-only — each order opens in Orders. At the desk a
+ * table; on a phone (under 760px) a card per order, the Orders list's own
+ * frame, so nothing hides sideways.
  */
 export function ProductOrdersTab({
     overview,
@@ -118,95 +121,149 @@ export function ProductOrdersTab({
                     </StateLink>
                 </TabState>
             ) : (
-                <Card className="overflow-x-auto rounded-[12px] px-[18px] pb-1.5 pt-0">
-                    <table className="w-full min-w-[600px] text-[13px]">
-                        <caption className="sr-only">
-                            Orders for {product.name}
-                        </caption>
-                        <thead>
-                            <tr
-                                className={cn(
-                                    grid,
-                                    "border-b border-border pb-[7px] pt-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
-                                )}
-                            >
-                                <th scope="col">Order</th>
-                                <th scope="col">Customer</th>
-                                <th scope="col">What</th>
-                                <th scope="col">Location</th>
-                                <th scope="col">When</th>
-                                <th scope="col">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((o) => (
+                <>
+                    <Card className="overflow-x-auto rounded-[12px] px-[18px] pb-1.5 pt-0 max-[759px]:hidden">
+                        <table className="w-full min-w-[600px] text-[13px]">
+                            <caption className="sr-only">
+                                Orders for {product.name}
+                            </caption>
+                            <thead>
                                 <tr
-                                    key={o.id}
                                     className={cn(
                                         grid,
-                                        "items-center border-b border-border py-2.5",
+                                        "border-b border-border pb-[7px] pt-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
                                     )}
                                 >
-                                    <td>
-                                        <Link
-                                            href={orderHref(storeId, o.id)}
-                                            className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                                        >
-                                            {o.orderNumber}
-                                        </Link>
-                                    </td>
-                                    <td className="truncate">
-                                        {o.customerId ? (
-                                            <Link
-                                                href={customerHref(
-                                                    storeId,
-                                                    o.customerId,
-                                                )}
-                                                className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                                            >
-                                                {o.customer}
-                                            </Link>
-                                        ) : (
-                                            // A walk-in (B13): no record to open.
-                                            o.customer
+                                    <th scope="col">Order</th>
+                                    <th scope="col">Customer</th>
+                                    <th scope="col">What</th>
+                                    <th scope="col">Location</th>
+                                    <th scope="col">When</th>
+                                    <th scope="col">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.map((o) => (
+                                    <tr
+                                        key={o.id}
+                                        className={cn(
+                                            grid,
+                                            "items-center border-b border-border py-2.5",
                                         )}
-                                    </td>
-                                    <td className="text-foreground/75">
-                                        {o.lines
-                                            .map(
-                                                (l) =>
-                                                    `${l.title || product.name} × ${l.quantity}`,
-                                            )
-                                            .join(", ")}
-                                    </td>
-                                    <td className="truncate text-muted-foreground">
-                                        {overview.storefront.name}
-                                    </td>
-                                    <td className="text-muted-foreground">
+                                    >
+                                        <td>
+                                            <Link
+                                                href={orderHref(storeId, o.id)}
+                                                className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                            >
+                                                {o.orderNumber}
+                                            </Link>
+                                        </td>
+                                        <td className="truncate">
+                                            {o.customerId ? (
+                                                <Link
+                                                    href={customerHref(
+                                                        storeId,
+                                                        o.customerId,
+                                                    )}
+                                                    className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                                >
+                                                    {o.customer}
+                                                </Link>
+                                            ) : (
+                                                // A walk-in (B13): no record to open.
+                                                o.customer
+                                            )}
+                                        </td>
+                                        <td className="text-foreground/75">
+                                            {linesText(o, product.name)}
+                                        </td>
+                                        <td className="truncate text-muted-foreground">
+                                            {overview.storefront.name}
+                                        </td>
+                                        <td className="text-muted-foreground">
+                                            <ViewerDate
+                                                iso={o.createdAt}
+                                                variant="dayMonth"
+                                            />
+                                        </td>
+                                        <td>
+                                            <Badge
+                                                variant={
+                                                    o.open
+                                                        ? "warning"
+                                                        : "neutral"
+                                                }
+                                                className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                            >
+                                                {ORDER_STATUS_LABEL[o.status] ??
+                                                    o.status}
+                                            </Badge>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </Card>
+                    <ul
+                        aria-label={`Orders for ${product.name}`}
+                        className="flex flex-col gap-2 min-[760px]:hidden"
+                    >
+                        {rows.map((o) => (
+                            <OrderCardFrame
+                                key={o.id}
+                                href={orderHref(storeId, o.id)}
+                                title={
+                                    <>
+                                        {o.customer}
+                                        <span className="sr-only">
+                                            , order {o.orderNumber}
+                                        </span>
+                                    </>
+                                }
+                                aside={
+                                    <Badge
+                                        variant={o.open ? "warning" : "neutral"}
+                                        className="flex-none whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
+                                    >
+                                        {ORDER_STATUS_LABEL[o.status] ??
+                                            o.status}
+                                    </Badge>
+                                }
+                                meta={
+                                    <>
+                                        <span className="font-mono">
+                                            {o.orderNumber}
+                                        </span>
+                                        <span aria-hidden>·</span>
+                                        <span className="text-foreground/75">
+                                            {linesText(o, product.name)}
+                                        </span>
+                                    </>
+                                }
+                                footer={
+                                    <div className="text-[12px] text-muted-foreground">
                                         <ViewerDate
                                             iso={o.createdAt}
                                             variant="dayMonth"
                                         />
-                                    </td>
-                                    <td>
-                                        <Badge
-                                            variant={
-                                                o.open ? "warning" : "neutral"
-                                            }
-                                            className="whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-[1.3]"
-                                        >
-                                            {ORDER_STATUS_LABEL[o.status] ??
-                                                o.status}
-                                        </Badge>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </Card>
+                                        {` · ${overview.storefront.name}`}
+                                    </div>
+                                }
+                            />
+                        ))}
+                    </ul>
+                </>
             )}
         </div>
     );
+}
+
+/** "800g × 2, 400g × 1": what the order holds of this product. */
+function linesText(order: OverviewOrder, productName: string): string {
+    return order.lines
+        .map((l) => `${l.title || productName} × ${l.quantity}`)
+        .join(", ");
 }
 
 /** "These hold the 5 promised: 30 ml 4, 15 ml 1." — what open orders hold. */

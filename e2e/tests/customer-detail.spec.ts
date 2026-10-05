@@ -2,6 +2,7 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { hiddenSideways } from "../fixtures/hidden-sideways";
 import { makeContact, makeOrder, northwind, stamp } from "../fixtures/own-data";
 import type { Role } from "../fixtures/sessions";
 import { useSession } from "../fixtures/sessions";
@@ -108,8 +109,12 @@ test.describe("customer detail", () => {
 
         await tab(page, /^Orders/).click();
         await expect(page).toHaveURL(/tab=ord/);
+        // A table's "#1042" at the desk, a card's "…, order #1042" on a phone.
         await expect(
-            page.getByRole("link", { name: /^#\d+/ }).first(),
+            page
+                .getByRole("link", { name: /#\d+/ })
+                .filter({ visible: true })
+                .first(),
         ).toBeVisible();
 
         await tab(page, /^Subscriptions/).click();
@@ -266,7 +271,10 @@ test.describe("customer detail", () => {
         await expect(page.getByText("Possible match — link?")).toHaveCount(0);
         await tab(page, /^Orders/).click();
         await expect(
-            page.getByRole("link", { name: /^#/ }).first(),
+            page
+                .getByRole("link", { name: /#/ })
+                .filter({ visible: true })
+                .first(),
         ).toBeVisible();
     });
 });
@@ -489,6 +497,21 @@ test.describe("customer detail on a 375px phone", () => {
         await expect(over).toHaveAttribute("aria-selected", "true");
         await expect(over).toBeFocused();
         await expect.poll(() => whole(over)).toBe(true);
+    });
+
+    test("the Orders tab is a card per order, nothing hidden sideways", async ({
+        page,
+    }) => {
+        await signIn(page, RYE);
+        await page.goto(`/customers/${PRIYA}?tab=ord`);
+        const list = page.getByRole("list", { name: "Their orders" });
+        await expect(list).toBeVisible();
+        await expect(
+            list.getByRole("link", { name: /order #\d+/ }).first(),
+        ).toBeVisible();
+        await expect
+            .poll(() => hiddenSideways(page, ['[role="tablist"]']))
+            .toEqual({ innerWidth: 375, culprits: [] });
     });
 
     test("a long name wraps without pushing the tags off-screen", async ({

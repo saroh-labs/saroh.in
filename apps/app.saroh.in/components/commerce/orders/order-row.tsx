@@ -255,6 +255,78 @@ export function OrderGridRow({
     );
 }
 
+/**
+ * The phone card's frame, shared by every list of orders that has to fit a
+ * phone (the Orders list, a product's Orders tab, a customer's Orders tab),
+ * so the three can't drift: a title line (who or what, with an aside such as
+ * the total), a meta line (the number, the step) and an optional footer.
+ * The title opens the order and its hit area covers the card.
+ */
+export function OrderCardFrame({
+    title,
+    href,
+    onOpen,
+    aside,
+    meta,
+    footer,
+    lead,
+    highlighted = false,
+}: {
+    title: ReactNode;
+    /** Where the card goes; ignored when `onOpen` is given. */
+    href: string;
+    /** Open a quick view instead of following `href`. */
+    onOpen?: () => void;
+    /** On the title line, after the title: the total, a status. */
+    aside?: ReactNode;
+    meta: ReactNode;
+    footer?: ReactNode;
+    /** Before the card's words: a selection box. */
+    lead?: ReactNode;
+    highlighted?: boolean;
+}) {
+    const name =
+        "min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground";
+    return (
+        <li
+            className={cn(
+                "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
+                highlighted &&
+                    "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
+            )}
+        >
+            {lead}
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex min-w-0 items-baseline gap-2">
+                    {onOpen ? (
+                        <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={onOpen}
+                            className={cn(
+                                ROW_LINK,
+                                name,
+                                "cursor-pointer text-left underline-offset-2 hover:underline active:text-muted-foreground",
+                            )}
+                        >
+                            {title}
+                        </button>
+                    ) : (
+                        <Link href={href} className={cn(ROW_LINK, name)}>
+                            {title}
+                        </Link>
+                    )}
+                    {aside}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
+                    {meta}
+                </div>
+                {footer}
+            </div>
+        </li>
+    );
+}
+
 export function OrderCard({
     row,
     showStore,
@@ -272,66 +344,48 @@ export function OrderCard({
     onOpen?: () => void;
 }) {
     const v = rowView(row, showStore);
-    const name =
-        "min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground";
-    const card = (
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex min-w-0 items-baseline gap-2">
-                {onOpen ? (
-                    <button
-                        type="button"
-                        aria-haspopup="dialog"
-                        onClick={onOpen}
+    return (
+        <OrderCardFrame
+            title={v.customer}
+            href={v.href}
+            onOpen={onOpen}
+            highlighted={open === true || select?.checked === true}
+            lead={
+                select ? (
+                    <Checkbox
+                        checked={select.checked}
+                        onCheckedChange={select.onToggle}
+                        aria-label={`${select.checked ? "Deselect" : "Select"} order number ${row.orderId}`}
                         className={cn(
-                            ROW_LINK,
-                            name,
-                            "cursor-pointer text-left underline-offset-2 hover:underline active:text-muted-foreground",
+                            BOX,
+                            "mt-px size-6 flex-none rounded-[6px]",
                         )}
-                    >
-                        {v.customer}
-                    </button>
-                ) : (
-                    <Link href={v.href} className={cn(ROW_LINK, name)}>
-                        {v.customer}
-                    </Link>
-                )}
-                {v.money.total ? (
+                    />
+                ) : null
+            }
+            aside={
+                v.money.total ? (
                     <span className="font-display text-[14px] font-semibold tabular-nums">
                         {v.money.total}
                     </span>
-                ) : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
-                <span className="font-mono">{v.ref}</span>
-                <StepPill progress={v.progress} dot={false} />
-                <span>{row.fulfilmentLabel}</span>
-                {v.age ? <AgeText age={v.age} /> : null}
-                <AttentionTag attention={v.attention} />
-            </div>
-            {v.money.unpaid ? (
-                <div className="text-[12px] font-bold text-destructive-subtle-foreground">
-                    {v.money.unpaid}
-                </div>
-            ) : null}
-        </div>
-    );
-    return (
-        <li
-            className={cn(
-                "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
-                (open === true || select?.checked === true) &&
-                    "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
-            )}
-        >
-            {select ? (
-                <Checkbox
-                    checked={select.checked}
-                    onCheckedChange={select.onToggle}
-                    aria-label={`${select.checked ? "Deselect" : "Select"} order number ${row.orderId}`}
-                    className={cn(BOX, "mt-px size-6 flex-none rounded-[6px]")}
-                />
-            ) : null}
-            {card}
-        </li>
+                ) : null
+            }
+            meta={
+                <>
+                    <span className="font-mono">{v.ref}</span>
+                    <StepPill progress={v.progress} dot={false} />
+                    <span>{row.fulfilmentLabel}</span>
+                    {v.age ? <AgeText age={v.age} /> : null}
+                    <AttentionTag attention={v.attention} />
+                </>
+            }
+            footer={
+                v.money.unpaid ? (
+                    <div className="text-[12px] font-bold text-destructive-subtle-foreground">
+                        {v.money.unpaid}
+                    </div>
+                ) : null
+            }
+        />
     );
 }
