@@ -9,6 +9,7 @@ import { APIError } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins";
 
 import {
+    sessionCookiePrefix,
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
@@ -324,6 +325,9 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
             },
         },
         advanced: {
+            // The development environment names its cookie apart from
+            // production's (`AUTH_COOKIE_PREFIX`, `constants.ts`).
+            cookiePrefix: sessionCookiePrefix(),
             crossSubDomainCookies: cookieDomain
                 ? { enabled: true, domain: cookieDomain }
                 : { enabled: false },

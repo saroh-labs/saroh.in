@@ -1,6 +1,8 @@
 import { getSessionCookie } from "better-auth/cookies";
+
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { sessionCookiePrefix } from "./constants";
 
 import { isTrustedOrigin } from "./origins";
 
@@ -68,7 +70,9 @@ export function createAuthMiddleware(opts: AuthMiddlewareOptions) {
             : true;
         if (!isProtected) return NextResponse.next();
 
-        const sessionCookie = getSessionCookie(request);
+        const sessionCookie = getSessionCookie(request, {
+            cookiePrefix: sessionCookiePrefix(),
+        });
         if (!sessionCookie) {
             const loginUrl = new URL(opts.loginUrl);
             loginUrl.searchParams.set("redirect", publicUrl(request));

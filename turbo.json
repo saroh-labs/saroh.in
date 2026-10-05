@@ -63,6 +63,7 @@
         // Signs saroh.app's calls to the api's site sign-in routes (ADR-011).
         "SITE_RELAY_SECRET",
         "VERCEL_ENV",
+        "AUTH_COOKIE_PREFIX",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
         // The customer account area's release switch, in the api and saroh.app
         // (round-2 A5): off until A6-A8 and A13 ship.
