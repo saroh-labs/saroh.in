@@ -33,6 +33,7 @@ import { createMemoryStorage } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { MediaService } from "../media/media.service";
+import { invoicePaper } from "../payments/public-invoices.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import type { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesController } from "./invoices.controller";
@@ -374,5 +375,102 @@ describe("DEC-072: a plan renewal's PDF shows no GST it does not charge (real da
         expect(text).not.toContain("Nil-rated");
         expect(text).not.toMatch(/GST \d/);
         expect(text).not.toContain("0%");
+    });
+});
+
+describe("a renamed business's issued paper (DEC-082, real database)", () => {
+    it("issuing freezes the seller; renaming after never changes the view, the PDF or the customer's paper", async () => {
+        const org = await prisma.organization.create({
+            data: {
+                name: "Kavi Dental",
+                slug: `invoice-pdf-kavi-${process.pid}`,
+            },
+        });
+        const kavi: OrganizationContext = {
+            organizationId: org.id,
+            userId: "user_3",
+            role: "OWNER",
+        };
+        await prisma.businessProfile.create({
+            data: {
+                organizationId: org.id,
+                legalName: "Kavi Dental Care LLP",
+                contactEmail: "desk@kavi.example",
+                gstState: "29",
+                addressLine1: "4 Lake Road",
+                city: "Bengaluru",
+                postalCode: "560001",
+                timezone: "Asia/Kolkata",
+            },
+        });
+        const asha = await prisma.contact.create({
+            data: {
+                organizationId: org.id,
+                email: "asha@example.com",
+                firstName: "Asha",
+            },
+        });
+        const draft = await invoices.createDraft(kavi, {
+            contactId: asha.id,
+            currency: "INR",
+            lines: [
+                { description: "Cleaning", quantity: 1, unitPrice: "1800" },
+            ],
+        } as never);
+        // A draft prints today's settings: none of its own.
+        expect(draft.sellerName).toBeNull();
+        const issued = await invoices.issue(kavi, draft.id);
+        expect(issued).toEqual(
+            expect.objectContaining({
+                sellerName: "Kavi Dental",
+                sellerLegalName: "Kavi Dental Care LLP",
+                sellerEmail: "desk@kavi.example",
+            }),
+        );
+
+        // The business renames itself, its legal name and its email.
+        await prisma.organization.update({
+            where: { id: org.id },
+            data: { name: "Kavi Smile Studio" },
+        });
+        await prisma.businessProfile.update({
+            where: { organizationId: org.id },
+            data: {
+                legalName: "Kavi Smile Studio Private Limited",
+                contactEmail: "hello@kavismile.example",
+            },
+        });
+
+        // The workspace's view model.
+        expect(await invoices.get(kavi, draft.id)).toEqual(
+            expect.objectContaining({
+                sellerName: "Kavi Dental",
+                sellerLegalName: "Kavi Dental Care LLP",
+                sellerEmail: "desk@kavi.example",
+            }),
+        );
+        // The PDF.
+        const text = textOf((await pdfs.render(kavi, draft.id)).file);
+        expect(text).toContain("Kavi Dental");
+        expect(text).toContain("Kavi Dental Care LLP");
+        expect(text).toContain("desk@kavi.example");
+        expect(text).not.toContain("Kavi Smile Studio");
+        expect(text).not.toContain("hello@kavismile.example");
+        // The pay page and the customer's receipt.
+        const paper = await invoicePaper(org.id, draft.id);
+        expect(paper.businessName).toBe("Kavi Dental");
+
+        // A new draft follows the new name until it is issued.
+        const next = await invoices.createDraft(kavi, {
+            contactId: asha.id,
+            currency: "INR",
+            lines: [
+                { description: "Whitening", quantity: 1, unitPrice: "4000" },
+            ],
+        } as never);
+        expect(next.sellerName).toBeNull();
+        expect((await invoices.issue(kavi, next.id)).sellerName).toBe(
+            "Kavi Smile Studio",
+        );
     });
 });

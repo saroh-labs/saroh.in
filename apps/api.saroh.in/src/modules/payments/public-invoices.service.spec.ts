@@ -268,6 +268,19 @@ describe("PublicInvoicesService.read", () => {
         expect(view.status).toBe("OVERDUE");
     });
 
+    it("names the business as it was when the invoice was issued, not since (DEC-082)", async () => {
+        // Issued as Lotus Yoga; the business has been renamed since.
+        invoiceFindFirst.mockResolvedValue({
+            ...STORED,
+            sellerName: "Lotus Yoga",
+            organization: { name: "Lotus Wellness Studio" },
+        });
+        const view = await makeService().service.read(TOKEN);
+        expect(view.businessName).toBe("Lotus Yoga");
+        // The customer's receipt (A5) reads the same paper.
+        expect(invoiceFindFirst.mock.calls[0][0].select.sellerName).toBe(true);
+    });
+
     it.each([
         ["an unknown token", "not-a-real-token"],
         ["a rotated or revoked token", mintPayToken().token],

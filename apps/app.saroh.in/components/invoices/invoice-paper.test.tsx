@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { Invoice, InvoiceGst, InvoiceLine } from "@/lib/invoices/service";
+import type { InvoiceBusiness } from "@/lib/invoices/tax";
 
 import { InvoicePaper } from "./invoice-paper";
 
@@ -206,5 +207,69 @@ describe("InvoicePaper GST totals (DEC-072)", () => {
             expect(out).toMatch(/>SGST</);
             expect(out).toContain("Prices include GST.");
         }
+    });
+});
+
+describe("InvoicePaper's seller (DEC-082)", () => {
+    /** The business today: renamed since the paper was issued. */
+    const TODAY: InvoiceBusiness = {
+        name: "Rye Bakehouse",
+        legalName: "Rye Bakehouse Private Limited",
+        email: "orders@ryebakehouse.example",
+        registered: true,
+        gstin: GST.sellerGstin,
+        state: { code: "29", name: "Karnataka" },
+        address: "1 New Road, Bengaluru 560001, Karnataka",
+        logo: "https://cdn.example/rye-logo.png",
+    };
+    const FROZEN = {
+        sellerName: "Rye & Co.",
+        sellerLegalName: "Rye and Company Bakery LLP",
+        sellerEmail: "hello@rye.example",
+        sellerAddress: "22 Hill Road, Indiranagar, Bengaluru 560038, Karnataka",
+    };
+    const paper = (i: Invoice) =>
+        renderToStaticMarkup(
+            <InvoicePaper
+                invoice={i}
+                business={TODAY}
+                businessName={TODAY.name}
+            />,
+        );
+
+    it("issued paper prints the seller as it was at issue after a rename", () => {
+        const out = paper(invoice(FROZEN));
+        expect(out).toContain("Rye &amp; Co.");
+        expect(out).toContain("Rye and Company Bakery LLP");
+        expect(out).toContain("hello@rye.example");
+        expect(out).toContain("22 Hill Road");
+        expect(out).not.toContain("Rye Bakehouse");
+        expect(out).not.toContain("orders@ryebakehouse.example");
+        // The logo is branding, not frozen: today's.
+        expect(out).toContain("https://cdn.example/rye-logo.png");
+    });
+
+    it("a draft still follows today's settings", () => {
+        const out = paper(
+            invoice({
+                status: "DRAFT",
+                standing: "DRAFT",
+                number: null,
+                // A draft's view carries no frozen seller (the API's rule).
+                sellerName: null,
+                sellerLegalName: null,
+                sellerEmail: null,
+                sellerAddress: null,
+            }),
+        );
+        expect(out).toContain("Rye Bakehouse");
+        expect(out).toContain("Rye Bakehouse Private Limited");
+        expect(out).toContain("orders@ryebakehouse.example");
+        expect(out).toContain("1 New Road");
+    });
+
+    it("an issued row without a frozen seller falls back to today's", () => {
+        const out = paper(invoice({ sellerName: null }));
+        expect(out).toContain("Rye Bakehouse");
     });
 });
