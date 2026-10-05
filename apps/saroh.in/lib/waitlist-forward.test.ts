@@ -7,6 +7,7 @@ import {
     relaySecret,
     signRelay,
     visitorAddress,
+    visitorCountry,
 } from "./waitlist-forward";
 
 const DEV = "saroh-dev-insecure-site-relay-secret-not-for-production";
@@ -147,5 +148,24 @@ describe("joinBody", () => {
         expect(joinBody(null)).toBeNull();
         expect(joinBody({ business: "B" })).toBeNull();
         expect(joinBody("a@b.in")).toBeNull();
+    });
+});
+
+describe("visitorCountry", () => {
+    const h = (value?: string) =>
+        new Headers(
+            value === undefined ? {} : { "x-vercel-ip-country": value },
+        );
+
+    it("reads the two letters Vercel's edge sets", () => {
+        expect(visitorCountry(h("IN"))).toBe("IN");
+        expect(visitorCountry(h(" us "))).toBe("US");
+    });
+
+    it("is unknown without the header, or with anything else in it", () => {
+        expect(visitorCountry(h())).toBeUndefined();
+        expect(visitorCountry(h(""))).toBeUndefined();
+        expect(visitorCountry(h("IND"))).toBeUndefined();
+        expect(visitorCountry(h("<x>"))).toBeUndefined();
     });
 });

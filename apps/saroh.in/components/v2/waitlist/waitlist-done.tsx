@@ -13,6 +13,8 @@ export interface WaitlistJoined {
     /** A new entry's place and link; absent on a repeat (plan D-8). */
     position?: number;
     link?: { href: string; shown: string };
+    /** Joined from outside India: Saroh opens there first. */
+    outsideIndia?: boolean;
 }
 
 /**
@@ -61,8 +63,19 @@ export function WaitlistDone({
             </h2>
             <p className="m-0 text-[15px] leading-[1.55] text-neutral-600 [overflow-wrap:anywhere]">
                 We&apos;ll email {joined.email} {when}
-                {content.offer ? ` ${content.offer.doneLine}` : null}
+                {content.offer && !joined.outsideIndia
+                    ? ` ${content.offer.doneLine}`
+                    : null}
             </p>
+            {joined.outsideIndia ? (
+                <p
+                    data-testid="waitlist-outside-india"
+                    className="m-0 text-[15px] leading-[1.55] text-neutral-600"
+                >
+                    Saroh opens in India first. We&apos;ll email you when
+                    it&apos;s ready where you are.
+                </p>
+            ) : null}
             {joined.link && (
                 <ReferralLink
                     href={joined.link.href}

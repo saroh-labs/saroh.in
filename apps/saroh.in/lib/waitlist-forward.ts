@@ -73,6 +73,8 @@ export interface JoinBody {
     plan?: string;
     source: string;
     ref?: string;
+    /** Two letters, from the host's view of the connection. */
+    country?: string;
 }
 
 const text = (value: unknown, max: number): string | undefined =>
@@ -103,6 +105,17 @@ export function joinBody(posted: unknown): JoinBody | null {
         source: text(p.src, 64) ?? "direct",
         ref: text(p.ref, 64),
     };
+}
+
+/**
+ * The visitor's country as Vercel's edge saw their connection
+ * (`x-vercel-ip-country`, two letters), or undefined anywhere it isn't set:
+ * local dev, the browser tests, a request that didn't come through Vercel.
+ * Never asked of the visitor.
+ */
+export function visitorCountry(headers: Headers): string | undefined {
+    const raw = headers.get("x-vercel-ip-country")?.trim().toUpperCase();
+    return raw && /^[A-Z]{2}$/.test(raw) ? raw : undefined;
 }
 
 /** The headers for the API call: JSON, and the relay when it can be signed. */

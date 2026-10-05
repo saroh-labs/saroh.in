@@ -16,7 +16,12 @@ import { NextResponse } from "next/server";
 
 import { env } from "@/env";
 import type { WaitlistResponse } from "@/lib/waitlist";
-import { forwardHeaders, joinBody, relaySecret } from "@/lib/waitlist-forward";
+import {
+    forwardHeaders,
+    joinBody,
+    relaySecret,
+    visitorCountry,
+} from "@/lib/waitlist-forward";
 
 let warnedNoSecret = false;
 
@@ -31,7 +36,9 @@ export async function POST(req: Request) {
         );
     }
 
-    const body = joinBody(posted);
+    const join = joinBody(posted);
+    const country = visitorCountry(req.headers);
+    const body = join && country ? { ...join, country } : join;
     if (!body) {
         return NextResponse.json<WaitlistResponse>(
             { status: "failure", reason: { code: "BAD_REQUEST" } },
@@ -107,8 +114,17 @@ export async function POST(req: Request) {
                       created: true,
                       position: joined.position,
                       ref: joined.ref ?? undefined,
+                      ...(country && country !== "IN"
+                          ? { outsideIndia: true }
+                          : {}),
                   }
-                : { status: "success", created: false },
+                : {
+                      status: "success",
+                      created: false,
+                      ...(country && country !== "IN"
+                          ? { outsideIndia: true }
+                          : {}),
+                  },
         );
     } catch (reason) {
         console.error("[waitlist] forward failed:", String(reason));

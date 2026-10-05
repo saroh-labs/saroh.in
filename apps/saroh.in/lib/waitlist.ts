@@ -98,6 +98,11 @@ export type WaitlistResponse =
           /** A new entry's place and referral id; never on a repeat. */
           position?: number;
           ref?: string;
+          /**
+           * The visitor joined from outside India, as the host saw their
+           * connection. Saroh opens in India first, and the done card says so.
+           */
+          outsideIndia?: boolean;
       }
     | {
           status: "failure";
