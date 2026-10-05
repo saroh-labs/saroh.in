@@ -391,6 +391,11 @@ export function OrganizationSettingsForm({
     // rather than waiting for the page to be fetched again.
     const [settings, setSettings] = useState(initial);
     const savedZone = settings.profile?.timezone ?? "";
+    // Said Registered at setup and no type chosen since: the take-money
+    // checklist holds going live on it, so the field says why.
+    const typeAsked =
+        settings.profile?.registered === true &&
+        businessTypeOf(settings.profile.type) === "";
     // In the address, so Search settings can open the tab a setting is on.
     const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, TAB_KEYS, "identity");
     const [editing, setEditing] = useState<TabKey | null>(null);
@@ -639,6 +644,9 @@ export function OrganizationSettingsForm({
             {
                 label: "Type",
                 value: businessTypeLabel(saved.type) ?? "",
+                ...(typeAsked
+                    ? { empty: "Not chosen yet — you said it's registered" }
+                    : {}),
             },
             {
                 label: "Time zone",
@@ -851,8 +859,9 @@ export function OrganizationSettingsForm({
                                 />
                             </FormControl>
                             <FormDescription>
-                                An individual trades in their own name; a
-                                company is registered as one.
+                                {typeAsked
+                                    ? "You said at setup that the business is registered. Choose which kind before you take money."
+                                    : "An individual trades in their own name; a company is registered as one."}
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

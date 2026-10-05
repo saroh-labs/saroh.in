@@ -108,6 +108,19 @@ export class BusinessProfileDto {
 }
 
 /**
+ * The profile setup sends: the settings fields, and setup's own answer to
+ * "Is it registered?". Registered sends `registered: true` and no type
+ * (Pvt Ltd, LLP and partnership aren't guessed at); the business is asked
+ * for the real one before it goes live. Settings never takes it: the type
+ * itself is the answer from then on.
+ */
+export class OnboardingProfileDto extends BusinessProfileDto {
+    @IsOptional()
+    @IsBoolean()
+    registered?: boolean;
+}
+
+/**
  * Payload for `POST /organizations` (S1-004). Carries only the business
  * identity — never the owner. Ownership is derived from the authenticated
  * caller, so this DTO deliberately has no `userId`/`ownerId`/`role` field.
@@ -123,8 +136,8 @@ export class OnboardOrganizationDto {
     /** Optional nested business profile (legal/tax/contact details). */
     @IsOptional()
     @ValidateNested()
-    @Type(() => BusinessProfileDto)
-    profile?: BusinessProfileDto;
+    @Type(() => OnboardingProfileDto)
+    profile?: OnboardingProfileDto;
 
     /**
      * The business's address on Saroh — the `<address>.saroh.app` its website

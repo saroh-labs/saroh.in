@@ -54,6 +54,11 @@ export interface OrganizationProfileInput {
     taxId?: string;
     contactEmail?: string;
     website?: string;
+    /**
+     * Setup's "Is it registered?": Registered sends true and no type, so
+     * the real one is asked for before the business goes live.
+     */
+    registered?: boolean;
 }
 
 export interface CreateOrganizationInput {

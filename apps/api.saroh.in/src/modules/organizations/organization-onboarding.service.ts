@@ -197,9 +197,17 @@ export class OrganizationOnboardingService {
             return null;
         }
 
+        const type = businessTypeWrite(profile.type) ?? undefined;
         const data = {
             legalName: profile.legalName,
-            type: businessTypeWrite(profile.type) ?? undefined,
+            type,
+            // Setup's "Is it registered?" (prelaunch): Registered sends no
+            // type, so the answer is kept to ask for the real one before
+            // the business goes live. Not registered is the `individual`
+            // type, so it reads as not registered without being sent.
+            legallyRegistered:
+                profile.registered ??
+                (type === "individual" ? false : undefined),
             country: profile.country,
             taxId: profile.taxId,
             contactEmail: profile.contactEmail,

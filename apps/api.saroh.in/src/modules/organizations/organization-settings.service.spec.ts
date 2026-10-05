@@ -96,6 +96,42 @@ describe("OrganizationSettingsService", () => {
             expect(settings.profile?.legalName).toBe("Acme Inc");
         });
 
+        it("says whether setup was told the business is registered (prelaunch)", async () => {
+            orgFindUnique.mockResolvedValue({
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                businessProfile: {
+                    legalName: null,
+                    type: null,
+                    country: "IN",
+                    taxId: null,
+                    contactEmail: null,
+                    website: null,
+                    legallyRegistered: true,
+                },
+            });
+            const settings = await service.get(ctx());
+            expect(settings.profile?.registered).toBe(true);
+            expect(settings.profile).not.toHaveProperty("legallyRegistered");
+            expect(orgFindUnique).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    select: expect.objectContaining({
+                        businessProfile: {
+                            select: expect.objectContaining({
+                                legallyRegistered: true,
+                            }),
+                        },
+                    }),
+                }),
+            );
+        });
+
+        it("reads a business set up before the answer was kept as not asked", async () => {
+            const settings = await service.get(ctx());
+            expect(settings.profile?.registered).toBeNull();
+        });
+
         it("returns the business's time zone with its profile", async () => {
             orgFindUnique.mockResolvedValue({
                 id: "org_1",
