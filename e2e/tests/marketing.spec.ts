@@ -1,4 +1,5 @@
 // @covers web:/ web:/features web:/solutions web:/waitlist web:/api/waitlist api:waitlist
+// @covers web:/integrations pkg:integrations
 import { createRequire } from "node:module";
 
 import AxeBuilder from "@axe-core/playwright";
@@ -74,8 +75,20 @@ const RESOURCE_PREFIXES = [
     "/privacy",
 ];
 
+/**
+ * The Integrations provider pages (Resources plan U3): every check runs on
+ * them; the sitemap lists them through RESOURCE_PREFIXES.
+ */
+const INTEGRATIONS = ["razorpay", "cashfree", "email"];
+
 /** Every page a visitor can land on. */
-const PAGES = INDEXED;
+const PAGES = [
+    ...INDEXED,
+    ...[
+        "/integrations",
+        ...INTEGRATIONS.map((s) => `/integrations/${s}`),
+    ].filter((p) => !INDEXED.includes(p)),
+];
 
 /** Kept out of search: robots.txt disallows each. */
 const NOT_INDEXED = ["/api/"];
@@ -511,4 +524,71 @@ test("no page loads Google Analytics outside production", async ({ page }) => {
         ).toHaveCount(0);
     }
     expect(gaRequests).toEqual([]);
+});
+
+test.describe("integrations", () => {
+    test("live cards link to their pages; planned rows never link", async ({
+        page,
+    }) => {
+        await openCollecting(page, "/integrations");
+        const main = page.locator("main");
+        for (const slug of INTEGRATIONS) {
+            await expect(
+                main.locator(`a[href="/integrations/${slug}"]`),
+            ).toHaveCount(1);
+        }
+        const planned = main.locator("section", {
+            has: page.getByRole("heading", {
+                name: "Planned · not available yet",
+            }),
+        });
+        await expect(planned.getByRole("listitem")).not.toHaveCount(0);
+        await expect(planned.locator("a")).toHaveCount(0);
+    });
+
+    for (const slug of INTEGRATIONS) {
+        test(`/integrations/${slug} walks its steps and never links to itself`, async ({
+            page,
+        }) => {
+            await openCollecting(page, `/integrations/${slug}`);
+            const main = page.locator("main");
+            await expect(main.getByRole("heading", { level: 1 })).toHaveCount(
+                1,
+            );
+            await expect(
+                main.locator(`a[href="/integrations/${slug}"]`),
+            ).toHaveCount(0);
+            const steps = main
+                .getByRole("list", { name: "Steps" })
+                .getByRole("button");
+            expect(await steps.count()).toBeGreaterThanOrEqual(3);
+            const current = main.locator('[aria-current="step"]');
+            await expect(current).toHaveCount(1);
+
+            // Each step, by click: it becomes the current one and its words show.
+            const count = await steps.count();
+            for (let i = 0; i < count; i++) {
+                await steps.nth(i).click();
+                await expect(steps.nth(i)).toHaveAttribute(
+                    "aria-current",
+                    "step",
+                );
+                const panel = page.locator(
+                    `#${await steps.nth(i).getAttribute("aria-controls")}`,
+                );
+                await expect(panel).toBeVisible();
+            }
+
+            // And by keyboard: Home, then Down, from the focused step.
+            await steps.nth(0).focus();
+            await page.keyboard.press("End");
+            await expect(steps.nth(count - 1)).toHaveAttribute(
+                "aria-current",
+                "step",
+            );
+            await expect(steps.nth(count - 1)).toBeFocused();
+            await page.keyboard.press("ArrowDown");
+            await expect(steps.nth(0)).toHaveAttribute("aria-current", "step");
+        });
+    }
 });

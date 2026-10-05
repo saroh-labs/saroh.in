@@ -1,6 +1,7 @@
 import type { CanActivate, ExecutionContext } from "@nestjs/common";
 import { ConflictException, Injectable } from "@nestjs/common";
 import type { Reflector } from "@nestjs/core";
+import { WEBHOOK_ROUTE } from "@saroh/integrations";
 
 import {
     SITE_RELAY_HEADER,
@@ -69,7 +70,7 @@ export class TestHostWriteGuard implements CanActivate {
 
     /** Public routes a test host never reaches with a browser origin. */
     static readonly EXEMPT_PREFIXES = [
-        "/public/webhooks",
+        `/${WEBHOOK_ROUTE}`,
         "/public/billing/webhooks",
         "/public/payments",
     ] as const;

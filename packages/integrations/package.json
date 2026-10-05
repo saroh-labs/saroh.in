@@ -1,0 +1,37 @@
+{
+    "name": "@saroh/integrations",
+    "version": "1.0.0",
+    "description": "Frontend-safe facts about Saroh's integrations that the API and the marketing site share: the payment webhook route and the events it acts on.",
+    "license": "MIT",
+    "sideEffects": false,
+    "main": "./dist/index.js",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist/**"
+    ],
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsup",
+        "clean": "rimraf .turbo node_modules dist",
+        "dev": "tsup --watch",
+        "lint": "eslint \"src/**/*.ts\"",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@saroh/eslint-config": "workspace:*",
+        "@saroh/tsconfig": "workspace:*",
+        "@types/node": "catalog:",
+        "rimraf": "^6.0.1",
+        "tsup": "^8.5.0",
+        "typescript": "catalog:",
+        "vitest": "^4.1.11"
+    }
+}

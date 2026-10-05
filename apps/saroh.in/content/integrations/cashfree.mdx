@@ -1,0 +1,134 @@
+---
+# Every screen, label, path and event below is copied from the code (audit
+# R4). Sources, from the repo root:
+#   SETUP  apps/app.saroh.in/components/providers/provider-setup-dialog.tsx
+#   HOOK   apps/app.saroh.in/components/providers/payment-webhook-steps.tsx
+#   WORDS  apps/app.saroh.in/lib/providers/webhook.ts
+#   ROWS   apps/app.saroh.in/lib/providers/rows.ts
+#   PAGE   apps/app.saroh.in/app/(shell)/settings/(sections)/providers/page.tsx
+#   PATH   packages/integrations/src/index.ts (webhookPath, WEBHOOK_EVENTS),
+#          used by apps/api.saroh.in/src/modules/payments/webhook-setup.ts
+#   SECRET apps/api.saroh.in/src/modules/payments/webhook-secret.ts
+#   KEYS   apps/api.saroh.in/src/modules/payments/providers/cashfree.provider.ts
+#          (Key ID is sent as x-client-id, Key secret as x-client-secret)
+# content/integrations.test.ts checks webhookPath and events against PATH.
+slug: cashfree
+name: Cashfree
+category: Payments
+title: "Cashfree on Saroh: take payments into your own account · Saroh"
+description: "Connect your own Cashfree account to Saroh in five steps: your keys, the webhook address and the events to tick. The money goes straight to you."
+intro: "Saroh's Cashfree integration takes payments through your own Cashfree account, for a business that already uses Cashfree. Customers pay by UPI, card or the other methods your account has switched on, and the money goes straight to you. Saroh never holds it."
+doesTitle: What it does in Saroh
+# PAGE: the screen is titled "Providers"; SETUP: Cashfree is a provider in it.
+panelPath: [Settings, Providers, Cashfree]
+# PATH: webhookPath("CASHFREE", "your-business-id").
+webhookPath: /public/webhooks/cashfree/your-business-id
+# PATH: WEBHOOK_EVENTS.CASHFREE, in Settings' order (HOOK, "Tick these events").
+events:
+    - PAYMENT_SUCCESS_WEBHOOK
+    - PAYMENT_FAILED_WEBHOOK
+    - PAYMENT_USER_DROPPED_WEBHOOK
+    - REFUND_STATUS_WEBHOOK
+initialStep: 2
+steps:
+    # ROWS: a provider not yet connected has a "Connect" button and type "Payments".
+    - title: Open Settings › Providers
+      cta: Connect
+      body: "Providers lists the services behind your business, Razorpay and Cashfree among them. Press Connect on Cashfree's row. The form shows your webhook address straight away, before you connect anything."
+      rows:
+          - { label: Provider, value: Cashfree }
+          - { label: Type, value: Payments }
+    # SETUP: step 1 "Your API keys", fields "Key ID", "Key secret" and
+    # "Public key" (optional, "Shown to the checkout; not a secret.").
+    # KEYS: Key ID and Key secret are Cashfree's client id and secret.
+    - title: Add your API keys
+      body: "Key ID and Key secret are your Cashfree app's client ID and client secret. The public key is optional: it's shown to the checkout and isn't a secret. Your keys are sealed when saved and never shown again."
+      rows:
+          - { label: Key ID, value: "••••••••••••7c21", mono: true, done: true }
+          - {
+                label: Key secret,
+                value: "••••••••••••••••",
+                note: Sealed,
+                mono: true,
+                done: true,
+            }
+          - { label: Public key, value: "optional", note: Not a secret }
+    # HOOK: step 2 "Tell Cashfree where to send payment updates", "Webhook URL"
+    # with "Copy", "Tick these events".
+    # WORDS: WEBHOOK_PLACE.CASHFREE = "Developers › Webhooks › Add Webhook Endpoint".
+    - title: Tell Cashfree where to send payment updates
+      body: "In Cashfree, open Developers › Webhooks › Add Webhook Endpoint. Paste this address, tick the four events and save. The address is made for your business. The id in it isn't a secret, because Saroh checks every message's signature."
+      rows:
+          - {
+                label: Webhook URL,
+                value: "https://api.saroh.in/public/webhooks/cashfree/your-business-id",
+                note: Copy,
+                tone: ok,
+                mono: true,
+            }
+          - {
+                label: Tick these events,
+                value: "PAYMENT_SUCCESS_WEBHOOK, PAYMENT_FAILED_WEBHOOK, PAYMENT_USER_DROPPED_WEBHOOK, REFUND_STATUS_WEBHOOK",
+                mono: true,
+            }
+    # SETUP: for Cashfree, no secret step: "Cashfree signs its payment updates
+    # with your key secret, so there's no separate secret to add."
+    # SECRET: Cashfree signs with the key secret. The button reads "Connect Cashfree".
+    - title: Connect
+      cta: Connect Cashfree
+      body: "Cashfree signs its payment updates with your key secret, so there's no separate secret to add. Press Connect Cashfree."
+      rows:
+          - {
+                label: Webhook signing secret,
+                value: "Your key secret",
+                note: No separate secret,
+            }
+    # WORDS: lastUpdateLine(). ROWS: the "Connected" pill.
+    - title: Check that payment updates arrive
+      body: "Make a test payment, such as a booking deposit or an invoice's pay link. Cashfree's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says 'No payment updates received yet — check the webhook in Cashfree.'"
+      rows:
+          - {
+                label: Cashfree,
+                value: Payments,
+                note: Connected,
+                tone: ok,
+                done: true,
+            }
+          - {
+                label: Payment updates,
+                value: "Last payment update from Cashfree: just now.",
+                done: true,
+            }
+faq:
+    - q: Why do I need a webhook?
+      a: "It's how Cashfree tells Saroh a payment went through, failed, was dropped or was refunded. Saroh checks each message's signature before believing it. Without the webhook, a customer who paid would stay 'Awaiting payment'."
+    # SECRET: needsWebhookSecret("CASHFREE") is false.
+    - q: Do I need a webhook secret for Cashfree?
+      a: "No. Cashfree signs its payment updates with your key secret, which you've already entered."
+    - q: Where does the money go?
+      a: "Straight into your Cashfree account, and from there to your bank on Cashfree's usual schedule. Saroh never holds it."
+    - q: Who charges the payment fees?
+      a: "Cashfree charges its usual fees on your account, as it would anywhere else."
+    - q: Can I use Razorpay instead?
+      a: "Yes. Razorpay works the same way, with one extra step for its webhook signing secret. Connect whichever account your business already has, or both."
+links:
+    - { label: Use Razorpay instead, href: /integrations/razorpay }
+---
+
+{/*
+Each line below is backed in the code and in docs/architecture/MARKETING_CLAIMS.md:
+deposits: BK8 (Service.depositMode); pay links: BI8 (public-invoices.*);
+matched for you: apps/api.saroh.in/src/modules/webhooks/providers/cashfree.webhook.ts
+(PAYMENT_SUCCESS_WEBHOOK → SUCCEEDED, PAYMENT_FAILED_WEBHOOK and
+PAYMENT_USER_DROPPED_WEBHOOK → FAILED, REFUND_STATUS_WEBHOOK → the refund);
+renewals: SU4 (subscription-renew.handler.ts). Cashfree's adapter has no
+autopay (payments/providers/cashfree.provider.ts has no `mandates`), so none is claimed.
+*/}
+
+**Deposits when someone books.** Ask for nothing, a quarter, half or all of the price when a customer books on your site.
+
+**Pay links on invoices.** Every invoice and reminder can carry a link to pay it by UPI or card.
+
+**Payments matched for you.** When Cashfree confirms a payment, the booking, order or invoice it was for is marked paid on its own. A failed payment or a refund is recorded the same way.
+
+**Renewals with a pay link.** Each membership or plan renewal is invoiced on its day, with a link to pay it.
