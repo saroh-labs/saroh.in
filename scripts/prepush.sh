@@ -294,7 +294,6 @@ e2e_stack() {
     export NEXT_PUBLIC_APP_URL=http://localhost:3003
     export NEXT_PUBLIC_API_URL=http://localhost:3333
     export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
-    export NEXT_PUBLIC_APP_DOMAIN=app.saroh.in
     export NEXT_PUBLIC_ROOT_DOMAIN=localhost
     export EMAIL_FROM="Saroh <noreply@saroh.in>"
     export E2E_APP_URL=http://localhost:3003

@@ -20,6 +20,26 @@
   `JOB_VISIBILITY_MS`, `JOB_WORKER_BATCH`, `JOB_WORKER_POLL_MS` and
   `PAYMENTS_ENC_KEY` are validated by the API and missing from its examples.
 
+## A missing production variable fails loudly — **Current**
+
+A fallback to a production address hides a missing variable: the deployment
+works, against whatever the code assumed. On 5 Oct 2026 that dropped every
+waitlist join for two days (DEV_LEARNINGS). So:
+
+- **The API** requires, at boot, every variable a deployed instance can't do
+  without (`REQUIRED_IN_PRODUCTION` in `apps/api.saroh.in/src/env.ts`:
+  `RENDERER_URL`, `APP_URL`, `EMAIL_FROM`). Add a variable there when its
+  fallback would send customers or staff to the wrong place.
+- **Each Vercel app's `next.config`** refuses a `VERCEL_ENV=production` build
+  without the addresses it talks to, and names them. Previews keep their
+  fallbacks on purpose (plan 2026-10-05-001 KTD-3).
+- **One resolver per address per app** (`rendererBase()`, `appBase()`,
+  `serverApiUrl()`/`publicApiUrl()`), never a fallback repeated at each call.
+- **A provider's environment is one switch on the API** (`CASHFREE_ENV`), sent
+  to the browser with the checkout, so server and client can't disagree.
+- Turbo passes only declared variables to builds: a variable a guard requires
+  must be in `turbo.json`.
+
 ## Environment checks are allowlists — **Current**
 
 `NODE_ENV` is `development`, `test` or `production`, and the repo compares with

@@ -2627,3 +2627,23 @@ minute from the column's height, at any scale.
 pointer it's on, and lays out overlaps; a spec that passes only on the
 seed's own day isn't evidence.
 **Category**: frontend · bookings · `apps/app.saroh.in/components/bookings/calendar/day-by-person.tsx`
+
+## Config — production fallbacks across the repo, and Cashfree always live
+
+**Symptom**: After the waitlist's missing `API_URL`, a scan of the repo
+(5 Oct) found about twenty `?? "https://api.saroh.in"`-style fallbacks across
+the Next apps, the API emailing `https://saroh.app` and `https://app.saroh.in`
+links from any non-development host when `RENDERER_URL`/`APP_URL` were
+unset, and Cashfree's host and browser drop-in fixed to production, so
+nothing could run against its sandbox. No secrets were committed.
+**Root cause**: Every address variable was optional with a production
+default, and the "deployed" switch was `NODE_ENV`, which is `production` on
+every Vercel build and every non-local API.
+**Fix**: plan `docs/plans/2026-10-05-001-fix-env-config-plan.md`: the API
+requires `RENDERER_URL`, `APP_URL` and `EMAIL_FROM` in production; every
+Vercel app's production build names and refuses missing addresses; one
+resolver per address; `CASHFREE_ENV` on the API, sent to the browser as the
+checkout's `mode`.
+**Rule**: `docs/patterns/devops-environments-and-flags.md` → "A missing
+production variable fails loudly".
+**Category**: config · env · `apps/*/next.config.*`, `apps/api.saroh.in/src/env.ts`

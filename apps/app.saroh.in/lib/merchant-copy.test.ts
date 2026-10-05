@@ -30,8 +30,6 @@ const ALLOWED = new Set([
     // The role's stored default name, read only to show it as "Location
     // team" (`shownRoleLabel`).
     "lib/organizations/storefront-team.ts Storefront team",
-    // A response header, not copy.
-    "lib/constants/index.ts Saroh.io - Storefront creator",
 ]);
 
 function sourceFiles(dir: string): string[] {
