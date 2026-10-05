@@ -2,12 +2,17 @@ const { REDIRECTS, TEMPORARY } = require("./redirects");
 
 // A production deployment without API_URL drops every waitlist join, and
 // nothing on the page shows it: refuse to build instead (it went unseen for
-// two days after Gate W, DEV_LEARNINGS). Previews and local builds may go
-// without; the waitlist says so there.
-if (process.env.VERCEL_ENV === "production" && !process.env.API_URL) {
-    throw new Error(
-        "saroh.in: API_URL must be set for a production deployment (the waitlist relays to it).",
-    );
+// two days after Gate W, DEV_LEARNINGS). Without SITE_RELAY_SECRET joins go
+// through but the API rate-limits every visitor as one. Previews and local
+// builds may go without; the waitlist says so there.
+const REQUIRED_IN_PRODUCTION = ["API_URL", "SITE_RELAY_SECRET"];
+if (process.env.VERCEL_ENV === "production") {
+    const missing = REQUIRED_IN_PRODUCTION.filter((key) => !process.env[key]);
+    if (missing.length > 0) {
+        throw new Error(
+            `saroh.in: ${missing.join(", ")} must be set for a production deployment (the waitlist relays to the API).`,
+        );
+    }
 }
 
 /** @type {import('next').NextConfig} */
