@@ -177,7 +177,7 @@ test.describe("link preview checker", () => {
         await expect(page.getByRole("checkbox")).toHaveCount(0);
         await page.getByLabel("Email").fill("not-an-email");
         await page.getByRole("button", { name: "Unlock" }).click();
-        await expect(page.getByRole("alert")).toHaveText(
+        await expect(page.locator("main").getByRole("alert")).toHaveText(
             "That email doesn't look right. Check it and try again.",
         );
 
@@ -220,17 +220,17 @@ test.describe("link preview checker", () => {
     }) => {
         await page.goto(TOOL);
         await check(page, `http://${origin}/bare`);
-        await expect(page.getByRole("alert")).toContainText(
+        await expect(page.locator("main").getByRole("alert")).toContainText(
             "found no share tags",
         );
 
         await check(page, `http://127.0.0.1:${closedPort}/`);
-        await expect(page.getByRole("alert")).toHaveText(
+        await expect(page.locator("main").getByRole("alert")).toHaveText(
             `We couldn't reach 127.0.0.1:${closedPort}. Check the address, or try again in a minute.`,
         );
 
         await check(page, "not an address");
-        await expect(page.getByRole("alert")).toHaveText(
+        await expect(page.locator("main").getByRole("alert")).toHaveText(
             "That doesn't look like a web address. Try something like yourbusiness.in.",
         );
     });
