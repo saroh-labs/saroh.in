@@ -14,6 +14,7 @@
     "portless": "saroh",
     "dependencies": {
         "@hookform/resolvers": "catalog:",
+        "@saroh/auth": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "clsx": "^2.1.1",
