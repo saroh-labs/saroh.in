@@ -2682,3 +2682,24 @@ the local run uses three integration databases; local Postgres has
 **Rule**: `docs/patterns/devops-tooling-and-deploy.md` → "Capped workers in
 the static burst".
 **Category**: tooling · gate · `scripts/prepush.sh`
+
+## Invoices — a treatment's balance printed today's seller, not its deposit's
+
+**Symptom**: a treatment's balance invoice, raised when the rest was paid
+after a deposit, printed the business's address, GSTIN and state as they
+were that day. A business that moved or re-registered between the two got
+a balance that disagreed with its deposit, and its place of supply and
+CGST + SGST vs IGST split were worked out afresh against the new state.
+**Root cause**: `ensureTreatmentBalanceInvoice` built the paper with
+`buildManualInvoice` from `loadTaxProfile`, patching only `registered` and
+(in DEC-082) the name, legal name and email from the deposit. ADR-008 says
+a correction takes its original's seller; the desk's balance, credit notes
+and supplementary invoices already did, through `buildCorrection`. Each
+frozen field added since was patched in one at a time, and the rest missed.
+**Fix**: the balance is built with `buildCorrection` from the deposit's
+row, so every frozen seller field, the place of supply and the tax type
+come from the deposit. Unit specs mock a settings change; `visits.db.spec`
+changes the profile between deposit and balance.
+**Rule**: `docs/patterns/backend-billing-and-classes.md` → "Issued paper
+never changes"; ADR-008 → "A balance after a deposit".
+**Category**: invoices · GST · `apps/api.saroh.in/src/modules/invoices/order-invoicing.ts`
