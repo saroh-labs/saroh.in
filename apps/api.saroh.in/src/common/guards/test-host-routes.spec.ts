@@ -66,6 +66,7 @@ const REFUSED = [
     "POST public/site-accounts/waitlist",
     "POST public/site-accounts/waitlist/leave",
     "POST public/waitlist",
+    "POST public/tools/link-preview/report",
     // Plans, packs and autopay.
     "POST public/site-accounts/me/plans/:ref/join",
     "POST public/site-accounts/me/plan/:ref/cancel",

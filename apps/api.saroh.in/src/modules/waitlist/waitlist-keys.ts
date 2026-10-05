@@ -22,6 +22,9 @@ export type WaitlistKind = (typeof WAITLIST_KINDS)[number];
 export const WAITLIST_PLANS = ["free", "grow", "pro"] as const;
 export type WaitlistPlan = (typeof WAITLIST_PLANS)[number];
 
+/** The `source` of an entry the link preview tool's email gate made (KTD-5). */
+export const LINK_PREVIEW_SOURCE = "link-preview";
+
 const GMAIL = new Set(["gmail.com", "googlemail.com"]);
 
 /**

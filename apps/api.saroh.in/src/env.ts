@@ -141,6 +141,13 @@ const envSchema = z.object({
     // own `SITE_ACCOUNT_AREA`, which hides the header entry and the pages;
     // this one is the server half that keeps it private.
     SITE_ACCOUNT_AREA: z.enum(["on", "off"]).optional(),
+    // TEST ONLY. Hosts the link preview tool may fetch although they resolve
+    // to loopback (comma-separated, e.g. `localhost`): the browser tests
+    // point it at a page served on the test machine, which the SSRF guard
+    // refuses otherwise. Loopback only, never a private range. Refused at
+    // boot under NODE_ENV=production (below), and ignored by the tool
+    // wherever the declared NODE_ENV is production (`link-preview/ssrf-guard.ts`).
+    LINK_PREVIEW_TEST_HOSTS: z.string().optional(),
 
     // Payments (S5-002 — org merchant credential encryption at rest).
     // A 32-byte AES-256-GCM key, supplied as base64 or 64-hex. OPTIONAL in the
@@ -199,6 +206,13 @@ const REQUIRED_IN_PRODUCTION = [
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {
     if (value.NODE_ENV !== "production") return;
+    if (value.LINK_PREVIEW_TEST_HOSTS) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["LINK_PREVIEW_TEST_HOSTS"],
+            message: "test only: never set when NODE_ENV=production",
+        });
+    }
     for (const key of REQUIRED_IN_PRODUCTION) {
         if (!value[key]) {
             ctx.addIssue({

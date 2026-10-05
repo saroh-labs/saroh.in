@@ -5043,6 +5043,16 @@ model WaitlistSignup {
 
   ipHash String?
 
+  // The link preview tool (resources plan U2, KTD-5): an email given to
+  // unlock its report is kept here with source "link-preview", with the
+  // last address it checked and when. The retention sweep drops the link
+  // after 12 months, and a link-preview-only entry with it (Privacy).
+  checkedUrl String?
+  checkedAt  DateTime?
+  // "Also send me Saroh news" as ticked: true only when they ticked it.
+  // Null on entries from forms that never asked.
+  newsConsent Boolean?
+
   // Set when the batch containing this signup is opened, so "who is still
   // waiting" is a query rather than a spreadsheet.
   invitedAt DateTime?
