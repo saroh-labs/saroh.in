@@ -23,7 +23,11 @@
 - **Issued paper never changes** (DEC-082): the seller's name, legal name,
   email, GSTIN, state and address are frozen on the invoice by
   `documentColumns` from `loadTaxProfile`, and a correction copies its
-  original's. Anything that draws an issued paper reads the frozen columns
+  original's. Anything against an original — a credit note, a supplementary
+  invoice, a deposit's balance — is built from the original's row
+  (`buildCorrection`, `buildCreditNote`), never `buildManualInvoice` with a
+  patched profile: that recomputes the seller, place of supply and tax
+  split from today's settings. Anything that draws an issued paper reads the frozen columns
   through `printedSeller`, never today's settings; only a draft prints
   today's. The logo is the one live part. A new frozen column needs its
   writer in `documentColumns`, its select in `serialize.ts` and a backfill.

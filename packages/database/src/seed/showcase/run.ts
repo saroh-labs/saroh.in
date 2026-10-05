@@ -298,6 +298,19 @@ async function retireBusinesses(ctx: Context) {
     }
 }
 
+/** GST state names the showcase's registered addresses use. */
+const STATE_NAMES: Record<string, string> = { "29": "Karnataka" };
+
+/**
+ * The registered address as an invoice prints it — the API's
+ * `formatSellerAddress`: "line 1, city PIN, state".
+ */
+function printedAddress(a: ShowcaseBusiness["registeredAddress"]): string {
+    const state = STATE_NAMES[a.gstState];
+    if (!state) throw new Error(`No state name for GST state ${a.gstState}`);
+    return `${a.addressLine1}, ${a.city} ${a.postalCode}, ${state}`;
+}
+
 /**
  * The business's zone (ADR-007): what renewals and "today" are counted in;
  * and its registered address, which its invoices print (DEC-068).
@@ -1178,6 +1191,14 @@ async function seedBusiness(
         pool: people.map((_, i) => i).filter((i) => i >= leadCount),
         staff: teamIds,
         invoicing: biz.modules.includes("PAYMENTS"),
+        // What `setProfile` wrote: the name and registered address, no
+        // legal name or contact email.
+        seller: {
+            sellerName: biz.name,
+            sellerLegalName: null,
+            sellerEmail: null,
+            sellerAddress: printedAddress(biz.registeredAddress),
+        },
     };
     const courses = biz.billing
         ? planCourses(billingCtx, biz.billing.courses)

@@ -72,6 +72,17 @@ export interface BillingContext {
     staff: readonly string[];
     /** Whether Payments is on: without it nothing sold is invoiced. */
     invoicing: boolean;
+    /**
+     * The seller its issued paper prints, frozen at issue as the API
+     * writes it (DEC-082, ADR-008): name, legal name, email and the
+     * registered address as one printed line.
+     */
+    seller: {
+        sellerName: string;
+        sellerLegalName: string | null;
+        sellerEmail: string | null;
+        sellerAddress: string | null;
+    };
 }
 
 /** When a contact first did something, so they exist before it. */
@@ -1001,6 +1012,9 @@ export function invoiceRows(
             contactId: contact.id,
             billToName: issuedAt ? contact.name : null,
             billToEmail: issuedAt ? contact.email : null,
+            // A draft prints today's settings; issued paper, the seller
+            // as it was then (DEC-082). An unregistered business: no GSTIN.
+            ...(issuedAt ? ctx.seller : {}),
             currency: CURRENCY,
             subtotal: rupees(subtotal),
             tax: rupees(spec.taxPaise),
