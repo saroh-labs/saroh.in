@@ -1,5 +1,6 @@
 import { apiFetch, orgBase, readError } from "@/lib/api/http";
 
+import { moduleErrorSentence, ROLE_REFUSAL } from "./blocker-copy";
 import type {
     ModuleBlocker,
     ModuleImpact,
@@ -78,11 +79,15 @@ async function moduleMutation(
     if (res.ok) {
         return { ok: true, data: moduleMutationResponseSchema.parse(raw).data };
     }
-    return {
-        ok: false,
-        error: readError(raw, fallback),
-        blockers: raw?.blockers,
-    };
+    // Never a code, a permission key or a status (DEC-057): a role that
+    // can't reaches the role line, our own failure the plain fallback.
+    const error =
+        res.status === 403
+            ? ROLE_REFUSAL
+            : res.status >= 500
+              ? fallback
+              : moduleErrorSentence(readError(raw, fallback), fallback);
+    return { ok: false, error, blockers: raw?.blockers };
 }
 
 /** Set a module's lifecycle (enable / disable / archive). */
