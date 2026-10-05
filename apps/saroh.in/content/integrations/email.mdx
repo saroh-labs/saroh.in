@@ -1,0 +1,118 @@
+---
+# Every screen, label and setting below is copied from the code (audit R4).
+# Sources, from the repo root:
+#   SETUP  apps/app.saroh.in/components/providers/provider-setup-dialog.tsx
+#          (MessagingForm and CHANNELS.EMAIL)
+#   ROWS   apps/app.saroh.in/lib/providers/rows.ts (COMMS_NAME, CHANNEL.EMAIL)
+#   PAGE   apps/app.saroh.in/app/(shell)/settings/(sections)/providers/page.tsx
+#   SEND   apps/api.saroh.in/src/modules/communications/providers/email.provider.ts
+#   WHAT   apps/api.saroh.in/src/modules/communications/transactional.ts,
+#          apps/api.saroh.in/src/modules/notifications/team-alert.handler.ts
+# Email has no webhook, so this page names no webhook path or events.
+slug: email
+name: Your own email
+category: Email
+title: "Your own email on Saroh: invoices sent from your address · Saroh"
+description: "Connect Resend, SendGrid or an SMTP relay to Saroh, and invoices, reminders and team alerts go out through your own email provider, from an address you choose."
+intro: "Saroh sends your business's email through your own email provider, not Saroh's. Connect Resend, SendGrid or an SMTP relay, choose the address it comes from, and invoices and reminders go out as you."
+doesTitle: What it sends
+# PAGE: the screen is titled "Providers"; SETUP: the email form is titled "Messaging".
+panelPath: [Settings, Providers, Messaging]
+initialStep: 0
+steps:
+    # ROWS: COMMS_NAME = Resend, SendGrid, SMTP relay; each has type "Email"
+    # and a "Connect" button until connected.
+    - title: Open Settings › Providers
+      cta: Connect
+      body: "Providers lists the services behind your business. Your email provider has its own row: Resend, SendGrid or SMTP relay. Press Connect on the one you use."
+      rows:
+          - { label: Provider, value: Resend }
+          - { label: Type, value: Email }
+    # SETUP: the "Channel" choice (Email first) and the "Provider" select:
+    # Resend, SendGrid, SMTP relay.
+    - title: Choose Email and your provider
+      body: "The form opens on Email. Under Provider, pick Resend, SendGrid or SMTP relay."
+      rows:
+          - { label: Channel, value: Email, done: true }
+          - { label: Provider, value: Resend, done: true }
+    # SETUP: fields "API key" (secret) and "Relay address" (optional, "Only for
+    # a self-hosted or regional relay. Leave empty for the provider's own.").
+    # SEND: one Resend-style API (POST <relay address>/emails, default
+    # https://api.resend.com); SendGrid and SMTP go through a relay that
+    # speaks it.
+    - title: Add your API key
+      body: "Paste the API key from your email provider. Saroh sends through Resend's email API, so with Resend you leave Relay address empty. SendGrid and SMTP relay are reached through a relay that takes the same requests: put its address in Relay address. Keys are sealed when saved and never shown again."
+      rows:
+          - {
+                label: API key,
+                value: "re_••••••••••••",
+                note: Sealed,
+                mono: true,
+                done: true,
+            }
+          - {
+                label: Relay address,
+                value: "optional",
+                note: Leave empty for Resend,
+            }
+    # SETUP: "Send from" (optional, "What recipients see it come from. Not a
+    # secret.") and the button "Connect email".
+    - title: Choose the address it comes from
+      cta: Connect email
+      body: "Under Send from, type the address your customers see, like hello@yourbusiness.in. Use one your email provider lets you send from, usually on a domain you've set up with them. Then press Connect email."
+      rows:
+          - {
+                label: Send from,
+                value: hello@yourbusiness.in,
+                note: Not a secret,
+                mono: true,
+            }
+    # SETUP: the toast "Email is sent through Resend". ROWS: the "Connected"
+    # pill and the "Sends from" reference on the row.
+    - title: Check the row in Settings › Providers
+      body: "Once connected, your provider's row says Connected and shows the address it sends from. Email stops the moment you disconnect it, and ones already sent aren't affected."
+      rows:
+          - {
+                label: Resend,
+                value: Email,
+                note: Connected,
+                tone: ok,
+                done: true,
+            }
+          - {
+                label: Sends from,
+                value: hello@yourbusiness.in,
+                mono: true,
+                done: true,
+            }
+faq:
+    # SEND: attachments go only to RESEND; others send the link alone.
+    - q: Is the invoice attached?
+      a: "With Resend, yes: the invoice's PDF goes with the email. Through SendGrid or an SMTP relay, the email carries a link to the invoice instead."
+    # PAGE + ROWS: email isn't sent until a provider is connected.
+    - q: What if I don't connect one?
+      a: "Then invoices, reminders and team alerts aren't emailed. Everything else in Saroh works as before."
+    # SETUP: "Keys are sealed when saved and never shown again."
+    - q: Can Saroh read my API key back?
+      a: "No. It's sealed when you save it and never shown again, here or anywhere. To change it, you enter a new one."
+    - q: Does Saroh send sign-in emails from my address?
+      a: "No. Sign-in and security email comes from Saroh. Your provider sends only your business's email to your customers and team."
+links:
+    - { label: Take payments with Razorpay, href: /integrations/razorpay }
+---
+
+{/*
+What goes through the business's own provider, from the code:
+WHAT: INVOICE_TEMPLATES = INVOICE_SENT, INVOICE_REMINDER (MARKETING_CLAIMS BI2);
+TEAM_TEMPLATES = TEAM_ALERT, "a new order, a booking, a failed payment,
+someone joining … sent only to the people who chose email for them".
+Booking and order notices to customers (NOTICE_TEMPLATES) go only to a live
+site account's verified email (site-accounts/notice-reach.ts), and customer
+accounts are behind SITE_ACCOUNT_AREA, so they aren't claimed here.
+*/}
+
+**Invoices and reminders.** When you send an invoice or a reminder, it goes to your customer from your address, with a link to pay it when you take payments online.
+
+**Alerts to your team.** A new order, a booking, a failed payment or someone joining is emailed to the people on your team who chose email for it.
+
+**Sign-in email stays with Saroh.** Sign-in and security email comes from Saroh, not from your provider.

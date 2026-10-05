@@ -1,3 +1,12 @@
+import type { PaymentWebhookProvider } from "@saroh/integrations";
+import {
+    PAYMENT_WEBHOOK_PROVIDERS,
+    WEBHOOK_EVENTS,
+    webhookPath,
+} from "@saroh/integrations";
+
+import type { IntegrationFrontmatter } from "./integrations";
+import { API_ORIGIN, PLACEHOLDER_BUSINESS_ID } from "./integrations";
 import type { FaqItem, Feature, Solution } from "./types";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "./types";
 
@@ -79,4 +88,92 @@ export function contentErrors({
         }
     }
     return errors;
+}
+
+/**
+ * Every way an integration page can drift from the code or link wrongly
+ * (Resources plan U3, audit R4), as readable lines; empty means sound.
+ * `integrations.test.ts` runs it on the real pages and on broken copies.
+ *
+ * - each live card has a page, and each page says it is that card's;
+ * - a payments page's webhook path is the API's own (`webhookPath` from
+ *   `@saroh/integrations`, which `webhook-setup.ts` builds the address
+ *   with), and every webhook address written anywhere in the file is it;
+ * - its events are the API's `WEBHOOK_EVENTS`, and the step that lists
+ *   them lists the same;
+ * - no page links to itself, and no planned row carries a link.
+ */
+export function integrationErrors({
+    live,
+    planned,
+    pages,
+}: {
+    live: readonly { slug: string; name: string }[];
+    planned: readonly object[];
+    pages: Partial<
+        Record<string, { frontmatter: IntegrationFrontmatter; source: string }>
+    >;
+}): string[] {
+    const errors: string[] = [];
+    for (const card of live) {
+        const page = pages[card.slug];
+        if (!page) {
+            errors.push(`integration ${card.slug}: no page`);
+            continue;
+        }
+        const fm = page.frontmatter;
+        const at = `integration ${card.slug}`;
+        if (fm.slug !== card.slug) errors.push(`${at}: slug says ${fm.slug}`);
+        for (const link of fm.links) {
+            if (link.href === `/integrations/${card.slug}`) {
+                errors.push(`${at}: links to itself`);
+            }
+        }
+        const provider = card.slug.toUpperCase();
+        if (!isPaymentWebhookProvider(provider)) continue;
+        const path = webhookPath(provider, PLACEHOLDER_BUSINESS_ID);
+        if (fm.webhookPath !== path) {
+            errors.push(`${at}: webhook path ${fm.webhookPath} is not ${path}`);
+        }
+        const written = page.source.match(/\/public\/webhooks\/[^\s"'`,)]*/g);
+        for (const found of written ?? []) {
+            if (found !== path) {
+                errors.push(`${at}: writes webhook path ${found}`);
+            }
+        }
+        const urls = page.source.match(
+            /https?:\/\/[^\s"'`,)]*\/webhooks\/[^\s"'`,)]*/g,
+        );
+        for (const url of urls ?? []) {
+            if (url !== `${API_ORIGIN}${path}`) {
+                errors.push(`${at}: writes webhook address ${url}`);
+            }
+        }
+        const events = WEBHOOK_EVENTS[provider];
+        if ((fm.events ?? []).join(",") !== events.join(",")) {
+            errors.push(`${at}: events are not ${events.join(", ")}`);
+        }
+        for (const step of fm.steps) {
+            for (const row of step.rows) {
+                if (row.label !== "Tick these events") continue;
+                if (row.value !== events.join(", ")) {
+                    errors.push(
+                        `${at}: step "${step.title}" lists other events`,
+                    );
+                }
+            }
+        }
+    }
+    for (const row of planned) {
+        if ("href" in row) {
+            errors.push(`planned ${(row as { name?: string }).name}: links`);
+        }
+    }
+    return errors;
+}
+
+function isPaymentWebhookProvider(
+    value: string,
+): value is PaymentWebhookProvider {
+    return (PAYMENT_WEBHOOK_PROVIDERS as readonly string[]).includes(value);
 }
