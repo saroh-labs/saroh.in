@@ -11,6 +11,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { holdState } from "../bookings/booking-hold";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { printedSeller } from "../invoices/invoice-paper-view";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
@@ -44,6 +45,7 @@ import {
  * references, no internal state.
  */
 export interface PublicInvoiceView {
+    /** The business as named when the invoice was issued (DEC-082). */
     businessName: string;
     number: string;
     issuedAt: string | null;
@@ -146,6 +148,9 @@ export async function invoicePaper(
             billToName: true,
             kind: true,
             sellerGstin: true,
+            // Named as it was at issue (DEC-082); today's name only for a
+            // row that froze none.
+            sellerName: true,
             organization: { select: { name: true } },
             lines: {
                 orderBy: { position: "asc" },
@@ -170,7 +175,11 @@ export async function invoicePaper(
         select: { style: true },
     });
     return {
-        businessName: invoice.organization.name,
+        businessName: printedSeller(invoice, {
+            name: invoice.organization.name,
+            legalName: null,
+            email: null,
+        }).name,
         number: invoice.number,
         issuedAt: invoice.issuedAt?.toISOString() ?? null,
         dueAt: invoice.dueAt?.toISOString() ?? null,

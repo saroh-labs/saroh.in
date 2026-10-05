@@ -1,3 +1,5 @@
+import { appBase } from "../../common/app-url";
+
 /**
  * Built-in self-test / preview templates (S6-004).
  *
@@ -29,13 +31,13 @@ const TEMPLATES: Record<SelfTestTemplate, RenderedTemplate> = {
         label: "Welcome email preview",
         html: `<h2>Welcome to Saroh</h2>
   <p>This is a preview of the welcome email your customers would receive.</p>
-  <p><a href="https://app.saroh.in" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Get started</a></p>`,
+  <p><a href="${appBase()}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Get started</a></p>`,
     },
     "enquiry-notification": {
         label: "New enquiry notification preview",
         html: `<h2>New enquiry from Jane Doe</h2>
   <p>Jane Doe submitted the "Contact us" form. Open the lead to follow up.</p>
-  <p><a href="https://app.saroh.in" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">View lead</a></p>`,
+  <p><a href="${appBase()}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">View lead</a></p>`,
     },
     receipt: {
         label: "Order receipt preview",

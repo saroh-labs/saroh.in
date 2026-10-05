@@ -5548,16 +5548,23 @@ model Invoice {
   // GST, frozen on issue (ADR-008). `sellerGstin` set = a tax invoice; null
   // = a receipt. Place of supply is a GST state code; `taxType` INTRA (CGST +
   // SGST) or INTER (IGST).
-  sellerGstin   String?
-  sellerState   String?
+  sellerGstin     String?
+  sellerState     String?
   // The business's registered address as printed, frozen on issue like the
   // GSTIN: settings edited later never change issued paper.
-  sellerAddress String?
-  placeOfSupply String?
-  taxType       String?
-  cgst          Decimal @default(0) @db.Decimal(12, 2)
-  sgst          Decimal @default(0) @db.Decimal(12, 2)
-  igst          Decimal @default(0) @db.Decimal(12, 2)
+  sellerAddress   String?
+  // The business's name (`Organization.name`), legal name and contact email
+  // (`BusinessProfile.legalName`, `.contactEmail`) as printed, frozen on
+  // issue like the GSTIN: settings edited later never change issued paper
+  // (DEC-082). Null on a draft, which prints today's. The logo stays live.
+  sellerName      String?
+  sellerLegalName String?
+  sellerEmail     String?
+  placeOfSupply   String?
+  taxType         String?
+  cgst            Decimal @default(0) @db.Decimal(12, 2)
+  sgst            Decimal @default(0) @db.Decimal(12, 2)
+  igst            Decimal @default(0) @db.Decimal(12, 2)
 
   currency String
   subtotal Decimal @db.Decimal(12, 2)

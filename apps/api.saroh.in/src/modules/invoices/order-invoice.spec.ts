@@ -18,6 +18,11 @@ const RYE: TaxProfile = {
     deliveryRateBps: 1800,
     deliverySac: "996813",
     address: "14 Hill Road, Indiranagar, Bengaluru 560038, Karnataka",
+    seller: {
+        sellerName: "Rye & Co.",
+        sellerLegalName: "Rye and Company Bakery LLP",
+        sellerEmail: "hello@rye.example",
+    },
 };
 
 const UNREGISTERED: TaxProfile = {
@@ -213,6 +218,9 @@ describe("a credit note", () => {
             sellerGstin: doc.sellerGstin,
             sellerState: doc.sellerState,
             sellerAddress: doc.sellerAddress,
+            sellerName: doc.sellerName,
+            sellerLegalName: doc.sellerLegalName,
+            sellerEmail: doc.sellerEmail,
             placeOfSupply: doc.placeOfSupply,
             taxType: doc.taxType,
             tax: String(doc.taxCents / 100),
@@ -509,6 +517,9 @@ describe("the seller's registered address (CGST rule 46)", () => {
                 sellerState: doc.sellerState,
                 sellerAddress:
                     "Old Shop, 1 MG Road, Bengaluru 560001, Karnataka",
+                sellerName: doc.sellerName,
+                sellerLegalName: doc.sellerLegalName,
+                sellerEmail: doc.sellerEmail,
                 placeOfSupply: doc.placeOfSupply,
                 taxType: doc.taxType,
                 tax: "0",
@@ -520,6 +531,73 @@ describe("the seller's registered address (CGST rule 46)", () => {
         expect(cn.sellerAddress).toBe(
             "Old Shop, 1 MG Road, Bengaluru 560001, Karnataka",
         );
+    });
+});
+
+describe("the seller's name, legal name and email (DEC-082)", () => {
+    const cake = [
+        {
+            description: "Cake",
+            quantity: 1,
+            unitCents: 50000,
+            rateBps: 500,
+            code: "1905",
+        },
+    ];
+    /** What the business is called since: renamed after the paper was issued. */
+    const RENAMED: TaxProfile = {
+        ...RYE,
+        seller: {
+            sellerName: "Rye Bakehouse",
+            sellerLegalName: "Rye Bakehouse Private Limited",
+            sellerEmail: "orders@ryebakehouse.example",
+        },
+    };
+
+    it("are frozen on an order's invoice, a hand-written one and a receipt", () => {
+        for (const doc of [
+            buildOrderInvoice(order(), RYE),
+            buildOrderInvoice(order(), UNREGISTERED),
+            buildManualInvoice(cake, RYE, null, 0),
+            buildManualInvoice(cake, UNREGISTERED, null, 0),
+        ]) {
+            expect(doc).toMatchObject(RYE.seller);
+        }
+    });
+
+    it("a credit note and a supplementary invoice carry their original's, not today's", () => {
+        const doc = buildOrderInvoice(order(), RYE);
+        const original = {
+            sellerGstin: doc.sellerGstin,
+            sellerState: doc.sellerState,
+            sellerAddress: doc.sellerAddress,
+            sellerName: doc.sellerName,
+            sellerLegalName: doc.sellerLegalName,
+            sellerEmail: doc.sellerEmail,
+            placeOfSupply: doc.placeOfSupply,
+            taxType: doc.taxType,
+            tax: "0",
+            total: (doc.totalCents / 100).toFixed(2),
+            lines: [],
+        };
+        // The business renamed since: nothing here reads RENAMED.
+        expect(RENAMED.seller.sellerName).not.toBe(original.sellerName);
+        expect(buildCreditNote(original, 1000)).toMatchObject(RYE.seller);
+        expect(buildPaymentSupplementary(original, 1000)).toMatchObject(
+            RYE.seller,
+        );
+        expect(
+            buildCorrection(original, [
+                {
+                    description: "Cake",
+                    quantity: 1,
+                    unitCents: 50000,
+                    rateBps: 500,
+                    code: "1905",
+                    orderItemId: null,
+                },
+            ]),
+        ).toMatchObject(RYE.seller);
     });
 });
 

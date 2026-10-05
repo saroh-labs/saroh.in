@@ -6,6 +6,7 @@ import {
     DEFAULT_MAX_UPLOAD_BYTES,
     DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
     extensionForContentType,
+    hasImageSignature,
     hasIsoBmffSignature,
     isAllowedContentType,
     isVideoContentType,
@@ -14,16 +15,32 @@ import {
 } from "./validation";
 
 describe("content-type allowlist", () => {
-    it("accepts allowed image and doc types", () => {
-        expect(
-            isAllowedContentType("image/png", DEFAULT_ALLOWED_CONTENT_TYPES),
-        ).toBe(true);
-        expect(
-            isAllowedContentType(
-                "application/pdf",
-                DEFAULT_ALLOWED_CONTENT_TYPES,
-            ),
-        ).toBe(true);
+    it("accepts images", () => {
+        for (const type of [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif",
+            "image/avif",
+        ]) {
+            expect(
+                isAllowedContentType(type, DEFAULT_ALLOWED_CONTENT_TYPES),
+            ).toBe(true);
+        }
+    });
+
+    it("refuses documents and text: the media buckets are public", () => {
+        for (const type of [
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+            "text/csv",
+        ]) {
+            expect(
+                isAllowedContentType(type, DEFAULT_ALLOWED_CONTENT_TYPES),
+            ).toBe(false);
+        }
     });
 
     it("rejects disallowed types (incl. scriptable svg and executables)", () => {
@@ -247,5 +264,64 @@ describe("hasIsoBmffSignature", () => {
             false,
         );
         expect(hasIsoBmffSignature(bytes([0, 0, 0, 0x20], "ftyp"))).toBe(false);
+    });
+});
+
+describe("hasImageSignature — the bytes are the image the type says", () => {
+    const bytes = (...parts: (number[] | string)[]) =>
+        new Uint8Array(
+            parts.flatMap((p) =>
+                typeof p === "string"
+                    ? Array.from(p, (c) => c.charCodeAt(0))
+                    : p,
+            ),
+        );
+    const pad = (b: Uint8Array) => {
+        const out = new Uint8Array(16);
+        out.set(b.subarray(0, 16));
+        return out;
+    };
+    const jpeg = pad(bytes([0xff, 0xd8, 0xff, 0xe0]));
+    const png = pad(bytes([0x89], "PNG", [0x0d, 0x0a, 0x1a, 0x0a]));
+    const gif = pad(bytes("GIF89a"));
+    const webp = pad(bytes("RIFF", [0, 0, 0, 0], "WEBP"));
+    const avif = pad(bytes([0, 0, 0, 0x1c], "ftypavif"));
+    const html = pad(bytes("<!doctype html>"));
+
+    it.each([
+        ["image/jpeg", jpeg],
+        ["image/png", png],
+        ["image/gif", gif],
+        ["image/webp", webp],
+        ["image/avif", avif],
+    ])("recognises %s", (type, b) => {
+        expect(hasImageSignature(type, b)).toBe(true);
+    });
+
+    it("refuses a page labelled as any image type", () => {
+        for (const type of [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "image/avif",
+        ]) {
+            expect(hasImageSignature(type, html)).toBe(false);
+        }
+    });
+
+    it("refuses one real image labelled as another", () => {
+        expect(hasImageSignature("image/png", jpeg)).toBe(false);
+        expect(
+            hasImageSignature(
+                "image/avif",
+                pad(bytes([0, 0, 0, 0x1c], "ftypisom")),
+            ),
+        ).toBe(false);
+    });
+
+    it("refuses too few bytes, and types that aren't images", () => {
+        expect(hasImageSignature("image/png", png.subarray(0, 8))).toBe(false);
+        expect(hasImageSignature("text/html", html)).toBe(false);
     });
 });

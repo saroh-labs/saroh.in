@@ -20,6 +20,56 @@
   `JOB_VISIBILITY_MS`, `JOB_WORKER_BATCH`, `JOB_WORKER_POLL_MS` and
   `PAYMENTS_ENC_KEY` are validated by the API and missing from its examples.
 
+## A missing production variable fails loudly — **Current**
+
+A fallback to a production address hides a missing variable: the deployment
+works, against whatever the code assumed. On 5 Oct 2026 that dropped every
+waitlist join for two days (DEV_LEARNINGS). So:
+
+- **The API** requires, at boot, every variable a deployed instance can't do
+  without (`REQUIRED_IN_PRODUCTION` in `apps/api.saroh.in/src/env.ts`:
+  `RENDERER_URL`, `APP_URL`, `EMAIL_FROM`). Add a variable there when its
+  fallback would send customers or staff to the wrong place.
+- **Each Vercel app's `next.config`** refuses a `VERCEL_ENV=production` build
+  without the addresses it talks to, and names them. A `development`-branch
+  build (`VERCEL_GIT_COMMIT_REF`) is the dev environment and needs the same,
+  plus the dev environment's own (below). Other previews keep their fallbacks
+  on purpose (plan 2026-10-05-001 KTD-3).
+- **One resolver per address per app** (`rendererBase()`, `appBase()`,
+  `serverApiUrl()`/`publicApiUrl()`), never a fallback repeated at each call.
+- **A provider's environment is one switch on the API** (`CASHFREE_ENV`), sent
+  to the browser with the checkout, so server and client can't disagree.
+- Turbo passes only declared variables to builds: a variable a guard requires
+  must be in `turbo.json`.
+
+## The dev environment lives on saroh.io — **Current**
+
+`development` deploys to its own domain (DEC-081), never under saroh.in, so its
+session can't touch production's.
+
+| Piece                                | Dev                                             | Production            |
+| ------------------------------------ | ----------------------------------------------- | --------------------- |
+| API (Coolify `saroh-api-dev`)        | `api.saroh.io`                                  | `api.saroh.in`        |
+| Workspace, sign-in, admin, marketing | `app.` `accounts.` `admin.saroh.io`, `saroh.io` | the `.saroh.in` hosts |
+| Merchant sites                       | `*.dev.saroh.app`                               | `*.saroh.app`         |
+
+- Each Vercel project serves the dev host from the `development` branch, and
+  its Preview variables point at the dev API and dev sign-in.
+- **Only key holders get in.** `withDevAccess` (`@saroh/auth/dev-access`) runs
+  in every dev app's middleware when `DEV_ACCESS_KEY` is set. Open any page
+  with `?access=<key>` once: it sets a cookie on `DEV_ACCESS_COOKIE_DOMAIN`
+  (`.saroh.io`) and drops the key from the address. Anyone else is sent to the
+  same page on `DEV_REDIRECT_ORIGIN` (production); a form post is refused.
+  Rotate by changing the key. The API and the merchant sites are not behind it
+  — dev holds no real customers and its payments run in sandbox
+  (`CASHFREE_ENV=sandbox`).
+- Vercel's preview protection still sits in front (a Vercel team login), so
+  today the key is a second lock. Lifting it for the saroh.io domains is the
+  only step needed to open dev to key holders (DEC-081).
+- `AUTH_COOKIE_PREFIX` names dev's session cookie apart from production's, a
+  second guard should the domains ever share a parent.
+- The key lives only on Vercel; it is never committed or printed.
+
 ## Environment checks are allowlists — **Current**
 
 `NODE_ENV` is `development`, `test` or `production`, and the repo compares with

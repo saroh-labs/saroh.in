@@ -1,3 +1,38 @@
+// A production deployment that falls back to built-in addresses talks to
+// whatever the code assumed; one missing variable once dropped every waitlist
+// join for two days (DEV_LEARNINGS, 5 Oct 2026). So a Vercel production build
+// refuses to start without these (the API and sign-in it talks to). Other previews and local builds
+// keep their fallbacks (plan 2026-10-05-001 KTD-3).
+const REQUIRED_IN_PRODUCTION = [
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_ACCOUNTS_URL",
+    "NEXT_PUBLIC_BETTER_AUTH_URL",
+];
+
+// The `development` branch's deployments are the dev environment (saroh.io).
+// They need everything production does, or they would quietly talk to
+// production, plus the key that keeps them private and their own session cookie.
+const REQUIRED_IN_DEVELOPMENT = [
+    ...REQUIRED_IN_PRODUCTION,
+    "DEV_ACCESS_KEY",
+    "DEV_ACCESS_COOKIE_DOMAIN",
+    "DEV_REDIRECT_ORIGIN",
+    "AUTH_COOKIE_PREFIX",
+    "BETTER_AUTH_TRUSTED_ORIGINS",
+];
+const required =
+    process.env.VERCEL_ENV === "production"
+        ? REQUIRED_IN_PRODUCTION
+        : process.env.VERCEL_GIT_COMMIT_REF === "development"
+          ? REQUIRED_IN_DEVELOPMENT
+          : [];
+const missing = required.filter((key) => !process.env[key]);
+if (missing.length > 0) {
+    throw new Error(
+        `app.saroh.in: ${missing.join(", ")} must be set for a ${process.env.VERCEL_ENV === "production" ? "production" : "development"} deployment.`,
+    );
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     transpilePackages: ["@saroh/auth", "@saroh/ui", "@saroh/site-blocks"],

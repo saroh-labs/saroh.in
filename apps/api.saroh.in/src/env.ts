@@ -145,6 +145,11 @@ const envSchema = z.object({
     // credential is en/decrypted) and throws a clear error if it is
     // missing/malformed. Never logged.
     PAYMENTS_ENC_KEY: z.string().optional(),
+    // Which Cashfree the API talks to, for merchants' payments and Saroh's own
+    // billing alike: `sandbox` for test credentials, `production` (default)
+    // for live ones. The API sends the mode with every checkout's client
+    // parameters, so the browser drop-in opens where the order was made.
+    CASHFREE_ENV: z.enum(["production", "sandbox"]).default("production"),
 
     // Saroh STAFF break-glass bootstrap (S1-012 admin). Comma-separated emails
     // that are treated as platform admins even with no PlatformAdmin row. This
@@ -174,6 +179,40 @@ const envSchema = z.object({
     npm_package_version: z.string().optional(),
 });
 
+/**
+ * Variables a deployed API cannot do without (NODE_ENV=production): unset,
+ * it would send customers and staff links to production's sites from any
+ * host (the fallbacks used to be `https://saroh.app` and
+ * `https://app.saroh.in`), or mail from an address nobody chose. Required
+ * at boot, so a missing one stops the deploy instead (plan
+ * 2026-10-05-001, KTD-2).
+ */
+const REQUIRED_IN_PRODUCTION = [
+    "RENDERER_URL",
+    "APP_URL",
+    "EMAIL_FROM",
+] as const;
+
+const checkedSchema = envSchema.superRefine((value, ctx) => {
+    if (value.NODE_ENV !== "production") return;
+    for (const key of REQUIRED_IN_PRODUCTION) {
+        if (!value[key]) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: [key],
+                message: "required when NODE_ENV=production",
+            });
+        }
+    }
+});
+
+/** Parse an environment the way the API does at boot (exported for tests). */
+export function parseEnv(
+    source: Record<string, string | undefined>,
+): ReturnType<typeof checkedSchema.safeParse> {
+    return checkedSchema.safeParse(source);
+}
+
 function loadEnv(): z.infer<typeof envSchema> {
     if (process.env.SKIP_ENV_VALIDATION) {
         return process.env as unknown as z.infer<typeof envSchema>;
@@ -186,7 +225,7 @@ function loadEnv(): z.infer<typeof envSchema> {
         source[key] = value === "" ? undefined : value;
     }
 
-    const parsed = envSchema.safeParse(source);
+    const parsed = parseEnv(source);
     if (!parsed.success) {
         const issues = parsed.error.issues
             .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)

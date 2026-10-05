@@ -43,9 +43,12 @@ import { fromCents, toCents } from "./totals";
 
 type Tx = Prisma.TransactionClient;
 
-/** The business's GST standing. A business without a profile is unregistered. */
+/**
+ * The business's GST standing, and the seller its paper prints (DEC-082). A
+ * business without a profile is unregistered, and prints its name alone.
+ */
 export async function loadTaxProfile(
-    tx: Pick<Tx, "businessProfile">,
+    tx: Pick<Tx, "businessProfile" | "organization">,
     organizationId: string,
 ): Promise<TaxProfile> {
     const p = await tx.businessProfile.findUnique({
@@ -63,7 +66,14 @@ export async function loadTaxProfile(
             addressLine2: true,
             city: true,
             postalCode: true,
+            legalName: true,
+            contactEmail: true,
         },
+    });
+    // The name the paper prints is the organization's (DEC-082).
+    const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true },
     });
     return {
         registered: Boolean(p?.gstRegistered && p.taxId && p.gstState),
@@ -77,12 +87,17 @@ export async function loadTaxProfile(
         address: p
             ? formatSellerAddress({ ...p, stateName: stateName(p.gstState) })
             : null,
+        seller: {
+            sellerName: org?.name ?? null,
+            sellerLegalName: p?.legalName ?? null,
+            sellerEmail: p?.contactEmail ?? null,
+        },
     };
 }
 
 /** Whether the business issues tax invoices (and ignores add-on tax). */
 export async function isGstRegistered(
-    tx: Pick<Tx, "businessProfile">,
+    tx: Pick<Tx, "businessProfile" | "organization">,
     organizationId: string,
 ): Promise<boolean> {
     return (await loadTaxProfile(tx, organizationId)).registered;
@@ -124,6 +139,9 @@ export function documentColumns(doc: BuiltDocument) {
         sellerGstin: doc.sellerGstin,
         sellerState: doc.sellerState,
         sellerAddress: doc.sellerAddress,
+        sellerName: doc.sellerName,
+        sellerLegalName: doc.sellerLegalName,
+        sellerEmail: doc.sellerEmail,
     };
 }
 
@@ -284,6 +302,9 @@ const ORIGINAL_SELECT = {
     sellerGstin: true,
     sellerState: true,
     sellerAddress: true,
+    sellerName: true,
+    sellerLegalName: true,
+    sellerEmail: true,
     placeOfSupply: true,
     taxType: true,
     tax: true,
@@ -428,6 +449,9 @@ function asOriginal(row: OriginalRow): Original {
         sellerGstin: row.sellerGstin,
         sellerState: row.sellerState,
         sellerAddress: row.sellerAddress,
+        sellerName: row.sellerName,
+        sellerLegalName: row.sellerLegalName,
+        sellerEmail: row.sellerEmail,
         placeOfSupply: row.placeOfSupply,
         taxType: row.taxType,
         tax: row.tax,
@@ -502,8 +526,17 @@ async function ensureTreatmentBalanceInvoice(
                 orderItemId: line.id,
             },
         ],
-        // The paper follows the deposit's: a receipt stays a receipt.
-        { ...profile, registered: original.sellerGstin !== null },
+        // The paper follows the deposit's: a receipt stays a receipt, and
+        // the seller is named as the deposit's paper named it (DEC-082).
+        {
+            ...profile,
+            registered: original.sellerGstin !== null,
+            seller: {
+                sellerName: original.sellerName,
+                sellerLegalName: original.sellerLegalName,
+                sellerEmail: original.sellerEmail,
+            },
+        },
         original.billToState,
         0,
     );
