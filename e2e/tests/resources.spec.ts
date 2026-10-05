@@ -149,7 +149,9 @@ test("the changelog's email joins the list, and the same address again is fine",
     const address = `${stamp(testInfo).toLowerCase()}@example.com`;
     for (const attempt of ["first", "again"]) {
         await page.goto(`${WEB}/changelog`);
-        await page.getByLabel("Email").fill(address);
+        await page
+            .getByRole("textbox", { name: "Email", exact: true })
+            .fill(address);
         const joined = page.waitForResponse(
             (r) =>
                 r.url().endsWith("/api/waitlist") &&

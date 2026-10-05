@@ -60,7 +60,7 @@ function render(s: ProductStock) {
             product={product}
             stock={s}
             money={(a) => `₹${Number(a)}`}
-            ordersHref="/orders"
+            ordersHref="/commerce/orders"
             onOpen={() => undefined}
         />,
     );
@@ -119,7 +119,7 @@ describe("StockTable on a phone", () => {
         expect(phone).toContain("11 can sell");
         expect(phone).toContain("Online · ");
         expect(phone).toContain("Only 7 left");
-        expect(phone).toContain('href="/orders"');
+        expect(phone).toContain('href="/commerce/orders"');
         expect(phone).toContain("relative z-[1]");
         expect(phone).toContain("coarse:min-h-11");
     });

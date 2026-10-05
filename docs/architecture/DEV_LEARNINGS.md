@@ -2756,3 +2756,26 @@ try) and at most 8 checks run at once (`busy` past that).
 **Rule**: `docs/patterns/backend-integrations.md` — "An email a stranger can
 trigger carries only our words".
 **Category**: security · email · `apps/api.saroh.in/src/modules/link-preview/`
+## Layout — a phone zoomed out on text it never showed
+
+**Symptom**: On the batch-2026-10-05-5 gate, a customer's Orders tab
+measured `innerWidth` 557 at a 375px phone, and New invoice's "Issue with
+pay link" could not be clicked on a Pixel 7: each try hit another element
+(the quantity box, the h1). Neither failed alone on a fresh seed.
+**Root cause**: Two widths no one could see. (1) An order card's
+`sr-only` ", order #1042" sits inside the truncated title link, but it is
+`position: absolute` and its containing block was the card's `li`
+(`relative`), so the link's `overflow: hidden` never clipped it: placed
+after a long title, it widened the page by 180px. (2) New invoice's left
+column was a `grid` with an implicit `auto` track, whose least width is
+its widest item's min-content — the contact picker's one-line
+"name · email". A parallel spec's 60-character email, first in the list,
+made it 1089px; the phone zoomed out and Playwright's clicks landed short.
+**Fix**: `OrderCardFrame` wraps the title in a `relative` span, so the
+truncated link clips its screen-reader words; the invoice form's column is
+`grid-cols-[minmax(0,1fr)]`.
+**Rule**: An `sr-only` inside truncated text needs a positioned ancestor
+inside the clip; a `grid` that holds one-line, truncating content names
+its track `minmax(0,1fr)` (`min-w-0` on the grid itself is not enough).
+**Category**: layout · phone · `components/commerce/orders/order-row.tsx`,
+`components/invoices/invoice-form.tsx`

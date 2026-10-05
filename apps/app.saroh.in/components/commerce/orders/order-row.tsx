@@ -287,6 +287,10 @@ export function OrderCardFrame({
 }) {
     const name =
         "min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground";
+    // The title's own box holds a screen reader's words (", order #1042"):
+    // positioned here, the truncated link clips them. Left to the card,
+    // their place past a long title widened the page on a phone.
+    const words = <span className="relative">{title}</span>;
     return (
         <li
             className={cn(
@@ -309,11 +313,11 @@ export function OrderCardFrame({
                                 "cursor-pointer text-left underline-offset-2 hover:underline active:text-muted-foreground",
                             )}
                         >
-                            {title}
+                            {words}
                         </button>
                     ) : (
                         <Link href={href} className={cn(ROW_LINK, name)}>
-                            {title}
+                            {words}
                         </Link>
                     )}
                     {aside}
