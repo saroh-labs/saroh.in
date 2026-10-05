@@ -21,3 +21,15 @@ import { env } from "@/env";
 export function publicApiUrl(): string {
     return env.NEXT_PUBLIC_API_URL ?? env.API_URL ?? "https://api.saroh.in";
 }
+
+/**
+ * The API origin for this app's own server reads (publication, catalogue,
+ * booking page, sessions, payments): `API_URL` first, the public one second.
+ * The one place server code works it out (plan 2026-10-05-001 KTD-4), where
+ * nine files used to. A production build refuses to start without both
+ * (`next.config.js`), so the fallback only ever applies locally and on
+ * previews.
+ */
+export function serverApiUrl(): string {
+    return env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+}

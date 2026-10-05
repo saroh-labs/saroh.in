@@ -9,6 +9,7 @@ import { SITE_RELAY_HEADER } from "@/lib/site-relay";
 import type { TestReleaseInfo } from "@/lib/test-release";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { trimTrailingSlashes } from "@saroh/site-blocks/url-path";
+import { serverApiUrl } from "./api-url";
 
 /**
  * Public publication client for the multi-tenant renderer (S2-006).
@@ -34,8 +35,7 @@ import { trimTrailingSlashes } from "@saroh/site-blocks/url-path";
  * snapshot from the public read API.
  */
 
-const API_URL =
-    env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+const API_URL = serverApiUrl();
 
 /**
  * A single section as it appears in a publication snapshot. `content` is
