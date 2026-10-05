@@ -1,4 +1,5 @@
 import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
+import { WEBHOOK_ROUTE } from "@saroh/integrations";
 
 /**
  * Who may call the API from a browser.
@@ -19,7 +20,7 @@ export function corsOptionsFor(
     trustedOrigins: string[],
 ): CorsOptions {
     const bare = path.split("?")[0] ?? "";
-    if (bare.startsWith("/public/") && !bare.startsWith("/public/webhooks/")) {
+    if (bare.startsWith("/public/") && !bare.startsWith(`/${WEBHOOK_ROUTE}/`)) {
         return { origin: true, credentials: false };
     }
     return { origin: trustedOrigins, credentials: true };
