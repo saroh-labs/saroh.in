@@ -136,8 +136,9 @@ process.stdin.on("data", (c) => chunks.push(c));
 process.stdin.on("end", async () => {
     const parser = new PDFParse({ data: new Uint8Array(Buffer.concat(chunks)) });
     const result = await parser.getText();
+    const meta = await parser.getInfo();
     await parser.destroy();
-    process.stdout.write(JSON.stringify({ text: result.text, pages: result.total }));
+    process.stdout.write(JSON.stringify({ text: result.text, pages: result.total, info: meta.info }));
 });
 `;
 
@@ -147,12 +148,22 @@ async function pdfText(r: InvoiceRow, business: PaperBusiness = RYE) {
     const out = execFileSync(process.execPath, ["-e", EXTRACT], {
         input: file,
     });
-    const { text, pages } = JSON.parse(out.toString()) as {
+    const { text, pages, info } = JSON.parse(out.toString()) as {
         text: string;
         pages: number;
+        info: Record<string, string>;
     };
-    return { file, text, pages };
+    return { file, text, pages, info };
 }
+
+describe("the PDF file's own details", () => {
+    it("names the business as its maker, never Saroh", async () => {
+        const { info } = await pdfText(taxInvoice());
+        expect(info.Author).toBe(RYE.name);
+        expect(info.Creator).toBe(RYE.name);
+        expect(info.Producer).toBe(RYE.name);
+    });
+});
 
 describe("the invoice's paper as words", () => {
     it("formats money and dates as the screen does, with the year", () => {
