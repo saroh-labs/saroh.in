@@ -133,7 +133,12 @@ describe("InvoicePaper line GST (DEC-072)", () => {
             }),
         );
         expect(out).toContain("GST 18% · taxable");
-        expect(out.match(/Nil-rated/g)).toHaveLength(1);
+        // One line is nil-rated: once under its name on the desk, once on
+        // a phone's second line.
+        expect(out.match(/Nil-rated/g)).toHaveLength(2);
+        expect(out.match(/data-phone-line[^>]*>[^<]*Nil-rated/g)).toHaveLength(
+            1,
+        );
         expect(out).toMatch(/Sourdough loaf<span[^>]*>Nil-rated/);
         expect(out).toMatch(/Bread club · Sep 2026<\/span>/);
     });
@@ -271,5 +276,44 @@ describe("InvoicePaper's seller (DEC-082)", () => {
     it("an issued row without a frozen seller falls back to today's", () => {
         const out = paper(invoice({ sellerName: null }));
         expect(out).toContain("Rye Bakehouse");
+    });
+});
+
+describe("InvoicePaper's lines on a phone (T6)", () => {
+    const croissant = line({
+        description: "Almond croissant (trade)",
+        quantity: 20,
+        unitPrice: "300.00",
+        amount: "6000.00",
+        gst: {
+            hsnSac: "19059020",
+            rate: "18.00",
+            taxableValue: "5084.75",
+            cgst: "457.63",
+            sgst: "457.63",
+            igst: "0.00",
+        },
+    });
+
+    it("a phone's second line carries HSN, quantity × price and GST", () => {
+        const out = html(invoice({ lines: [croissant] }));
+        const phone = /<span data-phone-line[^>]*>([^<]*)</.exec(out);
+        expect(phone?.[0]).toContain("sm:hidden");
+        expect(phone?.[1]).toBe(
+            "HSN 1905 90 20 · 20 × ₹300 · GST 18% · taxable ₹5,084.75",
+        );
+        // The desk keeps its HSN and Qty columns.
+        expect(out).toContain("HSN / SAC");
+        expect(out).toMatch(/hidden sm:block print:block[^"]*">20</);
+    });
+
+    it("no line with an HSN: no HSN column, on the desk either", () => {
+        const out = html(invoice({}));
+        expect(out).toContain("Tax invoice");
+        expect(out).not.toContain("HSN / SAC");
+        expect(out).toContain("sm:grid-cols-[minmax(0,3fr)_56px_90px]");
+        expect(out).not.toContain("70px");
+        // A line of one with no rate has nothing for a second line.
+        expect(out).not.toContain("data-phone-line");
     });
 });
