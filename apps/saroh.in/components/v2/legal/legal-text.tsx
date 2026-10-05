@@ -31,10 +31,106 @@ function Inline({ text }: { text: string }) {
     );
 }
 
+/** Words wrap whole, hyphenated by the page's `lang`; a long address may break as a last resort. */
+const WRAP = "break-words hyphens-auto";
+
+/**
+ * A pipe table, drawn twice and switched by CSS so nothing flashes on
+ * hydration (audit T1). Below `sm` each row is a card in a list: its first
+ * cell the card's bold heading, every other cell under its column name in a
+ * `<dl>`, so a screen reader hears label and value. From `sm` up it is a
+ * real `<table>`. The hidden one is `display: none`, out of the
+ * accessibility tree too, so neither needs `aria-hidden`.
+ */
+function LegalTable({ head, rows }: { head: string[]; rows: string[][] }) {
+    return (
+        <>
+            <ul
+                role="list"
+                data-legal-cards
+                className="m-0 grid list-none gap-3 p-0 sm:hidden"
+            >
+                {rows.map((row, j) => (
+                    <li
+                        key={j}
+                        className="rounded-mk-card border border-border bg-card px-4 py-3.5"
+                    >
+                        <p
+                            className={`m-0 text-[16px] font-semibold leading-[1.4] text-foreground ${WRAP}`}
+                        >
+                            <Inline text={row[0] ?? ""} />
+                        </p>
+                        <dl className="m-0 mt-2.5 grid gap-2.5">
+                            {row.slice(1).map((cell, k) => (
+                                <div key={k}>
+                                    <dt className="text-[13px] font-semibold text-muted-foreground">
+                                        {head[k + 1]}
+                                    </dt>
+                                    <dd
+                                        className={`m-0 mt-0.5 text-[15px] leading-[1.55] text-mk-copy ${WRAP}`}
+                                    >
+                                        <Inline text={cell} />
+                                    </dd>
+                                </div>
+                            ))}
+                        </dl>
+                    </li>
+                ))}
+            </ul>
+            <div className="hidden rounded-mk-card border border-border bg-card sm:block">
+                <table
+                    className={`w-full border-collapse text-left text-[15px] leading-[1.55] ${WRAP}`}
+                >
+                    <thead>
+                        <tr>
+                            {head.map((cell, j) => (
+                                <th
+                                    key={j}
+                                    scope="col"
+                                    className="border-b border-border px-4 py-3 text-left text-[13px] font-semibold text-muted-foreground"
+                                >
+                                    {cell}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map((row, j) => (
+                            <tr
+                                key={j}
+                                className="border-b border-mk-line-row last:border-b-0"
+                            >
+                                {row.map((cell, k) =>
+                                    k === 0 ? (
+                                        <th
+                                            key={k}
+                                            scope="row"
+                                            className="px-4 py-3 text-left align-top font-semibold text-foreground"
+                                        >
+                                            <Inline text={cell} />
+                                        </th>
+                                    ) : (
+                                        <td
+                                            key={k}
+                                            className="px-4 py-3 align-top text-mk-copy"
+                                        >
+                                            <Inline text={cell} />
+                                        </td>
+                                    ),
+                                )}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
+}
+
 /**
  * A legal page's text (plan U1, `/privacy`): headings in Space Grotesk with
  * a rule above, running copy at reading size, lists, and tables that keep
- * to the column (their cells wrap on a phone; nothing scrolls sideways).
+ * to the column: cards on a phone, a table from `sm` up (audit T1).
  */
 export function LegalText({ blocks }: { blocks: LegalBlock[] }) {
     return (
@@ -75,47 +171,11 @@ export function LegalText({ blocks }: { blocks: LegalBlock[] }) {
                         );
                     case "table":
                         return (
-                            <div
+                            <LegalTable
                                 key={i}
-                                className="overflow-hidden rounded-mk-card border border-border bg-card"
-                            >
-                                <table className="w-full border-collapse text-left text-[15px] leading-[1.55] [overflow-wrap:anywhere]">
-                                    <thead>
-                                        <tr>
-                                            {block.head.map((cell, j) => (
-                                                <th
-                                                    key={j}
-                                                    scope="col"
-                                                    className="border-b border-border px-4 py-3 text-[13px] font-semibold text-muted-foreground"
-                                                >
-                                                    {cell}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {block.rows.map((row, j) => (
-                                            <tr
-                                                key={j}
-                                                className="border-b border-mk-line-row last:border-b-0"
-                                            >
-                                                {row.map((cell, k) => (
-                                                    <td
-                                                        key={k}
-                                                        className={
-                                                            k === 0
-                                                                ? "px-4 py-3 align-top font-semibold text-foreground"
-                                                                : "px-4 py-3 align-top text-mk-copy"
-                                                        }
-                                                    >
-                                                        <Inline text={cell} />
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                head={block.head}
+                                rows={block.rows}
+                            />
                         );
                 }
             })}
