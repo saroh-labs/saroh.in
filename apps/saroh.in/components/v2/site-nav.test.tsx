@@ -137,6 +137,85 @@ describe("SiteNav", () => {
     });
 });
 
+/** The Resources menu the server would pass on 17 Oct: Help, Integrations, Changelog. */
+const RESOURCES = [
+    { name: "Help", line: "Answers.", href: "/help" },
+    { name: "Integrations", line: "Connect.", href: "/integrations" },
+    { name: "Changelog", line: "What's new.", href: "/changelog" },
+];
+
+describe("SiteNav: Resources (plan U1)", () => {
+    it("has no Resources menu while no Resources page is live", () => {
+        render(<SiteNav />);
+        expect(screen.queryAllByRole("button", { name: /^Resources/ })).toEqual(
+            [],
+        );
+    });
+
+    it("opens by keyboard on its first item; arrows move; Escape closes to its button", () => {
+        render(<SiteNav resources={RESOURCES} />);
+        const resources = button("Resources");
+        resources.focus();
+        // A <button>: Enter and Space click it.
+        fireEvent.click(resources);
+        expect(resources.getAttribute("aria-expanded")).toBe("true");
+        const menu = screen.getByRole("menu", { name: "Resources" });
+        const items = screen.getAllByRole("menuitem");
+        expect(items.map((i) => i.getAttribute("href"))).toEqual([
+            "/help",
+            "/integrations",
+            "/changelog",
+        ]);
+        expect(document.activeElement).toBe(items[0]);
+        fireEvent.keyDown(items[0], { key: "ArrowDown" });
+        expect(document.activeElement).toBe(items[1]);
+        fireEvent.keyDown(items[1], { key: "ArrowUp" });
+        fireEvent.keyDown(items[0], { key: "ArrowUp" });
+        expect(document.activeElement).toBe(items[2]);
+        expect(menu).toBeTruthy();
+
+        fireEvent.keyDown(document, { key: "Escape" });
+        expect(screen.queryByRole("menu")).toBeNull();
+        expect(resources.getAttribute("aria-expanded")).toBe("false");
+        expect(document.activeElement).toBe(resources);
+    });
+
+    it("on a changelog entry, underlines Resources", () => {
+        pathname = "/changelog/saroh-is-open";
+        render(<SiteNav resources={RESOURCES} />);
+        expect(button("Resources").className).toContain("decoration-brand-500");
+        expect(button("Features").className).not.toContain(
+            "decoration-brand-500",
+        );
+    });
+
+    it("on /changelog, the menu marks Changelog as the page", () => {
+        pathname = "/changelog";
+        render(<SiteNav resources={RESOURCES} />);
+        fireEvent.click(button("Resources"));
+        expect(
+            screen
+                .getByRole("menuitem", { name: /^Changelog/ })
+                .getAttribute("aria-current"),
+        ).toBe("page");
+    });
+
+    it("the phone sheet has Resources, open on a Resources page", () => {
+        pathname = "/changelog";
+        render(<SiteNav resources={RESOURCES} />);
+        fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+        const sheet = screen.getByRole("dialog", { name: "Menu" });
+        const row = screen
+            .getAllByRole("button", { name: /^Resources/ })
+            .find((b) => sheet.contains(b));
+        expect(row?.getAttribute("aria-expanded")).toBe("true");
+        const links = Array.from(
+            sheet.querySelectorAll("#nav-sheet-resources a"),
+        ).map((a) => a.getAttribute("href"));
+        expect(links).toEqual(["/help", "/integrations", "/changelog"]);
+    });
+});
+
 describe("MobileMenu (below 760px)", () => {
     it("opens on a Solutions page with Solutions expanded and Features closed", () => {
         pathname = "/solutions/gyms";

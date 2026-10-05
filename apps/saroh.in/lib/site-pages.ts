@@ -1,4 +1,7 @@
+import { changelogHref, liveEntries } from "@/content/changelog";
 import { featureHref } from "@/content/features";
+import type { PublishContext } from "@/content/resources";
+import { resourcePaths, routeExists } from "@/content/resources";
 import { solutionHref } from "@/content/solutions";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
 import type { LaunchMode } from "@/lib/links";
@@ -9,13 +12,26 @@ import type { LaunchMode } from "@/lib/links";
  * waitlist while it is the site's ask (`launchMode=waitlist`, KTD-16).
  * No `/pricing`: Pricing isn't published yet (it redirects to the waitlist,
  * `redirects.js`).
+ *
+ * Given a publish context (plan U1), the Resources and legal pages that are
+ * published and built, and the changelog's live entries, follow. Without
+ * one, only the fixed pages: what a redirect may always land on.
  */
-export function indexedPaths(mode: LaunchMode): string[] {
+export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
+    const resources = ctx ? resourcePaths(ctx) : [];
+    const entries =
+        ctx && resources.includes("/changelog")
+            ? liveEntries(ctx)
+                  .map((e) => changelogHref(e.slug))
+                  .filter((path) => routeExists(path, ctx.routes))
+            : [];
     return [
         "/",
         ...FEATURE_SLUGS.map(featureHref),
         ...SOLUTION_SLUGS.map(solutionHref),
         ...(mode === "waitlist" ? ["/waitlist"] : []),
+        ...resources,
+        ...entries,
     ];
 }
 

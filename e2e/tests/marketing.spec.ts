@@ -25,7 +25,8 @@ import { urls } from "../playwright.config";
  *   temporary redirect to the waitlist.
  * - Every internal link on every page answers 200, or one 301 to a 200;
  *   every redirect in `apps/saroh.in/redirects.js` lands in one hop; the
- *   sitemap lists exactly the indexable pages and robots.txt keeps out
+ *   sitemap lists the indexable pages (plus published Resources pages)
+ *   and robots.txt keeps out
  *   the API.
  *
  * - No page loads Google Analytics: the tag is production's alone, so a
@@ -57,6 +58,20 @@ const INDEXED = [
     ...FEATURES.map((s) => `/features/${s}`),
     ...SOLUTIONS.map((s) => `/solutions/${s}`),
     "/waitlist",
+];
+
+/**
+ * The Resources pages (plan U1) the sitemap lists once each is published
+ * and built (`apps/saroh.in/content/resources.ts`): which ones depends on
+ * the day and on which routes have landed, so the sitemap may list these on
+ * top of INDEXED, and nothing else. `resources.spec.ts` checks them.
+ */
+const RESOURCE_PREFIXES = [
+    "/changelog",
+    "/help",
+    "/integrations",
+    "/tools/",
+    "/privacy",
 ];
 
 /** Every page a visitor can land on. */
@@ -446,7 +461,14 @@ test.describe("links, redirects and the sitemap", () => {
         ]
             .map((m) => new URL(m[1]).pathname)
             .sort();
-        expect(listed).toEqual([...INDEXED].sort());
+        expect(listed).toEqual(expect.arrayContaining(INDEXED));
+        const extra = listed.filter((p) => !INDEXED.includes(p));
+        expect(
+            extra.filter(
+                (p) => !RESOURCE_PREFIXES.some((r) => p.startsWith(r)),
+            ),
+            "only Resources pages beyond the fixed list",
+        ).toEqual([]);
         for (const path of listed) {
             expect((await head(request, `${WEB}${path}`)).status(), path).toBe(
                 200,

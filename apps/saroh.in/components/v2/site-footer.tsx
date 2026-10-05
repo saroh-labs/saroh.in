@@ -2,9 +2,12 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { MADE_BY } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
 import { SIGN_IN_URL } from "@/lib/links";
 
+import { CookieChoicesButton } from "./cookie-choices-button";
+import type { NavItem } from "./nav-items";
 import { FEATURE_ITEMS, SOLUTION_ITEMS } from "./nav-items";
 
 const LINK =
@@ -12,12 +15,28 @@ const LINK =
 
 /**
  * The footer (Footer design): Saroh and who it is for, then Features,
- * Solutions and Saroh (Questions, Contact, Sign in), then Follow Saroh
- * (Saroh's accounts and its public code), in columns that wrap at 180px.
+ * Solutions, Resources (plan U1, when any is live), Saroh (Questions,
+ * Contact, Sign in) and Follow Saroh (Saroh's accounts and its public
+ * code), in columns that wrap at 150px (180px before Resources made six). Under them, who makes Saroh and the
+ * legal pages that are published (R6): Privacy from its date, and "Cookie
+ * choices" where the cookie notice can appear. No Terms until they're
+ * published.
+ *
+ * `resources` and `legal` are the pages the server says are live and built
+ * (`content/resources.ts`).
  */
-export function SiteFooter() {
+export function SiteFooter({
+    resources = [],
+    legal = [],
+    cookieChoices = false,
+}: {
+    resources?: NavItem[];
+    legal?: { name: string; href: string }[];
+    /** Whether GA, and so the cookie notice, is on this deployment. */
+    cookieChoices?: boolean;
+}) {
     return (
-        <footer className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-8 px-mk-gutter pb-12 pt-[88px] text-[14px] text-muted-foreground">
+        <footer className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-8 px-mk-gutter pb-12 pt-[88px] text-[14px] text-muted-foreground">
             <div className="grid content-start gap-2.5">
                 <Link
                     href="/"
@@ -44,6 +63,15 @@ export function SiteFooter() {
                     </Link>
                 ))}
             </Column>
+            {resources.length > 0 ? (
+                <Column title="Resources">
+                    {resources.map((item) => (
+                        <Link key={item.href} href={item.href} className={LINK}>
+                            {item.name}
+                        </Link>
+                    ))}
+                </Column>
+            ) : null}
             <Column title="Saroh">
                 <Link href="/#faq" className={LINK}>
                     Questions
@@ -68,6 +96,25 @@ export function SiteFooter() {
                     </a>
                 ))}
             </Column>
+            <div className="col-[1/-1] flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-6 text-[13.5px]">
+                <span>{MADE_BY}</span>
+                {legal.length > 0 || cookieChoices ? (
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                        {legal.map((page) => (
+                            <Link
+                                key={page.href}
+                                href={page.href}
+                                className={LINK}
+                            >
+                                {page.name}
+                            </Link>
+                        ))}
+                        {cookieChoices ? (
+                            <CookieChoicesButton className={LINK} />
+                        ) : null}
+                    </div>
+                ) : null}
+            </div>
         </footer>
     );
 }
