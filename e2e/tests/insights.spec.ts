@@ -2,6 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -40,6 +41,10 @@ async function expectNoSidewaysScroll(page: Page) {
             })),
         )
         .toEqual({ scroll: width, inner: width });
+    // Nor anything inside it hiding sideways, on a phone (audit T10).
+    if (test.info().project.name.startsWith("phone")) {
+        await expectNothingHiddenSideways(page);
+    }
 }
 
 test("a business that has sold reads its answers, then the figures behind them", async ({

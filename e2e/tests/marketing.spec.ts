@@ -6,6 +6,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { stamp } from "../fixtures/own-data";
 import { urls } from "../playwright.config";
 
@@ -196,6 +197,8 @@ test.describe("every page", () => {
                         { message: `${path} at ${width}` },
                     )
                     .toEqual({ inner: width, scroll: width });
+                // Nor anything inside main hiding sideways (audit T10).
+                await expectNothingHiddenSideways(page);
             }
         });
     }

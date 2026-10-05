@@ -2703,3 +2703,27 @@ changes the profile between deposit and balance.
 **Rule**: `docs/patterns/backend-billing-and-classes.md` → "Issued paper
 never changes"; ADR-008 → "A balance after a deposit".
 **Category**: invoices · GST · `apps/api.saroh.in/src/modules/invoices/order-invoicing.ts`
+
+## E2E — phone specs passed while tables hid 200–280px sideways
+
+**Symptom**: The Phone Tables audit (5 Oct, T10) found Stock, the product
+page's tabs and a customer's orders hiding 200–280px of columns — Can sell,
+Status — on a 390px phone, while every phone spec's "no sideways scroll"
+check passed on the same screens.
+**Root cause**: The specs measured the PAGE (`documentElement.scrollWidth
+<= innerWidth`). A 600px table inside an `overflow-x-auto` card keeps the
+page exactly the screen's width, so the check passed on the very bug. Nor
+did anything on screen say there was more: a phone draws no scrollbar.
+**Fix**: `e2e/fixtures/hidden-sideways.ts` — `hiddenSideways(page, allow)`
+lists every element inside `main` that clips or scrolls content wider than
+itself, and `expectNothingHiddenSideways(page)` polls it to empty. Scrollers
+that mean to scroll are allowed by default: `ScrollX` (`@saroh/ui/scroll-x`,
+marked `data-scroll-x`, which fades the side with more and hints "Swipe for
+more →" once), tab strips (`role=tablist`) and calendar grids
+(`role=grid`). DataView also stopped flashing its table on a phone before
+hydration (T8): the server draws the table and the list behind a 760px
+media rule and the client keeps the one in use.
+**Rule**: On a phone nothing hides sideways
+(`docs/patterns/frontend-verification.md`). A phone spec that checks the
+page fits also calls `expectNothingHiddenSideways`.
+**Category**: e2e · layout · `e2e/fixtures/hidden-sideways.ts`
