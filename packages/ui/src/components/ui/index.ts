@@ -30,6 +30,7 @@ export * from "./progress";
 export * from "./radio-group";
 export * from "./resizable";
 export * from "./scroll-area";
+export * from "./scroll-x";
 export * from "./select";
 export * from "./separator";
 export * from "./sheet";

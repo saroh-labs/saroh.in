@@ -2,7 +2,10 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { hiddenSideways } from "../fixtures/hidden-sideways";
+import {
+    expectNothingHiddenSideways,
+    hiddenSideways,
+} from "../fixtures/hidden-sideways";
 import { makeContact, makeOrder, northwind, stamp } from "../fixtures/own-data";
 import type { Role } from "../fixtures/sessions";
 import { useSession } from "../fixtures/sessions";
@@ -540,6 +543,7 @@ test.describe("customer detail on a 375px phone", () => {
             row.getByText("Returning", { exact: true }),
         ).toBeInViewport();
         expect(await noSideways(page)).toBe(true);
+        await expectNothingHiddenSideways(page);
     });
 
     test("More actions is the ⋯ button, and Delete says why it's off", async ({

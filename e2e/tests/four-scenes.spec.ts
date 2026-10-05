@@ -2,6 +2,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 
@@ -102,7 +103,7 @@ async function overlappingControls(page: Page) {
 
 test.describe("no scene scrolls sideways", () => {
     for (const route of ROUTES) {
-        test(`${route} fits its viewport`, async ({ page }) => {
+        test(`${route} fits its viewport`, async ({ page }, testInfo) => {
             await signIn(page);
             await openScene(page, route);
 
@@ -115,6 +116,12 @@ test.describe("no scene scrolls sideways", () => {
             // sideways scroll on an action list is how a merchant misses the
             // action.
             expect(scrollWidth).toBeLessThanOrEqual(innerWidth + 1);
+
+            // A page that fits can still hide a table's columns inside an
+            // overflow-x box; on a phone nothing may (audit T10).
+            if (testInfo.project.name.startsWith("phone")) {
+                await expectNothingHiddenSideways(page);
+            }
         });
     }
 });
