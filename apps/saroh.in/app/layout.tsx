@@ -6,6 +6,9 @@ import "./site.css";
 import { home } from "@/content/home";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
+import { env } from "@/env";
+import { gaMeasurementId } from "@/lib/ga";
+
 import { GoogleAnalytics } from "./google-analytics";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
@@ -93,7 +96,12 @@ export default function RootLayout({
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} ${fontWordmark.variable} font-sans antialiased`}
             >
-                <GoogleAnalytics />
+                <GoogleAnalytics
+                    id={gaMeasurementId({
+                        id: env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
+                        vercelEnv: env.VERCEL_ENV,
+                    })}
+                />
                 <a
                     href="#main"
                     className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[90] focus:rounded-lg focus:bg-foreground focus:px-[13px] focus:py-[9px] focus:text-[13px] focus:text-background"

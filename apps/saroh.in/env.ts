@@ -30,16 +30,29 @@ import { z } from "zod";
  *
  * `API_URL` also feeds the waitlist's launch offer
  * (`GET {API_URL}/public/waitlist/offer`). Unset, the page says the offer is
- * announced at launch.
+ * announced at launch. A production deployment refuses to build without it
+ * (`next.config.js`): unset, every waitlist join is dropped, which went
+ * unseen for two days after Gate W.
+ *
+ * `NEXT_PUBLIC_GA_MEASUREMENT_ID` turns Google Analytics on, and only on a
+ * Vercel production deployment (`VERCEL_ENV`, which Vercel sets and nothing
+ * else does): previews, local dev and the browser tests never load the tag,
+ * even with the id in a local `.env`, so test runs never count as visitors
+ * (they were most of GA's "visitors" until 5 Oct). `lib/ga.ts` decides.
  */
 export const env = createEnv({
     client: {
         NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
         NEXT_PUBLIC_LAUNCH_MODE: z.enum(["waitlist", "open"]).optional(),
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: z
+            .string()
+            .regex(/^G-[A-Z0-9]+$/)
+            .optional(),
     },
     server: {
         API_URL: z.string().url().optional(),
         SITE_RELAY_SECRET: z.string().min(32).optional(),
+        VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
     },
     shared: {
         NODE_ENV: z.enum(["development", "test", "production"]).optional(),
@@ -47,9 +60,12 @@ export const env = createEnv({
     runtimeEnv: {
         API_URL: process.env.API_URL,
         SITE_RELAY_SECRET: process.env.SITE_RELAY_SECRET,
+        VERCEL_ENV: process.env.VERCEL_ENV,
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,
+        NEXT_PUBLIC_GA_MEASUREMENT_ID:
+            process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,
