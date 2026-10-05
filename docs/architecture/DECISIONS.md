@@ -985,4 +985,5 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - Dev's session cookie has its own prefix (`AUTH_COOKIE_PREFIX`); production's is unchanged.
     - The dev apps admit only browsers that opened a page with `?access=<key>` (`DEV_ACCESS_KEY`); everyone else lands on the same page in production.
     - A `development`-branch build refuses to start without the dev environment's variables, as a production build does without production's.
+- For now Vercel's preview protection (a Vercel team login) stays on in front of the dev apps, since only the owner uses them, and the key is the second lock. When others need dev, the saroh.io domains come out from behind Vercel's login (a Deployment Protection Exception, or protection off for those projects) and the key alone decides.
 - Consequences: the dev API and merchant sites stay reachable without the key. A new Vercel app joining the dev environment needs the gate in its middleware and its variables on the `development` branch.

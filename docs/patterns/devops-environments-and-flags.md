@@ -63,6 +63,9 @@ session can't touch production's.
   Rotate by changing the key. The API and the merchant sites are not behind it
   — dev holds no real customers and its payments run in sandbox
   (`CASHFREE_ENV=sandbox`).
+- Vercel's preview protection still sits in front (a Vercel team login), so
+  today the key is a second lock. Lifting it for the saroh.io domains is the
+  only step needed to open dev to key holders (DEC-081).
 - `AUTH_COOKIE_PREFIX` names dev's session cookie apart from production's, a
   second guard should the domains ever share a parent.
 - The key lives only on Vercel; it is never committed or printed.
