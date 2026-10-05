@@ -56,9 +56,12 @@ export interface ShareCardProps {
 function Picture({
     image,
     className,
+    label = true,
 }: {
     image: ShareImageFacts;
     className?: string;
+    /** The stand-in's size line; the small tile is too small to hold it. */
+    label?: boolean;
 }) {
     const src = webImageUrl(image.url);
     // Per address, so a new picture gets its own try.
@@ -81,7 +84,7 @@ function Picture({
                     className,
                 )}
             >
-                {size}
+                {label ? size : null}
             </div>
         );
     }
@@ -295,7 +298,11 @@ export function ShareCard({
                     )}
                 >
                     {image ? (
-                        <Picture image={image} className="h-16 rounded-md" />
+                        <Picture
+                            image={image}
+                            label={false}
+                            className="h-16 rounded-md"
+                        />
                     ) : (
                         <div className="h-16 rounded-md bg-[#EDEAE3]" />
                     )}
