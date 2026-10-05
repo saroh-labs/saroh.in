@@ -12,8 +12,9 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * The dark panel (design 1b, the email version, KTD-5): locked, it asks
- * for an email and the news tickbox; unlocked, it lists the fixes from the
- * API's report and the tags to copy.
+ * for an email; unlocked, it lists the fixes from the API's report and the
+ * tags to copy. No news tickbox: an address typed into a public tool isn't
+ * verified, so it can't say yes to marketing (security review, 5 Oct 2026).
  */
 export function UnlockPanel({
     unlocked,
@@ -24,10 +25,9 @@ export function UnlockPanel({
     unlocked: Unlocked | null;
     pending: boolean;
     error: string | null;
-    onUnlock: (input: { email: string; consent: boolean }) => void;
+    onUnlock: (input: { email: string }) => void;
 }) {
     const [email, setEmail] = useState("");
-    const [consent, setConsent] = useState(false);
     const [invalid, setInvalid] = useState(false);
     const errorId = useId();
     const shown = invalid ? copy.badEmail : error;
@@ -98,7 +98,7 @@ export function UnlockPanel({
                         return;
                     }
                     setInvalid(false);
-                    onUnlock({ email: value, consent });
+                    onUnlock({ email: value });
                 }}
             >
                 <input
@@ -132,15 +132,6 @@ export function UnlockPanel({
                     </span>
                 ) : null}
             </form>
-            <label className="flex cursor-pointer items-start gap-2 text-[12.5px] leading-[1.45] text-mk-on-ink">
-                <input
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(event) => setConsent(event.target.checked)}
-                    className="mt-0.5 size-4 shrink-0 cursor-pointer accent-mk-saffron"
-                />
-                {copy.consent}
-            </label>
             <span className="text-xs text-mk-on-ink-muted">
                 {copy.promise}{" "}
                 <Link

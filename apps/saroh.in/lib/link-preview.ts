@@ -89,6 +89,7 @@ export type CheckFailure =
     | "no-tags"
     | "too-large"
     | "timeout"
+    | "busy"
     | "rate-limited"
     | "unavailable";
 
@@ -186,6 +187,8 @@ export function failureMessage(
             return `${domain}'s page is too big to read: its tags weren't in the first 512 KB.`;
         case "timeout":
             return `${domain} took too long to answer. Try again in a minute.`;
+        case "busy":
+            return "The checker is busy right now. Try again in a few seconds.";
         case "rate-limited":
             return "That's a lot of checks in a row. Wait a minute and try again.";
         case "unavailable":
@@ -224,6 +227,31 @@ export function reportLink(origin: string, address: string): string {
 
 /** What each app's card is drawn from: each app reads its own tags first. */
 export function cardText(
+    facts: LinkFacts,
+    platform: AppKey | "small",
+): { title: string; description: string; siteName: string } {
+    const text = cardTextAsWritten(facts, platform);
+    return {
+        title: clip(text.title, CARD_LIMITS.title),
+        description: clip(text.description, CARD_LIMITS.description),
+        siteName: clip(text.siteName, CARD_LIMITS.siteName),
+    };
+}
+
+/**
+ * The longest a card shows each line. Every app cuts long text anyway; the
+ * page cuts it too, so a page can't fill our cards with paragraphs of its
+ * own words on saroh.in.
+ */
+export const CARD_LIMITS = { title: 120, description: 300, siteName: 60 };
+
+/** Text on one line, cut to `max` characters with an ellipsis. */
+export function clip(value: string, max: number): string {
+    const text = value.replace(/\s+/g, " ").trim();
+    return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+function cardTextAsWritten(
     facts: LinkFacts,
     platform: AppKey | "small",
 ): { title: string; description: string; siteName: string } {

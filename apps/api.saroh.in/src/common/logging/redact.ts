@@ -111,7 +111,18 @@ const TOKEN_PATHS = [
     /^(\/public\/sites\/preview\/)[^/?#]+/,
 ];
 
+/**
+ * Public tools whose query string is a stranger's own input: the link
+ * preview tool's address someone checked (resources plan U2). The tool
+ * takes it in the body; this keeps it out of the log even if a caller puts
+ * it in the query string anyway.
+ */
+const QUERY_FREE_PATHS = [/^\/public\/tools\//];
+
 export function redactUrl(url: string): string {
+    if (QUERY_FREE_PATHS.some((pattern) => pattern.test(url))) {
+        return url.split("?")[0] ?? "";
+    }
     for (const pattern of TOKEN_PATHS) {
         if (pattern.test(url)) return url.replace(pattern, "$1[token]");
     }

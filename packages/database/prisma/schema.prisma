@@ -5047,11 +5047,17 @@ model WaitlistSignup {
   // unlock its report is kept here with source "link-preview", with the
   // last address it checked and when. The retention sweep drops the link
   // after 12 months, and a link-preview-only entry with it (Privacy).
-  checkedUrl String?
-  checkedAt  DateTime?
-  // "Also send me Saroh news" as ticked: true only when they ticked it.
-  // Null on entries from forms that never asked.
-  newsConsent Boolean?
+  checkedUrl       String?
+  checkedAt        DateTime?
+  // Marketing consent. Never set true by the link preview tool, which stopped
+  // asking (security review, 5 Oct 2026): an unverified address can't give
+  // it. False on its new entries; null on entries from forms that never asked.
+  newsConsent      Boolean?
+  // The link preview report emails this address was sent on one UTC day:
+  // the day and how many (at most 3). `reportEmailDay` also lets the gate
+  // count every report email sent today against its daily ceiling.
+  reportEmailDay   DateTime? @db.Date
+  reportEmailCount Int       @default(0)
 
   // Set when the batch containing this signup is opened, so "who is still
   // waiting" is a query rather than a spreadsheet.
@@ -5067,6 +5073,7 @@ model WaitlistSignup {
   @@index([createdAt])
   @@index([invitedAt])
   @@index([referredById])
+  @@index([reportEmailDay])
 }
 
 /// A record of a completed or in-flight idempotent operation.

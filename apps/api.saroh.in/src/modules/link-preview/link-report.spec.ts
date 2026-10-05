@@ -3,7 +3,7 @@ import { imageSize } from "./image-probe";
 import type { LinkFacts } from "./link-report";
 import { APPS, buildReport, factsFrom, scoreLine } from "./link-report";
 import type { HeadTags } from "./og-parse";
-import { reportSubject, reportText } from "./report-email";
+import { REPORT_SUBJECT, reportText } from "./report-email";
 
 /**
  * The report (resources plan U2, R14): the score line and the fix list come
@@ -235,51 +235,57 @@ describe("buildReport", () => {
 });
 
 describe("the emailed report", () => {
-    it("lists the fixes and the tags in plain words, and links back to the same check", () => {
+    it("says the score and the fixes in our words, and links back to the same check", () => {
         const f = facts(
             tags({ twitter: { card: null } as HeadTags["twitter"] }),
         );
-        const report = buildReport(f);
-        expect(reportSubject(f)).toBe(
-            "Your link preview report for example-bakery.in",
-        );
         const text = reportText(
-            f,
-            report,
-            false,
+            buildReport(f),
             "https://example-bakery.in/menu",
         );
+        expect(REPORT_SUBJECT).toBe("Your link preview report");
         expect(text).toContain(
             "Looks right on 5 of 6 apps. Fix 1 thing to fix all 6.",
         );
         expect(text).toContain("1. Tell X to use a large card.");
-        expect(text).toContain(
-            '<meta name="twitter:card" content="summary_large_image">',
-        );
+        expect(text).toContain("1200 × 630 pixels, under 300 KB");
         expect(text).toContain(
             "https://www.saroh.in/tools/link-preview?url=example-bakery.in%2Fmenu",
         );
         expect(text).toContain(
             "We won't send you anything else unless you ask.",
         );
-        expect(
-            reportText(f, report, true, "https://example-bakery.in/"),
-        ).toContain("You also asked for Saroh news");
+        expect(text).not.toContain("Saroh news");
     });
 
-    it("keeps a page's text on one line", () => {
+    it("carries no text the page wrote: a relay can't be built from it", () => {
+        const spam = "Claim your prize at https://evil.example/win now";
         const f = facts(
             tags({
-                og: { title: "Line one\nSubject: spoof" } as HeadTags["og"],
+                title: spam,
+                description: spam,
+                canonical: "https://evil.example/canonical",
+                og: {
+                    title: `${spam}\nSubject: spoof`,
+                    description: spam,
+                    image: "https://evil.example/pic.jpg",
+                    url: "https://evil.example/og",
+                    siteName: spam,
+                } as HeadTags["og"],
+                twitter: { card: null } as HeadTags["twitter"],
             }),
+            null,
         );
-        const text = reportText(
-            f,
-            buildReport(f),
-            false,
-            "https://example-bakery.in/",
-        );
-        expect(text).not.toContain("\nSubject: spoof");
+        const report = buildReport(f);
+        // The on-screen report still has the page's own values…
+        expect(report.suggestedTags).toContain("evil.example");
+        // …the email has none of them, nor the domain in our own link.
+        const text = reportText(report, "https://example-bakery.in/");
+        expect(text).not.toMatch(/evil|prize|Claim|spoof/i);
+        expect(text.match(/https?:\/\/[^\s]+/g)).toEqual([
+            "https://www.saroh.in/tools/link-preview?url=example-bakery.in%2F",
+        ]);
+        expect(text).not.toContain("<meta");
     });
 });
 

@@ -49,9 +49,8 @@ export const linkPreview = {
     emailPlaceholder: "you@yourbusiness.in",
     unlock: "Unlock",
     unlocking: "Unlocking…",
-    consent: "Also send me Saroh news, now and then.",
     promise:
-        "We'll show it here and email you a copy. No newsletter unless you tick the box.",
+        "We'll show it here and email you a copy. Nothing else unless you ask.",
     privacy: "Privacy",
     badEmail: "That email doesn't look right. Check it and try again.",
     unlockFailed:
@@ -118,7 +117,7 @@ export const linkPreview = {
         },
         {
             q: "What happens to my email?",
-            a: "We send the report to it, and keep it with the link you checked for 12 months. No newsletter unless you tick the box. The Privacy page has the rest.",
+            a: "We send the report to it, and keep it with the link you checked for 12 months. We don't send you anything else. The Privacy page has the rest.",
         },
     ] satisfies FaqItem[],
 };

@@ -2,7 +2,6 @@ import { Transform } from "class-transformer";
 import {
     IsBoolean,
     IsEmail,
-    IsIn,
     IsOptional,
     IsString,
     MaxLength,
@@ -11,17 +10,18 @@ import {
 /**
  * The address to check. Generous here: an address the tool won't fetch
  * (too long, another scheme, a private host) is answered as a typed state
- * by the guard, not refused as a bad request.
+ * by the guard, not refused as a bad request. In the body, never the query
+ * string: a request line is logged, a body is not.
  */
-export class CheckLinkQueryDto {
+export class CheckLinkDto {
     @IsString()
     @MaxLength(8192)
     url!: string;
 
-    /** `1`: "Check again", past the minute's cache. Text, as a query string is. */
+    /** "Check again", past the minute's cache. A real boolean: the body is JSON. */
     @IsOptional()
-    @IsIn(["1"])
-    fresh?: "1";
+    @IsBoolean()
+    fresh?: boolean;
 }
 
 const normalizeEmail = ({ value }: { value: unknown }): unknown =>
@@ -29,9 +29,9 @@ const normalizeEmail = ({ value }: { value: unknown }): unknown =>
 
 /**
  * Unlock the fix-it report (resources plan U2, KTD-5): the email it's sent
- * to, the address it's for, and "Also send me Saroh news" as ticked. The
- * report is built from the API's own check of `url`, never from anything
- * else the caller sends.
+ * to and the address it's for. The report is built from the API's own
+ * check of `url`, never from anything else the caller sends. No consent
+ * field: an address nobody has verified can't say yes to news.
  */
 export class UnlockReportDto {
     @Transform(normalizeEmail)
@@ -45,8 +45,4 @@ export class UnlockReportDto {
     @IsString()
     @MaxLength(8192)
     url!: string;
-
-    /** A real boolean: the body is JSON, and nothing converts it (backend-nestjs.md). */
-    @IsBoolean()
-    consent!: boolean;
 }

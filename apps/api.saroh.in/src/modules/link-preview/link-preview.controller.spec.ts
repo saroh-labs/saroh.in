@@ -4,6 +4,8 @@ jest.mock("@saroh/database", () => ({
             findUnique: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
+            aggregate: jest.fn(),
+            updateMany: jest.fn(),
         },
     },
 }));
@@ -13,16 +15,18 @@ jest.mock("../../common/email", () => ({
 
 import type { LookupAddress } from "node:dns";
 
-import { HttpException } from "@nestjs/common";
+import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { prisma } from "@saroh/database";
 
 import { sendLinkReportEmail } from "../../common/email";
-import { signSiteRelay } from "../site-accounts/site-relay";
+import type { SiteRelay } from "../site-accounts/site-relay";
+import { SiteRelayGuard } from "../site-accounts/site-relay";
 import { checkView, LinkPreviewController } from "./link-preview.controller";
 import { LinkPreviewService } from "./link-preview.service";
 import {
     EMAILS_PER_DAY,
     LinkReportGateService,
+    REPORT_EMAILS_PER_DAY,
 } from "./link-report-gate.service";
 import type {
     Transport,
@@ -34,11 +38,11 @@ import type { Resolver } from "./ssrf-guard";
 /**
  * The link preview routes (resources plan U2): every failure is a typed
  * state and never a 500, a check is cached for a minute per address, the
- * visitor is rate-limited, and unlocking stores the email in the
- * waitlist's store with its source, link and consent and sends one email.
+ * visitor is rate-limited, both routes need the signed relay, and
+ * unlocking stores the email in the waitlist's store with its source and
+ * link — never a consent — and sends one email in our own words.
  */
 
-const RELAY_SECRET = "saroh-dev-insecure-site-relay-secret-not-for-production";
 const PUBLIC = "93.184.216.34";
 
 const resolver: Resolver = (host) =>
@@ -133,27 +137,81 @@ function setup(replies: Record<string, Reply> = SITE) {
     return { controller, preview, gate, calls: t.calls };
 }
 
+/** The relay the guard checked, as the handler receives it. */
+const relayFor = (address: string): SiteRelay => ({
+    host: "www.saroh.in",
+    address,
+    clientHash: `hash-${address}`,
+});
 /** A different visitor each time, so the limits stay out of the way. */
 let visitor = 0;
-const ip = () => `203.0.113.${(visitor += 1) % 250}`;
-const relayFor = (address: string) =>
-    signSiteRelay({ address, host: "www.saroh.in" }, RELAY_SECRET);
+const anyone = () => relayFor(`203.0.113.${(visitor += 1) % 250}`);
+
+/**
+ * The entry's two email counters, as the database would keep them: the
+ * gate's conditional `updateMany` calls run against this one row.
+ */
+let row: { reportEmailDay: Date | null; reportEmailCount: number };
+let dayTotal = 0;
 
 beforeEach(() => {
     jest.clearAllMocks();
+    row = { reportEmailDay: null, reportEmailCount: 0 };
+    dayTotal = 0;
     (sendLinkReportEmail as jest.Mock).mockResolvedValue("sent");
     (prisma.waitlistSignup.findUnique as jest.Mock).mockResolvedValue(null);
     (prisma.waitlistSignup.create as jest.Mock).mockResolvedValue({ id: "w1" });
     (prisma.waitlistSignup.update as jest.Mock).mockResolvedValue({ id: "w1" });
+    (prisma.waitlistSignup.aggregate as jest.Mock).mockImplementation(() =>
+        Promise.resolve({ _sum: { reportEmailCount: dayTotal } }),
+    );
+    (prisma.waitlistSignup.updateMany as jest.Mock).mockImplementation(
+        ({
+            where,
+            data,
+        }: {
+            where: { reportEmailDay?: Date };
+            data: { reportEmailDay?: Date };
+        }) => {
+            const held = row.reportEmailDay?.getTime();
+            if (where.reportEmailDay) {
+                // Same day, under the cap: one more.
+                if (
+                    held !== where.reportEmailDay.getTime() ||
+                    row.reportEmailCount >= EMAILS_PER_DAY
+                ) {
+                    return Promise.resolve({ count: 0 });
+                }
+                row.reportEmailCount += 1;
+            } else {
+                // No day yet, or another day: start today's count.
+                const day = data.reportEmailDay as Date;
+                if (held === day.getTime())
+                    return Promise.resolve({ count: 0 });
+                row = { reportEmailDay: day, reportEmailCount: 1 };
+            }
+            dayTotal += 1;
+            return Promise.resolve({ count: 1 });
+        },
+    );
 });
 
-describe("GET /public/tools/link-preview", () => {
+describe("the relay", () => {
+    it("guards both routes: only saroh.in's server may call them", () => {
+        const guards = Reflect.getMetadata(
+            GUARDS_METADATA,
+            LinkPreviewController,
+        ) as unknown[];
+        expect(guards).toContain(SiteRelayGuard);
+    });
+});
+
+describe("POST /public/tools/link-preview (check)", () => {
     it("answers the facts, the verdicts and the score, and keeps the fixes for the unlock", async () => {
         const { controller } = setup();
         const view = await controller.check(
             { url: "shop.example.com" },
-            ip(),
-            undefined,
+            anyone(),
         );
         if (!view.ok) throw new Error(view.failure);
         expect(view.url).toBe("https://shop.example.com/");
@@ -192,7 +250,7 @@ describe("GET /public/tools/link-preview", () => {
         "answers %s as the typed state %s, never a 500",
         async (url, failure) => {
             const { controller } = setup();
-            const view = await controller.check({ url }, ip(), undefined);
+            const view = await controller.check({ url }, anyone());
             expect(view).toMatchObject({ ok: false, failure });
         },
     );
@@ -203,8 +261,7 @@ describe("GET /public/tools/link-preview", () => {
             const { controller } = setup();
             const pending = controller.check(
                 { url: "slow.example.com" },
-                ip(),
-                undefined,
+                anyone(),
             );
             await jest.advanceTimersByTimeAsync(5_001);
             await expect(pending).resolves.toMatchObject({
@@ -220,8 +277,7 @@ describe("GET /public/tools/link-preview", () => {
         const { controller, calls } = setup();
         const view = await controller.check(
             { url: "example-bakery.in" },
-            ip(),
-            undefined,
+            anyone(),
         );
         // Nothing is fetched: the sample isn't a real site.
         expect(calls).toHaveLength(0);
@@ -236,8 +292,7 @@ describe("GET /public/tools/link-preview", () => {
         const { controller } = setup();
         const view = await controller.check(
             { url: "gone.example.com" },
-            ip(),
-            undefined,
+            anyone(),
         );
         expect(view).toMatchObject({ failure: "unreachable", status: 404 });
     });
@@ -271,45 +326,20 @@ describe("GET /public/tools/link-preview", () => {
 
     it("limits a visitor to 10 checks a minute, counted by the signed relay", async () => {
         const { controller } = setup();
-        const visitorIp = "198.51.100.77";
-        // Through saroh.in's server: the API sees the server, the relay names the visitor.
+        const visitorRelay = relayFor("198.51.100.77");
         for (let i = 0; i < 10; i += 1) {
-            await controller.check(
-                { url: "plain.example.com" },
-                "10.0.0.1",
-                relayFor(visitorIp),
-            );
+            await controller.check({ url: "plain.example.com" }, visitorRelay);
         }
         await expect(
-            controller.check(
-                { url: "plain.example.com" },
-                "10.0.0.1",
-                relayFor(visitorIp),
-            ),
+            controller.check({ url: "plain.example.com" }, visitorRelay),
         ).rejects.toMatchObject({ status: 429 });
         // Another visitor through the same server is not counted with them.
         await expect(
             controller.check(
                 { url: "plain.example.com" },
-                "10.0.0.1",
                 relayFor("198.51.100.78"),
             ),
         ).resolves.toMatchObject({ ok: false });
-    });
-
-    it("counts a forged relay as the caller", async () => {
-        const { controller } = setup();
-        const caller = "198.51.100.99";
-        for (let i = 0; i < 10; i += 1) {
-            await controller.check(
-                { url: "plain.example.com" },
-                caller,
-                `v1.forged.${i}`,
-            );
-        }
-        await expect(
-            controller.check({ url: "plain.example.com" }, caller, "v1.other"),
-        ).rejects.toBeInstanceOf(HttpException);
     });
 
     it("passes a failure through the view unchanged", () => {
@@ -324,16 +354,11 @@ describe("GET /public/tools/link-preview", () => {
 });
 
 describe("POST /public/tools/link-preview/report", () => {
-    it("stores the email with source link-preview, the link and the consent, and sends one email", async () => {
+    it("stores the email with source link-preview and the link, no consent, and sends one email", async () => {
         const { controller } = setup();
         const result = await controller.unlock(
-            {
-                email: "Owner@Shop.Example.com",
-                url: "shop.example.com",
-                consent: true,
-            },
-            ip(),
-            undefined,
+            { email: "Owner@Shop.Example.com", url: "shop.example.com" },
+            anyone(),
         );
         expect(result).toMatchObject({ unlocked: true, emailed: "sent" });
         if (!result.unlocked) throw new Error("expected an unlock");
@@ -353,30 +378,39 @@ describe("POST /public/tools/link-preview/report", () => {
             businessKey: "",
             source: "link-preview",
             checkedUrl: "https://shop.example.com/",
-            newsConsent: true,
+            newsConsent: false,
         });
         expect(sendLinkReportEmail).toHaveBeenCalledTimes(1);
         const [to, subject, text] = (sendLinkReportEmail as jest.Mock).mock
             .calls[0] as [string, string, string];
         expect(to).toBe("owner@shop.example.com");
-        expect(subject).toBe("Your link preview report for shop.example.com");
+        expect(subject).toBe("Your link preview report");
         expect(text).toContain("1. Use a bigger picture.");
+        // Nothing the page wrote, not even its domain outside our own link.
+        expect(text).not.toContain("Fresh bread");
+        expect(text).not.toContain("Sourdough");
+        expect(text).not.toContain("cover.png");
     });
 
-    it("stores no consent when the box wasn't ticked", async () => {
-        const { gate } = setup();
+    it("stores the link without its query string", async () => {
+        const { gate } = setup({
+            ...SITE,
+            "https://shop.example.com/?ref=secret-token": html(GOOD_PAGE),
+        });
         await gate.unlock({
-            email: "quiet@example.com",
-            url: "shop.example.com",
-            consent: false,
+            email: "q@example.com",
+            url: "https://shop.example.com/?ref=secret-token",
         });
         expect(
             (prisma.waitlistSignup.create as jest.Mock).mock.calls[0][0].data
-                .newsConsent,
-        ).toBe(false);
+                .checkedUrl,
+        ).toBe("https://shop.example.com/");
+        const text = (sendLinkReportEmail as jest.Mock).mock
+            .calls[0][2] as string;
+        expect(text).not.toContain("secret-token");
     });
 
-    it("updates an existing entry's link without clearing an earlier yes", async () => {
+    it("updates only an existing entry's link and when, nothing else", async () => {
         (prisma.waitlistSignup.findUnique as jest.Mock).mockResolvedValue({
             id: "w1",
         });
@@ -384,7 +418,6 @@ describe("POST /public/tools/link-preview/report", () => {
         await gate.unlock({
             email: "back@example.com",
             url: "plain.example.com",
-            consent: false,
         });
         // plain.example.com has no tags: nothing to unlock, nothing stored.
         expect(prisma.waitlistSignup.update).not.toHaveBeenCalled();
@@ -392,12 +425,11 @@ describe("POST /public/tools/link-preview/report", () => {
         await gate.unlock({
             email: "back@example.com",
             url: "shop.example.com",
-            consent: false,
         });
         const data = (prisma.waitlistSignup.update as jest.Mock).mock
-            .calls[0][0].data;
+            .calls[0][0].data as Record<string, unknown>;
+        expect(Object.keys(data).sort()).toEqual(["checkedAt", "checkedUrl"]);
         expect(data.checkedUrl).toBe("https://shop.example.com/");
-        expect(data).not.toHaveProperty("newsConsent");
         expect(prisma.waitlistSignup.create).not.toHaveBeenCalled();
     });
 
@@ -406,67 +438,112 @@ describe("POST /public/tools/link-preview/report", () => {
         const result = await gate.unlock({
             email: "a@example.com",
             url: "pdf.example.com",
-            consent: true,
         });
         expect(result).toEqual({ unlocked: false, failure: "not-html" });
         expect(prisma.waitlistSignup.create).not.toHaveBeenCalled();
         expect(sendLinkReportEmail).not.toHaveBeenCalled();
     });
 
-    it(`emails one address at most ${EMAILS_PER_DAY} times a day, and still unlocks`, async () => {
+    it(`emails one address at most ${EMAILS_PER_DAY} times a UTC day, counted in the database, and still unlocks`, async () => {
         const { gate } = setup();
+        const now = new Date("2026-10-05T10:00:00Z");
         for (let i = 0; i < EMAILS_PER_DAY; i += 1) {
             await gate.unlock({
                 email: "target@example.com",
                 url: "shop.example.com",
-                consent: false,
+                now,
             });
         }
         const fourth = await gate.unlock({
             email: "Target+x@example.com",
             url: "shop.example.com",
-            consent: false,
+            now,
         });
         expect(fourth).toMatchObject({ unlocked: true, emailed: "limited" });
         expect(sendLinkReportEmail).toHaveBeenCalledTimes(EMAILS_PER_DAY);
+        // A new UTC day starts the count again.
+        const next = await gate.unlock({
+            email: "target@example.com",
+            url: "shop.example.com",
+            now: new Date("2026-10-06T00:00:01Z"),
+        });
+        expect(next).toMatchObject({ emailed: "sent" });
+    });
+
+    it(`sends no copy past ${REPORT_EMAILS_PER_DAY} report emails a day in all, and still unlocks`, async () => {
+        dayTotal = REPORT_EMAILS_PER_DAY;
+        const { gate } = setup();
+        await expect(
+            gate.unlock({ email: "late@example.com", url: "shop.example.com" }),
+        ).resolves.toMatchObject({ unlocked: true, emailed: "not-sent" });
+        expect(sendLinkReportEmail).not.toHaveBeenCalled();
     });
 
     it("says when mail is down, and still unlocks", async () => {
         (sendLinkReportEmail as jest.Mock).mockResolvedValue("not-configured");
         const { gate } = setup();
         await expect(
-            gate.unlock({
-                email: "down@example.com",
-                url: "shop.example.com",
-                consent: false,
-            }),
+            gate.unlock({ email: "down@example.com", url: "shop.example.com" }),
         ).resolves.toMatchObject({ unlocked: true, emailed: "not-sent" });
     });
 
     it("limits a visitor to 5 unlocks a minute", async () => {
         const { controller } = setup();
-        const caller = "198.51.100.150";
+        const caller = relayFor("198.51.100.150");
         for (let i = 0; i < 5; i += 1) {
             await controller.unlock(
-                {
-                    email: `v${i}@example.com`,
-                    url: "shop.example.com",
-                    consent: false,
-                },
+                { email: `v${i}@example.com`, url: "shop.example.com" },
                 caller,
-                undefined,
             );
         }
         await expect(
             controller.unlock(
-                {
-                    email: "v9@example.com",
-                    url: "shop.example.com",
-                    consent: false,
-                },
+                { email: "v9@example.com", url: "shop.example.com" },
                 caller,
-                undefined,
             ),
         ).rejects.toMatchObject({ status: 429 });
+    });
+
+    it("counts an unlock's check against the check limits too", async () => {
+        const { controller } = setup();
+        const caller = relayFor("198.51.100.160");
+        for (let i = 0; i < 9; i += 1) {
+            await controller.check({ url: "plain.example.com" }, caller);
+        }
+        await controller.unlock(
+            { email: "v@example.com", url: "shop.example.com" },
+            caller,
+        );
+        await expect(
+            controller.check({ url: "plain.example.com" }, caller),
+        ).rejects.toMatchObject({ status: 429 });
+    });
+});
+
+describe("the concurrency cap", () => {
+    it("answers busy, at once, past 8 checks in flight", async () => {
+        const replies: Record<string, Reply> = {};
+        for (let i = 0; i < 9; i += 1) {
+            replies[`https://s${i}.example.com/`] = "hang";
+        }
+        jest.useFakeTimers();
+        try {
+            const { preview } = setup(replies);
+            const running = Array.from({ length: 8 }, (_, i) =>
+                preview.check(`s${i}.example.com`),
+            );
+            await expect(
+                preview.check("s8.example.com"),
+            ).resolves.toMatchObject({ ok: false, failure: "busy" });
+            await jest.advanceTimersByTimeAsync(5_001);
+            await Promise.all(running);
+            // The slots are free again.
+            await jest.advanceTimersByTimeAsync(0);
+            const again = preview.check("s8.example.com", { fresh: true });
+            await jest.advanceTimersByTimeAsync(5_001);
+            await expect(again).resolves.toMatchObject({ failure: "timeout" });
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });

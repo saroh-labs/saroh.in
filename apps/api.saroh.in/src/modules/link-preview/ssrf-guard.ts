@@ -1,5 +1,5 @@
 import type { LookupAddress } from "node:dns";
-import { lookup as dnsLookup } from "node:dns/promises";
+import { Resolver as DnsResolver } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 
 /**
@@ -13,7 +13,9 @@ import { BlockList, isIP } from "node:net";
  * 1. **The address itself** ({@link checkTarget}): `http` or `https`, no
  *    user name or password, a host with a dot in it, one of the usual web
  *    ports, at most {@link MAX_URL_LENGTH} characters.
- * 2. **Where the host points** ({@link resolveTarget}): resolved ONCE, and
+ * 2. **Where the host points** ({@link resolveTarget}): resolved ONCE —
+ *    over DNS itself, never the system's `getaddrinfo` (see
+ *    {@link systemResolver}), within {@link DNS_TIMEOUT_MS} — and
  *    refused when ANY of its addresses is private, loopback, link-local,
  *    CGNAT, unique-local, multicast, unspecified, reserved or a cloud
  *    metadata address — IPv4 and IPv6, an IPv4-mapped IPv6 address judged
@@ -27,7 +29,8 @@ import { BlockList, isIP } from "node:net";
  * Browser tests point the tool at a page served on the test machine, which
  * rule 2 refuses. `LINK_PREVIEW_TEST_HOSTS` names hosts that may resolve to
  * loopback (and only loopback); the environment refuses to boot with it in
- * production (`env.ts`), and {@link testHostsFrom} ignores it there too.
+ * production (`env.ts`), and {@link testHostsFrom} honours it only where
+ * the process says it is a test run (`NODE_ENV=test`, or `CI` set).
  */
 
 export const MAX_URL_LENGTH = 2048;
@@ -178,15 +181,24 @@ export function isLoopbackAddress(ip: string): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * The test-only hosts, or none. Never in production, whatever is set: the
- * environment refuses to boot with the variable there, and this refuses
- * again for a host that runs without a declared NODE_ENV being production.
+ * The test-only hosts, or none. Honoured only in a run that says it is a
+ * test: `NODE_ENV` declared `test` (Jest), or `CI` set (the browser-test
+ * stack, in CI and in `scripts/prepush.sh`, runs the built API with no
+ * `NODE_ENV`). Never under a declared `production`, whatever else is set —
+ * and the environment refuses to boot with the variable there anyway. So a
+ * staging host that copied the variable, with `NODE_ENV=development` or
+ * none, does not get a way to loopback.
  */
 export function testHostsFrom(
     value: string | undefined,
-    nodeEnvs: (string | undefined)[],
+    run: { nodeEnvs: (string | undefined)[]; ci?: string },
 ): ReadonlySet<string> {
-    if (!value || nodeEnvs.includes("production")) return new Set();
+    if (!value || run.nodeEnvs.includes("production")) return new Set();
+    const ci = (run.ci ?? "").trim().toLowerCase();
+    const testRun =
+        run.nodeEnvs[0] === "test" ||
+        (ci !== "" && ci !== "false" && ci !== "0");
+    if (!testRun) return new Set();
     return new Set(
         value
             .split(",")
@@ -275,9 +287,62 @@ export function checkUrl(
 /** Every address a host name resolves to. */
 export type Resolver = (host: string) => Promise<LookupAddress[]>;
 
-/** The system resolver, every address, in the order it gave them. */
-export const systemResolver: Resolver = (host) =>
-    dnsLookup(host, { all: true, verbatim: true });
+/** How long a name may take to resolve before the check says "timed out". */
+export const DNS_TIMEOUT_MS = 1_500;
+
+/**
+ * The system's DNS servers, asked directly (c-ares), for A and AAAA
+ * records at once: every address, IPv4 first.
+ *
+ * Never `dns.lookup`: that is `getaddrinfo`, which runs on libuv's
+ * four-thread pool and can't be cancelled. A stranger's name whose
+ * nameserver never answers would hold a thread for 10–30 seconds per
+ * check, and a few such checks at once would queue every other user of
+ * the pool behind them — SMTP, payment and database connects, files, zlib,
+ * crypto. c-ares queries are sockets on the event loop: a slow name costs a
+ * timer, and {@link DNS_TIMEOUT_MS} later the resolver is cancelled.
+ *
+ * c-ares does not read `/etc/hosts`, so a test host must be an address
+ * (`127.0.0.1`), not `localhost`.
+ */
+export const systemResolver: Resolver = async (host) => {
+    const resolver = new DnsResolver({ timeout: DNS_TIMEOUT_MS, tries: 1 });
+    const timer = setTimeout(() => resolver.cancel(), DNS_TIMEOUT_MS + 100);
+    try {
+        const [v4, v6] = await Promise.allSettled([
+            resolver.resolve4(host),
+            resolver.resolve6(host),
+        ]);
+        // A name the DNS couldn't answer for at all is unreachable. A name
+        // with records of one family only is fine: the connection is pinned
+        // to an address that was checked, so a family that didn't answer
+        // can't be reached either.
+        if (v4.status === "rejected" && v6.status === "rejected") {
+            throw v4.reason instanceof Error ? v4.reason : new Error("dns");
+        }
+        return [
+            ...(v4.status === "fulfilled" ? v4.value : []).map(
+                (address): LookupAddress => ({ address, family: 4 }),
+            ),
+            ...(v6.status === "fulfilled" ? v6.value : []).map(
+                (address): LookupAddress => ({ address, family: 6 }),
+            ),
+        ];
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
+class DnsTimeout extends Error {}
+
+/** The resolver's answer, or {@link DnsTimeout} once `ms` have passed. */
+function withinDnsTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new DnsTimeout()), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 /** The one address a fetch may connect to, checked. */
 export interface PinnedAddress {
@@ -298,6 +363,7 @@ export async function resolveTarget(
     url: URL,
     resolver: Resolver,
     testHosts: ReadonlySet<string> = new Set(),
+    dnsTimeoutMs: number = DNS_TIMEOUT_MS,
 ): Promise<ResolveResult> {
     const host = bare(url.hostname);
     const literal = isIP(host);
@@ -313,9 +379,11 @@ export async function resolveTarget(
 
     let addresses: LookupAddress[];
     try {
-        addresses = await resolver(host);
-    } catch {
-        return { ok: false, failure: "unreachable", reason: "dns" };
+        addresses = await withinDnsTimeout(resolver(host), dnsTimeoutMs);
+    } catch (error) {
+        return error instanceof DnsTimeout
+            ? { ok: false, failure: "timeout", reason: "dns" }
+            : { ok: false, failure: "unreachable", reason: "dns" };
     }
     if (addresses.length === 0) {
         return { ok: false, failure: "unreachable", reason: "dns" };

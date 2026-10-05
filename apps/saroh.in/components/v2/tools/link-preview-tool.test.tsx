@@ -212,9 +212,13 @@ describe("LinkPreviewTool", () => {
         expect((await screen.findByTestId("score-line")).textContent).toBe(
             "Looks right on 0 of 6 apps. Fix 3 things to fix all 6.",
         );
-        expect(fetchMock.mock.calls[0]?.[0]).toBe(
-            "/api/link-preview?url=https%3A%2F%2Fshop.in",
-        );
+        // A POST with the address in the body: never a query string.
+        const [called, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(called).toBe("/api/link-preview");
+        expect(init.method).toBe("POST");
+        expect(JSON.parse(init.body as string)).toEqual({
+            url: "https://shop.in",
+        });
         expect(screen.getAllByLabelText(/: Needs a fix$/)).toHaveLength(6);
         expect(screen.getAllByLabelText(/, locked$/)).toHaveLength(4);
         expect(screen.getByText("Unlock the fix-it report")).toBeTruthy();
@@ -243,7 +247,10 @@ describe("LinkPreviewTool", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Check again" }));
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-        expect(fetchMock.mock.calls[1]?.[0]).toContain("&fresh=1");
+        const [, again] = fetchMock.mock.calls[1] as [string, RequestInit];
+        expect(JSON.parse(again.body as string)).toMatchObject({
+            fresh: true,
+        });
     });
 
     it("opens a shared report already checked", async () => {
@@ -269,22 +276,23 @@ describe("LinkPreviewTool", () => {
             "That email doesn't look right. Check it and try again.",
         );
 
+        // No news tickbox: an unverified address can't say yes to news.
+        expect(screen.queryByRole("checkbox")).toBeNull();
         fireEvent.change(email, { target: { value: "owner@shop.in" } });
-        fireEvent.click(screen.getByRole("checkbox"));
         fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
         expect(await screen.findByText("Fix these 3")).toBeTruthy();
         expect(screen.getByText("Add a description.")).toBeTruthy();
         expect(screen.getByText("We've emailed you a copy.")).toBeTruthy();
         expect(screen.queryAllByLabelText(/, locked$/)).toHaveLength(0);
-        const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+        const [path, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+        expect(path).toBe("/api/link-preview/report");
         expect(JSON.parse(init.body as string)).toEqual({
             email: "owner@shop.in",
-            consent: true,
             url: "https://shop.in/",
         });
     });
 
-    it("links the consent line to the Privacy page", async () => {
+    it("links the promise line to the Privacy page", async () => {
         fetchMock.mockReturnValue(reply(RESULT));
         render(<LinkPreviewTool />);
         fireEvent.change(field(), { target: { value: "shop.in" } });

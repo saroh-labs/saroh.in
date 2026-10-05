@@ -90,7 +90,10 @@ export function cleanSource(raw: string | null | undefined): string {
  * support report without putting the list in the log aggregator.
  */
 export function maskEmail(email: string): string {
-    const [local = "", domain = ""] = email.split("@");
-    const head = local.slice(0, 2);
-    return `${head}${"*".repeat(Math.max(local.length - 2, 0))}@${domain}`;
+    const at = email.lastIndexOf("@");
+    const local = at < 0 ? email : email.slice(0, at);
+    const domain = at < 0 ? "" : email.slice(at + 1);
+    // One character and a fixed mask: neither a short local part nor its
+    // length shows through.
+    return `${local.slice(0, 1)}***@${domain}`;
 }

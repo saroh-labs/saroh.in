@@ -1,15 +1,18 @@
 import type { LookupAddress } from "node:dns";
+import dns from "node:dns/promises";
 
 import type { Transport, TransportRequest } from "./safe-fetch";
 import { guardedFetch } from "./safe-fetch";
 import type { Resolver } from "./ssrf-guard";
 import {
     checkTarget,
+    DNS_TIMEOUT_MS,
     isPublicAddress,
     mappedIpv4,
     MAX_URL_LENGTH,
     pinnedLookup,
     resolveTarget,
+    systemResolver,
     testHostsFrom,
 } from "./ssrf-guard";
 
@@ -246,7 +249,9 @@ describe("resolveTarget", () => {
 
 describe("the test-only hosts", () => {
     it("let a named host reach loopback, and only loopback", async () => {
-        const hosts = testHostsFrom("localhost, fixture.test", ["test"]);
+        const hosts = testHostsFrom("localhost, fixture.test", {
+            nodeEnvs: ["test"],
+        });
         expect(checkTarget("http://localhost:4123/page", hosts).ok).toBe(true);
         const loop = await resolveTarget(
             new URL("http://fixture.test:4123/"),
@@ -265,11 +270,74 @@ describe("the test-only hosts", () => {
     });
 
     it("are none in production, whatever is set", () => {
-        expect(testHostsFrom("localhost", ["production"]).size).toBe(0);
-        expect(testHostsFrom("localhost", [undefined, "production"]).size).toBe(
-            0,
+        const none = (run: Parameters<typeof testHostsFrom>[1]) =>
+            testHostsFrom("localhost", run).size;
+        expect(none({ nodeEnvs: ["production"] })).toBe(0);
+        expect(none({ nodeEnvs: ["production"], ci: "true" })).toBe(0);
+        expect(none({ nodeEnvs: [undefined, "production"] })).toBe(0);
+        expect(testHostsFrom(undefined, { nodeEnvs: ["test"] }).size).toBe(0);
+    });
+
+    it("are honoured only in a test run: NODE_ENV=test, or CI set", () => {
+        const count = (run: Parameters<typeof testHostsFrom>[1]) =>
+            testHostsFrom("127.0.0.1", run).size;
+        // A staging host that copied the variable gets nothing.
+        expect(count({ nodeEnvs: ["development", "development"] })).toBe(0);
+        expect(count({ nodeEnvs: [undefined, "development"] })).toBe(0);
+        expect(count({ nodeEnvs: [undefined], ci: "false" })).toBe(0);
+        expect(count({ nodeEnvs: ["test", "test"] })).toBe(1);
+        // The browser-test stack: the built API with no NODE_ENV, CI set.
+        expect(
+            count({ nodeEnvs: [undefined, "development"], ci: "true" }),
+        ).toBe(1);
+        expect(count({ nodeEnvs: [undefined, "development"], ci: "1" })).toBe(
+            1,
         );
-        expect(testHostsFrom(undefined, ["test"]).size).toBe(0);
+    });
+});
+
+describe("resolving within the deadline", () => {
+    it("answers timeout within ~1.5s when the name never resolves", async () => {
+        const never: Resolver = () => new Promise(() => undefined);
+        const started = Date.now();
+        const result = await resolveTarget(
+            new URL("https://slow-dns.example.com/"),
+            never,
+        );
+        const took = Date.now() - started;
+        expect(result).toEqual({
+            ok: false,
+            failure: "timeout",
+            reason: "dns",
+        });
+        expect(took).toBeGreaterThanOrEqual(DNS_TIMEOUT_MS - 50);
+        expect(took).toBeLessThan(DNS_TIMEOUT_MS + 500);
+    });
+
+    it("asks DNS directly (c-ares), never getaddrinfo on the thread pool", async () => {
+        const v4 = jest
+            .spyOn(dns.Resolver.prototype, "resolve4")
+            .mockResolvedValue([PUBLIC_V4]);
+        const v6 = jest
+            .spyOn(dns.Resolver.prototype, "resolve6")
+            .mockRejectedValue(
+                Object.assign(new Error("no AAAA"), { code: "ENODATA" }),
+            );
+        const lookup = jest.spyOn(dns, "lookup");
+        try {
+            await expect(systemResolver("shop.example.com")).resolves.toEqual([
+                { address: PUBLIC_V4, family: 4 },
+            ]);
+            expect(lookup).not.toHaveBeenCalled();
+
+            // Neither family answered: the name is unreachable.
+            v4.mockRejectedValueOnce(new Error("ETIMEOUT"));
+            await expect(systemResolver("gone.example.com")).rejects.toThrow();
+        } finally {
+            v4.mockRestore();
+            v6.mockRestore();
+            lookup.mockRestore();
+        }
     });
 });
 
