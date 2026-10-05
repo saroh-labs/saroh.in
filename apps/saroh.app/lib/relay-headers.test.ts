@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const fakeEnv = vi.hoisted(() => ({
+interface FakeEnv {
+    SITE_RELAY_SECRET: string | undefined;
+    NODE_ENV: string;
+    NEXT_PUBLIC_VERCEL_ENV: string | undefined;
+}
+const fakeEnv = vi.hoisted((): FakeEnv => ({
     SITE_RELAY_SECRET: "a-test-secret-a-test-secret-a-test-secret",
     NODE_ENV: "production",
     NEXT_PUBLIC_VERCEL_ENV: "production",
