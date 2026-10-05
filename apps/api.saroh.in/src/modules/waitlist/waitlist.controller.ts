@@ -68,6 +68,7 @@ export class WaitlistController {
             business: dto.business,
             kind: dto.kind,
             city: dto.city,
+            country: dto.country,
             plan: dto.plan,
             source: dto.source,
             ref: dto.ref,

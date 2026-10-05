@@ -21,6 +21,7 @@ export interface WaitlistQuery {
     source?: string;
     kind?: string;
     city?: string;
+    country?: string;
     cursor?: string;
 }
 
@@ -50,6 +51,7 @@ export class AdminWaitlistService {
             bySource,
             byKind,
             byCity,
+            byCountry,
             referrers,
             oldest,
             lastWeek,
@@ -74,6 +76,12 @@ export class AdminWaitlistService {
                 by: ["city"],
                 where: { ...waitingOnly, city: { not: null } },
                 _count: { _all: true },
+            }),
+            prisma.waitlistSignup.groupBy({
+                by: ["country"],
+                where: waitingOnly,
+                _count: { _all: true },
+                orderBy: { _count: { country: "desc" } },
             }),
             prisma.waitlistSignup.groupBy({
                 by: ["referredById"],
@@ -123,6 +131,11 @@ export class AdminWaitlistService {
                     count: row._count._all,
                 })),
             ).slice(0, TOP_CITIES),
+            // Null: joined before 5 Oct 2026, or the host didn't know.
+            byCountry: byCountry.map((row) => ({
+                country: row.country,
+                count: row._count._all,
+            })),
             topReferrers: referrers.flatMap((row) => {
                 const who = row.referredById
                     ? byId.get(row.referredById)
@@ -162,6 +175,11 @@ export class AdminWaitlistService {
                 : query.city
                   ? { city: { equals: query.city, mode: "insensitive" } }
                   : {}),
+            ...(query.country === "none"
+                ? { country: null }
+                : query.country
+                  ? { country: query.country.toUpperCase() }
+                  : {}),
         };
         const rows = await prisma.waitlistSignup.findMany({
             where,
@@ -171,6 +189,7 @@ export class AdminWaitlistService {
                 businessName: true,
                 kind: true,
                 city: true,
+                country: true,
                 plan: true,
                 position: true,
                 source: true,

@@ -18,6 +18,8 @@ export interface JoinWaitlistInput {
     business?: string;
     kind?: WaitlistKind;
     city?: string;
+    /** Two letters, as the site's host saw the visitor's connection. */
+    country?: string;
     plan?: WaitlistPlan;
     source?: string;
     /** The referral id from the visitor's link. */
@@ -79,6 +81,7 @@ export class WaitlistService {
             businessName,
             kind: businessName ? (input.kind ?? null) : null,
             city: textOrNull(input.city),
+            country: input.country ?? null,
             plan: input.plan ?? null,
             source: cleanSource(input.source),
             referredById,

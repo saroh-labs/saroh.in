@@ -198,18 +198,21 @@ describe("the console's read", () => {
             business: "A",
             kind: "salon",
             city: "Pune",
+            country: "IN",
         });
         await joined({
             email: mail("b"),
             business: "B",
             kind: "salon",
             city: "pune",
+            country: "IN",
         });
         await joined({
             email: mail("c"),
             business: "C",
             kind: "gym",
             city: "Indore",
+            country: "US",
         });
         await joined({
             email: mail("d"),
@@ -239,6 +242,21 @@ describe("the console's read", () => {
                 { source: "instagram", count: 1 },
             ]),
         );
+        // Country as the site's host saw it; none for an entry without.
+        expect(summary.byCountry).toEqual([
+            { country: "IN", count: 2 },
+            { country: "US", count: 1 },
+            { country: null, count: 1 },
+        ]);
+    });
+
+    it("filters by country, and by none", async () => {
+        const us = await admin.list({ country: "us" });
+        expect(us.items.map((r) => [r.businessName, r.country])).toEqual([
+            ["C", "US"],
+        ]);
+        const none = await admin.list({ country: "none" });
+        expect(none.items.map((r) => r.businessName)).toEqual(["D"]);
     });
 
     it("lists entries with their kind and city, filtered by either", async () => {

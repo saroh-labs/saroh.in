@@ -125,6 +125,7 @@ export function WaitlistForm({ content }: { content: WaitlistContent }) {
             business: parsed.business,
             email: parsed.email,
             position: result.created ? result.position : undefined,
+            outsideIndia: result.outsideIndia === true,
             link:
                 result.created && result.ref
                     ? referralLink(window.location.origin, result.ref)
