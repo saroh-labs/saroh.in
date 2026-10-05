@@ -570,6 +570,26 @@ removed and the row says the decision is still open.
   knowing what to bake" and "Fill tomorrow's 7am class" are kept: they
   claim nothing about when Saroh opens.
 
+## 12. Resources: Changelog (`/changelog`, `/changelog/saroh-is-open`)
+
+The launch entry (plan U4, `apps/saroh.in/content/changelog.ts`) publishes
+on 17 Oct 2026 (`publishOn`). Its design copy repeated claims this ledger
+had already fixed; the entry ships the fixed wording, cited in the content
+file. The offer line reads the API's offer (`GET /public/waitlist/offer`),
+never a number in the repo.
+
+| #   | Claim (design)                                                                                                                 | Backed by                               | Status | Shipped words                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | ------ | --------------------------------------------------------------------------------------------------- |
+| CL1 | Orders: "…Late ones are flagged, and every step tells the customer."                                                           | As OR1, OR11                            | Fixed  | "every step tells the customer" dropped                                                             |
+| CL2 | Products: "stock for each storefront"                                                                                          | PR8; DEC-069 vocabulary                 | Fixed  | "stock for each location"                                                                           |
+| CL3 | Bookings: "…pay a deposit if you ask for one, and get a reminder email."                                                       | As BK2                                  | Fixed  | Reminder dropped                                                                                    |
+| CL4 | Subscriptions: "renew by UPI Autopay or card … a failed payment is retried and shown to you"                                   | As SU2 (D1)                             | Fixed  | SU2's wording: renew on their day, Autopay where set up, a failed payment shown with a new pay link |
+| CL5 | Billing: "Every paid order, booking and renewal gets a numbered GST tax invoice, or a bill of supply if you don't charge GST." | As BI6, F2                              | Fixed  | Bookings and renewals with Payments on; bill of supply for GST-exempt sales                         |
+| CL6 | Payments: "Customers pay by UPI, card or netbanking … Saroh never holds it."                                                   | Providers, F3                           | Partly | Kept as designed; F3 names UPI or card only. Netbanking is the provider's checkout: confirm         |
+| CL7 | Emails: "Order updates, booking reminders and invoices go out by email…"                                                       | As BK2, OR11; `invoice-send.service.ts` | Fixed  | "Invoices and reminders to pay go to your customers by email, through your own email account…"      |
+| CL8 | Website: "Start from a template made for your kind of business" + "See templates"                                              | Plan U6 (industry templates not built)  | Fixed  | "Start from a template…"; no Templates link                                                         |
+| CL9 | "On the waitlist? Your invite is in your email, with your first 3 months of Grow free."                                        | `GET /public/waitlist/offer`            | Backed | The API's plan and days; without an offer, "Your invite is in your email."                          |
+
 ## Keeping this current
 
 When a switch in the first table turns on, or a claim changes, update its

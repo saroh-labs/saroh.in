@@ -1,4 +1,5 @@
 const { REDIRECTS, TEMPORARY } = require("./redirects");
+const { builtRoutes } = require("./routes.config");
 
 // A production deployment without API_URL drops every waitlist join, and
 // nothing on the page shows it: refuse to build instead (it went unseen for
@@ -37,6 +38,16 @@ const nextConfig = {
     // No database here — saroh.in is the public marketing site (single backend
     // lives at api.saroh.in).
     reactStrictMode: false,
+
+    /**
+     * The pages this build has, read from `app/` as it is built
+     * (`routes.config.js`). The Resources list (`content/resources.ts`) shows a
+     * page in the nav, footer and sitemap only once its route is here, so a
+     * page listed ahead of its route never links to a 404.
+     */
+    env: {
+        SAROH_BUILT_ROUTES: JSON.stringify(builtRoutes()),
+    },
 
     /**
      * Old addresses to their V2 pages, one hop each, and pages not published

@@ -41,6 +41,7 @@ const config: Config = {
                     tint: mk("tint"),
                     soon: mk("soon"),
                     "line-row": mk("line-row"),
+                    prose: mk("prose"),
                     scrim: "var(--mk-scrim)",
                 },
             },

@@ -38,3 +38,32 @@ export function softwareApplicationLd(description: string): JsonLdObject {
 export function jsonLdText(data: JsonLdObject | JsonLdObject[]): string {
     return JSON.stringify(data).replace(/</g, "\\u003c");
 }
+
+/**
+ * A changelog entry as an `Article` (plan U7): its headline, its day (from
+ * midnight in India, KTD-2) and Saroh as author and publisher.
+ */
+export function articleLd(input: {
+    headline: string;
+    description: string;
+    path: string;
+    publishOn: string;
+}): JsonLdObject {
+    const saroh = {
+        "@type": "Organization",
+        name: SITE_NAME,
+        url: SITE_URL,
+        logo: { "@type": "ImageObject", url: `${SITE_URL}/icon1.png` },
+    };
+    return {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: input.headline,
+        description: input.description,
+        url: `${SITE_URL}${input.path}`,
+        mainEntityOfPage: `${SITE_URL}${input.path}`,
+        datePublished: `${input.publishOn}T00:00:00+05:30`,
+        author: saroh,
+        publisher: saroh,
+    };
+}

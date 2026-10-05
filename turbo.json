@@ -69,6 +69,12 @@
         "DEV_REDIRECT_ORIGIN",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+        // saroh.in: shows Resources pages before their publish date on a
+        // preview deployment; ignored on production (plan KTD-2).
+        "RESOURCES_PREVIEW",
+        // saroh.in: the build's page routes, written by its next.config.js
+        // (routes.config.js), never set by hand.
+        "SAROH_BUILT_ROUTES",
         // The customer account area's release switch, in the api and saroh.app
         // (round-2 A5): off until A6-A8 and A13 ship.
         "SITE_ACCOUNT_AREA",
