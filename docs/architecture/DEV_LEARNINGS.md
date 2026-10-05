@@ -2607,3 +2607,23 @@ marketing spec fails if any page requests googletagmanager.
 **Rule**: Third-party analytics load only on the production deployment,
 never by default; a browser spec proves no page loads them under test.
 **Category**: analytics · `apps/saroh.in/lib/ga.ts`, `e2e/tests/marketing.spec.ts`
+
+## Bookings — short bookings too small to tap, double bookings on top of each other
+
+**Symptom**: On a weekday the phone touch-target and overlap specs failed on
+`/bookings`: a 45-minute booking 36px tall, drawn over another booking of the
+same person at the same time. On a weekend the specs passed.
+**Root cause**: The day view drew 0.8px a minute everywhere, so anything
+under 55 minutes was under 44px on a phone, and every booking of a person
+was placed full width, so overlapping ones covered each other. The seeded
+day has no short or overlapping booking; on a weekday another spec's own
+booking lands on the same day and person, which is what exposed both.
+**Fix**: On a touch screen the day view draws 1.6px a minute (`--ppm`), a
+booking is at least 44px tall, and overlapping bookings sit side by side
+(`lib/services/diary-lanes.ts`, counting a short booking at its drawn
+length so it never covers the next). The closed-hours click works out the
+minute from the column's height, at any scale.
+**Rule**: A timeline that draws time as height sets its scale for the
+pointer it's on, and lays out overlaps; a spec that passes only on the
+seed's own day isn't evidence.
+**Category**: frontend · bookings · `apps/app.saroh.in/components/bookings/calendar/day-by-person.tsx`
