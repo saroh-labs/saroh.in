@@ -1014,3 +1014,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - On saroh.app it sits beside Print where the page offers a copy (a business that doesn't take payment online, and receipts), and as a quiet line under the pay page's own actions otherwise, in the business's `--site-*` tokens.
     - **Order pay links** (`/pay/o/<token>`) get none: the page is the order, not a paper, the link retires once the order is paid online, and an order can carry an invoice, a supplementary invoice and credit notes. The customer's order invoices are in their receipts, with the PDF.
 - Consequences: the invoice email's words are unchanged — they don't promise an attachment a provider may not carry. A provider adapter that learns to carry attachments says so (`takesAttachments`) and starts sending it.
+
+## DEC-084 A business that said it is registered names its type before it goes live
+
+**Status: Accepted — 2026-10-05** · user · from the pre-launch list (2026-09-28)
+
+- Context: setup's "Registered" chip saved nothing, so a registered business could go live with no legal type (Pvt Ltd, LLP, partnership, …) and the checklist could not tell it from one never asked.
+- Decision: setup stores the answer (`BusinessProfile.legallyRegistered`). A business that said Registered and takes money or invoices gets a "Choose your business type" step on its go-live checklist (Settings and Home) until it picks one. Every other business gets a gentle suggestion in Settings, never a block.
+- Consequences: businesses set up before this release read as "not asked" (the old answer was never saved), so they get the suggestion only. The API must deploy before the app: an older API refuses the new field.
