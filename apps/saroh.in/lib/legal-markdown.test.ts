@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { PRIVACY } from "@/content/privacy";
+import { REFUNDS } from "@/content/refunds";
+import { TERMS } from "@/content/terms";
 
 import { inlineRuns, parseLegal, slugify } from "./legal-markdown";
 
@@ -79,5 +81,60 @@ describe("the Privacy Policy", () => {
 
     it("names no price", () => {
         expect(PRIVACY.body).not.toMatch(/₹|Rs\.?\s?\d|INR/);
+    });
+});
+
+describe("the Terms and the Refund and Cancellation Policy", () => {
+    const headings = (body: string) =>
+        parseLegal(body).flatMap((b) => (b.kind === "heading" ? [b.text] : []));
+
+    it("the Terms have the owner's sections, in order", () => {
+        expect(headings(TERMS.body)).toEqual([
+            "The agreement",
+            "Your account and team",
+            "Plans and billing",
+            "Moving to a lower plan",
+            "Cancelling and refunds",
+            "Early access",
+            "Money you take",
+            "Your data and content",
+            "What you can't do",
+            "Your website and domain",
+            "The source code",
+            "Availability and changes",
+            "Closing an account",
+            "Liability",
+            "Changes to these terms",
+            "Law and disputes",
+        ]);
+    });
+
+    it("the refund policy names who we are first, then its sections", () => {
+        const blocks = parseLegal(REFUNDS.body);
+        expect(blocks[0]).toMatchObject({ kind: "paragraph" });
+        expect(headings(REFUNDS.body)).toEqual([
+            "Cancelling",
+            "Refunds",
+            "Introductory first month",
+            "Charged by mistake",
+            "Your customers' payments",
+            "Nothing is shipped",
+            "Questions or complaints",
+        ]);
+    });
+
+    it("both say cancelling is by email, and neither promises what isn't built", () => {
+        for (const body of [TERMS.body, REFUNDS.body]) {
+            expect(body).toContain("by writing to hello@saroh.in");
+            // Cancelling in Settings and the reminder before each payment wait for #805.
+            expect(body).not.toMatch(/cancel[^.]*in Settings/i);
+            expect(body).not.toMatch(/before each (monthly )?payment/i);
+        }
+    });
+
+    it("names no price or rate; those live in the database", () => {
+        for (const body of [TERMS.body, REFUNDS.body]) {
+            expect(body).not.toMatch(/₹|Rs\.?\s?\d|INR|\d+\s?%/);
+        }
     });
 });
