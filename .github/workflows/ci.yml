@@ -518,6 +518,10 @@ jobs:
       SITE_RELAY_SECRET: saroh-dev-insecure-site-relay-secret-not-for-production
       SITE_ACCOUNTS_CODE_SECRET: ci-placeholder-site-code-secret-at-least-32-chars
       SITE_CODES_EMAIL_FAKE: log
+      # The link preview spec serves its pages on this runner, which the
+      # API's SSRF guard refuses; this test-only list lets it reach them.
+      # The API refuses to boot with it under NODE_ENV=production.
+      LINK_PREVIEW_TEST_HOSTS: 127.0.0.1
       # Every real environment has a payments key, and sending an invoice
       # seals its pay link with it (D17): without one, Send answered 500 on
       # this stack. The same throwaway key the API specs use; it opens

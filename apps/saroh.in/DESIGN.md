@@ -42,7 +42,8 @@ dark bands and the featured plan; it is never body text.
 
 - **Space Grotesk 700** (`font-display`): display, headings, prices.
 - **Geist** (`font-sans`): body, labels, nav, eyebrows.
-- **JetBrains Mono** (`font-mono`): only the waitlist's opening date.
+- **JetBrains Mono** (`font-mono`): only the waitlist's opening date, and
+  the link preview tool's address field, tag names and tags to copy.
 - **Plus Jakarta Sans 600** (`font-wordmark`): only the phone menu's "Menu".
 - **Noto Sans Devanagari 500**: only सारोह in the waitlist footer.
 
@@ -66,6 +67,14 @@ manifest in `content/shots.ts`, each with alt text.
 
 Every clickable element has a pointer cursor, hover, focus and pressed states,
 and is reachable by keyboard.
+
+## The link preview tool
+
+`/tools/link-preview` (resources plan U2) draws each app's card with
+`ShareCard` from `@saroh/ui/share-card`, the same drawing the site settings
+use. Those cards are painted in each app's own colours, not Saroh's. The
+tool's verdict and error colours are `mk-good`, `mk-bad` (and their `-bg`),
+the field's placeholder `mk-hint` and the code block's text `mk-code`.
 
 ## Share cards
 

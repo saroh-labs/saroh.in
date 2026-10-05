@@ -34,6 +34,13 @@
     --mk-prose: 40 7% 16.9%; /* #2E2C28 — a Resources page's long-form copy */
     --mk-ok: 150.3 59.5% 30%; /* #1F7A4D — "Available", a field that's done */
     --mk-ok-tint: 141.4 33.3% 91.8%; /* #E3F1E8 — the "Available" pill */
+    /* The link preview tool's verdicts, its field's hint and its code block. */
+    --mk-good: 150.3 59.5% 30%; /* #1F7A4D — "Looks right", a tag that's set */
+    --mk-good-bg: 141.4 33.3% 91.8%; /* #E3F1E8 */
+    --mk-bad: 3 71.3% 32.7%; /* #8F1E18 — "Needs a fix", an error */
+    --mk-bad-bg: 9.6 64.1% 92.4%; /* #F8E3DF */
+    --mk-hint: 41.3 6.4% 51%; /* #8A857A — a field's placeholder */
+    --mk-code: 42.9 23.3% 88.2%; /* #E8E4DA — text in a code block on Ink */
 
     /* The design's three shadows: cards on hover, screenshots, the hero. */
     --mk-shadow-card: 0 10px 30px rgba(28, 28, 26, 0.08);

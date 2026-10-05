@@ -38,6 +38,19 @@ describe("the API's environment", () => {
         ).toEqual(["RENDERER_URL", "APP_URL", "EMAIL_FROM"]);
     });
 
+    it("refuses the link preview's test-only hosts in production", () => {
+        expect(
+            missing({ ...DEPLOYED, LINK_PREVIEW_TEST_HOSTS: "localhost" }),
+        ).toEqual(["LINK_PREVIEW_TEST_HOSTS"]);
+        expect(
+            missing({
+                ...BASE,
+                NODE_ENV: "test",
+                LINK_PREVIEW_TEST_HOSTS: "localhost",
+            }),
+        ).toEqual([]);
+    });
+
     it("lets development and tests go without them", () => {
         expect(missing({ ...BASE, NODE_ENV: "development" })).toEqual([]);
         expect(missing({ ...BASE, NODE_ENV: "test" })).toEqual([]);
