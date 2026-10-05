@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fakeEnv = vi.hoisted(() => ({
-    SITE_RELAY_SECRET: "a-test-secret-a-test-secret-a-test-secret" as
-        string | undefined,
-    NODE_ENV: "production" as string,
-    NEXT_PUBLIC_VERCEL_ENV: "production" as string | undefined,
+    SITE_RELAY_SECRET: "a-test-secret-a-test-secret-a-test-secret",
+    NODE_ENV: "production",
+    NEXT_PUBLIC_VERCEL_ENV: "production",
 }));
 vi.mock("@/env", () => ({ env: fakeEnv }));
 vi.mock("next/headers", () => ({
