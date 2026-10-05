@@ -655,6 +655,29 @@ describe("CommunicationsService.queueTransactional (D17)", () => {
         expect($transaction).not.toHaveBeenCalled();
     });
 
+    it("asks the send job to attach the invoice's PDF, and stores no file (DEC-083)", async () => {
+        await new CommunicationsService().queueTransactional(tx, "org_1", {
+            ...input(),
+            attachInvoicePdf: true,
+        });
+        const payload = jobCreate.mock.calls[0][0].data.payload;
+        expect(payload).toMatchObject({ attach: "INVOICE_PDF" });
+        expect(JSON.stringify(messageCreate.mock.calls)).not.toContain(
+            "INVOICE_PDF",
+        );
+    });
+
+    it("attaches nothing unless asked", async () => {
+        await new CommunicationsService().queueTransactional(
+            tx,
+            "org_1",
+            input(),
+        );
+        expect(jobCreate.mock.calls[0][0].data.payload).not.toHaveProperty(
+            "attach",
+        );
+    });
+
     it("a revoked email consent suppresses it and never makes the link", async () => {
         consentFindUnique.mockResolvedValue({ status: "REVOKED" });
         const link = jest.fn();

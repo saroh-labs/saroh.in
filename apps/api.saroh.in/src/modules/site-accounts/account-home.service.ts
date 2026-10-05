@@ -310,23 +310,10 @@ export class AccountHomeService {
      * (`PublicInvoiceView`), for the customer's own paid invoice only.
      */
     async receipt(ctx: Ctx, invoiceId: string): Promise<PublicInvoiceView> {
-        const own = await prisma.invoice.findFirst({
-            where: {
-                id: invoiceId,
-                organizationId: ctx.organizationId,
-                status: "PAID",
-                number: { not: null },
-                // Billed to the customer, or the invoice of one of their
-                // own orders (A7): an order's invoice names no contact.
-                OR: [
-                    { contactId: ctx.contactId },
-                    { kind: "INVOICE", order: await ownOrdersWhere(ctx) },
-                ],
-            },
-            select: { id: true },
-        });
-        if (!own) throw new NotFoundException();
-        return invoicePaper(ctx.organizationId, own.id);
+        return invoicePaper(
+            ctx.organizationId,
+            await ownReceiptId(ctx, invoiceId),
+        );
     }
 
     // ---- Health notes (default 12) ---------------------------------------
@@ -429,4 +416,31 @@ export async function block<T>(
         });
         return { ok: false };
     }
+}
+
+/**
+ * The id of one of the customer's own receipts: a paid, issued invoice of
+ * their business billed to them, or the invoice of one of their own orders
+ * (A7) — an order's invoice names no contact. Anyone else's is a 404. The
+ * receipt read and its PDF (DEC-083) both ask this.
+ */
+export async function ownReceiptId(
+    ctx: Pick<CustomerContext, "organizationId" | "contactId" | "accountId">,
+    invoiceId: string,
+): Promise<string> {
+    const own = await prisma.invoice.findFirst({
+        where: {
+            id: invoiceId,
+            organizationId: ctx.organizationId,
+            status: "PAID",
+            number: { not: null },
+            OR: [
+                { contactId: ctx.contactId },
+                { kind: "INVOICE", order: await ownOrdersWhere(ctx) },
+            ],
+        },
+        select: { id: true },
+    });
+    if (!own) throw new NotFoundException();
+    return own.id;
 }

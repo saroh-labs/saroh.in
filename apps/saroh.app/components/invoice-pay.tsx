@@ -6,12 +6,17 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { startPayment } from "@/app/pay/[token]/actions";
+import {
+    DownloadPdfButton,
+    InvoiceCopyActions,
+} from "@/components/download-pdf-button";
 import { InvoiceAutopay } from "@/components/invoice-autopay";
 import { PrintButton } from "@/components/print-button";
 import { ProviderHandoff } from "@/components/provider-handoff";
 import type { CheckoutIntent } from "@/lib/checkout-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
 import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
+import { hasCustomerPdf } from "@/lib/invoice-pdf";
 
 /**
  * The invoice a pay link shows, and its Pay button (ADR-007, U13).
@@ -27,8 +32,14 @@ import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
  * "Pay and turn on autopay" first (D12, `invoice-autopay.tsx`).
  *
  * A business that doesn't take payment online (`payOnline` false, DEC-070)
- * sends the same link to view the invoice: no Pay button, a copy to print
- * or save as PDF, and "Pay ‹business› the way they've asked you to".
+ * sends the same link to view the invoice: no Pay button, its PDF to
+ * download or a copy to print, and "Pay ‹business› the way they've asked
+ * you to".
+ *
+ * Wherever the page has a `pdfHref`, the customer can download the invoice
+ * as the business issued it (DEC-083): beside Print where the page offers
+ * a copy, and as a quieter line under the pay page's other actions. A void
+ * invoice has none.
  *
  * Styled in the business's `--site-*` tokens, never Saroh's brand. Status is
  * an opaque fill with its own foreground, for the reason checkout gives: the
@@ -38,11 +49,14 @@ export function InvoicePay({
     token,
     invoice,
     apiUrl,
+    pdfHref,
 }: {
     token: string;
     invoice: PayInvoice;
     /** Where an autopay window's return is posted (P1). */
     apiUrl?: string;
+    /** This app's route for the invoice's PDF (DEC-083); absent, none. */
+    pdfHref?: string;
 }) {
     const router = useRouter();
     const [intent, setIntent] = useState<CheckoutIntent | null>(null);
@@ -68,6 +82,8 @@ export function InvoicePay({
     // — the invoice to keep, and pay them their own way.
     const offer = payOffer(invoice);
     const payable = offer === "pay";
+    // The PDF, wherever there is one to hand out (DEC-083).
+    const pdf = pdfHref && hasCustomerPdf(invoice.status) ? pdfHref : null;
     // Autopay for the invoice's plan (D12): offered, or on already.
     const autopay =
         invoice.autopay &&
@@ -239,7 +255,14 @@ export function InvoicePay({
                             records.
                         </p>
                     </div>
-                    <PrintButton />
+                    {pdf ? (
+                        <InvoiceCopyActions
+                            pdfHref={pdf}
+                            number={invoice.number}
+                        />
+                    ) : (
+                        <PrintButton />
+                    )}
                 </div>
             ) : charging ? (
                 <div className="mt-6 space-y-4">
@@ -296,6 +319,17 @@ export function InvoicePay({
                     ) : null}
                 </div>
             )}
+            {pdf && offer !== "elsewhere" ? (
+                // Paying, paid or held for autopay: the invoice to keep,
+                // under the page's own actions.
+                <div className="mt-4">
+                    <DownloadPdfButton
+                        href={pdf}
+                        number={invoice.number}
+                        variant="link"
+                    />
+                </div>
+            ) : null}
         </section>
     );
 }

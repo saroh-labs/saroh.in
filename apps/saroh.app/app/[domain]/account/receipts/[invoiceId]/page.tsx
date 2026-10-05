@@ -4,14 +4,16 @@ import { notFound } from "next/navigation";
 
 import { AccountCard } from "@saroh/site-blocks";
 
+import { InvoiceCopyActions } from "@/components/download-pdf-button";
 import { InvoicePay } from "@/components/invoice-pay";
-import { PrintButton } from "@/components/print-button";
 import { getReceipt } from "@/lib/account-area";
+import { receiptPdfHref } from "@/lib/invoice-pdf";
 
 /**
  * One receipt from Me (round-2 plan A, A5): the customer's own paid invoice
  * on the pay link's paper — the same allow-list and the same drawing — with
- * the browser's print for a copy. No pay link is minted or shown: a paid
+ * its PDF to download (DEC-083, drawn on request by the API for this
+ * customer's session) and the browser's print for a copy. No pay link is minted or shown: a paid
  * invoice has nothing to pay, and the paper's Pay button never draws.
  * Another customer's invoice is a 404.
  */
@@ -50,7 +52,10 @@ export default async function ReceiptPage({
                 token it would pay with is never used. */}
             <InvoicePay token="" invoice={result.receipt} />
             <div className="mx-auto w-full max-w-xl px-5 sm:px-8">
-                <PrintButton />
+                <InvoiceCopyActions
+                    pdfHref={receiptPdfHref(invoiceId)}
+                    number={result.receipt.number}
+                />
             </div>
         </div>
     );

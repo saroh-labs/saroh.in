@@ -1000,3 +1000,17 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - Migration `20261022110000_invoice_seller_frozen` backfilled every invoice that is not a draft from today's settings — what its paper printed until then. A row still without them (written outside the API, like a seed) falls back to today's rather than print no seller.
     - **The logo stays live**: it is branding, not a particular rule 46 asks a tax invoice to carry, and a business replacing its logo expects its paper to follow.
 - Consequences: what is sent _now_ still names the business as it is now — the invoice email's sender line, an order's pay link and the booking page are not issued paper. `printedSeller` (API `invoices/invoice-paper-view.ts`, app `lib/invoices/seller.ts`) is the one rule.
+
+## DEC-083 Customers get the invoice PDF: attached to its email and downloadable from the pay link and receipts
+
+**Status: Accepted — 2026-10-05** · user · supersedes round-2 default 106 (the pay page keeps no PDF)
+
+- Context: only the merchant could download an issued invoice's PDF (D16, default 37). The customer got a link by email, and a pay page or receipt with the browser's print. Default 106 had dropped the pay page's PDF.
+- Decision:
+    - **One PDF.** The customer gets the same PDF the merchant downloads: the issued paper, the seller as at issue (DEC-082), the business's own name and logo, no Saroh brand. Drawn on request and never stored (`invoices/issued-invoice-pdf.ts`).
+    - **Attached to the invoice email**, the send and every reminder. The send job draws it as it hands the email to the business's own provider (Saroh's email is still never used). Resend takes attachments; the SendGrid and SMTP relays, reached through the same Resend-shaped request, are not given one. Where the provider can't carry it, or the PDF can't be drawn or is over 5 MB, the email goes with its link alone, as before. A send is never failed for its attachment.
+    - **Download PDF on the pay link** (`GET /public/invoices/:token/pdf`): the token alone, found by its hash as the pay read is; a replaced or revoked link, a draft and a void invoice are a 404. Limited per caller as the pay read is, and to 10 drawings per invoice per 10 minutes. `Content-Disposition: attachment`, named as the merchant's (`pdfFileName`), `Cache-Control: private, no-store`, `nosniff`. saroh.app asks it server to server from `/pay/<token>/pdf`, so the token never goes from the browser to the API.
+    - **Download PDF on a receipt** (`GET /public/site-accounts/me/receipts/:id/pdf`): the customer's session and the site's relay, exactly as the receipt's read; anyone else's invoice is a 404.
+    - On saroh.app it sits beside Print where the page offers a copy (a business that doesn't take payment online, and receipts), and as a quiet line under the pay page's own actions otherwise, in the business's `--site-*` tokens.
+    - **Order pay links** (`/pay/o/<token>`) get none: the page is the order, not a paper, the link retires once the order is paid online, and an order can carry an invoice, a supplementary invoice and credit notes. The customer's order invoices are in their receipts, with the PDF.
+- Consequences: the invoice email's words are unchanged — they don't promise an attachment a provider may not carry. A provider adapter that learns to carry attachments says so (`takesAttachments`) and starts sending it.
