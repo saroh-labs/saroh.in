@@ -20,6 +20,13 @@
 - **Issuing** re-reads the draft under its row lock and refuses a due date that
   has passed; it copies the bill-to name and email, so later edits to the
   contact don't change an issued invoice.
+- **Issued paper never changes** (DEC-082): the seller's name, legal name,
+  email, GSTIN, state and address are frozen on the invoice by
+  `documentColumns` from `loadTaxProfile`, and a correction copies its
+  original's. Anything that draws an issued paper reads the frozen columns
+  through `printedSeller`, never today's settings; only a draft prints
+  today's. The logo is the one live part. A new frozen column needs its
+  writer in `documentColumns`, its select in `serialize.ts` and a backfill.
 - **Money** is minor units in arithmetic and `Decimal` strings on the wire
   (`backend-data-and-money.md`).
 - **Who sees what:** invoice ids and numbers go only to a role with
