@@ -37,14 +37,14 @@ export async function POST(req: Request) {
     }
 
     const join = joinBody(posted);
-    const country = visitorCountry(req.headers);
-    const body = join && country ? { ...join, country } : join;
-    if (!body) {
+    if (!join) {
         return NextResponse.json<WaitlistResponse>(
             { status: "failure", reason: { code: "BAD_REQUEST" } },
             { status: 400 },
         );
     }
+    const country = visitorCountry(req.headers);
+    const body = country ? { ...join, country } : join;
 
     if (!env.API_URL) {
         // Fail loudly rather than pretending to have stored it. A visitor being
@@ -68,15 +68,25 @@ export async function POST(req: Request) {
     }
 
     try {
-        const upstream = await fetch(`${env.API_URL}/public/waitlist`, {
-            method: "POST",
-            headers: forwardHeaders({
-                headers: req.headers,
-                host: new URL(req.url).host,
-                secret,
-            }),
-            body: JSON.stringify(body),
-        });
+        const send = (payload: typeof body) =>
+            fetch(`${env.API_URL}/public/waitlist`, {
+                method: "POST",
+                headers: forwardHeaders({
+                    headers: req.headers,
+                    host: new URL(req.url).host,
+                    secret,
+                }),
+                body: JSON.stringify(payload),
+            });
+        let upstream = await send(body);
+        // An API from before `country` refuses the field it doesn't know
+        // (forbidNonWhitelisted): during a release the site can go live a few
+        // minutes before the API. The country is a nice-to-have; the join
+        // isn't, so it goes again without it. A refusal is answered before
+        // the API's rate limit counts, so this costs the visitor nothing.
+        if (upstream.status === 400 && country) {
+            upstream = await send(join);
+        }
 
         if (upstream.status === 429) {
             return NextResponse.json<WaitlistResponse>(
