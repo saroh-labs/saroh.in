@@ -378,6 +378,10 @@ test.describe("business settings tabs", () => {
         await signIn(page);
         await page.goto(`/open/${ORG}`);
         await page.goto("/settings/organization");
+        // The tabs are drawn: before they are, no "Address" tab says nothing.
+        await expect(
+            page.getByRole("tab", { name: "Registered address" }),
+        ).toBeVisible();
         await expect(
             page.getByRole("tab", { name: "Address", exact: true }),
         ).toHaveCount(0);

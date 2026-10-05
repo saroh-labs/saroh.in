@@ -340,6 +340,10 @@ describe("module enforcement rollout (#117)", () => {
             ),
         );
         expect(orgPart).toContain('@RequireModule("INSIGHTS")');
+        // Insights is set up once something is counted; a business with no
+        // sales and no visits yet reads its empty takings, not a refusal
+        // (DEC-075).
+        expect(orgPart).toContain("@IgnoreModuleReadiness()");
     });
 
     /*

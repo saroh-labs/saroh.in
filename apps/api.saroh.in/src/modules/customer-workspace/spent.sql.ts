@@ -30,8 +30,11 @@ import { Prisma } from "@saroh/database";
  */
 export const PAID_NON_ORDER_INVOICE = Prisma.sql`(i.status = 'PAID' AND i."orderId" IS NULL AND i.kind <> 'CREDIT_NOTE')`;
 
-/** Refunds that took money back from order `o`, in major units. */
-function orderRefundedSql(organizationId: string): Prisma.Sql {
+/**
+ * Refunds that took money back from order `o`, in major units. Insights'
+ * takings (`analytics/takings.sql.ts`) take them off by the same rule.
+ */
+export function orderRefundedSql(organizationId: string): Prisma.Sql {
     return Prisma.sql`COALESCE((
             SELECT SUM(pr."amountCents")::numeric / 100
             FROM "PaymentRefund" pr
@@ -52,8 +55,8 @@ function orderRefundedSql(organizationId: string): Prisma.Sql {
         ), 0)`;
 }
 
-/** Credit notes that corrected invoice `i`, in major units. */
-function invoiceCreditedSql(organizationId: string): Prisma.Sql {
+/** Credit notes that corrected invoice `i`, in major units. Takings too. */
+export function invoiceCreditedSql(organizationId: string): Prisma.Sql {
     return Prisma.sql`COALESCE((
             SELECT SUM(cn.total)
             FROM "Invoice" cn

@@ -4,6 +4,7 @@ import type { ReactNode, RefObject } from "react";
 import { useState } from "react";
 
 import { PanelDivider } from "@/components/sites/editor-chrome";
+import { queryCanvas } from "@/components/sites/editor/device-frame";
 import {
     railTabFor,
     selectRailTab,
@@ -221,12 +222,14 @@ function subjectOnCanvas(
     if (canvas === null) return null;
     if (selectedChrome !== null) {
         const name = selectedChrome === "header" ? "Header" : "Footer";
-        return canvas.querySelector<HTMLElement>(
+        return queryCanvas<HTMLElement>(
+            canvas,
             `button[aria-label^="${name}, on every page"]`,
         );
     }
     if (selectedIndex === null) return null;
-    return canvas.querySelector<HTMLElement>(
+    return queryCanvas<HTMLElement>(
+        canvas,
         `[data-block-index="${selectedIndex}"] > button[aria-pressed]`,
     );
 }

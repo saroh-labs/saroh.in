@@ -75,16 +75,29 @@ worker with `runOnce()`; the poll loop does not start under `NODE_ENV=test`.
 
 ## Known gaps
 
-| Type                  | Gap                                     | Consequence                                                                                   |
-| --------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `analytics.aggregate` | Handler registered; nothing enqueues it | Rollups come only from the seed, so Insights tells real organizations no views were recorded. |
+None. A new one is listed here and in `job-consumers.spec.ts`; close a gap
+and delete its entry in the same commit.
 
-It is listed in `job-consumers.spec.ts`. Close a gap and delete its entry in
-the same commit. It needs a product decision first (`saroh-product.md`).
+`analytics.aggregate` was one: its handler was registered (S7-002) and
+nothing queued it, so rollups came only from the seed. DEC-075 closed it
+with the hourly `analytics.rollup` chain (below).
 
 `booking.notify` was the other gap: enqueued on every booking and
 reschedule from S4-002 with no handler, so its jobs dead-lettered and
 nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
+
+## Insights rollups — **Current** (DEC-075)
+
+- **`analytics.rollup`** is a self-rescheduling chain, hourly
+  (`analytics/analytics-rollup.handler.ts`), one PENDING run at a time
+  (`Job_one_pending_analytics_rollup`). Each run finds every business and
+  UTC day with an `AnalyticsEvent` _received_ since its payload's `since`
+  (indexed on `receivedAt`) and queues one `analytics.aggregate` per pair;
+  the aggregate rebuilds that day with absolute upserts, so a duplicate is
+  harmless. The next run looks back five minutes past where this one
+  stopped, for an insert that committed late; a run whose sweep failed
+  hands its own `since` on. A fresh chain (boot, or `ensureScheduled` every
+  six hours finding none) starts 90 days back, the page's longest range.
 
 ## Customer notices — **Current** (A14)
 

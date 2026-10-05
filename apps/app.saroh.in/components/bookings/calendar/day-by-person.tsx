@@ -11,12 +11,24 @@ import {
     STATE_LABEL,
     UNASSIGNED,
 } from "@/lib/services/diary";
+import { bookingLanes } from "@/lib/services/diary-lanes";
 
 /** Pixels a minute takes on the diary: an hour is 48px (the design's 0.8). */
 export const PX = 0.8;
 
-const at = (minute: number, from: number) => `${(minute - from) * PX}px`;
-const tall = (a: number, b: number) => `${Math.max(0, b - a) * PX}px`;
+/**
+ * On a touch screen the day view draws a minute twice as tall (`--ppm`,
+ * set on its wrapper): a 30-minute booking is then 48px, a whole thumb,
+ * where 0.8 drew it at 24px. The phone shows one person, so the longer
+ * day costs only scrolling. Anything outside the day view keeps 0.8.
+ */
+const SCALE = `var(--ppm, ${PX}px)`;
+/** The least height a booking is drawn at on a phone: a 44px touch target. */
+const MIN_TOUCH_MINUTES = 28;
+
+const at = (minute: number, from: number) =>
+    `calc(${minute - from} * ${SCALE})`;
+const tall = (a: number, b: number) => `calc(${Math.max(0, b - a)} * ${SCALE})`;
 
 /** Closed time: a faint hatch you can click to open hours. */
 export const CLOSED_HATCH =
@@ -98,6 +110,9 @@ export function DayByPerson({
 }) {
     const [from, to] = span;
     const height = tall(from, to);
+    const lanesByColumn = new Map(
+        columns.map((c) => [c.key, bookingLanes(c.blocks, MIN_TOUCH_MINUTES)]),
+    );
 
     function closedAt(column: Column, e: MouseEvent<HTMLButtonElement>) {
         // A keyboard press has no pointer: open from the first closed hour.
@@ -108,13 +123,15 @@ export function DayByPerson({
             onClosed(column, Math.min(m, to - 60));
             return;
         }
+        // From the share of the column's height, so it holds at any scale.
         const r = e.currentTarget.getBoundingClientRect();
-        const m = Math.round(((e.clientY - r.top) / PX + from) / 30) * 30;
+        const share = r.height > 0 ? (e.clientY - r.top) / r.height : 0;
+        const m = Math.round((from + share * (to - from)) / 30) * 30;
         onClosed(column, Math.max(from, Math.min(to - 60, m)));
     }
 
     return (
-        <div className="overflow-auto rounded-[12px] border border-border bg-card">
+        <div className="overflow-auto rounded-[12px] border border-border bg-card [--ppm:0.8px] coarse:[--ppm:1.6px]">
             <div
                 className="grid min-w-[560px] grid-cols-[52px_repeat(var(--cols),minmax(170px,1fr))] max-[759px]:min-w-0 max-[759px]:grid-cols-[52px_minmax(0,1fr)]"
                 style={{ "--cols": columns.length } as CSSProperties}
@@ -198,43 +215,58 @@ export function DayByPerson({
                                   </button>
                               ))
                             : null}
-                        {c.blocks.map((b) => (
-                            <button
-                                key={b.key}
-                                type="button"
-                                onClick={() => onBlock(b)}
-                                aria-label={blockLabel(b)}
-                                className={cn(
-                                    "absolute inset-x-1 z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[7px] py-1 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
-                                    blockColour(b),
-                                    selected === b.key &&
-                                        "ring-2 ring-highlight ring-offset-0",
-                                    b.state === "cancelled" && "line-through",
-                                )}
-                                style={{
-                                    top: at(b.start, from),
-                                    height: tall(b.start, b.end),
-                                    // A cancelled booking over the time it
-                                    // gave back steps aside, so the free
-                                    // gap under it can still be booked.
-                                    ...(b.state === "cancelled" &&
-                                    c.day?.free.some(
-                                        ([fa, fb]) =>
-                                            fa < b.end && b.start < fb,
-                                    )
-                                        ? { left: "auto", width: "34%" }
-                                        : {}),
-                                }}
-                            >
-                                <span className="block truncate text-[12px] font-bold">
-                                    {blockTitle(b)}
-                                </span>
-                                <span className="block truncate text-[11px]">
-                                    {clock(b.start)}–{clock(b.end)} ·{" "}
-                                    {blockLine(b)}
-                                </span>
-                            </button>
-                        ))}
+                        {c.blocks.map((b) => {
+                            const lane = lanesByColumn
+                                .get(c.key)
+                                ?.get(b.key) ?? { lane: 0, lanes: 1 };
+                            return (
+                                <button
+                                    key={b.key}
+                                    type="button"
+                                    onClick={() => onBlock(b)}
+                                    aria-label={blockLabel(b)}
+                                    className={cn(
+                                        "absolute inset-x-1 z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[7px] py-1 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90 coarse:min-h-11",
+                                        blockColour(b),
+                                        selected === b.key &&
+                                            "ring-2 ring-highlight ring-offset-0",
+                                        b.state === "cancelled" &&
+                                            "line-through",
+                                    )}
+                                    style={{
+                                        top: at(b.start, from),
+                                        height: tall(b.start, b.end),
+                                        // Overlapping bookings sit side by side
+                                        // (`bookingLanes`), never on top.
+                                        ...(lane.lanes > 1
+                                            ? {
+                                                  left: `calc(${(lane.lane / lane.lanes) * 100}% + 2px)`,
+                                                  width: `calc(${100 / lane.lanes}% - 4px)`,
+                                                  right: "auto",
+                                              }
+                                            : {}),
+                                        // A cancelled booking over the time it
+                                        // gave back steps aside, so the free
+                                        // gap under it can still be booked.
+                                        ...(b.state === "cancelled" &&
+                                        c.day?.free.some(
+                                            ([fa, fb]) =>
+                                                fa < b.end && b.start < fb,
+                                        )
+                                            ? { left: "auto", width: "34%" }
+                                            : {}),
+                                    }}
+                                >
+                                    <span className="block truncate text-[12px] font-bold">
+                                        {blockTitle(b)}
+                                    </span>
+                                    <span className="block truncate text-[11px]">
+                                        {clock(b.start)}–{clock(b.end)} ·{" "}
+                                        {blockLine(b)}
+                                    </span>
+                                </button>
+                            );
+                        })}
                         {nowMinute !== null &&
                         nowMinute >= from &&
                         nowMinute <= to ? (

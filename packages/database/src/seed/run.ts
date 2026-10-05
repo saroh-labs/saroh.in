@@ -1048,7 +1048,7 @@ async function seedSubmissions(
  * The demo owner's other businesses, each holding one website (ADR-006).
  *
  * Only what a website needs: the business, the owner's membership, and the
- * Website module on with its rollout override — the same two rows Northwind
+ * Website module (and any `modules` it lists) on with its rollout override — the same two rows Northwind
  * gets, for the reason given there. No plan: the FREE default allows one site,
  * which is all each of these has.
  *
@@ -1085,39 +1085,42 @@ async function seedSideBusinesses(
             },
         });
 
-        await prisma.organizationModule.upsert({
-            where: {
-                organizationId_moduleKey: {
-                    organizationId: org.id,
-                    moduleKey: "WEBSITE",
+        for (const moduleKey of ["WEBSITE", ...(business.modules ?? [])]) {
+            const key = moduleKey.toLowerCase();
+            await prisma.organizationModule.upsert({
+                where: {
+                    organizationId_moduleKey: {
+                        organizationId: org.id,
+                        moduleKey,
+                    },
                 },
-            },
-            update: { status: "ENABLED" },
-            create: {
-                id: id("module", business.key, "website"),
-                organizationId: org.id,
-                moduleKey: "WEBSITE",
-                status: "ENABLED",
-                enabledAt: now,
-                enabledByUserId: userId,
-            },
-        });
-        // The flag row itself is written with Northwind's modules, above.
-        await prisma.featureFlagOverride.upsert({
-            where: {
-                flagKey_organizationId: {
-                    flagKey: "MODULE_WEBSITE",
+                update: { status: "ENABLED" },
+                create: {
+                    id: id("module", business.key, key),
                     organizationId: org.id,
+                    moduleKey,
+                    status: "ENABLED",
+                    enabledAt: now,
+                    enabledByUserId: userId,
                 },
-            },
-            update: { enabled: true },
-            create: {
-                id: id("flagoverride", business.key, "website"),
-                flagKey: "MODULE_WEBSITE",
-                organizationId: org.id,
-                enabled: true,
-            },
-        });
+            });
+            // The flag row itself is written with Northwind's modules, above.
+            await prisma.featureFlagOverride.upsert({
+                where: {
+                    flagKey_organizationId: {
+                        flagKey: `MODULE_${moduleKey}`,
+                        organizationId: org.id,
+                    },
+                },
+                update: { enabled: true },
+                create: {
+                    id: id("flagoverride", business.key, key),
+                    flagKey: `MODULE_${moduleKey}`,
+                    organizationId: org.id,
+                    enabled: true,
+                },
+            });
+        }
     }
     return ids;
 }

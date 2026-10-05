@@ -1,5 +1,5 @@
 // @covers accounts:/login app:/open app:/ app:/bookings app:/commerce app:/contacts api:home api:bookings
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { useSession } from "../fixtures/sessions";
@@ -25,6 +25,27 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  */
 
 const ROUTES = ["/", "/bookings", "/commerce", "/contacts"] as const;
+
+/**
+ * What each scene draws once its content has arrived. Measured before it
+ * lands, a page is the shell and a skeleton: nothing overlaps, nothing is
+ * wide, nothing is small, and every check here passes vacuously.
+ */
+const LANDMARK: Record<(typeof ROUTES)[number], (page: Page) => Locator> = {
+    "/": (page) => page.getByRole("region", { name: "Needs you" }),
+    "/bookings": (page) => page.getByRole("radiogroup", { name: "Layout" }),
+    // Sell lands on its location (or locations, with several).
+    "/commerce": (page) =>
+        page.getByRole("heading", { level: 1, name: /^Locations?$/ }),
+    "/contacts": (page) =>
+        page.getByRole("heading", { level: 1, name: "Contacts" }),
+};
+
+/** Opens the scene and waits for its own content, not just the shell. */
+async function openScene(page: Page, route: (typeof ROUTES)[number]) {
+    await page.goto(route);
+    await expect(LANDMARK[route](page)).toBeVisible();
+}
 
 async function signIn(page: Page) {
     await useSession(page);
@@ -83,7 +104,7 @@ test.describe("no scene scrolls sideways", () => {
     for (const route of ROUTES) {
         test(`${route} fits its viewport`, async ({ page }) => {
             await signIn(page);
-            await page.goto(route);
+            await openScene(page, route);
 
             const { scrollWidth, innerWidth } = await page.evaluate(() => ({
                 scrollWidth: document.documentElement.scrollWidth,
@@ -102,7 +123,7 @@ test.describe("no two controls share the same pixels", () => {
     for (const route of ROUTES) {
         test(`${route} has no overlapping controls`, async ({ page }) => {
             await signIn(page);
-            await page.goto(route);
+            await openScene(page, route);
 
             expect(await overlappingControls(page)).toEqual([]);
         });
@@ -119,7 +140,7 @@ test.describe("the phone tab bar", () => {
                 "The tab bar is drawn below 760px only.",
             );
             await signIn(page);
-            await page.goto(route);
+            await openScene(page, route);
             const bar = page.getByRole("navigation", { name: "Main" });
             await expect(bar).toBeVisible();
 
@@ -259,6 +280,11 @@ test.describe("touch targets", () => {
 
         await signIn(page);
         await page.goto("/bookings");
+        // The calendar itself, not its failed or locked state: measuring a
+        // page without the layout switch passes vacuously.
+        await expect(
+            page.getByRole("radiogroup", { name: "Layout" }),
+        ).toBeVisible();
 
         // Guard the guard: if `pointer: coarse` does not match, every
         // `coarse:` utility is inert and this test would pass vacuously.
@@ -342,6 +368,11 @@ test.describe("Home's Today (F5)", () => {
     }) => {
         await signIn(page);
         await page.goto("/");
+        // Today draws with Needs you: counted before Home has arrived, it
+        // is never there, and the test skips itself.
+        await expect(
+            page.getByRole("region", { name: "Needs you" }),
+        ).toBeVisible();
 
         const today = page.getByRole("region", { name: "Today" });
         // Only for a business that takes bookings or pick-ups.

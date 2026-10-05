@@ -2447,6 +2447,7 @@ as it wasn't in `globalEnv`.
 `turbo.json`. A `NEXT_PUBLIC_*` a build reads must be in `globalEnv` and in
 every stack that builds it.
 **Category**: e2e · rule in `scripts/prepush.sh`, `turbo.json`
+
 ## Seed — the Customers list stood empty for every seeded business
 
 **Problem**: Sell → Customers read "0 customers" on Northwind and Leela &
@@ -2470,6 +2471,7 @@ and their one possible match.
 what that path makes on the side. Run the same rule from the seed, with
 seed ids. `checkBoutique` now fails if a paying customer has no contact.
 **Category**: seed · customers · `packages/database/src/seed/helpers.ts`
+
 ## Frontend — every new post fell into "Couldn't load your website"
 
 **Problem**: Writing a new post, the editor turned into the route's error
@@ -2493,3 +2495,135 @@ so both editors share it.
 `editor.isDestroyed` first, and a surface built around one editor is keyed
 by `editorKey(editor)`. Pinned by `e2e/tests/post-editor.spec.ts`.
 **Category**: frontend · Tiptap · `apps/app.saroh.in/components/sites/rich-text-editor.tsx`
+
+## Frontend — a hero switched to Split never saved
+
+**Problem**: In the site editor, choosing the "Split" look for a starter
+site's hero and pasting a photo left the hero "Not finished yet, so not
+saved" with every field filled, and Publish stayed disabled. Found while
+filming the demo videos.
+**Root cause**: Choosing a look lifts a section to the newest contract
+(`withVariant`, `section-fields/variant-field.tsx`), but only the version
+number moved. A starter hero is v1, its button `{ label, href }`; v2 wants
+`cta.action`, so the lifted hero failed its contract on the button and the
+editor held it back with the generic message. Split also needs an image,
+which made it look like an image problem.
+**Fix**: `liftToLatest` (`packages/block-contract/src/section-contract.ts`)
+moves the content with the version: a hero's or cta block's `href` button
+becomes a `url` action, a v1 gallery's `layout` becomes its variant.
+`withVariant` uses it.
+**Rule**: Never bump `contractVersion` without lifting the content to that
+version — `liftToLatest` is the one place that does it. Pinned by
+`lift-to-latest.test.ts` and `variant-field.test.ts`.
+**Category**: frontend · site editor · `packages/block-contract/src/section-contract.ts`
+
+## Frontend — blocks squeezed in the editor's phone and tablet preview
+
+**Problem**: At phone width in the site editor, a testimonials card wrapped
+one word to a line; features, galleries and contact grids were as cramped.
+The live site on a phone was fine.
+**Root cause**: The device preview was a narrower `div` in a desktop-wide
+window, and the site blocks lay out with viewport breakpoints (`sm:`,
+`lg:`), which read the window: three columns inside 375px.
+**Fix**: At phone and tablet width the canvas renders the page into a
+same-origin iframe through a portal (`components/sites/editor/device-frame.tsx`),
+so the breakpoints read the frame. One renderer and React tree; the editor's
+stylesheets and root classes are mirrored in, keys are re-sent to the
+editor's window, and canvas lookups go through `queryCanvas`.
+**Rule**: Code that searches the canvas for a block uses `queryCanvas`, and
+code that looks up an element by id from a click uses the click target's
+`ownerDocument` — at phone or tablet width the page is in another document.
+**Category**: frontend · site editor · `apps/app.saroh.in/components/sites/editor/device-frame.tsx`
+
+## Frontend — the calendar's layout switch was 29px tall on a phone
+
+**Symptom**: CI's phone `four-scenes` touch-target spec failed on Bookings with
+"Day by person" and "Agenda" at 29px, on a batch that did not touch Bookings.
+**Root cause**: The layout radios (`calendar-screen.tsx`) were sized only by
+`py-[5px]`, with no `coarse:` height. The spec checks every control on the
+page, so the miss sat in `development` until a run reached it.
+**Fix**: `coarse:min-h-11` on each radio.
+**Rule**: Every hand-rolled button carries a `coarse:` height of 44px
+(`coarse:h-11`, `coarse:min-h-11` or `coarse:size-11`); the phone touch-target
+spec is the check.
+**Category**: frontend · touch targets · `e2e/tests/four-scenes.spec.ts`
+
+## E2E — the touch-target spec passed locally on a page it never measured
+
+**Symptom**: CI's phone `four-scenes` touch-target spec failed on the calendar's
+29px layout switch (PR #783) while `pnpm prepush --all` had passed the same
+spec on the same commit, in 0.3s against CI's 1.8s.
+**Root cause**: The spec measured every button straight after `page.goto`,
+before the calendar had arrived. Locally the page was measured with no
+calendar on it, so nothing was undersized; on CI's slower runner the
+calendar had already rendered. Proved by removing the fix: with a guard
+waiting for the calendar, the local run fails exactly as CI did.
+**Fix**: The spec waits for the calendar's "Layout" radiogroup before it
+measures (`e2e/tests/four-scenes.spec.ts`).
+**Rule**: A spec that measures or scans a page ("every button", "no
+undersized control", axe) first asserts that the thing it is about is
+visible. A scan of a page that hasn't arrived passes vacuously.
+**Sweep (4 Oct)**: the same hole was in 11 more specs (a11y's sixteen
+screens, four-scenes' viewport/overlap/tab-bar scenes, phone-reflow,
+orders-list, business-settings, calendar-week, invoices-without-payments,
+order-detail, site-account, site-review, marketing). Each now waits for its
+own landmark. Waiting found one more real bug at once: the calendar's two
+rule links overlapping on a phone.
+**Category**: e2e · flaky-by-timing · `e2e/tests/four-scenes.spec.ts`
+
+## Release — the waitlist dropped every join for two days, unseen
+
+**Symptom**: Production's waitlist had 0 entries on 5 Oct, two days after
+Gate W put the form live. The API log showed one join ever reaching it.
+**Root cause**: The Vercel project for saroh.in had no environment
+variables at all. Gate W's runbook step ("`API_URL` and `SITE_RELAY_SECRET`
+on Vercel `web`") was never done, and `/api/waitlist` answers
+`NOT_CONFIGURED` without `API_URL` — a 500 the visitor saw as an error,
+logged only on Vercel. Nothing failed loudly: `API_URL` is optional in
+`env.ts` so previews can build.
+**Fix**: Both variables set on Vercel Production (the secret piped from the
+API container, never printed), production redeployed, a join confirmed in
+the database. `next.config.js` now refuses to build a Vercel production
+deployment without `API_URL`.
+**Rule**: A runbook step that sets a production variable is checked on
+production before the release is called done — the variable's name in the
+container or project, and the path it feeds (a request that writes
+nothing). A variable that a production feature cannot work without fails
+the production build when missing.
+**Category**: release · env · `apps/saroh.in/next.config.js`
+
+## Analytics — GA's "visitors" were our own browser tests
+
+**Symptom**: GA showed ~1,000 users in 28 days, ~800 from the US, split
+almost evenly Windows/Android and desktop/mobile, nearly all Chrome.
+**Root cause**: The GA tag was hard-coded into saroh.in's root layout and
+loaded everywhere: local dev, `prepush` and CI browser runs, Vercel
+previews. The `desk` project emulates Desktop Chrome (a Windows user agent)
+and `phone` a Pixel 7 (Android); CI runs on GitHub's US runners.
+**Fix**: The measurement id is `NEXT_PUBLIC_GA_MEASUREMENT_ID`, set on
+Vercel Production only, and `lib/ga.ts` loads GA only when `VERCEL_ENV` is
+`production` as well — a local `.env` with the id still loads nothing. The
+marketing spec fails if any page requests googletagmanager.
+**Rule**: Third-party analytics load only on the production deployment,
+never by default; a browser spec proves no page loads them under test.
+**Category**: analytics · `apps/saroh.in/lib/ga.ts`, `e2e/tests/marketing.spec.ts`
+
+## Bookings — short bookings too small to tap, double bookings on top of each other
+
+**Symptom**: On a weekday the phone touch-target and overlap specs failed on
+`/bookings`: a 45-minute booking 36px tall, drawn over another booking of the
+same person at the same time. On a weekend the specs passed.
+**Root cause**: The day view drew 0.8px a minute everywhere, so anything
+under 55 minutes was under 44px on a phone, and every booking of a person
+was placed full width, so overlapping ones covered each other. The seeded
+day has no short or overlapping booking; on a weekday another spec's own
+booking lands on the same day and person, which is what exposed both.
+**Fix**: On a touch screen the day view draws 1.6px a minute (`--ppm`), a
+booking is at least 44px tall, and overlapping bookings sit side by side
+(`lib/services/diary-lanes.ts`, counting a short booking at its drawn
+length so it never covers the next). The closed-hours click works out the
+minute from the column's height, at any scale.
+**Rule**: A timeline that draws time as height sets its scale for the
+pointer it's on, and lays out overlaps; a spec that passes only on the
+seed's own day isn't evidence.
+**Category**: frontend · bookings · `apps/app.saroh.in/components/bookings/calendar/day-by-person.tsx`

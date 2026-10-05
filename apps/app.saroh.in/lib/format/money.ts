@@ -1,4 +1,4 @@
-import { DISPLAY_LOCALE } from "./locale";
+import { NUMBER_LOCALE } from "./locale";
 
 /**
  * Money formatting for the workspace.
@@ -26,7 +26,7 @@ export function formatMoney(
     const major = amountMinor / 100;
 
     if (currency) {
-        return new Intl.NumberFormat(DISPLAY_LOCALE, {
+        return new Intl.NumberFormat(NUMBER_LOCALE, {
             style: "currency",
             currency,
             // Whole amounts read faster in a dense table, and the decimals of a
@@ -35,7 +35,7 @@ export function formatMoney(
         }).format(major);
     }
 
-    return new Intl.NumberFormat(DISPLAY_LOCALE, {
+    return new Intl.NumberFormat(NUMBER_LOCALE, {
         maximumFractionDigits: major % 1 === 0 ? 0 : 2,
     }).format(major);
 }
@@ -58,25 +58,25 @@ export function formatMoneyMajor(
     if (!Number.isFinite(value)) return String(amount);
 
     if (currency) {
-        return new Intl.NumberFormat(DISPLAY_LOCALE, {
+        return new Intl.NumberFormat(NUMBER_LOCALE, {
             style: "currency",
             currency,
             maximumFractionDigits: value % 1 === 0 ? 0 : 2,
         }).format(value);
     }
-    return new Intl.NumberFormat(DISPLAY_LOCALE, {
+    return new Intl.NumberFormat(NUMBER_LOCALE, {
         maximumFractionDigits: value % 1 === 0 ? 0 : 2,
     }).format(value);
 }
 
 /**
- * A compact form for tiles and chips: 45,000 → "45k", 4,500,000 → "45L".
+ * A compact form for tiles and chips: 45,000 → "45K", 45,00,000 → "45L".
  * Falls back to the full format when a currency is stated, because abbreviating
  * money someone is owed invites the wrong read at a glance.
  */
 export function formatCount(value: number): string {
     if (value < 1000) return String(value);
-    return new Intl.NumberFormat(DISPLAY_LOCALE, {
+    return new Intl.NumberFormat(NUMBER_LOCALE, {
         notation: "compact",
         maximumFractionDigits: 1,
     }).format(value);
@@ -85,7 +85,7 @@ export function formatCount(value: number): string {
 /** The sign a currency is written with ("₹" for INR), for a field's prefix. */
 export function currencySymbol(currency: string): string {
     try {
-        const part = new Intl.NumberFormat(DISPLAY_LOCALE, {
+        const part = new Intl.NumberFormat(NUMBER_LOCALE, {
             style: "currency",
             currency,
             currencyDisplay: "narrowSymbol",

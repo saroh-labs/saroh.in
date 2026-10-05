@@ -70,3 +70,14 @@ export function todayIso(now: Date = new Date()): string {
     const offset = now.getTimezoneOffset() * 60_000;
     return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
+
+/** "India" for "IN": a country's name from its two-letter code, else the code. */
+export function countryName(code: string): string {
+    try {
+        return (
+            new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code
+        );
+    } catch {
+        return code;
+    }
+}

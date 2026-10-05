@@ -1088,6 +1088,64 @@ export function latestContractVersion(type: string): number {
     return versions.length > 0 ? Math.max(...versions) : 1;
 }
 
+/**
+ * Content written to an older contract, moved to the newest one for its type.
+ *
+ * Choosing a look lifts a section to the latest contract (that is what turns a
+ * `gallery@1` carrying `layout` into a `gallery@2` carrying `variant`). Lifting
+ * the version without the content made a starter hero, whose v1 button is
+ * `{ label, href }`, fail v2's `cta.action` — so picking "Split" left the hero
+ * "not finished" and unsaveable whatever was filled in. This is the one place
+ * the content moves with the version:
+ *
+ * - hero and cta 1 → 2: a button's `href` becomes `action: { kind: "url",
+ *   href }`, the same reading the editor gives a v1 button it edits;
+ * - gallery 1 → 2: `layout` becomes the `variant` it always meant, unless one
+ *   is already named.
+ *
+ * Content already at the latest version comes back unchanged. Nothing is
+ * validated here; the caller still parses the result.
+ */
+export function liftToLatest(
+    type: string,
+    version: number,
+    content: Record<string, unknown>,
+): { version: number; content: Record<string, unknown> } {
+    const latest = latestContractVersion(type);
+    if (version >= latest) return { version, content };
+    let next = content;
+    if (version < 2) {
+        if (type === "hero" && isRecord(content.cta)) {
+            next = { ...content, cta: buttonWithAction(content.cta) };
+        } else if (type === "cta") {
+            next = buttonWithAction(content);
+        } else if (type === "gallery") {
+            const { layout, ...rest } = content;
+            next =
+                rest.variant === undefined && typeof layout === "string"
+                    ? { ...rest, variant: layout }
+                    : rest;
+        }
+    }
+    return { version: latest, content: next };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** A v1 button (`href`) as a v2 one (`action`); one with an action is kept. */
+function buttonWithAction(
+    button: Record<string, unknown>,
+): Record<string, unknown> {
+    if (button.action !== undefined) return button;
+    const { href, ...rest } = button;
+    return {
+        ...rest,
+        action: { kind: "url", href: typeof href === "string" ? href : "" },
+    };
+}
+
 /** Every registered contract (e.g. for editor palettes / introspection). */
 export function listSectionContracts(): SectionContract[] {
     return Object.values(REGISTRY);

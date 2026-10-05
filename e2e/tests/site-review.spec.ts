@@ -89,6 +89,8 @@ test.describe("a reviewer", () => {
         const rail = onPhone
             ? page.getByRole("navigation", { name: "Main" })
             : page.getByRole("navigation", { name: "Primary" });
+        // The nav is drawn before anything is said to be missing from it.
+        await expect(rail.getByRole("link", { name: "Website" })).toBeVisible();
         if (onPhone) {
             // Home and Website are all a reviewer reaches, and both fit on
             // the bar — so there is no More sheet holding anything else.

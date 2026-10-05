@@ -17,7 +17,7 @@ export default function Error({
         <SectionError
             error={error}
             reset={reset}
-            title="Couldn't load analytics"
+            title="Couldn't load Insights"
             description="The figures didn't come back. This is usually temporary."
             backHref="/"
             backLabel="Back to Home"
