@@ -2647,3 +2647,18 @@ checkout's `mode`.
 **Rule**: `docs/patterns/devops-environments-and-flags.md` → "A missing
 production variable fails loudly".
 **Category**: config · env · `apps/*/next.config.*`, `apps/api.saroh.in/src/env.ts`
+
+## Storage — a presigned upload accepted any content type
+
+**Symptom**: Setting up R2 (5 Oct), a PUT to a presigned "image/png" upload
+URL sent as `text/html` was stored, and `media.saroh.io` served it as
+`text/html`: anyone signed in to a workspace could host a page on the media
+domain. Production had no uploads yet.
+**Root cause**: `getSignedUrl` signs `Content-Length` but leaves
+`Content-Type` out of a presigned PUT's signature unless it is named in
+`signableHeaders`; the adapter's comment said both were signed, and its test
+used a fake presigner, so nothing checked what the real signature covered.
+**Fix**: the R2 adapter signs `content-type`; R2 now refuses another type,
+or none, with 403. A test signs for real and reads `X-Amz-SignedHeaders`.
+**Rule**: `docs/patterns/backend-integrations.md` → "Media storage".
+**Category**: security · storage · `packages/object-storage/src/r2-adapter.ts`
