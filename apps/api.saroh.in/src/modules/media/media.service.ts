@@ -9,7 +9,9 @@ import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import {
     DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
+    hasImageSignature,
     hasIsoBmffSignature,
+    IMAGE_SNIFF_BYTES,
     ISO_BMFF_SNIFF_BYTES,
     isVideoContentType,
     VIDEO_UPLOAD_PURPOSE,
@@ -28,6 +30,9 @@ export const VIDEO_TOO_BIG_MESSAGE =
 /** What a merchant reads when a "video" turns out not to be one. */
 export const NOT_A_VIDEO_MESSAGE =
     "That file is not a video we can show. Choose an MP4 or MOV.";
+/** What a merchant reads when a "photo" turns out not to be one. */
+export const NOT_AN_IMAGE_MESSAGE =
+    "That file is not a photo we can show. Choose a JPG, PNG, WebP, GIF or AVIF.";
 
 /**
  * A video goes through the video purpose, is an MP4 or MOV, and is at most
@@ -159,26 +164,36 @@ export class MediaService {
         }
 
         /*
-         * A video is checked for what it is, not what it was labelled (#517).
-         * The type on the upload is the client's word; a page or a script
-         * sent as video/mp4 would otherwise be served from our storage. MP4
-         * and MOV both open with an ISO-BMFF `ftyp` box, so the first bytes
-         * — one ranged GET — settle it. Anything else is marked FAILED and
-         * its object deleted, so nothing can put it on a product.
+         * A file is checked for what it is, not what it was labelled (#517).
+         * The type on the upload is the client's word, and the bucket is
+         * public by address: a page or a script sent as video/mp4 or
+         * image/png would otherwise be served from our storage. Each format
+         * opens with its own magic number, so the first bytes — one ranged
+         * GET — settle it. Anything else is marked FAILED and its object
+         * deleted, so nothing can put it on a product or a page.
+         *
+         * A video whose bytes can't be read fails. A photo's unreadable bytes
+         * mean nothing was stored (R2 reads `null` only for a missing object)
+         * or the in-memory storage of local development, which never sees the
+         * browser's PUT, so it goes on as before.
          */
-        if (isVideoContentType(media.contentType)) {
-            const start = await this.storage.readObjectStart(
-                media.key,
-                ISO_BMFF_SNIFF_BYTES,
+        const video = isVideoContentType(media.contentType);
+        const start = await this.storage.readObjectStart(
+            media.key,
+            video ? ISO_BMFF_SNIFF_BYTES : IMAGE_SNIFF_BYTES,
+        );
+        const isWhatItSays = video
+            ? start !== null && hasIsoBmffSignature(start)
+            : start === null || hasImageSignature(media.contentType, start);
+        if (!isWhatItSays) {
+            await prisma.media.update({
+                where: { id: media.id },
+                data: { status: "FAILED" },
+            });
+            await this.storage.deleteObject(media.key);
+            throw new BadRequestException(
+                video ? NOT_A_VIDEO_MESSAGE : NOT_AN_IMAGE_MESSAGE,
             );
-            if (!start || !hasIsoBmffSignature(start)) {
-                await prisma.media.update({
-                    where: { id: media.id },
-                    data: { status: "FAILED" },
-                });
-                await this.storage.deleteObject(media.key);
-                throw new BadRequestException(NOT_A_VIDEO_MESSAGE);
-            }
         }
 
         const head = await this.storage.headObject(media.key);

@@ -277,6 +277,10 @@ admin health page says so; a deployed API must not run that way.
   — invoices, customer documents or ID proofs need a separate private bucket
   with no public domain, served through short-lived signed GETs after an
   access check.
+- **Images and videos only.** The allowlist is JPEG, PNG, WebP, GIF and AVIF;
+  MP4 and MOV join under the video purpose. No documents, no text, no SVG.
+  On completion the first bytes must be the format the type says, or the
+  upload is marked FAILED and its object deleted.
 - **A presigned upload fixes its type and size.** The adapter signs
   `content-type` and `content-length`, so R2 refuses any other. When a test
   fakes the presigner, keep one that signs for real and reads the URL.
@@ -284,6 +288,10 @@ admin health page says so; a deployed API must not run that way.
   shown with plain `<img>` and fetched server-side by Next, so no GET rule.
   An app that starts uploading gets its origin added then.
 - `r2.dev` access stays off; the custom domain is the only public way in.
+- **The media domains can't run a page.** A Cloudflare response-header rule
+  on `media.saroh.in` and `media.saroh.io` sets `Content-Security-Policy:
+default-src 'none'; img-src 'self'; media-src 'self'; sandbox` and
+  `X-Content-Type-Options: nosniff`, so even a mislabelled file is inert.
 
 ## Razorpay recurring payments (D11 spike) — **Current**
 

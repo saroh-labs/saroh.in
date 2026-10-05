@@ -36,7 +36,7 @@ import type {
 } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { MediaService } from "./media.service";
+import { MediaService, NOT_AN_IMAGE_MESSAGE } from "./media.service";
 
 const create = prisma.media.create as jest.Mock;
 const findUnique = prisma.media.findUnique as jest.Mock;
@@ -203,7 +203,7 @@ describe("MediaService.completeUpload", () => {
     });
 });
 
-describe("MediaService — videos (#517)", () => {
+describe("MediaService — a file is what its type says (#517)", () => {
     beforeEach(() => jest.clearAllMocks());
 
     const MB = 1024 * 1024;
@@ -367,17 +367,13 @@ describe("MediaService — videos (#517)", () => {
         expect(update).not.toHaveBeenCalled();
     });
 
-    it("never sniffs a photo", async () => {
-        const readObjectStart = jest.fn();
+    it("completes a photo whose first bytes are a PNG", async () => {
+        const png = new Uint8Array([
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d,
+        ]);
+        const readObjectStart = jest.fn().mockResolvedValue(png);
         const service = new MediaService(fakeStorage({ readObjectStart }));
-        findUnique.mockResolvedValue({
-            id: "m1",
-            organizationId: "org_1",
-            key: "a.png",
-            contentType: "image/png",
-            sizeBytes: 10,
-            status: "PENDING",
-        });
+        findUnique.mockResolvedValue(photo("m1"));
         update.mockResolvedValue({
             id: "m1",
             status: "READY",
@@ -385,8 +381,58 @@ describe("MediaService — videos (#517)", () => {
             key: "a.png",
         });
         await service.completeUpload(ctx(), "m1");
-        expect(readObjectStart).not.toHaveBeenCalled();
+        expect(readObjectStart).toHaveBeenCalledWith("a.png", 12);
+        expect(update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: "READY" }),
+            }),
+        );
     });
+
+    it("marks a page labelled image/png FAILED and deletes it", async () => {
+        const readObjectStart = jest.fn().mockResolvedValue(html);
+        const deleteObject = jest.fn().mockResolvedValue(undefined);
+        const service = new MediaService(
+            fakeStorage({ readObjectStart, deleteObject }),
+        );
+        findUnique.mockResolvedValue(photo("m2"));
+        await expect(service.completeUpload(ctx(), "m2")).rejects.toThrow(
+            NOT_AN_IMAGE_MESSAGE,
+        );
+        expect(update).toHaveBeenCalledWith({
+            where: { id: "m2" },
+            data: { status: "FAILED" },
+        });
+        expect(deleteObject).toHaveBeenCalledWith("a.png");
+    });
+
+    it("completes a photo whose bytes can't be read, as local storage never has them", async () => {
+        const service = new MediaService(fakeStorage());
+        findUnique.mockResolvedValue(photo("m3"));
+        update.mockResolvedValue({
+            id: "m3",
+            status: "READY",
+            sizeBytes: 10,
+            key: "a.png",
+        });
+        await service.completeUpload(ctx(), "m3");
+        expect(update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: "READY" }),
+            }),
+        );
+    });
+
+    function photo(id: string) {
+        return {
+            id,
+            organizationId: "org_1",
+            key: "a.png",
+            contentType: "image/png",
+            sizeBytes: 10,
+            status: "PENDING",
+        };
+    }
 });
 
 describe("MediaService.completeUpload — the url", () => {

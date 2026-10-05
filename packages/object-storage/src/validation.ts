@@ -3,10 +3,13 @@ import { z } from "zod";
 import type { ContentTypeAllowlist } from "./port";
 
 /**
- * Default content-type allowlist: common image + document types, mapped to a
- * canonical extension. SVG is deliberately excluded (scriptable / XSS risk);
- * an app may pass its own allowlist to the adapter factory to widen or narrow
- * this set.
+ * Default content-type allowlist: images only, mapped to a canonical
+ * extension. The media buckets are public by address (docs/patterns/
+ * backend-integrations.md → "Media storage"), so nothing goes in them that
+ * isn't meant to be seen: no documents, no text. SVG is excluded too
+ * (scriptable). Videos join through their own purpose ({@link
+ * VIDEO_UPLOAD_PURPOSE}). An app may pass its own allowlist to the adapter
+ * factory.
  */
 export const DEFAULT_ALLOWED_CONTENT_TYPES: ContentTypeAllowlist = {
     "image/jpeg": "jpg",
@@ -14,12 +17,6 @@ export const DEFAULT_ALLOWED_CONTENT_TYPES: ContentTypeAllowlist = {
     "image/webp": "webp",
     "image/gif": "gif",
     "image/avif": "avif",
-    "application/pdf": "pdf",
-    "application/msword": "doc",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-        "docx",
-    "text/plain": "txt",
-    "text/csv": "csv",
 };
 
 /** Default upload cap: 25 MiB. */
@@ -154,3 +151,48 @@ export function buildUploadInputSchema(options: UploadInputSchemaOptions) {
 export type ValidatedUploadInput = z.infer<
     ReturnType<typeof buildUploadInputSchema>
 >;
+
+/** How many leading bytes {@link hasImageSignature} needs. */
+export const IMAGE_SNIFF_BYTES = 12;
+
+const startsWith = (bytes: Uint8Array, at: number, ascii: string) =>
+    Array.from(ascii).every((c, i) => bytes[at + i] === c.charCodeAt(0));
+
+/**
+ * Do these leading bytes start the image `contentType` says? The type on an
+ * upload is the client's word; a page or a script labelled image/png would
+ * otherwise sit in the public bucket. Each format opens with its own magic
+ * number; AVIF is an ISO-BMFF file whose brand is `avif` or `avis`.
+ */
+export function hasImageSignature(
+    contentType: string,
+    bytes: Uint8Array,
+): boolean {
+    if (bytes.length < IMAGE_SNIFF_BYTES) return false;
+    switch (contentType) {
+        case "image/jpeg":
+            return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+        case "image/png":
+            return (
+                bytes[0] === 0x89 &&
+                startsWith(bytes, 1, "PNG") &&
+                bytes[4] === 0x0d &&
+                bytes[5] === 0x0a &&
+                bytes[6] === 0x1a &&
+                bytes[7] === 0x0a
+            );
+        case "image/gif":
+            return (
+                startsWith(bytes, 0, "GIF87a") || startsWith(bytes, 0, "GIF89a")
+            );
+        case "image/webp":
+            return startsWith(bytes, 0, "RIFF") && startsWith(bytes, 8, "WEBP");
+        case "image/avif":
+            return (
+                hasIsoBmffSignature(bytes) &&
+                (startsWith(bytes, 8, "avif") || startsWith(bytes, 8, "avis"))
+            );
+        default:
+            return false;
+    }
+}
