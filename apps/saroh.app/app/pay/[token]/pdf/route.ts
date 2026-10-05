@@ -1,5 +1,6 @@
 import { serverApiUrl } from "@/lib/api-url";
 import { pdfUnavailable, relayPdf } from "@/lib/invoice-pdf-relay";
+import { withRelayFrom } from "@/lib/relay-headers";
 
 /**
  * "Download PDF" on a pay link (DEC-083): the issued invoice, drawn by the
@@ -12,7 +13,7 @@ import { pdfUnavailable, relayPdf } from "@/lib/invoice-pdf-relay";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ token: string }> },
 ) {
     const { token } = await params;
@@ -20,7 +21,12 @@ export async function GET(
     try {
         res = await fetch(
             `${serverApiUrl()}/public/invoices/${encodeURIComponent(token)}/pdf`,
-            { cache: "no-store", headers: { accept: "application/pdf" } },
+            {
+                cache: "no-store",
+                headers: withRelayFrom(request.headers, {
+                    accept: "application/pdf",
+                }),
+            },
         );
     } catch {
         return pdfUnavailable(502);

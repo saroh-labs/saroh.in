@@ -3,14 +3,15 @@ import {
     Controller,
     Get,
     Header,
+    Headers,
     HttpCode,
     Ip,
     Param,
     Post,
     StreamableFile,
 } from "@nestjs/common";
-import { hashClientIp } from "../../common/client-ip";
 
+import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { AutopayOutcome, AutopayStart } from "./autopay.service";
 import type { CreateIntentResult } from "./payments.service";
 import { PublicInvoicePdfService } from "./public-invoice-pdf.service";
@@ -41,8 +42,9 @@ export class PublicInvoicesController {
     read(
         @Param("token") token: string,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicInvoiceView> {
-        return this.invoices.read(token, hashClientIp(ip));
+        return this.invoices.read(token, visitorKey(ip, relay));
     }
 
     /**
@@ -59,8 +61,12 @@ export class PublicInvoicesController {
     async pdf(
         @Param("token") token: string,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<StreamableFile> {
-        const { file, fileName } = await this.pdfs.pdf(token, hashClientIp(ip));
+        const { file, fileName } = await this.pdfs.pdf(
+            token,
+            visitorKey(ip, relay),
+        );
         return new StreamableFile(file, {
             type: "application/pdf",
             disposition: `attachment; filename="${fileName}"`,
@@ -83,8 +89,9 @@ export class PublicInvoicesController {
         @Param("token") token: string,
         @Body() body: unknown,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<CreateIntentResult> {
-        return this.invoices.createIntent(token, body, hashClientIp(ip));
+        return this.invoices.createIntent(token, body, visitorKey(ip, relay));
     }
 
     /**
@@ -103,8 +110,9 @@ export class PublicInvoicesController {
         @Param("token") token: string,
         @Body() body: unknown,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<AutopayStart> {
-        return this.invoices.startAutopay(token, body, hashClientIp(ip));
+        return this.invoices.startAutopay(token, body, visitorKey(ip, relay));
     }
 
     /** How autopay stands, for the page on the business's site after (D12). */
@@ -115,7 +123,8 @@ export class PublicInvoicesController {
     autopay(
         @Param("token") token: string,
         @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<AutopayOutcome & { payUrl: string }> {
-        return this.invoices.autopayOutcome(token, hashClientIp(ip));
+        return this.invoices.autopayOutcome(token, visitorKey(ip, relay));
     }
 }
