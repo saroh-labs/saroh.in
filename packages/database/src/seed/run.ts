@@ -50,7 +50,7 @@ import {
     writeSite,
 } from "./helpers";
 import { seedPreviousAddress } from "./previous-address";
-import { seedPlanId } from "./pricing.internal";
+import { seedPlanId } from "./pricing";
 import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
@@ -957,7 +957,7 @@ async function seedContent(
 // --- Billing ------------------------------------------------------------
 
 /**
- * Put the org on a paid plan: the catalogue's top plan (`pricing.internal.ts`).
+ * Put the org on a paid plan: the catalogue's top plan (`pricing.ts`).
  *
  * This is not scenery. `EntitlementService` caps a business on no plan at one
  * site and refuses a custom-domain claim outright, so without a subscription

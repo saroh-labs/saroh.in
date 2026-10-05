@@ -7,7 +7,7 @@ export default defineConfig((options) => ({
     // consumers resolving the package to nothing. Clean only on a one-off build.
     clean: !options.watch,
     dts: true,
-    entry: ["src/index.ts", "src/seed.internal.ts"],
+    entry: ["src/index.ts", "src/seed.ts"],
     format: ["cjs", "esm"],
     minify: isProduction,
     sourcemap: true,

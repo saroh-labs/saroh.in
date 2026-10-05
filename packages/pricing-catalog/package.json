@@ -12,15 +12,15 @@
             "require": "./dist/index.js"
         },
         "./seed": {
-            "types": "./dist/seed.internal.d.ts",
-            "import": "./dist/seed.internal.mjs",
-            "require": "./dist/seed.internal.js"
+            "types": "./dist/seed.d.ts",
+            "import": "./dist/seed.mjs",
+            "require": "./dist/seed.js"
         }
     },
     "typesVersions": {
         "*": {
             "seed": [
-                "./dist/seed.internal.d.ts"
+                "./dist/seed.d.ts"
             ]
         }
     },
