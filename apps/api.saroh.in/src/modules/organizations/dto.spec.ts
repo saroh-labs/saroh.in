@@ -12,6 +12,7 @@ import {
     BUSINESS_TYPES,
     BusinessProfileDto,
     InvoiceNumberFormatDto,
+    OnboardingProfileDto,
     OnboardOrganizationDto,
     UpdateOrganizationDto,
 } from "./dto";
@@ -181,5 +182,42 @@ describe("what is being set up (DEC-070)", () => {
             expect(response).toMatchObject({ statusCode: 400 });
             expect(JSON.stringify(response)).toContain("kind must be");
         }
+    });
+});
+
+describe('setup\'s "Is it registered?" (prelaunch)', () => {
+    const errors = async (body: unknown) =>
+        (await validate(plainToInstance(OnboardingProfileDto, body))).map(
+            (e) => e.property,
+        );
+
+    it("takes a yes or a no, or nothing", async () => {
+        expect(await errors({ registered: true })).toEqual([]);
+        expect(await errors({ registered: false })).toEqual([]);
+        expect(await errors({})).toEqual([]);
+    });
+
+    it("refuses anything that isn't a yes or a no", async () => {
+        expect(await errors({ registered: "yes" })).toEqual(["registered"]);
+    });
+
+    it("is setup's alone: Settings refuses it, as any unknown field", async () => {
+        const pipe = new ValidationPipe(validationPipeOptions);
+        const through = (metatype: new () => object, body: unknown) =>
+            pipe
+                .transform(body, { type: "body", metatype })
+                .then(() => null)
+                .catch((e: BadRequestException) => e.getResponse());
+        expect(
+            await through(OnboardOrganizationDto, {
+                name: "Asha",
+                profile: { registered: true },
+            }),
+        ).toBeNull();
+        expect(
+            await through(UpdateOrganizationDto, {
+                profile: { registered: true },
+            }),
+        ).toMatchObject({ statusCode: 400 });
     });
 });

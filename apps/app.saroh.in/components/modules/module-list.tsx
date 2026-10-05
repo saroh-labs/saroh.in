@@ -12,7 +12,7 @@ import {
     readModuleImpactAction,
     setModuleStatusAction,
 } from "@/lib/modules/actions";
-import { blockerSentence } from "@/lib/modules/blocker-copy";
+import { blockerSentence, refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleBlocker, ModuleView } from "@/lib/modules/schema";
 import {
     listWords,
@@ -226,10 +226,7 @@ function ModuleRow({
                     // A refusal is the safe-guard talking (open orders, say).
                     // Say what it said — the switch springing back with no
                     // reason is the worst version of this.
-                    const refused = result.blockers?.[0];
-                    showError(
-                        refused ? blockerSentence(refused) : result.error,
-                    );
+                    showError(refusalSentence(result));
                     return;
                 }
             }

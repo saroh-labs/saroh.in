@@ -32,6 +32,13 @@ export interface OrganizationProfile {
      * ("+919845012345"); null when none is set. Absent from an older API.
      */
     phone?: string | null;
+    /**
+     * Setup's answer to "Is it registered?": true for Registered, which saves
+     * no type, so the take-money checklist asks for the real one before the
+     * business goes live; false for Not registered; null when it wasn't
+     * asked. Absent from an older API, and read as not asked.
+     */
+    registered?: boolean | null;
 }
 
 /** GST (ADR-008). The GSTIN is the profile's `taxId`. */

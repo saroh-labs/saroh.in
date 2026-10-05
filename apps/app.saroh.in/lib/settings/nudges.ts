@@ -23,9 +23,11 @@ import {
  *
  * - **Email**, while Communications is on and no email provider sends
  *   (`emailAttention`) — the danger dot when one that was sending stopped.
- * - **Business type**, until one is chosen. Onboarding's "Registered" saves
- *   none, so the real one (Pvt Ltd, LLP, partnership…) is asked for here,
- *   before the business goes live (user, 2026-09-28).
+ * - **Business type**, until one is chosen, for a business that didn't say
+ *   Registered at setup. One that did is asked by the take-money steps
+ *   instead (`readyChecklist`): Registered saves no type, so the real one
+ *   (Pvt Ltd, LLP, partnership…) holds it back from going live (user,
+ *   2026-09-28). For everyone else it is only a suggestion.
  * - **Logo**, which prints on every receipt and invoice.
  * - **A pipeline**, while Contacts is on without one.
  *
@@ -79,11 +81,15 @@ function email(
     };
 }
 
-function businessType(settings: Pick<OrganizationSettings, "profile">): Nudge {
+function businessType(
+    settings: Pick<OrganizationSettings, "profile">,
+): Nudge | null {
+    // Said Registered: a take-money step asks, not this (`ready.ts`).
+    if (settings.profile?.registered === true) return null;
     return {
         key: "businessType",
         label: "Choose your business type",
-        why: "Sole proprietor, partnership, LLP, private limited or another — set it before you go live.",
+        why: "Sole proprietor, partnership, LLP, private limited or another — so your business details are complete.",
         cta: "Choose type",
         // Straight to the Type field, not the top of the tab.
         href: `${business("identity")}#${BUSINESS_TYPE_ANCHOR}`,

@@ -251,3 +251,49 @@ describe("the addresses named apart (DEC-069, L12)", () => {
         expect(labels).not.toContain("Address");
     });
 });
+
+describe("the business type a business that said Registered still owes (prelaunch)", () => {
+    const typeField = () => host.querySelector("#business-type");
+    const said = (type: string | null, registered: boolean | null) =>
+        settings({
+            profile: {
+                legalName: null,
+                type,
+                country: "IN",
+                taxId: null,
+                contactEmail: "hello@northwind.in",
+                website: null,
+                timezone: "Asia/Kolkata",
+                phone: null,
+                registered,
+            },
+        });
+
+    it("says why on the row, and at the field the checklist lands on", async () => {
+        draw(said(null, true));
+        expect(card()?.textContent).toContain(
+            "Not chosen yet — you said it's registered",
+        );
+        await click(button("Edit identity"));
+        expect(typeField()?.textContent).toContain(
+            "You said at setup that the business is registered. Choose which kind before you take money.",
+        );
+    });
+
+    it("goes back to the plain words once a type is chosen", async () => {
+        draw(said("llp", true));
+        expect(card()?.textContent).toContain("LLP");
+        await click(button("Edit identity"));
+        expect(typeField()?.textContent).not.toContain("You said at setup");
+        expect(typeField()?.textContent).toContain(
+            "An individual trades in their own name",
+        );
+    });
+
+    it("never says it to a business that didn't say Registered", async () => {
+        draw(said(null, null));
+        expect(card()?.textContent).not.toContain("you said it's registered");
+        await click(button("Edit identity"));
+        expect(typeField()?.textContent).not.toContain("You said at setup");
+    });
+});

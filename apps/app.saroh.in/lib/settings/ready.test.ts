@@ -586,6 +586,98 @@ describe("steps only when something invoices or takes money (DEC-070)", () => {
     });
 });
 
+describe("the real business type, for a business that said Registered (prelaunch)", () => {
+    /** Sells, everything else in, and setup's answer to "Is it registered?". */
+    const input = (
+        registered: boolean | null | undefined,
+        type: string | null,
+    ) => ({
+        settings: {
+            ...settled,
+            profile: { ...settled.profile, type, registered },
+            logo: { url: "https://x/logo.png", mediaId: null },
+            setup: {
+                products: 1,
+                services: 0,
+                sites: 0,
+                sitesNotLive: 0,
+                invoices: 0,
+            },
+        },
+        modules: [mod("PAYMENTS"), mod("COMMERCE")],
+        messaging: null,
+    });
+
+    it("holds back going live until the type is chosen, and says why", () => {
+        const list = readyChecklist(input(true, null));
+        const step = list.steps.find((s) => s.key === "businessType");
+        expect(step).toMatchObject({
+            done: false,
+            label: "Choose your business type",
+            cta: "Choose type",
+            href: "/settings/organization?section=identity#business-type",
+        });
+        expect(step?.why).toMatch(/You said your business is registered/);
+        expect(step?.why).toMatch(/private limited, LLP, partnership/);
+        expect(list.left.map((s) => s.key)).toEqual(["businessType"]);
+        expect(list.done).toBe(list.total - 1);
+    });
+
+    it("is done once a type is chosen", () => {
+        const list = readyChecklist(input(true, "llp"));
+        expect(list.steps.find((s) => s.key === "businessType")?.done).toBe(
+            true,
+        );
+        expect(list.left).toEqual([]);
+    });
+
+    it("comes right after the address", () => {
+        const keys = readyChecklist(input(true, null)).steps.map((s) => s.key);
+        expect(keys.indexOf("businessType")).toBe(keys.indexOf("address") + 1);
+    });
+
+    it.each([
+        ["said Not registered", false],
+        ["wasn't asked", null],
+        ["an older API", undefined],
+    ])("never holds back a business that %s", (_, registered) => {
+        const list = readyChecklist(input(registered, null));
+        expect(list.steps.map((s) => s.key)).not.toContain("businessType");
+        expect(list.left).toEqual([]);
+    });
+
+    it("is asked once in Settings: the step, not the suggestion as well", () => {
+        const keys = settingsChecklist(input(true, null)).steps.map(
+            (s) => s.key,
+        );
+        expect(keys.filter((k) => k === "businessType")).toHaveLength(1);
+        // Not registered: only Settings' suggestion, which Home never shows.
+        const suggested = settingsChecklist(input(false, null));
+        expect(
+            suggested.steps.filter((s) => s.key === "businessType"),
+        ).toHaveLength(1);
+        expect(
+            readyChecklist(input(false, null)).steps.map((s) => s.key),
+        ).not.toContain("businessType");
+    });
+
+    it("isn't asked of a business with nothing that invoices or takes money (DEC-070)", () => {
+        const site = {
+            ...input(true, null),
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+                mod("WEBSITE"),
+            ],
+        };
+        expect(readyChecklist(site).steps.map((s) => s.key)).not.toContain(
+            "businessType",
+        );
+    });
+});
+
 describe("checklistHeading (DEC-070)", () => {
     const steps = (...keys: string[]) => ({
         steps: keys.map((key) => ({ key }) as ReadyStep),
