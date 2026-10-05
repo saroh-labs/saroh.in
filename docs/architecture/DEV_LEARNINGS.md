@@ -2570,3 +2570,60 @@ order-detail, site-account, site-review, marketing). Each now waits for its
 own landmark. Waiting found one more real bug at once: the calendar's two
 rule links overlapping on a phone.
 **Category**: e2e · flaky-by-timing · `e2e/tests/four-scenes.spec.ts`
+
+## Release — the waitlist dropped every join for two days, unseen
+
+**Symptom**: Production's waitlist had 0 entries on 5 Oct, two days after
+Gate W put the form live. The API log showed one join ever reaching it.
+**Root cause**: The Vercel project for saroh.in had no environment
+variables at all. Gate W's runbook step ("`API_URL` and `SITE_RELAY_SECRET`
+on Vercel `web`") was never done, and `/api/waitlist` answers
+`NOT_CONFIGURED` without `API_URL` — a 500 the visitor saw as an error,
+logged only on Vercel. Nothing failed loudly: `API_URL` is optional in
+`env.ts` so previews can build.
+**Fix**: Both variables set on Vercel Production (the secret piped from the
+API container, never printed), production redeployed, a join confirmed in
+the database. `next.config.js` now refuses to build a Vercel production
+deployment without `API_URL`.
+**Rule**: A runbook step that sets a production variable is checked on
+production before the release is called done — the variable's name in the
+container or project, and the path it feeds (a request that writes
+nothing). A variable that a production feature cannot work without fails
+the production build when missing.
+**Category**: release · env · `apps/saroh.in/next.config.js`
+
+## Analytics — GA's "visitors" were our own browser tests
+
+**Symptom**: GA showed ~1,000 users in 28 days, ~800 from the US, split
+almost evenly Windows/Android and desktop/mobile, nearly all Chrome.
+**Root cause**: The GA tag was hard-coded into saroh.in's root layout and
+loaded everywhere: local dev, `prepush` and CI browser runs, Vercel
+previews. The `desk` project emulates Desktop Chrome (a Windows user agent)
+and `phone` a Pixel 7 (Android); CI runs on GitHub's US runners.
+**Fix**: The measurement id is `NEXT_PUBLIC_GA_MEASUREMENT_ID`, set on
+Vercel Production only, and `lib/ga.ts` loads GA only when `VERCEL_ENV` is
+`production` as well — a local `.env` with the id still loads nothing. The
+marketing spec fails if any page requests googletagmanager.
+**Rule**: Third-party analytics load only on the production deployment,
+never by default; a browser spec proves no page loads them under test.
+**Category**: analytics · `apps/saroh.in/lib/ga.ts`, `e2e/tests/marketing.spec.ts`
+
+## Bookings — short bookings too small to tap, double bookings on top of each other
+
+**Symptom**: On a weekday the phone touch-target and overlap specs failed on
+`/bookings`: a 45-minute booking 36px tall, drawn over another booking of the
+same person at the same time. On a weekend the specs passed.
+**Root cause**: The day view drew 0.8px a minute everywhere, so anything
+under 55 minutes was under 44px on a phone, and every booking of a person
+was placed full width, so overlapping ones covered each other. The seeded
+day has no short or overlapping booking; on a weekday another spec's own
+booking lands on the same day and person, which is what exposed both.
+**Fix**: On a touch screen the day view draws 1.6px a minute (`--ppm`), a
+booking is at least 44px tall, and overlapping bookings sit side by side
+(`lib/services/diary-lanes.ts`, counting a short booking at its drawn
+length so it never covers the next). The closed-hours click works out the
+minute from the column's height, at any scale.
+**Rule**: A timeline that draws time as height sets its scale for the
+pointer it's on, and lays out overlaps; a spec that passes only on the
+seed's own day isn't evidence.
+**Category**: frontend · bookings · `apps/app.saroh.in/components/bookings/calendar/day-by-person.tsx`
