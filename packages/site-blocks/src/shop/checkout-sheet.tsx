@@ -9,7 +9,12 @@ import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
-import type { CheckoutStanding, CheckoutStarted, ShopCheckoutApi } from "./api";
+import type {
+    CheckoutStanding,
+    CheckoutStarted,
+    DeliveryAddress,
+    ShopCheckoutApi,
+} from "./api";
 import { orderConfirmationHref } from "./order-confirmation";
 import { SheetFrame, sheetAltButton, sheetButton } from "./sheet-frame";
 
@@ -41,6 +46,7 @@ export function CheckoutPay({
     api,
     businessName,
     customer,
+    delivery,
     onPlaced,
     onConfirming,
     onSettled,
@@ -53,6 +59,11 @@ export function CheckoutPay({
     api: ShopCheckoutApi;
     businessName: string;
     customer: SignedInCustomer;
+    /**
+     * Where it goes, as typed in the bag: its name and phone fill the
+     * window's, so the customer isn't asked for them twice.
+     */
+    delivery?: DeliveryAddress;
     /** The order is placed: empty the bag. */
     onPlaced: () => void;
     /**
@@ -77,13 +88,23 @@ export function CheckoutPay({
     const session = useRef<{ close: () => void } | null>(null);
     const total = formatAmount(started.total, started.currency);
 
+    const phone = delivery?.phone?.replace(/[\s()-]/g, "") ?? "";
+
     function launch() {
         session.current?.close();
         const opened = openCheckout({
             handoff: started.payment,
             business: businessName,
             description: `Order ${started.orderNumber}`,
-            booker: { name: customer.name ?? "", email: customer.email },
+            booker: {
+                name:
+                    [customer.name, delivery?.name]
+                        .map((n) => n?.trim() ?? "")
+                        .find((n) => n !== "") ?? "",
+                email: customer.email,
+                // "98450 12345" as typed; the window wants the digits.
+                ...(phone ? { phone } : {}),
+            },
             apiUrl,
         });
         session.current = opened;

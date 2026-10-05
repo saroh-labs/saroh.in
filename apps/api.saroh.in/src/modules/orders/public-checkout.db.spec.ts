@@ -727,6 +727,55 @@ describe("starting a checkout and paying (G13)", () => {
         ).toBe(1);
     });
 
+    it("names the account's unnamed contact from the delivery, and keeps a name it has", async () => {
+        const s = await shop();
+        const delivery = (name: string) => ({
+            fulfilment: "LOCAL_DELIVERY",
+            address: {
+                name,
+                line1: "14, 2nd Cross",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560038",
+            },
+        });
+        const { email, token } = await signIn(s.host);
+        const contactOf = async () =>
+            (
+                await prisma.customerAccount.findFirstOrThrow({
+                    where: { organizationId: s.organizationId, email },
+                    select: { contact: true },
+                })
+            ).contact;
+        expect(await contactOf()).toMatchObject({
+            firstName: null,
+            lastName: null,
+        });
+
+        const first = await start(s, token, delivery("Kavya Iyer"));
+        expect(first.status).toBe(201);
+        expect(await contactOf()).toMatchObject({
+            firstName: "Kavya",
+            lastName: "Iyer",
+        });
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: first.body.orderId as string },
+            include: { customer: true },
+        });
+        expect(order.customer).toMatchObject({
+            firstName: "Kavya",
+            lastName: "Iyer",
+        });
+
+        // A later delivery to someone else doesn't rename the account.
+        const gift = await start(s, token, delivery("Arjun Rao"));
+        expect(gift.status).toBe(201);
+        expect(await contactOf()).toMatchObject({
+            firstName: "Kavya",
+            lastName: "Iyer",
+        });
+    });
+
     it("refuses a session from site A on site B's host, or naming site B", async () => {
         const [a, b] = [await shop(), await shop()];
         const { token } = await signIn(a.host);
