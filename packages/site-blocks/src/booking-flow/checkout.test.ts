@@ -191,6 +191,27 @@ describe("the provider's window (E11)", () => {
         });
     });
 
+    it("opens the sandbox drop-in when the API made a sandbox order", async () => {
+        const checkout = vi.fn(() =>
+            Promise.resolve({ paymentDetails: { paymentMessage: "ok" } }),
+        );
+        const Cashfree = vi.fn(() => ({ checkout }));
+        (window as unknown as { Cashfree: unknown }).Cashfree = Cashfree;
+
+        const session = openProviderCheckout(
+            request({
+                provider: "CASHFREE",
+                publicKey: null,
+                clientParams: {
+                    paymentSessionId: "session_2",
+                    mode: "sandbox",
+                },
+            }),
+        );
+        await expect(session.outcome).resolves.toBe("paid");
+        expect(Cashfree).toHaveBeenCalledWith({ mode: "sandbox" });
+    });
+
     it("tells Cashfree's closed window from its refused payment", async () => {
         let answer: unknown = {
             error: { message: "Payment failed: declined by bank" },
