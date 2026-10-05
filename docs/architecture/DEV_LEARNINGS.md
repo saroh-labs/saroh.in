@@ -2662,3 +2662,23 @@ used a fake presigner, so nothing checked what the real signature covered.
 or none, with 403. A test signs for real and reads `X-Amz-SignedHeaders`.
 **Rule**: `docs/patterns/backend-integrations.md` → "Media storage".
 **Category**: security · storage · `packages/object-storage/src/r2-adapter.ts`
+
+## Tooling — the local gate oversubscribed the laptop and timed out
+
+**Symptom**: `pnpm prepush --all` failed vitest on a demo-seed test ("Test
+timed out in 120000ms") that passed alone; the same morning `prisma
+generate` hit a bus error and a Jest worker segfaulted, each passing on a
+re-run. Under the gate vitest took 138s; alone, 20s.
+**Root cause**: The static burst starts lint, typecheck, Jest and every
+package's Vitest at once beside five production Next builds for the browser
+run, and Jest and Vitest each start a worker per core: several times the
+12 cores, near the 24 GB of memory. Integration then ran on one database
+because the local gate set `PREPUSH_INT_DBS=1`, though this Postgres trusts
+local connections.
+**Fix**: the gate caps turbo concurrency, Jest and Vitest workers, and runs
+the database package's seed tests as their own `seeds` step after the burst;
+the local run uses three integration databases; local Postgres has
+`max_locks_per_transaction = 256`.
+**Rule**: `docs/patterns/devops-tooling-and-deploy.md` → "Capped workers in
+the static burst".
+**Category**: tooling · gate · `scripts/prepush.sh`
