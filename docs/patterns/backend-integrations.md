@@ -288,6 +288,12 @@ admin health page says so; a deployed API must not run that way.
   shown with plain `<img>` and fetched server-side by Next, so no GET rule.
   An app that starts uploading gets its origin added then.
 - `r2.dev` access stays off; the custom domain is the only public way in.
+- **Same parent domain, for now (5 Oct 2026).** Media is served from
+  `media.saroh.in` rather than a separate domain (the way Google uses
+  `googleusercontent.com`). With images and videos only, signed types, byte
+  checks and the sandbox headers, a separate domain adds little. Revisit it
+  if Saroh ever accepts other file types. Stored URLs (`logoUrl`, site
+  content) would then need rewriting, so it is cheapest early.
 - **The media domains can't run a page.** A Cloudflare response-header rule
   on `media.saroh.in` and `media.saroh.io` sets `Content-Security-Policy:
 default-src 'none'; img-src 'self'; media-src 'self'; sandbox` and
