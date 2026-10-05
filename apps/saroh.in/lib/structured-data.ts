@@ -32,6 +32,41 @@ export function softwareApplicationLd(description: string): JsonLdObject {
 }
 
 /**
+ * A free tool on the site (resources plan U2/U7): the link preview checker,
+ * as a web application anyone can use for free. No offer: nothing is sold.
+ */
+export function toolLd(tool: {
+    name: string;
+    description: string;
+    url: string;
+}): JsonLdObject {
+    return {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: tool.name,
+        url: tool.url,
+        description: tool.description,
+        applicationCategory: "UtilitiesApplication",
+        operatingSystem: "Web",
+        isAccessibleForFree: true,
+        publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+    };
+}
+
+/** A page's questions and answers, as search engines read an FAQ. */
+export function faqPageLd(items: { q: string; a: string }[]): JsonLdObject {
+    return {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: items.map((item) => ({
+            "@type": "Question",
+            name: item.q,
+            acceptedAnswer: { "@type": "Answer", text: item.a },
+        })),
+    };
+}
+
+/**
  * The JSON for a `<script type="application/ld+json">`. `<` is escaped so no
  * string in it can close the script tag.
  */
