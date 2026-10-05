@@ -974,3 +974,15 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - A business that has never taken money sees one message with "Take an order" and "Send an invoice", not an answers card plus an empty state.
 - The word is **Sales**, not "Takings" (owner, 2026-10-04, audit F15): the section, its figures, "How sales are counted" and Home's "Sales so far". It still means money actually taken — paid, less refunds — as "How sales are counted" says. Code names (`takings*`) stay; they are not read by merchants.
 - Consequences: elsewhere the word is unchanged (a class pack's "Sales and takings" is its own screen).
+
+## DEC-081 The dev environment lives on saroh.io, behind a key
+
+**Status: Accepted — 2026-10-05** · user
+
+- Context: the dev API answered on `dev-api.saroh.in`, so its session cookie was set for `.saroh.in` — the same name and domain as production's, sent to both. Two-level names (`app.dev.saroh.in`) fail TLS on Cloudflare's free certificate, and the dev environment was open to anyone who found it.
+- Decision:
+    - `development` deploys to **saroh.io** (`app.`, `accounts.`, `admin.`, `api.` and the apex); merchant sites stay on `*.dev.saroh.app`. saroh.io may later give way to a dedicated domain such as saroh.dev.
+    - Dev's session cookie has its own prefix (`AUTH_COOKIE_PREFIX`); production's is unchanged.
+    - The dev apps admit only browsers that opened a page with `?access=<key>` (`DEV_ACCESS_KEY`); everyone else lands on the same page in production.
+    - A `development`-branch build refuses to start without the dev environment's variables, as a production build does without production's.
+- Consequences: the dev API and merchant sites stay reachable without the key. A new Vercel app joining the dev environment needs the gate in its middleware and its variables on the `development` branch.
