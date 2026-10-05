@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/billing/invoices site:/pay/[token] api:invoices api:payments api:capabilities
+// @covers accounts:/login app:/open app:/billing/invoices site:/pay/[token] site:/pay/[token]/pdf api:invoices api:payments api:capabilities
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -221,6 +221,19 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
             });
             await expect(copy).toBeVisible();
             await expect(copy).toHaveCSS("cursor", "pointer");
+            // Its PDF beside Print (DEC-083): the paper, saved as a file.
+            const pdf = page.getByRole("button", {
+                name: `Download PDF of invoice ${sharedNumber}`,
+            });
+            await expect(pdf).toBeVisible();
+            await expect(pdf).toHaveCSS("cursor", "pointer");
+            const [file] = await Promise.all([
+                page.waitForEvent("download"),
+                pdf.click(),
+            ]);
+            expect(file.suggestedFilename()).toBe(
+                `${sharedNumber.replace(/[^A-Za-z0-9._-]+/g, "-")}.pdf`,
+            );
         } finally {
             if (was === "ENABLED") await setPayments(request, "ENABLED");
             await expect.poll(() => paymentsLifecycle(request)).toBe(was);

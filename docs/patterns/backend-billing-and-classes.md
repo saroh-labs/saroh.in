@@ -27,6 +27,11 @@
   through `printedSeller`, never today's settings; only a draft prints
   today's. The logo is the one live part. A new frozen column needs its
   writer in `documentColumns`, its select in `serialize.ts` and a backfill.
+- **One PDF, never stored** (DEC-083): the merchant's download, the invoice
+  email's attachment and the customer's pay-link and receipt downloads all
+  draw through `drawPaperPdf` / `IssuedInvoicePdf`
+  (`invoices/issued-invoice-pdf.ts`), each behind its own reader's check.
+  A new reader asks for `InvoicePdfModule`, not the invoices module.
 - **Money** is minor units in arithmetic and `Decimal` strings on the wire
   (`backend-data-and-money.md`).
 - **Who sees what:** invoice ids and numbers go only to a role with

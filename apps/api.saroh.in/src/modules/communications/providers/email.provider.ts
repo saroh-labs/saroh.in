@@ -16,6 +16,14 @@ import type {
  * and key name are read from the (decrypted) credentials so a self-hosted relay
  * can point elsewhere.
  *
+ * Attachments (DEC-083, the invoice PDF) go only to RESEND, whose
+ * documented `/emails` API takes `attachments: [{ filename, content }]`
+ * with the content base64-encoded (40 MB a message, after encoding).
+ * SENDGRID and SMTP are reached here through a relay speaking this same
+ * shape, and nothing says a relay passes attachments on — one that
+ * rejected the field would fail the send — so they send the message alone,
+ * its link to the invoice as before.
+ *
  * SECURITY: on any non-2xx the error is SANITIZED to the HTTP status only —
  * never the Authorization header, the api key, or the raw provider body.
  */
@@ -23,13 +31,19 @@ export class EmailCommsProvider implements CommsProvider {
     readonly channel = "EMAIL" as const;
     private readonly logger = new Logger(EmailCommsProvider.name);
     private readonly providers = ["RESEND", "SENDGRID", "SMTP"];
+    /** The providers known to take attachments in this request shape. */
+    private readonly attaching = ["RESEND"];
 
     supports(provider: string): boolean {
         return this.providers.includes(provider);
     }
 
+    takesAttachments(provider: string): boolean {
+        return this.attaching.includes(provider);
+    }
+
     async send(input: CommsSendInput): Promise<CommsSendResult> {
-        const { to, from, subject, body, credentials } = input;
+        const { to, from, subject, body, credentials, attachments } = input;
 
         const { apiKey, baseUrl } = credentials as {
             apiKey?: string;
@@ -54,6 +68,15 @@ export class EmailCommsProvider implements CommsProvider {
                     to,
                     subject: subject ?? "",
                     html: body,
+                    ...(attachments && attachments.length > 0
+                        ? {
+                              attachments: attachments.map((a) => ({
+                                  filename: a.fileName,
+                                  content: a.content.toString("base64"),
+                                  content_type: a.contentType,
+                              })),
+                          }
+                        : {}),
                 }),
             });
         } catch {

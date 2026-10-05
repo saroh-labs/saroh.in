@@ -7,11 +7,13 @@ import {
     Ip,
     Param,
     Post,
+    StreamableFile,
 } from "@nestjs/common";
 import { hashClientIp } from "../../common/client-ip";
 
 import type { AutopayOutcome, AutopayStart } from "./autopay.service";
 import type { CreateIntentResult } from "./payments.service";
+import { PublicInvoicePdfService } from "./public-invoice-pdf.service";
 import type { PublicInvoiceView } from "./public-invoices.service";
 import { PublicInvoicesService } from "./public-invoices.service";
 
@@ -27,7 +29,10 @@ import { PublicInvoicesService } from "./public-invoices.service";
 
 @Controller("public/invoices")
 export class PublicInvoicesController {
-    constructor(private readonly invoices: PublicInvoicesService) {}
+    constructor(
+        private readonly invoices: PublicInvoicesService,
+        private readonly pdfs: PublicInvoicePdfService,
+    ) {}
 
     @Get(":token")
     @Header("Referrer-Policy", "no-referrer")
@@ -38,6 +43,29 @@ export class PublicInvoicesController {
         @Ip() ip: string,
     ): Promise<PublicInvoiceView> {
         return this.invoices.read(token, hashClientIp(ip));
+    }
+
+    /**
+     * The issued paper as a PDF (DEC-083), named for its number as the
+     * merchant's is. Drawn on request and never stored; a draft, a void
+     * invoice and a bad token are all a 404. One person's bill: private,
+     * never cached, and never sniffed into anything but a PDF.
+     */
+    @Get(":token/pdf")
+    @Header("Referrer-Policy", "no-referrer")
+    @Header("X-Robots-Tag", "noindex, nofollow")
+    @Header("Cache-Control", "private, no-store")
+    @Header("X-Content-Type-Options", "nosniff")
+    async pdf(
+        @Param("token") token: string,
+        @Ip() ip: string,
+    ): Promise<StreamableFile> {
+        const { file, fileName } = await this.pdfs.pdf(token, hashClientIp(ip));
+        return new StreamableFile(file, {
+            type: "application/pdf",
+            disposition: `attachment; filename="${fileName}"`,
+            length: file.length,
+        });
     }
 
     /**

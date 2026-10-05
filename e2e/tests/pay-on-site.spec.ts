@@ -1,4 +1,4 @@
-// @covers site:/pay/[token] site:/pay/o/[token] api:invoices api:payments
+// @covers site:/pay/[token] site:/pay/[token]/pdf site:/pay/o/[token] api:invoices api:payments
 import type { APIRequestContext } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -100,6 +100,49 @@ test.describe("pay links on the business's own address (L6)", () => {
         await page.goto(`${NORTHWIND}/pay/${token}`);
         await expect(heading).toBeVisible();
         await expect.poll(() => new URL(page.url()).host).toBe(home.host);
+    });
+
+    test("Download PDF gives the customer the issued invoice, on the apex and the business's host (DEC-083)", async ({
+        page,
+    }, testInfo) => {
+        await useSession(page);
+        const request = page.request;
+        const { number, token } = await issuedInvoice(request, stamp(testInfo));
+        const fileName = `${number.replace(/[^A-Za-z0-9._-]+/g, "-")}.pdf`;
+
+        // The route itself, on both hosts: the paper, private, as a file.
+        for (const origin of [urls.RENDERER_URL, NORTHWIND]) {
+            const res = await request.get(`${origin}/pay/${token}/pdf`, {
+                maxRedirects: 0,
+            });
+            expect(res.status(), origin).toBe(200);
+            expect(res.headers()["content-type"]).toBe("application/pdf");
+            expect(res.headers()["content-disposition"]).toBe(
+                `attachment; filename="${fileName}"`,
+            );
+            expect(res.headers()["cache-control"]).toContain("no-store");
+            expect((await res.body()).subarray(0, 5).toString("latin1")).toBe(
+                "%PDF-",
+            );
+        }
+        // A link that isn't one: nothing.
+        const bogus = await request.get(
+            `${urls.RENDERER_URL}/pay/not-a-token/pdf`,
+        );
+        expect(bogus.status()).toBe(404);
+
+        // The page's own control: a button, a pointer, a saved file.
+        await page.goto(`${urls.RENDERER_URL}/pay/${token}`);
+        const download = page.getByRole("button", {
+            name: `Download PDF of invoice ${number}`,
+        });
+        await expect(download).toBeVisible();
+        await expect(download).toHaveCSS("cursor", "pointer");
+        const [file] = await Promise.all([
+            page.waitForEvent("download"),
+            download.click(),
+        ]);
+        expect(file.suggestedFilename()).toBe(fileName);
     });
 
     test("another business's host sends the customer to the link's own", async ({
