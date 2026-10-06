@@ -74,3 +74,10 @@ export {
     PORTFOLIO_TEMPLATE_ID,
     portfolioTemplate,
 } from "./templates/portfolio";
+
+// Developer (industry templates U9): a one-page portfolio for an independent
+// engineer.
+export {
+    DEVELOPER_TEMPLATE_ID,
+    developerTemplate,
+} from "./templates/developer";
