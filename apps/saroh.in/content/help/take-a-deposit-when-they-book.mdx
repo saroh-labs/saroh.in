@@ -39,13 +39,15 @@
 #         people pay when they book": Both, Online, At the desk); booking
 #         page shows no payment line when it can't take the deposit (#822)
 # Where the design said otherwise, the app won: content/help/README.md.
-# Words updated for DEC-088 (6 Oct) without new shots. Shot 5 is OUT OF
-# DATE: captured before #822, it shows "Pay at the desk ₹12,000" beside the
-# get-in-touch line, which the booking page no longer draws — re-capture.
-# Shot 2 shows no warning only while the demo clinic has a provider
-# connected. A paid deposit on a booking couldn't
-# be captured without a real payment: step 4 says in words how it reads
-# (DESK).
+# Shots 1, 2, 3 and 5 re-captured on 6 Oct after DEC-088 (#821, #822).
+# The demo clinic's Razorpay connection has no key id, so its checkout
+# can't open and the app reads it as no provider connected (WARN): shot 1
+# marks the root canal Can't be booked online, shots 2 and 3 show the
+# warning under At booking, they pay, and shot 5's booking page shows the
+# get-in-touch line with no payment line under it. Shot 4 is Northwind,
+# which can take payment online (re-captured, unchanged). A paid deposit
+# on a booking couldn't be captured without a real payment: step 4 says
+# in words how it reads (DESK).
 title: Take a deposit when they book
 slug: take-a-deposit-when-they-book
 area: Bookings
@@ -61,13 +63,13 @@ steps:
     - title: Open the service
       body: "In Saroh, open Bookings › Services in the sidebar, and press Edit on the service you want a deposit for."
       shot: help-take-deposit-1
-      caption: "Services at Kavi Dental (demo clinic), with Edit on the root canal."
+      caption: "Services at Kavi Dental (demo clinic), with Edit on the root canal. The demo clinic has no payment provider connected, so the root canal is marked Can't be booked online."
       marker: Edit
     # PRICE, NOTE.
     - title: Choose what they pay at booking
       body: "Under Price, At booking, they pay has four choices: Nothing — they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If people couldn't pay it online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says so right under it, with a link to what fixes it."
       shot: help-take-deposit-2
-      caption: "The root canal's price at Kavi Dental (demo clinic), with a 50% deposit at booking."
+      caption: "The root canal's price at Kavi Dental (demo clinic), with a 50% deposit at booking, and the warning that people can't book it online until a payment provider is connected."
       tip: "In time means before the free cancellation time in your booking rules, under Bookings › Availability. A late cancel keeps the deposit."
       marker: 50% deposit
     # SAVE.

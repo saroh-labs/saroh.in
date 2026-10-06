@@ -234,28 +234,48 @@ const HELP_SHOTS: Shot[] = [
     },
 ];
 
-/* "Set your team's hours": Pulse Fitness's Availability, looked at only.
- * Picking a person, opening "+ Hours" and adding a range there are the
- * page's own draft; nothing is saved (Save hours is never pressed). */
+/* "Set your team's hours": Kavi Dental's Availability, looked at only.
+ * Kavi is the demo business whose storefront has opening hours (Mon–Sat
+ * 09:00–19:00, Sun 10:00–13:00), so the page says in-person bookings fall
+ * inside them (DEC-087). The dentists' seeded hours all fall inside, so
+ * "+ Hours" on Dr. Pillai's Saturday is set to 19:00–20:00 to show a
+ * stretch that isn't bookable in person. Picking a person, the times and
+ * Add are the page's own draft; nothing is saved (Save hours is never
+ * pressed). */
 const AVAILABILITY = "/bookings/availability";
 const PICK = (name: string): Step => ({
     click: `[role="radiogroup"][aria-label="Team member"] [role="radio"]:has-text("${name}")`,
 });
-const SATURDAY_HOURS: Step[] = [
-    PICK("Ritu Kapoor"),
-    {
-        click: 'section[aria-labelledby="weekly-hours"] li:has-text("Saturday") button:has-text("Hours")',
-    },
+const SATURDAY =
+    'section[aria-labelledby="weekly-hours"] li:has-text("Saturday")';
+const SATURDAY_EVENING: Step[] = [
+    PICK("Arun Pillai"),
+    { click: `${SATURDAY} button:has-text("Hours")` },
+    { click: `${SATURDAY} [aria-label="From"]` },
+    { click: '[role="option"]:has-text("19:00")' },
+    { click: `${SATURDAY} [aria-label="To"]` },
+    { click: '[role="option"]:has-text("20:00")' },
+    // Out of the picker, so no focus ring is in the picture.
+    { click: 'section[aria-labelledby="weekly-hours"] #weekly-hours' },
     {
         waitFor:
             'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
     },
 ];
+const SATURDAY_ADDED: Step[] = [
+    ...SATURDAY_EVENING,
+    {
+        click: 'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
+    },
+    { waitFor: 'button:has-text("Save hours")' },
+];
 
 /* "Take a deposit when they book": Kavi Dental's root canal, looked at
  * (a chip clicked, never saved); the booking page of Northwind, whose
  * Warehouse walkthrough was set to a 50% deposit on the throwaway
- * database, walked to its Paying step and never booked. */
+ * database, walked to its Paying step and never booked. Kavi's seeded
+ * Razorpay connection has no key id, so its checkout can't open: the
+ * editor and Services say it can't be booked online (DEC-088). */
 const KAVI_ROOT_CANAL = "/services/seed_sc_kavi_service_2";
 const KAVI_PRICE = 'section:has(h2:text-is("Price"))';
 
@@ -267,76 +287,86 @@ const RYE_PLANS = "/billing/subscriptions?tab=plans";
 
 /* "Connect your own domain" and "Make your link look right when shared":
  * Northwind's site settings. Its seeded domain, northwindsupply.in, waits
- * for DNS; the domain box is typed into and never added. */
+ * for DNS; the domain box is typed into and never added. The web address
+ * is the API's (`site-origin.ts` rendererHost): run the API with
+ * RENDERER_URL=https://saroh.app for help-own-domain-1, so it reads
+ * northwind.saroh.app as in production, not the local renderer's host. */
 const NW_SETTINGS = "/sites/seed_site_0/settings";
 const DOMAIN = 'section:has(h2:text-is("Your own domain"))';
 const SHARE = 'section:has(h2:text-is("Social share image"))';
 const SEARCH = 'section:has(h2:text-is("Search"))';
 
 const HELP_SHOTS_B: Shot[] = [
-    // ── Set your team's hours (Pulse Fitness) ──────────────────────────
+    // ── Set your team's hours (Kavi Dental) ───────────────────────────
     {
         key: "help-team-hours-1",
-        business: "pulse",
+        business: "kavi",
         role: "owner",
         route: AVAILABILITY,
         viewport: { width: 1280, height: 720 },
-        steps: [PICK("Ritu Kapoor")],
-        mark: '[role="radiogroup"][aria-label="Team member"] [role="radio"]:has-text("Ritu Kapoor")',
-        alt: "Availability at Pulse Fitness (demo gym): the team across the top, Ritu Kapoor picked, her weekly hours, time off and the booking rules",
-        caption: "Availability at Pulse Fitness, with Ritu Kapoor picked",
+        steps: [PICK("Arun Pillai")],
+        mark: '[role="radiogroup"][aria-label="Team member"] [role="radio"]:has-text("Arun Pillai")',
+        alt: "Availability at Kavi Dental (demo clinic): the dentists across the top, Dr. Arun Pillai picked, the note that in-person bookings fall inside opening hours, and his weekly hours",
+        caption: "Availability at Kavi Dental, with Dr. Arun Pillai picked",
     },
     {
         key: "help-team-hours-2",
-        business: "pulse",
+        business: "kavi",
         role: "owner",
         route: AVAILABILITY,
         viewport: { width: 1280, height: 1000 },
-        steps: SATURDAY_HOURS,
+        steps: SATURDAY_EVENING,
         clip: { selector: 'section[aria-labelledby="weekly-hours"]', pad: 12 },
         mark: 'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
-        alt: "Ritu Kapoor's weekly hours at Pulse Fitness (demo gym), a day at a time, with new hours being added on Saturday",
-        caption: "Ritu Kapoor's weekly hours, with + Hours open on Saturday",
+        alt: "Dr. Arun Pillai's weekly hours at Kavi Dental (demo clinic), a day at a time, with 19:00 to 20:00 being added on Saturday",
+        caption:
+            "Dr. Arun Pillai's weekly hours, with + Hours open on Saturday",
     },
     {
         key: "help-team-hours-3",
-        business: "pulse",
+        business: "kavi",
         role: "owner",
         route: AVAILABILITY,
-        viewport: { width: 1280, height: 720 },
-        steps: [
-            ...SATURDAY_HOURS,
-            {
-                click: 'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
-            },
-            { waitFor: 'button:has-text("Save hours")' },
-        ],
-        mark: 'button:has-text("Save hours")',
-        alt: "Availability at Pulse Fitness (demo gym) with a change not saved yet, and the bar with Discard and Save hours",
-        caption: "A change to Ritu Kapoor's hours, waiting for Save hours",
+        viewport: { width: 1280, height: 1000 },
+        steps: SATURDAY_ADDED,
+        clip: { selector: 'section[aria-labelledby="weekly-hours"]', pad: 12 },
+        mark: `${SATURDAY} p:has-text("bookable in person")`,
+        alt: "Dr. Arun Pillai's Saturday at Kavi Dental (demo clinic) with 19:00–20:00 added, drawn dashed, and the line saying it isn't bookable in person because the clinic is open 09:00–19:00",
+        caption: "Saturday evening added past closing, not bookable in person",
     },
     {
         key: "help-team-hours-4",
-        business: "pulse",
+        business: "kavi",
         role: "owner",
         route: AVAILABILITY,
-        viewport: { width: 1280, height: 1000 },
-        steps: [PICK("Sameer Khan")],
-        clip: { selector: 'section:has(h2:text-is("Time off"))', pad: 12 },
-        mark: 'section:has(h2:text-is("Time off")) button:has-text("Add day off")',
-        alt: "Time off for Sameer Khan at Pulse Fitness (demo gym): his days off for a wedding, and the form to add more",
-        caption: "Sameer Khan's time off, and the form to add a day off",
+        viewport: { width: 1280, height: 720 },
+        steps: SATURDAY_ADDED,
+        mark: 'button:has-text("Save hours")',
+        alt: "Availability at Kavi Dental (demo clinic) with a change not saved yet, and the bar with Discard and Save hours",
+        caption: "A change to Dr. Arun Pillai's hours, waiting for Save hours",
     },
     {
         key: "help-team-hours-5",
-        business: "pulse",
+        business: "kavi",
         role: "owner",
         route: AVAILABILITY,
-        viewport: { width: 1280, height: 1000 },
+        viewport: { width: 1280, height: 1400 },
+        steps: [PICK("Arun Pillai")],
+        clip: { selector: 'section:has(h2:text-is("Time off"))', pad: 12 },
+        mark: 'section:has(h2:text-is("Time off")) button:has-text("Add day off")',
+        alt: "Time off for Dr. Arun Pillai at Kavi Dental (demo clinic): his day at a dental conference, and the form to add more",
+        caption: "Dr. Arun Pillai's time off, and the form to add a day off",
+    },
+    {
+        key: "help-team-hours-6",
+        business: "kavi",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 1400 },
         clip: { selector: 'section[aria-labelledby="booking-rules"]', pad: 12 },
-        mark: '[aria-label="How far ahead people can book"]',
-        alt: "Booking rules at Pulse Fitness (demo gym): how far ahead people can book, the latest they can book, free cancellation and refunds",
-        caption: "Pulse Fitness's booking rules, for the whole business",
+        mark: '[aria-label="How people pay when they book"]',
+        alt: "Booking rules at Kavi Dental (demo clinic): how far ahead people can book, the latest they can book, free cancellation, refunds and how people pay when they book",
+        caption: "Kavi Dental's booking rules, for the whole business",
     },
 
     // ── Take a deposit when they book (Kavi Dental, Northwind) ─────────
@@ -347,7 +377,7 @@ const HELP_SHOTS_B: Shot[] = [
         route: "/services",
         viewport: { width: 1024, height: 760 },
         mark: 'a[aria-label="Edit Root canal treatment"]',
-        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button",
+        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button; the root canal is marked Can't be booked online, as no payment provider is connected",
         caption: "Services at Kavi Dental, with Edit on the root canal",
     },
     {
@@ -358,7 +388,7 @@ const HELP_SHOTS_B: Shot[] = [
         viewport: { width: 1280, height: 1400 },
         clip: { selector: KAVI_PRICE, pad: 12 },
         mark: 'section:has(h2:text-is("Price")) [role="radio"][aria-checked="true"]',
-        alt: "The root canal's price at Kavi Dental (demo clinic), with At booking, they pay set to a 50% deposit and what that means",
+        alt: "The root canal's price at Kavi Dental (demo clinic), with At booking, they pay set to a 50% deposit, what that means, and the warning that people can't book it online while no payment provider is connected",
         caption: "The root canal's price, with a 50% deposit at booking",
     },
     {

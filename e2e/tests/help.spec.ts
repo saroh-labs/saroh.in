@@ -177,7 +177,7 @@ test("at 390 the areas are a Topics menu, and nothing hides sideways", async ({
 
 /** The bookings, plans and website articles: each step's real screen, ringed. */
 const MORE = [
-    { slug: "set-your-teams-hours", title: "Set your team's hours", steps: 5 },
+    { slug: "set-your-teams-hours", title: "Set your team's hours", steps: 6 },
     {
         slug: "take-a-deposit-when-they-book",
         title: "Take a deposit when they book",
