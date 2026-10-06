@@ -1030,3 +1030,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: opening hours are kept per walk-in storefront (`Store.kind` SHOP, `openingHours`; Settings › Hours writes every storefront), but the slot engine never read them. Free times came only from each person's hours, or a service's own hours, so a business could offer times it says it is closed.
 - Decision: when a business has a SHOP storefront with opening hours, every in-person booking (a service that is `IN_PERSON`, or `EITHER` booked in person) is offered only inside those hours: a person's or service's hours are cut to them. Online bookings (`ONLINE`, or `EITHER` booked online) are not cut. A business with no SHOP storefront, or none with hours set, works as before. If its storefronts' hours differ, a time is offered when any of them is open.
 - Consequences: the Availability page shows the hours that fall outside opening hours as not bookable, and says why, so the merchant can see the cut. Bookings already made are never moved or cancelled. Supersedes nothing.
+
+## DEC-088 The business decides how a booking is paid: online, at the desk, or both
+
+**Status: Accepted — 2026-10-06** · user · from #821 and #822
+
+- Context: the booking page offered "pay now" whenever Payments was on and a provider connected, and "Pay at the desk" only when no deposit was due. The business had no say, and a deposit with no provider left a service that couldn't be booked online at all, while the summary still showed a desk line (#822).
+- Decision: Booking rules gain "How people pay when they book": Online, At the desk, or Both (default Both, which keeps today's behaviour). The booking page offers only the methods the business allows, and online only when a provider can take it. A deposit or full price at booking needs online: when online isn't allowed or no provider is connected, the service editor says so where the deposit is chosen (#821), and the booking page never shows a payment line it can't honour.
+- Consequences: existing businesses read as Both. One setting for the whole business, beside the other booking rules, since bookings aren't tied to a storefront.
