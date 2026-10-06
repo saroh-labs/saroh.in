@@ -45,7 +45,7 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
-import { asBookedOnPlan } from "./deposit-plan";
+import { asBookable } from "./deposit-plan";
 import type { BookPay } from "./dto";
 import type {
     PublicBooking,
@@ -328,10 +328,10 @@ export class PublicBookingsService {
             bookingPage: true,
         });
         const { rules } = loaded;
-        // A stored deposit the plan can't take online books as no deposit
-        // (pay at the desk) — the row keeps it for an upgrade
-        // (`deposit-plan.ts`): what a business set up never goes unbookable.
-        const service = await asBookedOnPlan(loaded.service);
+        // A stored deposit the business can't take online (its plan,
+        // Payments off, no provider) books as no deposit, at the desk — the
+        // row keeps it (`deposit-plan.ts`): a service never goes unbookable.
+        const service = await asBookable(loaded.service);
         // A signed-in customer books only their own business's services:
         // another business's service is as good as missing (A9).
         if (signedIn && service.organizationId !== signedIn.organizationId) {
@@ -756,13 +756,13 @@ export class PublicBookingsService {
                 field: "pay",
             });
         }
+        // A deposit is only ever here when money can be taken online
+        // (`asBookable`), so every refusal points to the desk.
         const deposit = depositCents(service.priceCents, service.depositMode);
         if (!(await takesOnlinePayment(service.organizationId))) {
             throw new ConflictException({
                 message:
-                    deposit === null
-                        ? "This business isn't taking payment online right now. Book it to pay at the desk."
-                        : "This business can't take the deposit online right now. Get in touch with them to book.",
+                    "This business isn't taking payment online right now. Book it to pay at the desk.",
                 field: "pay",
             });
         }
@@ -799,8 +799,8 @@ function creditOf(
  * that takes a deposit is paid online: its deposit, or the whole price, and
  * never at the desk — a full-price deposit is simply paying now. A service
  * that takes none is paid now or at the desk, and a deposit is refused.
- * On a plan without online payments the booking page hands this the
- * service with no deposit (`deposit-plan.ts`), so it books at the desk.
+ * When the business can't take money online the booking page hands this
+ * the service with no deposit (`deposit-plan.ts`), so it books at the desk.
  */
 export function payAtBooking(
     service: Pick<Service, "priceCents" | "depositMode">,

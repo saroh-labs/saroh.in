@@ -1,9 +1,7 @@
 import type { Service } from "@saroh/database";
 
-import {
-    assertPlanTakesOnlinePayment,
-    planTakesOnlinePayment,
-} from "../billing/online-payments-plan";
+import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
+import { takesOnlinePayment } from "./public-booking-page";
 
 /*
  * Deposits and the plan (6 Oct 2026: "Online needs a paid plan; Free takes
@@ -16,14 +14,18 @@ import {
  *   (NONE), or saving a service with the deposit it already has, never
  *   asks — a business that moved to a plan without online payments can
  *   still edit everything else about the service.
- * - **Booking** never becomes impossible: on a plan without online
- *   payments a service that keeps a stored deposit books exactly like a
- *   service that takes none — pay at the desk, no deposit offered. The
- *   stored `depositMode` is kept, so it comes back on an upgrade.
+ * - **Booking** never becomes impossible: whenever the business can't take
+ *   money online, for any reason — a plan without online payments,
+ *   Payments switched off, or no provider connected that can open the
+ *   checkout (`takesOnlinePayment`, the one predicate the booking page's
+ *   `payOnline` and `depositCents` answer from too) — a service that keeps
+ *   a stored deposit books exactly like one that takes none: pay at the
+ *   desk, no deposit offered. The stored `depositMode` is kept, so it comes
+ *   back the moment money can be taken online again.
  *
- * Both ask `planTakesOnlinePayment`, behind `PLAN_ENFORCEMENT` and failing
- * open (a plan that can't be read takes the deposit as today). Staff
- * bookings never ask: the desk takes a deposit or not as staff say.
+ * The plan is asked behind `PLAN_ENFORCEMENT` and fails open (a plan that
+ * can't be read takes the deposit as today). Staff bookings never ask: the
+ * desk takes a deposit or not as staff say.
  */
 
 /** 403 `MODULE_LOCKED` when a write would newly set a deposit the plan can't take. */
@@ -39,12 +41,12 @@ export async function assertDepositOnPlan(
 
 /**
  * The service as the booking page books it: its stored deposit while the
- * plan takes money online, else none (the row itself is never changed).
+ * business can take money online, else none (the row is never changed).
  */
-export async function asBookedOnPlan<
+export async function asBookable<
     T extends Pick<Service, "organizationId" | "depositMode">,
 >(service: T): Promise<T> {
     if (service.depositMode === "NONE") return service;
-    if (await planTakesOnlinePayment(service.organizationId)) return service;
+    if (await takesOnlinePayment(service.organizationId)) return service;
     return { ...service, depositMode: "NONE" };
 }
