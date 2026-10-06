@@ -252,6 +252,8 @@ export interface JournalContent {
  */
 export interface PlansContent {
     title?: string;
+    /** A line under the title (template polish). */
+    intro?: string;
     highlight?: "first" | "none";
     buttonLabel?: string;
     showDescriptions?: boolean;

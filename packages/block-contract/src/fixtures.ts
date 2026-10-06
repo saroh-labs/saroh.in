@@ -735,6 +735,12 @@ export const BLOCK_META = {
                 buttonLabel: "Ask to join",
                 showDescriptions: false,
             },
+            // A line under the title, the merchant's own (template polish).
+            intro: {
+                variant: "default",
+                title: "What it costs",
+                intro: "No joining fee, and nothing that renews without telling you.",
+            },
         },
     },
     productGrid: {

@@ -330,6 +330,7 @@ const renderedPlans = z.object({
     variant,
     padding,
     title: z.string().optional(),
+    intro: z.string().optional(),
     highlight: z.enum(["first", "none"]).optional(),
     buttonLabel: z.string().optional(),
     showDescriptions: z.boolean().optional(),

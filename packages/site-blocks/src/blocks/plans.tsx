@@ -25,7 +25,8 @@ import { askAboutHref } from "../shop/ask-about-ordering";
 /**
  * `plans` v1 — the business's subscription plans on sale, read live (G9).
  *
- * The section stores a title, a highlight, a button label and one switch.
+ * The section stores a title, a line under it (template polish), a
+ * highlight, a button label and one switch.
  * The plans come from `GET public/sites/:siteId/plans`, which serves only
  * plans on sale with their PUBLISHED values (never a draft or an unpublished
  * change) and 404s while Payments is off for the business. Two ways in:
@@ -274,9 +275,12 @@ const joinButton =
 
 function PlansFrame({
     title,
+    intro = null,
     children,
 }: {
     title: string;
+    /** A line under the title (template polish); the merchant's own words. */
+    intro?: string | null;
     children: React.ReactNode;
 }) {
     return (
@@ -287,6 +291,11 @@ function PlansFrame({
             >
                 {title}
             </h2>
+            {intro ? (
+                <p className="text-site-body -mt-1.5 mb-5 max-w-[60ch] text-[15px] leading-relaxed">
+                    {intro}
+                </p>
+            ) : null}
             {children}
         </section>
     );
@@ -357,7 +366,7 @@ function PlanCards({
     }
 
     return (
-        <PlansFrame title={title}>
+        <PlansFrame title={title} intro={said(content.intro)}>
             {done && prices ? (
                 <PricesDone message={done} accountHref={prices.accountHref} />
             ) : null}

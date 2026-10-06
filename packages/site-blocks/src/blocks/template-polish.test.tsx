@@ -3,9 +3,10 @@ import { BLOCK_META } from "@saroh/block-contract";
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SAMPLE_VISIT } from "../block-fixture-preview";
+import { SAMPLE_PLANS, SAMPLE_VISIT } from "../block-fixture-preview";
 import FeaturesSection from "./features";
 import HoursSection, { groupedHoursRows, hoursRows } from "./hours";
+import PlansSection from "./plans";
 import RichTextSection from "./rich-text";
 
 /**
@@ -177,5 +178,27 @@ describe("hours: grouped days and the address", () => {
         );
         expect(container.querySelectorAll("tbody tr").length).toBe(7);
         expect(container.querySelector("address")).toBeNull();
+    });
+});
+
+describe("plans: a line under the title", () => {
+    it("draws the merchant's line over the plans on sale", () => {
+        render(
+            <PlansSection
+                content={BLOCK_META.plans.cases.intro}
+                feed={{ plans: SAMPLE_PLANS, joinHref: "/contact" }}
+            />,
+        );
+        expect(screen.getByText(/No joining fee/)).toBeTruthy();
+    });
+
+    it("draws nothing at all with no plan on sale, line or not", () => {
+        const { container } = render(
+            <PlansSection
+                content={BLOCK_META.plans.cases.intro}
+                feed={{ plans: [], joinHref: "/contact" }}
+            />,
+        );
+        expect(container.innerHTML).toBe("");
     });
 });

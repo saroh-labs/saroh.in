@@ -720,6 +720,11 @@ const plansV1 = z.object({
     variant,
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
+    /**
+     * A line under the title — "Three ways in. No joining fee." (template
+     * polish). The merchant's own words; drawn only over plans on sale.
+     */
+    intro: z.string().trim().max(600).optional(),
     highlight: z.enum(["first", "none"]).optional(),
     buttonLabel,
     showDescriptions: z.boolean().optional(),

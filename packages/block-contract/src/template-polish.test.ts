@@ -107,3 +107,15 @@ describe("hours and visitUs: grouped days, the address, the business's place", (
         expect(parseSectionContent("visitUs", 1, {}).success).toBe(true);
     });
 });
+
+describe("plans: a line under the title", () => {
+    it("saves an intro and refuses one past its length", () => {
+        expect(
+            parseSectionContent("plans", 1, { intro: "No joining fee." })
+                .success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("plans", 1, { intro: "x".repeat(601) }).success,
+        ).toBe(false);
+    });
+});
