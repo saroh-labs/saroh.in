@@ -5,6 +5,9 @@
  * asked-for) one chosen to start with, a colourway of the chosen one sent
  * as `styleId`, and a module that is off said on its card, never refused.
  */
+import fs from "node:fs";
+import path from "node:path";
+
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
@@ -343,5 +346,50 @@ describe("rendered on the server", () => {
         expect(html).toContain("background:hsl(40 24% 97%)");
         // Modules unknown: nothing is claimed about them.
         expect(html).not.toContain("show once");
+    });
+});
+
+describe("TemplateThumbnail", () => {
+    it("shows the captured render when there is one, else the drawing", async () => {
+        const { TemplateThumbnail } = await import("./template-picker");
+        const captured = renderToStaticMarkup(
+            <TemplateThumbnail
+                name="Bakery"
+                colourway={{ id: "crust", name: "Crust", chips: CHIPS.crust }}
+                image={{
+                    src: "/templates/bakery.webp",
+                    width: 360,
+                    height: 225,
+                }}
+            />,
+        );
+        expect(captured).toContain("<img");
+        expect(captured).toContain("bakery.webp");
+        expect(captured).not.toContain("Bakery<");
+
+        const drawn = renderToStaticMarkup(
+            <TemplateThumbnail
+                name="Bakery"
+                colourway={{ id: "crust", name: "Crust", chips: CHIPS.crust }}
+            />,
+        );
+        expect(drawn).not.toContain("<img");
+        expect(drawn).toContain("Bakery");
+    });
+
+    it("finds a captured template's picture by its id", async () => {
+        const { TEMPLATE_THUMBNAILS, templateThumbnail } =
+            await import("@/lib/sites/template-thumbnails");
+        for (const [id, image] of Object.entries(TEMPLATE_THUMBNAILS)) {
+            expect(templateThumbnail(id)).toBe(image);
+            expect(image?.src).toBe(`/templates/${id}.webp`);
+            // Served from this app's own public folder.
+            expect(
+                fs.existsSync(
+                    path.join(process.cwd(), "public", image?.src ?? ""),
+                ),
+            ).toBe(true);
+        }
+        expect(templateThumbnail("no-such-template")).toBeUndefined();
     });
 });
