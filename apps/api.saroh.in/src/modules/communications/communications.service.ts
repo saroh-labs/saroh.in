@@ -31,6 +31,7 @@ import {
     MESSAGE_SEND_TYPE,
 } from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
+import type { NotEmailed } from "./saroh-delivery";
 import { sarohMaySend } from "./saroh-may-send";
 import { queueSarohInTx, renderForSaroh } from "./saroh-queue";
 import type {
@@ -115,11 +116,30 @@ export interface TransactionalSend {
 /** A queued (or suppressed) transactional message. */
 export interface TransactionalResult {
     id: string;
+    /** SUPPRESSED: they turned email off. */
     status: "QUEUED" | "SUPPRESSED";
     toAddress: string;
     /** Who sends it: the business's own provider, or Saroh (DEC-086). */
     route?: "PROVIDER" | "SAROH";
 }
+
+/**
+ * A notice given as its values: it may go through Saroh (DEC-086), where it
+ * can also be recorded and not emailed — ALLOWANCE_USED or NO_ALLOWANCE
+ * (`saroh-queue.ts`).
+ */
+export interface NoticeTransactionalResult extends Omit<
+    TransactionalResult,
+    "status"
+> {
+    status: TransactionalResult["status"] | NotEmailed;
+}
+
+/** {@link TransactionalInput} given as a notice's values. */
+export type NoticeTransactionalInput = Extract<
+    TransactionalInput,
+    { notice: NoticeVars }
+>;
 
 /** Where an email for this recipient would go, with the contact it is for. */
 export interface TransactionalAddress {
@@ -708,8 +728,18 @@ export class CommunicationsService {
     async queueTransactional(
         tx: Db,
         organizationId: string,
+        input: NoticeTransactionalInput,
+    ): Promise<NoticeTransactionalResult>;
+    async queueTransactional(
+        tx: Db,
+        organizationId: string,
+        input: Exclude<TransactionalInput, { notice: NoticeVars }>,
+    ): Promise<TransactionalResult>;
+    async queueTransactional(
+        tx: Db,
+        organizationId: string,
         input: TransactionalInput,
-    ): Promise<TransactionalResult> {
+    ): Promise<NoticeTransactionalResult> {
         const to = await this.transactionalAddress(
             tx,
             organizationId,

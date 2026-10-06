@@ -107,6 +107,8 @@ export function rowNotice(
         row.usage,
         words.what,
         words.paused,
+        // Saroh's emails lead with "Connect your email" (DEC-086).
+        { action: words.action },
     );
     return notice;
 }

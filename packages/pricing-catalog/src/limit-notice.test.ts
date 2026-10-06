@@ -98,4 +98,54 @@ describe("limitNotice", () => {
             title: "You've used 1,00,000 of 1,11,111 things on Plan A",
         });
     });
+
+    describe("a limit with its own way out (Saroh's emails, DEC-086)", () => {
+        const action = {
+            label: "Connect your email",
+            href: "/settings/providers",
+            sentence: "Connect your own email.",
+        };
+
+        it("says it first, a higher plan second, and no add-on", () => {
+            const warn = limitNotice(access, 85, "emails", "", { action });
+            expect(warn).toMatchObject({
+                on: true,
+                full: false,
+                body: "You'll be stopped at 100. Connect your own email. Or Plan B gives you more.",
+                cta: "Connect your email",
+                href: "/settings/providers",
+            });
+            const full = limitNotice(access, 100, "emails", "Stopped.", {
+                action,
+                resetsOn: "1 Nov",
+            });
+            expect(full).toMatchObject({
+                full: true,
+                title: "You've reached your 100 emails on Plan A",
+                body: "Stopped. It starts again on 1 Nov. Connect your own email. Or Plan B raises the limit.",
+                cta: "Connect your email",
+            });
+            expect(full.on && full.body).not.toMatch(/add-on/);
+        });
+
+        it("on the top plan, offers the action alone", () => {
+            expect(
+                limitNotice(
+                    { ...access, upgradeTo: "" },
+                    100,
+                    "emails",
+                    "Stopped.",
+                    {
+                        action,
+                    },
+                ),
+            ).toMatchObject({ body: "Stopped. Connect your own email." });
+        });
+
+        it("leaves every other limit's words as they were", () => {
+            expect(
+                limitNotice(access, 100, "things", "Paused."),
+            ).not.toHaveProperty("href");
+        });
+    });
 });

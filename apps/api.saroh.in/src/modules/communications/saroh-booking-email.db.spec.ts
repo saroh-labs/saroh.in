@@ -9,8 +9,10 @@
  * what is sent.
  *
  * Saroh's sender is a stand-in (no SES); everything else is real. The
- * switches are turned on per business (overrides), never for everyone.
- * Runs in the integration project.
+ * switches are turned on per business (overrides), never for everyone, and
+ * each business is on a made-up plan with an allowance of 3 a month
+ * (`fakeSarohEmailsCatalog`); the allowance itself is
+ * saroh-email-allowance.db.spec.ts. Runs in the integration project.
  */
 const mockEnv: Record<string, string | undefined> = {
     PAYMENTS_ENC_KEY:
@@ -28,6 +30,12 @@ jest.mock("./providers/saroh-email.sender", () => ({
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import {
+    fakeSarohEmailsCatalog,
+    installCatalogue,
+    sarohEmailVersion,
+    subscribe,
+} from "../../../test/fixtures/saroh-email";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BookingNotifyHandler } from "../bookings/booking-notify.handler";
 import { FlagKey } from "../feature-flags/flags";
@@ -50,6 +58,14 @@ const comms = new CommunicationsService();
 const notices = new CustomerNotifyService(comms);
 const bookingNotify = new BookingNotifyHandler(notices);
 const customerNotify = new CustomerNotifyHandler(notices);
+
+const V = sarohEmailVersion();
+const V_WITHOUT_ROW = V + 1;
+
+beforeAll(async () => {
+    await installCatalogue(V, fakeSarohEmailsCatalog());
+    await installCatalogue(V_WITHOUT_ROW, fakeSarohEmailsCatalog(false));
+});
 
 let seq = 0;
 const uniq = (p: string) => `${p}-${process.pid}-${++seq}`;
@@ -87,11 +103,16 @@ interface Business {
  * account, with Saroh's switch and plan enforcement on for it alone.
  */
 async function business(
-    opts: { saroh?: boolean; enforce?: boolean } = {},
+    opts: { saroh?: boolean; enforce?: boolean; allowance?: boolean } = {},
 ): Promise<Business> {
     const org = await prisma.organization.create({
         data: { name: "Rye & Co.", slug: uniq("saroh-mail") },
     });
+    await subscribe(
+        org.id,
+        "free",
+        opts.allowance === false ? V_WITHOUT_ROW : V,
+    );
     await prisma.businessProfile.create({
         data: {
             organizationId: org.id,
@@ -293,6 +314,7 @@ describe("Saroh sends booking emails (DEC-086, real database)", () => {
     it.each([
         ["the business's switch off", { saroh: false }, undefined],
         ["plan enforcement off", { enforce: false }, undefined],
+        ["a plan without the allowance", { allowance: false }, undefined],
         ["the global stop on", {}, "stop"],
         ["the daily ceiling reached", {}, "ceiling"],
     ] as const)(
@@ -351,6 +373,7 @@ describe("Saroh sends booking emails (DEC-086, real database)", () => {
             data: {
                 orderId: order.id,
                 organizationId: b.orgId,
+                kind: "STAGE",
                 fromStage: "PREPARING",
                 toStage: "READY",
             },

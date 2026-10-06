@@ -131,6 +131,16 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: "integrations",
         legacyEntitlementKey: null,
     },
+    /**
+     * Booking emails Saroh sends for a business with no email provider of
+     * its own (DEC-086), a month. Under no registry module: the allowance
+     * never gates Communications or the business's own provider.
+     */
+    "saroh-emails": {
+        registry: null,
+        limitKey: "sarohEmailsPerMonth",
+        legacyEntitlementKey: null,
+    },
 };
 
 /**

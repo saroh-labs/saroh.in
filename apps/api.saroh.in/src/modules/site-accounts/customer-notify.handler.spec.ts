@@ -40,6 +40,8 @@ const ORG = "org_1";
 
 function makeTx() {
     return {
+        // The plan-meter lock a booking notice takes first (DEC-086).
+        $executeRaw: jest.fn().mockResolvedValue(1),
         customerNotice: {
             createMany: jest.fn().mockResolvedValue({ count: 1 }),
             update: jest.fn().mockResolvedValue({}),

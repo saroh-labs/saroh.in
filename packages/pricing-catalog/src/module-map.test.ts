@@ -40,6 +40,13 @@ describe("module map (KTD-8)", () => {
         expect(MODULE_MAP.reviewers.limitKey).toBe("reviewers");
         // Invoicing needs no module (DEC-070), so nothing it governs can lock.
         expect(MODULE_MAP.invoicing.registry).toBeNull();
+        // Saroh's emails (DEC-086) count, but never gate Communications.
+        expect(MODULE_MAP["saroh-emails"]).toEqual({
+            registry: null,
+            limitKey: "sarohEmailsPerMonth",
+            legacyEntitlementKey: null,
+        });
+        expect(catalogueModulesFor("COMMUNICATIONS")).toEqual([]);
     });
 
     it("reads a legacy raise's key as its row", () => {

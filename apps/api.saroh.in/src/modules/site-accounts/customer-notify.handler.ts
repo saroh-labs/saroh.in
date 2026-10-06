@@ -2,7 +2,12 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { lockMeter } from "../billing/metering.service";
 import { CommunicationsService } from "../communications/communications.service";
+import {
+    isSarohTemplate,
+    SAROH_EMAILS_KEY,
+} from "../communications/saroh-delivery";
 import { isNoticeTemplate } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import type { CustomerNotifyPayload } from "./customer-notify-queue";
@@ -82,6 +87,12 @@ export class CustomerNotifyService {
         payload: CustomerNotifyPayload,
         now: Date,
     ): Promise<NoticeOutcome> {
+        // A booking notice may be counted against Saroh's email allowance
+        // (DEC-086): its plan-meter lock comes before any row this
+        // transaction writes (`backend-jobs.md`, advisory lock registry).
+        if (isSarohTemplate(payload.kind)) {
+            await lockMeter(tx, organizationId, SAROH_EMAILS_KEY);
+        }
         const claimed = await tx.customerNotice.createMany({
             data: [
                 {

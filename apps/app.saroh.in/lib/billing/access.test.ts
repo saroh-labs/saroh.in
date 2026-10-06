@@ -50,6 +50,30 @@ describe("rowNotice", () => {
         });
     });
 
+    it("leads Saroh's emails with connecting the business's own email, no add-on (DEC-086)", () => {
+        const n = rowNotice(
+            access({
+                modules: [
+                    row({
+                        moduleId: "saroh-emails",
+                        limit: 10,
+                        per: "month",
+                        usage: 10,
+                    }),
+                ],
+            }),
+            "saroh-emails",
+        );
+        expect(n).toMatchObject({
+            on: true,
+            full: true,
+            cta: "Connect your email",
+            href: "/settings/providers",
+        });
+        expect(n.on && n.body).toMatch(/^Saroh has stopped sending/);
+        expect(n.on && n.body).not.toMatch(/add-on/);
+    });
+
     it("tells, never refuses, at a soft cap (storage in GB)", () => {
         const storage = (usage: number) =>
             rowNotice(

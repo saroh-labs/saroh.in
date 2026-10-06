@@ -5,6 +5,7 @@ const mockEnv: Record<string, string | undefined> = {};
 jest.mock("../../env", () => ({ env: mockEnv }));
 
 import type { Prisma } from "@saroh/database";
+import type { ModuleAccess } from "@saroh/pricing-catalog";
 
 import { FlagKey } from "../feature-flags/flags";
 import type { SarohDeps } from "./saroh-may-send";
@@ -12,6 +13,7 @@ import {
     sarohDailyCeiling,
     sarohMaySend,
     sarohRefusal,
+    sarohRoomLeft,
     sarohSwitchesOn,
 } from "./saroh-may-send";
 
@@ -23,8 +25,22 @@ function db(status: string | null = null) {
     } as unknown as Pick<Prisma.TransactionClient, "communicationProvider">;
 }
 
+/** A made-up allowance row: on, 5 a month. */
+const ROW = {
+    moduleId: "saroh-emails",
+    state: "on",
+    limit: 5,
+    per: "month",
+} as unknown as ModuleAccess;
+
 function deps(
-    over: { flag?: boolean; enforced?: boolean; queued?: number } = {},
+    over: {
+        flag?: boolean;
+        enforced?: boolean;
+        queued?: number;
+        row?: ModuleAccess | null;
+        used?: number;
+    } = {},
 ): SarohDeps {
     return {
         flags: {
@@ -39,6 +55,10 @@ function deps(
             ),
         },
         queuedSince: jest.fn().mockResolvedValue(over.queued ?? 0),
+        allowance: jest
+            .fn()
+            .mockResolvedValue(over.row === undefined ? ROW : over.row),
+        used: jest.fn().mockResolvedValue(over.used ?? 0),
     };
 }
 
@@ -183,5 +203,41 @@ describe("sarohMaySend (DEC-086)", () => {
         expect(
             await sarohMaySend(db(), "org_1", "BOOKING_CONFIRMED", NOW, count),
         ).toBe(false);
+    });
+
+    it("never sends unmetered: no allowance row, no number, or the row off says no (U3)", async () => {
+        for (const row of [
+            null,
+            { ...ROW, limit: null },
+            { ...ROW, state: "locked" },
+        ] as (ModuleAccess | null)[]) {
+            expect(
+                await sarohRefusal(
+                    db(),
+                    "org_1",
+                    "BOOKING_CONFIRMED",
+                    NOW,
+                    deps({ row }),
+                ),
+            ).toBe("NO_ALLOWANCE");
+        }
+    });
+});
+
+describe("room in this month's allowance (U3)", () => {
+    it("has room under the cap, none at it", async () => {
+        expect(await sarohRoomLeft("org_1", NOW, deps({ used: 4 }))).toBe(true);
+        expect(await sarohRoomLeft("org_1", NOW, deps({ used: 5 }))).toBe(
+            false,
+        );
+    });
+
+    it("has none without an allowance, or when the count fails", async () => {
+        expect(await sarohRoomLeft("org_1", NOW, deps({ row: null }))).toBe(
+            false,
+        );
+        const d = deps();
+        (d.used as jest.Mock).mockRejectedValue(new Error("down"));
+        expect(await sarohRoomLeft("org_1", NOW, d)).toBe(false);
     });
 });

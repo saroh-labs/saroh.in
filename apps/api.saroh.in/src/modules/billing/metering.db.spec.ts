@@ -541,6 +541,28 @@ describe("what each limit counts (DB, U13)", () => {
                 ),
                 4,
             );
+            // Saroh's emails (DEC-086): one this month, one before it.
+            for (const at of [
+                start.getTime() + MINUTE,
+                start.getTime() - MINUTE,
+            ]) {
+                const message = await prisma.message.create({
+                    data: {
+                        organizationId: b.orgId,
+                        channel: "EMAIL",
+                        toAddress: "a@example.test",
+                        body: "x",
+                    },
+                });
+                await prisma.delivery.create({
+                    data: {
+                        organizationId: b.orgId,
+                        messageId: message.id,
+                        provider: "SAROH",
+                        createdAt: new Date(at),
+                    },
+                });
+            }
         }
         const ids = [india.orgId, newYork.orgId, quiet.orgId];
         const keys: MeteredLimitKey[] = [
@@ -555,6 +577,7 @@ describe("what each limit counts (DB, U13)", () => {
             "sites",
             "storageGb",
             "visitsPerMonth",
+            "sarohEmailsPerMonth",
         ];
         for (const key of keys) {
             const across = await countUsageAcross(prisma, key, ids);
@@ -583,6 +606,7 @@ describe("what each limit counts (DB, U13)", () => {
                 "sites",
                 "storage",
                 "visits",
+                "saroh-emails",
             ].sort(),
         );
         const row = businesses.find((b) => b.id === india.orgId);

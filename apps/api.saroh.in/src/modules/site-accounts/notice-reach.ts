@@ -4,6 +4,7 @@ import { accountThreadOn } from "../communications/account-thread";
 import {
     providerConnected,
     sarohMaySend,
+    sarohRoomLeft,
 } from "../communications/saroh-may-send";
 import type { NoticeTemplate } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
@@ -22,7 +23,8 @@ import { accountAreaOn } from "./account-area";
  * - **Email** goes only to a live site account's verified email, through
  *   the business's own connected EMAIL provider (D17, default 10) — or,
  *   for a booking notice at a business with none, through Saroh when
- *   `sarohMaySend` says so (DEC-086). So email reach is per notice kind.
+ *   `sarohMaySend` says so and its monthly allowance has room (DEC-086).
+ *   So email reach is per notice kind.
  *   Nothing goes by SMS or WhatsApp this round.
  */
 
@@ -82,7 +84,12 @@ export async function noticeChannels(
         noticeEmailRoute(db, organizationId, kind),
         accountAreaOn() ? accountThreadOn(organizationId) : false,
     ]);
-    return { email: route !== null, thread };
+    // Saroh's route says "emailed" only while this month's allowance has
+    // room: past it, the notice is recorded as not emailed (U3).
+    const email =
+        route === "PROVIDER" ||
+        (route === "SAROH" && (await sarohRoomLeft(organizationId)));
+    return { email, thread };
 }
 
 /** The rule itself, from what the business can use and the contact has. */

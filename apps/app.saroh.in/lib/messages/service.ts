@@ -39,7 +39,7 @@ export interface LeadMessage {
     toAddress: string;
     subject: string | null;
     body: string;
-    /** QUEUED | SENT | FAILED | SUPPRESSED */
+    /** QUEUED | SENT | FAILED | SUPPRESSED; a booking notice Saroh didn't email (DEC-086) ALLOWANCE_USED | NO_ALLOWANCE */
     status: string;
     createdAt: string;
     updatedAt: string;

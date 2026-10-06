@@ -3,6 +3,7 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
 import { LIMIT_WARN_AT, limitNotice } from "@saroh/pricing-catalog";
+import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
 import { CatalogueAccessService } from "./catalogue-access.service";
@@ -27,10 +28,29 @@ export function limitLevel(used: number, limit: number): LimitLevel | null {
     return null;
 }
 
+/** The once-only key a limit notice is claimed under (`CustomerNotice.eventKey`). */
+export function limitNoticeKey(
+    moduleId: string,
+    level: LimitLevel,
+    limit: number,
+    window: string,
+): string {
+    return `plan-limit:${moduleId}:${level}:${limit}:${window}`;
+}
+
+/** "1 Nov": the day the business's next month starts, in its zone. */
+export function nextMonthStarts(now: Date, zone: string): string {
+    return DateTime.fromJSDate(now, { zone })
+        .startOf("month")
+        .plus({ months: 1 })
+        .toFormat("d LLL");
+}
+
 /** What past a cap says, by key: what kept working. */
 function overBody(key: MeteredLimitKey, soft: boolean): string {
     if (key === "ordersPerMonth")
         return "Your site kept taking orders, so no customer was turned away.";
+    if (key === "sarohEmailsPerMonth") return METER_WORDS[key].paused;
     // A soft cap's own words say nothing was stopped (`LIMIT_WORDS.paused`).
     if (soft) return METER_WORDS[key].paused;
     return "What you already have stays as it is.";
@@ -47,13 +67,18 @@ export function limitNoticeWords(
     limit: number,
     used: number,
     level: LimitLevel,
+    /** When a monthly count starts again ("1 Nov"), for a limit that says so. */
+    resetsOn?: string,
 ): { title: string; body: string } {
     const words = METER_WORDS[key];
     const soft = row.soft === true;
     if (level === "over") {
-        const more = row.upgradeTo
-            ? `${row.upgradeTo} raises the limit.`
-            : "An add-on gives you more.";
+        // A limit with its own way out (Saroh's emails) offers no add-on.
+        const more = words.action
+            ? `${words.action.sentence}${row.upgradeTo ? ` Or ${row.upgradeTo} raises the limit.` : ""}`
+            : row.upgradeTo
+              ? `${row.upgradeTo} raises the limit.`
+              : "An add-on gives you more.";
         return {
             title: `You're past your ${limit.toLocaleString("en-IN")} ${words.what} on ${row.plan}`,
             body: `${overBody(key, soft)} ${more}`,
@@ -65,6 +90,7 @@ export function limitNoticeWords(
         used,
         words.what,
         words.paused,
+        { action: words.action, resetsOn },
     );
     if (!n.on) return { title: "", body: "" };
     return { title: n.title, body: n.body };
@@ -125,8 +151,25 @@ export class PlanLimitNoticeHandler {
         if (!level) return skip("under");
 
         const zone = await businessTimezone(prisma, p.organizationId);
-        const eventKey = `plan-limit:${p.moduleId}:${level}:${limit}:${windowKey(row.per, now, zone)}`;
-        const { title, body } = limitNoticeWords(row, key, limit, used, level);
+        const eventKey = limitNoticeKey(
+            p.moduleId,
+            level,
+            limit,
+            windowKey(row.per, now, zone),
+        );
+        // A limit that names its own way out says when its month restarts.
+        const resetsOn =
+            METER_WORDS[key].action && row.per === "month"
+                ? nextMonthStarts(now, zone)
+                : undefined;
+        const { title, body } = limitNoticeWords(
+            row,
+            key,
+            limit,
+            used,
+            level,
+            resetsOn,
+        );
         await prisma.$transaction(async (tx) => {
             const claim = await tx.customerNotice.createMany({
                 data: [

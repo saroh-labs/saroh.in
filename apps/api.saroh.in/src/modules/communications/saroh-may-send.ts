@@ -2,13 +2,19 @@ import { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { outsideOrgContext, prisma } from "@saroh/database";
 
+import type { ModuleAccess } from "@saroh/pricing-catalog";
+
 import { env } from "../../env";
+import { countUsage } from "../billing/metering";
+import { planMeter } from "../billing/metering.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import type { SarohTemplate } from "./saroh-delivery";
 import {
     isSarohTemplate,
     SAROH_DAILY_CEILING_DEFAULT,
+    SAROH_EMAILS_KEY,
+    SAROH_EMAILS_ROW,
     SAROH_PROVIDER,
 } from "./saroh-delivery";
 
@@ -24,7 +30,8 @@ import {
  * 3. the global stop (`SAROH_BUSINESS_EMAIL_STOP`) is off;
  * 4. the business's `SAROH_BUSINESS_EMAIL` flag is on;
  * 5. `PLAN_ENFORCEMENT` is on for it — Saroh's sending is never unmetered;
- * 6. its plan has an allowance for it (U3);
+ * 6. its plan has an allowance for it: a `saroh-emails` row, on, with a
+ *    number (`sarohEmailsPerMonth`, U3);
  * 7. the platform's daily ceiling has room.
  *
  * Every lookup that fails says no (and logs): this route spends a resource
@@ -38,6 +45,7 @@ export type SarohRefusal =
     | "STOPPED"
     | "SWITCHED_OFF"
     | "NOT_ENFORCED"
+    | "NO_ALLOWANCE"
     | "CEILING"
     | "LOOKUP_FAILED";
 
@@ -46,6 +54,18 @@ export interface SarohDeps {
     flags: Pick<FeatureFlagService, "isEnabled">;
     /** Saroh deliveries queued for every business since `since`. */
     queuedSince: (since: Date) => Promise<number>;
+    /**
+     * The business's `saroh-emails` row, when the plan is enforced and
+     * read (`MeteringService.enforcedRow`); null for every other case:
+     * enforcement off, a business off the catalogue, a version without the
+     * row, or a lookup that failed (logged `plan_meter_unresolved`).
+     */
+    allowance: (
+        organizationId: string,
+        now: Date,
+    ) => Promise<ModuleAccess | null>;
+    /** How many of the business's emails Saroh has counted this month. */
+    used: (organizationId: string, now: Date) => Promise<number>;
 }
 
 type ProviderDb = Pick<Prisma.TransactionClient, "communicationProvider">;
@@ -70,7 +90,17 @@ function queuedSince(since: Date): Promise<number> {
 export const defaultSarohDeps: SarohDeps = {
     flags: new FeatureFlagService(),
     queuedSince,
+    allowance: (organizationId, now) =>
+        planMeter.enforcedRow(organizationId, SAROH_EMAILS_ROW, now),
+    used: (organizationId, now) =>
+        countUsage(prisma, organizationId, SAROH_EMAILS_KEY, now),
 };
+
+/** The row's monthly cap, or null when it gives Saroh's emails no number. */
+export function allowanceLimit(row: ModuleAccess | null): number | null {
+    if (row?.state !== "on") return null;
+    return typeof row.limit === "number" ? row.limit : null;
+}
 
 /** The global stop, read at use, so an operator's change needs no deploy of code. */
 export function sarohStopped(): boolean {
@@ -152,6 +182,13 @@ export async function sarohRefusal(
         ) {
             return "NOT_ENFORCED";
         }
+        // Never unmetered: a plan whose allowance can't be read, or has no
+        // number, gives Saroh nothing to send against (fail closed).
+        if (
+            allowanceLimit(await deps.allowance(organizationId, now)) === null
+        ) {
+            return "NO_ALLOWANCE";
+        }
         const queued = await deps.queuedSince(new Date(now.getTime() - DAY_MS));
         if (queued >= sarohDailyCeiling()) {
             logger.warn(
@@ -182,3 +219,25 @@ export async function sarohMaySend(
 }
 
 export type { SarohTemplate };
+
+/**
+ * Whether the business's allowance has room for one more this month: what
+ * notice reach says ("emailed") only when it is true. Not the send's check
+ * (that counts under the plan-meter lock, `saroh-queue.ts`). Fails closed.
+ */
+export async function sarohRoomLeft(
+    organizationId: string,
+    now: Date = new Date(),
+    deps: SarohDeps = defaultSarohDeps,
+): Promise<boolean> {
+    try {
+        const limit = allowanceLimit(await deps.allowance(organizationId, now));
+        if (limit === null) return false;
+        return (await deps.used(organizationId, now)) < limit;
+    } catch (err) {
+        logger.warn(
+            `saroh_email_lookup_failed org=${organizationId} step=room error=${err instanceof Error ? err.name : "unknown"}`,
+        );
+        return false;
+    }
+}

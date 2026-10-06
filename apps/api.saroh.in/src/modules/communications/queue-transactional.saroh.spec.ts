@@ -16,14 +16,32 @@ jest.mock("./saroh-may-send", () => ({
 
 jest.mock("@saroh/database", () => ({ prisma: {} }));
 
-import { ConflictException } from "@nestjs/common";
+// The allowance's meter (U3), stood in: the real one is in
+// saroh-email-allowance.db.spec.ts.
+jest.mock("../billing/metering.service", () => ({
+    ...jest.requireActual<object>("../billing/metering.service"),
+    planMeter: { roomInTx: jest.fn(), enforcedRow: jest.fn() },
+}));
 
+import { ConflictException, ForbiddenException } from "@nestjs/common";
+
+import { planMeter } from "../billing/metering.service";
 import type { NoticeVars } from "../site-accounts/notify-templates";
 import { renderNotice } from "../site-accounts/notify-templates";
 import { CommunicationsService } from "./communications.service";
 import { sarohMaySend } from "./saroh-may-send";
 
 const maySend = sarohMaySend as jest.Mock;
+const roomInTx = planMeter.roomInTx as jest.Mock;
+const enforcedRow = planMeter.enforcedRow as jest.Mock;
+
+/** The meter refusing at the cap, with the caller's own refusal. */
+const atTheCap = (
+    _tx: unknown,
+    _org: string,
+    _row: string,
+    opts: { refuse: () => Error },
+) => Promise.reject(opts.refuse());
 
 const vars: NoticeVars = {
     kind: "BOOKING_CONFIRMED",
@@ -77,8 +95,13 @@ function makeTx(
                 Promise.resolve({ id: "msg_1", ...data }),
             ),
         },
-        delivery: { create: jest.fn().mockResolvedValue({ id: "del_1" }) },
+        delivery: {
+            create: jest.fn().mockResolvedValue({ id: "del_1" }),
+            count: jest.fn().mockResolvedValue(3),
+        },
         job: { create: jest.fn().mockResolvedValue({ id: "job_1" }) },
+        service: { findFirst: jest.fn().mockResolvedValue(null) },
+        customerNotice: { findUnique: jest.fn().mockResolvedValue(null) },
     };
 }
 
@@ -97,6 +120,13 @@ const comms = new CommunicationsService();
 beforeEach(() => {
     jest.clearAllMocks();
     maySend.mockResolvedValue(true);
+    roomInTx.mockResolvedValue({ limit: 3, used: 0, adding: 1 });
+    enforcedRow.mockResolvedValue({
+        moduleId: "saroh-emails",
+        state: "on",
+        limit: 3,
+        per: "month",
+    });
 });
 
 describe("queueTransactional through Saroh (DEC-086)", () => {
@@ -196,5 +226,119 @@ describe("queueTransactional through Saroh (DEC-086)", () => {
             }),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(maySend).not.toHaveBeenCalled();
+    });
+});
+
+describe("the monthly allowance on Saroh's route (U3)", () => {
+    it("counts each send against the business's row, on its transaction", async () => {
+        const tx = makeTx();
+        await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            notice(true),
+        );
+        expect(roomInTx).toHaveBeenCalledWith(
+            tx,
+            "org_1",
+            "saroh-emails",
+            expect.objectContaining({ refuse: expect.any(Function) }),
+        );
+    });
+
+    it("at the cap: recorded ALLOWANCE_USED, no delivery or job, nothing thrown, the cap's notice queued once", async () => {
+        roomInTx.mockImplementation(atTheCap);
+        const tx = makeTx();
+        const res = await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            notice(true),
+        );
+        expect(res).toMatchObject({ status: "ALLOWANCE_USED", route: "SAROH" });
+        expect(tx.message.create.mock.calls[0][0].data).toMatchObject({
+            status: "ALLOWANCE_USED",
+            template: "BOOKING_CONFIRMED",
+        });
+        expect(tx.delivery.create).not.toHaveBeenCalled();
+        const jobs = tx.job.create.mock.calls.map(
+            (c: [{ data: { type: string } }]) => c[0].data,
+        );
+        expect(jobs).toEqual([
+            expect.objectContaining({
+                type: "plan.limit.notice",
+                payload: { organizationId: "org_1", moduleId: "saroh-emails" },
+            }),
+        ]);
+        expect(tx.customerNotice.findUnique.mock.calls[0][0].where).toEqual({
+            organizationId_eventKey: {
+                organizationId: "org_1",
+                eventKey: expect.stringMatching(
+                    /^plan-limit:saroh-emails:full:3:\d{4}-\d{2}$/,
+                ) as unknown,
+            },
+        });
+    });
+
+    it("at the cap with this month's notice already told: no second notice job", async () => {
+        roomInTx.mockImplementation(atTheCap);
+        const tx = makeTx();
+        tx.customerNotice.findUnique.mockResolvedValue({ id: "cn_1" });
+        await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            notice(true),
+        );
+        expect(tx.job.create).not.toHaveBeenCalled();
+    });
+
+    it("no allowance to count against (the meter has nothing): NO_ALLOWANCE, not sent", async () => {
+        roomInTx.mockResolvedValue(null);
+        const tx = makeTx();
+        const res = await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            notice(true),
+        );
+        expect(res.status).toBe("NO_ALLOWANCE");
+        expect(tx.delivery.create).not.toHaveBeenCalled();
+        expect(tx.job.create).not.toHaveBeenCalled();
+    });
+
+    it("the row turned off since: NO_ALLOWANCE, the refusal kept out of the caller's transaction", async () => {
+        roomInTx.mockRejectedValue(new ForbiddenException("locked"));
+        const tx = makeTx();
+        await expect(
+            comms.queueTransactional(
+                tx as unknown as Tx,
+                "org_1",
+                notice(true),
+            ),
+        ).resolves.toMatchObject({ status: "NO_ALLOWANCE" });
+    });
+
+    it("a database failure is not swallowed: the job retries", async () => {
+        roomInTx.mockRejectedValue(new Error("connection lost"));
+        await expect(
+            comms.queueTransactional(
+                makeTx() as unknown as Tx,
+                "org_1",
+                notice(true),
+            ),
+        ).rejects.toThrow("connection lost");
+    });
+
+    it("a revoked consent is suppressed before anything is counted", async () => {
+        const tx = makeTx({ consent: "REVOKED" });
+        await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            notice(true),
+        );
+        expect(roomInTx).not.toHaveBeenCalled();
+    });
+
+    it("the business's own provider is never counted", async () => {
+        const tx = makeTx({ provider: "CONNECTED" });
+        await comms.queueTransactional(tx as unknown as Tx, "org_1", notice());
+        expect(roomInTx).not.toHaveBeenCalled();
     });
 });

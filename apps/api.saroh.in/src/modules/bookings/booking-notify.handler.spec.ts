@@ -31,6 +31,8 @@ const WAS = new Date("2026-10-05T04:30:00.000Z");
 
 function makeTx() {
     return {
+        // The plan-meter lock a booking notice takes first (DEC-086).
+        $executeRaw: jest.fn().mockResolvedValue(1),
         booking: {
             findFirst: jest.fn().mockResolvedValue({
                 id: "bk_1",
@@ -74,6 +76,29 @@ function run(tx: FakeTx, payload: BookingNotifyPayload) {
 beforeEach(() => jest.clearAllMocks());
 
 describe("booking.notify", () => {
+    it("takes Saroh's email allowance's plan-meter lock before it writes anything (DEC-086)", async () => {
+        const tx = makeTx();
+        tx.bookingEvent.findFirst.mockResolvedValue({
+            id: "ev_move",
+            type: "RESCHEDULED",
+            actorUserId: null,
+            fromStartAt: WAS,
+            toStartAt: NOW,
+        });
+        await run(tx, { bookingId: "bk_1", reason: "rescheduled" });
+        const [lock] = tx.$executeRaw.mock.calls[0] as [
+            TemplateStringsArray,
+            string,
+        ];
+        expect(lock.join("?")).toContain("pg_advisory_xact_lock");
+        expect(tx.$executeRaw.mock.calls[0][1]).toBe(
+            `plan-meter:${ORG}:sarohEmailsPerMonth`,
+        );
+        expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+            tx.customerNotice.createMany.mock.invocationCallOrder[0],
+        );
+    });
+
     it("the customer moved it: the team's inbox says so, and the customer is told", async () => {
         const tx = makeTx();
         tx.bookingEvent.findFirst.mockResolvedValue({

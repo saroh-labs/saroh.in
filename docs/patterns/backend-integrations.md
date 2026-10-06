@@ -52,7 +52,10 @@ a note saying so.
   credentials, webhooks or contracts (DEC-010).
 - **Current** — **The Organization connects its own messaging provider** for real
   sends; Saroh-owned email is only for identity mail and a template test to the
-  signed-in user's own verified address (DEC-011).
+  signed-in user's own verified address (DEC-011) — and, while a business has
+  no email provider, its booking notices, sent from `notify.saroh.in` under
+  one rule (`sarohMaySend`) and counted against its plan's
+  `sarohEmailsPerMonth`, failing closed (DEC-086).
 - **Current** — **Settings → Providers is one row per provider, connected
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
   API can connect is offered, and a row shows only what the API sends as
@@ -133,7 +136,8 @@ a note saying so.
   transaction: fixed templates (`communications/transactional.ts`), only to
   the bill-to email or a verified site-account email (never a typed
   address, never a DEC-049 placeholder), only through the business's own
-  EMAIL provider (409 otherwise), no marketing opt-in, and a revoked email
+  EMAIL provider (409 otherwise; a booking notice given as its values may go
+  through Saroh instead, DEC-086), no marketing opt-in, and a revoked email
   consent still suppresses it. A secret link in it (a pay link) is sealed
   into the `message.send` job with the credentials' key and filled in only
   as the email goes to the provider; the stored body keeps a slot, so

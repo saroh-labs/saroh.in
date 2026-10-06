@@ -4743,7 +4743,7 @@ model Message {
   subject   String?
   body      String
 
-  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED; a Saroh send (DEC-086) also UNKNOWN
+  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED; a Saroh send (DEC-086) also UNKNOWN, or, not emailed, ALLOWANCE_USED | NO_ALLOWANCE
 
   createdByUserId String?
 
