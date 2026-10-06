@@ -1,6 +1,10 @@
 "use client";
 
-import { isSafeHref, PROJECTS_MAX } from "@saroh/block-contract";
+import {
+    isSafeHref,
+    PROJECTS_MAX,
+    resolveVariant,
+} from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
@@ -11,6 +15,7 @@ import type { ProjectItem, ProjectsContent } from "@/lib/sites/service";
 
 import { Field } from "./field";
 import { ImageBrief } from "./image-brief";
+import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { RepeatedItems } from "./repeated-items";
 
@@ -53,8 +58,21 @@ export function ProjectsFields({
                 newItem={() => ({ title: "" })}
                 reorderable
             >
-                {(item, set) => <ProjectFields item={item} set={set} />}
+                {(item, set) => (
+                    <ProjectFields
+                        item={item}
+                        set={set}
+                        rows={resolveVariant("projects", c) === "rows"}
+                    />
+                )}
             </RepeatedItems>
+
+            <OptionSwitch
+                label="Count the projects"
+                checked={c.showCount === true}
+                onChange={(on) => patch({ showCount: on ? true : undefined })}
+                note="Beside the title, counted from the projects here: “5 projects across 8 years”, the span read from their years."
+            />
         </div>
     );
 }
@@ -62,16 +80,43 @@ export function ProjectsFields({
 function ProjectFields({
     item,
     set,
+    rows,
 }: {
     item: ProjectItem;
     set: (next: Partial<ProjectItem>) => void;
+    /** The rows look draws no photos, so it asks for none. */
+    rows: boolean;
 }) {
     const linkHint = useId();
     const link = item.link ?? "";
     const badLink = link.trim() !== "" && !isSafeHref(link.trim());
     return (
         <>
-            <ProjectPhoto item={item} set={set} />
+            {rows ? null : <ProjectPhoto item={item} set={set} />}
+            {rows ? (
+                <div className="grid grid-cols-2 gap-2">
+                    <Field label="Year">
+                        <Input
+                            value={item.year ?? ""}
+                            onChange={(e) =>
+                                set({ year: e.target.value || undefined })
+                            }
+                            maxLength={20}
+                            placeholder="2026"
+                        />
+                    </Field>
+                    <Field label="Your role">
+                        <Input
+                            value={item.role ?? ""}
+                            onChange={(e) =>
+                                set({ role: e.target.value || undefined })
+                            }
+                            maxLength={80}
+                            placeholder="Sole engineer"
+                        />
+                    </Field>
+                </div>
+            ) : null}
             <Field label="Title">
                 <Input
                     value={item.title}
@@ -87,6 +132,14 @@ function ProjectFields({
                     }
                     rows={2}
                     placeholder="A line or two: who it was for, what came of it. Optional."
+                />
+            </Field>
+            <Field label="Details">
+                <Input
+                    value={item.meta ?? ""}
+                    onChange={(e) => set({ meta: e.target.value || undefined })}
+                    maxLength={160}
+                    placeholder="Optional. A short line of facts, like the tools used."
                 />
             </Field>
             <div className="grid gap-1">

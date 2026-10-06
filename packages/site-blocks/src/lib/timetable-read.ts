@@ -142,3 +142,38 @@ export function sessionHref(bookHref: string, s: TimetableSession): string {
     });
     return `${bookHref}?${q.toString()}`;
 }
+
+/** Whether a `YYYY-MM-DD` falls Monday to Friday, read as a calendar date. */
+export function isWeekday(date: string): boolean {
+    const d = new Date(`${date}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return false;
+    const day = d.getUTCDay();
+    return day >= 1 && day <= 5;
+}
+
+/**
+ * Whether a session fills — full, or "Fills fast" — the one thing the accent
+ * look sets on the accent (template polish). The same rule as `placesWord`.
+ */
+export function fills(
+    session: Pick<TimetableSession, "placesLeft" | "capacity">,
+): boolean {
+    const tone = placesWord(session, true)?.tone;
+    return tone === "full" || tone === "filling";
+}
+
+/**
+ * The week's counts, from the sessions shown (template polish): "13
+ * sessions across 5 days", and how many of them fill. Days are those with
+ * a session, so a quiet day is not counted as one.
+ */
+export function weekCounts(sessions: readonly TimetableSession[]): {
+    line: string;
+    filling: number;
+} | null {
+    const n = sessions.length;
+    if (n === 0) return null;
+    const days = new Set(sessions.map((s) => s.date)).size;
+    const line = `${n} ${n === 1 ? "session" : "sessions"} across ${days} ${days === 1 ? "day" : "days"}`;
+    return { line, filling: sessions.filter(fills).length };
+}

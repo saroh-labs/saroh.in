@@ -16,7 +16,8 @@ type Photo = Pick<RichTextContent, "image" | "imageSide">;
 
 /**
  * The text block's photo (G7): one photo beside the text, on the left or the
- * right, described for someone who can't see it.
+ * right, or above it (template polish), described for someone who can't see
+ * it.
  *
  * The design's photo field: a small thumbnail, "Upload a photo…" (or
  * "Replace…" once there is one), Remove, and a note saying where it goes.
@@ -80,7 +81,9 @@ export function TextPhotoFields({
                 <ImageBrief brief={brief} hasImage={image !== undefined} />
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
-                        Beside the text. On a phone it sits above it.
+                        {side === "above"
+                            ? "Above the text, wide."
+                            : "Beside the text. On a phone it sits above it."}
                     </p>
                     {image ? (
                         <Button
@@ -128,7 +131,11 @@ export function TextPhotoFields({
                             type="single"
                             value={side}
                             onValueChange={(v) => {
-                                if (v === "left" || v === "right") {
+                                if (
+                                    v === "left" ||
+                                    v === "right" ||
+                                    v === "above"
+                                ) {
                                     onChange({ image, imageSide: v });
                                 }
                             }}
@@ -140,6 +147,9 @@ export function TextPhotoFields({
                             </ToggleGroupItem>
                             <ToggleGroupItem value="right" className={SEGMENT}>
                                 Right
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="above" className={SEGMENT}>
+                                Above
                             </ToggleGroupItem>
                         </ToggleGroup>
                     </Field>

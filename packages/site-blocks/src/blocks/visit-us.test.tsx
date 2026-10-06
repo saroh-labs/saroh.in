@@ -169,12 +169,40 @@ describe("visitUs (G8)", () => {
         expect(container.innerHTML).toBe("");
     });
 
-    it("renders nothing live, and asks nothing of the API, with no storefront chosen", async () => {
-        const { container, fetchMock } = await renderFetching(json(RYE), {
-            content: {},
-        });
+    it("with no storefront chosen, reads the business's own place (template polish)", async () => {
+        const { fetchMock } = await renderFetching(
+            json({ ...RYE, source: "business", storeId: null }),
+            { content: {} },
+        );
+        expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+            "https://api.test/public/sites/site_rye/visit",
+        );
+        expect(screen.getByText(/22 Hill Road, Bandra West/)).toBeTruthy();
+    });
+
+    it("renders nothing for a place with no address, hours or phone", () => {
+        const { container } = render(
+            <VisitUsSection
+                content={{}}
+                visit={{
+                    ...RYE,
+                    source: "business",
+                    storeId: null,
+                    address: null,
+                    phone: null,
+                    hours: null,
+                }}
+            />,
+        );
         expect(container.innerHTML).toBe("");
-        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("renders nothing when the business has no place of its own (404)", async () => {
+        const { container } = await renderFetching(
+            json({ message: "Not found" }, 404),
+            { content: {} },
+        );
+        expect(container.innerHTML).toBe("");
     });
 
     it("renders nothing on a live page that could not tell its site", async () => {

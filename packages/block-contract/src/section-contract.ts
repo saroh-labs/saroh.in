@@ -313,8 +313,15 @@ const heroV1 = z.object({
  * would lose the photo. The pre-publish check flags a photo with no
  * description instead (`site-flags.ts`), as it does every other gap.
  */
-export const TEXT_IMAGE_SIDES = ["left", "right"] as const;
+/**
+ * `above` (template polish) puts the photo over the text at 16:9, as the
+ * developer design opens its case study; the text keeps its own column.
+ */
+export const TEXT_IMAGE_SIDES = ["left", "right", "above"] as const;
 export type TextImageSide = (typeof TEXT_IMAGE_SIDES)[number];
+
+/** How long a text block's callout may run. */
+export const TEXT_CALLOUT_MAX = 600;
 
 const richTextV1 = z.object({
     variant,
@@ -325,6 +332,23 @@ const richTextV1 = z.object({
     /** The photo beside the text, until it has one (KTD-5). */
     imageBrief,
     imageSide: z.enum(TEXT_IMAGE_SIDES).optional(),
+    /**
+     * A boxed line after the text, ruled on its left in the accent — "What
+     * changed: …" (template polish). Plain text, so it is not sanitized and
+     * cannot carry markup; ABSENT draws nothing.
+     */
+    callout: z
+        .object({
+            label: z.string().trim().max(60).optional(),
+            text: z.string().trim().min(1).max(TEXT_CALLOUT_MAX),
+        })
+        .optional(),
+    /**
+     * Sets the text's `h3`s as small capitals labels, the way a case study
+     * names its parts ("The problem", "What I decided"). ABSENT keeps them
+     * as headings.
+     */
+    partLabels: z.boolean().optional(),
 });
 
 /** cta v1 — a standalone call-to-action button. */
@@ -440,9 +464,20 @@ const galleryV2 = z
  * media dependency. An added optional field is not a breaking change, so either
  * can arrive without a v2.
  */
+/** How long a point's figure ("₹42,000", "14 years") may run. */
+export const FEATURE_VALUE_MAX = 60;
+
 const featureItemSchema = z.object({
     title: z.string().min(1).max(120),
     body: z.string().max(600).optional(),
+    /**
+     * A figure the point stands on — a rate, a count, a span ("₹42,000",
+     * "14 years") — set large in the heading face (template polish). The
+     * merchant's own words, never read from anywhere: a rate here is the
+     * owner's to write, not a price the platform knows. Optional, so it
+     * extends v1 in place.
+     */
+    value: z.string().trim().max(FEATURE_VALUE_MAX).optional(),
 });
 
 const featuresV1 = z.object({
@@ -451,6 +486,14 @@ const featuresV1 = z.object({
     heading: z.string().max(160).optional(),
     intro: z.string().max(600).optional(),
     items: z.array(featureItemSchema).min(1).max(12),
+    /**
+     * The `list` and `steps` looks in two columns from the tablet width up
+     * (one on a phone). ABSENT is one column, as before. The grid has its
+     * own columns and ignores it.
+     */
+    columns: z.union([z.literal(1), z.literal(2)]).optional(),
+    /** A muted line under the points — a disclaimer, a caveat. Plain text. */
+    note: z.string().trim().max(600).optional(),
 });
 
 /**
@@ -576,6 +619,11 @@ const buttonLabel = z.string().trim().max(40).optional();
  * Display options (G16): `layout` (ABSENT: `list`, the rows it has always
  * drawn), `showDescriptions` (ABSENT: shown) and `buttonLabel`, the words on
  * each service's own button (ABSENT: "Book").
+ *
+ * The `priceCard` look (template polish) is for a practice with one
+ * appointment: the first service still offered as a card — its name, its
+ * price set large and its duration, read live like every service here —
+ * beside the heading, the intro and what it includes.
  */
 const servicesListV1 = z.object({
     variant,
@@ -599,6 +647,18 @@ const servicesListV1 = z.object({
     layout: listLayout,
     showDescriptions: z.boolean().optional(),
     buttonLabel,
+    /**
+     * The `priceCard` look's own words (template polish), around a price and
+     * a duration that are ALWAYS the service's: `modeLine` under the price
+     * ("In person in Pune, or by video"), `followUpLine` under the button
+     * ("Follow-ups are … and usually six weeks apart"), and beside the card
+     * what the appointment includes, under `includesLabel`. Plain text, the
+     * merchant's own; a figure typed here is theirs, never read as a price.
+     */
+    modeLine: z.string().trim().max(160).optional(),
+    followUpLine: z.string().trim().max(300).optional(),
+    includesLabel: z.string().trim().max(60).optional(),
+    includes: z.array(z.string().trim().min(1).max(200)).max(12).optional(),
 });
 
 /**
@@ -613,9 +673,12 @@ const servicesListV1 = z.object({
  * `storeId` names one `SHOP` storefront — a place with an address and hours.
  * It is the block's own and NOT the site's "sells from" storefront, because a
  * site that sells from an `ONLINE` storefront still has a shop to visit.
- * Optional, like `booking.serviceId`: a just-added block has none until the
- * editor picks one, and the live site then renders nothing rather than a
- * card with no place in it.
+ * ABSENT, the block shows the business's own place (template polish), as
+ * `hours` does (`GET public/sites/:siteId/visit`): its first open shop, else
+ * the business profile's address and hours — so a template can lay the block
+ * down for a business with one place and nothing to choose. With no place
+ * at all the live site renders nothing rather than a card with no place in
+ * it.
  *
  * `showMap` is the Get directions link (a maps search for the address, not an
  * embedded map); `showHours` the week and "Open now". Both default to on, so
@@ -652,6 +715,12 @@ const visitUsV1 = z.object({
  * and so ignores `count`, `layout`, `showImages` and `buttonLabel`. A look
  * rather than `count: "all"`, so `count` keeps meaning one thing and a
  * section switched back to cards keeps the count it had.
+ *
+ * The `lead` look (template polish) opens on the newest post in depth: its
+ * date, title, own excerpt, a reading time worked out from its length, its
+ * opening paragraphs as plain text and "Continue reading". The paragraphs
+ * come from the post's body the feed already carries, so nothing new is
+ * read. A section under it sets `afterLead` so the newest is not shown twice.
  */
 const journalV1 = z.object({
     variant,
@@ -663,6 +732,25 @@ const journalV1 = z.object({
     /** Display options (G16): ABSENT, cards and no button of their own. */
     layout: listLayout,
     buttonLabel,
+    /**
+     * Leave out the newest post (template polish), for a section under a
+     * `lead` one that already opens on it. ABSENT, every post.
+     */
+    afterLead: z.boolean().optional(),
+    /** The archive look's posts under their year (template polish). */
+    groupByYear: z.boolean().optional(),
+    /**
+     * "{n} pieces in all" beside the title, counted from every post the
+     * site has live, not only the ones shown (template polish).
+     */
+    showTotal: z.boolean().optional(),
+    /**
+     * The archive look's newest few, with "All {n} entries" beside the title
+     * to the posts index (template polish). ABSENT, every post.
+     */
+    archiveLimit: z.number().int().min(1).max(24).optional(),
+    /** Dates in this year without the year: "2 Apr" (template polish). */
+    shortDates: z.boolean().optional(),
 });
 
 /**
@@ -683,6 +771,11 @@ const plansV1 = z.object({
     variant,
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
+    /**
+     * A line under the title — "Three ways in. No joining fee." (template
+     * polish). The merchant's own words; drawn only over plans on sale.
+     */
+    intro: z.string().trim().max(600).optional(),
     highlight: z.enum(["first", "none"]).optional(),
     buttonLabel,
     showDescriptions: z.boolean().optional(),
@@ -736,7 +829,9 @@ export const PROJECTS_MAX = 24;
  * is chosen first and the draft saves in between.
  *
  * `link` is a `linkHref`, so `javascript:` is refused when it is authored.
- * Looks are `cards` and `list` (`LIST_LAYOUTS`), in `BLOCK_META`.
+ * Looks are `cards` and `list` (`LIST_LAYOUTS`), and the template polish's
+ * `rhythm` (a wide lead, then a pair, then a portrait beside a landscape)
+ * and `rows` (hairline rows: year | the work | role), in `BLOCK_META`.
  * Up to {@link PROJECTS_MAX}: past that it is a page of its own.
  */
 const projectItemSchema = z.object({
@@ -751,6 +846,16 @@ const projectItemSchema = z.object({
     title: z.string().trim().min(1).max(120),
     summary: z.string().max(600).optional(),
     link: linkHref.optional(),
+    /**
+     * When, who and with what (template polish), for the `rows` look's
+     * columns: `year` ("2026", "2019–2022") in the first, `role` ("Sole
+     * engineer") in the last, `meta` (a stack, a medium) under the summary.
+     * Plain text, each optional; the other looks draw `meta` under the
+     * summary and leave the rest.
+     */
+    year: z.string().trim().max(20).optional(),
+    role: z.string().trim().max(80).optional(),
+    meta: z.string().trim().max(160).optional(),
 });
 
 const projectsV1 = z.object({
@@ -758,6 +863,12 @@ const projectsV1 = z.object({
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
     items: z.array(projectItemSchema).min(1).max(PROJECTS_MAX),
+    /**
+     * A line beside the title counted from the projects shown — "5 projects
+     * across 8 years", the span read from their years (template polish).
+     * Derived, never typed. ABSENT, not shown.
+     */
+    showCount: z.boolean().optional(),
     /**
      * `over`: in the cards look, a project's title and caption sit on a
      * bounded band over its photo (DEC-090). Absent is below, as before.
@@ -823,6 +934,21 @@ const productGridV1 = z.object({
     showPhotos: z.boolean().optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel,
+    /**
+     * A line beside the title counted from the products shown — "3 of 5
+     * available", "All sold out" (template polish). Derived, never typed,
+     * so it is a switch. ABSENT, not shown.
+     */
+    showAvailability: z.boolean().optional(),
+    /** A short line under the grid, the merchant's own. Plain text. */
+    note: z.string().trim().max(400).optional(),
+    /**
+     * `bare` (template polish): the even grid's products without a card —
+     * a tall 4:5 photo, the name and price beside each other in the
+     * heading face, sold out as a label on the photo's corner. ABSENT is
+     * the card. The other looks ignore it.
+     */
+    cardStyle: z.enum(["card", "bare"]).optional(),
 });
 
 /** How many classes a Timetable may be limited to (U2). */
@@ -844,8 +970,10 @@ export const TIMETABLE_MAX_SERVICES = 24;
  * - The week is always seven days from today: a field for it would be a
  *   number with one right answer.
  *
- * Looks are `grid` (days across, times down; a list on a phone) and `list`
- * (day by day), in `BLOCK_META`. With no class sessions in the week the
+ * Looks are `grid` (days across, times down; a list on a phone), `list`
+ * (day by day) and the template polish's `accent` (the grid with the
+ * sessions that fill set on the accent, times in the mono face), in
+ * `BLOCK_META`. With no class sessions in the week the
  * block renders nothing on the site; the editor's canvas says why.
  */
 const timetableV1 = z.object({
@@ -863,6 +991,18 @@ const timetableV1 = z.object({
         .optional(),
     showTrainer: z.boolean().optional(),
     showPlacesLeft: z.boolean().optional(),
+    /**
+     * Monday to Friday only (template polish), for a business whose week is
+     * the working week; the weekend's sessions are left off. ABSENT, all
+     * seven days.
+     */
+    weekdaysOnly: z.boolean().optional(),
+    /**
+     * A line counted from the week shown — "13 sessions across 5 days" —
+     * before the intro, and in the accent look a key for its filled cells
+     * (template polish). Derived, never typed. ABSENT, not shown.
+     */
+    showCounts: z.boolean().optional(),
 });
 
 /**
@@ -885,6 +1025,16 @@ const hoursV1 = z.object({
     title: z.string().trim().max(160).optional(),
     storeId: z.string().min(1).optional(),
     showClosed: z.boolean().optional(),
+    /**
+     * Days in a row with the same hours as one line — "Tuesday to Friday ·
+     * 7:00 – 15:00" (template polish). ABSENT, one row per day, as before.
+     */
+    groupDays: z.boolean().optional(),
+    /**
+     * The place's address under the week, from the same read (template
+     * polish), for a page with no Visit us beside it. ABSENT, not shown.
+     */
+    showAddress: z.boolean().optional(),
 });
 
 /** How many qualifications a Person lists, at most, and how long a bio runs. */
@@ -905,6 +1055,36 @@ export const PERSON_BIO_MAX = 1200;
  * The photo's description is asked for before publishing, not on save
  * (`site-flags.ts`), as the text block's is.
  */
+/**
+ * One qualification (template polish): a line, as v1 always held, or a row —
+ * the title and where or when it came from ("MSc Clinical Nutrition" /
+ * "Manipal University, 2012"). A union rather than a second field, so a
+ * person's qualifications stay one list in one order.
+ */
+const credentialSchema = z.union([
+    z.string().trim().min(1).max(120),
+    z.object({
+        title: z.string().trim().min(1).max(120),
+        detail: z.string().trim().max(160).optional(),
+    }),
+]);
+
+/** How many more people a team carries beside the block's own person. */
+export const PERSON_TEAM_MAX = 11;
+
+/**
+ * Another person in the `team` look (template polish): their photo, name,
+ * what they do and a line about them. Plain text and a photo, as the
+ * block's own person is.
+ */
+const teamMemberSchema = z.object({
+    image: imageSchema.optional(),
+    imageBrief,
+    name: z.string().trim().min(1).max(120),
+    role: z.string().trim().max(160).optional(),
+    bio: z.string().trim().max(600).optional(),
+});
+
 const personV1 = z.object({
     variant,
     padding: paddingOverride,
@@ -914,11 +1094,34 @@ const personV1 = z.object({
     name: z.string().trim().min(1).max(120),
     role: z.string().trim().max(160).optional(),
     credentials: z
-        .array(z.string().trim().min(1).max(120))
+        .array(credentialSchema)
         .max(PERSON_CREDENTIALS_MAX)
         .optional(),
+    /**
+     * A visible label over the qualifications ("Qualifications", "Training").
+     * ABSENT: the portrait look says "Qualifications"; the default look keeps
+     * its list unlabelled on screen, as before.
+     */
+    credentialsLabel: z.string().trim().max(40).optional(),
     bio: z.string().trim().max(PERSON_BIO_MAX).optional(),
     cta: ctaSchemaV2.optional(),
+    /**
+     * The name as the page's `h1` (template polish), for a person who opens
+     * the page — the practitioner's site whose first section is them. ABSENT
+     * is the `h2` every section heading is. Set it only on a section that
+     * opens its page, so the page keeps one `h1`.
+     */
+    asTitle: z.boolean().optional(),
+    /**
+     * The `team` look's heading over the grid ("Who is coaching"). The other
+     * looks have the person's name as their heading and ignore it.
+     */
+    title: z.string().trim().max(160).optional(),
+    /**
+     * The `team` look's other people, after the block's own person, who is
+     * always first. The other looks draw one person and ignore them.
+     */
+    people: z.array(teamMemberSchema).max(PERSON_TEAM_MAX).optional(),
 });
 
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */

@@ -80,6 +80,23 @@ export function cardLine(blurb: string | null): string | null {
     return first ? first[0] : text;
 }
 
+/**
+ * What is left, counted from the products shown (template polish): "3 of 5
+ * available", "All 5 available", "All sold out". Sold out is said in words,
+ * so the line never leans on a colour.
+ */
+export function availabilityLine(
+    products: readonly Pick<ShopListingCard, "soldOut">[],
+): string | null {
+    const n = products.length;
+    if (n === 0) return null;
+    const free = products.filter((p) => !p.soldOut).length;
+    if (n === 1) return free === 1 ? "Available" : "Sold out";
+    if (free === 0) return "All sold out";
+    if (free === n) return `All ${n} available`;
+    return `${free} of ${n} available`;
+}
+
 /** A value with something in it, else null: an empty string says nothing. */
 function said(value: string | null | undefined): string | null {
     const trimmed = value?.trim();
@@ -243,24 +260,48 @@ const textButton = cn(
 function GridFrame({
     title,
     more,
+    count = null,
+    note = null,
     children,
 }: {
     title: string;
     more?: React.ReactNode;
+    /** What is left, beside the title (template polish). */
+    count?: string | null;
+    /** The merchant's line under the grid (template polish). */
+    note?: string | null;
     children: React.ReactNode;
 }) {
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-            <div className="mb-3.5 flex items-baseline gap-3">
+            <div
+                className={cn(
+                    "mb-3.5 flex items-baseline gap-3",
+                    count && "flex-wrap",
+                )}
+            >
                 <h2
                     data-site-title=""
                     className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
                 >
                     {title}
                 </h2>
+                {count ? (
+                    <span
+                        data-availability=""
+                        className="text-site-muted shrink-0 text-[12.5px] font-semibold uppercase tracking-[0.09em]"
+                    >
+                        {count}
+                    </span>
+                ) : null}
                 {more ?? null}
             </div>
             {children}
+            {note ? (
+                <p className="text-site-body mt-6 max-w-[60ch] whitespace-pre-line text-[15px] leading-relaxed">
+                    {note}
+                </p>
+            ) : null}
         </section>
     );
 }
@@ -329,10 +370,14 @@ function ProductCards({
         list
             ? listCard(show.photo && p.image !== null)
             : cn(cardClass, !show.photo && "pt-4");
+    // Bare cards (template polish): the even grid without the card.
+    const bare = !lead && !plates && !list && content.cardStyle === "bare";
 
     return (
         <GridFrame
             title={title}
+            count={content.showAvailability ? availabilityLine(products) : null}
+            note={said(content.note)}
             more={
                 base !== null ? (
                     <a
@@ -362,6 +407,8 @@ function ProductCards({
                     base={base}
                     line={cardLine}
                 />
+            ) : bare ? (
+                <BareGrid products={products} show={show} base={base} />
             ) : (
                 <ul
                     className={cn(
@@ -510,5 +557,107 @@ function CardWords({
             ) : null}
             {show.label ? <span className={cardLink}>{show.label}</span> : null}
         </>
+    );
+}
+
+/**
+ * The bare cards (template polish), as the bakery design lays out its
+ * bread: no card around each product, a tall 4:5 photo, the name and the
+ * price side by side in the heading face, the line under them. Sold out is
+ * a label on the photo's top corner and the words go quiet — said, not only
+ * coloured. With photos off, the label sits beside the name.
+ */
+function BareGrid({
+    products,
+    show,
+    base,
+}: {
+    products: ShopListingCard[];
+    show: CardShow;
+    base: string | null;
+}) {
+    return (
+        <ul className="grid gap-x-[30px] gap-y-10 [grid-template-columns:repeat(auto-fill,minmax(min(212px,100%),1fr))]">
+            {products.map((p) => {
+                const line = show.line ? cardLine(p.blurb) : null;
+                const amount = formatAmount(p.price, p.currency);
+                const soldOut = p.soldOut ? (
+                    <span className="bg-site-fg text-site-bg px-2 py-1 text-[11.5px] font-semibold uppercase tracking-[0.06em]">
+                        Sold out
+                    </span>
+                ) : null;
+                const inner = (
+                    <>
+                        {show.photo ? (
+                            <span className="bg-site-surface relative mb-3.5 block aspect-[4/5] overflow-hidden rounded-[var(--site-radius)]">
+                                {p.image ? (
+                                    <img
+                                        src={p.image.url}
+                                        alt={p.image.alt}
+                                        loading="lazy"
+                                        className="h-full w-full object-cover"
+                                    />
+                                ) : null}
+                                {soldOut ? (
+                                    <span className="absolute left-0 top-0 flex">
+                                        {soldOut}
+                                    </span>
+                                ) : null}
+                            </span>
+                        ) : null}
+                        <span className="flex items-baseline gap-3">
+                            <span
+                                className={cn(
+                                    "font-site-heading min-w-0 flex-1 text-[calc(1.25rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em] underline-offset-4 group-hover:underline",
+                                    p.soldOut && "text-site-muted",
+                                )}
+                            >
+                                {p.name}
+                            </span>
+                            {!show.photo && soldOut ? (
+                                <span className="shrink-0">{soldOut}</span>
+                            ) : null}
+                            {show.price ? (
+                                <span
+                                    className={cn(
+                                        "font-site-heading shrink-0 text-[calc(1.3125rem*var(--site-heading-scale))] font-semibold tabular-nums tracking-[-0.02em]",
+                                        p.soldOut && "text-site-muted",
+                                    )}
+                                >
+                                    {p.priceFrom ? `From ${amount}` : amount}
+                                </span>
+                            ) : null}
+                        </span>
+                        {line ? (
+                            <span className="text-site-body mt-1.5 block text-[14px] leading-normal [text-wrap:pretty]">
+                                {line}
+                            </span>
+                        ) : null}
+                        {show.label ? (
+                            <span className="text-site-accent mt-2 block text-sm font-semibold underline-offset-4 group-hover:underline">
+                                {show.label}
+                            </span>
+                        ) : null}
+                    </>
+                );
+                return (
+                    <li key={p.slug} className="text-site-fg min-w-0">
+                        {base !== null ? (
+                            <a
+                                href={`${base}/${encodeURIComponent(p.slug)}`}
+                                className={cn(
+                                    "group block cursor-pointer rounded-[var(--site-radius)]",
+                                    focusRing,
+                                )}
+                            >
+                                {inner}
+                            </a>
+                        ) : (
+                            <div>{inner}</div>
+                        )}
+                    </li>
+                );
+            })}
+        </ul>
     );
 }

@@ -63,3 +63,70 @@ export function JournalArchive({ rows }: { rows: ArchiveRow[] }) {
         </ol>
     );
 }
+
+/** One year of the archive and its rows, newest first (template polish). */
+export interface ArchiveYear {
+    /** "2026", or "Not published" behind a preview token. */
+    year: string;
+    rows: ArchiveRow[];
+}
+
+/**
+ * The archive grouped by year (template polish), as the blog design files
+ * its writing: the year in a narrow column, that year's posts beside it —
+ * the date (without the year it sits under) and the title. On a phone the
+ * year sits above its posts. Each year is a list of its own, labelled by
+ * the year, so a screen reader hears where it is.
+ */
+export function JournalArchiveByYear({ years }: { years: ArchiveYear[] }) {
+    return (
+        <div className="border-site-border border-t">
+            {years.map((group) => (
+                <section
+                    key={group.year}
+                    aria-label={group.year}
+                    className="border-site-border grid gap-x-6 gap-y-2 border-b py-5 sm:grid-cols-[3.875rem_minmax(0,1fr)]"
+                >
+                    <p className="text-site-muted text-[15px] tabular-nums sm:pt-0.5">
+                        {group.year}
+                    </p>
+                    <ol className="grid gap-2.5">
+                        {group.rows.map((row) => (
+                            <li key={row.key}>
+                                <a
+                                    href={row.href}
+                                    className={cn(
+                                        "text-site-fg group grid grid-cols-[4.125rem_minmax(0,1fr)] gap-x-4",
+                                        focusRing,
+                                    )}
+                                >
+                                    <span className="text-site-muted pt-0.5 text-[14px] tabular-nums">
+                                        {row.date ? (
+                                            row.dateTime ? (
+                                                <time dateTime={row.dateTime}>
+                                                    {row.date}
+                                                </time>
+                                            ) : (
+                                                row.date
+                                            )
+                                        ) : null}
+                                    </span>
+                                    <span className="grid min-w-0 gap-1">
+                                        <span className="font-site-heading text-[calc(1.15625rem*var(--site-heading-scale))] leading-snug underline-offset-4 [overflow-wrap:anywhere] group-hover:underline">
+                                            {row.title}
+                                        </span>
+                                        {row.excerpt ? (
+                                            <span className="text-site-body text-[14px] leading-normal [text-wrap:pretty]">
+                                                {row.excerpt}
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                </a>
+                            </li>
+                        ))}
+                    </ol>
+                </section>
+            ))}
+        </div>
+    );
+}

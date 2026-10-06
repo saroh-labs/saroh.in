@@ -1,13 +1,22 @@
 "use client";
 
-import { PERSON_BIO_MAX, PERSON_CREDENTIALS_MAX } from "@saroh/block-contract";
+import {
+    PERSON_BIO_MAX,
+    PERSON_CREDENTIALS_MAX,
+    PERSON_TEAM_MAX,
+    resolveVariant,
+} from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
 import { MediaPicker } from "@/components/sites/media-picker";
-import type { PersonContent } from "@/lib/sites/service";
+import type {
+    PersonContent,
+    PersonCredential,
+    PersonMember,
+} from "@/lib/sites/service";
 
 import {
     CtaActionFields,
@@ -17,6 +26,7 @@ import {
 } from "./cta-action-fields";
 import { Field } from "./field";
 import { ImageBrief } from "./image-brief";
+import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 
 /**
@@ -38,8 +48,9 @@ export function PersonFields({
     const patch = (next: Partial<PersonContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
     const credentials = c.credentials ?? [];
-    const setCredentials = (next: string[]) =>
+    const setCredentials = (next: PersonCredential[]) =>
         patch({ credentials: next.length > 0 ? next : undefined });
+    const team = resolveVariant("person", c) === "team";
     const hintId = useId();
     const image = c.image?.src ? c.image : undefined;
 
@@ -122,54 +133,111 @@ export function PersonFields({
                 />
             </Field>
 
-            <Field label="Qualifications">
-                <div className="grid gap-2">
-                    {credentials.map((line, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                            <Input
-                                value={line}
-                                aria-label={`Qualification ${i + 1}`}
-                                onChange={(e) =>
-                                    setCredentials(
-                                        credentials.map((v, j) =>
-                                            j === i ? e.target.value : v,
-                                        ),
-                                    )
-                                }
-                                placeholder="MSc Clinical Nutrition"
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                aria-label={`Remove qualification ${i + 1}`}
-                                onClick={() =>
-                                    setCredentials(
-                                        credentials.filter((_, j) => j !== i),
-                                    )
-                                }
-                            >
-                                Remove
-                            </Button>
+            {team ? null : (
+                <>
+                    <Field label="Qualifications">
+                        <div className="grid gap-2">
+                            {credentials.map((cred, i) => {
+                                const row = credentialRow(cred);
+                                return (
+                                    <div
+                                        key={i}
+                                        className="grid gap-1.5 rounded-md border p-2"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                value={row.title}
+                                                aria-label={`Qualification ${i + 1}`}
+                                                onChange={(e) =>
+                                                    setCredentials(
+                                                        credentials.map(
+                                                            (v, j) =>
+                                                                j === i
+                                                                    ? asCredential(
+                                                                          e
+                                                                              .target
+                                                                              .value,
+                                                                          row.detail,
+                                                                      )
+                                                                    : v,
+                                                        ),
+                                                    )
+                                                }
+                                                placeholder="MSc Clinical Nutrition"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                aria-label={`Remove qualification ${i + 1}`}
+                                                onClick={() =>
+                                                    setCredentials(
+                                                        credentials.filter(
+                                                            (_, j) => j !== i,
+                                                        ),
+                                                    )
+                                                }
+                                            >
+                                                Remove
+                                            </Button>
+                                        </div>
+                                        <Input
+                                            value={row.detail}
+                                            aria-label={`Where qualification ${i + 1} is from`}
+                                            onChange={(e) =>
+                                                setCredentials(
+                                                    credentials.map((v, j) =>
+                                                        j === i
+                                                            ? asCredential(
+                                                                  row.title,
+                                                                  e.target
+                                                                      .value,
+                                                              )
+                                                            : v,
+                                                    ),
+                                                )
+                                            }
+                                            placeholder="Optional. Where and when, like Manipal University, 2012"
+                                        />
+                                    </div>
+                                );
+                            })}
+                            {credentials.length < PERSON_CREDENTIALS_MAX ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="justify-self-start"
+                                    onClick={() =>
+                                        setCredentials([...credentials, ""])
+                                    }
+                                >
+                                    Add a qualification
+                                </Button>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">
+                                    That is the most this block lists.
+                                </p>
+                            )}
                         </div>
-                    ))}
-                    {credentials.length < PERSON_CREDENTIALS_MAX ? (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="justify-self-start"
-                            onClick={() => setCredentials([...credentials, ""])}
-                        >
-                            Add a qualification
-                        </Button>
-                    ) : (
-                        <p className="text-xs text-muted-foreground">
-                            That is the most this block lists.
-                        </p>
-                    )}
-                </div>
-            </Field>
+                    </Field>
+                    {credentials.length > 0 ? (
+                        <Field label="Label over them">
+                            <Input
+                                value={c.credentialsLabel ?? ""}
+                                onChange={(e) =>
+                                    patch({
+                                        credentialsLabel:
+                                            e.target.value || undefined,
+                                    })
+                                }
+                                maxLength={40}
+                                placeholder="Qualifications"
+                            />
+                        </Field>
+                    ) : null}
+                </>
+            )}
 
             <Field label="About them">
                 <Textarea
@@ -201,6 +269,173 @@ export function PersonFields({
                     }
                 />
             ) : null}
+
+            {team ? (
+                <>
+                    <Field label="Heading over the team">
+                        <Input
+                            value={c.title ?? ""}
+                            onChange={(e) =>
+                                patch({ title: e.target.value || undefined })
+                            }
+                            placeholder="Who is coaching"
+                        />
+                    </Field>
+                    <TeamFields
+                        people={c.people ?? []}
+                        onChange={(people) =>
+                            patch({
+                                people: people.length > 0 ? people : undefined,
+                            })
+                        }
+                    />
+                </>
+            ) : null}
+
+            <OptionSwitch
+                label="This opens the page"
+                checked={c.asTitle === true}
+                onChange={(on) => patch({ asTitle: on ? true : undefined })}
+                note={
+                    team
+                        ? "The heading becomes the page's main title. Use it only when this is the first thing on the page."
+                        : "The name becomes the page's main title. Use it only when this is the first thing on the page."
+                }
+            />
         </div>
+    );
+}
+
+/** A credential as the two inputs edit it. */
+function credentialRow(cred: PersonCredential): {
+    title: string;
+    detail: string;
+} {
+    return typeof cred === "string"
+        ? { title: cred, detail: "" }
+        : { title: cred.title, detail: cred.detail ?? "" };
+}
+
+/** A line while there is no detail, a row once there is one. */
+function asCredential(title: string, detail: string): PersonCredential {
+    return detail.trim() ? { title, detail } : title;
+}
+
+/**
+ * The team look's other people: a name, what they do, a line and a photo
+ * each, up to the contract's cap. The block's own person, above, is always
+ * first.
+ */
+function TeamFields({
+    people,
+    onChange,
+}: {
+    people: PersonMember[];
+    onChange: (next: PersonMember[]) => void;
+}) {
+    const set = (i: number, next: Partial<PersonMember>) =>
+        onChange(people.map((p, j) => (j === i ? { ...p, ...next } : p)));
+    return (
+        <Field label="Everyone else">
+            <div className="grid gap-2">
+                {people.map((p, i) => (
+                    <div key={i} className="grid gap-2 rounded-md border p-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                                Person {i + 2}
+                            </span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`Remove person ${i + 2}`}
+                                onClick={() =>
+                                    onChange(people.filter((_, j) => j !== i))
+                                }
+                            >
+                                Remove
+                            </Button>
+                        </div>
+                        <MediaPicker
+                            label={
+                                p.image?.src
+                                    ? "Replace photo…"
+                                    : "Upload a photo…"
+                            }
+                            onPick={(picked) =>
+                                set(i, {
+                                    image: {
+                                        src: picked.src,
+                                        alt: p.image?.alt,
+                                        width: picked.width,
+                                        height: picked.height,
+                                    },
+                                })
+                            }
+                        />
+                        <ImageBrief
+                            brief={p.imageBrief}
+                            hasImage={Boolean(p.image?.src)}
+                        />
+                        {p.image?.src ? (
+                            <Input
+                                value={p.image.alt ?? ""}
+                                aria-label={`Describe person ${i + 2}'s photo`}
+                                onChange={(e) =>
+                                    set(i, {
+                                        image: p.image
+                                            ? {
+                                                  ...p.image,
+                                                  alt: e.target.value,
+                                              }
+                                            : undefined,
+                                    })
+                                }
+                                placeholder="What is in the photo, for someone who can't see it"
+                            />
+                        ) : null}
+                        <Input
+                            value={p.name}
+                            aria-label={`Person ${i + 2}'s name`}
+                            onChange={(e) => set(i, { name: e.target.value })}
+                            placeholder="Their name"
+                        />
+                        <Input
+                            value={p.role ?? ""}
+                            aria-label={`What person ${i + 2} does`}
+                            onChange={(e) =>
+                                set(i, { role: e.target.value || undefined })
+                            }
+                            placeholder="What they do"
+                        />
+                        <Textarea
+                            value={p.bio ?? ""}
+                            aria-label={`About person ${i + 2}`}
+                            onChange={(e) =>
+                                set(i, { bio: e.target.value || undefined })
+                            }
+                            rows={2}
+                            maxLength={600}
+                            placeholder="A line about them. Optional."
+                        />
+                    </div>
+                ))}
+                {people.length < PERSON_TEAM_MAX ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="justify-self-start"
+                        onClick={() => onChange([...people, { name: "" }])}
+                    >
+                        Add a person
+                    </Button>
+                ) : (
+                    <p className="text-xs text-muted-foreground">
+                        That is the most a team block shows.
+                    </p>
+                )}
+            </div>
+        </Field>
     );
 }

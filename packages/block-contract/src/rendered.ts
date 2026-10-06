@@ -146,7 +146,13 @@ const renderedRichText = z.object({
     /** One photo beside the text (G7); absent side is the right. */
     image: renderedImageSchema.optional(),
     imageBrief: z.string().optional(),
-    imageSide: z.enum(["left", "right"]).optional(),
+    // A side this build does not know draws as the right, as absent does.
+    imageSide: z.string().optional(),
+    /** A boxed line after the text, ruled in the accent (template polish). */
+    callout: z
+        .object({ label: z.string().optional(), text: z.string() })
+        .optional(),
+    partLabels: z.boolean().optional(),
 });
 
 const renderedCta = renderedCtaSchema.extend({ variant, padding });
@@ -220,9 +226,13 @@ const renderedFeatures = z.object({
             z.object({
                 title: z.string(),
                 body: z.string().optional(),
+                /** A figure the point stands on, the merchant's own words. */
+                value: z.string().optional(),
             }),
         )
         .min(1),
+    columns: z.number().int().optional(),
+    note: z.string().optional(),
 });
 
 /**
@@ -284,6 +294,10 @@ const renderedServicesList = z.object({
     layout: z.enum(["cards", "list"]).optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel: z.string().optional(),
+    modeLine: z.string().optional(),
+    followUpLine: z.string().optional(),
+    includesLabel: z.string().optional(),
+    includes: z.array(z.string()).optional(),
 });
 
 /**
@@ -312,6 +326,11 @@ const renderedJournal = z.object({
     showImages: z.boolean().optional(),
     layout: z.enum(["cards", "list"]).optional(),
     buttonLabel: z.string().optional(),
+    afterLead: z.boolean().optional(),
+    groupByYear: z.boolean().optional(),
+    showTotal: z.boolean().optional(),
+    archiveLimit: z.number().int().optional(),
+    shortDates: z.boolean().optional(),
 });
 
 /**
@@ -322,6 +341,7 @@ const renderedPlans = z.object({
     variant,
     padding,
     title: z.string().optional(),
+    intro: z.string().optional(),
     highlight: z.enum(["first", "none"]).optional(),
     buttonLabel: z.string().optional(),
     showDescriptions: z.boolean().optional(),
@@ -346,6 +366,10 @@ const renderedProductGrid = z.object({
     showPhotos: z.boolean().optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel: z.string().optional(),
+    showAvailability: z.boolean().optional(),
+    note: z.string().optional(),
+    // A card style this build does not know draws as the card.
+    cardStyle: z.string().optional(),
 });
 
 /**
@@ -379,10 +403,14 @@ const renderedProjects = z.object({
                 title: z.string(),
                 summary: z.string().optional(),
                 link: z.string().optional(),
+                year: z.string().optional(),
+                role: z.string().optional(),
+                meta: z.string().optional(),
             }),
         )
         .min(1),
     captionPlacement: z.string().optional(),
+    showCount: z.boolean().optional(),
 });
 
 /**
@@ -398,6 +426,8 @@ const renderedTimetable = z.object({
     serviceIds: z.array(z.string()).optional(),
     showTrainer: z.boolean().optional(),
     showPlacesLeft: z.boolean().optional(),
+    weekdaysOnly: z.boolean().optional(),
+    showCounts: z.boolean().optional(),
 });
 
 const renderedHours = z.object({
@@ -406,6 +436,8 @@ const renderedHours = z.object({
     title: z.string().optional(),
     storeId: z.string().optional(),
     showClosed: z.boolean().optional(),
+    groupDays: z.boolean().optional(),
+    showAddress: z.boolean().optional(),
 });
 
 const renderedPerson = z.object({
@@ -415,9 +447,34 @@ const renderedPerson = z.object({
     imageBrief: z.string().optional(),
     name: z.string(),
     role: z.string().optional(),
-    credentials: z.array(z.string()).optional(),
+    // A line, or a row with where it came from (template polish).
+    credentials: z
+        .array(
+            z.union([
+                z.string(),
+                z.object({
+                    title: z.string(),
+                    detail: z.string().optional(),
+                }),
+            ]),
+        )
+        .optional(),
+    credentialsLabel: z.string().optional(),
     bio: z.string().optional(),
     cta: renderedCtaSchema.optional(),
+    asTitle: z.boolean().optional(),
+    title: z.string().optional(),
+    people: z
+        .array(
+            z.object({
+                image: renderedImageSchema.optional(),
+                imageBrief: z.string().optional(),
+                name: z.string(),
+                role: z.string().optional(),
+                bio: z.string().optional(),
+            }),
+        )
+        .optional(),
 });
 
 /**

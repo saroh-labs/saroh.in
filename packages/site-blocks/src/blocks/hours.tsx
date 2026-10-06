@@ -23,6 +23,9 @@ import { cn } from "../lib/utils";
  * - no hours saved, the place gone or closed, or a live render that could
  *   not tell its site: the block renders NOTHING — never seven "Closed"
  *   rows, a claim the business never made;
+ * - `groupDays` (template polish): days in a row with the same hours on one
+ *   line, "Tuesday to Friday"; `showAddress`: the place's address under the
+ *   week, from the same read. Both absent by default;
  * - the read fails: the block's own error state, with a retry;
  * - `siteId` undefined (the editor's canvas): it says where the hours come
  *   from; `visit` given (catalog, tests): drawn without a fetch.
@@ -94,6 +97,52 @@ export function hoursRows(
     return rows;
 }
 
+/** One line of the week: one day, or days in a row with the same hours. */
+export interface HoursLine {
+    days: Weekday[];
+    /** "Tuesday", "Saturday and Sunday", "Tuesday to Friday". */
+    label: string;
+    hours: string | null;
+}
+
+/**
+ * The week's rows with days in a row that keep the same hours (or are all
+ * closed) as one line, "Tuesday to Friday" (template polish). Only days
+ * next to each other in the week join: a day left out between two others
+ * keeps them apart, so a line never claims a day it does not list.
+ */
+export function groupedHoursRows(
+    rows: readonly { day: Weekday; hours: string | null }[],
+): HoursLine[] {
+    const lines: HoursLine[] = [];
+    let last: HoursLine | null = null;
+    for (const row of rows) {
+        const lastDay: Weekday | null = last
+            ? last.days[last.days.length - 1]
+            : null;
+        const adjacent =
+            lastDay !== null &&
+            WEEK.indexOf(row.day) === WEEK.indexOf(lastDay) + 1;
+        if (last && adjacent && last.hours === row.hours) {
+            last.days.push(row.day);
+        } else {
+            last = { days: [row.day], label: "", hours: row.hours };
+            lines.push(last);
+        }
+    }
+    for (const line of lines) {
+        const first = DAY_NAMES[line.days[0]];
+        const end = DAY_NAMES[line.days[line.days.length - 1]];
+        line.label =
+            line.days.length === 1
+                ? first
+                : line.days.length === 2
+                  ? `${first} and ${end}`
+                  : `${first} to ${end}`;
+    }
+    return lines;
+}
+
 export default function HoursSection({
     content,
     siteId,
@@ -158,6 +207,14 @@ export default function HoursSection({
     if (!place) return null;
     const rows = hoursRows(place.hours, content.showClosed !== false);
     if (!rows) return null;
+    const lines: HoursLine[] = content.groupDays
+        ? groupedHoursRows(rows)
+        : rows.map((row) => ({
+              days: [row.day],
+              label: DAY_NAMES[row.day],
+              hours: row.hours,
+          }));
+    const address = content.showAddress ? said(place.address) : null;
     const at = now ?? new Date();
     const today = weekdayIn(at, place.timezone);
     const status = openState(
@@ -184,11 +241,12 @@ export default function HoursSection({
             <table className="w-full max-w-md border-collapse text-left text-[15px]">
                 <caption className="sr-only">{title}</caption>
                 <tbody>
-                    {rows.map((row) => {
-                        const isToday = row.day === today;
+                    {lines.map((row) => {
+                        const isToday =
+                            today !== null && row.days.includes(today);
                         return (
                             <tr
-                                key={row.day}
+                                key={row.days[0]}
                                 aria-current={isToday ? "date" : undefined}
                                 className="border-site-border border-b last:border-b-0"
                             >
@@ -199,7 +257,7 @@ export default function HoursSection({
                                         row.hours === null && "text-site-muted",
                                     )}
                                 >
-                                    {DAY_NAMES[row.day]}
+                                    {row.label}
                                     {isToday ? (
                                         <span className="text-site-muted ml-2 text-[12.5px] font-normal">
                                             Today
@@ -219,6 +277,11 @@ export default function HoursSection({
                     })}
                 </tbody>
             </table>
+            {address ? (
+                <address className="text-site-body mt-4 max-w-md whitespace-pre-line text-[14.5px] not-italic leading-relaxed">
+                    {address}
+                </address>
+            ) : null}
         </Frame>
     );
 }

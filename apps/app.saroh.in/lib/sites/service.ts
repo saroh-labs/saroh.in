@@ -103,8 +103,12 @@ export interface RichTextContent {
     image?: ImageValue;
     /** The photo a template says belongs here (KTD-5). */
     imageBrief?: string;
-    /** Which side the photo sits on; absent is the right. */
-    imageSide?: "left" | "right";
+    /** Where the photo sits: a side, or above the text; absent is the right. */
+    imageSide?: "left" | "right" | "above";
+    /** A boxed line after the text, ruled in the accent (template polish). */
+    callout?: { label?: string; text: string };
+    /** The text's h3s as small capitals part labels. */
+    partLabels?: boolean;
 }
 
 export type CtaContent = CtaValue;
@@ -125,6 +129,8 @@ export interface GalleryContent {
 export interface FeatureItem {
     title: string;
     body?: string;
+    /** A figure the point stands on — a rate, a span (template polish). */
+    value?: string;
 }
 
 /** `features` — a heading over a set of short, titled points. */
@@ -132,6 +138,10 @@ export interface FeaturesContent {
     heading?: string;
     intro?: string;
     items: FeatureItem[];
+    /** The list looks in two columns; absent is one. */
+    columns?: 1 | 2;
+    /** A muted line under the points. */
+    note?: string;
 }
 
 /** One question in an FAQ section (mirror of the section contract). */
@@ -171,12 +181,18 @@ export interface ProjectItem {
     summary?: string;
     /** A web address, an email or phone link, or a path on this site. */
     link?: string;
+    /** The rows look's year, role and a line of facts (template polish). */
+    year?: string;
+    role?: string;
+    meta?: string;
 }
 
 /** `projects` — the merchant's own work, typed in (K11). Up to 24. */
 export interface ProjectsContent {
     title?: string;
     items: ProjectItem[];
+    /** "5 projects across 8 years" beside the title. */
+    showCount?: boolean;
 }
 
 /** `contact` — where to find the business and how to reach it. */
@@ -205,6 +221,11 @@ export interface ServicesListContent {
     layout?: ListLayout;
     showDescriptions?: boolean;
     buttonLabel?: string;
+    /** The price card's lines around the service's price (template polish). */
+    modeLine?: string;
+    followUpLine?: string;
+    includesLabel?: string;
+    includes?: string[];
 }
 
 /** "Show as" (G16): side by side, or one per row. */
@@ -235,6 +256,16 @@ export interface JournalContent {
     /** Display options (G16). Absent: cards, and no button of their own. */
     layout?: ListLayout;
     buttonLabel?: string;
+    /** Leave out the newest post, shown above by a lead (template polish). */
+    afterLead?: boolean;
+    /** The archive by year. */
+    groupByYear?: boolean;
+    /** "{n} pieces in all" beside the title. */
+    showTotal?: boolean;
+    /** The archive's newest few, and a link to all. */
+    archiveLimit?: number;
+    /** This year's dates without the year. */
+    shortDates?: boolean;
 }
 
 /**
@@ -244,6 +275,8 @@ export interface JournalContent {
  */
 export interface PlansContent {
     title?: string;
+    /** A line under the title (template polish). */
+    intro?: string;
     highlight?: "first" | "none";
     buttonLabel?: string;
     showDescriptions?: boolean;
@@ -273,6 +306,12 @@ export interface ProductGridContent {
     showPhotos?: boolean;
     showDescriptions?: boolean;
     buttonLabel?: string;
+    /** "3 of 5 available" beside the title (template polish). */
+    showAvailability?: boolean;
+    /** A line under the products. */
+    note?: string;
+    /** `bare`: the even grid without a card. Absent: the card. */
+    cardStyle?: "card" | "bare";
 }
 
 /**
@@ -297,6 +336,10 @@ export interface TimetableContent {
     serviceIds?: string[];
     showTrainer?: boolean;
     showPlacesLeft?: boolean;
+    /** Monday to Friday only (template polish). */
+    weekdaysOnly?: boolean;
+    /** "13 sessions across 5 days" under the title. */
+    showCounts?: boolean;
 }
 
 /**
@@ -307,6 +350,10 @@ export interface HoursContent {
     title?: string;
     storeId?: string;
     showClosed?: boolean;
+    /** Days in a row with the same hours on one line (template polish). */
+    groupDays?: boolean;
+    /** The place's address under the week. */
+    showAddress?: boolean;
 }
 
 /** `person` — one practitioner, typed in (U2). */
@@ -316,9 +363,30 @@ export interface PersonContent {
     imageBrief?: string;
     name: string;
     role?: string;
-    credentials?: string[];
+    /** A line, or a row with where it came from (template polish). */
+    credentials?: PersonCredential[];
+    /** A visible label over the qualifications. */
+    credentialsLabel?: string;
     bio?: string;
     cta?: CtaValue;
+    /** The name as the page's h1, for a person who opens the page. */
+    asTitle?: boolean;
+    /** The team look's heading. */
+    title?: string;
+    /** The team look's other people. */
+    people?: PersonMember[];
+}
+
+/** One qualification: a line, or a title with where it came from. */
+export type PersonCredential = string | { title: string; detail?: string };
+
+/** Another person in the team look. */
+export interface PersonMember {
+    image?: ImageValue;
+    imageBrief?: string;
+    name: string;
+    role?: string;
+    bio?: string;
 }
 
 /** The field types an enquiry form supports (mirror of the section contract). */

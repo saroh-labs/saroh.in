@@ -13,10 +13,13 @@ import type {
 } from "../lib/timetable-read";
 import {
     dayLabel,
+    fills,
     isPublicTimetable,
+    isWeekday,
     placesWord,
     sessionHref,
     timetableQuery,
+    weekCounts,
 } from "../lib/timetable-read";
 import { cn } from "../lib/utils";
 
@@ -34,7 +37,13 @@ import { cn } from "../lib/utils";
  *
  * Looks: `grid` — days across and times down from the large breakpoint, day
  * by day below it (the same list as `list`), so a phone never scrolls
- * sideways; `list` — day by day at every width.
+ * sideways; `list` — day by day at every width; `accent` (template polish)
+ * — the grid with the sessions that fill set on the accent and still saying
+ * "Fills fast" or "Full" in words, times in the mono face.
+ *
+ * `weekdaysOnly` leaves the weekend off; `showCounts` opens the line under
+ * the title with "13 sessions across 5 days", counted from the week shown,
+ * and gives the accent look a key for its filled cells.
  *
  * - no sessions this week, Appointments off, or a live render that could
  *   not tell its site: the block renders NOTHING;
@@ -151,18 +160,41 @@ export default function TimetableSection({
         );
     }
 
-    const week = state.timetable;
+    const look = resolveVariant("timetable", content);
+    // Monday to Friday only (template polish): the weekend left off.
+    const weekdays = content.weekdaysOnly === true;
+    const week: PublicTimetable = weekdays
+        ? {
+              ...state.timetable,
+              days: state.timetable.days.filter(isWeekday),
+              sessions: state.timetable.sessions.filter((s) =>
+                  isWeekday(s.date),
+              ),
+          }
+        : state.timetable;
     if (week.sessions.length === 0) return null;
+    const accent = look === "accent";
     const show: Show = {
         trainer: content.showTrainer !== false,
         places: content.showPlacesLeft !== false,
         bookHref,
+        accent,
     };
-    const grid = resolveVariant("timetable", content) === "grid";
+    const grid = look === "grid" || accent;
     const days = week.days.length > 0 ? week.days : uniqueDays(week.sessions);
+    const counts = content.showCounts ? weekCounts(week.sessions) : null;
 
     return (
-        <Frame title={title} intro={intro}>
+        <Frame
+            title={title}
+            intro={intro}
+            counts={counts?.line ?? null}
+            legend={
+                accent && counts && counts.filling > 0
+                    ? `${counts.filling} of them fill fast`
+                    : null
+            }
+        >
             {grid ? (
                 <>
                     <div className="hidden lg:block">
@@ -183,6 +215,8 @@ interface Show {
     trainer: boolean;
     places: boolean;
     bookHref?: string;
+    /** The accent look (template polish): filling sessions on the accent. */
+    accent?: boolean;
 }
 
 function uniqueDays(sessions: TimetableSession[]): string[] {
@@ -200,12 +234,26 @@ const textButton = cn(
 function Frame({
     title,
     intro,
+    counts = null,
+    legend = null,
     children,
 }: {
     title: string;
     intro: string | null;
+    /** "13 sessions across 5 days", counted from the week (template polish). */
+    counts?: string | null;
+    /** The accent look's key: a swatch and "4 of them fill fast". */
+    legend?: string | null;
     children: React.ReactNode;
 }) {
+    const lede =
+        counts || intro ? (
+            <p className="text-site-body mt-1.5 max-w-[60ch] text-[15px] leading-relaxed">
+                {counts ? `${counts}.` : null}
+                {counts && intro ? " " : null}
+                {intro}
+            </p>
+        ) : null;
     return (
         <section className="text-site-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <h2
@@ -214,11 +262,23 @@ function Frame({
             >
                 {title}
             </h2>
-            {intro ? (
-                <p className="text-site-body mt-1.5 max-w-[60ch] text-[15px] leading-relaxed">
-                    {intro}
-                </p>
-            ) : null}
+            {legend ? (
+                <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+                    {lede ?? <span />}
+                    <p
+                        data-timetable-legend=""
+                        className="text-site-body flex items-center gap-2 text-[13px]"
+                    >
+                        <span
+                            aria-hidden="true"
+                            className="bg-site-accent inline-block size-[11px] shrink-0"
+                        />
+                        {legend}
+                    </p>
+                </div>
+            ) : (
+                lede
+            )}
             <div className="mt-4">{children}</div>
         </section>
     );
@@ -252,8 +312,22 @@ const TONE: Record<PlacesWord["tone"], string> = {
     open: "bg-[color-mix(in_srgb,hsl(var(--site-fg))_7%,hsl(var(--site-surface)))] text-site-fg",
 };
 
-function Places({ word }: { word: PlacesWord | null }) {
+function Places({
+    word,
+    onAccent = false,
+}: {
+    word: PlacesWord | null;
+    /** On an accent cell: the words in the accent's text colour, no pill. */
+    onAccent?: boolean;
+}) {
     if (!word) return null;
+    if (onAccent) {
+        return (
+            <span className="text-site-accent-fg inline-block whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em]">
+                {word.text}
+            </span>
+        );
+    }
     return (
         <span
             className={cn(
@@ -276,13 +350,28 @@ function Session({
     show: Show;
     withTime: boolean;
 }) {
-    const word = placesWord(session, show.places);
+    // The accent look (template polish) always says Fills fast or Full on
+    // a filling cell, whatever "places left" says: the colour is never the
+    // only signal.
+    const lit = show.accent === true && fills(session);
+    const word = placesWord(session, show.places || lit);
     const full = session.placesLeft <= 0;
     const trainer = show.trainer ? said(session.staffName) : null;
     const body = (
         <>
             {withTime ? (
-                <span className="font-site-heading text-[15px] font-semibold tabular-nums">
+                <span
+                    className={
+                        show.accent
+                            ? cn(
+                                  "font-site-mono text-[13px] tabular-nums",
+                                  lit
+                                      ? "text-site-accent-fg"
+                                      : "text-site-muted",
+                              )
+                            : "font-site-heading text-[15px] font-semibold tabular-nums"
+                    }
+                >
                     {session.time}
                 </span>
             ) : null}
@@ -290,24 +379,34 @@ function Session({
                 <span className="block text-[14.5px] font-semibold leading-snug [overflow-wrap:anywhere]">
                     {session.serviceName}
                 </span>
-                <span className="text-site-muted block text-[12.5px]">
+                <span
+                    className={cn(
+                        "block text-[12.5px]",
+                        lit ? "text-site-accent-fg" : "text-site-muted",
+                    )}
+                >
                     {trainer
                         ? `With ${trainer} · ${session.durationMinutes} min`
                         : `${session.durationMinutes} min`}
                 </span>
             </span>
             <span>
-                <Places word={word} />
+                <Places word={word} onAccent={lit} />
             </span>
         </>
     );
     const layout = withTime
         ? "grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3"
         : "grid gap-1.5";
-    const box = cn(
-        "border-site-border bg-site-surface text-site-fg rounded-[var(--site-radius)] border p-2.5",
-        layout,
-    );
+    const box = lit
+        ? cn(
+              "bg-site-accent text-site-accent-fg rounded-[var(--site-radius)] border border-transparent p-2.5",
+              layout,
+          )
+        : cn(
+              "border-site-border bg-site-surface text-site-fg rounded-[var(--site-radius)] border p-2.5",
+              layout,
+          );
     if (full || !show.bookHref) {
         return <div className={box}>{body}</div>;
     }
@@ -409,7 +508,11 @@ function WeekGrid({
                     <tr key={time}>
                         <th
                             scope="row"
-                            className="font-site-heading pr-1 align-top text-[15px] font-semibold tabular-nums"
+                            className={
+                                show.accent
+                                    ? "font-site-mono text-site-muted pr-1 pt-3 text-right align-top text-[12.5px] font-normal tabular-nums"
+                                    : "font-site-heading pr-1 align-top text-[15px] font-semibold tabular-nums"
+                            }
                         >
                             {time}
                         </th>

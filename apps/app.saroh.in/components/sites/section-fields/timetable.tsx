@@ -10,6 +10,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import type { TimetableContent } from "@/lib/sites/service";
 
 import { Field } from "./field";
+import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { ServicesLoadNotice } from "./services-load-notice";
 
@@ -134,6 +135,20 @@ export function TimetableFields({
                     A full class always says Full.
                 </p>
             </div>
+            <OptionSwitch
+                label="Monday to Friday only"
+                checked={c.weekdaysOnly === true}
+                onChange={(on) =>
+                    patch({ weekdaysOnly: on ? true : undefined })
+                }
+                note="Leaves the weekend's classes off this block."
+            />
+            <OptionSwitch
+                label="Count the week"
+                checked={c.showCounts === true}
+                onChange={(on) => patch({ showCounts: on ? true : undefined })}
+                note="Opens the line under the title with “13 sessions across 5 days”, counted from the week shown."
+            />
         </div>
     );
 }
