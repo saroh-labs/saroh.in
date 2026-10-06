@@ -539,18 +539,27 @@ describe("the last owner", () => {
     });
 });
 
-describe("the plan's team members (U13): Reviewers aren't counted", () => {
-    it("inviting a Reviewer adds nobody to the count", async () => {
+describe("the plan's team members (U13): Reviewers aren't counted, and have their own cap", () => {
+    it("inviting a Reviewer checks the Reviewers cap, never the team's", async () => {
         const withRoom = jest.spyOn(planMeter, "withRoom");
+        const count = jest.fn().mockResolvedValue(0);
         await service.invite(ctx(), {
             email: "reviewer@example.test",
             role: "REVIEWER",
             siteIds: ["site_1"],
         });
+        expect(withRoom.mock.calls[0][1]).toBe("reviewers");
         const options = withRoom.mock.calls[0][3] as {
             addingIn: (tx: unknown) => Promise<number>;
         };
-        expect(await options.addingIn(prisma)).toBe(0);
+        const tx = { organizationInvitation: { count } };
+        expect(await options.addingIn(tx)).toBe(1);
+        // Only an open Reviewer invitation already counts this person.
+        expect(count.mock.calls[0][0].where).toMatchObject({
+            role: "REVIEWER",
+        });
+        count.mockResolvedValue(1);
+        expect(await options.addingIn(tx)).toBe(0);
         withRoom.mockRestore();
     });
 
@@ -561,6 +570,7 @@ describe("the plan's team members (U13): Reviewers aren't counted", () => {
             email: "member@example.test",
             role: "MEMBER",
         });
+        expect(withRoom.mock.calls[0][1]).toBe("members");
         const options = withRoom.mock.calls[0][3] as {
             addingIn: (tx: unknown) => Promise<number>;
         };
@@ -603,18 +613,22 @@ describe("the plan's team members (U13): Reviewers aren't counted", () => {
         roomInTx.mockRestore();
     });
 
-    it("other role changes, and moving to Reviewer, aren't metered", async () => {
-        const roomInTx = jest.spyOn(planMeter, "roomInTx");
+    it("making someone a Reviewer checks the Reviewers cap; other changes aren't metered", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockResolvedValue(null);
         db.membership.findUnique.mockResolvedValue({
             role: "MEMBER",
             extraActions: [],
         });
         await service.updateRole(ctx(), "user_2", { role: "ADMIN" });
+        expect(roomInTx).not.toHaveBeenCalled();
         await service.updateRole(ctx(), "user_2", {
             role: "REVIEWER",
             siteIds: ["site_1"],
         });
-        expect(roomInTx).not.toHaveBeenCalled();
+        expect(roomInTx).toHaveBeenCalledTimes(1);
+        expect(roomInTx).toHaveBeenCalledWith(prisma, "org_1", "reviewers");
         roomInTx.mockRestore();
     });
 });

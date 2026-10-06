@@ -116,6 +116,15 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: "teamMembers",
         legacyEntitlementKey: "teamMembers",
     },
+    /**
+     * Reviewers only read, comment on and approve the sites they're invited to
+     * (DEC-006): they use no team seat, but a plan caps how many.
+     */
+    reviewers: {
+        registry: null,
+        limitKey: "reviewers",
+        legacyEntitlementKey: null,
+    },
     roles: { registry: null, limitKey: null, legacyEntitlementKey: null },
     integrations: {
         registry: null,

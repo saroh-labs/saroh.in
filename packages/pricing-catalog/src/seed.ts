@@ -260,6 +260,18 @@ const input: CatalogInput = {
             },
         },
         {
+            id: "reviewers",
+            name: "Reviewers",
+            group: "team",
+            pricing: "show",
+            what: "People who only approve your website's pages. They use no team seat.",
+            cells: {
+                free: C("1", "", 1),
+                grow: C("3", "", 3),
+                pro: C("100", "", 100),
+            },
+        },
+        {
             id: "roles",
             name: "Custom roles",
             group: "team",

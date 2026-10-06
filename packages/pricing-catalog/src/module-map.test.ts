@@ -36,6 +36,8 @@ describe("module map (KTD-8)", () => {
         expect(MODULE_MAP.sites.limitKey).toBe("sites");
         expect(MODULE_MAP.storage.limitKey).toBe("storageGb");
         expect(MODULE_MAP.visits.limitKey).toBe("visitsPerMonth");
+        // Reviewers use no team seat, but have their own cap.
+        expect(MODULE_MAP.reviewers.limitKey).toBe("reviewers");
         // Invoicing needs no module (DEC-070), so nothing it governs can lock.
         expect(MODULE_MAP.invoicing.registry).toBeNull();
     });
