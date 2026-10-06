@@ -93,3 +93,10 @@ export {
     BAKERY_TEMPLATE_ID,
     bakeryTemplate,
 } from "./templates/bakery";
+// Studio, the gallery's "Portfolio" (industry templates plan, U10).
+export {
+    STUDIO_PROJECT_BRIEFS,
+    STUDIO_TEMPLATE_ID,
+    studioHasEmail,
+    studioTemplate,
+} from "./templates/studio";

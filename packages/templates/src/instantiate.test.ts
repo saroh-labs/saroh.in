@@ -63,11 +63,11 @@ describe("registry", () => {
     });
 
     it("registers the DEC-070 templates beside the starter (K15)", () => {
-        // First, in this order; the industry templates follow them.
+        // First, ahead of the industry templates registered after them.
         expect(
             listTemplates()
-                .map((t) => `${t.id}@${t.version}`)
-                .slice(0, 4),
+                .slice(0, 4)
+                .map((t) => `${t.id}@${t.version}`),
         ).toEqual(["starter@2", "personal@1", "portfolio@1", "writing@1"]);
         for (const id of ["personal", "portfolio", "writing"]) {
             expect(getTemplate(id)?.id).toBe(id);
