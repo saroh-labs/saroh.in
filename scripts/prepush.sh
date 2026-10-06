@@ -305,6 +305,9 @@ e2e_stack() {
     # help and privacy specs; plan U29), as
     # CI does: its waitlist forwards to this stack's API.
     export E2E_WEB_URL=http://localhost:3002
+    # Resources pages before their publish date, as CI: without it the Help
+    # and Privacy specs skip themselves and test nothing.
+    export RESOURCES_PREVIEW=1
     local web_filter=""
     case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,

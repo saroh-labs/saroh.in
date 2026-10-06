@@ -13,6 +13,8 @@ import { urls } from "../playwright.config";
  * - the article draws its five real screenshots (each loaded, not a
  *   placeholder), rings the controls it names, and carries HowTo JSON-LD;
  * - at 390 the product areas are a Topics menu, and nothing hides sideways;
+ * - at desk the topics stay in view as the article scrolls, and scroll
+ *   inside themselves when taller than the window;
  * - the other articles draw a ringed real screen for every step, at desk
  *   and phone width where the spec says so;
  * - every Next link and every link in the side nav answers 200.
@@ -173,6 +175,31 @@ test("at 390 the areas are a Topics menu, and nothing hides sideways", async ({
     await page.getByRole("searchbox", { name: "Search help" }).fill("product");
     await expect(page.getByRole("list", { name: "Results" })).toBeVisible();
     await expectNothingHiddenSideways(page);
+});
+
+test("at desk the topics stay in view while the article scrolls, and scroll inside when taller than the window", async ({
+    page,
+}, testInfo) => {
+    test.skip(isPhone(testInfo), "on the phone the topics are a menu");
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`${WEB}${ARTICLE}`);
+    const nav = page.getByRole("navigation", { name: "Help topics" });
+    await page.mouse.wheel(0, 2400);
+    await expect
+        .poll(async () => (await nav.boundingBox())?.y ?? -1)
+        .toBeGreaterThanOrEqual(0);
+    expect((await nav.boundingBox())?.y).toBeLessThanOrEqual(30);
+
+    // A window shorter than the list: the nav scrolls on its own.
+    await page.setViewportSize({ width: 1280, height: 320 });
+    const sizes = await nav.evaluate((el) => ({
+        client: el.clientHeight,
+        scroll: el.scrollHeight,
+        overflow: getComputedStyle(el).overflowY,
+    }));
+    expect(sizes.client).toBeLessThanOrEqual(320);
+    expect(sizes.scroll).toBeGreaterThan(sizes.client);
+    expect(sizes.overflow).toBe("auto");
 });
 
 /** The bookings, plans and website articles: each step's real screen, ringed. */
