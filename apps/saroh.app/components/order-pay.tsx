@@ -1,6 +1,12 @@
 "use client";
 
-import { ctaClasses, destructiveAlertClasses } from "@saroh/site-blocks";
+import {
+    ctaClasses,
+    destructiveAlertClasses,
+    hasPayInstructions,
+    PayInstructionsCard,
+    payWaysText,
+} from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -24,8 +30,10 @@ import { orderPayOffer } from "@/lib/order-pay-shape";
  *
  * When the business can't take it online (`payOnline` false, R33 — a link
  * made before its plan changed, say), the page is view-only: the order,
- * what's left to pay and "Pay ‹business› directly", with the business's
- * own way to pay once it has one (`howToPay`), and no Pay button.
+ * what's left to pay and "Pay ‹business› directly", with no Pay button.
+ * While it is due, the business's own way to be paid offline, where it set
+ * one (R32, {@link OrderPayInstructions}): its UPI ID as a QR for what is
+ * due, its bank details and its note.
  *
  * Styled in the business's `--site-*` tokens, never Saroh's brand. Status is
  * an opaque fill with its own foreground: the page ground is the
@@ -145,7 +153,6 @@ export function OrderPay({ token, order }: { token: string; order: PayOrder }) {
                 <PayDirectly
                     businessName={order.businessName}
                     due={money(order.due)}
-                    howToPay={order.howToPay ?? null}
                 />
             ) : offer === "pay" ? (
                 <div className="mt-6 space-y-4">
@@ -191,23 +198,28 @@ export function OrderPay({ token, order }: { token: string; order: PayOrder }) {
                     </p>
                 </div>
             )}
+            {/* With Pay offered these are the other ways; on the view-only
+                page (R33) they are the way. */}
+            <OrderPayInstructions
+                order={order}
+                online={offer === "pay"}
+                className="mt-6"
+            />
         </section>
     );
 }
 
 /**
- * The view-only page's ask (R33): pay the business directly — in the
- * business's own words when it has given them ("How to pay us"), else
- * just that. No button: nothing here takes money.
+ * The view-only page's ask (R33): pay the business directly. Its "How to
+ * pay us" card follows it when it set one (`OrderPayInstructions`). No
+ * button: nothing here takes money.
  */
 function PayDirectly({
     businessName,
     due,
-    howToPay,
 }: {
     businessName: string;
     due: string;
-    howToPay: string | null;
 }) {
     return (
         <div
@@ -221,12 +233,47 @@ function PayDirectly({
                 {businessName} doesn&apos;t take payment online here. {due} is
                 left to pay.
             </p>
-            {howToPay ? (
-                <p className="mt-3 whitespace-pre-line text-sm text-site-body">
-                    {howToPay}
-                </p>
-            ) : null}
         </div>
+    );
+}
+
+/**
+ * "How to pay us" (R32) on a due order: nothing when the business set none
+ * or nothing is due. `online`: the page offers Pay too, so these are the
+ * other ways; without it (an order the business can't take online), they
+ * are the way.
+ */
+export function OrderPayInstructions({
+    order,
+    online,
+    className,
+}: {
+    order: PayOrder;
+    online: boolean;
+    className?: string;
+}) {
+    if (order.status !== "DUE" || !hasPayInstructions(order.payInstructions)) {
+        return null;
+    }
+    const ways = payWaysText(order.payInstructions);
+    const due = payMoney(order.due, order.currency);
+    return (
+        <PayInstructionsCard
+            instructions={order.payInstructions}
+            businessName={order.businessName}
+            amount={order.due}
+            currency={order.currency}
+            reference={`Order #${order.orderNumber}`}
+            title={online ? "Other ways to pay" : undefined}
+            lead={
+                ways
+                    ? online
+                        ? `${order.businessName} also takes ${due} by ${ways}.`
+                        : `Pay ${due} by ${ways}.`
+                    : null
+            }
+            className={className}
+        />
     );
 }
 

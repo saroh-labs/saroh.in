@@ -32,6 +32,8 @@ jest.mock("@saroh/database", () => {
         featureFlag: { findUnique: jest.fn().mockResolvedValue(null) },
         // DEC-070: Payments on (no row) unless a test turns it off.
         organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
+        // How to pay us (R32): none set unless a test sets some.
+        businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     return {
         ...actual,
@@ -183,6 +185,8 @@ describe("PublicInvoicesService.read", () => {
                 "payUrl",
                 // DEC-070: whether the page offers Pay.
                 "payOnline",
+                // R32: owed and not payable online, how to pay offline.
+                "payInstructions",
                 "status",
                 "tax",
                 "theme",
@@ -213,6 +217,8 @@ describe("PublicInvoicesService.read", () => {
             payUrl: `https://saroh.app/pay/${TOKEN}`,
             // No provider can open the checkout window here.
             payOnline: false,
+            // R32: the business set none.
+            payInstructions: null,
         });
         // Asked only for what it shows: no email, contact, ids or notes.
         const select = invoiceFindFirst.mock.calls[0][0].select;
@@ -438,6 +444,45 @@ describe("PublicInvoicesService.createIntent", () => {
             orderBy: { createdAt: "asc" },
         });
         expect(result.provider).toBe("CASHFREE");
+    });
+
+    it("shows how to pay offline on an owed view-only invoice, and never on a paid one (R32)", async () => {
+        const profileFindUnique = prisma.businessProfile
+            .findUnique as jest.Mock;
+        // Made-up details.
+        profileFindUnique.mockResolvedValue({
+            payUpiId: "lotus.yoga@okexample",
+            payBankAccountName: "Lotus Yoga",
+            payBankAccountNumber: "123456789012",
+            payBankIfsc: "ABCD0123456",
+            payBankName: null,
+            payNote: null,
+        });
+        invoiceFindFirst.mockResolvedValue(STORED);
+        // Payable online: the page's Pay button, and no offline details.
+        const online = await makeService().service.read(TOKEN);
+        expect(online.payOnline).toBe(true);
+        expect(online).not.toHaveProperty("payInstructions");
+        // No provider can open the window: a view link, with them.
+        providerFindFirst.mockResolvedValue(null);
+        const view = await makeService().service.read(TOKEN);
+        expect(view.payOnline).toBe(false);
+        expect(view.payInstructions).toEqual(
+            expect.objectContaining({
+                upiId: "lotus.yoga@okexample",
+                bankIfsc: "ABCD0123456",
+            }),
+        );
+        expect(profileFindUnique).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { organizationId: "org_1" } }),
+        );
+
+        profileFindUnique.mockClear();
+        invoiceFindFirst.mockResolvedValue({ ...STORED, status: "PAID" });
+        const paid = await makeService().service.read(TOKEN);
+        expect(paid).not.toHaveProperty("payInstructions");
+        expect(profileFindUnique).not.toHaveBeenCalled();
+        profileFindUnique.mockResolvedValue(null);
     });
 
     it("refuses when no connection can open the window: the business doesn't take payment online (DEC-070)", async () => {

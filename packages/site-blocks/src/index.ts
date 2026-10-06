@@ -203,6 +203,19 @@ export type {
     WaitlistSession,
 } from "./booking-flow/waitlist";
 
+// Not a page block: "How to pay us" (R32) on a customer's own unpaid
+// invoice, order or booking — the business's UPI ID as a QR, its bank
+// details and note, as the API sent them with that record.
+export {
+    hasPayInstructions,
+    payInstructionsOf,
+    payWaysText,
+    upiPayUri,
+} from "./pay-instructions/model";
+export type { PayInstructions } from "./pay-instructions/model";
+export { PayInstructionsCard } from "./pay-instructions/pay-instructions";
+export type { PayInstructionsCardProps } from "./pay-instructions/pay-instructions";
+
 // Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
 // The site's server actions arrive as `api`; the sheet never calls the API.
 export { UNAVAILABLE_TEXT, callLine, retryText } from "./account/api";

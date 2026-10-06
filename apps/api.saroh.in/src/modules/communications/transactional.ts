@@ -86,6 +86,13 @@ export interface InvoiceMailVars {
      * Absent, as before DEC-070: a pay link.
      */
     payOnline?: boolean;
+    /**
+     * How the business has said it can be paid offline (R32), when the
+     * link is a view link: "by UPI or bank transfer", "by UPI" or "by bank
+     * transfer". The details stay on the invoice page; the email only says
+     * they are there. Null or absent: the plain view-and-download line.
+     */
+    payWays?: string | null;
 }
 
 export interface RenderedMessage {
@@ -132,9 +139,11 @@ export function renderTransactional(
     const body = [
         `<p>${greeting}</p>`,
         `<p>${lead}</p>`,
-        vars.payOnline === false
-            ? `<p>You can view it and download a copy here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
-            : `<p>You can pay it by UPI or card here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
+        vars.payOnline === false && vars.payWays
+            ? `<p>You can view it, download a copy and see how to pay ${business} ${escapeHtml(vars.payWays)} here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
+            : vars.payOnline === false
+              ? `<p>You can view it and download a copy here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`
+              : `<p>You can pay it by UPI or card here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
         reminder
             ? `<p>If you&#39;ve already paid, thank you, and please ignore this.</p>`
             : "",

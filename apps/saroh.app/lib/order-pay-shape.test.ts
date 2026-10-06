@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { howToPayOf, isPayOrder, orderPayOffer } from "./order-pay-shape";
+import { isPayOrder, orderPayOffer } from "./order-pay-shape";
 
 const ORDER = {
     businessName: "Northwind",
@@ -66,14 +66,5 @@ describe("orderPayOffer (R33)", () => {
 
     it("still accepts the order with payOnline in it", () => {
         expect(isPayOrder({ ...ORDER, payOnline: false })).toBe(true);
-    });
-});
-
-describe("howToPayOf", () => {
-    it("keeps the business's own words, trimmed, and nothing else", () => {
-        expect(howToPayOf("  UPI: shop@upi  ")).toBe("UPI: shop@upi");
-        expect(howToPayOf("   ")).toBeNull();
-        expect(howToPayOf(42)).toBeNull();
-        expect(howToPayOf(undefined)).toBeNull();
     });
 });

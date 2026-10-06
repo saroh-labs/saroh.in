@@ -18,6 +18,12 @@ import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import { MediaService } from "../media/media.service";
 import { logoProblem } from "./business-logo";
+import type { PayInstructionsView } from "./business-pay-instructions";
+import {
+    PAY_SELECT,
+    payInstructionsView,
+    payInstructionsWrite,
+} from "./business-pay-instructions";
 import { phoneWrite } from "./business-phone";
 import type {
     RegisteredAddressView,
@@ -96,6 +102,12 @@ export interface OrganizationSettings {
      * served from and the library object it is; null until one is set.
      */
     logo: { url: string; mediaId: string | null } | null;
+    /**
+     * "How to pay us" (R32): the UPI ID, bank details and note a customer
+     * sees on their own unpaid invoice, order or booking. Every field null
+     * until set.
+     */
+    payInstructions: PayInstructionsView;
 }
 
 /** The checklist's facts ({@link OrganizationSettings.setup}). */
@@ -139,6 +151,7 @@ const PROFILE_SELECT = {
     addressLine2: true,
     city: true,
     postalCode: true,
+    ...PAY_SELECT,
 } as const;
 
 interface ProfileRow {
@@ -163,6 +176,12 @@ interface ProfileRow {
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+    payUpiId?: string | null;
+    payBankAccountName?: string | null;
+    payBankAccountNumber?: string | null;
+    payBankIfsc?: string | null;
+    payBankName?: string | null;
+    payNote?: string | null;
 }
 
 function splitProfile(
@@ -175,6 +194,7 @@ function splitProfile(
             tax: taxView(null, counters),
             registeredAddress: addressView(null),
             logo: null,
+            payInstructions: payInstructionsView(null),
         };
     }
     const {
@@ -191,6 +211,12 @@ function splitProfile(
         city: _ci,
         postalCode: _pc,
         legallyRegistered,
+        payUpiId: _u,
+        payBankAccountName: _ban,
+        payBankAccountNumber: _bno,
+        payBankIfsc: _bi,
+        payBankName: _bn,
+        payNote: _pn,
         ...profile
     } = p;
     return {
@@ -203,6 +229,7 @@ function splitProfile(
         tax: taxView(p, counters),
         registeredAddress: addressView(p),
         logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,
+        payInstructions: payInstructionsView(p),
     };
 }
 
@@ -322,12 +349,23 @@ export class OrganizationSettingsService {
                   taxSent,
               )
             : {};
+        // How to pay us (R32): checked as the bank details will stand.
+        const payData = dto.payInstructions
+            ? payInstructionsWrite(
+                  dto.payInstructions,
+                  await prisma.businessProfile.findUnique({
+                      where: { organizationId: ctx.organizationId },
+                      select: PAY_SELECT,
+                  }),
+              )
+            : {};
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...(dto.kind !== undefined ? ["kind"] : []),
             ...Object.keys(profileData),
             ...Object.keys(phone),
             ...Object.keys(taxData),
+            ...Object.keys(payData),
         ];
 
         // Nothing to do — return current state rather than writing an empty
@@ -368,6 +406,7 @@ export class OrganizationSettingsService {
                 ...timezone,
                 ...phone,
                 ...taxData,
+                ...payData,
             };
             if (Object.keys(written).length > 0) {
                 await tx.businessProfile.upsert({

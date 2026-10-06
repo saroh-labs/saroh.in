@@ -18,6 +18,8 @@ import { isBillOfSupply } from "../invoices/invoice-title";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
 import { invoicePayOnline, NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { hashPayToken } from "../invoices/pay-token";
+import type { PayInstructionsView } from "../organizations/business-pay-instructions";
+import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
@@ -103,6 +105,13 @@ export interface PublicInvoiceView {
      * receipt in the account area does not.
      */
     payUrl?: string;
+    /**
+     * "How to pay us" (R32): the business's UPI ID, bank details and note,
+     * on the pay link's read of an invoice that is owed and can't be paid
+     * online — the customer's own invoice, so the details go to someone the
+     * business billed. Null when the business set none; absent otherwise.
+     */
+    payInstructions?: PayInstructionsView | null;
 }
 
 /** What the pay page may say about autopay (D12). */
@@ -291,9 +300,16 @@ export class PublicInvoicesService {
             ]);
             // Autopay only on a plan's invoice that offers it (D12), and
             // only while the business takes payment online.
-            const [autopay, charging] = await Promise.all([
+            const owed =
+                paper.status === "ISSUED" || paper.status === "OVERDUE";
+            const [autopay, charging, payInstructions] = await Promise.all([
                 payOnline ? this.payAutopay(found) : null,
                 chargeUnderWayOn(prisma, found.organizationId, found.id),
+                // How to pay the business offline (R32): only on an owed
+                // invoice the page offers no Pay button for.
+                owed && !payOnline
+                    ? businessPayInstructionsOf(found.organizationId)
+                    : undefined,
             ]);
             const view: PublicInvoiceView = autopay
                 ? { ...paper, payOnline, autopay }
@@ -307,6 +323,7 @@ export class PublicInvoicesService {
             return {
                 ...view,
                 payUrl: await payLinkUrlFor(found.organizationId, token),
+                ...(payInstructions !== undefined ? { payInstructions } : {}),
                 ...(charging
                     ? { autopayCharging: { at: charging.at.toISOString() } }
                     : {}),

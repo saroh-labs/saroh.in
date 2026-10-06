@@ -75,6 +75,34 @@ describe("renderTransactional", () => {
         expect(view.body).toContain(`href="${SECRET_LINK_SLOT}"`);
     });
 
+    it("says a view link shows how to pay offline, never the details (R32)", () => {
+        const { body } = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: false,
+            payWays: "by UPI or bank transfer",
+        });
+        expect(body).toContain(
+            "You can view it, download a copy and see how to pay Rye &amp; Co. by UPI or bank transfer here:",
+        );
+        expect(body).toContain(`href="${SECRET_LINK_SLOT}"`);
+        // A pay link keeps its own words, whatever is set.
+        const pay = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: true,
+            payWays: "by UPI",
+        });
+        expect(pay.body).toContain("You can pay it by UPI or card here:");
+        // Nothing (or only a note) set: the plain view line.
+        const plain = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: false,
+            payWays: null,
+        });
+        expect(plain.body).toContain(
+            "You can view it and download a copy here:",
+        );
+    });
+
     it("escapes what a person or business typed", () => {
         const { body } = renderTransactional("INVOICE_SENT", {
             ...vars,

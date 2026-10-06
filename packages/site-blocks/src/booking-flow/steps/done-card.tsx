@@ -1,4 +1,6 @@
 import { cn } from "../../lib/utils";
+import { payInstructionsOf, payWaysText } from "../../pay-instructions/model";
+import { PayInstructionsCard } from "../../pay-instructions/pay-instructions";
 import type { Phase } from "../flow-state";
 import type { BookingPageData } from "../model";
 import { buildIcs, changeText, firstVisitText } from "../model";
@@ -55,6 +57,12 @@ export function DoneCard({
           : "Nothing to pay in advance.";
     // Paid with a class credit (A10): what it came from and what is left.
     const payText = phase.creditText ?? paidText;
+    // To pay at the desk, with something to pay: how to pay ahead, if the
+    // business says (R32).
+    const payAhead =
+        !phase.paid && !phase.creditText && phase.price
+            ? payInstructionsOf(booking.payInstructions)
+            : null;
     return (
         <div className={cn(card, "px-[26px] py-7")}>
             <div
@@ -83,6 +91,20 @@ export function DoneCard({
             <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
                 {payText}
             </p>
+            {payAhead ? (
+                <PayInstructionsCard
+                    instructions={payAhead}
+                    businessName={business}
+                    reference={`Booking ${booking.reference}`}
+                    title="Or pay ahead"
+                    lead={
+                        payWaysText(payAhead)
+                            ? `${business} also takes payment by ${payWaysText(payAhead)} before you arrive.`
+                            : null
+                    }
+                    className="mt-4"
+                />
+            ) : null}
             {/* Where the booking lives until the account area (A5) shows it. */}
             <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
                 We&apos;ve saved this to your details with {business}.

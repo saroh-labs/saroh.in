@@ -1,3 +1,5 @@
+import type { PayInstructions } from "@saroh/site-blocks";
+
 /**
  * The public order an order pay link shows (plan B, B11), and the check that
  * narrows it. Kept apart from `order-pay.ts`, which reads the app's env, so
@@ -41,12 +43,10 @@ export interface PayOrder {
      */
     payOnline?: boolean;
     /**
-     * How the business asks to be paid when it isn't online (its "How to
-     * pay us" — UPI, bank, at the counter), shown on the view-only page.
-     * Not sent yet: kept so the page is ready for it. Absent or null: the
-     * page says only to pay the business directly.
+     * "How to pay us" (R32): the business's UPI ID, bank details and note,
+     * while the order is due. Null or absent: none set.
      */
-    howToPay?: string | null;
+    payInstructions?: PayInstructions | null;
 }
 
 /**
@@ -63,11 +63,6 @@ export function orderPayOffer(
 ): OrderPayOffer {
     if (order.status !== "DUE") return "settled";
     return order.payOnline === false ? "elsewhere" : "pay";
-}
-
-/** "How to pay us", checked: trimmed text, or none. */
-export function howToPayOf(v: unknown): string | null {
-    return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
