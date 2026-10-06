@@ -86,7 +86,7 @@ describe("/templates", () => {
         expect(
             screen.getByText(/Every business shown is a sample/),
         ).toBeTruthy();
-        expect(screen.getByText(/^Seven templates/)).toBeTruthy();
+        expect(screen.getByText(/^Nine templates/)).toBeTruthy();
         // The pre-launch line is gone on the day.
         expect(screen.queryByText(/ready for you on 17 Oct/)).toBeNull();
         expect(screen.queryByText(/Plan/)).toBeNull();
@@ -100,6 +100,7 @@ describe("/templates", () => {
         );
         expect(chips).toEqual([
             "All",
+            "Salons",
             "Gyms & studios",
             "Clinics",
             "Dieticians & coaches",

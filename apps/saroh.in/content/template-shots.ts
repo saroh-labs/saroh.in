@@ -45,6 +45,20 @@ export const TEMPLATE_SHOTS: Readonly<
             },
         },
     },
+    clinic: {
+        "/": {
+            desktop: {
+                src: "/templates/clinic/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/clinic/home-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
     dietician: {
         "/": {
             desktop: {
@@ -104,6 +118,20 @@ export const TEMPLATE_SHOTS: Readonly<
             },
             phone: {
                 src: "/templates/gym/trainers-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
+    salon: {
+        "/": {
+            desktop: {
+                src: "/templates/salon/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/salon/home-phone.webp",
                 width: 390,
                 height: 844,
             },

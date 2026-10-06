@@ -32,6 +32,7 @@ describe("FONT_PAIRS", () => {
             "source-serif-inter",
             "geist",
             "archivo",
+            "inter-tight",
         ]) {
             expect(isFontPairKey(key)).toBe(true);
         }
@@ -44,6 +45,13 @@ describe("FONT_PAIRS", () => {
         // The code face is the mono accent, for machine facts only.
         expect(pair?.mono?.family).toBe("JetBrains Mono");
         expect(pair?.name).toBe("Geist and JetBrains Mono");
+    });
+
+    it("sets the Clinic pair's headings in Inter Tight over Inter (U11)", () => {
+        const pair = findFontPair("inter-tight");
+        expect(pair?.heading.family).toBe("Inter Tight");
+        expect(pair?.body.family).toBe("Inter");
+        expect(pair?.mono).toBeUndefined();
     });
 
     it("gives the gym's pair IBM Plex Mono for its times", () => {

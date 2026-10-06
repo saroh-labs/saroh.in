@@ -80,7 +80,7 @@ describe("joining", () => {
             email: mail("tpl-unknown"),
             business: "Kesar Salon",
             kind: "salon",
-            template: "salon",
+            template: "no-such-template",
         });
         const rows = await prisma.waitlistSignup.findMany({
             where: { email: { in: [mail("tpl"), mail("tpl-unknown")] } },

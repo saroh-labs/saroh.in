@@ -130,6 +130,17 @@ export const FONT_PAIRS = [
         heading: face("Archivo", SYSTEM_FONT_STACK),
         body: face("Archivo", SYSTEM_FONT_STACK),
     },
+    /*
+     * The Clinic design's (U11): Inter Tight for headings, set close and
+     * sans like a clinic's signage, over Inter for reading. Both faces are
+     * already loaded for other pairs, so this adds a pairing, not a font.
+     */
+    {
+        key: "inter-tight",
+        name: "Inter Tight and Inter",
+        heading: face("Inter Tight", SYSTEM_FONT_STACK),
+        body: face("Inter", SYSTEM_FONT_STACK),
+    },
 ] as const satisfies readonly SiteFontPair[];
 
 export type FontPairKey = (typeof FONT_PAIRS)[number]["key"];

@@ -53,7 +53,7 @@ describe("WaitlistService", () => {
             }),
         );
 
-        await service.join({ ...V2, template: "salon" });
+        await service.join({ ...V2, template: "no-such-template" });
         expect(create).toHaveBeenLastCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({ template: null }),
