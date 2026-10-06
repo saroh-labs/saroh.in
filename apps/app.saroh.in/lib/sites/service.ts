@@ -219,6 +219,11 @@ export interface ServicesListContent {
     layout?: ListLayout;
     showDescriptions?: boolean;
     buttonLabel?: string;
+    /** The price card's lines around the service's price (template polish). */
+    modeLine?: string;
+    followUpLine?: string;
+    includesLabel?: string;
+    includes?: string[];
 }
 
 /** "Show as" (G16): side by side, or one per row. */

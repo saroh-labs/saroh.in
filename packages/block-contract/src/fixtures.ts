@@ -640,10 +640,36 @@ export const BLOCK_META = {
         label: "Services",
         description:
             "Your bookable services with their duration and price, kept current from Appointments.",
-        variants: soleVariant(
-            "Services in a list, each with its duration and price.",
-        ),
+        variants: [
+            {
+                id: "default",
+                label: "Services",
+                description:
+                    "Services in a list, each with its duration and price.",
+            },
+            {
+                id: "priceCard",
+                label: "One price",
+                description:
+                    "One appointment as a card — its price set large, how long it takes and a button — beside what it includes. For a practice with a single consultation.",
+            },
+        ] as const,
         fixtures: {
+            priceCard: {
+                variant: "priceCard",
+                heading: "One consultation",
+                intro: "There is one appointment type and one price. If a follow-up is useful I will say so at the end of the first one.",
+                serviceIds: ["fixture-consult"],
+                buttonLabel: "Ask for a time",
+                modeLine: "In person, or by video",
+                followUpLine:
+                    "Follow-ups are shorter and usually six weeks apart.",
+                includesLabel: "What it includes",
+                includes: [
+                    "A written plan afterwards, in plain language",
+                    "Review of any blood work or notes you bring",
+                ],
+            },
             default: {
                 variant: "default",
                 heading: "Services",

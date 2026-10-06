@@ -26,6 +26,7 @@ import ProjectsSection from "./projects";
 import { rhythmGroups } from "./projects-rhythm";
 import { linkText, projectsCount } from "./projects-rows";
 import RichTextSection from "./rich-text";
+import ServicesListSection from "./services-list";
 import TimetableSection from "./timetable";
 
 /**
@@ -653,5 +654,59 @@ describe("journal: the lead, the archive by year, totals and limits", () => {
             />,
         );
         expect(one.container.innerHTML).toBe("");
+    });
+});
+
+describe("servicesList: the price card", () => {
+    const consult = {
+        id: "svc_consult",
+        name: "Initial consultation",
+        description: null,
+        durationMinutes: 45,
+        priceCents: 250000,
+        currency: "INR",
+    };
+
+    it("draws the service's own price and duration, the merchant's lines and what it includes", () => {
+        const { container } = render(
+            <ServicesListSection
+                content={BLOCK_META.servicesList.fixtures.priceCard}
+                services={[consult]}
+                bookHref="/book"
+            />,
+        );
+        const card = container.querySelector("[data-price-card]");
+        expect(card?.textContent).toContain("Initial consultation");
+        expect(card?.textContent).toMatch(/2,500/);
+        expect(card?.textContent).toContain("for 45 min");
+        expect(card?.textContent).toContain("In person, or by video");
+        const book = screen.getByRole("link", {
+            name: "Ask for a time: Initial consultation",
+        });
+        expect(book.getAttribute("href")).toBe("/book?service=svc_consult");
+        const included = screen.getByRole("list", { name: "What it includes" });
+        expect(within(included).getAllByRole("listitem").length).toBe(2);
+    });
+
+    it("says how long and nothing about cost when the service has no price", () => {
+        const { container } = render(
+            <ServicesListSection
+                content={BLOCK_META.servicesList.fixtures.priceCard}
+                services={[{ ...consult, priceCents: null, currency: null }]}
+            />,
+        );
+        const card = container.querySelector("[data-price-card]");
+        expect(card?.textContent).toContain("45 min");
+        expect(card?.textContent).not.toMatch(/₹|0/);
+    });
+
+    it("renders nothing when the service is no longer offered", () => {
+        const { container } = render(
+            <ServicesListSection
+                content={BLOCK_META.servicesList.fixtures.priceCard}
+                services={[]}
+            />,
+        );
+        expect(container.innerHTML).toBe("");
     });
 });

@@ -286,3 +286,39 @@ describe("journal: the lead, the archive by year, totals and limits", () => {
         }
     });
 });
+
+describe("servicesList: the price card", () => {
+    const base = { serviceIds: ["svc_1"] };
+
+    it("saves the card's own lines; the price is never one of them", () => {
+        const parsed = parseSectionContent("servicesList", 1, {
+            ...base,
+            variant: "priceCard",
+            modeLine: "In person, or by video",
+            followUpLine: "Follow-ups are shorter.",
+            includesLabel: "What it includes",
+            includes: ["A written plan"],
+            price: 2500,
+        });
+        expect(parsed.success).toBe(true);
+        if (parsed.success) {
+            expect(parsed.data).not.toHaveProperty("price");
+        }
+        expect(resolveVariant("servicesList", { variant: "priceCard" })).toBe(
+            "priceCard",
+        );
+    });
+
+    it("refuses an empty included line and more than twelve", () => {
+        expect(
+            parseSectionContent("servicesList", 1, { ...base, includes: [" "] })
+                .success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("servicesList", 1, {
+                ...base,
+                includes: Array.from({ length: 13 }, () => "x"),
+            }).success,
+        ).toBe(false);
+    });
+});

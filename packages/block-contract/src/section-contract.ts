@@ -610,6 +610,11 @@ const buttonLabel = z.string().trim().max(40).optional();
  * Display options (G16): `layout` (ABSENT: `list`, the rows it has always
  * drawn), `showDescriptions` (ABSENT: shown) and `buttonLabel`, the words on
  * each service's own button (ABSENT: "Book").
+ *
+ * The `priceCard` look (template polish) is for a practice with one
+ * appointment: the first service still offered as a card — its name, its
+ * price set large and its duration, read live like every service here —
+ * beside the heading, the intro and what it includes.
  */
 const servicesListV1 = z.object({
     variant,
@@ -633,6 +638,18 @@ const servicesListV1 = z.object({
     layout: listLayout,
     showDescriptions: z.boolean().optional(),
     buttonLabel,
+    /**
+     * The `priceCard` look's own words (template polish), around a price and
+     * a duration that are ALWAYS the service's: `modeLine` under the price
+     * ("In person in Pune, or by video"), `followUpLine` under the button
+     * ("Follow-ups are … and usually six weeks apart"), and beside the card
+     * what the appointment includes, under `includesLabel`. Plain text, the
+     * merchant's own; a figure typed here is theirs, never read as a price.
+     */
+    modeLine: z.string().trim().max(160).optional(),
+    followUpLine: z.string().trim().max(300).optional(),
+    includesLabel: z.string().trim().max(60).optional(),
+    includes: z.array(z.string().trim().min(1).max(200)).max(12).optional(),
 });
 
 /**
