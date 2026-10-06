@@ -1,4 +1,4 @@
-// @covers web:/changelog web:/privacy web:/api/waitlist api:waitlist
+// @covers web:/changelog web:/privacy web:/help web:/api/waitlist api:waitlist
 import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -55,16 +55,22 @@ async function resolves(request: APIRequestContext, url: string) {
     return second.status() === 200 ? "200" : `→ ${second.status()}`;
 }
 
-/** Same-site paths of the links matching `selector`. */
+/**
+ * Same-site paths of the links matching `selector`. A jump within the page
+ * ("On this page", `#step-1`) is not a link to another page, so it is left
+ * out.
+ */
 async function sitePaths(page: Page, selector: string): Promise<string[]> {
     const hrefs = await page
         .locator(selector)
         .evaluateAll((els) => els.map((el) => (el as HTMLAnchorElement).href));
+    const here = new URL(page.url()).pathname;
     return [
         ...new Set(
             hrefs
                 .map((h) => new URL(h))
                 .filter((u) => u.origin === new URL(WEB).origin)
+                .filter((u) => !(u.hash && u.pathname === here))
                 .map((u) => u.pathname),
         ),
     ];

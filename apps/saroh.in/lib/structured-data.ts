@@ -102,3 +102,32 @@ export function articleLd(input: {
         publisher: saroh,
     };
 }
+
+/**
+ * A Help article as a `HowTo` (plan U7): its steps in order, each with the
+ * screen it shows, and how long it takes to read.
+ */
+export function howToLd(input: {
+    name: string;
+    description: string;
+    url: string;
+    totalMinutes: number;
+    steps: { name: string; text: string; url: string; image: string }[];
+}): JsonLdObject {
+    return {
+        "@context": "https://schema.org",
+        "@type": "HowTo",
+        name: input.name,
+        description: input.description,
+        url: input.url,
+        totalTime: `PT${input.totalMinutes}M`,
+        step: input.steps.map((s, i) => ({
+            "@type": "HowToStep",
+            position: i + 1,
+            name: s.name,
+            text: s.text,
+            url: s.url,
+            image: s.image,
+        })),
+    };
+}

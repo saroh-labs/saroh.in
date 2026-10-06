@@ -4,10 +4,18 @@
  * edit `e2e/marketing-shots/shots.config.ts` and re-run the capture instead.
  * `width` and `height` are the image's pixels (2× the CSS layout).
  * `content/shots.ts` reads this: a captured shot replaces the placeholder.
+ * Help's `help-…` shots are read by `content/help` articles; `mark` is
+ * where the step's control sits, in fractions of the image.
  */
 export const CAPTURED: Record<
     string,
-    { src: string; alt: string; width: number; height: number }
+    {
+        src: string;
+        alt: string;
+        width: number;
+        height: number;
+        mark?: { x: number; y: number; w: number; h: number };
+    }
 > = {
     "s-home": {
         src: "/shots/v2/s-home.webp",
@@ -218,5 +226,40 @@ export const CAPTURED: Record<
         alt: "The site of Kavi Dental (demo clinic): free times today and Book an appointment",
         width: 2880,
         height: 1800,
+    },
+    "help-add-product-1": {
+        src: "/shots/help/help-add-product-1.webp",
+        alt: "Products at Rye & Co. (demo bakery), with New product open on its two locations, Online and Hill Road",
+        width: 2048,
+        height: 1120,
+        mark: { x: 0.8128, y: 0.1821, w: 0.1676, h: 0.0893 },
+    },
+    "help-add-product-2": {
+        src: "/shots/help/help-add-product-2.webp",
+        alt: "Basics for a new product at Rye & Co. (demo bakery): the name, the address on the shop made from it, the price and the category",
+        width: 1070,
+        height: 1240,
+        mark: { x: 0.0467, y: 0.2944, w: 0.9065, h: 0.0851 },
+    },
+    "help-add-product-3": {
+        src: "/shots/help/help-add-product-3.webp",
+        alt: "Photos and videos for the Sourdough loaf at Rye & Co. (demo bakery): two photos, the first marked Cover, each with what it shows",
+        width: 1070,
+        height: 1058,
+        mark: { x: 0.0598, y: 0.2385, w: 0.107, h: 0.0576 },
+    },
+    "help-add-product-4": {
+        src: "/shots/help/help-add-product-4.webp",
+        alt: "A new product at Rye & Co. (demo bakery) with a name and a price, Visibility set to Draft and the Create draft button",
+        width: 2048,
+        height: 1120,
+        mark: { x: 0.8818, y: 0.1143, w: 0.1104, h: 0.0821 },
+    },
+    "help-add-product-5": {
+        src: "/shots/help/help-add-product-5.webp",
+        alt: "Variants and Stock for the Sourdough loaf at Rye & Co. (demo bakery): 800g and 400g with their own SKU and price, and Track stock on with On hand and Warn at for each",
+        width: 948,
+        height: 1616,
+        mark: { x: 0.846, y: 0.6027, w: 0.1013, h: 0.042 },
     },
 };
