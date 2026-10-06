@@ -6,24 +6,31 @@ import { escapeHtml } from "./html";
  * for work made by hand in small runs. Designed as "Kiln", a ceramics
  * studio. One page, and no hero: the collection is the top of the page.
  *
- * - **The page's name**, small (hero `none`): the name and the owner's own
- *   line, so the page still has its heading. No band, no photo above the
- *   fold.
- * - **Current collection**: the business's own products, read live, the
- *   first piece taking twice the room (Product grid `lead`). Names, prices
- *   and what is sold out come from the catalogue, never from here (KTD-4).
- *   Laid down only with Commerce on (DEC-057): without it the grid has
- *   nothing to show.
- * - **Material**: three short notes the owner writes over (the clay, the
- *   glaze, the firing), then their photographs, shipped as a brief (KTD-5).
+ * - **The page's name**, for screen readers only (hero `none`,
+ *   `titleVisible: false`): the header already shows it, so the page opens
+ *   on the collection with no band and no photo above the fold.
+ * - **Current collection** (`#collection`): the business's own products,
+ *   read live, as plates — fixed cells with 1px hairlines between them, the
+ *   first piece taking twice the room, the name and price on a band over
+ *   the photo — with "{n} of {m} available" counted from the pieces shown.
+ *   Names, prices and what is sold out come from the catalogue, never from
+ *   here (KTD-4). Laid down only with Commerce on (DEC-057): without it the
+ *   grid has nothing to show.
+ * - **Material** (`#material`): three short notes the owner writes over
+ *   (the clay, the glaze, the firing), then their photographs, captioned,
+ *   shipped as a brief (KTD-5).
  * - **The studio**: a few words about where and how the work is made, and
- *   a short list of facts, beside a photo of the wheel (a brief until the
- *   owner adds one).
+ *   a short list of facts, beside a photo of the wheel on the left (a brief
+ *   until the owner adds one).
+ *
+ * Section titles are the design's small green capitals (`eyebrowAccent`),
+ * and the two anchored sections lead the header menu as in-page links.
  *
  * Left out, on purpose: the design's "Stocked at" list. Saroh holds no
  * stockists, so a list here could only be invented shop names on someone's
  * live site, and the design draws the section only when there are some.
- * The collection's note about pieces held for stockists goes with it.
+ * The collection's note about pieces held for stockists goes with it; the
+ * note the grid keeps says only what the grid itself shows.
  *
  * The words that describe the work are placeholders, and say so: Kiln's own
  * clay, town and maker would be false on any other business's site.
@@ -46,11 +53,6 @@ export function ceramicsSellsProducts(ctx: TemplateContext): boolean {
     return modulesOf(ctx).includes(COMMERCE);
 }
 
-/** What the owner has said about the work, if anything. */
-function ownWords(ctx: TemplateContext): string | undefined {
-    return ctx.tagline ?? ctx.description;
-}
-
 /**
  * How many pieces the collection shows: the lead and four beside it, which
  * fills the design's grid (two rows) exactly.
@@ -59,11 +61,65 @@ export const CERAMICS_COLLECTION_COUNT = 5;
 
 /** What the material photographs should show (KTD-5). */
 const MATERIAL_BRIEF =
-    "Three close-ups, one each: raw clay with grog specks and a thumbprint; glaze breaking over a thrown ridge; the kiln shelf through the spyhole";
+    "Three square close-ups, each captioned: raw clay with grog specks and a thumbprint; glaze breaking over a thrown ridge; the kiln shelf through the spyhole";
 
 /** The studio photograph (KTD-5), the design's own brief. */
 const STUDIO_BRIEF =
     "The wheel mid-throw, clay-covered hands and forearms, shallow depth of field";
+
+/** The design's exact colours: unbleached paper, ink and a deep green. */
+const GREEN_PALETTE = {
+    bg: "#F4F1E8",
+    surface: "#EAE6DB",
+    fg: "#1A1815",
+    body: "#3B362E",
+    muted: "#6E685E",
+    border: "#DFDACD",
+    accent: "#1F3D2B",
+    accentFg: "#F4F1E8",
+} as const;
+
+/**
+ * The Oxblood colourway's ash, cell and oxblood swatches; ink, body, quiet
+ * text and the hairline held at Green's lightness and turned neutral.
+ */
+const OXBLOOD_PALETTE = {
+    bg: "#F1F1F4",
+    surface: "#DADADE",
+    fg: "#18181B",
+    body: "#37373D",
+    muted: "#69696F",
+    border: "#CBCBD0",
+    accent: "#4F2927",
+    accentFg: "#F1F1F4",
+} as const;
+
+/**
+ * The design's type: a 1180px column, 16px body, and section titles as
+ * small wide capitals in the accent.
+ */
+const CERAMICS_TYPE = {
+    bodySize: 16,
+    measure: 62,
+    contentWidth: 1180,
+    labelStyle: "eyebrowAccent",
+} as const;
+
+/** 1px gaps: the hairlines between the plates and the photographs. */
+const CERAMICS_SCALARS = {
+    pageMargin: 44,
+    sectionPadding: 64,
+    gridGap: 1,
+    cornerRadius: 0,
+    headingScale: 0.9,
+} as const;
+
+/**
+ * The footer's line as it starts: where the design has the area and the
+ * studio's open day, words that say what to write there.
+ */
+export const CERAMICS_FOOTER_LINE =
+    "Your area and town — and when the studio is open";
 
 export const ceramicsTemplate: TemplateManifest = {
     id: CERAMICS_TEMPLATE_ID,
@@ -76,6 +132,7 @@ export const ceramicsTemplate: TemplateManifest = {
     shape: "store",
     sample: { name: "Kiln", host: "kiln.saroh.app" },
     uses: [COMMERCE],
+    footer: { line: CERAMICS_FOOTER_LINE, layout: "left" },
     styles: [
         {
             // Unbleached paper, ink and a deep green; hairlines, not cards.
@@ -90,14 +147,10 @@ export const ceramicsTemplate: TemplateManifest = {
                     ctaBand: "graphite",
                     footer: "chalk",
                 },
-                scalars: {
-                    pageMargin: 44,
-                    sectionPadding: 64,
-                    gridGap: 6,
-                    cornerRadius: 0,
-                    headingScale: 0.9,
-                },
+                scalars: CERAMICS_SCALARS,
                 fontPair: "fraunces-inter-tight",
+                palette: GREEN_PALETTE,
+                type: CERAMICS_TYPE,
             },
         },
         {
@@ -113,14 +166,10 @@ export const ceramicsTemplate: TemplateManifest = {
                     ctaBand: "clay",
                     footer: "chalk",
                 },
-                scalars: {
-                    pageMargin: 44,
-                    sectionPadding: 64,
-                    gridGap: 6,
-                    cornerRadius: 0,
-                    headingScale: 0.9,
-                },
+                scalars: CERAMICS_SCALARS,
                 fontPair: "fraunces-inter-tight",
+                palette: OXBLOOD_PALETTE,
+                type: CERAMICS_TYPE,
             },
         },
     ],
@@ -131,17 +180,15 @@ export const ceramicsTemplate: TemplateManifest = {
             isHome: true,
             sections: [
                 {
-                    // No hero: the page's heading, small, and straight on.
+                    // No hero: the page's one h1, for screen readers and
+                    // search engines; the header already shows the name.
                     type: "hero",
                     contractVersion: 1,
-                    content: (ctx: TemplateContext) => {
-                        const own = ownWords(ctx);
-                        return {
-                            variant: "none",
-                            heading: ctx.organizationName,
-                            ...(own ? { subheading: own } : {}),
-                        };
-                    },
+                    content: (ctx: TemplateContext) => ({
+                        variant: "none",
+                        heading: ctx.organizationName,
+                        titleVisible: false,
+                    }),
                 },
                 {
                     // The business's own products, read live (ADR-004).
@@ -149,11 +196,15 @@ export const ceramicsTemplate: TemplateManifest = {
                     contractVersion: 1,
                     when: ceramicsSellsProducts,
                     content: {
-                        variant: "lead",
+                        variant: "plates",
+                        anchor: "collection",
+                        navLabel: "Collection",
                         title: "Current collection",
                         source: "newest",
                         count: CERAMICS_COLLECTION_COUNT,
                         showPrices: true,
+                        showAvailability: true,
+                        note: "Everything not marked sold out can be bought here.",
                     },
                 },
                 {
@@ -161,6 +212,8 @@ export const ceramicsTemplate: TemplateManifest = {
                     contractVersion: 1,
                     content: {
                         variant: "grid",
+                        anchor: "material",
+                        navLabel: "Material",
                         heading: "Material",
                         intro: "The clay, the glaze and the firing, and not one of them behaves the same way twice.",
                         items: [
@@ -187,6 +240,7 @@ export const ceramicsTemplate: TemplateManifest = {
                     content: {
                         variant: "grid",
                         images: [],
+                        captionPlacement: "below",
                         imageBrief: MATERIAL_BRIEF,
                     },
                 },
@@ -208,11 +262,11 @@ export const ceramicsTemplate: TemplateManifest = {
                             `one at a time, and what happens when a glaze or a ` +
                             `batch is gone. Replace both paragraphs with your ` +
                             `own.</p>` +
-                            `<ul>` +
-                            `<li><strong>Studio:</strong> where you work</li>` +
-                            `<li><strong>Made by:</strong> your name</li>` +
-                            `<li><strong>Throwing since:</strong> the year you started</li>` +
-                            `</ul>`,
+                            `<dl>` +
+                            `<dt>Studio</dt><dd>Your area and town — where you work</dd>` +
+                            `<dt>Made by</dt><dd>Your name — or the names of everyone who makes</dd>` +
+                            `<dt>Throwing since</dt><dd>Your first year — when you started</dd>` +
+                            `</dl>`,
                     }),
                 },
             ],

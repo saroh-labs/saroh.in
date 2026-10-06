@@ -129,10 +129,29 @@ describe("the bakery template, rendered live", () => {
         // The bread is the business's, and sold out is said in words.
         expect(screen.getByText("Sourdough loaf")).toBeVisible();
         expect(screen.getByText("Sold out")).toBeVisible();
-        // Monday is stated closed, not left out.
+        // Counted from the bread shown, with the note under it.
+        expect(screen.getByText(/^\d of \d available$/)).toBeVisible();
+        expect(
+            screen.getByText(
+                "Baked this morning. Anything marked sold out has gone for today.",
+            ),
+        ).toBeVisible();
+        // Monday is stated closed, not left out; Tuesday to Friday is one line.
         const monday = screen.getByRole("rowheader", { name: "Monday" });
         expect(monday.closest("tr")?.textContent).toContain("Closed");
-        // Every post, as a dated list.
+        expect(
+            screen.getByRole("rowheader", { name: /^Tuesday to Friday/ }),
+        ).toBeVisible();
+        // The week sits on the dark band, and the menu's three links land.
+        expect(
+            container.querySelector("#visit")?.closest("[data-site-band]"),
+        ).toHaveAttribute("data-site-band", "inverse");
+        expect(container.querySelector("#today")).not.toBeNull();
+        expect(container.querySelector("#journal")).not.toBeNull();
+        expect(
+            screen.getByRole("link", { name: /^All 3 entries/ }),
+        ).toHaveAttribute("href", "/journal");
+        // The newest posts, as a dated list.
         for (const post of SAMPLE_POSTS) {
             expect(
                 screen.getByRole("link", { name: new RegExp(post.title) }),
