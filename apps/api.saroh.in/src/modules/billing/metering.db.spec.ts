@@ -427,7 +427,7 @@ describe("what each limit counts (DB, U13)", () => {
         expect(await countUsage(prisma, orgId, "integrations")).toBe(2);
     });
 
-    it("leaves Reviewers out of the team, people and invitations both", async () => {
+    it("leaves Reviewers out of the team, and counts them on their own cap", async () => {
         const { orgId } = await business("free");
         for (const role of ["OWNER", "REVIEWER"]) {
             const user = await prisma.user.create({
@@ -450,6 +450,8 @@ describe("what each limit counts (DB, U13)", () => {
             });
         }
         expect(await countUsage(prisma, orgId, "teamMembers")).toBe(2);
+        // The Reviewer in the business and the open Reviewer invitation.
+        expect(await countUsage(prisma, orgId, "reviewers")).toBe(2);
     });
 
     it("counts live locations customers visit, never an online one", async () => {
@@ -547,6 +549,7 @@ describe("what each limit counts (DB, U13)", () => {
             "bookingsPerMonth",
             "blogPosts",
             "teamMembers",
+            "reviewers",
             "integrations",
             "shopLocations",
             "sites",
@@ -576,6 +579,7 @@ describe("what each limit counts (DB, U13)", () => {
                 "orders",
                 "products",
                 "locations",
+                "reviewers",
                 "sites",
                 "storage",
                 "visits",

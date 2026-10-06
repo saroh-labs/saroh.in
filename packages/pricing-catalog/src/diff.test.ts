@@ -63,7 +63,7 @@ describe("diff", () => {
     it("words a cap turning soft", () => {
         const b = edit(fixture(), (c) => {
             const cell = c.modules[1].cells.b;
-            if (cell?.inc) cell.soft = true;
+            if (cell.inc) cell.soft = true;
         });
         expect(diff(fixture(), b)).toEqual([
             "Things on Plan B: a soft cap, never refused",
