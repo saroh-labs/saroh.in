@@ -185,7 +185,7 @@ function Callout({ label, text }: { label?: string; text: string }) {
                 </p>
             ) : null}
             <p
-                className={`whitespace-pre-line text-[length:var(--site-body-size,1rem)] leading-relaxed${name ? "mt-1.5" : ""}`}
+                className={`whitespace-pre-line text-[length:var(--site-body-size,1rem)] leading-relaxed ${name ? "mt-1.5" : ""}`}
             >
                 {text.trim()}
             </p>
