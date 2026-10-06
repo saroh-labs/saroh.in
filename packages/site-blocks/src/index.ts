@@ -18,6 +18,8 @@ export {
     opensOverPhoto,
 } from "./section-renderer";
 export type { Section } from "./section-renderer";
+// A business's live data given to a whole page (template renders, U14).
+export type { SiteFixtures } from "./site-fixtures";
 
 export {
     BlockFixturePreview,

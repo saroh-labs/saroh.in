@@ -169,6 +169,10 @@ const SITE_LAYER_ALLOWED = new Set([
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
     "apps/saroh.app/app/[domain]/layout.tsx",
     "apps/saroh.app/app/preview/[token]/layout.tsx",
+    // The renderer's template renders (industry templates U14): the same
+    // ground a published site's layout gives its blocks, for a gallery
+    // template drawn for its sample business. Every block is PageSections'.
+    "apps/saroh.app/app/template-renders/[template]/[style]/[[...path]]/page.tsx",
     // The error and loading boundaries, same category as the 404 above: a
     // Saroh surface on a merchant's page, which should wear the merchant's
     // palette rather than ours. They draw no block — a heading, a line of

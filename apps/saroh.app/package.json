@@ -5,6 +5,7 @@
     "scripts": {
         "dev": "portless saroh.app next dev",
         "dev:app": "next dev",
+        "dev:templates": "TEMPLATE_RENDERS=on NEXT_PUBLIC_ROOT_DOMAIN=templates.saroh.app.localhost portless templates.saroh.app next dev",
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
@@ -13,7 +14,9 @@
     },
     "portless": "saroh.app",
     "dependencies": {
+        "@saroh/block-contract": "workspace:*",
         "@saroh/site-blocks": "workspace:*",
+        "@saroh/templates": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "class-variance-authority": "^0.7.1",

@@ -1,8 +1,10 @@
 import type { RenderedHero } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
+import type { PublicVisit } from "../lib/public-visit";
 import FullBleedHero from "./hero-full-bleed";
 import PlainHero from "./hero-plain";
+import type { PublicToday } from "./on-today";
 import OnTodayHero from "./on-today";
 
 /**
@@ -30,6 +32,8 @@ export default function HeroSection({
     siteId,
     apiUrl,
     bookHref,
+    visit,
+    today,
 }: {
     content: RenderedHero;
     /** The live site, for On today's read (G18). See `SectionRenderer`. */
@@ -38,11 +42,20 @@ export default function HeroSection({
     apiUrl?: string;
     /** The site's booking page, where On today's rows go (live sites only). */
     bookHref?: string;
+    /** A place to draw the open line from instead of reading (fixtures). */
+    visit?: PublicVisit;
+    /** A day to draw On today from instead of reading (fixtures). */
+    today?: PublicToday;
 }) {
     const look = resolveVariant("hero", content);
     if (look === "fullBleed") {
         return (
-            <FullBleedHero content={content} siteId={siteId} apiUrl={apiUrl} />
+            <FullBleedHero
+                content={content}
+                siteId={siteId}
+                apiUrl={apiUrl}
+                visit={visit}
+            />
         );
     }
     if (look === "none") return <CompactHeading content={content} />;
@@ -53,6 +66,7 @@ export default function HeroSection({
                 siteId={siteId}
                 apiUrl={apiUrl}
                 bookHref={bookHref}
+                today={today}
             />
         );
     }

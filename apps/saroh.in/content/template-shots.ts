@@ -1,8 +1,9 @@
 /**
  * The gallery's real renders (industry templates plan U14, KTD-6; Resources
  * plan R18): each template's pages as the renderer draws them for its sample
- * business, captured at 2× by `e2e/marketing-shots`, and saved under
- * `public/templates/<slug>/`.
+ * business, captured at 2× by `e2e/marketing-shots/template-shots.ts`, and
+ * saved under `public/templates/<slug>/`. Generated: re-run the capture
+ * instead of editing the entries.
  *
  * Keyed by the template's gallery slug, then the page's path (`/`,
  * `/timetable`). A page with a shot shows it — on the card (its home page,
@@ -29,7 +30,86 @@ export const TEMPLATE_SHOTS: Readonly<
     Partial<
         Record<string, Readonly<Partial<Record<string, TemplatePageShots>>>>
     >
-> = {};
+> = {
+    bakery: {
+        "/": {
+            desktop: {
+                src: "/templates/bakery/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/bakery/home-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
+    dietician: {
+        "/": {
+            desktop: {
+                src: "/templates/dietician/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/dietician/home-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
+    gym: {
+        "/": {
+            desktop: {
+                src: "/templates/gym/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/gym/home-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+        "/membership": {
+            desktop: {
+                src: "/templates/gym/membership-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/gym/membership-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+        "/timetable": {
+            desktop: {
+                src: "/templates/gym/timetable-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/gym/timetable-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+        "/trainers": {
+            desktop: {
+                src: "/templates/gym/trainers-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/gym/trainers-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
+};
 
 /** A page's shot for a device, when it has been captured. */
 export function templateShot(

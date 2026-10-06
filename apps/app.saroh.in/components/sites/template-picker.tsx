@@ -3,11 +3,14 @@
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { cn } from "@saroh/ui/lib/utils";
 import { Check, Info } from "lucide-react";
+import Image from "next/image";
 import { useId, useState } from "react";
 
 import type { Template, TemplateColourway } from "@/lib/sites/service";
 import type { ModuleStates } from "@/lib/sites/template-picker";
 import { moduleNote, shapeWord, usesLine } from "@/lib/sites/template-picker";
+import type { TemplateThumbnailImage } from "@/lib/sites/template-thumbnails";
+import { templateThumbnail } from "@/lib/sites/template-thumbnails";
 
 /**
  * The template picker (industry templates plan, U12): a grid of cards, one
@@ -172,6 +175,7 @@ function TemplateCard({
             <TemplateThumbnail
                 name={template.name}
                 colourway={template.colourways?.[0]}
+                image={templateThumbnail(template.id)}
             />
             <span className="flex min-w-0 flex-col gap-1.5 p-3">
                 <span className="flex min-w-0 items-center gap-2">
@@ -227,18 +231,39 @@ function TemplateCard({
 }
 
 /**
- * The card's picture. Until the 2× renders land (plan U14), the template's
- * first colourway drawn as a page: its ground, its name in its text colour
- * and a bar of its accent. A template with no colourway is drawn in the
+ * The card's picture: the template's home page as the renderer draws it for
+ * its sample business, captured at 2× (plan U14), when there is one.
+ * Otherwise the template's first colourway drawn as a page: its ground, its
+ * name in its text colour and a bar of its accent. A template with no colourway is drawn in the
  * workspace's own muted surface rather than an invented palette.
  */
 export function TemplateThumbnail({
     name,
     colourway,
+    image,
 }: {
     name: string;
     colourway?: TemplateColourway;
+    /**
+     * The template's home page as the renderer draws it (U14,
+     * `lib/sites/template-thumbnails.ts`). Absent: the drawn card.
+     */
+    image?: TemplateThumbnailImage;
 }) {
+    if (image) {
+        return (
+            // Decorative: the card's name and description say what it is.
+            <Image
+                src={image.src}
+                alt=""
+                aria-hidden
+                width={image.width}
+                height={image.height}
+                sizes="(min-width: 640px) 360px, 100vw"
+                className="aspect-video w-full border-b border-border object-cover object-top"
+            />
+        );
+    }
     const [ground, text, accent] = colourway?.chips ?? [];
     return (
         <span

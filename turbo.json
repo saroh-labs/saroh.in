@@ -92,6 +92,11 @@
         // The customer account area's release switch, in the api and saroh.app
         // (round-2 A5): off until A6-A8 and A13 ship.
         "SITE_ACCOUNT_AREA",
+        // saroh.app's template renders for the gallery's captures (industry
+        // templates U14): off unless "on", never on a production deployment.
+        "TEMPLATE_RENDERS",
+        // Where e2e's template captures find those renders (U14).
+        "TEMPLATE_RENDER_URL",
         // The api's fake site-code transport writes to os.tmpdir(), which the
         // e2e runner reads (`e2e/tests/site-codes.ts`). Strict env mode drops
         // TMPDIR, so on macOS the api fell back to /tmp while the runner read
