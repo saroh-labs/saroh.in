@@ -74,3 +74,11 @@ export {
     PORTFOLIO_TEMPLATE_ID,
     portfolioTemplate,
 } from "./templates/portfolio";
+
+// Studio, the gallery's "Portfolio" (industry templates plan, U10).
+export {
+    STUDIO_PROJECT_BRIEFS,
+    STUDIO_TEMPLATE_ID,
+    studioHasEmail,
+    studioTemplate,
+} from "./templates/studio";

@@ -2,6 +2,7 @@ import type { TemplateManifest } from "./manifest";
 import { personalTemplate } from "./templates/personal";
 import { portfolioTemplate } from "./templates/portfolio";
 import { starterTemplate, starterTemplateV1 } from "./templates/starter";
+import { studioTemplate } from "./templates/studio";
 import { writingTemplate } from "./templates/writing";
 
 /** Registry key for an `id@version` pair. */
@@ -25,6 +26,7 @@ const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
         personalTemplate,
         portfolioTemplate,
         writingTemplate,
+        studioTemplate,
     ].map((t) => [key(t.id, t.version), t]),
 );
 
