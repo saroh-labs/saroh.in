@@ -124,6 +124,8 @@ const renderedHero = z.object({
     subheading: z.string().optional(),
     cta: renderedCtaSchema.optional(),
     image: renderedImageSchema.optional(),
+    /** The photo it wants (KTD-5): a note to the owner, never drawn live. */
+    imageBrief: z.string().optional(),
     /** "On today" beside the headline (G18); read live, never stored. */
     onToday: z.boolean().optional(),
 });
@@ -141,6 +143,7 @@ const renderedRichText = z.object({
     value: z.string(),
     /** One photo beside the text (G7); absent side is the right. */
     image: renderedImageSchema.optional(),
+    imageBrief: z.string().optional(),
     imageSide: z.enum(["left", "right"]).optional(),
 });
 
@@ -158,7 +161,14 @@ const renderedCta = renderedCtaSchema.extend({ variant, padding });
 const renderedGallery = z.object({
     variant,
     padding,
-    images: z.array(renderedImageSchema).min(1),
+    /**
+     * Empty only for a slot shipped as a brief (KTD-5), which the live site
+     * draws as nothing. Each image may carry a caption (U2).
+     */
+    images: z.array(
+        renderedImageSchema.extend({ caption: z.string().optional() }),
+    ),
+    imageBrief: z.string().optional(),
 });
 
 const renderedEnquiryField = z.object({
@@ -360,12 +370,49 @@ const renderedProjects = z.object({
         .array(
             z.object({
                 image: renderedImageSchema.optional(),
+                imageBrief: z.string().optional(),
+                caption: z.string().optional(),
                 title: z.string(),
                 summary: z.string().optional(),
                 link: z.string().optional(),
             }),
         )
         .min(1),
+});
+
+/**
+ * `timetable`, `hours` and `person`, as published (industry templates U2).
+ * The first two are bound: nothing resolves at publish, the sessions and the
+ * week are read live. A person's button resolves like hero's.
+ */
+const renderedTimetable = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    intro: z.string().optional(),
+    serviceIds: z.array(z.string()).optional(),
+    showTrainer: z.boolean().optional(),
+    showPlacesLeft: z.boolean().optional(),
+});
+
+const renderedHours = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    storeId: z.string().optional(),
+    showClosed: z.boolean().optional(),
+});
+
+const renderedPerson = z.object({
+    variant,
+    padding,
+    image: renderedImageSchema.optional(),
+    imageBrief: z.string().optional(),
+    name: z.string(),
+    role: z.string().optional(),
+    credentials: z.array(z.string()).optional(),
+    bio: z.string().optional(),
+    cta: renderedCtaSchema.optional(),
 });
 
 /**
@@ -400,6 +447,9 @@ export const RENDERED_SCHEMAS = {
     productGrid: renderedProductGrid,
     packs: renderedPacks,
     projects: renderedProjects,
+    timetable: renderedTimetable,
+    hours: renderedHours,
+    person: renderedPerson,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -423,6 +473,9 @@ export type RenderedPlans = RenderedContent<"plans">;
 export type RenderedProductGrid = RenderedContent<"productGrid">;
 export type RenderedPacks = RenderedContent<"packs">;
 export type RenderedProjects = RenderedContent<"projects">;
+export type RenderedTimetable = RenderedContent<"timetable">;
+export type RenderedHours = RenderedContent<"hours">;
+export type RenderedPerson = RenderedContent<"person">;
 
 /**
  * Validate rendered content for a block type.

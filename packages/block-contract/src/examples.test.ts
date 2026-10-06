@@ -40,6 +40,10 @@ describe("the example a block starts with", () => {
             "productGrid",
             "packs",
             "projects",
+            "timetable",
+            "hours",
+            // An invented practitioner would be a claim about the business.
+            "person",
         ] as const) {
             expect(blockExample(type)).toBeUndefined();
         }
