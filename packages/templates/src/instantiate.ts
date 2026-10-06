@@ -3,7 +3,7 @@ import type {
     SectionContractError,
     SectionType,
 } from "@saroh/block-contract";
-import { parseSectionContent } from "@saroh/block-contract";
+import { parseSectionContent, repeatedAnchor } from "@saroh/block-contract";
 
 import type { TemplateContext, TemplateManifest } from "./manifest";
 import { resolveContent } from "./manifest";
@@ -130,6 +130,32 @@ export function instantiateTemplate(
                 };
             },
         );
+
+        // An anchor is an element id on its page: a template that repeats
+        // one is a mistake in the manifest, refused like an invalid section.
+        const repeated = repeatedAnchor(sections);
+        if (repeated) {
+            const at = included[repeated.index];
+            throw new TemplateInstantiationError({
+                templateId: template.id,
+                templateVersion: template.version,
+                pagePath: page.path,
+                sectionIndex: at.sectionIndex,
+                contractError: {
+                    code: "INVALID_CONTENT",
+                    type: at.section.type,
+                    version: at.section.contractVersion,
+                    issues: [
+                        {
+                            code: "custom",
+                            path: ["anchor"],
+                            message: `"${repeated.anchor}" is already another section's link name on this page`,
+                        },
+                    ],
+                    message: `"${repeated.anchor}" is already another section's link name on this page`,
+                },
+            });
+        }
 
         return {
             path: page.path,

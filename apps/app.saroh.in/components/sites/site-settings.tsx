@@ -916,7 +916,7 @@ export function SiteSettings({
                                 variant="outline"
                                 onClick={() => setEditing("footer")}
                             >
-                                {site.footer ? "Edit" : "Add"}
+                                {site.footer?.value.trim() ? "Edit" : "Add"}
                             </Button>
                         )
                     }
@@ -971,7 +971,9 @@ export function SiteSettings({
                                 stripped when you publish.
                             </p>
                         </div>
-                    ) : site.footer ? (
+                    ) : site.footer?.value.trim() ? (
+                        // A template's row with no line yet keeps its layout
+                        // (the API's), and reads as no line here.
                         <span className="whitespace-pre-wrap break-words text-muted-foreground">
                             {site.footer.value}
                         </span>

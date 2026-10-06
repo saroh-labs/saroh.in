@@ -160,7 +160,7 @@ export const developerTemplate: TemplateManifest = {
                     cornerRadius: 0,
                     headingScale: 0.85,
                 },
-                fontPair: "geist-jetbrains",
+                fontPair: "geist",
             },
         },
         {
@@ -179,7 +179,7 @@ export const developerTemplate: TemplateManifest = {
                     cornerRadius: 0,
                     headingScale: 0.85,
                 },
-                fontPair: "geist-jetbrains",
+                fontPair: "geist",
             },
         },
     ],

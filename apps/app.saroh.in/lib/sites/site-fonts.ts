@@ -7,6 +7,7 @@ import {
     IBM_Plex_Sans,
     Inter,
     Inter_Tight,
+    JetBrains_Mono,
     Newsreader,
     Source_Serif_4,
 } from "next/font/google";
@@ -67,6 +68,12 @@ const sourceSerif = Source_Serif_4({
 });
 const inter = Inter({ subsets: ["latin"], display: "swap", preload: false });
 const geist = Geist({ subsets: ["latin"], display: "swap", preload: false });
+// A mono role's face (the Developer pair's), for machine facts only.
+const jetbrainsMono = JetBrains_Mono({
+    subsets: ["latin"],
+    display: "swap",
+    preload: false,
+});
 
 /**
  * Each family's registered CSS name, by its Google Fonts name, for
@@ -84,4 +91,5 @@ export const SITE_FACES: LoadedSiteFaces = {
     "Source Serif 4": sourceSerif.style.fontFamily,
     Inter: inter.style.fontFamily,
     Geist: geist.style.fontFamily,
+    "JetBrains Mono": jetbrainsMono.style.fontFamily,
 };

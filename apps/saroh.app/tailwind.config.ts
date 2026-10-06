@@ -1,6 +1,10 @@
 import type { Config } from "tailwindcss";
 
-import { siteColors, siteFontFamily } from "@saroh/site-blocks/tailwind-preset";
+import {
+    siteColors,
+    siteFontFamily,
+    siteMaxWidth,
+} from "@saroh/site-blocks/tailwind-preset";
 
 import sharedConfig from "../../tooling/tailwind-config/tailwind.config";
 
@@ -40,6 +44,9 @@ const config = {
                 ...sharedConfig.theme?.extend?.fontFamily,
                 ...siteFontFamily,
             },
+            // max-w-site-content: the page's column, a template's width or
+            // today's 1280px.
+            maxWidth: siteMaxWidth,
         },
     },
 } satisfies Config;

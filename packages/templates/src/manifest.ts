@@ -237,6 +237,25 @@ export interface TemplateManifest {
      * in the first, or the one asked for by id. Absent: the default look.
      */
     styles?: readonly TemplateStylePreset[];
+    /**
+     * The site's footer as it starts (industry templates, polish pass): a
+     * short line the design sets beside the name — "14 Hill Road, Bandra
+     * West · Closed Mondays" — and how the footer is laid out. Written to
+     * `Site.footer` at creation as plain text, where the owner rewrites it in
+     * Site settings like any footer; it is sample text, like a template's
+     * headings, so a pre-publish check can tell it is still the template's
+     * by comparing it with this. Absent: no footer is written, and the site
+     * ends in its name and "Runs on Saroh", as every site has.
+     */
+    footer?: TemplateFooter;
+}
+
+/** A template's starting footer. See {@link TemplateManifest.footer}. */
+export interface TemplateFooter {
+    /** One line, plain text; no line breaks. */
+    line?: string;
+    /** `left` for the designs' row; absent or `centre` for today's line. */
+    layout?: "centre" | "left";
 }
 
 /**

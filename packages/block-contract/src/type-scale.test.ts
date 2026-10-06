@@ -27,6 +27,21 @@ describe("parseTypeScale", () => {
         expect(rounded.ok && rounded.type.bodySize).toBe(17.5);
     });
 
+    it("takes a column width from 720 to 1320px, in whole pixels", () => {
+        expect(parseTypeScale({ contentWidth: 820.4 })).toEqual({
+            ok: true,
+            type: { contentWidth: 820 },
+        });
+        expect(parseTypeScale({ contentWidth: 1320 }).ok).toBe(true);
+        for (const contentWidth of [719, 1321, "820px"]) {
+            const result = parseTypeScale({ contentWidth });
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.problems[0].field).toBe("type.contentWidth");
+            }
+        }
+    });
+
     it("stores plain as nothing, so plain and unset are one look", () => {
         expect(parseTypeScale({ labelStyle: "plain" })).toEqual({
             ok: true,
@@ -63,12 +78,14 @@ describe("typeScaleVariables", () => {
                 displaySize: 44,
                 bodySize: 18.5,
                 measure: 64,
+                contentWidth: 820,
                 labelStyle: "eyebrowAccent",
             }),
         ).toEqual({
             "--site-display-size": "44px",
             "--site-body-size": "18.5px",
             "--site-measure": "64ch",
+            "--site-content-width": "820px",
             "--site-label-style": "eyebrowAccent",
         });
     });
@@ -79,5 +96,8 @@ describe("sameTypeScale", () => {
         expect(sameTypeScale(undefined, {})).toBe(true);
         expect(sameTypeScale({ measure: 64 }, { measure: 64 })).toBe(true);
         expect(sameTypeScale({ measure: 64 }, { measure: 66 })).toBe(false);
+        expect(
+            sameTypeScale({ contentWidth: 820 }, { contentWidth: 1320 }),
+        ).toBe(false);
     });
 });

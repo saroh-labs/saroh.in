@@ -20,7 +20,10 @@ import OnTodayHero from "./on-today";
  * - `none` — no band at all: the page's heading and its line, small, in the
  *   page column, for pages that go straight to a list (a blog, a portfolio).
  *   The heading stays an `h1`, so the page still has one for a screen
- *   reader and a search engine. Its button and photo are not drawn.
+ *   reader and a search engine. Its button and photo are not drawn. With
+ *   `titleVisible: false` the h1 is for those readers only — the header
+ *   already shows the business's name, and a page opening on it twice reads
+ *   as a mistake — and with no line under it the section takes no room.
  */
 export default function HeroSection({
     content,
@@ -58,13 +61,26 @@ export default function HeroSection({
 
 /** The `none` look: a page title, not a hero. */
 function CompactHeading({ content }: { content: RenderedHero }) {
+    const visible = content.titleVisible !== false;
+    if (!visible && !content.subheading) {
+        // Only the page's h1, for screen readers and search engines.
+        return <h1 className="sr-only">{content.heading}</h1>;
+    }
     return (
         <section className="text-site-fg mx-auto w-full max-w-screen-xl px-5 pb-2 pt-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-            <h1 className="font-site-heading text-balance text-[calc(2rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.025em]">
+            <h1
+                className={
+                    visible
+                        ? "font-site-heading text-balance text-[calc(2rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.025em]"
+                        : "sr-only"
+                }
+            >
                 {content.heading}
             </h1>
             {content.subheading ? (
-                <p className="text-site-body mt-2 max-w-[60ch] text-pretty text-base leading-relaxed">
+                <p
+                    className={`text-site-body max-w-[60ch] text-pretty text-base leading-relaxed ${visible ? "mt-2" : ""}`}
+                >
                     {content.subheading}
                 </p>
             ) : null}

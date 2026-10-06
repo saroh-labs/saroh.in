@@ -37,7 +37,7 @@ export function modulePageTopOf(page: {
 
 export function ModulePageTop({ title, lead }: ModulePageTopContent) {
     return (
-        <div className="mx-auto w-full max-w-screen-xl px-5 pt-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+        <div className="max-w-site-content mx-auto w-full px-5 pt-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <h1 className="font-site-heading text-site-fg m-0 text-[calc(clamp(2rem,7vw,2.875rem)*var(--site-heading-scale))] font-semibold leading-[1.08] tracking-[-0.02em] [text-wrap:balance]">
                 {title}
             </h1>

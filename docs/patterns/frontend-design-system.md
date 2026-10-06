@@ -25,8 +25,9 @@
   merchant's site — no `font-sans`, `font-display` or `font-mono` in a block,
   no `packages/ui/fonts` path in `apps/saroh.app`, and `next/font` only in its
   merchant font list, `lib/site-fonts.ts`.
-  Blocks set type with `font-site-heading` and `font-site-body` (see "Type and
-  the mark").
+  Blocks set type with `font-site-heading` and `font-site-body`, and small
+  machine facts (a time, a year, a handle) with `font-site-mono`, which falls
+  back to the body face for a pair without a mono (see "Type and the mark").
 - **Current** — Every `siteColors` key has a default in `SiteTheme` (`muted` and
   `border` did not until `00cd219`).
 - **Current** — **A template may carry exact colours and a type scale
@@ -39,6 +40,20 @@
   `--site-body-size` and `--site-measure` with today's value as the fallback,
   and marks a section title `data-site-title` (the eyebrow rule `SiteTheme`
   writes from `--site-label-style`). Section headings use `font-site-heading`.
+- **Current** — **A section's frame and the page's column** (industry
+  templates, polish pass). Every section may carry `anchor`, `navLabel` and
+  `band` beside its own fields (`section-frame.ts` in `@saroh/block-contract`;
+  `parseSectionContent` keeps them for every block, so a block schema never
+  names them). `PageSections` puts the anchor on the wrapper as its `id` and
+  the band as `data-site-band`; `SiteTheme` recolours the section's own
+  `--site-*` tokens inside a band (through `--site-band-*` aliases), so a block
+  never knows it is in one. A home-page section with a menu label leads the
+  header's menu as `/#anchor`, resolved at publish (`withInPageNavigation`).
+  A template's `type.contentWidth` (720–1320px) becomes `--site-content-width`:
+  the chrome reads it as `max-w-site-content`, and while it is set `SiteTheme`
+  sets the blocks' `max-w-screen-md/lg/xl` inside sections to it. The footer
+  may be laid out `left` (`Site.footer.layout`), which a save of the line
+  alone keeps.
 
 ## Saroh tokens — Ink & Saffron
 
@@ -222,7 +237,9 @@
   `apps/saroh.app/lib/site-fonts.ts` and, for the editor's previews,
   `apps/app.saroh.in/lib/sites/site-fonts.ts` (`SiteFacesProvider`); a
   browser fetches only the pair the page is set in. A new pair is a list entry
-  plus a loader in both files; tests hold the three in step.
+  plus a loader in both files; tests hold the three in step. A pair may name a
+  third, `mono` face (`archivo-narrow`: IBM Plex Mono; `geist`: JetBrains
+  Mono), emitted as `--site-font-mono` only when it has one.
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app

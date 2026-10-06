@@ -400,13 +400,18 @@ export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
 export {
+    FOOTER_LAYOUTS,
     SiteFooter,
     SiteHeader,
     footerLine,
     siteMenu,
     withShopLink,
 } from "./site-chrome";
-export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
+export type {
+    FooterLayout,
+    ModulePageStates,
+    SiteFooterContent,
+} from "./site-chrome";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
 // A module page's title and lead (DEC-073 #9).
@@ -416,7 +421,12 @@ export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 export { SiteTheme, SiteThemeScope, fontPairStacks } from "./site-theme";
 export type { LoadedSiteFaces } from "./site-theme";
 // The typeface pairs (KTD-2), for the renderer's loader and the Style panel.
-export { FONT_PAIRS, findFontPair, isFontPairKey } from "@saroh/block-contract";
+export {
+    FONT_PAIRS,
+    findFontPair,
+    fontPairFamilies,
+    isFontPairKey,
+} from "@saroh/block-contract";
 export type { FontPairKey, SiteFontPair } from "@saroh/block-contract";
 
 // A test release (DEC-071, T6): the layout's provider, the hook the flows

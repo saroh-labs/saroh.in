@@ -24,12 +24,15 @@ import { SITE_FONT_STACK } from "./tailwind-preset";
  */
 export type LoadedSiteFaces = Readonly<Record<string, string>>;
 
-/** The two `--site-font-*` variables, and the role each one sets. */
+/** The `--site-font-*` variables, and the role each one sets. */
 const FONT_ROLES: Partial<
-    Record<string, keyof Pick<SiteFontPair, "heading" | "body">>
+    Record<string, keyof Pick<SiteFontPair, "heading" | "body" | "mono">>
 > = {
     "--site-font-heading": "heading",
     "--site-font-body": "body",
+    // The optional third face (`font-site-mono`): absent for a pair without
+    // one, which then sets machine facts in its body face.
+    "--site-font-mono": "mono",
 };
 
 /**
@@ -58,7 +61,7 @@ function safeLoadedFamily(
 export function fontPairStacks(
     key: unknown,
     faces?: LoadedSiteFaces,
-): { heading: string; body: string } | null {
+): { heading: string; body: string; mono?: string } | null {
     const pair = findFontPair(key);
     if (!pair) return null;
     return {
@@ -67,6 +70,15 @@ export function fontPairStacks(
             safeLoadedFamily(faces, pair.heading.family),
         ),
         body: fontStack(pair.body, safeLoadedFamily(faces, pair.body.family)),
+        // Only a pair that names a mono face has one.
+        ...(pair.mono
+            ? {
+                  mono: fontStack(
+                      pair.mono,
+                      safeLoadedFamily(faces, pair.mono.family),
+                  ),
+              }
+            : {}),
     };
 }
 
@@ -117,6 +129,7 @@ export function SiteTheme({
     const custom = cssVariables(variables, faces);
     const at = safeSelector(selector);
     const labels = labelRule(at, variables?.[LABEL_STYLE_VARIABLE]);
+    const column = columnRule(at, variables?.[CONTENT_WIDTH_VARIABLE]);
 
     return (
         <style>{`
@@ -199,7 +212,7 @@ ${
                 }
             }`
         : `            ${at} {\n${custom}\n            }`
-}${labels}
+}${labels}${column}${sectionRules(at)}
         `}</style>
     );
 }
@@ -234,6 +247,101 @@ function labelRule(at: string, style: string | undefined): string {
                 letter-spacing: 0.14em;
                 text-transform: uppercase;
                 color: ${colour};
+            }`;
+}
+
+/** A template's column width (DEC-090 type scale), in px. */
+const CONTENT_WIDTH_VARIABLE = "--site-content-width";
+
+/**
+ * One column for the whole page, when a template sets one.
+ *
+ * The header, the footer and a module page's title read the width through
+ * `max-w-site-content`. The blocks still name their own Tailwind widths
+ * (1280px, or a 768px reading column for text), so while the site has a
+ * column this rule sets each of those, inside a section, to it — a
+ * developer's single 820px column, a studio's 1320px frame. Without one the
+ * rule is not written, and every block keeps the width it has always had.
+ * Margins are inside the width, as they are inside `max-w-screen-xl`.
+ */
+function columnRule(at: string, width: string | undefined): string {
+    if (!width || !/^\d{3,4}px$/.test(width)) return "";
+    return `
+            ${at} [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
+                max-width: var(${CONTENT_WIDTH_VARIABLE});
+            }`;
+}
+
+/**
+ * What a section's frame asks of the page (`section-frame.ts` in the
+ * contract), written for every site because each only matches a section
+ * that set it, and none has until a template or the merchant does.
+ *
+ * BANDS. A band recolours the section's own `--site-*` tokens, so every
+ * block inside it draws in the band's colours without knowing it is in one.
+ * The swap reads the page's colours through `--site-band-*` aliases
+ * declared at the theme's own scope: a property cannot read its own
+ * inherited value on the element that redefines it, but an alias, computed
+ * where the theme is, carries the page's value down. Each band keeps a
+ * pairing the palette already holds to 4.5:1 — ink on paper swapped, the
+ * accent's text on the accent — and every quieter text role (body, quiet,
+ * hairline) takes that same full-contrast colour, never a tint nobody
+ * checked. The accent inside an inverse band is the paper, so a button there
+ * is paper with ink words; inside an accent band, the accent's own text.
+ *
+ * Anchors leave room for the sticky header when a link jumps to them.
+ *
+ * DEFINITION LISTS. A text block may carry `dl`/`dt`/`dd` (facts: "Clay /
+ * Stoneware"). The prose defaults would set them in the typography
+ * plugin's greys; this sets them in the merchant's colours, terms in the
+ * heading face. Scoped to sections, so a footer's own colours stay its own.
+ */
+function sectionRules(at: string): string {
+    return `
+            ${at} {
+                --site-band-paper: var(--site-bg);
+                --site-band-ink: var(--site-fg);
+                --site-band-card: var(--site-surface);
+                --site-band-accent: var(--site-accent);
+                --site-band-accent-fg: var(--site-accent-fg);
+            }
+            ${at} [data-site-band] {
+                background-color: hsl(var(--site-bg));
+                color: hsl(var(--site-body));
+            }
+            ${at} [data-site-band="surface"] {
+                --site-bg: var(--site-band-card);
+                --site-surface: var(--site-band-paper);
+            }
+            ${at} [data-site-band="inverse"] {
+                --site-bg: var(--site-band-ink);
+                --site-surface: var(--site-band-ink);
+                --site-fg: var(--site-band-paper);
+                --site-body: var(--site-band-paper);
+                --site-muted: var(--site-band-paper);
+                --site-border: var(--site-band-paper);
+                --site-accent: var(--site-band-paper);
+                --site-accent-fg: var(--site-band-ink);
+            }
+            ${at} [data-site-band="accent"] {
+                --site-bg: var(--site-band-accent);
+                --site-surface: var(--site-band-accent);
+                --site-fg: var(--site-band-accent-fg);
+                --site-body: var(--site-band-accent-fg);
+                --site-muted: var(--site-band-accent-fg);
+                --site-border: var(--site-band-accent-fg);
+                --site-accent: var(--site-band-accent-fg);
+                --site-accent-fg: var(--site-band-accent);
+            }
+            ${at} [data-site-section][id] {
+                scroll-margin-top: 4.5rem;
+            }
+            ${at} [data-site-section] .prose dt {
+                color: hsl(var(--site-fg));
+                font-family: var(--site-font-heading);
+            }
+            ${at} [data-site-section] .prose dd {
+                color: hsl(var(--site-fg) / 0.8);
             }`;
 }
 

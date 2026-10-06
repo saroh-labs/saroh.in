@@ -20,7 +20,7 @@ import type {
     RenderedTimetable,
     RenderedVisitUs,
 } from "@saroh/block-contract";
-import { resolveVariant } from "@saroh/block-contract";
+import { resolveVariant, sectionFrameOf } from "@saroh/block-contract";
 
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
@@ -333,6 +333,13 @@ export function opensOverPhoto(section: Section): boolean {
  * The wrapper exists to carry a per-section padding override. It used to be
  * absent, so a merchant could set a section's padding in the editor, watch the
  * preview honour it, publish, and see the live site ignore it.
+ *
+ * It also carries the section's frame (`section-frame.ts`): its anchor as the
+ * wrapper's `id`, so a header entry or a button can jump to it, and its band
+ * as `data-site-band`, whose colours `SiteTheme` writes. `data-site-section`
+ * marks every wrapper, for the rules that apply inside sections only (a
+ * template's column width, definition lists). A section that sets none of it
+ * gets no id and no band: the page is what it was.
  */
 export function PageSections({
     sections,
@@ -406,11 +413,15 @@ export function PageSections({
                         modulePage={modulePage}
                     />
                 );
+                const frame = sectionFrameOf(section.content);
                 return (
                     <div
                         key={i}
+                        id={frame.anchor}
                         className={className}
                         style={style}
+                        data-site-section=""
+                        data-site-band={frame.band}
                         data-site-first-hero={
                             !top && i === 0 && opensOverPhoto(section)
                                 ? "fullBleed"

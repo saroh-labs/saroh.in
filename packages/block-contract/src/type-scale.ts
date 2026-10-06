@@ -1,8 +1,9 @@
 /**
  * A template's type scale (DEC-090): the few sizes a design sets that the
  * heading-scale slider cannot — how large the display line is, how large
- * body copy reads, how long a reading line runs, and whether section titles
- * are set as small wide-tracked capitals (an eyebrow).
+ * body copy reads, how long a reading line runs, how wide the page's one
+ * column is, and whether section titles are set as small wide-tracked
+ * capitals (an eyebrow).
  *
  * Bounded, not free: each is a number in a narrow range or a word from a
  * list, refused outside it. Like a palette it reaches a site only as part of
@@ -20,6 +21,13 @@ export const TYPE_SCALE_BOUNDS = {
     bodySize: { min: 15, max: 19, unit: "px" },
     /** The longest reading line, in characters. */
     measure: { min: 52, max: 76, unit: "ch" },
+    /**
+     * The page's column, in px, margins included: every section, the header
+     * and the footer line up on it, so a design can be one 820px column (the
+     * developer's) or a 1320px frame (the studio's). Absent, each block keeps
+     * its own width (1280px for most, a narrower reading column for text).
+     */
+    contentWidth: { min: 720, max: 1320, unit: "px" },
 } as const;
 export type TypeScaleSize = keyof typeof TYPE_SCALE_BOUNDS;
 const SIZE_KEYS = Object.keys(TYPE_SCALE_BOUNDS) as TypeScaleSize[];
@@ -38,6 +46,7 @@ export interface SiteTypeScale {
     displaySize?: number;
     bodySize?: number;
     measure?: number;
+    contentWidth?: number;
     labelStyle?: LabelStyle;
 }
 
@@ -93,7 +102,11 @@ export function parseTypeScale(input: unknown): TypeScaleResult {
             continue;
         }
         // Half steps at most: 18.5px body is a real size, 18.37px is not.
-        type[key] = Math.round(value * 2) / 2;
+        // A column is whole pixels.
+        type[key] =
+            key === "contentWidth"
+                ? Math.round(value)
+                : Math.round(value * 2) / 2;
     }
     const label = raw.labelStyle;
     if (label !== undefined) {
@@ -140,6 +153,9 @@ export function typeScaleVariables(
     }
     if (type.measure !== undefined) {
         vars["--site-measure"] = `${type.measure}ch`;
+    }
+    if (type.contentWidth !== undefined) {
+        vars["--site-content-width"] = `${type.contentWidth}px`;
     }
     if (type.labelStyle && type.labelStyle !== "plain") {
         vars["--site-label-style"] = type.labelStyle;

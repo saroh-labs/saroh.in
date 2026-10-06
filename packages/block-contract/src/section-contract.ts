@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseSectionFrame } from "./section-frame";
+
 /**
  * Versioned section contract (Stage 2 — S2-001).
  *
@@ -284,6 +286,13 @@ const heroV1 = z.object({
     /** The photo this hero wants, until it has one (KTD-5). */
     imageBrief,
     onToday: z.boolean().optional(),
+    /**
+     * `false` keeps the heading for screen readers and search engines only
+     * (the `none` look): a page whose header already shows the business's
+     * name still has its one h1 without printing the name twice. Absent is
+     * shown, as every hero has been.
+     */
+    titleVisible: z.boolean().optional(),
 });
 
 /**
@@ -1466,7 +1475,36 @@ export function parseSectionContent(
         }
     }
 
-    return { success: true, data: result.data, contract };
+    /*
+     * The section's frame — anchor, menu label, band — rides beside every
+     * block's own fields (`section-frame.ts`). Read off the RAW content,
+     * because the block's schema strips keys it does not name, and put back
+     * on the parsed data so a save keeps it.
+     */
+    const frame = parseSectionFrame(content);
+    if (!frame.ok) {
+        return {
+            success: false,
+            error: {
+                code: "INVALID_CONTENT",
+                type,
+                version,
+                issues: frame.issues.map((issue) => ({
+                    code: z.ZodIssueCode.custom,
+                    path: issue.path,
+                    message: issue.message,
+                })),
+                message: frame.issues[0].message,
+            },
+        };
+    }
+    const parsed: unknown = result.data;
+    const data: unknown =
+        Object.keys(frame.frame).length > 0
+            ? { ...(parsed as Record<string, unknown>), ...frame.frame }
+            : parsed;
+
+    return { success: true, data, contract };
 }
 
 /**

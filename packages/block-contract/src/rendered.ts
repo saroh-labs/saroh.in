@@ -128,6 +128,8 @@ const renderedHero = z.object({
     imageBrief: z.string().optional(),
     /** "On today" beside the headline (G18); read live, never stored. */
     onToday: z.boolean().optional(),
+    /** `false`: the heading is for screen readers only (the `none` look). */
+    titleVisible: z.boolean().optional(),
 });
 
 /**

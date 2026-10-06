@@ -266,7 +266,9 @@ for (const root of SEARCH_ROOTS) {
  *     `--site-font-*`; a `next/font` call anywhere else would be a face on
  *     every site whatever its merchant chose.
  */
-const SAROH_FONT_UTILITY_RE = /\bfont-(?:sans|display|mono)\b(?![\w-])/g;
+// Not preceded by a dash either: `--site-font-mono` is the merchant's own
+// mono role (industry templates), and `font-site-mono` its utility.
+const SAROH_FONT_UTILITY_RE = /(?<![\w-])font-(?:sans|display|mono)\b(?![\w-])/g;
 const SAROH_FONT_LOAD_RE =
     /packages\/ui\/fonts|from\s+["']next\/font(?:\/[\w-]+)?["']/g;
 

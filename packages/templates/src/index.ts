@@ -19,6 +19,7 @@ export {
 export type {
     TemplateContent,
     TemplateContext,
+    TemplateFooter,
     TemplateKind,
     TemplateManifest,
     TemplatePage,
@@ -36,6 +37,7 @@ export {
     FONT_PAIRS,
     FONT_PAIR_KEYS,
     findFontPair,
+    fontPairVariables,
     isFontPairKey,
 } from "@saroh/block-contract";
 export type { FontPairKey, SiteFontPair } from "@saroh/block-contract";

@@ -3,6 +3,7 @@ import type { FontPairKey, SitePalette, SiteTypeScale } from "@saroh/templates";
 import {
     DEFAULT_FONT_PAIR,
     FONT_PAIRS,
+    fontPairVariables,
     isFontPairKey,
     paletteVariables,
     parsePalette,
@@ -446,14 +447,10 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
          * only stacks from its own list, never a value from here. A renderer
          * that does not know the key drops it and keeps the system stack.
          * Absent for the default pair, so a site that chose nothing resolves
-         * to exactly the variables it always did.
+         * to exactly the variables it always did. A pair with a mono face
+         * names it too (`--site-font-mono`), for its machine facts.
          */
-        ...(style.fontPair
-            ? {
-                  "--site-font-heading": style.fontPair,
-                  "--site-font-body": style.fontPair,
-              }
-            : {}),
+        ...fontPairVariables(style.fontPair),
         /*
          * A template's own colours replace the rows' (DEC-090). Already
          * checked to 4.5:1 per pairing, so none of the corrections above
