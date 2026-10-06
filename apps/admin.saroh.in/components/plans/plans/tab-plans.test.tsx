@@ -193,7 +193,7 @@ describe("Plan by plan", () => {
 
     it("adds a plan with the design's defaults and selects it", async () => {
         open();
-        fireEvent.click(screen.getByRole("button", { name: "Plan" }));
+        fireEvent.click(screen.getByRole("button", { name: "Add plan" }));
         expect(chip(/^New plan/).getAttribute("aria-pressed")).toBe("true");
         expect(screen.getByLabelText("Button")).toHaveProperty(
             "value",
@@ -234,7 +234,7 @@ describe("Plan by plan", () => {
 
     it("takes a limit as a whole number above 0, blank for none", async () => {
         open();
-        const limit = row("things").getByLabelText("Limit (blank: none)");
+        const limit = row("things").getByLabelText("Limit (empty for none)");
         expect(limit).toHaveProperty("value", "111");
 
         fireEvent.change(limit, { target: { value: "0" } });
@@ -262,7 +262,7 @@ describe("Plan by plan", () => {
         open();
         const soft = () =>
             row("things").getByRole("switch", {
-                name: "Soft cap: count and tell the business, never refuse",
+                name: "Soft limit: we tell the business, and never block it",
             });
         expect(soft().getAttribute("aria-checked")).toBe("true");
         expect(
@@ -280,9 +280,12 @@ describe("Plan by plan", () => {
         });
 
         fireEvent.click(soft());
-        fireEvent.change(row("things").getByLabelText("Limit (blank: none)"), {
-            target: { value: "" },
-        });
+        fireEvent.change(
+            row("things").getByLabelText("Limit (empty for none)"),
+            {
+                target: { value: "" },
+            },
+        );
         expect(row("things").queryByRole("switch")).toBeNull();
         c = await saved();
         expect(c.modules[0]?.cells.b).toMatchObject({
@@ -297,9 +300,12 @@ describe("Plan by plan", () => {
         expect(
             row("things").getByText("2 of 2 use it · highest 10 · 1 at 80%+"),
         ).toBeTruthy();
-        fireEvent.change(row("things").getByLabelText("Limit (blank: none)"), {
-            target: { value: "5" },
-        });
+        fireEvent.change(
+            row("things").getByLabelText("Limit (empty for none)"),
+            {
+                target: { value: "5" },
+            },
+        );
         expect(
             row("things").getByText(
                 "2 of 2 use it · highest 10 · 1 over the limit",
@@ -337,12 +343,32 @@ describe("Plan by plan", () => {
         expect(
             row("things").getByRole("checkbox", { name: /Things/ }),
         ).toHaveProperty("disabled", true);
-        expect(screen.getByRole("button", { name: "Plan" })).toHaveProperty(
-            "disabled",
-            true,
-        );
+        expect(screen.queryByRole("button", { name: "Add plan" })).toBeNull();
         // Plans can still be looked through.
         fireEvent.click(chip(/^Plan C/));
         expect(screen.getByLabelText("Name")).toHaveProperty("value", "Plan C");
+    });
+});
+
+describe("taking back a new plan", () => {
+    it("removes a plan that was never published, and Undo brings it back", async () => {
+        open();
+        fireEvent.click(screen.getByRole("button", { name: "Add plan" }));
+        fireEvent.click(screen.getByRole("button", { name: "Remove plan" }));
+        expect(screen.getByRole("status").textContent).toContain(
+            "New plan removed",
+        );
+        let c = await saved();
+        expect(c.plans.map((p) => p.id)).toEqual(["a", "b", "c"]);
+        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+        c = await saved();
+        expect(c.plans.map((p) => p.name)).toContain("New plan");
+    });
+
+    it("offers no Remove on a live plan (Retire is the way)", () => {
+        open();
+        expect(
+            screen.queryByRole("button", { name: "Remove plan" }),
+        ).toBeNull();
     });
 });

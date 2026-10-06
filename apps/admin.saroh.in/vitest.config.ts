@@ -11,18 +11,29 @@ import { defineConfig } from "vitest/config";
  * `@vitest-environment jsdom` comment. Layout, focus across the page and the
  * four scenes need a real browser, which is `e2e/`.
  *
- * `@saroh/pricing-catalog` resolves to its source, so a test never depends
- * on a `dist` someone forgot to build.
+ * `@saroh/pricing-catalog` (and its `/seed` entry, which the first-run
+ * screen's starter catalogue reads) resolves to its source, so a test never
+ * depends on a `dist` someone forgot to build.
  */
 export default defineConfig({
     resolve: {
-        alias: {
-            "@": path.resolve(__dirname),
-            "@saroh/pricing-catalog": path.resolve(
-                __dirname,
-                "../../packages/pricing-catalog/src/index.ts",
-            ),
-        },
+        alias: [
+            {
+                find: /^@saroh\/pricing-catalog\/seed$/,
+                replacement: path.resolve(
+                    __dirname,
+                    "../../packages/pricing-catalog/src/seed.ts",
+                ),
+            },
+            {
+                find: /^@saroh\/pricing-catalog$/,
+                replacement: path.resolve(
+                    __dirname,
+                    "../../packages/pricing-catalog/src/index.ts",
+                ),
+            },
+            { find: "@", replacement: path.resolve(__dirname) },
+        ],
     },
     esbuild: { jsx: "automatic" },
     test: {

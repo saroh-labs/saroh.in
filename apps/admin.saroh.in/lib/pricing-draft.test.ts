@@ -199,3 +199,23 @@ describe("versions", () => {
         );
     });
 });
+
+describe("the first version (nothing live yet)", () => {
+    it("counts no changes in the tab, and says what publishing does", () => {
+        expect(
+            tabLabels({
+                versions: 0,
+                hasDraft: true,
+                changes: 0,
+                firstVersion: true,
+            }).publish,
+        ).toBe("Review & publish");
+        expect(
+            draftSummary({
+                check: { valid: true, errors: [], changes: [] },
+                impact: null,
+                firstVersion: true,
+            }),
+        ).toBe("Nothing is live yet: publishing makes this version 1");
+    });
+});

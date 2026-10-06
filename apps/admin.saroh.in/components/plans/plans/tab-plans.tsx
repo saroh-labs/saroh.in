@@ -2,13 +2,15 @@
 
 import type { Catalog } from "@saroh/pricing-catalog";
 import { cellOf, formatInr } from "@saroh/pricing-catalog";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { AddButton } from "../add-button";
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
 import { usePlansNav } from "../plans-nav";
+import { useFlash } from "../toast";
 import {
     addPlan,
     cellChanged,
@@ -26,10 +28,13 @@ import {
 } from "./catalog-edits";
 import { ModuleRow } from "./module-row";
 import { PlanFields } from "./plan-fields";
+import { isUnpublishedPlan, removePlan, restorePlan } from "./structure-edits";
 
 /**
  * The Plans tab: "Plan by plan" (plans catalogue U7, the design's plan
- * editor). Pick a plan from its chips, or add one; change its own fields;
+ * editor). Pick a plan from its chips, or add one (Add plan, top right; a
+ * plan that was never published can be removed again, with Undo); change
+ * its own fields;
  * then go down the modules, group by group, ticking what the plan includes
  * and saying how each looks on the pricing page and in the dashboard.
  *
@@ -42,6 +47,7 @@ export function TabPlans() {
     const { catalog, live, edit, check, canEdit } = useDraft();
     const { pricing } = usePlans();
     const { focus, clearFocus } = usePlansNav();
+    const flash = useFlash();
     const liveCatalog = live?.catalog ?? null;
 
     const [planId, setPlanId] = useState<string | null>(
@@ -99,6 +105,26 @@ export function TabPlans() {
                 <h2 className="flex-[1_1_auto] font-display text-[16px] font-semibold">
                     Plan by plan
                 </h2>
+                {canEdit && (
+                    <AddButton
+                        onClick={() => {
+                            const made: { id: string | null } = { id: null };
+                            edit((c) => {
+                                made.id = addPlan(c);
+                            });
+                            if (made.id) {
+                                setPlanId(made.id);
+                                setFocusModule(null);
+                            }
+                        }}
+                    >
+                        Add plan
+                    </AddButton>
+                )}
+            </div>
+            {/* The plan being edited stays in view down the long list of rows,
+                just under the console's 56px header (h-14). */}
+            <div className="sticky top-14 z-10 -mx-4 bg-card px-4 py-1.5 sm:-mx-[18px] sm:px-[18px]">
                 <div
                     role="group"
                     aria-label="Plans"
@@ -141,28 +167,10 @@ export function TabPlans() {
                             </button>
                         );
                     })}
-                    <button
-                        type="button"
-                        disabled={!canEdit}
-                        onClick={() => {
-                            const made: { id: string | null } = { id: null };
-                            edit((c) => {
-                                made.id = addPlan(c);
-                            });
-                            if (made.id) {
-                                setPlanId(made.id);
-                                setFocusModule(null);
-                            }
-                        }}
-                        className="flex h-[34px] cursor-pointer items-center gap-1 rounded-[9px] border border-dashed border-border-strong px-3 text-[13px] font-semibold text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        <Plus aria-hidden className="size-3.5" />
-                        Plan
-                    </button>
                 </div>
             </div>
 
-            <p className="flex flex-wrap gap-x-4 gap-y-2 text-[12.5px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px] text-muted-foreground">
                 <span>
                     {on} {on === 1 ? "business" : "businesses"} on {plan.name}
                     {older ? ` · ${older} on an older version` : ""}
@@ -172,7 +180,41 @@ export function TabPlans() {
                         Retired: not on the pricing page
                     </span>
                 )}
-            </p>
+                {canEdit &&
+                    isUnpublishedPlan(liveCatalog, plan.id) &&
+                    catalog.plans.length > 1 && (
+                        <Button
+                            type="button"
+                            variant="link"
+                            className="h-auto p-0 text-[12.5px] text-destructive"
+                            onClick={() => {
+                                const taken: {
+                                    r: ReturnType<typeof removePlan>;
+                                } = { r: null };
+                                const name = plan.name || "Unnamed plan";
+                                edit((c) => {
+                                    taken.r = removePlan(
+                                        c,
+                                        liveCatalog,
+                                        plan.id,
+                                    );
+                                });
+                                const removed = taken.r;
+                                if (!removed) return;
+                                setPlanId(null);
+                                flash(`${name} removed`, {
+                                    label: "Undo",
+                                    onClick: () => {
+                                        edit((c) => restorePlan(c, removed));
+                                        setPlanId(removed.plan.id);
+                                    },
+                                });
+                            }}
+                        >
+                            Remove plan
+                        </Button>
+                    )}
+            </div>
 
             <PlanFields
                 plan={plan}

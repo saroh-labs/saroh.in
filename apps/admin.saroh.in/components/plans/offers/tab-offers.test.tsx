@@ -151,9 +151,7 @@ describe("the Offers tab", () => {
         expect(
             screen.queryByRole("button", { name: /\+ Products/ }),
         ).toBeNull();
-        expect(
-            screen.queryByRole("button", { name: "+ New coupon" }),
-        ).toBeNull();
+        expect(screen.queryByRole("button", { name: "New coupon" })).toBeNull();
         expect(
             screen.getByText("You can see coupons but not change them."),
         ).toBeTruthy();
@@ -169,7 +167,7 @@ describe("coupons", () => {
             details: { field: "code" },
         });
         draw();
-        fireEvent.click(screen.getByRole("button", { name: "+ New coupon" }));
+        fireEvent.click(screen.getByRole("button", { name: "New coupon" }));
         fireEvent.change(screen.getByLabelText("Code"), {
             target: { value: "hello" },
         });

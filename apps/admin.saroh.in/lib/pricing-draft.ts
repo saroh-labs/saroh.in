@@ -42,15 +42,18 @@ export function tabLabels(input: {
     versions: number;
     hasDraft: boolean;
     changes: number;
+    /** Nothing is live: there is nothing to count changes against. */
+    firstVersion?: boolean;
 }): Record<PlansTab, string> {
     return {
         plans: "Plans",
         modules: "Modules",
         offers: "Offers",
         versions: `Versions · ${input.versions}`,
-        publish: input.hasDraft
-            ? `Review & publish · ${input.changes}`
-            : "Review & publish",
+        publish:
+            input.hasDraft && !input.firstVersion
+                ? `Review & publish · ${input.changes}`
+                : "Review & publish",
     };
 }
 
@@ -109,6 +112,8 @@ export function changeCount(n: number): string {
 export function draftSummary(input: {
     check: DraftCheck;
     impact: Impact | null;
+    /** Nothing is live yet: this draft would be the first version. */
+    firstVersion?: boolean;
 }): string {
     const { check, impact } = input;
     if (!check.valid) {
@@ -134,7 +139,9 @@ export function draftSummary(input: {
         }
     }
     const { changes } = check;
-    if (changes.length === 0) {
+    if (input.firstVersion) {
+        parts.push("Nothing is live yet: publishing makes this version 1");
+    } else if (changes.length === 0) {
         parts.push("Nothing differs from the live version yet");
     } else {
         parts.push(...changes.slice(0, 2));

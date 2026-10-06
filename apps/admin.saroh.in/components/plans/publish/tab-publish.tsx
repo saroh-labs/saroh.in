@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { pricingImpactAction } from "@/lib/pricing-actions";
@@ -8,6 +9,7 @@ import type { Impact } from "@/lib/pricing-types";
 
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
+import { usePlansNav } from "../plans-nav";
 import { nextVersion } from "../versions/versions";
 import { CompareTable } from "./compare-table";
 import type { ImpactState } from "./impact-list";
@@ -23,6 +25,7 @@ import { PublishPanel } from "./publish-panel";
 export function TabPublish() {
     const { pricing, access } = usePlans();
     const draft = useDraft();
+    const { setTab } = usePlansNav();
     const { hasDraft, check, revision, save, flush } = draft;
     const [fetched, setFetched] = useState<{
         revision: number;
@@ -84,11 +87,35 @@ export function TabPublish() {
             ? "Reload the draft first"
             : !check.valid
               ? "Fix the draft before publishing"
-              : check.changes.length === 0
+              : // The first version has nothing to differ from.
+                check.changes.length === 0 && draft.live
                 ? "Nothing differs from the live version"
                 : scheduled
                   ? `Version ${scheduled.version} is already scheduled`
                   : null;
+
+    if (!hasDraft) {
+        // Nothing to review: one line and the way to start, not an empty
+        // Live / Draft table (the Plans console audit's cut list).
+        return (
+            <div className="grid justify-items-start gap-3 rounded-[14px] border border-dashed border-border px-4 py-5 text-[13.5px]">
+                <p className="text-muted-foreground">
+                    No draft. Edit a plan, a module or an offer, and you&apos;ll
+                    see who it affects here before you publish.
+                </p>
+                {access.canEdit && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="h-[34px] rounded-[9px] px-3.5 text-[13px]"
+                        onClick={() => setTab("plans")}
+                    >
+                        Go to Plans
+                    </Button>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="grid gap-3.5 text-[13.5px]">
@@ -99,18 +126,17 @@ export function TabPublish() {
             {draft.catalog && (
                 <CompareTable live={live} draft={draft.catalog} />
             )}
-            {hasDraft &&
-                (access.canPublish ? (
-                    <PublishPanel
-                        nextV={nextVersion(pricing.versions)}
-                        blocked={blocked}
-                    />
-                ) : (
-                    <p className="rounded-[14px] border border-border bg-card px-4 py-3.5 text-[12.5px] text-muted-foreground">
-                        Publishing needs permission to publish pricing. Someone
-                        who has it can publish this draft from here.
-                    </p>
-                ))}
+            {access.canPublish ? (
+                <PublishPanel
+                    nextV={nextVersion(pricing.versions)}
+                    blocked={blocked}
+                />
+            ) : (
+                <p className="rounded-[14px] border border-border bg-card px-4 py-3.5 text-[12.5px] text-muted-foreground">
+                    Publishing needs permission to publish pricing. Someone who
+                    has it can publish this draft from here.
+                </p>
+            )}
         </div>
     );
 }

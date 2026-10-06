@@ -248,7 +248,12 @@ describe("Review & publish", () => {
 
     it("with no draft, says there's nothing yet and offers no publish", () => {
         draw({ pricing: fakePricing() }, null as never);
-        expect(screen.getByText(/No changes yet/)).toBeTruthy();
+        expect(screen.getByText(/^No draft\./)).toBeTruthy();
+        expect(
+            screen.getByRole("button", { name: "Go to Plans" }),
+        ).toBeTruthy();
+        // No empty Live / Draft table with nothing in it.
+        expect(screen.queryByRole("table")).toBeNull();
         expect(screen.queryByRole("region", { name: "Publish" })).toBeNull();
     });
 });
@@ -277,5 +282,26 @@ describe("publish rules", () => {
         expect(
             publishLabel({ ...base, policy: "move", dateProblem: null }),
         ).toEqual({ label: "Schedule version 4", ready: true });
+    });
+});
+
+describe("publishing the first version", () => {
+    it("isn't blocked for having nothing to differ from", () => {
+        draw(
+            {
+                pricing: fakePricing({
+                    liveVersion: null,
+                    versions: [],
+                    draft: fakeDraft({ baseVersion: null }),
+                }),
+            },
+            null as never,
+        );
+        expect(
+            screen.getByRole("heading", { name: "Publish version 1" }),
+        ).toBeTruthy();
+        expect(publishButton().textContent).not.toBe(
+            "Nothing differs from the live version",
+        );
     });
 });
