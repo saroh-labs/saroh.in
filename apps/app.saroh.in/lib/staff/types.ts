@@ -60,6 +60,12 @@ export interface StaffList {
     staff: StaffView[];
     /** Current and coming closures, soonest first. */
     closures: Closure[];
+    /**
+     * When the business is open, as weekly ranges in `timezone` (every
+     * walk-in storefront's together), or null with none set. In-person
+     * bookings fall inside them (DEC-087).
+     */
+    openingHours?: WeeklyRange[] | null;
 }
 
 /**
