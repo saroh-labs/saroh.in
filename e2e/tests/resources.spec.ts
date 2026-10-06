@@ -196,3 +196,33 @@ test("the changelog's email joins the list, and the same address again is fine",
         await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
     }
 });
+
+test("help.saroh.in is sent to Help on www, old pages to their article", async ({
+    request,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name.startsWith("phone"),
+        "a redirect is the same on the phone",
+    );
+    // The stack serves saroh.in on localhost; the proxy reads the Host
+    // header, so this asks for help.saroh.in on it.
+    const go = (path: string) =>
+        request.get(`${WEB}${path}`, {
+            headers: { host: "help.saroh.in" },
+            maxRedirects: 0,
+        });
+    const helpShown = (await request.get(`${WEB}/help`)).status() === 200;
+
+    const home = await go("/");
+    expect(home.status()).toBe(307);
+    expect(home.headers().location).toBe(
+        helpShown ? "https://www.saroh.in/help" : "https://www.saroh.in/",
+    );
+
+    const selling = await go("/selling");
+    expect(selling.headers().location).toBe(
+        helpShown
+            ? "https://www.saroh.in/help/add-your-first-product"
+            : "https://www.saroh.in/",
+    );
+});
