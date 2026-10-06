@@ -82,8 +82,11 @@ export function ProviderRowView({
     payments,
     messaging,
     webhooks,
+    anchorId,
 }: {
     entry: ProviderEntry;
+    /** An id to jump to this row by (the booking-emails block's Connect). */
+    anchorId?: string;
     payments: ConnectedPaymentProvider[];
     messaging: ConnectedCommsProvider[];
     /** Each payment provider's webhook, for setup; `null` when unread. */
@@ -136,7 +139,10 @@ export function ProviderRowView({
     }
 
     return (
-        <div className="px-4 py-[13px] min-[760px]:px-[18px]">
+        <div
+            id={anchorId}
+            className="scroll-mt-6 px-4 py-[13px] target:bg-muted/60 min-[760px]:px-[18px]"
+        >
             <div className="flex flex-col gap-2.5 min-[760px]:flex-row min-[760px]:items-center min-[760px]:gap-3">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
                     <Monogram name={entry.name} />

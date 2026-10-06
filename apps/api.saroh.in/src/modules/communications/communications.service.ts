@@ -32,6 +32,8 @@ import {
 } from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
 import type { NotEmailed } from "./saroh-delivery";
+import type { SarohEmailState } from "./saroh-email-state";
+import { sarohEmailState } from "./saroh-email-state";
 import { sarohMaySend } from "./saroh-may-send";
 import { queueSarohInTx, renderForSaroh } from "./saroh-queue";
 import type {
@@ -315,6 +317,18 @@ export class CommunicationsService {
             orderBy: { createdAt: "desc" },
         });
         return rows.map(redact);
+    }
+
+    /**
+     * Whether Saroh sends the business's booking emails for it, and how
+     * much of the month's allowance is used (DEC-086), for Settings →
+     * Providers. `comms:manage`, as the provider list beside it. The same
+     * rule as the send (`saroh-email-state.ts`); a failed lookup reads as
+     * UNREAD, never as off or a zero.
+     */
+    async sarohEmail(ctx: OrganizationContext): Promise<SarohEmailState> {
+        authorize(ctx, "comms:manage");
+        return sarohEmailState(prisma, ctx.organizationId);
     }
 
     /**
