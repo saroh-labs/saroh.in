@@ -1,4 +1,5 @@
 import type { TemplateManifest } from "./manifest";
+import { ceramicsTemplate } from "./templates/ceramics";
 import { personalTemplate } from "./templates/personal";
 import { portfolioTemplate } from "./templates/portfolio";
 import { starterTemplate, starterTemplateV1 } from "./templates/starter";
@@ -25,6 +26,7 @@ const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
         personalTemplate,
         portfolioTemplate,
         writingTemplate,
+        ceramicsTemplate,
     ].map((t) => [key(t.id, t.version), t]),
 );
 
