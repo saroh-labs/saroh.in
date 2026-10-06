@@ -74,6 +74,19 @@ const V_WITHOUT_ROW = V + 1;
 const ZONE = "Asia/Kolkata";
 const KEY = "sarohEmailsPerMonth" as const;
 
+// A real team member: the booking's event names who made it.
+let staffId: string;
+
+beforeAll(async () => {
+    staffId = (
+        await prisma.user.create({
+            data: {
+                email: `saroh-mail-staff-${process.pid}-${Date.now()}@example.com`,
+            },
+        })
+    ).id;
+});
+
 let seq = 0;
 const uniq = (p: string) => `${p}-${process.pid}-${++seq}`;
 
@@ -142,7 +155,7 @@ async function business(
     await setFlag(FlagKey.SAROH_BUSINESS_EMAIL, org.id);
     await setFlag(FlagKey.PLAN_ENFORCEMENT, org.id);
     return {
-        owner: { organizationId: org.id, userId: "u_owner", role: "OWNER" },
+        owner: { organizationId: org.id, userId: staffId, role: "OWNER" },
         orgId: org.id,
         contactId: contact.id,
         accountId: account.id,
@@ -182,7 +195,7 @@ async function booking(b: Business) {
             organizationId: b.orgId,
             type: "BOOKED",
             toStartAt: startAt,
-            actorUserId: "u_owner",
+            actorUserId: staffId,
         },
     });
     return { row, event, service };

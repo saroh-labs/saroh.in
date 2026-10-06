@@ -67,6 +67,19 @@ beforeAll(async () => {
     await installCatalogue(V_WITHOUT_ROW, fakeSarohEmailsCatalog(false));
 });
 
+// A real team member: the booking's event names who made it.
+let staffId: string;
+
+beforeAll(async () => {
+    staffId = (
+        await prisma.user.create({
+            data: {
+                email: `saroh-mail-staff-${process.pid}-${Date.now()}@example.com`,
+            },
+        })
+    ).id;
+});
+
 let seq = 0;
 const uniq = (p: string) => `${p}-${process.pid}-${++seq}`;
 
@@ -138,7 +151,7 @@ async function business(
     await setFlag(FlagKey.SAROH_BUSINESS_EMAIL, org.id, opts.saroh ?? true);
     await setFlag(FlagKey.PLAN_ENFORCEMENT, org.id, opts.enforce ?? true);
     return {
-        owner: { organizationId: org.id, userId: "u_owner", role: "OWNER" },
+        owner: { organizationId: org.id, userId: staffId, role: "OWNER" },
         orgId: org.id,
         contactId: contact.id,
         accountId: account.id,
@@ -188,7 +201,7 @@ async function booking(b: Business, serviceName = "Check-up") {
             organizationId: b.orgId,
             type: "BOOKED",
             toStartAt: startAt,
-            actorUserId: "u_owner",
+            actorUserId: staffId,
         },
     });
     await prisma.job.create({
