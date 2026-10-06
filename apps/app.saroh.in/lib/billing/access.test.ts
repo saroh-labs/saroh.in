@@ -216,10 +216,9 @@ describe("rowNotice on a soft cap", () => {
     });
 
     it("at the cap, says nothing is blocked", () => {
-        expect(rowNotice(storage(11), "storage")).toMatchObject({
-            full: true,
-            body: expect.stringMatching(/^Nothing is blocked/),
-        });
+        const notice = rowNotice(storage(11), "storage");
+        expect(notice.full).toBe(true);
+        expect(notice.on && notice.body).toMatch(/^Nothing is blocked/);
     });
 });
 

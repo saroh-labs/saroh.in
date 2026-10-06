@@ -122,6 +122,10 @@ async function shop(
     const store = await prisma.store.create({
         data: { name: "Online", slug: uniq("store"), organizationId: org.id },
     });
+    // The creator owns the storefront, as creating one in the app records.
+    await prisma.storeOwner.create({
+        data: { storeId: store.id, userId: owner.id },
+    });
     await prisma.storeSettings.create({
         data: {
             storeId: store.id,

@@ -23,6 +23,8 @@ jest.mock("@saroh/database", () => {
         prisma: {
             order: { findUnique: jest.fn(), findFirst: jest.fn() },
             site: { findFirst: jest.fn().mockResolvedValue(null) },
+            // "How to pay us" (R32): none set.
+            businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
             organizationModule: { findFirst: jest.fn() },
             merchantPaymentProvider: {
                 findFirst: jest.fn(),

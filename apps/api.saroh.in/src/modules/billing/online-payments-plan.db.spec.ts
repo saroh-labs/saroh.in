@@ -157,15 +157,23 @@ async function contact(b: Business): Promise<string> {
     ).id;
 }
 
+/**
+ * A live membership plan the business already has — written straight to the
+ * table, as one made before a downgrade would be: on a plan without
+ * memberships, making one is refused at set-up (R31).
+ */
 async function membershipPlan(b: Business): Promise<string> {
-    return (
-        await subscriptions.createPlan(b.owner, {
-            name: "Monthly",
+    const plan = await prisma.subscriptionPlan.create({
+        data: {
+            organizationId: b.orgId,
+            name: `Monthly ${uniq("p")}`,
             price: "1200",
             currency: "INR",
             interval: "MONTH",
-        })
-    ).id;
+        },
+        select: { id: true },
+    });
+    return plan.id;
 }
 
 /** Push a subscription's period into the past so it is due now. */
