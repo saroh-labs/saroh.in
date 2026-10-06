@@ -15,6 +15,10 @@ export interface SideNavGroup {
  * A Resources section's own nav (plan U1, R1): its topics down the side
  * from 900px; below that, a "Topics" button that opens the same list in
  * place. The page you're on is marked and is not a link (no self-links).
+ *
+ * From 900px the nav itself is sticky (a sticky child of a box its own
+ * height never moves), so it stays in view while the page scrolls; a list
+ * taller than the window scrolls inside it.
  */
 export function SideNav({
     label,
@@ -35,7 +39,10 @@ export function SideNav({
     }
 
     return (
-        <nav aria-label={label} className="min-w-0">
+        <nav
+            aria-label={label}
+            className="min-w-0 min-[900px]:sticky min-[900px]:top-6 min-[900px]:max-h-[calc(100dvh-3rem)] min-[900px]:overflow-y-auto min-[900px]:overscroll-contain min-[900px]:pb-6"
+        >
             <button
                 type="button"
                 aria-expanded={open}
@@ -58,7 +65,7 @@ export function SideNav({
                 id="resource-topics"
                 className={cn(
                     open ? "grid" : "hidden",
-                    "gap-5 pt-3 min-[900px]:sticky min-[900px]:top-6 min-[900px]:grid min-[900px]:pt-0",
+                    "gap-5 pt-3 min-[900px]:grid min-[900px]:pt-0",
                 )}
             >
                 {groups.map((group) => (
