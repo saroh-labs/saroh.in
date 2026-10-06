@@ -2947,3 +2947,72 @@ no live version.
 **Rule**: a screen that edits "the live thing" needs a test with no live
 thing; an empty instance is a real state, not an edge case.
 **Category**: admin console · empty states
+**Symptom**: A security review of the link preview tool (5 Oct, before
+release) found its email gate could send any text to any inbox from
+Saroh's address: the report quoted the checked page's title, description,
+site name, picture address and tags, and named its domain in the subject.
+Anyone could host a page saying what they liked, type a stranger's email,
+and have Saroh deliver it — and tick "Also send me Saroh news" on their
+behalf. The caps on it were in one process's memory, the API took calls
+without saroh.in's relay, the checked address rode in a logged query
+string, and DNS for a stranger's name ran on libuv's four-thread pool
+(`dns.lookup`), where a never-answering nameserver could stall SMTP,
+database connects, zlib and crypto for every user.
+**Root cause**: The email was designed as "the report, mailed", without
+asking who chooses its words; and the tool was built like an internal
+endpoint (in-memory limits, GET, the system resolver) though anyone on the
+internet drives it.
+**Fix**: `report-email.ts` writes our words only: a fixed subject, the
+score, fix titles from a fixed list, size advice and one link back to the
+tool. No consent is asked or stored (`newsConsent` false). Both caps (3 a
+UTC day per address, 300 a day in all) are counted in `WaitlistSignup`.
+Both routes need the signed relay (`SiteRelayGuard`), the check is a POST,
+`redactUrl` drops `/public/tools/` query strings, and the stored link is
+origin and path. DNS goes over c-ares (`dns.promises.Resolver`, 1.5 s, one
+try) and at most 8 checks run at once (`busy` past that).
+**Rule**: `docs/patterns/backend-integrations.md` — "An email a stranger can
+trigger carries only our words".
+**Category**: security · email · `apps/api.saroh.in/src/modules/link-preview/`
+
+## Layout — a phone zoomed out on text it never showed
+
+**Symptom**: On the batch-2026-10-05-5 gate, a customer's Orders tab
+measured `innerWidth` 557 at a 375px phone, and New invoice's "Issue with
+pay link" could not be clicked on a Pixel 7: each try hit another element
+(the quantity box, the h1). Neither failed alone on a fresh seed.
+**Root cause**: Two widths no one could see. (1) An order card's
+`sr-only` ", order #1042" sits inside the truncated title link, but it is
+`position: absolute` and its containing block was the card's `li`
+(`relative`), so the link's `overflow: hidden` never clipped it: placed
+after a long title, it widened the page by 180px. (2) New invoice's left
+column was a `grid` with an implicit `auto` track, whose least width is
+its widest item's min-content — the contact picker's one-line
+"name · email". A parallel spec's 60-character email, first in the list,
+made it 1089px; the phone zoomed out and Playwright's clicks landed short.
+**Fix**: `OrderCardFrame` wraps the title in a `relative` span, so the
+truncated link clips its screen-reader words; the invoice form's column is
+`grid-cols-[minmax(0,1fr)]`.
+**Rule**: An `sr-only` inside truncated text needs a positioned ancestor
+inside the clip; a `grid` that holds one-line, truncating content names
+its track `minmax(0,1fr)` (`min-w-0` on the grid itself is not enough).
+**Category**: layout · phone · `components/commerce/orders/order-row.tsx`,
+`components/invoices/invoice-form.tsx`
+
+## Email — nodemailer says CONN for every timeout, whatever the stage
+
+**Symptom** (U1 review, 6 Oct, caught before commit): the Saroh business
+sender classed a send as "unknown, don't retry" when the error's `command`
+started with `DATA`. Nodemailer never produces that for a lost connection:
+every timeout and drop is `command: 'CONN'`, and the only `DATA` errors
+carry a server reply. So a send lost mid-hand-over would be retried, and
+the customer emailed twice.
+**Root cause**: the rule was written from the error shape we expected, not from
+`nodemailer/lib/smtp-connection` (10.0.x).
+**Fix**: the stage comes from the server's last reply, which nodemailer
+attaches on a dropped connection: `responseCode` 354 (SES had started
+taking the message) or a bare `Timeout` mid-session is `unknown`; a 4xx/5xx
+reply, or anything before the hand-over, is `failed`. The spec uses
+nodemailer's real shapes.
+**Rule**: Classify a library's errors from its source, and test with the
+shapes it actually throws, not a hand-made object.
+**Category**: email · `modules/communications/providers/saroh-email.sender.ts`
