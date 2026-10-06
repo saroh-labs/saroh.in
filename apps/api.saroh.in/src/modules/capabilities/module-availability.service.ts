@@ -35,6 +35,18 @@ import type {
 import { MODULE_BY_KEY, MODULE_KEYS, moduleRolledOut } from "./module-registry";
 import { ModuleReadinessRegistry } from "./readiness/module-readiness.registry";
 
+/**
+ * Registry modules whose catalogue rows lock actions, never the module.
+ * PAYMENTS holds what a business already owes and is owed — subscriptions
+ * that keep renewing, refunds, invoices — so a plan without online payments
+ * (`payments`, `subscriptions`) leaves it available, and refuses only new
+ * online payments and new subscriptions where they start
+ * (`billing/online-payments-plan.ts`, ADR-003: disabling never abandons
+ * obligations). Invoicing has no registry module and needs none (DEC-070).
+ */
+export const PLAN_LOCKS_ACTIONS_ONLY: ReadonlySet<ModuleKey> =
+    new Set<ModuleKey>(["PAYMENTS"]);
+
 /** A single reason a module is unavailable or not fully ready. */
 export interface AvailabilityBlocker {
     code: string;
@@ -236,6 +248,7 @@ export class ModuleAvailabilityService {
         organizationId: string,
         moduleKey: ModuleKey,
     ): Promise<boolean> {
+        if (PLAN_LOCKS_ACTIONS_ONLY.has(moduleKey)) return true;
         if (catalogueModulesFor(moduleKey).length === 0) return true;
         if (
             !(await this.flags.isEnabled(

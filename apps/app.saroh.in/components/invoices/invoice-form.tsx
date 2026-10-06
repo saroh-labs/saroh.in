@@ -16,6 +16,7 @@ import type { FieldErrors } from "react-hook-form";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
@@ -301,9 +302,15 @@ export function InvoiceForm({
         }
         const link = await createPayLink(id);
         if (!link.ok) {
-            showError(
-                `${number} issued, but no pay link was made: ${link.error}`,
-            );
+            if (link.plan) {
+                // Issued; only the pay link is the plan's to refuse.
+                showSuccess(`${number} issued. Its lines are locked.`);
+                reportFailure(link);
+            } else {
+                showError(
+                    `${number} issued, but no pay link was made: ${link.error}`,
+                );
+            }
         } else if (await copy(link.data.url)) {
             showSuccess(
                 `${number} issued and its pay link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,

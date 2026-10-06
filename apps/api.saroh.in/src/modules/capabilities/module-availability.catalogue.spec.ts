@@ -119,6 +119,29 @@ describe("module availability: the plan step (U12)", () => {
         expect(moduleIncluded).not.toHaveBeenCalled();
     });
 
+    it("leaves PAYMENTS available on a plan without online payments: its rows lock actions, never the module", async () => {
+        // Rows sit under PAYMENTS now (`payments`, `subscriptions`); a plan
+        // that leaves them off still reaches what the business already
+        // owes and is owed — renewals, refunds, invoices (ADR-003).
+        expect(catalogueModulesFor("PAYMENTS")).toEqual(
+            expect.arrayContaining(["payments", "subscriptions"]),
+        );
+        const { service, moduleIncluded } = build({ included: false });
+
+        await expect(
+            service.evaluate(input("PAYMENTS")),
+        ).resolves.toMatchObject({
+            entitled: true,
+            readiness: "ACTIVE",
+            gatesPassed: true,
+        });
+        expect(moduleIncluded).not.toHaveBeenCalled();
+    });
+
+    it("leaves invoicing to no registry module, so no plan lock reaches it (DEC-070)", () => {
+        expect(MODULE_MAP.invoicing?.registry).toBeNull();
+    });
+
     it("maps catalogue rows only onto registry modules that exist", () => {
         const known = new Set<string>(MODULE_KEYS);
         for (const e of Object.values(MODULE_MAP)) {

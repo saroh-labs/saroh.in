@@ -11,6 +11,7 @@ import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import { planMeter } from "../billing/metering.service";
+import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
 import { assertBusinessDetails } from "../invoices/business-details";
@@ -721,6 +722,8 @@ export class OrdersService {
             );
         }
         await assertPaymentsOn(prisma, organizationId, "make a pay link");
+        // A pay link charges online: the plan's too (403 MODULE_LOCKED).
+        await assertPlanTakesOnlinePayment(organizationId);
         // A pay link takes money online: the business details first
         // (DEC-068), before the order is made.
         await assertBusinessDetails(prisma, organizationId);

@@ -249,6 +249,21 @@ orgId)` (`organizations/organization-kind.ts`).
   existing things stay readable and editable; only adding is refused. A
   new write that adds a metered thing, or a new switch row, gets its call
   and a row in `billing/plan-limits.db.spec.ts`.
+- **Current** (plan shape of 5 Oct) — **A plan without online payments
+  stops new money online, never what a business already has.** The
+  `payments` and `subscriptions` rows (registry PAYMENTS) are asked where a
+  new online payment or subscription starts, through
+  `billing/online-payments-plan.ts`: a first provider connection, a pay
+  link that charges (invoice, order, booking), a workspace intent, the
+  site's checkout (`checkoutReadiness` reason `plan`), the booking page,
+  packs, plan joins, and subscribing someone. The business hears 403
+  `MODULE_LOCKED`; a customer hears 409 `NOT_PAID_ONLINE` naming no plan.
+  Renewals never ask: the renewal and charge jobs, a renewal invoice's pay
+  link and pay page (`subscriptionId` set), autopay on it, and re-entering a
+  connected provider's keys all go on. PAYMENTS itself stays available
+  (`PLAN_LOCKS_ACTIONS_ONLY`), since it holds refunds, renewals and
+  invoices; invoicing has no registry and needs none (DEC-070).
+  `billing/online-payments-plan.db.spec.ts`.
 - **Current** (DEC-068) — **Turning a module on creates its minimum in the
   switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
   checks `module:manage` and then the action for each thing it creates

@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import { paymentsOn } from "../invoices/payments-on";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
@@ -398,21 +399,25 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
 }
 
 /**
- * Payments on, and a provider connected to take the money — one whose
- * checkout window can open: a Razorpay connection still missing its public
- * key id is not (DEC-054).
+ * Payments on, a plan that takes payment online
+ * (`billing/online-payments-plan.ts`), and a provider connected to take the
+ * money — one whose checkout window can open: a Razorpay connection still
+ * missing its public key id is not (DEC-054). The booking page, packs and
+ * plans all ask this, so none takes a new online payment the plan leaves
+ * off.
  */
 export async function takesOnlinePayment(
     organizationId: string,
 ): Promise<boolean> {
-    const [on, provider] = await Promise.all([
+    const [on, provider, plan] = await Promise.all([
         paymentsOn(prisma, organizationId),
         prisma.merchantPaymentProvider.findFirst({
             where: { organizationId, status: "CONNECTED", ...OPENS_CHECKOUT },
             select: { id: true },
         }),
+        planTakesOnlinePayment(organizationId),
     ]);
-    return on && provider !== null;
+    return on && provider !== null && plan;
 }
 
 /**

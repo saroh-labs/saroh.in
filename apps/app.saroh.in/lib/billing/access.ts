@@ -173,3 +173,78 @@ export function upgradeLine(lock: {
         up.pricePaise > 0 ? `, ${formatInr(up.pricePaise)} a month + GST` : "";
     return `${lock.name} comes with ${up.name}${price}. You're on ${lock.plan}.`;
 }
+
+/**
+ * A row the plan leaves locked, while locks are enforced: what it is and
+ * the way up. Null when it is on, hidden, not in this version, when the
+ * catalogue doesn't reach the business, or while nothing enforces it (a
+ * lock nothing enforces would be a claim the API doesn't back).
+ */
+export function rowLock(
+    view: BillingAccessView | null,
+    moduleId: string,
+): PlanLock | null {
+    if (view?.source !== "catalogue" || !view.enforced) return null;
+    const row = accessRow(view, moduleId);
+    if (row?.state !== "locked") return null;
+    return {
+        href: upgradeHref(row.upgradeTo?.planId),
+        name: row.name,
+        what: row.what,
+        plan: view.plan?.name ?? "",
+        upgradeTo: row.upgradeTo,
+    };
+}
+
+/** What a screen says where the plan stops new online payments. */
+export interface OnlinePaymentsLock {
+    title: string;
+    body: string;
+    cta: string;
+    href: string;
+}
+
+/**
+ * The plan's stop on taking money online (rows `payments` and
+ * `subscriptions`, under Payments), in words that are true: new online
+ * payments, or new memberships, stop; what the business already has goes
+ * on — memberships keep renewing, and invoices still go out, as a link to
+ * view (DEC-070). Plan names are the catalogue's; no price is said here.
+ * Null when nothing is locked, or while nothing enforces it.
+ *
+ * - `payments`: taking payment online — connecting a provider, pay links,
+ *   the site's checkout.
+ * - `subscriptions`: subscribing someone new — needs memberships and online
+ *   payments both, so either row's lock stops it.
+ */
+export function onlinePaymentsLock(
+    view: BillingAccessView | null,
+    what: "payments" | "subscriptions",
+): OnlinePaymentsLock | null {
+    const lock =
+        what === "payments"
+            ? rowLock(view, "payments")
+            : (rowLock(view, "subscriptions") ?? rowLock(view, "payments"));
+    if (!lock) return null;
+    const up = lock.upgradeTo;
+    const on = lock.plan ? `You're on ${lock.plan}. ` : "";
+    const cta = up ? `See ${up.name}` : "See plans";
+    if (what === "payments") {
+        return {
+            title: up
+                ? `Taking payment online comes with ${up.name}`
+                : `Taking payment online isn't in your ${lock.plan || "current"} plan`,
+            body: `${on}Invoices still go out, as a link to view, and customers pay you another way. Memberships you already have keep renewing.`,
+            cta,
+            href: lock.href,
+        };
+    }
+    return {
+        title: up
+            ? `New memberships come with ${up.name}`
+            : `New memberships aren't in your ${lock.plan || "current"} plan`,
+        body: `${on}Everyone already subscribed keeps renewing, and nothing they hold is lost. Subscribing someone new needs ${up ? up.name : "another plan"}.`,
+        cta,
+        href: lock.href,
+    };
+}

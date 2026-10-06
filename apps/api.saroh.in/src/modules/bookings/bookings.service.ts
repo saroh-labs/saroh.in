@@ -12,6 +12,7 @@ import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
+import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { isGstRate } from "../invoices/gst";
@@ -1225,6 +1226,8 @@ export class BookingsService {
                 "Connect a payment provider to take payment online.",
             );
         }
+        // A pay link charges online: the plan's too (403 MODULE_LOCKED).
+        await assertPlanTakesOnlinePayment(ctx.organizationId);
         // The link issues the booking's invoice: the business details
         // first (DEC-068).
         await assertBusinessDetails(prisma, ctx.organizationId);
