@@ -83,7 +83,7 @@ export const blogsTemplate: TemplateManifest = {
                 fontPair: "newsreader",
                 palette: {
                     bg: "#FCFBF8",
-                    surface: "#F2EDE3",
+                    surface: "#FCFBF8",
                     fg: "#1A1714",
                     body: "#3B352E",
                     muted: "#635C54",
@@ -111,7 +111,7 @@ export const blogsTemplate: TemplateManifest = {
                 fontPair: "newsreader",
                 palette: {
                     bg: "#FAFBFC",
-                    surface: "#EAEEF1",
+                    surface: "#FAFBFC",
                     fg: "#161819",
                     body: "#343639",
                     muted: "#5A5E61",
