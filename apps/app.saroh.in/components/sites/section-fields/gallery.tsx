@@ -5,8 +5,11 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 
-import type { ImageValue } from "@/lib/sites/service";
+import { liftToLatest } from "@saroh/block-contract";
+
+import type { GalleryContent, GalleryImage } from "@/lib/sites/service";
 import { FIELD_LABEL } from "./constants";
+import { ImageBrief } from "./image-brief";
 import type { SectionFieldsProps } from "./props";
 
 /**
@@ -25,8 +28,24 @@ export function GalleryFields({
     onChange,
 }: SectionFieldsProps<"gallery">) {
     const c = section.content;
-    const setImages = (images: ImageValue[]) =>
+    const setImages = (images: GalleryImage[]) =>
         onChange({ ...section, content: { ...c, images } });
+    /*
+     * A caption (U2) lives on gallery@2 only — v1 is frozen — so writing one
+     * lifts the section, `layout` becoming the `variant` it always meant,
+     * exactly as choosing a look does. The look does not change.
+     */
+    const setCaptioned = (images: GalleryImage[]) => {
+        const lifted = liftToLatest("gallery", section.contractVersion, {
+            ...c,
+            images,
+        });
+        onChange({
+            ...section,
+            contractVersion: lifted.version,
+            content: lifted.content as unknown as GalleryContent,
+        });
+    };
     return (
         <div className="grid gap-3">
             {/*
@@ -37,53 +56,79 @@ export function GalleryFields({
             */}
             <div className="grid gap-2">
                 <Label className={FIELD_LABEL}>Images</Label>
+                <ImageBrief
+                    brief={c.imageBrief}
+                    hasImage={c.images.some((img) => img.src.trim() !== "")}
+                />
                 {c.images.map((img, i) => (
-                    <div key={i} className="flex items-start gap-2">
+                    <div key={i} className="grid gap-1.5">
+                        <div className="flex items-start gap-2">
+                            <Input
+                                value={img.src}
+                                onChange={(e) =>
+                                    setImages(
+                                        c.images.map((im, idx) =>
+                                            idx === i
+                                                ? {
+                                                      ...im,
+                                                      src: e.target.value,
+                                                  }
+                                                : im,
+                                        ),
+                                    )
+                                }
+                                placeholder="Image source"
+                            />
+                            <Input
+                                value={img.alt ?? ""}
+                                onChange={(e) =>
+                                    setImages(
+                                        c.images.map((im, idx) =>
+                                            idx === i
+                                                ? {
+                                                      ...im,
+                                                      alt: e.target.value,
+                                                  }
+                                                : im,
+                                        ),
+                                    )
+                                }
+                                placeholder="Alt text"
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Remove image"
+                                onClick={() =>
+                                    setImages(
+                                        c.images.filter((_, idx) => idx !== i),
+                                    )
+                                }
+                            >
+                                ✕
+                            </Button>
+                        </div>
+                        {/* A line under the photo (U2), on the site under it. */}
                         <Input
-                            value={img.src}
+                            value={img.caption ?? ""}
                             onChange={(e) =>
-                                setImages(
+                                setCaptioned(
                                     c.images.map((im, idx) =>
                                         idx === i
                                             ? {
                                                   ...im,
-                                                  src: e.target.value,
+                                                  caption:
+                                                      e.target.value ||
+                                                      undefined,
                                               }
                                             : im,
                                     ),
                                 )
                             }
-                            placeholder="Image source"
+                            placeholder="Caption, shown under the photo. Optional."
+                            aria-label={`Caption for image ${i + 1}`}
                         />
-                        <Input
-                            value={img.alt ?? ""}
-                            onChange={(e) =>
-                                setImages(
-                                    c.images.map((im, idx) =>
-                                        idx === i
-                                            ? {
-                                                  ...im,
-                                                  alt: e.target.value,
-                                              }
-                                            : im,
-                                    ),
-                                )
-                            }
-                            placeholder="Alt text"
-                        />
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Remove image"
-                            onClick={() =>
-                                setImages(
-                                    c.images.filter((_, idx) => idx !== i),
-                                )
-                            }
-                        >
-                            ✕
-                        </Button>
                     </div>
                 ))}
                 {/*

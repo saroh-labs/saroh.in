@@ -109,6 +109,30 @@ export function emptySection(type: SectionType): Section {
                 contractVersion: 1,
                 content: { title: "", items: [{ title: "" }] },
             };
+        case "person":
+            // An empty name to fill in: no invented practitioner (U2).
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { name: "" },
+            };
+        case "timetable":
+            // Nothing to choose: every class on offer, read live.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "This week" },
+            };
+        case "hours":
+            // The business's own hours, read live; a shop can be chosen.
+            return {
+                key: newKey(),
+                type,
+                contractVersion: 1,
+                content: { title: "Opening hours" },
+            };
         case "servicesList":
             // Empty until the merchant picks a service; the editor lists
             // theirs, or says there are none yet.

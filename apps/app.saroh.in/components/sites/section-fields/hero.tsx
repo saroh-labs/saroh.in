@@ -12,6 +12,7 @@ import {
     withCtaLabel,
 } from "./cta-action-fields";
 import { Field } from "./field";
+import { ImageBrief } from "./image-brief";
 import type { SectionFieldsProps } from "./props";
 
 /**
@@ -115,6 +116,10 @@ export function HeroFields({
                     placeholder="or paste an image address"
                     aria-label="Image address"
                     className="mt-1.5"
+                />
+                <ImageBrief
+                    brief={c.imageBrief}
+                    hasImage={Boolean(c.image?.src)}
                 />
             </Field>
             {c.image?.src ? (

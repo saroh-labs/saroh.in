@@ -85,6 +85,13 @@ export interface HeroContent {
     subheading?: string;
     cta?: CtaValue;
     image?: ImageValue;
+    /**
+     * The photo a template says belongs here, until there is one (KTD-5).
+     * Shown as the empty slot's text in the editor; never on the site.
+     */
+    imageBrief?: string;
+    /** "On today" (G18); on the full-bleed look, the open line alone. */
+    onToday?: boolean;
 }
 
 export interface RichTextContent {
@@ -92,6 +99,8 @@ export interface RichTextContent {
     value: string;
     /** One photo beside the text (G7). */
     image?: ImageValue;
+    /** The photo a template says belongs here (KTD-5). */
+    imageBrief?: string;
     /** Which side the photo sits on; absent is the right. */
     imageSide?: "left" | "right";
 }
@@ -100,9 +109,14 @@ export type CtaContent = CtaValue;
 
 export type GalleryLayout = "grid" | "carousel" | "masonry";
 
+/** A gallery photo, with an optional line under it (gallery@2, U2). */
+export type GalleryImage = ImageValue & { caption?: string };
+
 export interface GalleryContent {
-    images: ImageValue[];
+    images: GalleryImage[];
     layout?: GalleryLayout;
+    /** What photographs belong here, until there are some (KTD-5). */
+    imageBrief?: string;
 }
 
 /** One point in a features section (mirror of the section contract). */
@@ -147,6 +161,10 @@ export interface TestimonialsContent {
 /** One piece of work in a projects section (mirror of the section contract). */
 export interface ProjectItem {
     image?: ImageValue;
+    /** The photo a template says belongs here (KTD-5). */
+    imageBrief?: string;
+    /** A line under the photo (U2). */
+    caption?: string;
     title: string;
     summary?: string;
     /** A web address, an email or phone link, or a path on this site. */
@@ -266,6 +284,41 @@ export interface PacksContent {
     showDescriptions?: boolean;
 }
 
+/**
+ * `timetable` — which classes the week shows (U2). The sessions themselves
+ * are read live by the site. No ids: every class on offer. Both switches
+ * read as on when absent.
+ */
+export interface TimetableContent {
+    title?: string;
+    intro?: string;
+    serviceIds?: string[];
+    showTrainer?: boolean;
+    showPlacesLeft?: boolean;
+}
+
+/**
+ * `hours` — opening hours on their own (U2), read live. No `storeId`: the
+ * business's own place. `showClosed` absent means closed days are listed.
+ */
+export interface HoursContent {
+    title?: string;
+    storeId?: string;
+    showClosed?: boolean;
+}
+
+/** `person` — one practitioner, typed in (U2). */
+export interface PersonContent {
+    image?: ImageValue;
+    /** The photo a template says belongs here (KTD-5). */
+    imageBrief?: string;
+    name: string;
+    role?: string;
+    credentials?: string[];
+    bio?: string;
+    cta?: CtaValue;
+}
+
 /** The field types an enquiry form supports (mirror of the section contract). */
 export type EnquiryFieldType = "text" | "email" | "tel" | "textarea";
 
@@ -330,6 +383,9 @@ export interface SectionContentByType {
     packs: PacksContent;
     productGrid: ProductGridContent;
     projects: ProjectsContent;
+    timetable: TimetableContent;
+    hours: HoursContent;
+    person: PersonContent;
 }
 
 /**

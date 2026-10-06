@@ -258,10 +258,21 @@ function checkSection(
                 );
             }
 
-            // A hero is the one section built around an image.
+            // A hero is the one section built around an image — except
+            // the "No hero" look (U2), which draws none at all.
             const image = obj(c.image);
-            if (str(image.src).trim() === "") {
-                at("missingImage", "This hero has no image.", "image");
+            if (
+                resolveVariant("hero", c) !== "none" &&
+                str(image.src).trim() === ""
+            ) {
+                const brief = str(c.imageBrief).trim();
+                at(
+                    "missingImage",
+                    brief
+                        ? `This hero has no image yet. It wants: ${brief}`
+                        : "This hero has no image.",
+                    "image",
+                );
             }
 
             const cta = obj(c.cta);
@@ -390,6 +401,32 @@ function checkSection(
                     );
                 }
             });
+            break;
+        }
+
+        case "person": {
+            // The practitioner's photo must be described (U2), as a
+            // project's is: the contract saves it before it is.
+            const photo = obj(c.image);
+            if (str(photo.src).trim() !== "" && str(photo.alt).trim() === "") {
+                at(
+                    "emptyRequiredField",
+                    "The photo in this person block has no description, so someone using a screen reader won't know what it shows.",
+                    "image",
+                );
+            }
+            const cta = obj(c.cta);
+            if (Object.keys(cta).length > 0) {
+                checkCtaTarget(
+                    cta,
+                    "cta",
+                    "The person block's button",
+                    at,
+                    pagePaths,
+                    pageIds,
+                    false,
+                );
+            }
             break;
         }
 

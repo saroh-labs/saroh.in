@@ -84,7 +84,9 @@ export function SiteNavRow({ items }: { items: SiteNavItem[] }) {
                             "focus-visible:ring-site-accent coarse:min-h-11 inline-flex h-[34px] shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full px-3 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 " +
                             (on
                                 ? "bg-site-fg text-site-bg active:opacity-80"
-                                : "text-site-body hover:bg-site-border/40 hover:text-site-fg active:bg-site-border/70")
+                                : // Over a full-bleed hero's photo (U2), the page's
+                                  // paper, as the header's name.
+                                  "text-site-body hover:bg-site-border/40 hover:text-site-fg active:bg-site-border/70 [body:has([data-site-first-hero])_&]:text-site-bg [body:has([data-site-first-hero])_&]:hover:bg-site-bg/15")
                         }
                     >
                         {item.label}

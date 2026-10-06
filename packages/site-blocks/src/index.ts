@@ -12,7 +12,11 @@
  * and a merchant's storefront must never inherit it. Gate G1 enforces this;
  * it is not a convention.
  */
-export { PageSections, default as SectionRenderer } from "./section-renderer";
+export {
+    PageSections,
+    default as SectionRenderer,
+    opensOverPhoto,
+} from "./section-renderer";
 export type { Section } from "./section-renderer";
 
 export {
@@ -21,6 +25,7 @@ export {
     SAMPLE_POSTS,
     SAMPLE_PRODUCTS,
     SAMPLE_SERVICES,
+    SAMPLE_TIMETABLE,
     SAMPLE_VISIT,
 } from "./block-fixture-preview";
 export { default as BookingSection } from "./blocks/booking";
@@ -33,6 +38,18 @@ export { default as FaqSection } from "./blocks/faq";
 export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
+export { default as FullBleedHero } from "./blocks/hero-full-bleed";
+export {
+    HOURS_TITLE,
+    default as HoursSection,
+    hoursRows,
+} from "./blocks/hours";
+export { default as PersonSection } from "./blocks/person";
+export {
+    TIMETABLE_TITLE,
+    default as TimetableSection,
+} from "./blocks/timetable";
+// Server-safe: the Timetable read's shape, check and words.
 export {
     default as JournalSection,
     postExcerpt,
@@ -53,6 +70,14 @@ export {
     packEyebrow,
     packPerClass,
 } from "./blocks/packs";
+export {
+    dayLabel,
+    isPublicTimetable,
+    placesWord,
+    sessionHref,
+    timetableQuery,
+} from "./lib/timetable-read";
+export type { PublicTimetable, TimetableSession } from "./lib/timetable-read";
 // Called by saroh.app's server: from a module with no "use client".
 export type { PacksFeed, PublicPack } from "./blocks/packs";
 export {

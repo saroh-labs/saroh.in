@@ -10,6 +10,7 @@ import { MediaPicker } from "@/components/sites/media-picker";
 import type { ProjectItem, ProjectsContent } from "@/lib/sites/service";
 
 import { Field } from "./field";
+import { ImageBrief } from "./image-brief";
 import type { SectionFieldsProps } from "./props";
 import { RepeatedItems } from "./repeated-items";
 
@@ -164,6 +165,7 @@ function ProjectPhoto({
                         }
                     />
                 </div>
+                <ImageBrief brief={item.imageBrief} hasImage={Boolean(image)} />
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
                         Optional. Without one, the project shows as words only.
@@ -201,6 +203,17 @@ function ProjectPhoto({
                             : "Read aloud to visitors who can't see it."}
                     </p>
                 </div>
+            ) : null}
+            {image ? (
+                <Field label="Caption">
+                    <Input
+                        value={item.caption ?? ""}
+                        onChange={(e) =>
+                            set({ caption: e.target.value || undefined })
+                        }
+                        placeholder="A line under the photo, like who took it. Optional."
+                    />
+                </Field>
             ) : null}
         </>
     );

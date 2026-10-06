@@ -76,6 +76,18 @@ const heroVariants = [
         description:
             "Copy on one side, image on the other, side by side from the large breakpoint up.",
     },
+    {
+        id: "fullBleed",
+        label: "Full-bleed photo",
+        description:
+            "The photo fills the band edge to edge under a dark wash, with the headline, a line and the button over it. The site's menu sits over the photo when this hero opens the page.",
+    },
+    {
+        id: "none",
+        label: "No hero",
+        description:
+            "Just the page's heading and a line under it, small, for pages that go straight to a list.",
+    },
 ] as const;
 
 /** The single look a block has, when it honestly has one. */
@@ -181,6 +193,41 @@ export const BLOCK_META = {
                     height: 800,
                 },
             },
+            fullBleed: {
+                variant: "fullBleed",
+                heading: "Bread, the slow way",
+                subheading:
+                    "Sourdough and rye from a wood-fired oven, out by seven every morning.",
+                cta: {
+                    label: "See what's on the counter",
+                    href: "/shop",
+                    style: "link",
+                    action: { kind: "page" },
+                },
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Crect width='1600' height='900' fill='%236b5a48'/%3E%3Crect y='560' width='1600' height='340' fill='%233d3128'/%3E%3Cellipse cx='520' cy='560' rx='260' ry='120' fill='%23c8a06a'/%3E%3Cellipse cx='1000' cy='580' rx='220' ry='100' fill='%23b88c58'/%3E%3C/svg%3E",
+                    alt: "Loaves cooling on the counter in morning light",
+                    width: 1600,
+                    height: 900,
+                },
+                onToday: true,
+            },
+            none: {
+                variant: "none",
+                heading: "Writing",
+                subheading:
+                    "Notes on building small things, about once a month.",
+            },
+        },
+        cases: {
+            // A slot shipped as a brief (KTD-5): no photo yet, so the live
+            // site draws the band without one.
+            brief: {
+                variant: "fullBleed",
+                heading: "Bread, the slow way",
+                imageBrief:
+                    "Morning light on the counter, loaves stacked, steam rising",
+            },
         },
     },
     richText: {
@@ -258,6 +305,16 @@ export const BLOCK_META = {
             grid: { variant: "grid", images: [...GALLERY_IMAGES] },
             carousel: { variant: "carousel", images: [...GALLERY_IMAGES] },
             masonry: { variant: "masonry", images: [...GALLERY_IMAGES] },
+        },
+        cases: {
+            // A line under each photo (U2), as the studio design writes them.
+            captions: {
+                variant: "grid",
+                images: GALLERY_IMAGES.map((image, i) => ({
+                    ...image,
+                    caption: i === 0 ? "The counter, 6am" : "The deck oven",
+                })),
+            },
         },
     },
     enquiry: {
@@ -516,12 +573,24 @@ export const BLOCK_META = {
         label: "Journal",
         description:
             "The site's latest published posts, newest first, read live from the posts the site owns.",
-        variants: soleVariant(
-            "Cards with a photo, the author and date, the title and an excerpt, linking to each post.",
-        ),
+        variants: [
+            {
+                id: "default",
+                label: "Latest posts",
+                description:
+                    "Cards with a photo, the author and date, the title and an excerpt, linking to each post.",
+            },
+            {
+                id: "archive",
+                label: "Archive",
+                description:
+                    "Every published post as a dated list: the date in a column, the title and its line beside it.",
+            },
+        ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component sample posts.
             default: { variant: "default", title: "Journal", count: 3 },
+            archive: { variant: "archive", title: "All writing" },
         },
         cases: {
             // Two rows, words only: the switches off and the larger count.
@@ -560,12 +629,24 @@ export const BLOCK_META = {
         label: "Product grid",
         description:
             "Products from the catalogue, the newest, a collection's or hand-picked, read live from the storefront the site sells from.",
-        variants: soleVariant(
-            "Cards with a photo, the options it comes in, the name, a line about it and the price, each opening its product page.",
-        ),
+        variants: [
+            {
+                id: "default",
+                label: "Even grid",
+                description:
+                    "Cards with a photo, the options it comes in, the name, a line about it and the price, each opening its product page.",
+            },
+            {
+                id: "lead",
+                label: "Lead piece",
+                description:
+                    "The first product takes twice the room, with tall photos and the price set large. One column on a phone.",
+            },
+        ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component sample products.
             default: { variant: "default", title: "From the counter" },
+            lead: { variant: "lead", title: "On the counter today" },
         },
         cases: {
             // Hand-picked, two of them, no prices.
@@ -634,6 +715,102 @@ export const BLOCK_META = {
                 variant: "list",
                 title: "Selected work",
                 items: PROJECT_ITEMS.map((item) => ({ ...item })),
+            },
+        },
+        cases: {
+            // A line under each photo (U2), and a slot shipped as a brief.
+            captions: {
+                variant: "cards",
+                title: "Selected work",
+                items: [
+                    { ...PROJECT_ITEMS[0], caption: "Photographed on site" },
+                    {
+                        title: "A shopfront in Bandra",
+                        imageBrief: "The finished shopfront at dusk",
+                    },
+                ],
+            },
+        },
+    },
+    timetable: {
+        label: "Timetable",
+        description:
+            "The week's classes, day by day, with who takes each and the places left, read live from the booking page.",
+        /*
+         * `grid` first: it is the design's look, and it becomes the list on a
+         * phone anyway, so neither demands more content than the other.
+         */
+        variants: [
+            {
+                id: "grid",
+                label: "Week grid",
+                description:
+                    "Days across, times down, each class in its cell with who takes it and the places left. Day by day on a phone.",
+            },
+            {
+                id: "list",
+                label: "Day by day",
+                description:
+                    "Each day in turn, its classes one per row. Better for a short week.",
+            },
+        ] as const,
+        fixtures: {
+            // The catalog and the snapshot hand the component a sample week.
+            grid: { variant: "grid", title: "This week" },
+            list: { variant: "list", title: "This week" },
+        },
+    },
+    hours: {
+        label: "Opening hours",
+        description:
+            "The week's opening hours as a table, read live from Settings › Hours. Closed days are said, not left out.",
+        variants: soleVariant(
+            "A table of the seven days and their hours, today marked, closed days muted but stated.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component a sample week.
+            default: { variant: "default", title: "Opening hours" },
+        },
+    },
+    person: {
+        label: "Person",
+        description:
+            "One practitioner: a photo, their name, what they do, their qualifications and a few lines about them.",
+        variants: soleVariant(
+            "The photo beside the words, stacking on a phone; qualifications as a list.",
+        ),
+        fixtures: {
+            default: {
+                variant: "default",
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1000'%3E%3Crect width='800' height='1000' fill='%23d8d2c4'/%3E%3Ccircle cx='400' cy='380' r='150' fill='%23a89a84'/%3E%3Crect x='200' y='580' width='400' height='420' rx='180' fill='%238a7d68'/%3E%3C/svg%3E",
+                    alt: "Portrait of the dietician at her desk",
+                    width: 800,
+                    height: 1000,
+                },
+                name: "Dr Anika Rao",
+                role: "Clinical dietician",
+                credentials: [
+                    "MSc Clinical Nutrition",
+                    "Registered Dietitian",
+                    "12 years in hospital practice",
+                ],
+                bio: "I help people eat for the conditions they live with: diabetes, PCOS, kidney care.\nEvery plan starts with what you already cook.",
+                cta: {
+                    label: "Book a consultation",
+                    href: "/book",
+                    style: "primary",
+                    action: { kind: "page" },
+                },
+            },
+        },
+        cases: {
+            // Words only, as a template ships it before the photo (KTD-5).
+            brief: {
+                variant: "default",
+                imageBrief: "A plain portrait, natural light, at the desk",
+                name: "Dr Anika Rao",
+                role: "Clinical dietician",
             },
         },
     },

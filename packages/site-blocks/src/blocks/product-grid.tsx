@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { RenderedProductGrid } from "@saroh/block-contract";
-import { PRODUCT_GRID_DEFAULT_COUNT } from "@saroh/block-contract";
+import {
+    PRODUCT_GRID_DEFAULT_COUNT,
+    resolveVariant,
+} from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import {
@@ -16,6 +19,7 @@ import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
 import { cardLink, listCard, listPhoto } from "./list-layout";
+import { LeadGrid } from "./product-grid-lead";
 
 /**
  * `productGrid` v1 — products from the catalogue, read live (G12).
@@ -311,6 +315,9 @@ function ProductCards({
     const list = content.layout === "list";
     const base =
         feed.basePath != null ? trimTrailingSlashes(feed.basePath) : null;
+    // The lead look (U2): the first product twice the room. It ignores
+    // "Show as", which is the even grid's.
+    const lead = resolveVariant("productGrid", content) === "lead";
     const card = (p: ShopListingCard) =>
         list
             ? listCard(show.photo && p.image !== null)
@@ -334,40 +341,49 @@ function ProductCards({
                 )
             }
         >
-            <ul
-                className={cn(
-                    "grid",
-                    list
-                        ? "grid-cols-1 gap-2.5"
-                        : "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]",
-                )}
-            >
-                {products.map((p) => {
-                    const inner = list ? (
-                        <ListRowBody product={p} show={show} />
-                    ) : (
-                        <CardBody product={p} show={show} />
-                    );
-                    return (
-                        <li key={p.slug} className="min-w-0">
-                            {base !== null ? (
-                                <a
-                                    href={`${base}/${encodeURIComponent(p.slug)}`}
-                                    className={cn(
-                                        card(p),
-                                        "hover:border-site-fg/40 group cursor-pointer transition-[border-color,transform] active:scale-[0.99]",
-                                        focusRing,
-                                    )}
-                                >
-                                    {inner}
-                                </a>
-                            ) : (
-                                <div className={card(p)}>{inner}</div>
-                            )}
-                        </li>
-                    );
-                })}
-            </ul>
+            {lead ? (
+                <LeadGrid
+                    products={products}
+                    show={show}
+                    base={base}
+                    line={cardLine}
+                />
+            ) : (
+                <ul
+                    className={cn(
+                        "grid",
+                        list
+                            ? "grid-cols-1 gap-2.5"
+                            : "gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr))]",
+                    )}
+                >
+                    {products.map((p) => {
+                        const inner = list ? (
+                            <ListRowBody product={p} show={show} />
+                        ) : (
+                            <CardBody product={p} show={show} />
+                        );
+                        return (
+                            <li key={p.slug} className="min-w-0">
+                                {base !== null ? (
+                                    <a
+                                        href={`${base}/${encodeURIComponent(p.slug)}`}
+                                        className={cn(
+                                            card(p),
+                                            "hover:border-site-fg/40 group cursor-pointer transition-[border-color,transform] active:scale-[0.99]",
+                                            focusRing,
+                                        )}
+                                    >
+                                        {inner}
+                                    </a>
+                                ) : (
+                                    <div className={card(p)}>{inner}</div>
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
         </GridFrame>
     );
 }

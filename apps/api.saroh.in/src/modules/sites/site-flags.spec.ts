@@ -982,3 +982,59 @@ describe("checkAddress (DEC-069, L5)", () => {
         expect(flags.some((f) => f.blocking)).toBe(false);
     });
 });
+
+describe("the industry templates' blocks (U2)", () => {
+    it("asks no image of the No hero look, and names a brief when one is wanted", () => {
+        const none = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: { variant: "none", heading: "Writing" },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(none)).not.toContain("missingImage");
+
+        const briefed = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: {
+                        variant: "fullBleed",
+                        heading: "Bread, the slow way",
+                        imageBrief: "Loaves on the counter at dawn",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        const missing = briefed.find((f) => f.type === "missingImage");
+        expect(missing?.message).toMatch(/Loaves on the counter at dawn/);
+    });
+
+    it("asks for a person's photo description, and checks their button", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "person",
+                    content: {
+                        name: "Anika",
+                        image: { src: "https://x/a.jpg", alt: "" },
+                        cta: {
+                            label: "Book",
+                            action: { kind: "url", href: "/nowhere" },
+                        },
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(flags.map((f) => [f.type, f.field])).toEqual(
+            expect.arrayContaining([
+                ["emptyRequiredField", "image"],
+                ["brokenLink", "cta"],
+            ]),
+        );
+    });
+});

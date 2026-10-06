@@ -237,6 +237,29 @@ const imageSchema = z.object({
     height: z.number().int().positive().optional(),
 });
 
+/** How long an image brief may run (KTD-5). */
+export const IMAGE_BRIEF_MAX = 200;
+
+/**
+ * What photograph belongs in an image slot that has none yet (KTD-5,
+ * industry templates U2): "Morning light on the counter, loaves stacked".
+ *
+ * A SIBLING of the block's image, not a field inside it. `imageSchema`
+ * requires a `src` — every image published so far has one, and the media
+ * library's "on a published site" guard reads it — so a slot with only a
+ * brief cannot be an image. Making `src` optional instead would loosen every
+ * image in every block, and every renderer would have to learn that an
+ * image may have nowhere to load from. A sibling string touches only the
+ * blocks that take one, is optional (so it extends each block's current
+ * version in place) and is plain text.
+ *
+ * A template ships the slot as this brief and no image. The live site draws
+ * nothing for the slot — a brief is a note to the owner, never something a
+ * visitor reads — and the editor shows it as the empty slot's text. Once a
+ * photo is chosen the brief is simply not drawn; it can stay.
+ */
+const imageBrief = z.string().trim().max(IMAGE_BRIEF_MAX).optional();
+
 // ---------------------------------------------------------------------------
 // Section content schemas (per type + version)
 // ---------------------------------------------------------------------------
@@ -258,6 +281,8 @@ const heroV1 = z.object({
     subheading: z.string().optional(),
     cta: ctaSchema.optional(),
     image: imageSchema.optional(),
+    /** The photo this hero wants, until it has one (KTD-5). */
+    imageBrief,
     onToday: z.boolean().optional(),
 });
 
@@ -288,6 +313,8 @@ const richTextV1 = z.object({
     format: z.enum(["html", "markdown"]).default("html"),
     value: z.string(),
     image: imageSchema.optional(),
+    /** The photo beside the text, until it has one (KTD-5). */
+    imageBrief,
     imageSide: z.enum(TEXT_IMAGE_SIDES).optional(),
 });
 
@@ -341,11 +368,39 @@ const galleryV1 = z.object({
  * `grid` is first because it is the least demanding look and therefore the
  * default an unrecognised variant falls back to (#254).
  */
-const galleryV2 = z.object({
-    variant,
-    padding: paddingOverride,
-    images: z.array(imageSchema).min(1),
+/**
+ * One gallery image, with an optional line under it (industry templates U2).
+ *
+ * The caption is the gallery's own, not the shared `imageSchema`'s: a hero's
+ * photo has no line under it, and extending the shared shape would offer one
+ * everywhere a photo is. Plain text; an empty caption draws nothing.
+ * Added to v2 only, as an optional field: every gallery@2 section and
+ * publication validates as before, and v1 stays untouched (see above).
+ */
+export const GALLERY_CAPTION_MAX = 200;
+const galleryImageSchema = imageSchema.extend({
+    caption: z.string().trim().max(GALLERY_CAPTION_MAX).optional(),
 });
+
+const galleryV2 = z
+    .object({
+        variant,
+        padding: paddingOverride,
+        images: z.array(galleryImageSchema),
+        /**
+         * What photographs belong here, when there are none yet (KTD-5). A
+         * template ships a gallery as this brief and no images; see
+         * `imageBrief` above. No images and a brief: the live site draws
+         * nothing, the editor shows the brief in the empty slot.
+         */
+        imageBrief,
+    })
+    .refine((g) => g.images.length > 0 || Boolean(g.imageBrief), {
+        // Loosened from `.min(1)` only for a slot that says what it wants:
+        // every gallery that validated before still does.
+        message: "Add at least one image",
+        path: ["images"],
+    });
 
 /**
  * features v1 — a heading over a set of short, titled points.
@@ -573,6 +628,12 @@ const visitUsV1 = z.object({
  * such as "Read" at the foot of each post's card (ABSENT: none, the card
  * itself is the link). Photos are `showImages` and descriptions
  * `showExcerpts`.
+ *
+ * The `archive` look (industry templates U2) lists EVERY published post as
+ * a dated list — the date in a column, the title and its line beside it —
+ * and so ignores `count`, `layout`, `showImages` and `buttonLabel`. A look
+ * rather than `count: "all"`, so `count` keeps meaning one thing and a
+ * section switched back to cards keeps the count it had.
  */
 const journalV1 = z.object({
     variant,
@@ -662,6 +723,13 @@ export const PROJECTS_MAX = 24;
  */
 const projectItemSchema = z.object({
     image: imageSchema.optional(),
+    /** The photo this project wants, until it has one (KTD-5). */
+    imageBrief,
+    /**
+     * A line under the photo — who took it, where, when (industry templates
+     * U2). Drawn only beside a photo. Optional, so it extends v1 in place.
+     */
+    caption: z.string().trim().max(GALLERY_CAPTION_MAX).optional(),
     title: z.string().trim().min(1).max(120),
     summary: z.string().max(600).optional(),
     link: linkHref.optional(),
@@ -696,6 +764,10 @@ export const PRODUCT_GRID_DEFAULT_COUNT = 4;
  * - `count` ABSENT means {@link PRODUCT_GRID_DEFAULT_COUNT}.
  * - `showPrices` defaults to on, so ABSENT means shown.
  *
+ * The `lead` look (industry templates U2) gives the first product twice the
+ * room — two columns and two rows from the tablet width up, one column on a
+ * phone — with tall photos and the price set large. It ignores `layout`.
+ *
  * A just-added block, or one whose collection or products are still to be
  * chosen, saves: a draft is saved as it is typed. It renders nothing live
  * until there is something to show, and the flag engine says why. Whether
@@ -726,6 +798,102 @@ const productGridV1 = z.object({
     showPhotos: z.boolean().optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel,
+});
+
+/** How many classes a Timetable may be limited to (U2). */
+export const TIMETABLE_MAX_SERVICES = 24;
+
+/**
+ * timetable v1 — the week's class sessions, read live (industry templates U2).
+ *
+ * A bound block like `booking` (ADR-004, KTD-4): it stores which classes and
+ * how they show, never a session. The sessions are read when the page is
+ * viewed (`GET public/sites/:siteId/timetable`), the booking page's own
+ * starts for the next seven days, so a time here is always one the booking
+ * page offers, and a session's places left are right without a republish.
+ *
+ * - `serviceIds` ABSENT or empty: every class the booking page offers. Set:
+ *   only those, and only while they are classes on offer. Ids, never names.
+ * - `showTrainer` and `showPlacesLeft` default to on, so ABSENT means shown.
+ *   Full is always said in words, whatever `showPlacesLeft` is.
+ * - The week is always seven days from today: a field for it would be a
+ *   number with one right answer.
+ *
+ * Looks are `grid` (days across, times down; a list on a phone) and `list`
+ * (day by day), in `BLOCK_META`. With no class sessions in the week the
+ * block renders nothing on the site; the editor's canvas says why.
+ */
+const timetableV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    intro: z.string().trim().max(600).optional(),
+    serviceIds: z
+        .array(z.string().trim().min(1).max(64))
+        .max(TIMETABLE_MAX_SERVICES)
+        .refine(
+            (ids) => new Set(ids).size === ids.length,
+            "A class is listed twice",
+        )
+        .optional(),
+    showTrainer: z.boolean().optional(),
+    showPlacesLeft: z.boolean().optional(),
+});
+
+/**
+ * hours v1 — opening hours on their own, read live (industry templates U2).
+ *
+ * A bound block like `visitUs`, reading the same public visit read: with a
+ * `storeId`, that SHOP storefront (`GET public/sites/:siteId/visit/:storeId`);
+ * ABSENT, the business's own place (`GET public/sites/:siteId/visit`) — its
+ * first open shop, else the business profile's hours. So a business with one
+ * place needs to choose nothing. The week is Settings › Hours (DEC-034).
+ *
+ * `showClosed` ABSENT means closed days are listed, muted but stated
+ * ("Sunday · Closed"); off, they are left out. With no hours saved the block
+ * renders nothing, never "Closed" every day — a claim the business never
+ * made.
+ */
+const hoursV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    storeId: z.string().min(1).optional(),
+    showClosed: z.boolean().optional(),
+});
+
+/** How many qualifications a Person lists, at most, and how long a bio runs. */
+export const PERSON_CREDENTIALS_MAX = 8;
+export const PERSON_BIO_MAX = 1200;
+
+/**
+ * person v1 — one practitioner: a photo, their name, what they do, their
+ * qualifications and a few lines about them (industry templates U2).
+ *
+ * A STATIC block, like `projects`: what a merchant types is what a visitor
+ * reads. It is not bound to a staff member, because staff carry no photo,
+ * qualifications or bio today, and a site's "about the practitioner" is the
+ * merchant's own words. Only `name` is required; a person with no photo
+ * draws without a gap. `bio` is plain text, its line breaks kept. `cta` is
+ * the usual button (#207), "Book with Anika" pointing at the booking page.
+ *
+ * The photo's description is asked for before publishing, not on save
+ * (`site-flags.ts`), as the text block's is.
+ */
+const personV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    image: imageSchema.optional(),
+    /** The photo this person wants, until it has one (KTD-5). */
+    imageBrief,
+    name: z.string().trim().min(1).max(120),
+    role: z.string().trim().max(160).optional(),
+    credentials: z
+        .array(z.string().trim().min(1).max(120))
+        .max(PERSON_CREDENTIALS_MAX)
+        .optional(),
+    bio: z.string().trim().max(PERSON_BIO_MAX).optional(),
+    cta: ctaSchemaV2.optional(),
 });
 
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
@@ -831,6 +999,9 @@ export const SECTION_TYPES = [
     "productGrid",
     "packs",
     "projects",
+    "timetable",
+    "hours",
+    "person",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -994,6 +1165,28 @@ const REGISTRY: Record<string, SectionContract> = {
         schema: projectsV1,
         sanitizedFields: [],
     },
+    [key("timetable", 1)]: {
+        type: "timetable",
+        version: 1,
+        // A title, which classes by id and two switches; the sessions are
+        // read live.
+        schema: timetableV1,
+        sanitizedFields: [],
+    },
+    [key("hours", 1)]: {
+        type: "hours",
+        version: 1,
+        // A title, an id and a switch; the week is read live.
+        schema: hoursV1,
+        sanitizedFields: [],
+    },
+    [key("person", 1)]: {
+        type: "person",
+        version: 1,
+        // Plain text, a photo and a button; nothing here is authored HTML.
+        schema: personV1,
+        sanitizedFields: [],
+    },
 };
 
 // ---------------------------------------------------------------------------
@@ -1014,6 +1207,13 @@ export interface VariantRequirement {
     field: string;
     /** Shown to the author, so it must name the look and the field. */
     message: string;
+    /**
+     * A field that stands in for `field` while it is empty: a split hero's
+     * image brief (KTD-5) says which photo goes there, so a template can
+     * ship the look before the owner has the photo. The live site draws
+     * the hero without one until then, and the pre-publish check names it.
+     */
+    orField?: string;
 }
 
 const VARIANT_REQUIREMENTS: Partial<
@@ -1029,6 +1229,7 @@ const VARIANT_REQUIREMENTS: Partial<
         split: [
             {
                 field: "image",
+                orField: "imageBrief",
                 message:
                     'The "Split" hero shows an image beside the copy — add one, or choose the "Centered" look.',
             },
@@ -1222,10 +1423,13 @@ export function parseSectionContent(
         // is a registered type by construction.
         const unmet = variantRequirements(contract.type, named).filter(
             (req) => {
-                const value = (result.data as Record<string, unknown>)[
-                    req.field
-                ];
-                return value === undefined || value === null || value === "";
+                const data = result.data as Record<string, unknown>;
+                const empty = (value: unknown) =>
+                    value === undefined || value === null || value === "";
+                return (
+                    empty(data[req.field]) &&
+                    (req.orField === undefined || empty(data[req.orField]))
+                );
             },
         );
         if (unmet.length > 0) {
