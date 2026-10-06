@@ -650,9 +650,9 @@ export class CommunicationsService {
     // ---- Transactional (D17; A14 reuses it) -------------------------------
 
     /**
-     * Whether the business can send email at all: its own provider,
-     * connected. Saroh's own email is never used for a business's customers
-     * (DEC-011, default 38).
+     * Whether the business's own email provider is connected. Invoices,
+     * autopay and team alerts need it (DEC-011, default 38); booking
+     * notices may also go through Saroh while it has none (DEC-086).
      */
     async emailConnected(db: Db, organizationId: string): Promise<boolean> {
         const row = await db.communicationProvider.findUnique({

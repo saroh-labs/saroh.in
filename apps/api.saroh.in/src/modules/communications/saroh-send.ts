@@ -1,7 +1,10 @@
 import type { Message } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import type { SarohBusinessEmail } from "./providers/saroh-email.sender";
+import type {
+    SarohBusinessEmail,
+    SarohSendOutcome,
+} from "./providers/saroh-email.sender";
 import { sendSarohBusinessEmail } from "./providers/saroh-email.sender";
 import { SAROH_STOPPED, SAROH_UNKNOWN } from "./saroh-delivery";
 import { sarohSwitchesOn } from "./saroh-may-send";
@@ -32,7 +35,7 @@ export async function deliverThroughSaroh(
         Message,
         "id" | "organizationId" | "toAddress" | "subject" | "body"
     >,
-    send: (email: SarohBusinessEmail) => Promise<string> = (email) =>
+    send: (email: SarohBusinessEmail) => Promise<SarohSendOutcome> = (email) =>
         sendSarohBusinessEmail(email),
 ): Promise<boolean> {
     if (!(await sarohSwitchesOn(message.organizationId))) {
@@ -75,32 +78,42 @@ export async function deliverThroughSaroh(
         html: message.body,
     });
 
-    if (outcome === "sent") {
-        await record(deliveryId, message.id, {
-            delivery: "SENT",
-            message: "SENT",
-            error: null,
-        });
-        return true;
+    switch (outcome) {
+        case "sent":
+            await record(deliveryId, message.id, {
+                delivery: "SENT",
+                message: "SENT",
+                error: null,
+            });
+            return true;
+        case "unknown":
+            await record(deliveryId, message.id, {
+                delivery: SAROH_UNKNOWN,
+                message: SAROH_UNKNOWN,
+                error: "The connection dropped after the email was handed over; not retried, in case it went",
+            });
+            return false;
+        case "not-configured":
+        case "failed": {
+            const error =
+                outcome === "not-configured"
+                    ? "Saroh's email isn't set up on this server"
+                    : "Saroh's email couldn't send it";
+            await record(deliveryId, message.id, {
+                delivery: "FAILED",
+                message: "FAILED",
+                error,
+            });
+            throw new Error(error);
+        }
+        default: {
+            // A new outcome is a compile error here until it is handled.
+            const unhandled: never = outcome;
+            throw new Error(
+                `unhandled Saroh send outcome ${String(unhandled)}`,
+            );
+        }
     }
-    if (outcome === "unknown") {
-        await record(deliveryId, message.id, {
-            delivery: SAROH_UNKNOWN,
-            message: SAROH_UNKNOWN,
-            error: "The connection dropped after the email was handed over; not retried, in case it went",
-        });
-        return false;
-    }
-    const error =
-        outcome === "not-configured"
-            ? "Saroh's email isn't set up on this server"
-            : "Saroh's email couldn't send it";
-    await record(deliveryId, message.id, {
-        delivery: "FAILED",
-        message: "FAILED",
-        error,
-    });
-    throw new Error(error);
 }
 
 async function record(

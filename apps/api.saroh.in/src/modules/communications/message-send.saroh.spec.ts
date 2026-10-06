@@ -171,4 +171,19 @@ describe("message.send through Saroh (DEC-086)", () => {
         await handler.handle(job);
         expect(send).not.toHaveBeenCalled();
     });
+
+    it.each(["UNKNOWN", "STOPPED"])(
+        "a re-run on a Saroh delivery already %s never sends it",
+        async (status) => {
+            (prisma.delivery.findUnique as jest.Mock).mockResolvedValue({
+                id: "del_1",
+                status,
+                provider: "SAROH",
+            });
+            await expect(handler.handle(job)).resolves.toBeUndefined();
+            expect(send).not.toHaveBeenCalled();
+            expect(deliveryUpdate).not.toHaveBeenCalled();
+            expect(messageUpdate).not.toHaveBeenCalled();
+        },
+    );
 });

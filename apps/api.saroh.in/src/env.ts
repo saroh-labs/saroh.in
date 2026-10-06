@@ -103,7 +103,10 @@ const envSchema = z.object({
     // The global stop for that route: "true" stops every business's Saroh
     // email at once, queued and retrying ones included, whatever each
     // business's SAROH_BUSINESS_EMAIL flag says (the complaint alarm's
-    // runbook step). Read at use (`communications/saroh-may-send.ts`).
+    // runbook step). Checked on every send and queued job
+    // (`communications/saroh-may-send.ts`), but env is read at boot, so it
+    // takes effect once the API and workers restart with it set; for an
+    // instant stop, turn off the business's SAROH_BUSINESS_EMAIL flag.
     SAROH_BUSINESS_EMAIL_STOP: z.enum(["true", "false"]).optional(),
     // At most this many Saroh-sent business emails in any 24 hours, for
     // every business together, so sign-in codes keep their room on the SES

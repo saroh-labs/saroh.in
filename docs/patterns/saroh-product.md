@@ -320,9 +320,13 @@ organizations/:org/customers`: everyone who has paid (an order through a
 ## Communications
 
 - **Current** — Real messages go through the Organization's own connected
-  provider (DEC-011). Saroh-owned email is only for identity and security mail,
-  and for a template test sent to the signed-in user's own verified address.
-  Consent gates every send.
+  provider (DEC-011), with one exception: while it has none, Saroh sends its
+  three booking notices (confirmed, moved, cancelled) from `notify.saroh.in`
+  when the shared rule allows. Each one counts against the plan's monthly
+  allowance, and when the allowance is used or can't be read, Saroh sends
+  nothing (DEC-086). Otherwise Saroh-owned email is only for identity and
+  security mail, and for a template test sent to the signed-in user's own
+  verified address. Consent gates every send.
 - **Adopted** — A simple WhatsApp deep link with a prefilled message is
   acceptable before any provider integration (§16). None exists yet.
 - **Adopted** (2026-09-26, ADR-011) — A message about a customer's own order,

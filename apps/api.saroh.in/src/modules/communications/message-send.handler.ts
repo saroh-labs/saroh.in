@@ -16,7 +16,7 @@ import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
 } from "./providers/provider.port";
-import { SAROH_PROVIDER } from "./saroh-delivery";
+import { SAROH_PROVIDER, SAROH_STOPPED, SAROH_UNKNOWN } from "./saroh-delivery";
 import { deliverThroughSaroh } from "./saroh-send";
 import { fillSecretLink, SECRET_LINK_SLOT } from "./transactional";
 
@@ -61,6 +61,12 @@ export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 /** Delivery states that are terminal-success — a re-run must NOT re-send. */
 const SENT_STATES = new Set(["SENT", "DELIVERED"]);
+
+/**
+ * A Saroh delivery's own terminal states (DEC-086): STOPPED never goes, and
+ * UNKNOWN may already have gone, so a re-run must not send either.
+ */
+const SAROH_TERMINAL_STATES = new Set([SAROH_STOPPED, SAROH_UNKNOWN]);
 
 /**
  * Consumer for the `message.send` job (S6-001): take a QUEUED Delivery and hand
@@ -122,6 +128,15 @@ export class MessageSendHandler {
         if (SENT_STATES.has(delivery.status)) {
             this.logger.log(
                 `message.send: delivery ${deliveryId} already ${delivery.status}; skipping.`,
+            );
+            return;
+        }
+        if (
+            delivery.provider === SAROH_PROVIDER &&
+            SAROH_TERMINAL_STATES.has(delivery.status)
+        ) {
+            this.logger.log(
+                `message.send: Saroh delivery ${deliveryId} already ${delivery.status}; skipping.`,
             );
             return;
         }

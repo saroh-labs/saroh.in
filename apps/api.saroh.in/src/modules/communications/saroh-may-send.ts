@@ -96,13 +96,20 @@ export const defaultSarohDeps: SarohDeps = {
         countUsage(prisma, organizationId, SAROH_EMAILS_KEY, now),
 };
 
-/** The row's monthly cap, or null when it gives Saroh's emails no number. */
+/**
+ * The row's monthly cap, or null (no allowance: fail closed) unless it gives
+ * Saroh's emails a number above nothing.
+ */
 export function allowanceLimit(row: ModuleAccess | null): number | null {
     if (row?.state !== "on") return null;
-    return typeof row.limit === "number" ? row.limit : null;
+    return typeof row.limit === "number" && row.limit > 0 ? row.limit : null;
 }
 
-/** The global stop, read at use, so an operator's change needs no deploy of code. */
+/**
+ * The global stop, checked on every send and queued job. Env is read at
+ * boot, so it takes effect once the API and workers restart with it set;
+ * for an instant stop, turn off the business's `SAROH_BUSINESS_EMAIL` flag.
+ */
 export function sarohStopped(): boolean {
     return env.SAROH_BUSINESS_EMAIL_STOP === "true";
 }

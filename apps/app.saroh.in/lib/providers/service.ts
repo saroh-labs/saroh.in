@@ -123,8 +123,37 @@ export async function getSarohEmail(): Promise<SarohEmailState> {
     );
     if (res?.status === 404) return SAROH_EMAIL_OFF;
     if (!res?.ok) return { state: "UNREAD" };
-    const body = (await res.json().catch(() => null)) as SarohEmailState | null;
-    return body && typeof body.state === "string" ? body : { state: "UNREAD" };
+    const body: unknown = await res.json().catch(() => null);
+    return isSarohEmailState(body) ? body : { state: "UNREAD" };
+}
+
+/** Only a body shaped as one of the states is read; anything else is UNREAD. */
+function isSarohEmailState(body: unknown): body is SarohEmailState {
+    if (typeof body !== "object" || body === null) return false;
+    const b = body as Record<string, unknown>;
+    switch (b.state) {
+        case "OFF":
+            return typeof b.takesOver === "boolean";
+        case "UNREAD":
+            return true;
+        case "SENDING":
+        case "NEAR":
+        case "PAUSED": {
+            const sender = b.sender as Record<string, unknown> | null;
+            return (
+                typeof b.used === "number" &&
+                typeof b.cap === "number" &&
+                typeof b.resetsOn === "string" &&
+                typeof sender === "object" &&
+                sender !== null &&
+                typeof sender.name === "string" &&
+                typeof sender.address === "string" &&
+                (b.replyTo === null || typeof b.replyTo === "string")
+            );
+        }
+        default:
+            return false;
+    }
 }
 
 export async function listCommsProviders(): Promise<

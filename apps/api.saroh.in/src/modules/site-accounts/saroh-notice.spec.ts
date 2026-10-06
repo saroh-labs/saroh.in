@@ -7,6 +7,7 @@ const booking = (
         business: string;
         service: string;
         staff: string | null;
+        firstName: string | null;
     }> = {},
 ): NoticeVars => ({
     kind: "BOOKING_CONFIRMED",
@@ -55,6 +56,22 @@ describe("a booking notice as Saroh sends it (DEC-086)", () => {
         const all = `${words?.subject} ${words?.body}`;
         expect(all).not.toMatch(/evil|https?:|www\./);
         expect(words?.body).toContain("Your Free gift with mail on");
+    });
+
+    it("cleans the customer's first name too, and greets with Hello when nothing is left", () => {
+        const linked = renderSarohNotice(
+            booking({ firstName: "Asha www.evil.example" }),
+            sender,
+        );
+        expect(linked?.body).toContain("Hi Asha,");
+        expect(linked?.body).not.toMatch(/evil|www\./);
+
+        const onlyALink = renderSarohNotice(
+            booking({ firstName: "https://evil.example/claim" }),
+            sender,
+        );
+        expect(onlyALink?.body).toContain("Hello,");
+        expect(onlyALink?.body).not.toMatch(/evil|https?:/);
     });
 
     it("falls back when nothing of a name survives cleaning", () => {

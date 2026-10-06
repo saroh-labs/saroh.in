@@ -209,6 +209,7 @@ describe("sarohMaySend (DEC-086)", () => {
         for (const row of [
             null,
             { ...ROW, limit: null },
+            { ...ROW, limit: 0 },
             { ...ROW, state: "locked" },
         ] as (ModuleAccess | null)[]) {
             expect(
@@ -236,6 +237,13 @@ describe("room in this month's allowance (U3)", () => {
         expect(await sarohRoomLeft("org_1", NOW, deps({ row: null }))).toBe(
             false,
         );
+        expect(
+            await sarohRoomLeft(
+                "org_1",
+                NOW,
+                deps({ row: { ...ROW, limit: 0 } as ModuleAccess }),
+            ),
+        ).toBe(false);
         const d = deps();
         (d.used as jest.Mock).mockRejectedValue(new Error("down"));
         expect(await sarohRoomLeft("org_1", NOW, d)).toBe(false);
