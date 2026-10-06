@@ -54,7 +54,7 @@ a note saying so.
   sends; Saroh-owned email is only for identity mail and a template test to the
   signed-in user's own verified address (DEC-011) — and, while a business has
   no email provider, its booking notices, sent from `notify.saroh.in` under
-  one rule (`sarohMaySend`) and counted against its plan's
+  one rule (`emailRoute` → `sarohDecision`) and counted against its plan's
   `sarohEmailsPerMonth`, failing closed (DEC-086).
 - **Current** — **Settings → Providers is one row per provider, connected
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
