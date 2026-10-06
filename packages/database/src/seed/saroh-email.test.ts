@@ -7,7 +7,11 @@ import {
 } from "./saroh-email";
 
 vi.mock("./pricing", () => ({
-    seedPlanId: vi.fn(() => Promise.resolve("plan_pro")),
+    SEED_PLAN_ID: "pro",
+    SEED_ENTRY_PLAN_ID: "free",
+    seedPlanId: vi.fn((_db: unknown, _now: Date, key: string) =>
+        Promise.resolve(`plan_${key}`),
+    ),
 }));
 
 interface Call {
@@ -37,7 +41,25 @@ function recorder(): { db: Db; calls: Call[] } {
 }
 
 describe("Asha's Saroh-email businesses (DEC-086)", () => {
-    it("turns the route on for its own two businesses and nobody else", async () => {
+    it("puts the third on the entry plan, the others on the top plan", async () => {
+        const { db, calls } = recorder();
+        await seedSarohEmailBusinesses(db, "seed_user_founder", new Date());
+        const plans = Object.fromEntries(
+            calls
+                .filter((c) => c.model === "subscription")
+                .map((c) => [
+                    String(c.args.create.organizationId),
+                    c.args.create.planId,
+                ]),
+        );
+        expect(plans).toEqual({
+            "seed_org_saroh-email_desk": "plan_pro",
+            "seed_org_saroh-email_phone": "plan_pro",
+            "seed_org_saroh-email_entry": "plan_free",
+        });
+    });
+
+    it("turns the route on for its own businesses and nobody else", async () => {
         const { db, calls } = recorder();
         await seedSarohEmailBusinesses(db, "seed_user_founder", new Date());
 

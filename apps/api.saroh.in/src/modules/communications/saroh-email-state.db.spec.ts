@@ -8,9 +8,12 @@
  * The unit spec (`saroh-email-state.spec.ts`) injects every read; this
  * pins what it can't: a plan that can't be read is UNREAD (never OFF and
  * never a zero), and a business off the catalogue or with enforcement off
- * is OFF.
+ * is OFF; and whether it can connect its own email (`canConnectOwn`), read
+ * by the connect's own check on the plan's `integrations` row.
  *
- * Every number is made up (`fakeSarohEmailsCatalog`: Plan A, 3 a month).
+ * Every number is made up (`fakeSarohEmailsCatalog`: Plan A, 3 a month),
+ * with an `integrations` row of this file's own: locked on Plan A, 1 on
+ * Plan B, 2 on Plan F, no cap elsewhere.
  * Runs in the integration project.
  */
 const mockEnv: Record<string, string | undefined> = {
@@ -21,6 +24,8 @@ const mockEnv: Record<string, string | undefined> = {
 jest.mock("../../env", () => ({ env: mockEnv }));
 
 import { prisma } from "@saroh/database";
+import type { Catalog } from "@saroh/pricing-catalog";
+import { parseCatalog } from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
 import {
@@ -32,6 +37,7 @@ import {
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { FlagKey } from "../feature-flags/flags";
+import { encryptSecret } from "../payments/crypto";
 import { CommunicationsService } from "./communications.service";
 
 const comms = new CommunicationsService();
@@ -42,8 +48,32 @@ let staffId: string;
 let seq = 0;
 const uniq = (p: string) => `${p}-${process.pid}-${++seq}`;
 
+/** The shared catalogue with this file's own `integrations` row. */
+function withIntegrations(): Catalog {
+    const c = fakeSarohEmailsCatalog();
+    return parseCatalog({
+        ...c,
+        modules: [
+            ...c.modules,
+            {
+                id: "integrations",
+                name: "Links",
+                group: "g",
+                cells: {
+                    free: { inc: false, off: "locked" },
+                    grow: { inc: true, text: "1", limit: 1 },
+                    pro: { inc: true, text: "Included" },
+                    soft: { inc: true, text: "Included" },
+                    max: { inc: true, text: "Included" },
+                    ten: { inc: true, text: "2", limit: 2 },
+                },
+            },
+        ],
+    });
+}
+
 beforeAll(async () => {
-    await installCatalogue(V, fakeSarohEmailsCatalog());
+    await installCatalogue(V, withIntegrations());
     staffId = (
         await prisma.user.create({
             data: {
@@ -136,6 +166,84 @@ describe("Settings' Saroh email state with the real defaults (DEC-086, U4)", () 
                 address: "bookings@notify.saroh.in",
             },
             replyTo: "hello@rye.example",
+            // Plan A leaves connecting its own email off.
+            canConnectOwn: false,
+        });
+    });
+
+    describe("canConnectOwn: the connect's own check on `integrations`", () => {
+        /** One payment provider connected: one `integrations` connection. */
+        async function paymentsConnected(organizationId: string) {
+            const sealed = encryptSecret(JSON.stringify({ k: "v" }));
+            await prisma.merchantPaymentProvider.create({
+                data: {
+                    organizationId,
+                    provider: "RAZORPAY",
+                    status: "CONNECTED",
+                    encryptedCredentials: sealed.ciphertext,
+                    credentialsIv: sealed.iv,
+                    credentialsAuthTag: sealed.authTag,
+                },
+            });
+        }
+
+        it("false where the plan leaves it off (Plan A)", async () => {
+            const b = await business("free");
+            expect(await comms.sarohEmail(b.owner)).toMatchObject({
+                state: "SENDING",
+                canConnectOwn: false,
+            });
+        });
+
+        it("true where the plan includes it with room (Plan F, one of two used)", async () => {
+            const b = await business("ten");
+            await paymentsConnected(b.orgId);
+            expect(await comms.sarohEmail(b.owner)).toMatchObject({
+                state: "SENDING",
+                canConnectOwn: true,
+            });
+        });
+
+        it("false at the cap (Plan B, its one connection used), as the connect refuses it", async () => {
+            const b = await business("grow");
+            await paymentsConnected(b.orgId);
+            expect(await comms.sarohEmail(b.owner)).toMatchObject({
+                state: "SENDING",
+                canConnectOwn: false,
+            });
+            await expect(
+                comms.connectProvider(b.owner, {
+                    channel: "email",
+                    provider: "resend",
+                    credentials: { apiKey: "re_test_123" },
+                }),
+            ).rejects.toMatchObject({
+                response: { details: { code: "PLAN_LIMIT_REACHED" } },
+            });
+        });
+
+        it("null, never true, when the plan can't be read for it; the rest still stands", async () => {
+            const b = await business("ten");
+            const real = CatalogueAccessService.prototype.resolve;
+            // The allowance's read goes through; the connect check's fails.
+            const resolve = jest
+                .spyOn(CatalogueAccessService.prototype, "resolve")
+                .mockImplementationOnce(function (
+                    this: CatalogueAccessService,
+                    ...args: Parameters<CatalogueAccessService["resolve"]>
+                ) {
+                    return real.apply(this, args);
+                })
+                .mockRejectedValueOnce(new Error("down"));
+            try {
+                expect(await comms.sarohEmail(b.owner)).toMatchObject({
+                    state: "SENDING",
+                    used: 0,
+                    canConnectOwn: null,
+                });
+            } finally {
+                resolve.mockRestore();
+            }
         });
     });
 

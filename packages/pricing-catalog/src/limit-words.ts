@@ -12,6 +12,22 @@ export interface LimitAction {
     href: string;
     /** The sentence the notice says it in. */
     sentence: string;
+    /**
+     * The catalogue row the action adds to (connecting an email is one
+     * more `integrations` connection): with no room there, it is closed.
+     */
+    room: string;
+    /**
+     * Said instead when the business can't take the action now (its plan
+     * has no room to connect its own email, DEC-086): upgrading leads, and
+     * the button is the plan picker's.
+     */
+    closed: {
+        /** The button: "See plans". */
+        label: string;
+        /** Said after the higher plan, only when there is one. */
+        sentence: string;
+    };
 }
 
 /** How a metered limit reads to the merchant, for `limitNotice`'s sentences. */
@@ -100,8 +116,16 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         action: {
             label: "Connect your email",
             href: "/settings/providers",
+            room: "integrations",
             sentence:
                 "Connect your own email and your booking emails go through it, with no monthly limit.",
+            // Free has no room to connect one; Grow and Pro do, the
+            // catalogue's `integrations` row decides (DEC-086).
+            closed: {
+                label: "See plans",
+                sentence:
+                    "A higher plan lets you connect your own email, and then your booking emails go through it with no monthly limit.",
+            },
         },
     },
 };

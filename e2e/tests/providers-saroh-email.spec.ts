@@ -22,7 +22,9 @@ import { urls } from "../playwright.config";
  * writes them (`packages/database/src/seed/saroh-email.ts`) for two of
  * Asha's businesses that nothing else reads, one per browser
  * (`seed_org_saroh-email_desk` / `_phone`), since each connects and
- * disconnects an email: the flags are on for those two alone, the
+ * disconnects an email, and a third on the catalogue's entry plan
+ * (`_entry`), only read, whose plan has no room to connect an email of its
+ * own (DEC-086): the flags are on for those three alone, the
  * allowance is the sample catalogue's made-up number. Every other business
  * reads what it did. The test puts its business back to where the seed
  * left it first (no email of its own, no contact email), so a retry starts
@@ -44,6 +46,7 @@ type SarohEmailState =
           resetsOn: string;
           sender: { name: string; address: string };
           replyTo: string | null;
+          canConnectOwn?: boolean | null;
       };
 
 const api = (b: OwnBusiness, path: string) =>
@@ -179,7 +182,9 @@ test.describe("with Saroh sending a business's booking emails", () => {
         await expect(card.getByText(contact)).toBeVisible();
         await expect(add).toHaveCount(0);
 
-        // Connect jumps to the first email provider on offer.
+        // Connect jumps to the first email provider on offer. Passes once
+        // the sample catalogue includes `integrations` on Pro (the pricing
+        // session's change); until then Pro has no room, so it offers plans.
         await card.getByRole("link", { name: "Connect your email" }).click();
         await expect(page).toHaveURL(/#connect-email$/);
         await expect(page.locator("#connect-email")).toBeInViewport();
@@ -239,4 +244,35 @@ test.describe("with Saroh sending a business's booking emails", () => {
             "Disconnected — Saroh sends your booking emails for now, counted against your plan",
         );
     });
+});
+
+test("on a plan with no room to connect its own email, the block offers plans, not Connect (DEC-086)", async ({
+    page,
+}) => {
+    // Seeded on the catalogue's entry plan, and only read: both browsers
+    // share it.
+    await useSession(page, "founder");
+    const b: OwnBusiness = {
+        id: "seed_org_saroh-email_entry",
+        address: "saroh-email-entry",
+        name: "Asha's Pottery",
+    };
+    const state = await stateOf(page, b);
+    expect(state).toMatchObject({ canConnectOwn: false });
+    expect(["SENDING", "NEAR", "PAUSED"]).toContain(state.state);
+
+    await openProviders(page, b);
+    const card = block(page);
+    await expect(card).toBeVisible();
+    await expect(card).toContainText(
+        "A higher plan lets you connect your own email",
+    );
+    await expect(
+        card.getByRole("link", { name: "Connect your email" }),
+    ).toHaveCount(0);
+    await expect(card.getByRole("link", { name: "See plans" })).toHaveAttribute(
+        "href",
+        "/settings/billing#change-plan",
+    );
+    await noSideways(page);
 });

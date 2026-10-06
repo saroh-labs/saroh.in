@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useId } from "react";
 
 import type { BookingEmails } from "@/lib/providers/booking-emails";
-import { CONTACT_EMAIL_HREF } from "@/lib/providers/booking-emails";
+import {
+    CONTACT_EMAIL_HREF,
+    SEE_PLANS_HREF,
+} from "@/lib/providers/booking-emails";
 
 /**
  * Settings → Providers' "Booking emails" block (DEC-086): Saroh sending the
@@ -13,7 +16,8 @@ import { CONTACT_EMAIL_HREF } from "@/lib/providers/booking-emails";
  * the month's allowance is used, who the customer sees it from and where
  * replies go. Above the Available group, never in Connected — Saroh is not
  * a provider the business connected. Its one action jumps to the first
- * email provider to connect.
+ * email provider to connect, or, on a plan with no room to connect one
+ * (DEC-086), to the plans.
  */
 
 const PILL = {
@@ -36,8 +40,9 @@ export function BookingEmailsBlock({
         return <PartialNotice>{emails.text}</PartialNotice>;
     }
     const b = emails.block;
-    // Near or at the cap, connecting is what the block asks for.
+    // Near or at the cap, the way out is what the block asks for.
     const urgent = b.tone !== "sending";
+    const variant = urgent ? "default" : "outline";
     return (
         <section aria-labelledby={id}>
             <h3
@@ -69,14 +74,16 @@ export function BookingEmailsBlock({
                             {b.body}
                         </p>
                     </div>
-                    {connectHref ? (
+                    {b.own === "connect" && connectHref ? (
                         <div className="shrink-0">
-                            <Button
-                                asChild
-                                size="sm"
-                                variant={urgent ? "default" : "outline"}
-                            >
+                            <Button asChild size="sm" variant={variant}>
                                 <a href={connectHref}>Connect your email</a>
+                            </Button>
+                        </div>
+                    ) : b.own === "upgrade" ? (
+                        <div className="shrink-0">
+                            <Button asChild size="sm" variant={variant}>
+                                <Link href={SEE_PLANS_HREF}>See plans</Link>
                             </Button>
                         </div>
                     ) : null}

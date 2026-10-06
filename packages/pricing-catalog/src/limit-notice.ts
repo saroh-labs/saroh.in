@@ -34,6 +34,13 @@ export interface LimitNoticeOptions {
      * a higher plan second and no add-on.
      */
     action?: LimitAction;
+    /**
+     * Whether the business can take `action` now (default true). false: it
+     * can't (Saroh's emails on a plan with no room to connect its own), so
+     * a higher plan leads with `action.closed`'s words and button. null:
+     * that couldn't be read, so neither is claimed — only the higher plan.
+     */
+    actionOpen?: boolean | null;
     /** When a monthly count starts again ("1 Nov"), said at the cap. */
     resetsOn?: string | null;
 }
@@ -49,7 +56,9 @@ export interface LimitNoticeOptions {
  *
  * A limit with its own way out (`options.action`, Saroh's emails) says it
  * first, a higher plan second, and offers no add-on; its button is the
- * action's. `options.resetsOn` says when a monthly count starts again.
+ * action's. When the business can't take it (`options.actionOpen`), the
+ * higher plan leads and the button is the plan picker's, still with no
+ * add-on. `options.resetsOn` says when a monthly count starts again.
  */
 export function limitNotice(
     access: Pick<ModuleAccess, "inc" | "limit" | "plan" | "upgradeTo"> &
@@ -69,6 +78,9 @@ export function limitNotice(
     // Storage counts in GB, so a count can have a fraction: one place.
     const used = formatCount(Math.round(n * 10) / 10);
     const { action } = options;
+    // An action the business can't take now isn't offered (DEC-086).
+    const open =
+        options.actionOpen === undefined || options.actionOpen === true;
     const again =
         full && options.resetsOn
             ? ` It starts again on ${options.resetsOn}.`
@@ -78,12 +90,18 @@ export function limitNotice(
         : soft
           ? `Nothing stops at ${formatCount(L)}; we'll let you know when you reach it.`
           : `You'll be stopped at ${formatCount(L)}.`;
-    // A limit's own way out comes first, a higher plan second, no add-on.
+    const higher = full ? "raises the limit" : "gives you more";
+    // A limit's own way out comes first, a higher plan second, no add-on;
+    // closed, the higher plan leads and says what it opens.
     const more = action
-        ? ` ${action.sentence}` +
-          (up
-              ? ` Or ${up} ${full ? "raises the limit" : "gives you more"}.`
-              : "")
+        ? open
+            ? ` ${action.sentence}` + (up ? ` Or ${up} ${higher}.` : "")
+            : up
+              ? ` ${up} ${higher}.` +
+                (options.actionOpen === false
+                    ? ` ${action.closed.sentence}`
+                    : "")
+              : ""
         : full
           ? up
               ? ` ${up} raises the limit, or add more with an add-on.`
@@ -100,8 +118,14 @@ export function limitNotice(
             ? `You've reached your ${formatCount(L)} ${what} on ${access.plan}`
             : `You've used ${used} of ${formatCount(L)} ${what} on ${access.plan}`,
         body: first + more,
-        cta: action ? action.label : up ? "Upgrade or add more" : "Add more",
-        ...(action ? { href: action.href } : {}),
+        cta: action
+            ? open
+                ? action.label
+                : action.closed.label
+            : up
+              ? "Upgrade or add more"
+              : "Add more",
+        ...(action && open ? { href: action.href } : {}),
         why:
             full && !soft
                 ? `You've reached your ${what} limit on ${access.plan}`

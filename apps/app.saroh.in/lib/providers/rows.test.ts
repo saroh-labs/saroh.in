@@ -417,6 +417,7 @@ describe("booking emails Saroh sends (DEC-086)", () => {
             state: "SENDING" | "NEAR" | "PAUSED";
             used: number;
             replyTo: string | null;
+            canConnectOwn: boolean | null;
         }> = {},
     ): SarohEmailState => ({
         state: over.state ?? "SENDING",
@@ -429,6 +430,8 @@ describe("booking emails Saroh sends (DEC-086)", () => {
         },
         replyTo:
             over.replyTo === undefined ? "hello@rye.example" : over.replyTo,
+        canConnectOwn:
+            over.canConnectOwn === undefined ? true : over.canConnectOwn,
     });
     const block = (view: ReturnType<typeof buildProvidersView>) => {
         const b = view.bookingEmails;
@@ -488,6 +491,70 @@ describe("booking emails Saroh sends (DEC-086)", () => {
         expect(b.tone).toBe("paused");
         expect(b.status).toBe("Paused until 1 Nov");
         expect(b.body).toContain("in their account on your site");
+    });
+
+    describe("when its plan has no room to connect its own email (DEC-086)", () => {
+        const higher =
+            "A higher plan lets you connect your own email, and then they go through it with no monthly limit.";
+
+        it("offers connecting when it can", () => {
+            const b = block(
+                buildProvidersView(input({ sarohEmail: sending() })),
+            );
+            expect(b.own).toBe("connect");
+            expect(b.body).toBe(
+                "Confirmed, moved and cancelled bookings, counted against your plan. Connect your own email and they go through it, with no monthly limit.",
+            );
+        });
+
+        it("offers seeing plans instead, in every state, and never Connect", () => {
+            const words = {
+                SENDING: `Confirmed, moved and cancelled bookings, counted against your plan. ${higher}`,
+                NEAR: `At 10, Saroh stops sending them until 1 Nov. ${higher}`,
+                PAUSED: `Saroh has sent all 10 booking emails your plan includes this month. Customers still see each booking update in their account on your site. ${higher}`,
+            } as const;
+            for (const [state, body] of Object.entries(words)) {
+                const b = block(
+                    buildProvidersView(
+                        input({
+                            sarohEmail: sending({
+                                state: state as keyof typeof words,
+                                used:
+                                    state === "SENDING"
+                                        ? 3
+                                        : state === "NEAR"
+                                          ? 8
+                                          : 10,
+                                canConnectOwn: false,
+                            }),
+                        }),
+                    ),
+                );
+                expect(b.own).toBe("upgrade");
+                expect(b.body).toBe(body);
+                expect(b.body).not.toMatch(/Connect your own email/);
+            }
+        });
+
+        it("claims neither when that couldn't be read", () => {
+            const b = block(
+                buildProvidersView(
+                    input({ sarohEmail: sending({ canConnectOwn: null }) }),
+                ),
+            );
+            expect(b.own).toBe("unread");
+            expect(b.body).toMatch(
+                /We couldn't read whether your plan lets you connect your own email\./,
+            );
+        });
+
+        it("offers connecting, as before, from an API that predates the field", () => {
+            const old: SarohEmailState = { ...sending() };
+            delete (old as { canConnectOwn?: boolean | null }).canConnectOwn;
+            expect(
+                block(buildProvidersView(input({ sarohEmail: old }))).own,
+            ).toBe("connect");
+        });
     });
 
     it("names what it couldn't read, and never shows a zero", () => {

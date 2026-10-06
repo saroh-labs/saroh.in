@@ -107,10 +107,36 @@ export function rowNotice(
         row.usage,
         words.what,
         words.paused,
-        // Saroh's emails lead with "Connect your email" (DEC-086).
-        { action: words.action },
+        // Saroh's emails lead with "Connect your email" where the plan has
+        // room to connect one, and with a higher plan where it hasn't (DEC-086).
+        {
+            action: words.action,
+            actionOpen: words.action
+                ? roomForOneMore(view, words.action.room)
+                : undefined,
+        },
     );
     return notice;
+}
+
+/**
+ * Whether one more of a row's things would get past the API's check now
+ * (`MeteringService.hasRoom`, the same decision as the write's), from the
+ * figures the access read gave: for an enforced catalogue business only.
+ * A row its version doesn't have is room, as the write goes ahead then; a
+ * count it couldn't give is null, never room.
+ */
+export function roomForOneMore(
+    view: BillingAccessView,
+    moduleId: string,
+): boolean | null {
+    const row = accessRow(view, moduleId);
+    if (!row) return true;
+    const soft = row.soft === true;
+    if (row.state !== "on") return soft;
+    if (row.limit === null) return true;
+    if (row.usage === null) return null;
+    return soft || row.usage + 1 <= row.limit;
 }
 
 /**

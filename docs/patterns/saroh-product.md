@@ -324,7 +324,11 @@ organizations/:org/customers`: everyone who has paid (an order through a
   three booking notices (confirmed, moved, cancelled) from `notify.saroh.in`
   when the shared rule allows. Each one counts against the plan's monthly
   allowance, and when the allowance is used or can't be read, Saroh sends
-  nothing (DEC-086). Otherwise Saroh-owned email is only for identity and
+  nothing (DEC-086). Connecting its own email provider comes with Grow and
+  Pro, not Free: the catalogue's `integrations` row decides, so Settings
+  and the allowance's notices offer "Connect your email" only where the
+  plan has room for one, and "See plans" otherwise — never a connect the
+  API would refuse (DEC-086, amended 6 Oct). Otherwise Saroh-owned email is only for identity and
   security mail, and for a template test sent to the signed-in user's own
   verified address. Consent gates every send.
 - **Adopted** — A simple WhatsApp deep link with a prefilled message is

@@ -69,19 +69,33 @@ export function limitNoticeWords(
     level: LimitLevel,
     /** When a monthly count starts again ("1 Nov"), for a limit that says so. */
     resetsOn?: string,
+    /**
+     * Whether the business can take the limit's own way out now
+     * (`limitNotice`'s `actionOpen`): false leads with a higher plan
+     * (Saroh's emails on a plan with no room to connect its own email),
+     * null claims neither. Default true.
+     */
+    actionOpen?: boolean | null,
 ): { title: string; body: string } {
     const words = METER_WORDS[key];
     const soft = row.soft === true;
     if (level === "over") {
-        // A limit with its own way out (Saroh's emails) offers no add-on.
+        const open = actionOpen === undefined || actionOpen === true;
+        const up = row.upgradeTo;
+        // A limit with its own way out (Saroh's emails) offers no add-on;
+        // closed, the higher plan leads, as in `limitNotice`.
         const more = words.action
-            ? `${words.action.sentence}${row.upgradeTo ? ` Or ${row.upgradeTo} raises the limit.` : ""}`
-            : row.upgradeTo
-              ? `${row.upgradeTo} raises the limit.`
+            ? open
+                ? `${words.action.sentence}${up ? ` Or ${up} raises the limit.` : ""}`
+                : up
+                  ? `${up} raises the limit.${actionOpen === false ? ` ${words.action.closed.sentence}` : ""}`
+                  : ""
+            : up
+              ? `${up} raises the limit.`
               : "An add-on gives you more.";
         return {
             title: `You're past your ${limit.toLocaleString("en-IN")} ${words.what} on ${row.plan}`,
-            body: `${overBody(key, soft)} ${more}`,
+            body: [overBody(key, soft), more].filter(Boolean).join(" "),
         };
     }
     // The shared rule words a soft cap too, so the inbox and the screen agree.
@@ -90,7 +104,7 @@ export function limitNoticeWords(
         used,
         words.what,
         words.paused,
-        { action: words.action, resetsOn },
+        { action: words.action, actionOpen, resetsOn },
     );
     if (!n.on) return { title: "", body: "" };
     return { title: n.title, body: n.body };
@@ -162,6 +176,16 @@ export class PlanLimitNoticeHandler {
             METER_WORDS[key].action && row.per === "month"
                 ? nextMonthStarts(now, zone)
                 : undefined;
+        // Its way out is closed when the plan has no room for it (Saroh's
+        // emails: connecting its own email is one more `integrations`
+        // connection, DEC-086), asked by the connect's own check; unread,
+        // neither is claimed.
+        const room = METER_WORDS[key].action?.room;
+        const actionOpen = room
+            ? await this.meter
+                  .hasRoom(p.organizationId, room, { now })
+                  .catch(() => null)
+            : undefined;
         const { title, body } = limitNoticeWords(
             row,
             key,
@@ -169,6 +193,7 @@ export class PlanLimitNoticeHandler {
             used,
             level,
             resetsOn,
+            actionOpen,
         );
         await prisma.$transaction(async (tx) => {
             const claim = await tx.customerNotice.createMany({

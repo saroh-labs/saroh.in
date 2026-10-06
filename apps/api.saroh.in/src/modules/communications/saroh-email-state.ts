@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
+import { planMeter } from "../billing/metering.service";
 import {
     limitLevel,
     nextMonthStarts,
@@ -37,7 +38,10 @@ import {
  *   it would hand the booking emails to Saroh — for the Disconnect warning.
  * - SENDING / NEAR (80% of the month's allowance used) / PAUSED (all of it):
  *   the month's count, the cap, the day it starts again, and who the email
- *   comes from and where replies go.
+ *   comes from and where replies go, and whether the business can connect
+ *   its own email now (`canConnectOwn`): its plan's `integrations` row,
+ *   read by the connect's own rule (`MeteringService.hasRoom`) — on Free
+ *   it can't, so Settings offers upgrading instead (DEC-086).
  * - UNREAD: a lookup failed, so nothing can be said either way — never a
  *   zero.
  */
@@ -59,6 +63,13 @@ export type SarohEmailState =
           sender: SarohSender;
           /** Where a customer's reply goes; null when no clean contact email. */
           replyTo: string | null;
+          /**
+           * Whether connecting its own email would go through now: the
+           * plan's `integrations` row has room for one more (enforcement
+           * off or off the catalogue: true, as the connect goes ahead).
+           * null when that couldn't be read: never claimed either way.
+           */
+          canConnectOwn: boolean | null;
       }
     | { state: "UNREAD" };
 
@@ -72,6 +83,12 @@ export interface SarohBusinessFacts {
 
 export interface SarohStateDeps extends SarohDeps {
     business: (organizationId: string) => Promise<SarohBusinessFacts>;
+    /**
+     * Whether connecting its own email provider would get past the
+     * connect's plan check now (`integrations`, one more connection);
+     * throws when the plan or the count can't be read.
+     */
+    ownEmailRoom: (organizationId: string, now: Date) => Promise<boolean>;
 }
 
 async function businessFacts(
@@ -99,6 +116,10 @@ async function businessFacts(
 export const defaultSarohStateDeps: SarohStateDeps = {
     ...defaultSarohDeps,
     business: businessFacts,
+    // The connect's own check (`CommunicationsService.connectProvider`):
+    // no email of its own is connected here, so it adds one.
+    ownEmailRoom: (organizationId, now) =>
+        planMeter.hasRoom(organizationId, "integrations", { now }),
 };
 
 type ProviderDb = Pick<Prisma.TransactionClient, "communicationProvider">;
@@ -138,9 +159,11 @@ export async function sarohEmailState(
     // The rule said yes only with a cap; said again so the type knows it.
     if (cap === null) return { state: "UNREAD" };
     try {
-        const [used, facts] = await Promise.all([
+        const [used, facts, canConnectOwn] = await Promise.all([
             deps.used(organizationId, now),
             deps.business(organizationId),
+            // Unread is its own answer, not the whole state's.
+            deps.ownEmailRoom(organizationId, now).catch(() => null),
         ]);
         const name = cleanBusinessName(facts.name, facts.slug);
         return {
@@ -159,6 +182,7 @@ export async function sarohEmailState(
                     SAROH_BUSINESS_FROM_DEFAULT,
             },
             replyTo: replyToAddress(facts.contactEmail),
+            canConnectOwn,
         };
     } catch {
         return { state: "UNREAD" };

@@ -1,13 +1,14 @@
 import type { Db } from "./helpers";
 import { id } from "./helpers";
-import { seedPlanId } from "./pricing";
+import { SEED_ENTRY_PLAN_ID, SEED_PLAN_ID, seedPlanId } from "./pricing";
 
 /**
- * Two of Asha's businesses that Saroh sends booking emails for (DEC-086):
+ * Three of Asha's businesses that Saroh sends booking emails for (DEC-086):
  * `providers-saroh-email.spec.ts` reads Settings → Providers' "Booking
  * emails" block on one per browser — desk and phone each connect and
- * disconnect an email of their own, so they can't share one. Nothing else
- * reads them.
+ * disconnect an email of their own, so they can't share one — on the
+ * catalogue's top plan, and only reads the third, on its entry plan, whose
+ * plan has no room to connect an email of its own. Nothing else reads them.
  *
  * The route needs what only staff set in production, through `/admin`: the
  * business's `SAROH_BUSINESS_EMAIL` flag on, plan limits enforced
@@ -24,8 +25,9 @@ import { seedPlanId } from "./pricing";
  * run starts from Saroh sending, with nowhere for replies to go.
  */
 export const SAROH_EMAIL_BUSINESSES = [
-    { key: "desk", name: "Asha's Pottery" },
-    { key: "phone", name: "Asha's Pottery" },
+    { key: "desk", name: "Asha's Pottery", plan: SEED_PLAN_ID },
+    { key: "phone", name: "Asha's Pottery", plan: SEED_PLAN_ID },
+    { key: "entry", name: "Asha's Pottery", plan: SEED_ENTRY_PLAN_ID },
 ] as const;
 
 const SET = "saroh-email";
@@ -73,10 +75,10 @@ export async function seedSarohEmailBusinesses(
             enabledByDefault: false,
         },
     });
-    // The sample catalogue's top plan, as every seeded business.
-    const planId = await seedPlanId(prisma, now);
-
     for (const b of SAROH_EMAIL_BUSINESSES) {
+        // The sample catalogue's top plan, as every seeded business, or its
+        // entry plan for the one that shows connecting locked.
+        const planId = await seedPlanId(prisma, now, b.plan);
         const orgId = id("org", SET, b.key);
         await prisma.organization.upsert({
             where: { id: orgId },

@@ -104,6 +104,12 @@ export type SarohEmailState =
           sender: { name: string; address: string };
           /** Where customers' replies go; null without a clean contact email. */
           replyTo: string | null;
+          /**
+           * Whether connecting its own email would go through now (its
+           * plan's `integrations` room, DEC-086); null when that couldn't
+           * be read. Absent from an API that predates it: offered, as before.
+           */
+          canConnectOwn?: boolean | null;
       }
     | { state: "UNREAD" };
 
@@ -148,7 +154,10 @@ function isSarohEmailState(body: unknown): body is SarohEmailState {
                 sender !== null &&
                 typeof sender.name === "string" &&
                 typeof sender.address === "string" &&
-                (b.replyTo === null || typeof b.replyTo === "string")
+                (b.replyTo === null || typeof b.replyTo === "string") &&
+                (b.canConnectOwn === undefined ||
+                    b.canConnectOwn === null ||
+                    typeof b.canConnectOwn === "boolean")
             );
         }
         default:

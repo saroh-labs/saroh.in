@@ -7,9 +7,10 @@ jest.mock("../../env", () => ({ env: mockEnv }));
 import type { Prisma } from "@saroh/database";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
 
+import { planMeter } from "../billing/metering.service";
 import { FlagKey } from "../feature-flags/flags";
 import type { SarohStateDeps } from "./saroh-email-state";
-import { sarohEmailState } from "./saroh-email-state";
+import { defaultSarohStateDeps, sarohEmailState } from "./saroh-email-state";
 
 function db(status: string | null = null) {
     return {
@@ -37,6 +38,8 @@ function deps(
         usedFails?: boolean;
         contactEmail?: string | null;
         name?: string;
+        /** Room to connect its own email; "fails" when unread. */
+        ownRoom?: boolean | "fails";
     } = {},
 ): SarohStateDeps {
     return {
@@ -69,6 +72,10 @@ function deps(
                     : over.contactEmail,
             zone: "Asia/Kolkata",
         }),
+        ownEmailRoom:
+            over.ownRoom === "fails"
+                ? jest.fn().mockRejectedValue(new Error("db down"))
+                : jest.fn().mockResolvedValue(over.ownRoom ?? true),
     };
 }
 
@@ -91,6 +98,7 @@ describe("sarohEmailState (DEC-086, U4)", () => {
                 address: "bookings@notify.saroh.in",
             },
             replyTo: "hello@rye.example",
+            canConnectOwn: true,
         });
     });
 
@@ -238,5 +246,48 @@ describe("sarohEmailState (DEC-086, U4)", () => {
                 deps({ rowFails: true }),
             ),
         ).toEqual({ state: "OFF", takesOver: false });
+    });
+
+    describe("whether it can connect its own email (canConnectOwn)", () => {
+        it("says yes or no in every sending state, as the plan's room says", async () => {
+            for (const used of [3, 8, 10]) {
+                for (const ownRoom of [true, false]) {
+                    const s = await sarohEmailState(
+                        db(),
+                        "org_1",
+                        NOW,
+                        deps({ used, ownRoom }),
+                    );
+                    expect(s).toMatchObject({ canConnectOwn: ownRoom });
+                }
+            }
+        });
+
+        it("is null, never yes, when the room can't be read; the rest still stands", async () => {
+            const s = await sarohEmailState(
+                db(),
+                "org_1",
+                NOW,
+                deps({ ownRoom: "fails" }),
+            );
+            expect(s).toMatchObject({
+                state: "SENDING",
+                used: 3,
+                canConnectOwn: null,
+            });
+        });
+
+        it("asks the connect's own check: one more `integrations` connection", async () => {
+            const spy = jest
+                .spyOn(planMeter, "hasRoom")
+                .mockResolvedValue(false);
+            expect(await defaultSarohStateDeps.ownEmailRoom("org_1", NOW)).toBe(
+                false,
+            );
+            expect(spy).toHaveBeenCalledWith("org_1", "integrations", {
+                now: NOW,
+            });
+            spy.mockRestore();
+        });
     });
 });
