@@ -208,6 +208,7 @@ describe("readSince", () => {
                 // Real orders only, as the Orders list counts them (H-3).
                 NOT: {
                     placedOnline: true,
+                    payOnHandover: false,
                     paymentStatus: "UNPAID",
                     paymentIntents: { none: { status: "SUCCEEDED" } },
                 },

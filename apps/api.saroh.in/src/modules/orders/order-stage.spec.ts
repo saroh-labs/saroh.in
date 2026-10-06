@@ -437,3 +437,41 @@ describe("the six types (order-stage over fulfilment.ts)", () => {
         ).toThrow("An order that is new cannot become sent.");
     });
 });
+
+describe("an order paid at the handover (site checkout, 2026-10-06)", () => {
+    const handover = (over: Partial<StageSubject> = {}) =>
+        order({ paymentStatus: "UNPAID", payOnHandover: true, ...over });
+
+    it("pick-up: is made before it is paid, and collected only once paid", () => {
+        let o = handover();
+        expect(nextStages(o)).toEqual(["PREPARING"]);
+        o = step(o, "PREPARING");
+        o = step(o, "READY");
+        // The handover waits for the money.
+        expect(nextStages(o)).toEqual([]);
+        expect(() => planStageMove(o, "COLLECTED")).toThrow(
+            "This order is paid when it's collected. Mark it paid first, then mark it collected.",
+        );
+        o = { ...o, paymentStatus: "PAID" };
+        expect(nextStages(o)).toEqual(["COLLECTED"]);
+        expect(step(o, "COLLECTED").status).toBe("DELIVERED");
+    });
+
+    it("local delivery: goes out before it is paid, delivered only once paid", () => {
+        let o = handover({ fulfilment: "LOCAL_DELIVERY" });
+        o = step(o, "PREPARING");
+        o = step(o, "READY");
+        o = step(o, "OUT_FOR_DELIVERY");
+        expect(o.status).toBe("SHIPPED");
+        expect(() => planStageMove(o, "DELIVERED")).toThrow(ConflictException);
+        expect(() => planStageMove(o, "DELIVERED")).toThrow(
+            "This order is paid on delivery. Mark it paid first, then mark it delivered.",
+        );
+    });
+
+    it("leaves every other unpaid order waiting in New, as before", () => {
+        const o = order({ paymentStatus: "UNPAID" });
+        expect(nextStages(o)).toEqual([]);
+        expect(() => planStageMove(o, "PREPARING")).toThrow(ConflictException);
+    });
+});

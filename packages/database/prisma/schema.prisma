@@ -1638,6 +1638,14 @@ model Order {
   // list). Null for every order never renumbered.
   renumberedFrom String?
 
+  // Placed at the site's checkout to be paid when it is handed over: "Pay
+  // when you collect" or "Pay on delivery" (2026-10-06). Such an order is a
+  // real order from the moment it is made, as a staff pay-later order is: it
+  // promises its units at once, shows in Orders as not paid yet, never
+  // closes as an abandoned checkout, and is marked paid by staff. False for
+  // every other order, and every order before it.
+  payOnHandover Boolean @default(false)
+
   @@unique([storeId, orderId])
   @@unique([storeId, checkoutKey])
   @@index([storeId])
@@ -2073,6 +2081,14 @@ model StoreSettings {
   // storefront's. Store customers from before it was set stay as they
   // are, so turning it on never re-links a pair that already existed.
   linkSameEmailSince DateTime?
+
+  // "Pay when you collect" and "Pay on delivery" at the site's checkout
+  // (2026-10-06, the owner's rule: online needs a paid plan, Free takes money
+  // offline). On a plan without online payments the checkout always offers
+  // them — it is the only way to pay there — so this is read only where the
+  // plan takes money online: on, the checkout shows them beside paying
+  // online; off (the default, and every existing storefront's), online only.
+  offerPayOnHandover Boolean @default(false)
 }
 
 model StoreFeatures {

@@ -264,7 +264,9 @@ orgId)` (`organizations/organization-kind.ts`).
   new online payment or subscription starts, through
   `billing/online-payments-plan.ts`: a first provider connection, a pay
   link that charges (invoice, order, booking), a workspace intent, the
-  site's checkout (`checkoutReadiness` reason `plan`), the booking page,
+  site's checkout (`checkoutReadiness`: online off, so it takes payment at
+  the handover instead — "Free takes money offline", 2026-10-06), the
+  booking page,
   packs, plan joins, and subscribing someone. The business hears 403
   `MODULE_LOCKED`; a customer hears 409 `NOT_PAID_ONLINE` naming no plan.
   Renewals never ask: the renewal and charge jobs, a renewal invoice's pay

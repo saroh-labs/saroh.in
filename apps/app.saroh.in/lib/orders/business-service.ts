@@ -70,6 +70,11 @@ export interface OrderRow extends FulfilmentFields {
     stage: string;
     standing: OrderStanding;
     payment: PaymentStanding;
+    /**
+     * Placed on the website to be paid when it is collected or delivered
+     * ("Pay when you collect", "Pay on delivery"). Absent from an older API.
+     */
+    payOnHandover?: boolean;
     currency: string;
     /**
      * Left out of the kitchen's view: a Member reaches the list through

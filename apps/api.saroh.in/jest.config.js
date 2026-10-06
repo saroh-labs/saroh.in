@@ -220,6 +220,10 @@ module.exports = {
         // Whether the site can take an online order, with the plan's say
         // over online payments — DB-free.
         "<rootDir>/src/modules/orders/checkout-readiness.spec.ts",
+        // Paying at the handover at the site's checkout (2026-10-06): the
+        // order's write and the service's choice, with a mocked database.
+        "<rootDir>/src/modules/orders/offline-checkout-order.spec.ts",
+        "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",

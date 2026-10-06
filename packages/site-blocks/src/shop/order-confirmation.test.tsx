@@ -30,9 +30,38 @@ const ORDER: OrderConfirmationData = {
         deliverTo: null,
     },
     refunded: false,
+    toPay: null,
 };
 
 describe("OrderConfirmation (P4)", () => {
+    it("says an order paid at the handover is placed and still to pay", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: { ...ORDER, toPay: "Pay when you collect" },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "Thank you — your order is placed",
+            }),
+        ).toBeTruthy();
+        expect(
+            screen.getByText(
+                "You'll pay when you collect your order. Rye & Co. will be in touch when it's ready.",
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.getByText("To pay when you collect").nextElementSibling
+                ?.textContent,
+        ).toBe("₹680");
+        expect(screen.queryByText("Paid")).toBeNull();
+    });
+
     it("shows the order: its number, lines, total and where to pick it up", () => {
         render(
             <OrderConfirmation

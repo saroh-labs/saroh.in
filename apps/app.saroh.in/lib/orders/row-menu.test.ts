@@ -539,3 +539,44 @@ describe("Order Detail, opened from the list", () => {
         expect(arrivalOf({ print: "0" })).toBeNull();
     });
 });
+
+describe("an order paid at the handover (website, 2026-10-06)", () => {
+    const unpaid = { paymentStatus: "UNPAID", payment: "UNPAID" as const };
+
+    it("moves on before it is paid, as far as the handover", () => {
+        const fresh = row({
+            ...unpaid,
+            payOnHandover: true,
+            status: "PENDING",
+            stage: "NEW",
+            stepIndex: 0,
+        });
+        expect(rowNext(fresh)).toMatchObject({
+            step: { to: "PREPARING" },
+            disabled: null,
+        });
+        const ready = row({
+            ...unpaid,
+            payOnHandover: true,
+            stage: "READY",
+            stepIndex: 2,
+        });
+        expect(rowNext(ready)).toMatchObject({
+            step: { to: "COLLECTED" },
+            disabled: "Not paid yet.",
+        });
+    });
+
+    it("leaves every other unpaid order waiting in New", () => {
+        expect(
+            rowNext(
+                row({
+                    ...unpaid,
+                    status: "PENDING",
+                    stage: "NEW",
+                    stepIndex: 0,
+                }),
+            ).disabled,
+        ).toBe("Not paid yet.");
+    });
+});

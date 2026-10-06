@@ -157,16 +157,28 @@ export function rowAge(
 }
 
 /**
+ * How an order placed on the website to be paid on handover is settled:
+ * "pay on collection" for a pick-up, "pay on delivery" otherwise.
+ */
+export function payOnHandoverWords(fulfilmentType: string | undefined): string {
+    return fulfilmentType === "PICKUP"
+        ? "pay on collection"
+        : "pay on delivery";
+}
+
+/**
  * The row's money, only when the API sent it: a caller without `order:read`
  * (the kitchen, DEC-024) gets neither the total nor what is unpaid, and the
  * row draws neither. "₹480 unpaid" only while there is something to collect
- * on an order that still stands.
+ * on an order that still stands; "₹480 to pay on collection" when the
+ * customer chose to pay at the handover on the website.
  */
 export function rowMoney(
     row: Pick<
         OrderRow,
         "total" | "unpaidAmount" | "currency" | "payment" | "standing"
-    >,
+    > &
+        Partial<Pick<OrderRow, "payOnHandover" | "fulfilmentType">>,
 ): { total: string | null; unpaid: string | null } {
     const total =
         row.total === undefined
@@ -179,7 +191,9 @@ export function rowMoney(
         row.payment === "UNPAID" &&
         stands &&
         owed > 0
-            ? `${formatMoneyMajor(row.unpaidAmount, row.currency)} unpaid`
+            ? row.payOnHandover
+                ? `${formatMoneyMajor(row.unpaidAmount, row.currency)} to ${payOnHandoverWords(row.fulfilmentType)}`
+                : `${formatMoneyMajor(row.unpaidAmount, row.currency)} unpaid`
             : null;
     return { total, unpaid };
 }

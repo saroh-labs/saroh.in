@@ -8,6 +8,7 @@ import type {
     QuotedLine,
 } from "./checkout-quote";
 import { buildQuote, quoteLines } from "./checkout-quote";
+import { payableWays } from "./checkout-readiness";
 import type { StorefrontFulfilmentType } from "./fulfilment";
 import { NEW_STOREFRONT_TYPES, storefrontTypesOf } from "./fulfilment";
 
@@ -56,11 +57,16 @@ export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
     };
 }
 
-/** The bag priced from the storefront's listings and shelves. */
+/**
+ * The bag priced from the storefront's listings and shelves. With how the
+ * storefront can be paid (`pays`), only the ways an order can be paid for
+ * are offered: paying on handover alone can't pay for a shipment.
+ */
 export async function priceBag(
     scope: ShopScope,
     bag: BagLine[],
     asked: StorefrontFulfilmentType | null,
+    pays?: { online: boolean; onHandover: boolean },
 ): Promise<{
     quote: CheckoutQuote;
     lines: QuotedLine[];
@@ -158,7 +164,7 @@ export async function priceBag(
     const quote = buildQuote({
         currency: settings.currency,
         lines,
-        storefrontWays: settings.ways,
+        storefrontWays: pays ? payableWays(pays, settings.ways) : settings.ways,
         fees: settings.fees,
         asked,
     });

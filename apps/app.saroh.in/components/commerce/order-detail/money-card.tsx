@@ -40,7 +40,10 @@ export function MoneyCard({
     payLink,
     way,
     appointment = false,
+    handover,
 }: {
+    /** Still to be paid at the handover: "collection" or "delivery". */
+    handover?: "collection" | "delivery";
     money: OrderReadMoney;
     /** It goes to an address (a local delivery or a shipment). */
     delivery: boolean;
@@ -97,7 +100,9 @@ export function MoneyCard({
             ? "Online payment"
             : paymentStatus === "FAILED"
               ? "Didn't go through"
-              : "Not paid yet";
+              : handover
+                ? `Pay on ${handover}`
+                : "Not paid yet";
     const pay: [string, string][] = [["Paid by", paidBy]];
     const refund = refundLines(money, refundStanding, format);
     if (n(money.paid) > 0) pay.push(["Taken", format(n(money.paid))]);

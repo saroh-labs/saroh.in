@@ -83,6 +83,9 @@ module.exports = {
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
         // P4: the order confirmation's view, pure.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
+        // Paying at the handover (2026-10-06): mocked database, unit project.
+        "<rootDir>/src/modules/orders/offline-checkout-order.spec.ts",
+        "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",

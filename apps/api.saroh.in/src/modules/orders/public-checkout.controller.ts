@@ -22,12 +22,12 @@ import {
     SITE_RELAY_HEADER,
     visitorKey,
 } from "../site-accounts/site-relay";
-import type { CheckoutQuote } from "./checkout-quote";
 import { CheckoutQuoteDto, CheckoutStartDto } from "./checkout.dto";
 import type {
     CheckoutOptions,
     CheckoutStanding,
     CheckoutStarted,
+    PricedBag,
 } from "./public-checkout.service";
 import { PublicCheckoutService } from "./public-checkout.service";
 
@@ -36,10 +36,11 @@ import { PublicCheckoutService } from "./public-checkout.service";
  *
  * - `GET  …/checkout/options` — whether this site can take an online order
  *   now, and the ways it leaves. No session.
- * - `POST …/checkout/quote` — the bag priced from listings. Writes nothing,
- *   needs no session.
+ * - `POST …/checkout/quote` — the bag priced from listings, and how the
+ *   chosen way can be paid. Writes nothing, needs no session.
  * - `POST …/checkout` — behind {@link CustomerSessionGuard}: the unpaid
- *   online order and its intent, idempotent on the sheet's key.
+ *   online order and its intent, or the order to be paid on handover,
+ *   idempotent on the sheet's key.
  * - `GET  …/checkout/orders/:orderId` — how a checkout this customer
  *   started stands, while the sheet waits on the payment.
  *
@@ -79,7 +80,7 @@ export class PublicCheckoutController {
         @Body() dto: CheckoutQuoteDto,
         @Ip() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
-    ): Promise<CheckoutQuote> {
+    ): Promise<PricedBag> {
         return this.checkout.quote(siteId, dto, visitorKey(ip, relay));
     }
 

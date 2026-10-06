@@ -7,6 +7,7 @@ import { splitName } from "../bookings/reservation";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { ShopScope } from "./checkout-bag";
 import type { QuotedLine } from "./checkout-quote";
 import type { CheckoutStartDto } from "./checkout.dto";
@@ -19,7 +20,9 @@ import {
     CLOSE_ABANDONED_CHECKOUT_TYPE,
     closeCheckoutInTx,
     MAX_OPEN_CHECKOUTS,
+    PAY_ON_HANDOVER_WAITING,
 } from "./online-checkout";
+import { applyInventoryTransition } from "./order-inventory";
 import { fromCents, withGstRates } from "./order-pricing";
 
 /** The signed-in site account a checkout is for (ADR-011). */
@@ -34,11 +37,18 @@ export interface SiteAccount {
 
 /**
  * The order, in one transaction at the sells-from storefront: PENDING,
- * UNPAID and `placedOnline`, each line priced from its listing and
- * holding nothing, for the account's store customer at that storefront —
- * linked to the account's contact (`SITE_ACCOUNT`, no team member) when
- * it has no link yet. Its close a day later is written in the same
- * transaction.
+ * UNPAID and `placedOnline`, each line priced from its listing, for the
+ * account's store customer at that storefront — linked to the account's
+ * contact (`SITE_ACCOUNT`, no team member) when it has no link yet.
+ *
+ * Paid online, its lines hold nothing until the payment lands, and its
+ * close a day later is written in the same transaction. Paid on handover
+ * ("Pay when you collect", "Pay on delivery"), it is made as a staff
+ * pay-later order is (DEC-032's "when stock is promised"): its lines
+ * promise their units now — refused past what the storefront can sell —
+ * it never closes on its own, and the team is told of it at once. Its
+ * invoice is made when staff mark it paid (DEC-023), as a pay-later
+ * order's is.
  */
 export async function createCheckoutOrder(
     scope: ShopScope,
@@ -49,9 +59,12 @@ export async function createCheckoutOrder(
         shippingCents: number;
         currency: string;
         dto: CheckoutStartDto;
+        /** Paid when it is collected or delivered, not online. */
+        payOnHandover?: boolean;
     },
 ): Promise<string> {
     const { lines, type, shippingCents, dto } = input;
+    const onHandover = input.payOnHandover === true;
     const storeId = scope.storefront.id;
     const sold = lines.flatMap((l) =>
         l.productId
@@ -88,7 +101,8 @@ export async function createCheckoutOrder(
             return await prisma.$transaction(async (tx) => {
                 // The plan's monthly orders cap is soft here (U13, OQ-8):
                 // the site never turns a customer away; at the cap the
-                // business is told instead. It counts once paid (OQ-7).
+                // business is told instead. It counts once paid (OQ-7), or
+                // from the start when it is paid on handover.
                 await planMeter.roomInTx(tx, scope.organizationId, "orders", {
                     soft: true,
                 });
@@ -129,12 +143,15 @@ export async function createCheckoutOrder(
                 // A new checkout replaces the account's older unpaid ones
                 // here: a changed bag makes a new one, and must not pile up
                 // checkouts until the cap locks the customer out. A payment
-                // that still reaches a closed one is refunded (DEC-032).
+                // that still reaches a closed one is refunded (DEC-032). An
+                // order to be paid on handover is a real order, never
+                // replaced.
                 const older = await tx.order.findMany({
                     where: {
                         storeId,
                         customerId: customer.id,
                         placedOnline: true,
+                        payOnHandover: false,
                         status: "PENDING",
                         paymentStatus: { in: ["UNPAID", "FAILED"] },
                     },
@@ -144,11 +161,17 @@ export async function createCheckoutOrder(
                 for (const o of older) {
                     await closeCheckoutInTx(tx, o.id, CHECKOUT_REPLACED);
                 }
+                // At most a few at once, business-wide: unpaid online
+                // checkouts, or — since each holds its units — orders
+                // waiting to be paid on handover, each counted on its own.
                 const open = await tx.order.count({
                     where: {
                         organizationId: scope.organizationId,
                         placedOnline: true,
-                        status: "PENDING",
+                        payOnHandover: onHandover,
+                        status: onHandover
+                            ? { in: ["PENDING", "PROCESSING"] }
+                            : "PENDING",
                         paymentStatus: { in: ["UNPAID", "FAILED"] },
                         customer: {
                             email: {
@@ -159,7 +182,12 @@ export async function createCheckoutOrder(
                     },
                 });
                 if (open >= MAX_OPEN_CHECKOUTS) {
-                    throw new HttpException(CHECKOUT_OPEN_ALREADY, 429);
+                    throw new HttpException(
+                        onHandover
+                            ? PAY_ON_HANDOVER_WAITING
+                            : CHECKOUT_OPEN_ALREADY,
+                        429,
+                    );
                 }
                 // Linked to the account's contact, unless it already
                 // stands for someone (staff linked it, or a payment did).
@@ -198,6 +226,7 @@ export async function createCheckoutOrder(
                         fulfilment: storedValueFor(type),
                         notes: dto.notes ?? null,
                         placedOnline: true,
+                        payOnHandover: onHandover,
                         checkoutKey: dto.key,
                         // The account's Orders find it by this (A7).
                         customerAccountId: account.accountId,
@@ -212,7 +241,8 @@ export async function createCheckoutOrder(
                                   deliveryPostalCode: address.postalCode,
                               }
                             : {}),
-                        // No stockRow: nothing is held until it is paid.
+                        // Paid online: no stockRow, nothing is held until
+                        // it is paid. On handover: held just below.
                         items: {
                             create: sold.map((l) => ({
                                 productId: l.productId,
@@ -222,8 +252,27 @@ export async function createCheckoutOrder(
                             })),
                         },
                     },
-                    select: { id: true },
+                    select: { id: true, items: { select: { id: true } } },
                 });
+                if (onHandover) {
+                    // Promised now, as a staff pay-later order's units are
+                    // (DEC-032); the last unit gone meanwhile refuses the
+                    // order (409) and nothing is written.
+                    await applyInventoryTransition(
+                        tx,
+                        order.items,
+                        "RELEASED",
+                        "RESERVED",
+                    );
+                    // The team's "New order" (F14), now: no payment is
+                    // coming to tell them.
+                    await enqueueTeamAlert(tx, scope.organizationId, {
+                        event: "order",
+                        orderId: order.id,
+                        actorUserId: null,
+                    });
+                    return order.id;
+                }
                 await tx.job.create({
                     data: {
                         organizationId: scope.organizationId,

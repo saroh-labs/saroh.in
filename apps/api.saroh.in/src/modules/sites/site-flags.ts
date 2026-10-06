@@ -714,11 +714,11 @@ export interface ShopFlagInput {
     /** Whether a path is the shop's address or under it. */
     isShopPath: (path: string) => boolean;
     /**
-     * Why the chosen storefront can't take an online order now (G13), or
-     * null when it can (or none is chosen).
+     * Why the chosen storefront can't take an order at the site's checkout
+     * now (G13), or null when it can (or none is chosen).
      */
     cantTakeOrders?: {
-        reason: "paused" | "no-provider" | "plan";
+        reason: "paused" | "no-provider";
         message: string;
     } | null;
 }

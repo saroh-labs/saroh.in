@@ -75,6 +75,12 @@ export interface OrderRowDto extends FulfilmentView, LateView {
     standing: ReturnType<typeof orderStanding>;
     /** Paid, not paid yet, partly refunded or refunded. */
     payment: PaymentStanding;
+    /**
+     * Placed at the site's checkout to be paid when it is collected or
+     * delivered: the row says "pay on collection" or "pay on delivery"
+     * while it is not paid yet.
+     */
+    payOnHandover: boolean;
     currency: string;
     /** Only with `order:read`. */
     total?: string;
@@ -118,6 +124,8 @@ export interface RawOrderRow {
     walkInPhone?: string | null;
     status: string;
     paymentStatus: string;
+    /** Absent where it isn't loaded: read as false. */
+    payOnHandover?: boolean;
     stage: string;
     fulfilment: string;
     currency: string;
@@ -257,6 +265,7 @@ export function serializeOrderRow(
         ),
         standing: orderStanding(order.status, order.paymentStatus),
         payment: paymentStandingOf(order.paymentStatus, captured, refunded),
+        payOnHandover: order.payOnHandover ?? false,
         currency: order.currency,
         ...(view.money
             ? {

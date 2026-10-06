@@ -123,6 +123,11 @@ export function ChangeCard({
  * step). Saroh sends no messages, so this says nothing was sent — and offers
  * what the counter can do: record cash taken for it, or, when a payment
  * didn't go through, a pay link to copy and send (B11).
+ *
+ * An order the customer chose to pay at the handover on the website
+ * (`handover`) isn't blocked: it is made and brought as usual, and only its
+ * handover waits for the money. The banner says so, without alarm, and
+ * offers to mark it paid.
  */
 export function PaymentBanner({
     failed,
@@ -131,6 +136,7 @@ export function PaymentBanner({
     onCash,
     onSendLink,
     sending = false,
+    handover,
 }: {
     failed: boolean;
     first: string;
@@ -139,7 +145,39 @@ export function PaymentBanner({
     /** Make (or replace) the pay link — only when one can be made. */
     onSendLink?: () => void;
     sending?: boolean;
+    /** Paid at the handover: how ("collection" or "delivery"). */
+    handover?: "collection" | "delivery";
 }) {
+    if (handover && !failed) {
+        return (
+            <div
+                role="status"
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted px-4 py-[13px]"
+            >
+                <div className="min-w-0 flex-[1_1_260px]">
+                    <div className="text-[13.5px] font-bold">
+                        {handover === "collection"
+                            ? "Pay on collection"
+                            : "Pay on delivery"}
+                    </div>
+                    <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                        {handover === "collection"
+                            ? `${first} chose to pay when they collect it. Prepare it as usual, take the money at the counter, then mark it paid before marking it collected.`
+                            : `${first} chose to pay on delivery. Prepare and send it as usual, take the money at the door, then mark it paid before marking it delivered.`}
+                    </p>
+                </div>
+                {canRecord ? (
+                    <Button
+                        type="button"
+                        className={actionClass("primary")}
+                        onClick={onCash}
+                    >
+                        Mark paid
+                    </Button>
+                ) : null}
+            </div>
+        );
+    }
     const link = failed && onSendLink !== undefined;
     return (
         <div

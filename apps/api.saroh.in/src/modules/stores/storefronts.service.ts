@@ -17,6 +17,7 @@ import {
 } from "../audit/audit.service";
 import { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
+import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type {
     LateThresholds,
     StorefrontFulfilmentType,
@@ -103,6 +104,15 @@ export interface StorefrontSettings extends StorefrontSummary {
     lateAfterMinutes: LateThresholds;
     tipsEnabled: boolean;
     guestCheckout: boolean;
+    /**
+     * "Pay when you collect" and "Pay on delivery" at the site's checkout,
+     * beside paying online. Read only where the plan takes money online:
+     * on a plan without it (`onlinePaymentsPlan` false) the checkout always
+     * offers them, as the only way to pay.
+     */
+    offerPayOnHandover: boolean;
+    /** Whether the business's plan takes payment online. */
+    onlinePaymentsPlan: boolean;
     /** ISO, when paused; `null` while taking payments. */
     pausedAt: string | null;
     /** The site checkout's flat delivery fees (G13); `null` is free. */
@@ -205,6 +215,7 @@ export class StorefrontsService {
             onHand,
             promised,
             siteShop,
+            onlinePaymentsPlan,
         ] = await Promise.all([
             prisma.storeSettings.findUnique({ where: { storeId } }),
             prisma.order.count({
@@ -236,6 +247,9 @@ export class StorefrontsService {
             // Only whether to ask for the website's delivery fees: a flag
             // that can't be read hides them rather than the screen.
             shopRolloutOn(organizationId).catch(() => false),
+            // Only which words the pay-on-handover switch wears: a plan
+            // that can't be read shows the switch.
+            planTakesOnlinePayment(organizationId).catch(() => true),
         ]);
         const connected = providers.filter((p) => p.status === "CONNECTED");
         const named = settings?.checkoutProvider ?? null;
@@ -272,6 +286,8 @@ export class StorefrontsService {
             lateAfterMinutes: lateThresholdsOf(settings),
             tipsEnabled: settings?.tipsEnabled ?? false,
             guestCheckout: settings?.guestCheckout ?? true,
+            offerPayOnHandover: settings?.offerPayOnHandover ?? false,
+            onlinePaymentsPlan,
             pausedAt: settings?.pausedAt?.toISOString() ?? null,
             paused: Boolean(settings?.pausedAt),
             localDeliveryFee: settings?.localDeliveryFee
@@ -380,6 +396,9 @@ export class StorefrontsService {
                 : {}),
             ...(dto.guestCheckout !== undefined
                 ? { guestCheckout: dto.guestCheckout }
+                : {}),
+            ...(dto.offerPayOnHandover !== undefined
+                ? { offerPayOnHandover: dto.offerPayOnHandover }
                 : {}),
             // Pausing twice keeps the first time it was paused.
             ...(dto.paused !== undefined
