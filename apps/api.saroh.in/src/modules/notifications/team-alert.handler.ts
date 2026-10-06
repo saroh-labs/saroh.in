@@ -12,7 +12,7 @@ import { orderPartyName } from "../orders/walk-in";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
-import type { TeamAlertPayload } from "./team-alerts";
+import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
 
@@ -28,27 +28,7 @@ export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live";
 
 type Tx = Prisma.TransactionClient;
 
-/** An alert, worded. */
-export interface WordedAlert {
-    event: AlertEvent;
-    /** Unique per business: claimed once, so the alert goes out once. */
-    eventKey: string;
-    /** The inbox notice already written (a booking's), or null to write one. */
-    notificationId: string | null;
-    type: string;
-    title: string;
-    body: string;
-    /** Where it opens in the workspace, for the email. */
-    path: string | null;
-    /** Not emailed about their own doing. */
-    skipUserId: string | null;
-    /**
-     * Emailed whatever they chose, while still on the team: whoever
-     * scheduled a go-live hears how it went (DEC-071, T10).
-     */
-    alwaysUserId?: string | null;
-    orderId?: string;
-}
+export type { WordedAlert } from "./team-alerts";
 
 /** What a row is called in the grid, for the email's footer. */
 const ROW_LABEL: Record<AlertEvent, string> = {

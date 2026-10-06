@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import type { AlertEvent } from "./alert-preferences";
 
 /**
  * The team's alerts (round-2 F14): what a producer writes, inside its own
@@ -72,4 +73,29 @@ export async function enqueueTeamAlert(
             ...(runAt ? { runAt } : {}),
         },
     });
+}
+
+/**
+ * An alert, worded. Here rather than in the handler so a wording module
+ * (`uncollected-alert.ts`) can use it without importing the handler back.
+ */
+export interface WordedAlert {
+    event: AlertEvent;
+    /** Unique per business: claimed once, so the alert goes out once. */
+    eventKey: string;
+    /** The inbox notice already written (a booking's), or null to write one. */
+    notificationId: string | null;
+    type: string;
+    title: string;
+    body: string;
+    /** Where it opens in the workspace, for the email. */
+    path: string | null;
+    /** Not emailed about their own doing. */
+    skipUserId: string | null;
+    /**
+     * Emailed whatever they chose, while still on the team: whoever
+     * scheduled a go-live hears how it went (DEC-071, T10).
+     */
+    alwaysUserId?: string | null;
+    orderId?: string;
 }

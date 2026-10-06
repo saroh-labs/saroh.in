@@ -9,8 +9,7 @@ import {
     uncollectedFrom,
 } from "../orders/uncollected";
 import { orderPartyName } from "../orders/walk-in";
-import type { WordedAlert } from "./team-alert.handler";
-import type { TeamAlertPayload } from "./team-alerts";
+import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { enqueueTeamAlert } from "./team-alerts";
 
 /** The inbox notice an uncollected order writes; on the New order row. */
