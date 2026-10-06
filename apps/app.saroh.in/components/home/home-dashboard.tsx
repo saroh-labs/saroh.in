@@ -3,8 +3,14 @@ import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
 import { Home } from "lucide-react";
 import Link from "next/link";
 
+import { upgradeHref } from "@/lib/billing/access";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
-import { firstRunJobs, onButNotOpen } from "@/lib/home/first-run";
+import {
+    firstRunJobs,
+    heldByPlan,
+    mayManageModules,
+    onButNotOpen,
+} from "@/lib/home/first-run";
 import { formatList, nextLine } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
 import { showsWeek, weekRows } from "@/lib/home/week";
@@ -193,6 +199,51 @@ function FirstRun({
                 icon={<Home aria-hidden />}
                 title="Nothing here is open to you yet"
                 description={`${businessName} runs on Saroh, but your role doesn't reach any of it yet. An owner or admin can change what you can reach, in Team.`}
+            />
+        );
+    }
+
+    const manages = mayManageModules(modules);
+
+    // Turned on, but the plan holds it (#837): the business did pick, so
+    // "has not picked" would be false. The owner gets the way to a plan
+    // that has it; anyone else, who changes it.
+    if (heldByPlan(modules)) {
+        return (
+            <EmptyState
+                icon={<Home aria-hidden />}
+                title="What's turned on isn't in your plan"
+                description={
+                    manages
+                        ? `${businessName} has picked what Saroh does for it, but its plan doesn't include it yet. Nothing is lost; it's all here when the plan does.`
+                        : `${businessName} has picked what Saroh does for it, but its plan doesn't include it yet. The owner can change the plan in Settings › Plan and billing.`
+                }
+                action={
+                    manages ? (
+                        <Button asChild variant="brand">
+                            <Link href={upgradeHref()}>See plans</Link>
+                        </Button>
+                    ) : undefined
+                }
+            />
+        );
+    }
+
+    // Someone who may turn things on is never told to wait for someone who
+    // manages it (#837): it's them. The full list is theirs.
+    if (manages) {
+        return (
+            <EmptyState
+                icon={<Home aria-hidden />}
+                title="Nothing is turned on yet"
+                description={`Pick what Saroh does for ${businessName}. Each one adds its own rows to the sidebar, and nothing is lost if you turn it off again.`}
+                action={
+                    <Button asChild variant="brand">
+                        <Link href="/settings/modules">
+                            Choose what it does
+                        </Link>
+                    </Button>
+                }
             />
         );
     }
