@@ -19,7 +19,7 @@ const svc = (depositMode: DepositMode, priceCents: number | null = 80_000) => ({
     depositMode,
 });
 
-describe("whether a service can be booked online (DEC-088, #821)", () => {
+describe("what happens when a service is booked online (DEC-088, DEC-089, #821)", () => {
     it("Both with a provider: every service can", () => {
         for (const mode of [
             "NONE",
@@ -31,12 +31,56 @@ describe("whether a service can be booked online (DEC-088, #821)", () => {
         }
     });
 
-    it("a deposit with no provider: says so, with a link to Settings › Providers", () => {
+    it("Both, a deposit with no provider: paid at the desk for now, linking to Settings › Providers (DEC-089)", () => {
         const problem = onlineBookingProblem(
             svc("PERCENT_50"),
             view("BOTH", "NO_PROVIDER"),
         );
         expect(problem).toEqual({
+            blocked: false,
+            text: "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book.",
+            line: "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book.",
+            fix: {
+                href: "/settings/providers",
+                label: "Connect one in Settings › Providers",
+            },
+        });
+    });
+
+    it("Both, a deposit with Payments switched off: paid at the desk, the fix is turning Payments on", () => {
+        expect(
+            onlineBookingProblem(
+                svc("PERCENT_25"),
+                view("BOTH", "PAYMENTS_OFF"),
+            ),
+        ).toMatchObject({
+            blocked: false,
+            text: "Paid at the desk for now: Payments is switched off, so nothing is taken when people book.",
+            fix: { href: "/settings/modules", label: "Turn on Payments" },
+        });
+    });
+
+    it("a deposit when the business takes payment at the desk only: paid at the desk, the fix is the booking rule", () => {
+        for (const blocker of [null, "NO_PROVIDER"] as const) {
+            expect(
+                onlineBookingProblem(svc("PERCENT_50"), view("DESK", blocker)),
+            ).toEqual({
+                blocked: false,
+                text: "Paid at the desk: your booking rules take payment at the desk only, so nothing is taken when people book.",
+                line: "Paid at the desk: your booking rules take payment at the desk only, so nothing is taken when people book.",
+                fix: {
+                    href: "/bookings/availability",
+                    label: "Change it in Booking rules",
+                },
+            });
+        }
+    });
+
+    it("online only, a deposit with no provider: can't be booked online", () => {
+        expect(
+            onlineBookingProblem(svc("FULL"), view("ONLINE", "NO_PROVIDER")),
+        ).toEqual({
+            blocked: true,
             text: "People can't book this online: it takes payment when they book, and no payment provider is connected.",
             line: "Can't be booked online: it takes payment when they book, and no payment provider is connected.",
             fix: {
@@ -45,37 +89,14 @@ describe("whether a service can be booked online (DEC-088, #821)", () => {
             },
         });
         expect(
-            onlineBookingProblem(svc("FULL"), view("ONLINE", "NO_PROVIDER")),
-        ).toMatchObject({
-            line: "Can't be booked online: it takes payment when they book, and no payment provider is connected.",
-        });
-    });
-
-    it("a deposit with Payments switched off: the fix is turning Payments on", () => {
-        expect(
             onlineBookingProblem(
-                svc("PERCENT_25"),
-                view("BOTH", "PAYMENTS_OFF"),
+                svc("PERCENT_50"),
+                view("ONLINE", "PAYMENTS_OFF"),
             ),
-        ).toMatchObject({
-            line: "Can't be booked online: it takes payment when they book, and Payments is switched off.",
-            fix: { href: "/settings/modules", label: "Turn on Payments" },
-        });
-    });
-
-    it("a deposit when the business takes payment at the desk only: the fix is the booking rule", () => {
-        for (const blocker of [null, "NO_PROVIDER"] as const) {
-            expect(
-                onlineBookingProblem(svc("PERCENT_50"), view("DESK", blocker)),
-            ).toEqual({
-                text: "People can't book this online: it takes payment when they book, and your booking rules take payment at the desk only. Take nothing at booking, or let people pay online.",
-                line: "Can't be booked online: it takes payment when they book, and your booking rules take payment at the desk only.",
-                fix: {
-                    href: "/bookings/availability",
-                    label: "Change it in Booking rules",
-                },
-            });
-        }
+        ).toMatchObject({ blocked: true });
+        expect(
+            onlineBookingProblem(svc("PERCENT_50"), view("ONLINE")),
+        ).toBeNull();
     });
 
     it("nothing at booking: fine at the desk, and with Both even with no provider", () => {
@@ -91,6 +112,7 @@ describe("whether a service can be booked online (DEC-088, #821)", () => {
         expect(
             onlineBookingProblem(svc("NONE"), view("ONLINE", "NO_PROVIDER")),
         ).toMatchObject({
+            blocked: true,
             text: "People can't book this online: your booking rules take payment online only, and no payment provider is connected.",
         });
         expect(onlineBookingProblem(svc("NONE"), view("ONLINE"))).toBeNull();
@@ -107,5 +129,14 @@ describe("whether a service can be booked online (DEC-088, #821)", () => {
             onlineBookingProblem(svc("NONE", 0), view("ONLINE", "NO_PROVIDER")),
         ).toBeNull();
         expect(onlineBookingProblem(svc("PERCENT_50"), null)).toBeNull();
+    });
+
+    it("on a plan without online payments: names the plan and links to Plans", () => {
+        expect(
+            onlineBookingProblem(svc("PERCENT_50"), view("ONLINE", "PLAN")),
+        ).toMatchObject({
+            line: "Can't be booked online: it takes payment when they book, and your plan doesn't take payment online.",
+            fix: { href: "/settings/billing#change-plan", label: "See plans" },
+        });
     });
 });

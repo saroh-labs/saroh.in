@@ -108,8 +108,9 @@ export interface PublicBookingPage {
         /**
          * What is paid online at booking when the booker pays the deposit
          * (E8): the service's share of its price, worked out here, or null
-         * when it takes none. A service with a deposit is never paid at the
-         * desk; one whose deposit is the full price is paid now.
+         * when it takes none. A service with a deposit is paid at the desk
+         * only when online can't take it and the business allows the desk
+         * (DEC-089); one whose deposit is the full price is paid now.
          */
         depositCents: number | null;
         /**
@@ -403,7 +404,13 @@ export async function publicBookingPage(
             capacity: svc.capacity,
             priceCents: svc.priceCents,
             currency: svc.currency,
-            depositCents: depositCents(svc.priceCents, svc.depositMode),
+            // A deposit the business can't take online (its plan, Payments
+            // off, no provider) isn't served: the service books as one
+            // without, at the desk, as `bookOnline` books it — the page
+            // never shows a deposit it can't take (`deposit-plan.ts`).
+            depositCents: online
+                ? depositCents(svc.priceCents, svc.depositMode)
+                : null,
             visits: svc.visits,
             online: svc.locationType === "ONLINE",
             // The page asks Where for EITHER (E7); anything unknown reads

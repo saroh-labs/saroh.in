@@ -20,10 +20,10 @@ describe("cta", () => {
 
     it("waitlist mode: a paid plan reads Get early access · Plan", () => {
         expect(
-            cta({ src: "solutions-gyms", plan: "grow", mode: "waitlist" }),
+            cta({ src: "pricing", plan: "grow", mode: "waitlist" }),
         ).toMatchObject({
             label: "Get early access · Grow",
-            href: "/waitlist?plan=grow&src=solutions-gyms",
+            href: "/waitlist?plan=grow&src=pricing",
         });
     });
 

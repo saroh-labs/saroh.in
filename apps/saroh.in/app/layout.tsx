@@ -92,7 +92,7 @@ export const revalidate = 300;
 /**
  * The shell every page shares: fonts, GA and the light-only scheme. Pages
  * bring their own chrome through route groups: `(v2)` the Marketing Site V2
- * pages, `(standalone)` the waitlist.
+ * pages, `(standalone)` the waitlist, `(preview)` the pricing draft.
  *
  * Light only (owner, 2026-10-03): no theme provider, no dark class, no
  * toggle; `color-scheme: light` is set here and in site.css.

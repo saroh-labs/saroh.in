@@ -95,7 +95,7 @@ describe("service fields (E1, real database)", () => {
         expect(page.services.map((s) => s.name)).toContain("Check-up");
     });
 
-    it("round-trips 3 visits and a 50% deposit on the staff read; the booking page serves the visits and the deposit's amount", async () => {
+    it("round-trips 3 visits and a 50% deposit on the staff read; the booking page serves the visits, and no deposit it can't take online", async () => {
         const made = await bookings.createService(owner, {
             name: "Root canal",
             durationMinutes: 60,
@@ -121,12 +121,14 @@ describe("service fields (E1, real database)", () => {
         const page = await publicBookings.publicBookingPage(siteId);
         const shown = page.services.find((s) => s.id === made.id);
         // Either isn't online-only; the page asks Where for it (E7). The
-        // booking page serves the deposit the server worked out (E8), never
-        // the mode, and the visits (E10).
+        // booking page never serves the mode, only the visits (E10) and the
+        // deposit the server worked out (E8) — and only when the business can
+        // take it online. This business has no provider, so the page offers
+        // "pay at the desk" and no deposit (R28); the staff read keeps it.
         expect(shown).toMatchObject({
             online: false,
             where: "EITHER",
-            depositCents: 600_025,
+            depositCents: null,
             visits: 3,
         });
         expect(JSON.stringify(shown)).not.toMatch(

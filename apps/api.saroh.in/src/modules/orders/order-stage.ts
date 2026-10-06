@@ -92,12 +92,34 @@ export interface StageSubject {
     paymentStatus: string;
     /** As stored (read through `typeOf`). */
     fulfilment: OrderFulfilment;
+    /**
+     * Placed at the site's checkout to be paid at the handover ("Pay when
+     * you collect", "Pay on delivery"). Absent reads as false.
+     */
+    payOnHandover?: boolean;
+}
+
+/**
+ * Whether a move waits for the money. An order is made, or sent, only once
+ * it is paid: its first step out of New needs the payment. An order the
+ * customer pays at the handover is made and brought before the money, so
+ * only the handover itself — collected, or delivered — waits for it.
+ */
+export function moveAwaitsPayment(
+    move: Pick<StageMove, "from" | "toStatus">,
+    order: Pick<StageSubject, "paymentStatus" | "payOnHandover">,
+): boolean {
+    if (order.paymentStatus === "PAID") return false;
+    return order.payOnHandover
+        ? move.toStatus === "DELIVERED"
+        : move.from === "NEW";
 }
 
 /**
  * The next step(s) an order can take from where it is, for the screen. An
  * unpaid order has none until it is paid — the kitchen is blocked, and the
- * screen says why from `paymentStatus`.
+ * screen says why from `paymentStatus` — except one paid at the handover,
+ * which goes as far as the handover.
  */
 export function nextStages(order: StageSubject): OrderStage[] {
     if (order.status === "CANCELLED") return [];
@@ -106,7 +128,7 @@ export function nextStages(order: StageSubject): OrderStage[] {
             (m) =>
                 m.from === order.stage &&
                 m.fromStatus === order.status &&
-                (m.from !== "NEW" || order.paymentStatus === "PAID"),
+                !moveAwaitsPayment(m, order),
         )
         .map((m) => m.to);
 }
@@ -145,9 +167,20 @@ export function planStageMove(order: StageSubject, to: OrderStage): StageMove {
             field: "stage",
         });
     }
+    // Paid at the handover: it is made and brought first, and handed over
+    // once the money is taken and marked.
+    if (order.payOnHandover && moveAwaitsPayment(move, order)) {
+        throw new ConflictException({
+            message:
+                type === "PICKUP"
+                    ? "This order is paid when it's collected. Mark it paid first, then mark it collected."
+                    : "This order is paid on delivery. Mark it paid first, then mark it delivered.",
+            field: "paymentStatus",
+        });
+    }
     // The first step out of New needs the money: nothing is made, or sent,
     // for an order nobody paid for.
-    if (move.from === "NEW" && order.paymentStatus !== "PAID") {
+    if (moveAwaitsPayment(move, order)) {
         throw new ConflictException({
             message:
                 move.to === "PREPARING"

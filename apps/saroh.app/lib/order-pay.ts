@@ -1,7 +1,9 @@
+import { payInstructionsOf } from "@saroh/site-blocks";
+
 import { serverApiUrl } from "./api-url";
 import { isIntent } from "./checkout-shape";
 import type { StartResult } from "./invoice-pay";
-import { payUrlOf } from "./invoice-pay-shape";
+import { payOnlineOf, payUrlOf } from "./invoice-pay-shape";
 import type { PayOrder } from "./order-pay-shape";
 import { isPayOrder } from "./order-pay-shape";
 
@@ -39,7 +41,14 @@ export async function getPayOrder(token: string): Promise<OrderPayLookup> {
             ? {
                   ok: true,
                   // Where the link lives (DEC-069, L6), checked.
-                  order: { ...body, payUrl: payUrlOf(body.payUrl) },
+                  order: {
+                      ...body,
+                      payUrl: payUrlOf(body.payUrl),
+                      // Only a real `false` turns Pay off (R33).
+                      payOnline: payOnlineOf(body.payOnline),
+                      // How to pay offline (R32), checked field by field.
+                      payInstructions: payInstructionsOf(body.payInstructions),
+                  },
               }
             : { ok: false, reason: "unavailable" };
     }

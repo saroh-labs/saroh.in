@@ -413,10 +413,61 @@ export class ListWaitlistDto {
 /** Remove one entry when its owner asks (U30, KTD-17). */
 export class DeleteWaitlistDto extends OperatorReasonDto {}
 
-export class InviteWaitlistDto extends OperatorReasonDto {
-    @IsArray()
-    @ArrayMinSize(1)
-    @ArrayMaxSize(200)
-    @IsString({ each: true })
-    ids!: string[];
+/**
+ * A catalogue override on one business (plans catalogue U11): grant or
+ * remove a catalogue row, or set its limit up or down. `expiresAt` is
+ * optional: without one it lasts until an operator removes it.
+ */
+export class ModuleOverrideDto extends OperatorReasonDto {
+    @IsIn(["grant", "remove", "limit"])
+    kind!: "grant" | "remove" | "limit";
+
+    @IsString()
+    @MaxLength(80)
+    moduleKey!: string;
+
+    /** The new limit, for `limit` only. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    @Max(1_000_000)
+    value?: number;
+
+    @IsOptional()
+    @IsISO8601()
+    expiresAt?: string;
+}
+
+/** A custom monthly price for one business, before GST, in paise (KTD-18). */
+export class PriceOverrideDto extends OperatorReasonDto {
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    @Max(100_000_000)
+    pricePaise!: number;
+
+    @IsOptional()
+    @IsISO8601()
+    expiresAt?: string;
+}
+
+/**
+ * Put a business on a catalogue plan until a date, whatever its
+ * subscription says (how grandfathering works, U5). Writing one replaces
+ * the plan override it had, so extending is writing a later date.
+ */
+export class PlanOverrideDto extends OperatorReasonDto {
+    @IsString()
+    @MaxLength(80)
+    planKey!: string;
+
+    @IsISO8601()
+    expiresAt!: string;
+}
+
+/** Move one business to the live catalogue version, now or at its renewal. */
+export class CatalogueMoveDto extends OperatorReasonDto {
+    @IsIn(["now", "renewal"])
+    when!: "now" | "renewal";
 }

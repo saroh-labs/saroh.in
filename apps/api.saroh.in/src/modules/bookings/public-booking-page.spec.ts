@@ -68,7 +68,9 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import { validationPipeOptions } from "../../common/validation";
+import { planMeter } from "../billing/metering.service";
 import { hashPayToken } from "../invoices/pay-token";
 import { BookServiceDto } from "./dto";
 import { PublicBookingsService } from "./public-bookings.service";
@@ -378,7 +380,7 @@ describe("a deposit at booking (E8)", () => {
         );
     });
 
-    it("never books a deposit service to pay at the desk, holding nothing", async () => {
+    it("never books a deposit service to pay at the desk while online can take it, holding nothing", async () => {
         db.service.findUnique.mockResolvedValue(half());
         for (const pay of ["DESK", undefined] as const) {
             await expect(
@@ -428,7 +430,7 @@ describe("a deposit at booking (E8)", () => {
         expect(db.booking.create).not.toHaveBeenCalled();
     });
 
-    it("says the deposit can't be taken when no provider is connected", async () => {
+    it("no provider connected: the deposit isn't taken online, the desk is the way (DEC-089)", async () => {
         db.service.findUnique.mockResolvedValue(half());
         db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
         await expect(
@@ -441,9 +443,55 @@ describe("a deposit at booking (E8)", () => {
         ).rejects.toMatchObject({
             response: {
                 message:
-                    "This business can't take the deposit online right now. Get in touch with them to book.",
+                    "This business isn't taking payment online right now. Book it to pay at the desk.",
             },
         });
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it.each([["DESK" as const], [undefined]])(
+        "no provider connected: books a deposit service to pay at the desk (DEC-089), pay %s",
+        async (pay) => {
+            db.service.findUnique.mockResolvedValue(half());
+            db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+            const out = await new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay }),
+                "iphash",
+                NOW,
+            );
+            const data = db.booking.create.mock.calls[0][0].data;
+            expect(data).toMatchObject({
+                status: "CONFIRMED",
+                paidWith: "DESK",
+            });
+            expect(data.snapshot.deposit).toBeUndefined();
+            expect(db.invoice.create).not.toHaveBeenCalled();
+            expect(out.payToken).toBeNull();
+        },
+    );
+
+    it("on a plan without online payments: a deposit service books to pay at the desk, a provider connected or not (R28, DEC-089)", async () => {
+        jest.spyOn(planMeter, "enforcedRow").mockImplementation(
+            (_org: string, moduleId: string) =>
+                Promise.resolve(
+                    moduleId === "payments" || moduleId === "subscriptions"
+                        ? fakePaymentsRow("free", moduleId)
+                        : null,
+                ),
+        );
+        db.service.findUnique.mockResolvedValue(half());
+        const out = await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DESK" }),
+            "iphash",
+            NOW,
+        );
+        const data = db.booking.create.mock.calls[0][0].data;
+        expect(data).toMatchObject({ status: "CONFIRMED", paidWith: "DESK" });
+        expect(db.invoice.create).not.toHaveBeenCalled();
+        expect(out.payToken).toBeNull();
+        jest.restoreAllMocks();
     });
 
     it("fixes the free-cancel deadline when the booking is made", async () => {
@@ -580,8 +628,41 @@ describe("how people pay when they book (DEC-088)", () => {
         expect(db.invoice.create).not.toHaveBeenCalled();
     });
 
-    it("at the desk only: a deposit can't be taken, so it says get in touch", async () => {
+    it("at the desk only: a deposit isn't taken online, and the desk books it (DEC-089)", async () => {
         db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        db.service.findUnique.mockResolvedValue(
+            service({ depositMode: "PERCENT_50" }),
+        );
+        await expect(book({ pay: "DEPOSIT" })).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message:
+                    "This business takes payment at the desk. Book it to pay at the desk.",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+        await book({ pay: "DESK", idempotencyKey: "key_2" });
+        expect(db.booking.create.mock.calls[0][0].data).toMatchObject({
+            status: "CONFIRMED",
+            paidWith: "DESK",
+        });
+        expect(db.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it("Both with a provider: a deposit service is still never at the desk", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("BOTH"));
+        db.service.findUnique.mockResolvedValue(
+            service({ depositMode: "PERCENT_50" }),
+        );
+        await expect(book({ pay: "DESK" })).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("online only with no provider: a deposit service can't be booked, the desk refused too", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
         db.service.findUnique.mockResolvedValue(
             service({ depositMode: "PERCENT_50" }),
         );
@@ -591,6 +672,11 @@ describe("how people pay when they book (DEC-088)", () => {
                     "This business can't take the deposit online right now. Get in touch with them to book.",
             },
         });
+        for (const pay of ["DESK", undefined] as const) {
+            await expect(book({ pay })).rejects.toMatchObject({
+                response: { field: "pay" },
+            });
+        }
         expect(db.booking.create).not.toHaveBeenCalled();
     });
 

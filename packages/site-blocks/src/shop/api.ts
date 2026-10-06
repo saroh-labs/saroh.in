@@ -38,6 +38,18 @@ export interface QuoteWay {
     fee: string | null;
 }
 
+/**
+ * How an order is paid: online in the provider's window, or at the
+ * handover — "Pay when you collect", "Pay on delivery".
+ */
+export type ShopPayment = "ONLINE" | "ON_HANDOVER";
+
+/** A way to pay the chosen way of leaving can take, in the shop's words. */
+export interface QuotePayment {
+    type: ShopPayment;
+    label: string;
+}
+
 /** The bag priced now: every amount is the server's. */
 export interface CheckoutQuote {
     currency: string;
@@ -48,6 +60,12 @@ export interface CheckoutQuote {
     delivery: string;
     total: string;
     ready: boolean;
+    /**
+     * How an order leaving the chosen way can be paid, online first. Empty
+     * until a way is chosen; absent from an API before offline payment,
+     * which takes online payment only.
+     */
+    payments?: QuotePayment[];
 }
 
 /** Where a Local delivery or a shipment goes. */
@@ -66,17 +84,24 @@ export interface StartCheckout {
     fulfilment: ShopWay;
     address?: DeliveryAddress;
     notes?: string;
+    /** How it is paid; left out, online. */
+    payment?: ShopPayment;
     /** Stable for one checkout, so a double tap starts it once. */
     key: string;
 }
 
-/** A started checkout: the order and the provider's window to open. */
+/**
+ * A started checkout: the order and the provider's window to open — or,
+ * paid at the handover, no window: the order is placed already.
+ */
 export interface CheckoutStarted {
     orderId: string;
     orderNumber: string;
     total: string;
     currency: string;
-    payment: PaymentHandoff;
+    /** Absent from an API before offline payment: online. */
+    payBy?: ShopPayment;
+    payment: PaymentHandoff | null;
 }
 
 /** How a started checkout stands while the payment is confirmed. */
@@ -85,8 +110,9 @@ export interface CheckoutStanding {
     /**
      * refunding: paid, but it sold out or had closed; the refund is owed
      * and being sent. refunded: the provider has taken it — on its way.
+     * to-pay: placed, to be paid at the handover.
      */
-    state: "paying" | "placed" | "refunding" | "refunded" | "closed";
+    state: "paying" | "placed" | "refunding" | "refunded" | "closed" | "to-pay";
     total: string;
     currency: string;
     /** For "refunding" and "refunded": what the customer is told. */

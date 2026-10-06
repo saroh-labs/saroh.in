@@ -7,6 +7,7 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { planStartsSubscriptions } from "../billing/online-payments-plan";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
@@ -32,6 +33,9 @@ import { PLANS_ON_SALE } from "./plan-on-sale";
  *   module rolled out for the business AND switched on. Otherwise a 404, the
  *   same as a site with no plans at all, so a rollout flag never leaks
  *   (DEC-057).
+ * - **Nothing on a plan without memberships** (6 Oct 2026): no plans, so
+ *   the block draws nothing — never a card that can only say "Ask about
+ *   joining" (`offered: false` tells the editor why).
  * - **Whether Join works** (G20): `payOnline`, the booking page's own
  *   question (a connected provider that opens a checkout). It never says
  *   how — the site names no payment method (DEC-059).
@@ -80,6 +84,13 @@ export interface PublicPlans {
      * paid online. Added beside the rest, so an older site ignores it.
      */
     autopayMethods: MandateMethod[];
+    /**
+     * False when the business's Saroh plan leaves memberships off (6 Oct
+     * 2026): `plans` is then empty whatever is on sale, so the editor can
+     * say why the section is empty. Added beside the rest, so an older site
+     * ignores it (an empty list draws nothing).
+     */
+    offered: boolean;
 }
 
 function notFound(): never {
@@ -176,40 +187,49 @@ export class PublicPlansService {
         if (!site) notFound();
         const { organizationId } = site;
 
-        const [rows, payOnline] = await runInOrgContext(
-            organizationId,
-            async () => {
-                if (!(await paymentsOffered(organizationId))) notFound();
-                return Promise.all([
-                    prisma.subscriptionPlan.findMany({
-                        where: { organizationId, ...PLANS_ON_SALE },
-                        take: MAX_PLANS,
-                        orderBy: [
-                            { price: "asc" },
-                            { name: "asc" },
-                            { id: "asc" },
-                        ],
-                        // The published columns only: never `pendingChanges`.
-                        select: {
-                            id: true,
-                            name: true,
-                            description: true,
-                            price: true,
-                            currency: true,
-                            interval: true,
-                            _count: {
-                                select: {
-                                    subscriptions: {
-                                        where: { status: { not: "CANCELLED" } },
-                                    },
+        const read = await runInOrgContext(organizationId, async () => {
+            if (!(await paymentsOffered(organizationId))) notFound();
+            // Memberships are a paid feature (6 Oct 2026): on a plan without
+            // them (or without online payments) no plan is on the site at
+            // all, not even as "Ask about joining". Members already on one
+            // keep renewing; the site just stops offering it.
+            if (!(await planStartsSubscriptions(organizationId))) return null;
+            return Promise.all([
+                prisma.subscriptionPlan.findMany({
+                    where: { organizationId, ...PLANS_ON_SALE },
+                    take: MAX_PLANS,
+                    orderBy: [{ price: "asc" }, { name: "asc" }, { id: "asc" }],
+                    // The published columns only: never `pendingChanges`.
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        price: true,
+                        currency: true,
+                        interval: true,
+                        _count: {
+                            select: {
+                                subscriptions: {
+                                    where: { status: { not: "CANCELLED" } },
                                 },
                             },
                         },
-                    }),
-                    takesOnlinePayment(organizationId),
-                ]);
-            },
-        );
+                    },
+                }),
+                // Join is a new subscription: the plan starts one (checked
+                // above); here, whether a checkout opens.
+                takesOnlinePayment(organizationId),
+            ]);
+        });
+        if (read === null) {
+            return {
+                plans: [],
+                payOnline: false,
+                autopayMethods: [],
+                offered: false,
+            };
+        }
+        const [rows, payOnline] = read;
         // How the join sheet can offer autopay (D12): the provider's own
         // list, only where Join is paid online; a provider that can't say
         // offers none.
@@ -225,6 +245,7 @@ export class PublicPlansService {
         return {
             payOnline,
             autopayMethods,
+            offered: true,
             plans: orderPlans(
                 rows.map(({ _count, ...row }) => ({
                     ...row,

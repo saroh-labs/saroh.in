@@ -8,7 +8,9 @@ import { Repeat, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import type { ContactOption } from "@/components/shared/contact-picker";
+import type { OnlinePaymentsLock } from "@/lib/billing/access";
 import { LIST_LIMIT } from "@/lib/lists/capped";
 import { plansOnTab } from "@/lib/subscriptions/plan-cards";
 import type {
@@ -62,6 +64,8 @@ export function SubscriptionsScreen({
     nowIso,
     settings = null,
     autopayOffered = false,
+    newLocked = null,
+    plansLocked = null,
 }: {
     subscriptions: Subscription[];
     /** The newest read hit its cap: older cancelled ones are not here. */
@@ -84,6 +88,17 @@ export function SubscriptionsScreen({
     settings?: SubscriptionSettings | null;
     /** The business offers autopay (D14): the copy may say so. */
     autopayOffered?: boolean;
+    /**
+     * The plan starts no new membership (rows `subscriptions`, `payments`):
+     * its notice instead of "Subscribe someone". Those already on a plan
+     * keep renewing.
+     */
+    newLocked?: OnlinePaymentsLock | null;
+    /**
+     * The plan sets up no membership plan (6 Oct 2026): the Plans tab says
+     * so in place of "New plan", and its own notice replaces the one above.
+     */
+    plansLocked?: OnlinePaymentsLock | null;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -129,6 +144,8 @@ export function SubscriptionsScreen({
     const plans = planRead ?? [];
     const onPlans = tab === "plans";
     const peek = subscriptions.find((s) => s.id === peekId) ?? null;
+    // Subscribing someone new, where the plan allows it.
+    const canSubscribe = canWrite && !newLocked;
 
     return (
         <>
@@ -142,7 +159,7 @@ export function SubscriptionsScreen({
                         {running.length} active
                         {monthly ? ` · about ${monthly} a month` : ""}
                     </span>
-                    {canWrite ? (
+                    {canSubscribe ? (
                         <Button
                             className="h-[38px] rounded-[9px] px-4 text-[14px] font-semibold"
                             onClick={() => setSubscribing(true)}
@@ -151,6 +168,17 @@ export function SubscriptionsScreen({
                         </Button>
                     ) : null}
                 </div>
+                {/* The Plans tab says its own lock, in its own words. */}
+                {newLocked && !(onPlans && plansLocked) ? (
+                    <LimitNoticeBlock
+                        full={false}
+                        title={newLocked.title}
+                        body={newLocked.body}
+                        cta={newLocked.cta}
+                        href={newLocked.href}
+                        className="mb-3"
+                    />
+                ) : null}
                 {renewNote ? (
                     <p
                         className={cn(
@@ -253,6 +281,7 @@ export function SubscriptionsScreen({
                         showClasses={showClasses}
                         settings={settings}
                         nowIso={nowIso}
+                        locked={plansLocked}
                     />
                 ) : (
                     <>
@@ -284,7 +313,7 @@ export function SubscriptionsScreen({
                                 title="No one is subscribed yet"
                                 description="Put someone on a plan and their first invoice is issued at once; each renewal after that invoices itself."
                                 action={
-                                    canWrite ? (
+                                    canSubscribe ? (
                                         <Button
                                             onClick={() => setSubscribing(true)}
                                         >
@@ -333,7 +362,7 @@ export function SubscriptionsScreen({
                 canWrite={canWrite}
                 now={now}
             />
-            {canWrite ? (
+            {canSubscribe ? (
                 <SubscribeDialog
                     open={subscribing}
                     onOpenChange={onSubscribeOpenChange}

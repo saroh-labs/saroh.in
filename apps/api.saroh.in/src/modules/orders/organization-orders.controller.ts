@@ -26,6 +26,7 @@ import {
     MoveStageDto,
     OrderFilterOptionsQuery,
     OrderProductsQuery,
+    RecordDifferenceDto,
     UndoStageDto,
 } from "./dto";
 import { OrderCancelService } from "./order-cancel.service";
@@ -285,6 +286,21 @@ export class OrganizationOrdersController {
             url: await orderPayLinkUrlFor(ctx.organizationId, token),
             payLinkCreatedAt,
         };
+    }
+
+    /**
+     * "Record payment" (audit, 6 Oct 2026): what a paid order still owes —
+     * an edit's difference — was paid in cash, by UPI or by card at the
+     * counter. `order:edit`, as any payment recorded by hand (B16).
+     */
+    @Post(":orderId/record-payment")
+    @HttpCode(200)
+    recordDifference(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("orderId") orderId: string,
+        @Body() dto: RecordDifferenceDto,
+    ) {
+        return this.kitchen.recordDifference(ctx, orderId, dto);
     }
 
     /**

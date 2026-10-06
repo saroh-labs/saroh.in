@@ -5,8 +5,8 @@
  * Two answers differ from the designs, for the public-repo rule (no prices,
  * no plan limits in the repo): "What does Start free include?" names no
  * plan's contents (they are set in the admin, DEC-075 D3), and "Can my team
- * use it…" drops the sentence giving a plan's team size. No answer names a
- * plan's limits or prices.
+ * use it…" drops the sentence giving Grow's team size. Both come back from
+ * the catalogue when it feeds the site (U24).
  *
  * The design's "Is my customers' site in Hindi?" is gone: a business's own
  * content can't be in a second language yet (DEC-075, D13). Other answers

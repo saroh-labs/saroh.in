@@ -1,5 +1,7 @@
+import { offersOnlinePay } from "@/lib/billing/access";
 import { moduleOn } from "@/lib/contacts/panels";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 
 import { hasPaymentProvider } from "./tax";
 
@@ -19,14 +21,30 @@ export async function paymentsModuleOn(): Promise<boolean> {
 }
 
 /**
- * A pay link can be made: Payments on and a provider that opens the
- * checkout window. With Payments off the API refuses the pay link, so the
- * form mustn't offer one.
+ * A pay link can be made: the plan takes online payment, Payments is on
+ * and a provider opens the checkout window (`offersOnlinePay`). With any of
+ * them off the API refuses the pay link, so the form mustn't offer one —
+ * it issues, and the invoice goes out as a link to view (DEC-070, R33).
  */
 export async function payLinkPossible(): Promise<boolean> {
-    const [on, provider] = await Promise.all([
+    const [access, on, provider] = await Promise.all([
+        billingAccessOrNull(),
         paymentsModuleOn(),
-        hasPaymentProvider(),
+        hasPaymentProvider().catch(() => false),
     ]);
-    return on && provider;
+    return offersOnlinePay(access, on, provider);
+}
+
+/**
+ * A screen with no invoice yet may offer a pay link: the plan takes online
+ * payment and a provider opens the checkout window (`offersOnlinePay`).
+ * Bookings ask this for "Send a pay link" and "Take ₹X"'s link; on a plan
+ * without online payments they offer paying at the session instead (R33).
+ */
+export async function onlinePayReady(): Promise<boolean> {
+    const [access, provider] = await Promise.all([
+        billingAccessOrNull(),
+        hasPaymentProvider().catch(() => false),
+    ]);
+    return offersOnlinePay(access, provider);
 }

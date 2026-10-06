@@ -19,6 +19,10 @@ import {
 } from "../communications/account-thread";
 import { CommunicationsService } from "../communications/communications.service";
 import type { InvoiceTemplate } from "../communications/transactional";
+import {
+    businessPayInstructionsOf,
+    payWaysWords,
+} from "../organizations/business-pay-instructions";
 import { authorize } from "../organizations/organization-policy";
 import {
     AUTOPAY_CHARGE_IN_PROGRESS,
@@ -62,6 +66,8 @@ const SEND_SELECT = {
     kind: true,
     source: true,
     orderId: true,
+    // A renewal stays payable online on any plan (`online-payments-plan.ts`).
+    subscriptionId: true,
     contactId: true,
     billToName: true,
     currency: true,
@@ -175,7 +181,7 @@ export class InvoiceSendService {
     ): Promise<InvoiceSendView> {
         const [nextReminderAt, payOnline] = await Promise.all([
             this.nextReminderAt(db, row.id, now),
-            invoicePayOnline(db, organizationId),
+            invoicePayOnline(db, organizationId, row),
         ]);
         const none = (reason: SendBlocker): InvoiceSendView => ({
             channels: [],
@@ -291,6 +297,18 @@ export class InvoiceSendService {
                                 : null,
                             overdue: isPastDue(row, now),
                             payOnline: view.payOnline,
+                            // How to pay offline (R32), named, never the
+                            // details: those stay on the invoice's page.
+                            ...(view.payOnline
+                                ? {}
+                                : {
+                                      payWays: payWaysWords(
+                                          await businessPayInstructionsOf(
+                                              organizationId,
+                                              tx,
+                                          ),
+                                      ),
+                                  }),
                         },
                         recipient: { kind: "INVOICE_BILL_TO", invoiceId: id },
                         // A fresh link, as "New link" makes; the old one

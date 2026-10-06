@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { SignedInCustomer } from "../account/api";
 import { destructiveAlertClasses } from "../alert";
+import type { PaymentHandoff } from "../booking-flow/api";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
 import { cn } from "../lib/utils";
@@ -15,7 +16,7 @@ import type {
     DeliveryAddress,
     ShopCheckoutApi,
 } from "./api";
-import { orderConfirmationHref } from "./order-confirmation";
+import { orderConfirmationHref, toPayLead } from "./order-confirmation";
 import { SheetFrame, sheetAltButton, sheetButton } from "./sheet-frame";
 
 /**
@@ -41,6 +42,50 @@ type Phase =
     | { kind: "confirming"; tries: number }
     | { kind: "done"; standing: CheckoutStanding };
 
+/** A started checkout paid online: its provider window to open. */
+export type OnlineStarted = CheckoutStarted & { payment: PaymentHandoff };
+
+/**
+ * An order placed to be paid at the handover ("Pay when you collect", "Pay
+ * on delivery"): nothing to pay now, so the sheet says it is placed and
+ * still to be paid, and leads to its confirmation page.
+ */
+export function OrderPlacedToPay({
+    started,
+    businessName,
+    toPay,
+    onClose,
+}: {
+    started: CheckoutStarted;
+    businessName: string;
+    /** "Pay when you collect" or "Pay on delivery", as the bag offered it. */
+    toPay: string;
+    onClose: () => void;
+}) {
+    const total = formatAmount(started.total, started.currency);
+    return (
+        <SheetFrame
+            title="Order placed"
+            lead={`Order ${started.orderNumber} · ${total}. ${toPayLead(toPay)} ${businessName} will be in touch when it's ready.`}
+            onClose={onClose}
+        >
+            <Link
+                href={orderConfirmationHref(started.orderId)}
+                onClick={onClose}
+                className={cn(
+                    sheetButton(false),
+                    "flex items-center justify-center",
+                )}
+            >
+                See your order
+            </Link>
+            <button type="button" onClick={onClose} className={sheetAltButton}>
+                Done
+            </button>
+        </SheetFrame>
+    );
+}
+
 export function CheckoutPay({
     started,
     api,
@@ -55,7 +100,7 @@ export function CheckoutPay({
     openCheckout = openProviderCheckout,
     apiUrl,
 }: {
-    started: CheckoutStarted;
+    started: OnlineStarted;
     api: ShopCheckoutApi;
     businessName: string;
     customer: SignedInCustomer;

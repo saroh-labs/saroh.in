@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { PlanLocked } from "@/components/billing/plan-locked";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
 import { moduleAccess } from "@/lib/modules/guard";
@@ -117,6 +118,28 @@ export async function ModuleGate({
                 />
             );
             return denied ? await denied(standard) : standard;
+        }
+        /*
+         * Shut only by the plan (U14): locked, not off. It says which plan
+         * has it and the way there, rather than "turned off" with a switch
+         * that wouldn't open it.
+         */
+        const planOnly =
+            access.module.blockers.length > 0 &&
+            access.module.blockers.every(
+                (b) => b.code === "ENTITLEMENT_REQUIRED",
+            );
+        if (planOnly) {
+            return (
+                <PageContainer>
+                    <PageHeader title={access.module.label} className="mb-6" />
+                    <PlanLocked
+                        moduleKey={access.module.key}
+                        label={access.module.label}
+                        canManage={access.module.canManage}
+                    />
+                </PageContainer>
+            );
         }
         return (
             <Unavailable

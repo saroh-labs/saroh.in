@@ -25,6 +25,7 @@ jest.mock("@saroh/database", () => ({
 import { prisma } from "@saroh/database";
 
 import { EntitlementService } from "../billing/entitlement.service";
+import { planMeter } from "../billing/metering.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
 
@@ -40,7 +41,8 @@ const overrides = prisma.entitlementOverride.findMany as jest.Mock;
 const onPlan = (entitlements: Record<string, number | boolean>) =>
     subFindUnique.mockResolvedValue({
         status: "ACTIVE",
-        plan: { entitlements },
+        // A plan key no catalogue plan maps: its own row decides (U12).
+        plan: { key: "custom", entitlements },
     });
 
 describe("StoresService.createForUser — storefronts up to the plan", () => {
@@ -118,6 +120,22 @@ describe("StoresService.createForUser — storefronts up to the plan", () => {
         // The ceiling is checked before the plan is read.
         expect(subFindUnique).not.toHaveBeenCalled();
         expect(storeCreate).not.toHaveBeenCalled();
+    });
+
+    it("asks only the ceiling where the catalogue governs locations (U13)", async () => {
+        // A new storefront is online: the plan's locations cap places
+        // customers visit, metered when its kind changes.
+        const enforcedRow = jest
+            .spyOn(planMeter, "enforcedRow")
+            .mockResolvedValue({ moduleId: "locations" } as never);
+        onPlan({ storefronts: 2 });
+        storeCount.mockResolvedValue(7);
+        await expect(
+            service.createForUser("user_1", "org_1", { name: "Eighth" }),
+        ).resolves.toEqual({ id: "store_1" });
+        expect(enforcedRow).toHaveBeenCalledWith("org_1", "locations");
+        expect(subFindUnique).not.toHaveBeenCalled();
+        enforcedRow.mockRestore();
     });
 
     it("counts only live storefronts: a closed one frees its place", async () => {

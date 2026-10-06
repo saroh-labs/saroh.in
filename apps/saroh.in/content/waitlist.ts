@@ -7,8 +7,8 @@
  * - `openingDate` is null until the open launch is scheduled (OQ-12), and
  *   the header says "Opening soon" instead of a date.
  * - `offer` is null here. The page reads the launch offer from the API
- *   (`GET /public/waitlist/offer`, `lib/launch-offer.ts`) — the plan and
- *   the API's `LAUNCH_OFFER_DAYS` — and builds
+ *   (`GET /public/waitlist/offer`, `lib/launch-offer.ts`) — the same
+ *   `LAUNCH_OFFER_DAYS` and plan the opening-day invites carry — and builds
  *   its lines with `launchOfferLines`. With none, the form says "Offer
  *   details announced at launch". The repo is public: the words are here,
  *   the plan's name and the number of days only ever come from the API.

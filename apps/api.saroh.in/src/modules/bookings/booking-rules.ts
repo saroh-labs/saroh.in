@@ -31,8 +31,9 @@ export interface BookingRulesValue {
 /**
  * How people pay when they book (DEC-088): ONLINE only, at the DESK only,
  * or BOTH. Online still needs a provider that can take it
- * (`takesOnlinePayment`); a deposit or full price at booking is only ever
- * paid online.
+ * (`takesOnlinePayment`); a deposit or full price at booking is paid
+ * online, or at the desk when online can't take it and the desk is allowed
+ * (DEC-089).
  */
 export const BOOKING_PAYMENTS = ["ONLINE", "DESK", "BOTH"] as const;
 export type BookingPayment = (typeof BOOKING_PAYMENTS)[number];

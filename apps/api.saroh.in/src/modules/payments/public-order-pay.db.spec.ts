@@ -336,9 +336,13 @@ describe("paying from an order's pay link (real database)", () => {
             due: "500.00",
             currency: "INR",
             status: "DUE",
+            // A provider is connected and the plan takes payment online.
+            payOnline: true,
             theme: null,
             // Where the link lives (DEC-069, L6): the apex, the flag off.
             payUrl: `https://saroh.app/pay/o/${token}`,
+            // How to pay us (R32): the business set none.
+            payInstructions: null,
         });
         // No email, phone, surname or ids reach the page.
         const text = JSON.stringify(view);

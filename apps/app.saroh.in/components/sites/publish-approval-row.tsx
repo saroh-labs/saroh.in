@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { Row, Section } from "@/components/sites/settings-rows";
 import { setPublishNeedsApproval } from "@/lib/sites/actions";
 import type { PublishApproval } from "@/lib/sites/publish-approval";
@@ -40,7 +41,9 @@ export function PublishApprovalSection({
             const res = await setPublishNeedsApproval(siteId, next);
             if (!res.ok) {
                 setOn(!next);
-                showError(res.error);
+                // Review isn't in the plan (U13): the way up, not a toast.
+                if (res.plan) showPlanRefusal(res.plan);
+                else showError(res.error);
                 return;
             }
             router.refresh();

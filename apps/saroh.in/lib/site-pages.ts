@@ -10,10 +10,10 @@ import type { LaunchMode } from "@/lib/links";
 
 /**
  * The site's indexable pages, one list for the sitemap and the redirect test
- * (plan U26): Home, the eight features, the three solutions, and the
+ * (plan U26): Home, Pricing, the eight features, the three solutions, and the
  * waitlist while it is the site's ask (`launchMode=waitlist`, KTD-16).
- * No `/pricing`: Pricing isn't published yet (it redirects to the waitlist,
- * `redirects.js`).
+ * `/pricing` only once the launch switch is open: before that it redirects
+ * to the waitlist (`redirects.js`), and a sitemap never lists a redirect.
  *
  * Given a publish context (plan U1), the Resources and legal pages that are
  * published and built, the changelog's live entries and Help's live
@@ -36,6 +36,7 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
             : [];
     return [
         "/",
+        ...(mode === "open" ? ["/pricing"] : []),
         ...FEATURE_SLUGS.map(featureHref),
         ...SOLUTION_SLUGS.map(solutionHref),
         ...(mode === "waitlist" ? ["/waitlist"] : []),
@@ -48,5 +49,9 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
 /** Every page the site serves, whatever the mode: a redirect may land on any. */
 export const SERVED_PATHS: readonly string[] = indexedPaths("waitlist");
 
-/** What robots.txt keeps crawlers out of: the site's own API routes. */
-export const CRAWL_DISALLOWED = ["/api/"];
+/**
+ * What robots.txt keeps crawlers out of: the pricing draft and the link that
+ * opens it (staff-only; noindex by header and meta too), and the site's own
+ * API routes.
+ */
+export const CRAWL_DISALLOWED = ["/api/", "/pricing/draft", "/pricing/preview"];

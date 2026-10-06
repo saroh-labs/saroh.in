@@ -1,19 +1,20 @@
 import { ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import { paymentsOn } from "../invoices/payments-on";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import type { BookingPayment, BookingRulesValue } from "./booking-rules";
 import { allowsDesk, allowsOnline, loadBookingRules } from "./booking-rules";
 import type { AccountBookPay } from "./dto";
-import { depositCents } from "./service-fields";
 
 /*
  * How people pay when they book (DEC-088, #821, #822): the business's
  * choice — online, at the desk, or both — and whether online can be taken
  * at all. The booking page offers only what both allow, the booking write
- * refuses anything else, and the merchant's screens say when a service
- * can't be booked online because of it.
+ * refuses anything else, and the merchant's screens say what happens to a
+ * deposit online can't take: paid at the desk where the business allows
+ * the desk, else it can't be booked online (DEC-089).
  */
 
 /**
@@ -22,25 +23,33 @@ import { depositCents } from "./service-fields";
  * open (a Razorpay connection still missing its public key id can't,
  * DEC-054).
  */
-export type OnlineBlocker = "PAYMENTS_OFF" | "NO_PROVIDER";
+export type OnlineBlocker = "PLAN" | "PAYMENTS_OFF" | "NO_PROVIDER";
 
+/**
+ * …and its plan: one without online payments (the catalogue's `payments`
+ * row, behind PLAN_ENFORCEMENT, failing open) takes no new online payment
+ * (R28, `billing/online-payments-plan.ts`). Asked first: on such a plan the
+ * other two can't be fixed by the business anyway.
+ */
 export async function onlinePaymentBlocker(
     organizationId: string,
 ): Promise<OnlineBlocker | null> {
-    const [on, provider] = await Promise.all([
+    const [plan, on, provider] = await Promise.all([
+        planTakesOnlinePayment(organizationId),
         paymentsOn(prisma, organizationId),
         prisma.merchantPaymentProvider.findFirst({
             where: { organizationId, status: "CONNECTED", ...OPENS_CHECKOUT },
             select: { id: true },
         }),
     ]);
+    if (!plan) return "PLAN";
     if (!on) return "PAYMENTS_OFF";
     return provider === null ? "NO_PROVIDER" : null;
 }
 
 /**
- * What the merchant's screens read to say when a service can't be booked
- * online (#821): the business's way to pay, and why online can't be taken
+ * What the merchant's screens read to say what happens to a deposit
+ * online can't take (#821, DEC-089): the business's way to pay, and why online can't be taken
  * now, if it can't.
  */
 export interface BookingPaymentView {
@@ -58,7 +67,26 @@ export async function bookingPaymentView(
     return { bookingPayment: rules.bookingPayment, onlineBlocker: blocker };
 }
 
-/** "Get in touch" — said when a service can't be booked online at all. */
+/**
+ * Whether a service that asks a deposit (or the full price) at booking is
+ * booked to pay at the desk instead (DEC-089): the business allows the
+ * desk, and online can't be taken — it chose At the desk, or Payments is
+ * off, or no provider can take it. Under Online only it never is: that
+ * service can't be booked online at all.
+ */
+export async function depositPaidAtDesk(
+    organizationId: string,
+    rules: Pick<BookingRulesValue, "bookingPayment">,
+): Promise<boolean> {
+    if (!allowsDesk(rules)) return false;
+    if (!allowsOnline(rules)) return true;
+    return (await onlinePaymentBlocker(organizationId)) !== null;
+}
+
+/**
+ * "Get in touch" — said only when a service can't be booked online at all:
+ * the business takes payment online only, and online can't be taken now.
+ */
 export const DEPOSIT_UNPAYABLE =
     "This business can't take the deposit online right now. Get in touch with them to book.";
 const ONLINE_UNPAYABLE =
@@ -69,22 +97,21 @@ const ONLINE_UNPAYABLE =
  * anything is held. A credit (A10) is not a payment and is never refused
  * here. A service with no price is booked with nothing to pay, whatever
  * the rule. `pay` is already what the service allows (`payAtBooking`):
- * a deposit service is never DESK by then.
+ * a deposit service is DESK by then only when it is paid at the desk
+ * (DEC-089).
  */
 export function refuseDisallowedPay(
-    service: { priceCents: number | null; depositMode: string },
+    service: { priceCents: number | null },
     pay: AccountBookPay | undefined,
     rules: Pick<BookingRulesValue, "bookingPayment">,
 ): void {
     if (pay === "CREDIT") return;
     if (pay === "NOW" || pay === "DEPOSIT") {
         if (allowsOnline(rules)) return;
-        const deposit = depositCents(service.priceCents, service.depositMode);
+        // At the desk only: a deposit too is paid at the desk (DEC-089).
         throw new ConflictException({
             message:
-                deposit === null
-                    ? "This business takes payment at the desk. Book it to pay at the desk."
-                    : DEPOSIT_UNPAYABLE,
+                "This business takes payment at the desk. Book it to pay at the desk.",
             field: "pay",
         });
     }
@@ -100,15 +127,16 @@ export function refuseDisallowedPay(
 
 /**
  * The refusal when pay now can't be taken because no provider can take it
- * (or Payments is off): a deposit, or a business that takes payment only
- * online, can't be booked online at all; otherwise the desk is the way.
+ * (or Payments is off): where the business allows the desk, the desk is
+ * the way — a deposit too (DEC-089); a business that takes payment only
+ * online can't be booked online at all.
  */
 export function onlineUnavailableMessage(
     hasDeposit: boolean,
     rules: Pick<BookingRulesValue, "bookingPayment">,
 ): string {
-    if (hasDeposit) return DEPOSIT_UNPAYABLE;
-    return allowsDesk(rules)
-        ? "This business isn't taking payment online right now. Book it to pay at the desk."
-        : ONLINE_UNPAYABLE;
+    if (allowsDesk(rules)) {
+        return "This business isn't taking payment online right now. Book it to pay at the desk.";
+    }
+    return hasDeposit ? DEPOSIT_UNPAYABLE : ONLINE_UNPAYABLE;
 }

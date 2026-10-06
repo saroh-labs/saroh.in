@@ -177,6 +177,8 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
         // beyond the autopay methods the provider itself reports (D12).
         expect(Object.keys(read).sort()).toEqual([
             "autopayMethods",
+            // Whether memberships are on the business's plan at all (R31).
+            "offered",
             "payOnline",
             "plans",
         ]);
@@ -230,6 +232,7 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
             plans: [],
             payOnline: false,
             autopayMethods: [],
+            offered: true,
         });
     });
 
@@ -289,6 +292,7 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
             plans: [],
             payOnline: false,
             autopayMethods: [],
+            offered: true,
         });
     });
 });

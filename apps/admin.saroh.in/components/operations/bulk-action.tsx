@@ -32,8 +32,14 @@ const VERDICT: Record<
     unsafe: { label: "Refused", variant: "warning" },
 };
 
+const VERB: Record<OperationKind, string> = {
+    "jobs.retry": "Retry",
+    "webhooks.replay": "Replay",
+    "waitlist.invite": "Invite",
+};
+
 /**
- * A bulk retry or replay: always a dry run first. Opening the dialog asks
+ * A bulk retry, replay or invite: always a dry run first. Opening the dialog asks
  * the API what would happen to every target and shows it — what runs, what
  * has nothing to do, what is refused and why — before anything changes.
  * Running it starts a durable operation and opens its progress.
@@ -58,7 +64,7 @@ export function BulkAction({
     const [reason, setReason] = useState("");
     const [key, setKey] = useState("");
     const [pending, startTransition] = useTransition();
-    const verb = kind === "jobs.retry" ? "Retry" : "Replay";
+    const verb = VERB[kind];
 
     function onOpenChange(next: boolean) {
         setOpen(next);

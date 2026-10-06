@@ -26,18 +26,20 @@ export interface CtaInput {
     src: string;
     /**
      * The plan the button names, when it names one: a site plan id, or any
-     * other plan id.
+     * id the pricing catalogue offers (the pricing page draws whatever plans
+     * the catalogue has).
      */
     plan?: string;
-    /** The plan's name; defaults to the site's own name. */
+    /** The plan's name, from the catalogue; defaults to the site's own name. */
     planName?: string;
     /** Whether the plan costs anything; defaults to "it isn't Free". */
     paid?: boolean;
     /** Open mode: the trial length a plan card offers, when a trial is on. */
     trialDays?: number;
     /**
-     * Open mode: the billing cycle a paid plan's button names. Carried to
-     * sign-up as `cycle`; it only preselects.
+     * Open mode: the billing cycle a paid plan's card shows (Pricing's
+     * Monthly / Yearly switch). Carried to sign-up as `cycle`; it only
+     * preselects, and the checkout prices it on the server (U15).
      */
     cycle?: "month" | "year";
     /** Defaults to the site's mode; tests and previews pass one. */

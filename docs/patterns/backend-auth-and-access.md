@@ -215,6 +215,93 @@ orgId)` (`organizations/organization-kind.ts`).
 - **Current** — **Three control planes, never conflated** (ADR-003): feature flags
   are Saroh's rollout, entitlements are what a plan permits, modules are what an
   Organization has chosen.
+- **Current** (plans catalogue U5, U12) — **Access is read from the pricing
+  catalogue, in one place.** `CatalogueAccessService.resolve` (billing)
+  turns a business's subscription (or a due pending move, or Free) into
+  plan@version, applies its live overrides — a `plan` override first (how
+  grandfathering works), then remove, grant, limit, raise — and its add-ons
+  (`resolveAccess`, `@saroh/pricing-catalog`). `EntitlementService` reads
+  its limit map (`check`, `can`), module availability its registry step
+  after the rollout gate, behind the `PLAN_ENFORCEMENT` kill switch, and
+  `GET …/billing/access` its rows. A legacy `business`/`pro` subscriber
+  reads as Grow and keeps its own row for the keys no catalogue row sells,
+  so it never resolves as Free; a business with no subscription row and no
+  plan override reads `FREE_ENTITLEMENTS` until the backfills reach it
+  (`docs/architecture/PRICING_ROLLOUT.md`). Never read `Plan.entitlements`
+  directly for access.
+- **Current** (plans catalogue U13) — **A plan limit is checked where the
+  write happens, behind the kill switch.** A write that adds a metered
+  thing calls `planMeter.roomInTx(tx, org, row)` on its own transaction
+  before writing (or `withRoom` when it had no transaction, `assertRoom`
+  when it can't share one), and a write a switch row governs calls
+  `planMeter.assertIncluded(org, row)` (`billing/metering.service.ts`).
+  Off (`PLAN_ENFORCEMENT`), neither reads anything nor opens a
+  transaction. On, a business off the catalogue is never refused, and a
+  plan that can't be read lets the write through (logged,
+  `plan_meter_unresolved`). The refusals are 403 with `details.code`
+  `PLAN_LIMIT_REACHED` (with the limit, the count, `upgradeTo` and the
+  design's notice) or `MODULE_LOCKED`; the booking page gets 409
+  `BOOKINGS_PAUSED`, which names no plan. What each limit counts is
+  `billing/metering.ts`, the one place: orders and bookings that stand
+  (never an unpaid online checkout or a pay-now hold), in the business's
+  month in its zone (many businesses at once: `billing/metering-across.ts`,
+  the same rules). The site's checkout is never refused (a soft cap,
+  OQ-8); a payment once captured never is (OQ-7). A catalogue cell marked
+  `soft` (storage, site visits) is soft wherever it's checked — counted and
+  told, never refused — whatever the call site passes. Websites (`sites`)
+  and places customers visit (`locations` → `shopLocations`, metered when a
+  storefront's kind becomes SHOP) are the catalogue's where `enforcedRow`
+  answers for the row; elsewhere the old one-website and `storefronts`
+  floor (`LEGACY_FLOOR_ENTITLEMENTS`) still applies, so nothing new locks
+  behind the switch. Team members never count a Reviewer, so moving
+  someone off Reviewer is metered. Over after a downgrade,
+  existing things stay readable and editable; only adding is refused. A
+  new write that adds a metered thing, or a new switch row, gets its call
+  and a row in `billing/plan-limits.db.spec.ts`.
+- **Current** (plan shape of 5 Oct) — **A plan without online payments
+  stops new money online, never what a business already has.** The
+  `payments` and `subscriptions` rows (registry PAYMENTS) are asked where a
+  new online payment or subscription starts, through
+  `billing/online-payments-plan.ts`: a first provider connection, a pay
+  link that charges (invoice, order, booking), a workspace intent, the
+  site's checkout (`checkoutReadiness`: online off, so it takes payment at
+  the handover instead — "Free takes money offline", 2026-10-06), the
+  booking page,
+  packs, plan joins, and subscribing someone. The business hears 403
+  `MODULE_LOCKED`; a customer hears 409 `NOT_PAID_ONLINE` naming no plan.
+  Renewals never ask: the renewal and charge jobs, a renewal invoice's pay
+  link and pay page (`subscriptionId` set), autopay on it, and re-entering a
+  connected provider's keys all go on. PAYMENTS itself stays available
+  (`PLAN_LOCKS_ACTIONS_ONLY`), since it holds refunds, renewals and
+  invoices; invoicing has no registry and needs none (DEC-070).
+  `billing/online-payments-plan.db.spec.ts`.
+- **Current** (6 Oct 2026, "Online needs a paid plan; Free takes money
+  offline") — **Check an online-money feature where it is configured, never
+  at the customer's moment.** A feature that takes money online is set up
+  only on a plan with the `payments` row, and the check sits on the write
+  that sets it up (403 `MODULE_LOCKED`). Nothing a business set up may
+  become unbookable or unbuyable after a downgrade: the customer's side
+  quietly falls back to the offline way and keeps the stored setting for an
+  upgrade. Deposits are the first (`bookings/deposit-plan.ts`): setting a
+  service's `depositMode` to anything but NONE needs the row (NONE, or the
+  deposit it already has, never asks, so the editor's full-form save keeps
+  working); whenever the business can't take money online — that plan,
+  Payments off, or no provider (`takesOnlinePayment`, the one predicate) —
+  the booking page serves no `depositCents` and books the service "pay at
+  the desk", with the stored deposit untouched. Staff bookings never ask. The app locks the control
+  with the way up (`depositLock`). `bookings/deposit-plan.db.spec.ts`.
+  Memberships are the second (`subscriptions/plan-writes.ts`,
+  `plan-drafts.ts`): creating a membership plan, starting or publishing a
+  draft and selling an archived plan again need the `subscriptions` and
+  `payments` rows (`assertPlanStartsSubscriptions`). Changing a plan's
+  wording (also publishing a live plan's changes), archiving, discarding
+  and deleting a draft never ask, so a downgraded business tidies up. A
+  membership has no offline fallback on the site, so there the plan
+  **leaves the site**: `public-plans` answers no plans and `offered: false`
+  (no card, no "Ask about joining"); the editor's canvas says why. Members
+  already on a plan keep renewing; staff can't add new ones (`subscribe`).
+  The app swaps "New plan" for the notice and drops "Sell again"
+  (`membershipPlansLock`). `subscriptions/membership-plan-lock.db.spec.ts`.
 - **Current** (DEC-068) — **Turning a module on creates its minimum in the
   switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
   checks `module:manage` and then the action for each thing it creates
@@ -253,7 +340,8 @@ orgId)` (`organizations/organization-kind.ts`).
   a Platform Owner whose ownership does not expire.
 - **Current** — **Cross-tenant reads live only behind the admin guards** (plan
   D2). The admin services (`admin-organizations`, `admin-people`,
-  `admin-machinery`, `admin-waitlist`, `admin-metrics`) read across every
+  `admin-machinery`, `admin-waitlist`, `admin-metrics`, and the pricing
+  catalogue's `ImpactService`) read across every
   business with no organization context, so the `org_isolation` policies take
   their permissive branch. Each says **CROSS-TENANT READ** in its doc comment,
   returns what decides whether to act — never a business's customers, orders

@@ -6,8 +6,9 @@
  * (saroh-product.md), captions name no amounts, claims the product can't
  * back are reworded (`MARKETING_CLAIMS.md`, DEC-075), and each hero note
  * names its business as a demo. Segments carry no caption of their own: the
- * frame reads the captured alt, which says what the screenshot shows. No page names a
- * plan's price, limits or contents.
+ * frame reads the captured alt, which says what the screenshot shows. Plan prices and plan
+ * summaries are not here: the pricing block names plans by id and renders the
+ * placeholder until the catalogue feeds the site.
  */
 import type {
     FeatureSlug,
@@ -89,6 +90,12 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 shot: "s-insights",
             },
         ],
+        pricing: {
+            title: "Pricing for shops",
+            featured: "grow",
+            fit: "For a shop, that means stock across your locations, weekly orders that renew on their day, and GST invoices.",
+            second: "pro",
+        },
         faq: "shops-counter-online",
         closer: "Open tomorrow knowing what to bake.",
     },
@@ -166,6 +173,12 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 shot: "g-billing",
             },
         ],
+        pricing: {
+            title: "Pricing for gyms and studios",
+            featured: "grow",
+            fit: "For a studio, that means class packs, courses and memberships that renew themselves.",
+            second: "free",
+        },
         faq: "gyms-pack-and-membership",
         closer: "Fill tomorrow's 7am class.",
     },
@@ -235,6 +248,12 @@ export const solutions: Record<SolutionSlug, Solution> = {
                 shot: "d-billing",
             },
         ],
+        pricing: {
+            title: "Pricing for clinics",
+            featured: "grow",
+            fit: "For a clinic, that means treatments over several visits, patient notes kept to the right people, and bills of supply.",
+            second: "pro",
+        },
         faq: "clinics-medical-notes",
         closer: "Know every patient before they sit down.",
     },

@@ -371,6 +371,8 @@ describe("the site's checkout options and quote (G13)", () => {
             canOrder: true,
             storefront: { name: "Online" },
             currency: "INR",
+            // How the customer can pay: online here; offline is off (R30).
+            payments: { online: true, onHandover: false },
             ways: [
                 { type: "PICKUP", label: "Pick-up", fee: null },
                 {

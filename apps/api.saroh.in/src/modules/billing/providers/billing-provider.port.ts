@@ -49,6 +49,39 @@ export interface CreateSubscriptionInput {
     currency: string;
     interval: string;
     organizationId: string;
+    /**
+     * The provider's own plan the subscription bills on (pricing catalogue
+     * U15: `PricingProviderPlan.providerPlanId`). Its amount is the plan's
+     * price with GST, set when the plan was synced; nothing here sends an
+     * amount for the recurring charge.
+     */
+    providerPlanId?: string;
+    /** When the recurring charges start; absent or null: at authorisation. */
+    startAt?: Date | null;
+    /**
+     * A one-off charge taken at authorisation (an upgrade's difference for
+     * the rest of the period), GST included, in paise. Worked out by Saroh.
+     */
+    upfront?: { name: string; amountPaise: number } | null;
+    /**
+     * A coupon (U16): `amountPaise` (GST included, worked out by Saroh) off
+     * each of the subscription's first `charges` charges. A provider that
+     * can't take one off refuses (`BillingProviderError` REFUSED) rather
+     * than charge the full amount.
+     *
+     * `razorpayOfferId` is the coupon's Razorpay Offer, made in the Razorpay
+     * Dashboard: Razorpay takes a discount off only through one, applying
+     * the Offer's own terms, which must match the coupon's
+     * (`PRICING_ROLLOUT.md`). Razorpay refuses a coupon without one.
+     */
+    discount?: {
+        code: string;
+        amountPaise: number;
+        charges: number;
+        razorpayOfferId?: string | null;
+    } | null;
+    /** Saroh's reference for this attempt (the checkout id), for the notes. */
+    reference?: string;
 }
 
 /** The provider's accepted-subscription receipt. */
@@ -61,6 +94,100 @@ export interface CreateSubscriptionResult {
     status: SubscriptionStatus;
     /** The end of the first paid period, when the provider reports it. */
     currentPeriodEnd?: Date | null;
+    /**
+     * Where the business authorises it (the provider's hosted page), when the
+     * provider makes one. Answered once to the caller; Saroh never stores it.
+     */
+    authorisationUrl?: string;
+}
+
+/** How a cancel ends the provider subscription. */
+export interface CancelSubscriptionOptions {
+    /**
+     * True (the default): it runs to the end of the period already paid and
+     * charges no more. False: it ends now.
+     */
+    atCycleEnd?: boolean;
+}
+
+/**
+ * What a provider event says happened to the subscription, beyond the target
+ * status (U15). The checkout and the renewal path read this; `status` alone
+ * can't tell an authorisation from a renewal charge.
+ */
+export const BILLING_EVENT_PHASES = [
+    "authenticated",
+    "activated",
+    "charged",
+    "pending",
+    "halted",
+    "cancelled",
+    "completed",
+    "other",
+] as const;
+export type BillingEventPhase = (typeof BILLING_EVENT_PHASES)[number];
+
+/** A provider plan to make: one catalogue plan row × cycle (U15). */
+export interface CreateProviderPlanInput {
+    /** Saroh's reference (the `PricingProviderPlan` id), kept in its notes. */
+    reference: string;
+    name: string;
+    /** The amount per period, GST included, in paise (KTD-18). */
+    amountPaise: number;
+    currency: string;
+    period: "month" | "year";
+}
+
+/**
+ * Making the provider's plan objects (U15). Optional on the port: a provider
+ * without it can't sell catalogue plans, and its rows fail to sync.
+ */
+export interface ProviderPlanCapability {
+    /**
+     * The provider plan made earlier for this reference, or null. Asked first,
+     * so a retry after an unanswered create never makes a second plan.
+     */
+    findPlan(reference: string): Promise<string | null>;
+    createPlan(input: CreateProviderPlanInput): Promise<{
+        providerPlanId: string;
+    }>;
+}
+
+/** A one-off item for a provider subscription's next charge (U16 add-ons). */
+export interface NextChargeItem {
+    providerSubscriptionId: string;
+    /** Saroh's reference (the `SubscriptionAddonCharge` id), in its notes. */
+    reference: string;
+    name: string;
+    /** GST included, in paise (KTD-18). */
+    amountPaise: number;
+    currency: string;
+}
+
+/**
+ * Putting one-off items on a provider subscription's next charge (U16): how
+ * add-ons are billed, after the period they cover. Optional on the port: a
+ * provider without it can't bill add-ons, and their charges wait.
+ */
+export interface ProviderChargeCapability {
+    addToNextCharge(
+        item: NextChargeItem,
+    ): Promise<{ providerChargeId: string }>;
+}
+
+/**
+ * A provider call that failed, classified: `REFUSED` is an answer it would
+ * give again (a 4xx), `UNKNOWN` may have worked (network, timeout, 5xx, 429).
+ * Never carries the request, a credential or the provider's body.
+ */
+export class BillingProviderError extends Error {
+    constructor(
+        readonly kind: "REFUSED" | "UNKNOWN",
+        message: string,
+    ) {
+        super(message);
+        this.name = "BillingProviderError";
+    }
 }
 
 /**
@@ -78,6 +205,17 @@ export interface ParsedBillingEvent {
     providerSubscriptionId?: string;
     /** The normalized target status, or `"IGNORED"` for a non-state event. */
     status: SubscriptionStatus | "IGNORED";
+    /** What happened (U15); absent reads as "other". */
+    phase?: BillingEventPhase;
+    /** When the provider says it happened; orders late deliveries (U15). */
+    eventAt?: Date | null;
+    /** The end of the period the subscription is now paid to, when sent. */
+    currentPeriodEnd?: Date | null;
+    /**
+     * The provider's id for the payment this event reports, when it carries
+     * one (a `charged` event). Kept on Saroh's invoice for the charge (U17).
+     */
+    providerPaymentId?: string | null;
 }
 
 export interface BillingProvider {
@@ -87,7 +225,14 @@ export interface BillingProvider {
         input: CreateSubscriptionInput,
     ): Promise<CreateSubscriptionResult>;
     /** Cancel the provider subscription (real adapters: HTTP). */
-    cancelSubscription(providerSubscriptionId: string): Promise<void>;
+    cancelSubscription(
+        providerSubscriptionId: string,
+        options?: CancelSubscriptionOptions,
+    ): Promise<void>;
+    /** Provider plan objects for the catalogue (U15); absent: can't sell them. */
+    readonly plans?: ProviderPlanCapability;
+    /** Items on the next charge (U16 add-ons); absent: can't bill them. */
+    readonly charges?: ProviderChargeCapability;
     /**
      * Constant-time HMAC verify over the RAW bytes using Saroh's PLATFORM
      * webhook secret (from `process.env`). Never throws on mismatch — returns

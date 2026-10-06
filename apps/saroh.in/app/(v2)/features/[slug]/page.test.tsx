@@ -16,6 +16,11 @@ vi.mock("next/navigation", () => ({
     },
 }));
 
+// No API in a unit test: the pages show the placeholder free-plan line.
+vi.mock("@/lib/pricing", () => ({
+    readLivePricing: () => Promise.resolve(null),
+}));
+
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
 
 afterEach(() => {

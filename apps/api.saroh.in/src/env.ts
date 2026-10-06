@@ -104,6 +104,20 @@ const envSchema = z.object({
     // The key the destination email and the code are HMAC'd under, so a
     // database read reveals neither who asked nor the code.
     SITE_ACCOUNTS_CODE_SECRET: z.string().min(32).optional(),
+    // Signs the pricing draft-preview token staff mint in the admin console
+    // (plans catalogue KTD-10): at most 15 minutes, bound to one draft
+    // revision. API only — saroh.in passes the token through, never checks
+    // it. Read at use (`pricing/pricing-secrets.ts`): development and test
+    // fall back to a fixed public value, anywhere else preview is refused
+    // until it is set. Never logged.
+    PRICING_PREVIEW_SECRET: z.string().min(32).optional(),
+    // saroh.in's on-demand revalidation hook (plans catalogue KTD-10): after
+    // a publish commits, and at a scheduled version's go-live, a job POSTs to
+    // `<PRICING_SITE_URL>/api/revalidate` with the secret in `x-saroh-revalidate`. Both unset:
+    // nothing is queued, and saroh.in picks the change up on its ISR timer.
+    // The secret is byte-identical in saroh.in. Never logged.
+    PRICING_SITE_URL: z.string().url().optional(),
+    PRICING_REVALIDATE_SECRET: z.string().min(32).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -124,11 +138,10 @@ const envSchema = z.object({
     // to see the "couldn't send" path and alert. Development, or named
     // outright off production (the CI browser stack); never in production.
     SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
-    // The opening-day launch offer (marketing plan, Gate W): how many days of
-    // the offer plan saroh.in's waitlist page promises
-    // (`GET /public/waitlist/offer`). The owner's number, set per instance,
-    // never committed. Unset, the endpoint answers 404 and the page says the
-    // offer is announced at launch.
+    // The opening-day launch offer (marketing plan U31, OQ-1): how many days
+    // of the offer plan a business made through a waitlist invite gets, from
+    // the moment it is made. The owner's number, set per instance, never
+    // committed. Unset, no invite can be sent and none grants an offer.
     LAUNCH_OFFER_DAYS: z.coerce.number().int().min(1).max(366).optional(),
     // Web addresses kept for Saroh beyond the built-in list in
     // `sites/site-address.ts`: comma-separated, set per instance. People's
@@ -166,6 +179,37 @@ const envSchema = z.object({
     // for live ones. The API sends the mode with every checkout's client
     // parameters, so the browser drop-in opens where the order was made.
     CASHFREE_ENV: z.enum(["production", "sandbox"]).default("production"),
+
+    // Saroh's own invoices to businesses for their plan (pricing catalogue
+    // U17), read at use by `billing/saroh-seller.ts`. All optional so dev and
+    // test boot without them; never hard-coded. Unset GSTIN: the paper is an
+    // "Invoice", not a tax invoice, and `saroh_invoice_seller_incomplete` is
+    // logged. Unset state: the GSTIN's first two digits.
+    SAROH_LEGAL_NAME: z.string().optional(),
+    SAROH_GSTIN: z
+        .string()
+        .regex(/^[0-9]{2}[A-Z0-9]{13}$/, "a 15-character GSTIN")
+        .optional(),
+    // GST state code of Saroh's registration ("29"): CGST + SGST for a
+    // business in the same state, IGST otherwise.
+    SAROH_GST_STATE: z
+        .string()
+        .regex(/^[0-9]{2}$/, "a two-digit GST state code")
+        .optional(),
+    // The registered address printed on the paper, one line.
+    SAROH_REGISTERED_ADDRESS: z.string().optional(),
+    // The contact address printed on the paper and the billing email's reply-to.
+    SAROH_BILLING_EMAIL: z.string().email().optional(),
+    // The SAC printed against each line.
+    SAROH_INVOICE_SAC: z
+        .string()
+        .regex(/^[0-9]{4,8}$/, "a 4–8 digit SAC")
+        .optional(),
+    // The series prefix: 1–3 capitals or digits (SRH → SRH/26-27/00001).
+    SAROH_INVOICE_PREFIX: z
+        .string()
+        .regex(/^[A-Z0-9]{1,3}$/, "1–3 capitals or digits")
+        .optional(),
 
     // Saroh STAFF break-glass bootstrap (S1-012 admin). Comma-separated emails
     // that are treated as platform admins even with no PlatformAdmin row. This

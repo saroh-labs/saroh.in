@@ -408,9 +408,20 @@ export async function takeCounterPaymentInTx(
     },
 ): Promise<void> {
     const { orderId, organizationId, userId, kind, at } = input;
+    const placed = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { total: true },
+    });
     await tx.order.update({
         where: { id: orderId },
-        data: { paymentStatus: "PAID", paidAt: at, ...RETIRED_PAY_LINK },
+        data: {
+            paymentStatus: "PAID",
+            paidAt: at,
+            // What was taken, kept on the order (`hand-payments.ts`): an
+            // edit later asks only for the difference.
+            ...(placed ? { paidByHand: placed.total } : {}),
+            ...RETIRED_PAY_LINK,
+        },
     });
     await ensureOrderInvoice(tx, orderId, { at, method: kind });
     if (!organizationId) return;

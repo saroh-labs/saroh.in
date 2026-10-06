@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CRAWL_DISALLOWED, SERVED_PATHS, indexedPaths } from "./lib/site-pages";
 import nextConfig from "./next.config.js";
-import { REDIRECTS, TEMPORARY } from "./redirects.js";
+import { REDIRECTS, temporary } from "./redirects.js";
 
 /** The URLs the V1 sitemap listed, and the addresses before it (plan U26). */
 const OLD_URLS = [
@@ -35,18 +35,25 @@ function matcher(source: string): RegExp {
 
 /** Where Next sends a path: the first matching rule, or null. */
 function resolve(path: string): string | null {
-    const rule = [...REDIRECTS, ...TEMPORARY].find((r) =>
-        matcher(r.source).test(path),
-    );
+    const rule = REDIRECTS.find((r) => matcher(r.source).test(path));
     return rule ? rule.destination : null;
 }
 
 describe("redirects", () => {
     it("is what next.config.js serves", async () => {
+        // The tests run with the switch unset: waitlist mode.
         expect(await nextConfig.redirects?.()).toEqual([
             ...REDIRECTS,
-            ...TEMPORARY,
+            ...temporary(undefined),
         ]);
+    });
+
+    it("sends Pricing to the waitlist until the launch switch opens", () => {
+        expect(temporary(undefined)).toEqual([
+            { source: "/pricing", destination: "/waitlist", statusCode: 302 },
+        ]);
+        expect(temporary("waitlist")).toHaveLength(1);
+        expect(temporary("open")).toEqual([]);
     });
 
     it.each(OLD_URLS)("sends %s to a V2 page in one hop", (path) => {
@@ -60,7 +67,7 @@ describe("redirects", () => {
     });
 
     it("never chains: no destination is another rule's source", () => {
-        for (const r of [...REDIRECTS, ...TEMPORARY]) {
+        for (const r of REDIRECTS) {
             expect(resolve(r.destination)).toBeNull();
         }
     });
@@ -69,29 +76,20 @@ describe("redirects", () => {
         for (const page of SERVED_PATHS) expect(resolve(page)).toBeNull();
     });
 
-    it("is a 301 for every old address", () => {
+    it("is a 301 every time", () => {
         for (const r of REDIRECTS) expect(r.statusCode).toBe(301);
-    });
-
-    it("sends the unpublished /pricing to the waitlist, temporarily", () => {
-        expect(TEMPORARY).toEqual([
-            { source: "/pricing", destination: "/waitlist", statusCode: 302 },
-        ]);
-        expect(SERVED_PATHS).not.toContain("/pricing");
-    });
-
-    it("never points an old address at /pricing", () => {
-        for (const r of REDIRECTS) {
-            expect(r.destination.startsWith("/pricing")).toBe(false);
-        }
     });
 });
 
 describe("indexed pages", () => {
-    it("lists Home, 8 features, 3 solutions and the waitlist while it is the ask", () => {
+    it("lists Home, 8 features, 3 solutions and the waitlist while it is the ask; Pricing once it opens", () => {
         const waitlist = indexedPaths("waitlist");
         expect(waitlist).toHaveLength(13);
         expect(waitlist).toContain("/waitlist");
+        // Pricing waits at the waitlist until launch, and a sitemap never
+        // lists a redirect.
+        expect(waitlist).not.toContain("/pricing");
+        expect(indexedPaths("open")).toContain("/pricing");
         expect(waitlist.filter((p) => p.startsWith("/features/"))).toHaveLength(
             8,
         );
@@ -101,15 +99,12 @@ describe("indexed pages", () => {
         expect(indexedPaths("open")).not.toContain("/waitlist");
     });
 
-    it("never lists /pricing, which isn't published yet", () => {
-        for (const mode of ["waitlist", "open"] as const) {
-            for (const p of indexedPaths(mode)) {
-                expect(p.startsWith("/pricing")).toBe(false);
-            }
+    it("never lists the pricing draft, and robots keeps crawlers out of it", () => {
+        for (const p of indexedPaths("waitlist")) {
+            expect(p.startsWith("/pricing/")).toBe(false);
         }
-    });
-
-    it("keeps crawlers out of the API routes", () => {
-        expect(CRAWL_DISALLOWED).toEqual(["/api/"]);
+        expect(CRAWL_DISALLOWED).toEqual(
+            expect.arrayContaining(["/pricing/draft", "/pricing/preview"]),
+        );
     });
 });

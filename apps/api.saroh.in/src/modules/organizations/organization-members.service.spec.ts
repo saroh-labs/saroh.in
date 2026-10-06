@@ -58,6 +58,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
+import { planMeter } from "../billing/metering.service";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
@@ -535,6 +536,100 @@ describe("the last owner", () => {
         expect(db.membership.update.mock.calls[0][0].data).toEqual({
             role: "ADMIN",
         });
+    });
+});
+
+describe("the plan's team members (U13): Reviewers aren't counted, and have their own cap", () => {
+    it("inviting a Reviewer checks the Reviewers cap, never the team's", async () => {
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        const count = jest.fn().mockResolvedValue(0);
+        await service.invite(ctx(), {
+            email: "reviewer@example.test",
+            role: "REVIEWER",
+            siteIds: ["site_1"],
+        });
+        expect(withRoom.mock.calls[0][1]).toBe("reviewers");
+        const options = withRoom.mock.calls[0][3] as {
+            addingIn: (tx: unknown) => Promise<number>;
+        };
+        const tx = { organizationInvitation: { count } };
+        expect(await options.addingIn(tx)).toBe(1);
+        // Only an open Reviewer invitation already counts this person.
+        expect(count.mock.calls[0][0].where).toMatchObject({
+            role: "REVIEWER",
+        });
+        count.mockResolvedValue(1);
+        expect(await options.addingIn(tx)).toBe(0);
+        withRoom.mockRestore();
+    });
+
+    it("inviting anyone else adds one, unless a counted invite is open", async () => {
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        const count = jest.fn().mockResolvedValue(0);
+        await service.invite(ctx(), {
+            email: "member@example.test",
+            role: "MEMBER",
+        });
+        expect(withRoom.mock.calls[0][1]).toBe("members");
+        const options = withRoom.mock.calls[0][3] as {
+            addingIn: (tx: unknown) => Promise<number>;
+        };
+        const tx = { organizationInvitation: { count } };
+        expect(await options.addingIn(tx)).toBe(1);
+        // An open invitation as a Reviewer didn't count; this one does.
+        expect(count.mock.calls[0][0].where).toMatchObject({
+            role: { not: "REVIEWER" },
+        });
+        count.mockResolvedValue(1);
+        expect(await options.addingIn(tx)).toBe(0);
+        withRoom.mockRestore();
+    });
+
+    it("moving someone off Reviewer is metered, on the role change's transaction", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockResolvedValue(null);
+        db.membership.findUnique.mockResolvedValue({
+            role: "REVIEWER",
+            extraActions: [],
+        });
+        await service.updateRole(ctx(), "user_2", { role: "MEMBER" });
+        expect(roomInTx).toHaveBeenCalledWith(prisma, "org_1", "members");
+        roomInTx.mockRestore();
+    });
+
+    it("a refusal stops the role change", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockRejectedValue(new ForbiddenException("full"));
+        db.membership.findUnique.mockResolvedValue({
+            role: "REVIEWER",
+            extraActions: [],
+        });
+        await expect(
+            service.updateRole(ctx(), "user_2", { role: "MEMBER" }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(db.membership.update).not.toHaveBeenCalled();
+        roomInTx.mockRestore();
+    });
+
+    it("making someone a Reviewer checks the Reviewers cap; other changes aren't metered", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockResolvedValue(null);
+        db.membership.findUnique.mockResolvedValue({
+            role: "MEMBER",
+            extraActions: [],
+        });
+        await service.updateRole(ctx(), "user_2", { role: "ADMIN" });
+        expect(roomInTx).not.toHaveBeenCalled();
+        await service.updateRole(ctx(), "user_2", {
+            role: "REVIEWER",
+            siteIds: ["site_1"],
+        });
+        expect(roomInTx).toHaveBeenCalledTimes(1);
+        expect(roomInTx).toHaveBeenCalledWith(prisma, "org_1", "reviewers");
+        roomInTx.mockRestore();
     });
 });
 

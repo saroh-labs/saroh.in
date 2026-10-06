@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 
 import type { Prisma } from "@prisma/client";
 
-import { PLAN } from "../data";
 import type { Db } from "../helpers";
 import { at, id, listProductAt, setStockLevel } from "../helpers";
+import { seedPlanId } from "../pricing";
 import type { BoutiqueProduct } from "./boutique-catalog";
 import {
     BOUTIQUE_CATEGORIES,
@@ -157,10 +157,7 @@ export async function seedBoutique(
             },
         });
     }
-    const plan = await prisma.plan.findUniqueOrThrow({
-        where: { key_version: { key: PLAN.key, version: PLAN.version } },
-        select: { id: true },
-    });
+    const plan = { id: await seedPlanId(prisma, now) };
     await prisma.subscription.upsert({
         where: { organizationId: orgId },
         update: { planId: plan.id, status: "ACTIVE" },

@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import type { KeyboardEvent, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { SIGN_IN_URL } from "@/lib/links";
+import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
 
 import { CtaLink } from "./cta-link";
 import { MobileMenu } from "./mobile-menu";
@@ -27,10 +27,11 @@ const CURRENT =
 
 /**
  * The site's nav (Nav design, plan U19). From 760px: the logo, Features
- * (a two-column menu with lines), Solutions, Resources (plan U1; only when
- * some Resources page is live), then Sign in and the start button. Below
- * 760px: the logo, the start button and a Menu button that opens
- * `MobileMenu`.
+ * (a two-column menu with lines), Solutions, Pricing (once the site's launch
+ * switch is open; before that it would only bounce to the waitlist),
+ * Resources (plan U1; only when some Resources page is live), then Sign in
+ * and the start button. Below 760px: the logo, the start button and a Menu
+ * button that opens `MobileMenu`.
  *
  * `resources` is the Resources menu: the server decides which pages are
  * published and built (`content/resources.ts`) and passes them in, so the
@@ -130,6 +131,17 @@ export function SiteNav({ resources = [] }: { resources?: NavItem[] }) {
                     }
                     buttonRef={solutionsButton}
                 />
+                {LAUNCH_MODE === "open" ? (
+                    <Link
+                        href="/pricing"
+                        aria-current={
+                            section === "pricing" ? "page" : undefined
+                        }
+                        className={cn(TOP, section === "pricing" && CURRENT)}
+                    >
+                        Pricing
+                    </Link>
+                ) : null}
                 {resources.length > 0 ? (
                     <Menu
                         id="resources"

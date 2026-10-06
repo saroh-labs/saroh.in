@@ -27,6 +27,7 @@ import { prisma } from "@saroh/database";
 import { toMinor } from "../../../common/money";
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import type { EntitlementService } from "../../billing/entitlement.service";
+import { planMeter } from "../../billing/metering.service";
 import { STOREFRONT_FULFILMENT_TYPES } from "../../orders/fulfilment";
 import { storefrontLimit } from "../../organizations/business-limits";
 import { authorize } from "../../organizations/organization-policy";
@@ -123,6 +124,27 @@ export function firstStorefront(
     });
 }
 
+/** The old `storefronts` floor, in the merchant's words when it refuses. */
+async function storefrontFloor(
+    ctx: OrganizationContext,
+    entitlements: Entitlements,
+): Promise<void> {
+    try {
+        await entitlements.check(ctx.organizationId, "storefronts", 0);
+    } catch (err) {
+        if (!(err instanceof ForbiddenException)) throw err;
+        const limit = storefrontLimit(
+            await entitlements.getEntitlements(ctx.organizationId),
+        );
+        throw new ForbiddenException({
+            message:
+                limit < 1
+                    ? "Your plan doesn't include a location. A bigger plan adds one."
+                    : `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
+        });
+    }
+}
+
 async function prepareCommerce(
     ctx: OrganizationContext,
     setup: CommerceSetupDto,
@@ -133,22 +155,15 @@ async function prepareCommerce(
         authorize(ctx, "store:write");
     } else {
         authorize(ctx, "store:create");
-        // The plan's `storefronts` limit, as creating one by hand checks it
-        // (StoresService.createForUser), in the merchant's words.
-        try {
-            await entitlements.check(ctx.organizationId, "storefronts", 0);
-        } catch (err) {
-            if (!(err instanceof ForbiddenException)) throw err;
-            const limit = storefrontLimit(
-                await entitlements.getEntitlements(ctx.organizationId),
-            );
-            throw new ForbiddenException({
-                message:
-                    limit < 1
-                        ? "Your plan doesn't include a location. A bigger plan adds one."
-                        : `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
-            });
-        }
+        // The plan's `storefronts` floor, as creating one by hand checks it
+        // (StoresService.createForUser), in the merchant's words — only
+        // where the catalogue doesn't govern locations: where it does, a
+        // new storefront is online and adds no place customers visit.
+        const governed = await planMeter.enforcedRow(
+            ctx.organizationId,
+            "locations",
+        );
+        if (!governed) await storefrontFloor(ctx, entitlements);
     }
     return (tx) => writeCommerce(tx, ctx, setup);
 }

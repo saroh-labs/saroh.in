@@ -6,27 +6,38 @@ import { CtaBand } from "@/components/v2/cta-band";
 import { Eyebrow } from "@/components/v2/eyebrow";
 import { Faq } from "@/components/v2/faq";
 import { HomeHero } from "@/components/v2/home/home-hero";
+import { HomePricing } from "@/components/v2/home/home-pricing";
 import { TourVideo } from "@/components/v2/home/tour-video";
 import { JsonLd } from "@/components/v2/json-ld";
 import { PillLink } from "@/components/v2/pill";
 import { SectionHeading } from "@/components/v2/section-heading";
 import { faqItems, HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
-import { FREE_PLAN_LINE, home } from "@/content/home";
+import { home } from "@/content/home";
 import { solutionHref, solutionList } from "@/content/solutions";
+import { LAUNCH_MODE } from "@/lib/links";
 import { HOME_OG_ALT } from "@/lib/og-card";
+import {
+    freePlanLine,
+    homePlanTeasers,
+    planTeaserFootnote,
+    startFreeFaq,
+} from "@/lib/plan-teasers";
+import { readLivePricing } from "@/lib/pricing";
 import { pageMetadata } from "@/lib/seo";
 import { organizationLd, softwareApplicationLd } from "@/lib/structured-data";
 
 /**
  * `/` (plan U21): the Home design, "saroh" hero and "band" closer. The hero,
  * then "Works for", the eight features (`#features`, Dashboard first), the
- * tour video once there is one (`#video`), Solutions (`#solutions`),
- * Questions (`#faq`) and the dark CTA band.
+ * tour video once there is one (`#video`), Solutions (`#solutions`), the
+ * pricing teaser (`#pricing`), Questions (`#faq`) and the dark CTA band.
  *
- * No pricing section: no page names a plan's price, limits or contents
- * until Pricing is published.
+ * Prices, plan lines and the free-plan line come from the published pricing
+ * catalogue, refreshed every five minutes and at once on publish (KTD-10);
+ * with none, the "announced at launch" placeholders.
  */
+export const revalidate = 300;
 
 export const metadata: Metadata = pageMetadata({
     title: home.metaTitle,
@@ -35,13 +46,21 @@ export const metadata: Metadata = pageMetadata({
     image: { url: "/opengraph-image", alt: HOME_OG_ALT },
 });
 
-export default function HomePage() {
+export default async function HomePage() {
+    const catalog = await readLivePricing();
+    const faq = faqItems(HOME_FAQ).map((item, i) =>
+        HOME_FAQ[i] === "start-free" ? startFreeFaq(catalog, item) : item,
+    );
+
     return (
         <>
             <JsonLd
-                data={[organizationLd(), softwareApplicationLd(home.sub)]}
+                data={[
+                    organizationLd(),
+                    softwareApplicationLd(catalog, home.sub),
+                ]}
             />
-            <HomeHero freeLine={FREE_PLAN_LINE} />
+            <HomeHero freeLine={freePlanLine(catalog)} />
 
             <Container
                 as="nav"
@@ -108,7 +127,17 @@ export default function HomePage() {
                 </div>
             </Container>
 
-            <Faq items={faqItems(HOME_FAQ)} title={home.faqTitle} />
+            {/* Plans show once the site's launch switch opens: before
+                that Pricing waits at the waitlist (Gate W), so no page draws
+                a plan or links to it. */}
+            {LAUNCH_MODE === "open" ? (
+                <HomePricing
+                    plans={homePlanTeasers(catalog)}
+                    footnote={planTeaserFootnote(catalog)}
+                />
+            ) : null}
+
+            <Faq items={faq} title={home.faqTitle} />
 
             <CtaBand title={home.closer} src="home-band" />
         </>

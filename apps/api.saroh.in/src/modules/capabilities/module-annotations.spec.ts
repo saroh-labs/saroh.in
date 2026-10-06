@@ -129,6 +129,8 @@ const NEVER: Record<string, string> = {
     "members/members.controller.ts": "tenancy",
     "stores/stores.controller.ts": "tenancy",
     "billing/billing.controller.ts": "billing is not a capability module",
+    "waitlist/launch-offer.controller.ts":
+        "taking an opening-day invite's plan offer at onboarding — billing, not a capability module",
     "admin/admin.controller.ts": "staff control plane, not a tenant surface",
     "admin/admin-machinery.controller.ts":
         "staff control plane, not a tenant surface",
@@ -242,6 +244,10 @@ const NEVER: Record<string, string> = {
     "waitlist/waitlist.controller.ts": "public waitlist",
     "waitlist/public-offer.controller.ts":
         "the launch offer saroh.in's waitlist page shows, not a tenant surface",
+    "pricing/public-pricing.controller.ts":
+        "Saroh's own price list for saroh.in, not a tenant surface",
+    "pricing/admin-pricing.controller.ts":
+        "staff control plane (Plans & modules), not a tenant surface",
     // Resources plan U2: saroh.in's free link preview tool, used before any
     // account or business exists. Behind the signed visitor relay instead.
     "link-preview/link-preview.controller.ts":

@@ -25,6 +25,7 @@ import {
 } from "../invoices/order-invoicing";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { PaymentStatus } from "../orders/dto";
+import { holdsOnPayment } from "../orders/online-checkout";
 import { finishCancelInTx } from "../orders/order-cancel";
 import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
@@ -547,12 +548,15 @@ export class WebhooksService {
         // and the order's lock comes after the intent's (reserve.ts). Its
         // balance, once it costs more (B9), holds nothing: another payment
         // held its units, and this one is settled as any second payment.
+        // One to be paid on handover promised its units when it was made,
+        // so a pay link's payment on it is settled as a staff order's.
         const placed = await tx.order.findUnique({
             where: { id: orderId },
-            select: { placedOnline: true },
+            select: { placedOnline: true, payOnHandover: true },
         });
         if (
-            placed?.placedOnline &&
+            placed &&
+            holdsOnPayment(placed) &&
             !(await heldByAnotherPayment(tx, orderId, intent.id))
         ) {
             const online = await applyOnlineOrderSuccess(
@@ -716,12 +720,16 @@ export class WebhooksService {
         // is IGNORED rather than forced through an illegal transition.
         const order = await tx.order.findUnique({
             where: { id: orderId },
-            select: { paymentStatus: true, placedOnline: true },
+            select: {
+                paymentStatus: true,
+                placedOnline: true,
+                payOnHandover: true,
+            },
         });
         // A checkout's failed attempt (G13) leaves its order UNPAID: until it
         // is paid it is an abandoned checkout, which Orders leaves out (B1),
         // and the customer may try again on the same order.
-        if (order?.paymentStatus === "UNPAID" && !order.placedOnline) {
+        if (order?.paymentStatus === "UNPAID" && !holdsOnPayment(order)) {
             const changed = await this.moveOrderPayment(tx, orderId, "FAILED");
             applied = applied || changed;
         }
@@ -800,7 +808,11 @@ export class WebhooksService {
         // already-REFUNDED orders pass.
         const order = await tx.order.findUnique({
             where: { id: orderId },
-            select: { paymentStatus: true, placedOnline: true },
+            select: {
+                paymentStatus: true,
+                placedOnline: true,
+                payOnHandover: true,
+            },
         });
         if (!order) return { applied: false };
         const current = order.paymentStatus as PaymentStatus;
@@ -808,7 +820,7 @@ export class WebhooksService {
         // the order never became paid, so its refund settles on its own row
         // and the order stays as it is: closed, nothing held or invoiced.
         if (
-            order.placedOnline &&
+            holdsOnPayment(order) &&
             (current === "UNPAID" || current === "FAILED")
         ) {
             const { applied } = await this.settleRefund(tx, intent, event);

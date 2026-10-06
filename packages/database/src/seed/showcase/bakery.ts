@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
-import { PLAN } from "../data";
 import type { Db } from "../helpers";
+import { seedPlanId } from "../pricing";
 import type { BakeryProduct, CategoryKey, StoreKey } from "./bakery-catalogue";
 import {
     ALLERGENS,
@@ -585,10 +585,7 @@ export async function seedBakery(
             },
         });
     }
-    const plan = await prisma.plan.findUniqueOrThrow({
-        where: { key_version: { key: PLAN.key, version: PLAN.version } },
-        select: { id: true },
-    });
+    const plan = { id: await seedPlanId(prisma, now) };
     await prisma.subscription.upsert({
         where: { organizationId: orgId },
         update: { planId: plan.id, status: "ACTIVE" },

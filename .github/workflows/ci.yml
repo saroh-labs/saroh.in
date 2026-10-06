@@ -483,7 +483,7 @@ jobs:
       APP_URL: http://localhost:3003
       NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
       # Where accounts sends a new account (onboarding); unset, the production
-      # build falls back to https://app.saroh.in.
+      # build falls back to https://app.saroh.in (signup-from-marketing.spec).
       NEXT_PUBLIC_APP_URL: http://localhost:3003
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333

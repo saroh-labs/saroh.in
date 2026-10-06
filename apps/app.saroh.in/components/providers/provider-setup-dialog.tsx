@@ -18,6 +18,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
@@ -256,7 +257,8 @@ function PaymentsForm({
         );
         setSaving(false);
         if (!res) return;
-        if (!res.ok) return showError(res.error);
+        // At the plan's connections limit (U13): its notice, not a toast.
+        if (!res.ok) return reportFailure(res);
         showSuccess(`${labelOfPayment(provider)} connected`);
         onDone();
         router.refresh();
@@ -487,7 +489,7 @@ function MessagingForm({
             ...(fromAddress.trim() ? { fromAddress: fromAddress.trim() } : {}),
         });
         setSaving(false);
-        if (!res.ok) return showError(res.error);
+        if (!res.ok) return reportFailure(res);
         showSuccess(
             `${spec.label} is sent through ${labelOfComms(channel, provider)}`,
         );

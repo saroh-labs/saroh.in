@@ -19,6 +19,16 @@ import { SiteNav } from "./site-nav";
  */
 let pathname = "/";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+/** The site's launch switch (plan KTD-16): Pricing shows once it's open. */
+const launch = vi.hoisted((): { mode: "waitlist" | "open" } => ({
+    mode: "waitlist",
+}));
+vi.mock("@/lib/links", async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    get LAUNCH_MODE() {
+        return launch.mode;
+    },
+}));
 vi.mock("next/link", () => ({
     default: ({
         href,
@@ -70,10 +80,18 @@ describe("SiteNav", () => {
         ).toBeNull();
     });
 
-    it("has no Pricing link: Pricing isn't published yet", () => {
+    it("on /pricing, marks Pricing as the page, once the launch switch is open", () => {
+        launch.mode = "open";
+        pathname = "/pricing";
         render(<SiteNav />);
-        expect(screen.queryAllByRole("link", { name: "Pricing" })).toEqual([]);
-        expect(document.querySelector('a[href^="/pricing"]')).toBeNull();
+        const pricing = screen.getAllByRole("link", { name: "Pricing" })[0];
+        expect(pricing.getAttribute("aria-current")).toBe("page");
+        launch.mode = "waitlist";
+    });
+
+    it("draws no Pricing link before launch: it would only bounce to the waitlist", () => {
+        render(<SiteNav />);
+        expect(screen.queryByRole("link", { name: "Pricing" })).toBeNull();
     });
 
     it("Features opens a menu of eight, focused on the first", () => {

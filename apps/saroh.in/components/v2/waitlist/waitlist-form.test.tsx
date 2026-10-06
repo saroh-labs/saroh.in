@@ -113,7 +113,7 @@ describe("WaitlistForm", () => {
             position: 7,
             ref: "abcdefgh",
         });
-        renderForm("?plan=grow&src=solutions-gyms&ref=hjkmnpqr");
+        renderForm("?plan=grow&src=pricing&ref=hjkmnpqr");
         fill();
         await submit();
 
@@ -130,13 +130,13 @@ describe("WaitlistForm", () => {
             email: "you@glowstudio.in",
             city: "Pune",
             plan: "grow",
-            src: "solutions-gyms",
+            src: "pricing",
             ref: "hjkmnpqr",
         });
 
         expect(gtag).toHaveBeenCalledWith("event", "waitlist_join", {
             kind: "salon",
-            src: "solutions-gyms",
+            src: "pricing",
             plan: "grow",
             ref: true,
         });

@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import type { AlertEvent } from "./alert-preferences";
 
 /**
  * The team's alerts (round-2 F14): what a producer writes, inside its own
@@ -32,12 +33,17 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   run's own finding, not data read back). Keyed to the release and the
  *   instant it was scheduled for, so each schedule is told of once. The
  *   person who scheduled it is always emailed, whatever they chose.
+ * - `uncollected`: a website order to pay on collection or delivery still
+ *   unpaid and not handed over three days after it was placed (R34,
+ *   `orders/uncollected.ts`). Queued with the order, for the instant it
+ *   becomes due; told on the New order row's choices, once per order.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
     | { event: "failed"; invoiceId: string; paymentIntentId: string }
     | { event: "team"; userId: string; invitationId: string }
     | { event: "booking"; notificationId: string }
+    | { event: "uncollected"; orderId: string }
     | {
           event: "site";
           testReleaseId: string;
@@ -49,17 +55,47 @@ export type TeamAlertPayload =
 
 type Tx = Pick<Prisma.TransactionClient, "job">;
 
-/** Queue one alert on the caller's transaction. */
+/**
+ * Queue one alert on the caller's transaction: now, or at `runAt` for one
+ * that is due later (an uncollected order's).
+ */
 export async function enqueueTeamAlert(
     tx: Tx,
     organizationId: string,
     payload: TeamAlertPayload,
+    runAt?: Date,
 ): Promise<void> {
     await tx.job.create({
         data: {
             organizationId,
             type: TEAM_ALERT_TYPE,
             payload,
+            ...(runAt ? { runAt } : {}),
         },
     });
+}
+
+/**
+ * An alert, worded. Here rather than in the handler so a wording module
+ * (`uncollected-alert.ts`) can use it without importing the handler back.
+ */
+export interface WordedAlert {
+    event: AlertEvent;
+    /** Unique per business: claimed once, so the alert goes out once. */
+    eventKey: string;
+    /** The inbox notice already written (a booking's), or null to write one. */
+    notificationId: string | null;
+    type: string;
+    title: string;
+    body: string;
+    /** Where it opens in the workspace, for the email. */
+    path: string | null;
+    /** Not emailed about their own doing. */
+    skipUserId: string | null;
+    /**
+     * Emailed whatever they chose, while still on the team: whoever
+     * scheduled a go-live hears how it went (DEC-071, T10).
+     */
+    alwaysUserId?: string | null;
+    orderId?: string;
 }

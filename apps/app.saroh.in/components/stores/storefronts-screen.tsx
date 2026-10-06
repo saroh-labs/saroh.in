@@ -51,6 +51,7 @@ import type {
 
 import { FulfilmentSection } from "./fulfilment-section";
 import { LocationSellingLine } from "./location-selling-line";
+import { PayOnHandoverRow } from "./pay-on-handover-row";
 import { SameEmailSection } from "./same-email-section";
 import { Note, Section, ToggleRow } from "./storefront-section";
 
@@ -1034,6 +1035,13 @@ function CheckoutSection({
                 canEdit={canEdit}
                 pending={pending}
                 save={save}
+            />
+            <PayOnHandoverRow
+                store={store}
+                canEdit={canEdit}
+                pending={pending}
+                save={save}
+                setStore={setStore}
             />
         </Section>
     );

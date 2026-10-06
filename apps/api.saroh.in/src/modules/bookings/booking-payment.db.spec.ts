@@ -3,7 +3,9 @@
  * #822): the rule saved and read with the other booking rules, Both for a
  * business that never set it (with or without a rules row), and the
  * booking write refusing a way to pay the business doesn't allow — before
- * anything is held. And the merchant's read of why online can't be taken.
+ * anything is held — but booking a deposit service to pay at the desk
+ * when online can't take it and the desk is allowed (DEC-089). And the
+ * merchant's read of why online can't be taken.
  *
  * Only the app env is stubbed; the provider is the network-free fake.
  * Runs in the integration project.
@@ -164,7 +166,7 @@ describe("the booking write refuses what the business doesn't allow (DEC-088)", 
         ).rejects.toMatchObject({
             response: {
                 message:
-                    "This business can't take the deposit online right now. Get in touch with them to book.",
+                    "This business takes payment at the desk. Book it to pay at the desk.",
             },
         });
         expect(
@@ -181,6 +183,72 @@ describe("the booking write refuses what the business doesn't allow (DEC-088)", 
             status: "CONFIRMED",
             paidWith: "DESK",
         });
+    });
+
+    it("at the desk only: a deposit service books to pay at the desk (DEC-089)", async () => {
+        await setWay("DESK");
+        const out = await publicBookings.bookOnline(
+            rootCanal,
+            booking("DESK"),
+            undefined,
+        );
+        expect(out.booking).toMatchObject({
+            status: "CONFIRMED",
+            paidWith: "DESK",
+        });
+        expect(out.payToken).toBeNull();
+        expect(
+            await prisma.invoice.count({
+                where: { bookingId: out.booking.id },
+            }),
+        ).toBe(0);
+    });
+
+    it("Both with no provider: a deposit service books to pay at the desk (DEC-089)", async () => {
+        for (const pay of ["DESK", undefined] as const) {
+            const out = await publicBookings.bookOnline(
+                rootCanal,
+                booking(pay),
+                undefined,
+            );
+            expect(out.booking).toMatchObject({
+                status: "CONFIRMED",
+                paidWith: "DESK",
+            });
+        }
+        await expect(
+            publicBookings.bookOnline(rootCanal, booking("DEPOSIT"), undefined),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business isn't taking payment online right now. Book it to pay at the desk.",
+            },
+        });
+    });
+
+    it("online only with no provider: a deposit service can't be booked (DEC-089)", async () => {
+        await setWay("ONLINE");
+        const before = await prisma.booking.count({
+            where: { organizationId: owner.organizationId },
+        });
+        await expect(
+            publicBookings.bookOnline(rootCanal, booking("DEPOSIT"), undefined),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business can't take the deposit online right now. Get in touch with them to book.",
+            },
+        });
+        for (const pay of ["DESK", undefined] as const) {
+            await expect(
+                publicBookings.bookOnline(rootCanal, booking(pay), undefined),
+            ).rejects.toMatchObject({ response: { field: "pay" } });
+        }
+        expect(
+            await prisma.booking.count({
+                where: { organizationId: owner.organizationId },
+            }),
+        ).toBe(before);
     });
 
     it("online only: refuses the desk, and no way given", async () => {
@@ -218,5 +286,22 @@ describe("the booking write refuses what the business doesn't allow (DEC-088)", 
         );
         expect(out.booking.status).toBe("PENDING");
         expect(out.payToken).toEqual(expect.any(String));
+    });
+
+    it("Both with a provider: a deposit service is paid online, never at the desk", async () => {
+        await expect(
+            publicBookings.bookOnline(rootCanal, booking("DESK"), undefined),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "This takes a deposit when you book. Pay the deposit or the full price online.",
+            },
+        });
+        const out = await publicBookings.bookOnline(
+            rootCanal,
+            booking("DEPOSIT"),
+            undefined,
+        );
+        expect(out.booking.status).toBe("PENDING");
     });
 });

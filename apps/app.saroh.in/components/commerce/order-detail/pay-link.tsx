@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { makeOrderPayLink } from "@/lib/orders/actions";
@@ -56,7 +57,7 @@ export function usePayLink({
         startTransition(async () => {
             const res = await makeOrderPayLink(orderId);
             if (!res.ok) {
-                showError(res.error);
+                reportFailure(res);
                 return;
             }
             setUrl(res.data.url);

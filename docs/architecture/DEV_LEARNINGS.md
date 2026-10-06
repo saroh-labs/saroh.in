@@ -2434,6 +2434,37 @@ other, never to 1. The RLS gate (`int-rls` in `pnpm prepush --all`) is what
 catches a recurrence.
 **Category**: tests · rule in `apps/api.saroh.in/test/truncate.ts`
 
+## Pricing — a publish nested a transaction the Postgres adapter can't open
+
+**Problem**: Every catalogue publish and rollback failed with "Nested
+transactions are not supported by adapter @prisma/adapter-pg: createSavepoint
+is not implemented". The unit's own gate never ran its db specs, so it shipped
+to the integration branch.
+**Root cause**: `writeCatalogueVersion` picked "open my own transaction" by
+checking `"$transaction" in db`, but a transaction client answers to it too;
+called with the publish's `tx`, it opened a second, nested transaction.
+**Fix**: two functions: `writeCatalogueVersion(prisma, …)` opens its own,
+`writeCatalogueVersionInTx(tx, …)` joins the caller's. Never decide by probing
+the client. The pricing db specs (`catalogue-writes.db.spec.ts`) pin it.
+**Category**: database · rule in `packages/database/src/pricing-catalogue.ts`
+
+## Seed — a catalogue version went live after the clock that read it
+
+**Problem**: every fresh showcase seed threw `no "pro" plan`, so the e2e stack
+never started on the marketing branch.
+**Root cause**: the base seed installed catalogue version 1 live from the wall
+clock, while the showcase reads the live plan at the clock rounded down to the
+half hour — earlier, so version 1 wasn't live yet when the showcase looked.
+**Fix**: the seed's version 1 is live from a fixed past date. A seed never
+dates something "now" that a later step reads at a different "now".
+`prepush --e2e` (fresh-seed path) is what caught it.
+**Category**: seed · rule in `packages/database/src/seed/`
+
+## E2E — a new account was sent to production's onboarding
+
+**Problem**: the first browser test to follow a sign-up into onboarding
+(`signup-from-marketing.spec.ts`) timed out on
+
 ## E2E — a new account was sent to production's onboarding
 
 **Problem**: the first browser test to follow a sign-up into onboarding
@@ -2534,6 +2565,22 @@ editor's window, and canvas lookups go through `queryCanvas`.
 code that looks up an element by id from a click uses the click target's
 `ownerDocument` — at phone or tablet width the page is in another document.
 **Category**: frontend · site editor · `apps/app.saroh.in/components/sites/editor/device-frame.tsx`
+
+## Frontend — empty and off states unreadable in dark
+
+**Problem**: In dark mode the line under "No invoices from Saroh yet" (and
+every `EmptyState`, `CapabilityOffState` and `PermissionDeniedState`
+description and note) read at about 2:1 — axe `color-contrast`, found
+checking Plan and billing (U14) in dark.
+**Root cause**: `StateCard` set its description and note in `text-neutral-600`,
+Ink 600, a light-mode cut with no dark value. The `a11y.spec.ts` audit runs
+light only, so nothing caught it.
+**Fix**: `dark:text-muted-foreground` beside it, as the `neutral` Badge
+already does (`packages/ui/src/components/ui/data-state.tsx`).
+**Rule**: A raw ramp step (`text-neutral-600`) on text needs its dark pair;
+prefer a semantic token. Check a screen's empty and failed states in dark,
+not only its full one (`saroh-four-scenes`).
+**Category**: frontend · design system · `packages/ui/src/components/ui/data-state.tsx`
 
 ## Frontend — the calendar's layout switch was 29px tall on a phone
 
@@ -2813,6 +2860,28 @@ API's rules, and the form's `superRefine` puts the problem under its field.
 checks".
 **Category**: discounts · forms · `apps/app.saroh.in/components/stores/discount-form.tsx`
 
+## Orders — a counter-paid order edited up asked for its whole new total
+
+**Symptom**: an order paid in cash at the counter, edited to cost more, asked
+for its whole new total online instead of the difference; on a plan without
+online payments the edit said "the money didn't settle" and nothing could
+record the difference by hand (audit, 6 Oct 2026).
+**Root cause**: the edit worked out what was paid from SUCCEEDED payment
+intents only. A counter payment (`takeCounterPaymentInTx`, "Record as paid")
+writes no intent and kept no amount, so `kept` was 0. The read had papered
+over the same gap with "paid by hand: nothing is due".
+**Fix**: `Order.paidByHand` keeps what was taken outside Saroh;
+`orders/hand-payments.ts` counts it beside online payments for the edit, the
+read, the list row and the pay link (0 on an older order paid by hand reads
+as its total). With no way online (`orders/order-online.ts`) nothing is
+tried, and "Record payment" (`POST orders/:id/record-payment`) settles the
+difference and its supplementary invoice. Edited down, the till gives back
+what was paid by hand. `order-kitchen.service.spec.ts` ("the difference after
+an edit…") and `order-difference.db.spec.ts` cover it.
+**Rule**: "what the order was paid" is every payment it received — online
+and recorded by hand — read through `hand-payments.ts`, never intents alone.
+**Category**: orders · money · `apps/api.saroh.in/src/modules/orders/order-kitchen.service.ts`
+
 ## Seeds — the clinic's 70-day sweep timed out on CI, not locally
 
 **Symptom**: PR #825's unit job failed twice on `clinic.test.ts` ("keeps
@@ -2843,3 +2912,19 @@ build, every time (about a second).
 **Rule**: anything generated outside a task's turbo `outputs` must be
 regenerated before it is used; a cache hit won't do it.
 **Category**: gate · Prisma · `scripts/prepush.sh` (int-build)
+
+## Tests — a db spec passed in every local gate and failed in CI on PAYMENTS_ENC_KEY
+
+**Symptom**: `plan-limits.db.spec.ts` ("integrations … refuses a new
+connection past the cap") passed in every `pnpm prepush --int`/`--all` and
+failed in CI's integration shard with "PAYMENTS_ENC_KEY is not set".
+**Root cause**: connecting a provider encrypts its credentials. The local gate
+exports a test `PAYMENTS_ENC_KEY` for every step (`scripts/prepush.sh`); CI's
+integration job sets none. Specs that connect providers mock `../../env` with
+the test key; this one read the real env, so it only worked locally.
+**Fix**: the spec mocks `../../env`, keeping the real values and adding the
+test key, as the payments specs do.
+**Rule**: a db spec that encrypts or connects a provider brings its own test
+key (mock `../../env`); never rely on the gate's exported one. Check by running
+it with `env -u PAYMENTS_ENC_KEY`.
+**Category**: tests · CI vs local gate

@@ -408,8 +408,9 @@ export default function BookingFlow({
         chosenStart?.startAt ?? null,
     );
     // The ways this service may be paid (E8): the one chosen, else the
-    // first — and a service that takes a deposit is never at the desk.
-    // Only the ways the business allows (DEC-088).
+    // first — and a service that takes a deposit is at the desk only when
+    // online can't take it (DEC-089). Only the ways the business allows
+    // (DEC-088).
     const way = bookingPaymentOf(page.rules);
     const choices = service
         ? [
@@ -417,9 +418,9 @@ export default function BookingFlow({
               ...payChoices(service, page.payOnline, page.businessName, way),
           ]
         : [];
-    // A priced service nothing the business allows can pay for (a deposit,
-    // or online only, with no way to pay online): it can't be booked here,
-    // and the summary shows no payment line (#822). A credit still books it.
+    // A priced service nothing the business allows can pay for (online
+    // only, with no way to pay online): it can't be booked here, and the
+    // summary shows no payment line (#822). A credit still books it.
     const unpayable = credit
         ? null
         : unpayableText(service, page.payOnline, page.businessName, way);

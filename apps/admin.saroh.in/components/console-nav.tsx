@@ -7,6 +7,7 @@ import {
     Rocket,
     ScrollText,
     ShieldCheck,
+    Tags,
     UserPlus,
     Users,
     Webhook,
@@ -54,6 +55,12 @@ const GROUPS: ConsoleNavGroup[] = [
                 label: "People",
                 icon: Users,
                 permission: "organization:pii:read",
+            },
+            {
+                href: "/plans",
+                label: "Plans & modules",
+                icon: Tags,
+                permission: "pricing:read",
             },
             {
                 href: "/flags",

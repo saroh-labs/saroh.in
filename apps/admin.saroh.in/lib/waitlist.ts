@@ -20,8 +20,12 @@ export interface WaitlistSummary {
         email: string;
         referrals: number;
     }[];
-    /** False when this instance does not know where people sign up. */
+    /** U31: invited people who made their business with the invite. */
+    joined: number;
+    /** False when invites can't go: no sign-up address or no launch offer. */
     canInvite: boolean;
+    /** Why not, in the API's words; null when they can. */
+    inviteBlocker: string | null;
 }
 
 export interface WaitlistRow {
@@ -39,6 +43,10 @@ export interface WaitlistRow {
     source: string | null;
     createdAt: string;
     invitedAt: string | null;
+    /** U31: when the invite email left; null while it is being sent. */
+    inviteSentAt: string | null;
+    /** U31: when they made their business with the invite. */
+    joinedAt: string | null;
 }
 
 export function getWaitlistSummary(): Promise<WaitlistSummary | null> {

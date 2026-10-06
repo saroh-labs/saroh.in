@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson } from "@/lib/api/http";
+import type { PlanRefusal } from "@/lib/billing/refusal";
 
 /**
  * CSV import data access for app.saroh.in (#175).
@@ -60,7 +61,7 @@ export interface ImportDescriptor {
 
 export type Result<T> =
     | { ok: true; data: T }
-    | { ok: false; error: string; fileIssues?: RowIssue[] };
+    | { ok: false; error: string; fileIssues?: RowIssue[]; plan?: PlanRefusal };
 
 export interface ImportInput {
     csv: string;
@@ -79,9 +80,12 @@ async function post<T>(path: string, body: unknown): Promise<Result<T>> {
     // A refused file lists its problems under `error.details.fileIssues`.
     const details = (data as { error?: { details?: unknown } } | null)?.error
         ?.details as { fileIssues?: RowIssue[] } | undefined;
+    const failure = toFailure(data, "Something went wrong");
     return {
         ok: false,
-        error: toFailure(data, "Something went wrong").error,
+        error: failure.error,
+        // Its plan refused the rows (U13): shown as the notice (U14).
+        ...(failure.plan ? { plan: failure.plan } : {}),
         ...(details?.fileIssues ? { fileIssues: details.fileIssues } : {}),
     };
 }

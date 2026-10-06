@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
 
 import { BookingDetailView } from "@/components/bookings/booking-detail";
+import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packOffer, usablePacks } from "@/lib/class-packs/balance";
 import { readPurchasesFor } from "@/lib/class-packs/service";
 import { packsOn } from "@/lib/class-packs/switched-on";
-import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import {
     canReadOrders,
     canRefundPayments,
@@ -57,14 +59,15 @@ export default async function BookingPage({
     // about its OUTCOME is decided by the clock — only a person sets that.
     const organization = await resolveActiveOrganization();
     // Taking payment at the desk (P2), and sending a pay link instead when
-    // a provider is connected to take it.
+    // the plan takes online payment and a provider is connected (R33).
     const canTake = canTakeDeskPayments(organization);
     const desk = {
         canTake,
         canLink:
             canTake &&
             !!booking.money?.take?.byLink &&
-            (await hasPaymentProvider().catch(() => false)),
+            (await onlinePayReady()),
+        online: takesOnlinePayment(await billingAccessOrNull()),
     };
     return (
         <BookingDetailView

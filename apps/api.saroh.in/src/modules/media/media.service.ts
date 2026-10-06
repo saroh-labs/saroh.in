@@ -18,6 +18,8 @@ import {
 } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { BYTES_PER_GB } from "../billing/metering";
+import { planMeter } from "../billing/metering.service";
 import { authorize } from "../organizations/organization-policy";
 import { OBJECT_STORAGE } from "./object-storage.provider";
 
@@ -202,10 +204,24 @@ export class MediaService {
         // Falls back to the recorded size when the head misses (dev/memory).
         const sizeBytes = head?.contentLength ?? media.sizeBytes;
 
-        const updated = await prisma.media.update({
-            where: { id: media.id },
-            data: { status: "READY", sizeBytes },
-        });
+        // The plan's storage (`storageGb`) is soft: counted, and the
+        // business told when it passes its space, never refused. Checked on
+        // the write's transaction while this file is still PENDING, so the
+        // count is what was there before it.
+        const updated = await planMeter.withRoom(
+            ctx.organizationId,
+            "storage",
+            (db) =>
+                db.media.update({
+                    where: { id: media.id },
+                    data: { status: "READY", sizeBytes },
+                }),
+            {
+                soft: true,
+                // Confirming again adds nothing it hadn't already counted.
+                adding: media.status === "READY" ? 0 : sizeBytes / BYTES_PER_GB,
+            },
+        );
 
         return {
             id: updated.id,

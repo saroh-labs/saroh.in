@@ -36,6 +36,10 @@ import { BusinessSection } from "@/components/organizations/business-section";
 import { GstinGuide } from "@/components/organizations/gstin-guide";
 import { InvoiceNumberFields } from "@/components/organizations/invoice-number-fields";
 import {
+    PAY_SECTION,
+    PayInstructionsSection,
+} from "@/components/organizations/pay-instructions-section";
+import {
     fieldWidth,
     RegisteredAddressFields,
 } from "@/components/organizations/registered-address-fields";
@@ -287,11 +291,28 @@ const SECTIONS = {
 type SectionKey = keyof typeof SECTIONS;
 const SECTION_KEYS = Object.keys(SECTIONS) as SectionKey[];
 
-/** The tabs, in the design's order. */
-type TabKey = SectionKey | "hours";
-const TAB_KEYS: TabKey[] = ["identity", "contact", "tax", "hours", "address"];
+/**
+ * The tabs, in the design's order; How to pay us (R32) follows what every
+ * invoice carries. Hours and How to pay us keep their own forms.
+ */
+type OwnFormKey = "hours" | "pay";
+type TabKey = SectionKey | OwnFormKey;
+const TAB_KEYS: TabKey[] = [
+    "identity",
+    "contact",
+    "tax",
+    "pay",
+    "hours",
+    "address",
+];
+const OWN_FORM: Record<OwnFormKey, { title: string; panel: string }> = {
+    hours: { title: HOURS_SECTION.title, panel: "business-hours-panel" },
+    pay: { title: PAY_SECTION.title, panel: "business-pay-panel" },
+};
+const isOwnForm = (key: TabKey | null): key is OwnFormKey =>
+    key === "hours" || key === "pay";
 const titleOf = (key: TabKey) =>
-    key === "hours" ? HOURS_SECTION.title : SECTIONS[key].title;
+    isOwnForm(key) ? OWN_FORM[key].title : SECTIONS[key].title;
 
 const sectionOf = (field: string): SectionKey =>
     SECTION_KEYS.find((key) =>
@@ -401,6 +422,8 @@ export function OrganizationSettingsForm({
     const [editing, setEditing] = useState<TabKey | null>(null);
     // The Hours card keeps its own form; whether it has changes, from it.
     const [hoursDirty, setHoursDirty] = useState(false);
+    // How to pay us (R32) keeps its own form too.
+    const [payDirty, setPayDirty] = useState(false);
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: valuesOf(initial),
@@ -422,7 +445,12 @@ export function OrganizationSettingsForm({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run per change of the values (or a refusal appearing), not per render
     }, [watched, showing]);
     // Whether the open card has changes, whichever form holds it.
-    const editDirty = editing === "hours" ? hoursDirty : isDirty;
+    const editDirty =
+        editing === "hours"
+            ? hoursDirty
+            : editing === "pay"
+              ? payDirty
+              : isDirty;
     // An open edit with changes holds the way off this page.
     const { leaveTo, stay } = useLeaveGuard(editing !== null && editDirty);
     // Undo on a save (F12); what it saved back shows at once.
@@ -489,7 +517,7 @@ export function OrganizationSettingsForm({
 
     async function onSubmit(values: FormValues) {
         // Hours save through their own card's form.
-        if (!editing || editing === "hours") return;
+        if (!editing || isOwnForm(editing)) return;
         // The number format's rules, said on its field before the API would.
         const numberRefusal = numberFormatProblemOnSave(values, dirtyFields);
         if (numberRefusal) {
@@ -1141,8 +1169,8 @@ export function OrganizationSettingsForm({
                             role="tab"
                             aria-selected={on}
                             aria-controls={
-                                key === "hours"
-                                    ? "business-hours-panel"
+                                isOwnForm(key)
+                                    ? OWN_FORM[key].panel
                                     : "business-panel"
                             }
                             tabIndex={on ? 0 : -1}
@@ -1167,7 +1195,7 @@ export function OrganizationSettingsForm({
             </div>
 
             <div className="flex flex-wrap items-start gap-5">
-                {tab === "hours" ? null : (
+                {isOwnForm(tab) ? null : (
                     <div className="grid min-w-0 flex-[1_1_460px] gap-4">
                         <form
                             id="business-panel"
@@ -1227,9 +1255,23 @@ export function OrganizationSettingsForm({
                     onDirty={setHoursDirty}
                     offerUndo={undo.offer}
                 />
+                {/* Its own form and its own preview: what customers see. */}
+                <PayInstructionsSection
+                    saved={settings.payInstructions}
+                    businessName={settings.name}
+                    hidden={tab !== "pay"}
+                    editing={editing === "pay"}
+                    canEdit={canEdit}
+                    onEdit={() => startEditing("pay")}
+                    onDone={() => setEditing(null)}
+                    onDirty={setPayDirty}
+                    onSaved={setSettings}
+                    offerUndo={undo.offer}
+                />
 
                 <BusinessPrintPreview
-                    live={editing !== null && editing !== "hours" && isDirty}
+                    hidden={tab === "pay"}
+                    live={editing !== null && !isOwnForm(editing) && isDirty}
                     logoUrl={settings.logo?.url ?? null}
                     registered={registered}
                     number={number(v)}

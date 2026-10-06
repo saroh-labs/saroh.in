@@ -15,6 +15,9 @@ jest.mock("@saroh/database", () => {
 import { Logger } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
+import { planMeter } from "../billing/metering.service";
+
 import {
     RENEW_BATCH,
     RENEW_EVERY_MS,
@@ -108,6 +111,37 @@ describe("subscription.renew", () => {
         ]);
         // …and the next run is still enqueued.
         expect(jobCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("renews on a plan without online payments: subscriptions a business already has never ask the plan", async () => {
+        // The business's plan leaves `payments` and `subscriptions` off
+        // (`billing/online-payments-plan.ts`): new ones stop, these go on.
+        const enforcedRow = jest
+            .spyOn(planMeter, "enforcedRow")
+            .mockImplementation((_org: string, moduleId: string) =>
+                Promise.resolve(
+                    fakePaymentsRow(
+                        "free",
+                        moduleId as "payments" | "subscriptions",
+                    ),
+                ),
+            );
+        const assertIncluded = jest.spyOn(planMeter, "assertIncluded");
+        findMany.mockResolvedValue([
+            { id: "sub_1", organizationId: "org_free" },
+            { id: "sub_2", organizationId: "org_free" },
+        ]);
+
+        await handler.handle(JOB);
+
+        expect(renewOne.mock.calls.map((c) => c[0])).toEqual([
+            "sub_1",
+            "sub_2",
+        ]);
+        expect(enforcedRow).not.toHaveBeenCalled();
+        expect(assertIncluded).not.toHaveBeenCalled();
+        enforcedRow.mockRestore();
+        assertIncluded.mockRestore();
     });
 
     it("counts a period left uncharged by skips in the run's log", async () => {

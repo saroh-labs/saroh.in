@@ -19,6 +19,8 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { UNMETERED_ROLE } from "../billing/metering";
+import { planMeter } from "../billing/metering.service";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
@@ -292,33 +294,65 @@ export class OrganizationMembersService {
 
         const token = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-        const invitation = await prisma.organizationInvitation.upsert({
-            where: {
-                organizationId_email: {
-                    organizationId: ctx.organizationId,
-                    email: dto.email,
-                },
+        // The plan's team members cap counts people and open invitations
+        // (U13), Reviewers left out: a new invitation is checked; sending a
+        // live one again adds nobody. A Reviewer is checked against the
+        // plan's own Reviewers cap instead, the same way.
+        const reviewer = dto.role === UNMETERED_ROLE;
+        const invitation = await planMeter.withRoom(
+            ctx.organizationId,
+            reviewer ? "reviewers" : "members",
+            (tx) =>
+                tx.organizationInvitation.upsert({
+                    where: {
+                        organizationId_email: {
+                            organizationId: ctx.organizationId,
+                            email: dto.email,
+                        },
+                    },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        email: dto.email,
+                        role: dto.role,
+                        siteIds,
+                        tokenHash: hashInviteToken(token),
+                        invitedByUserId: ctx.userId,
+                        expiresAt,
+                    },
+                    update: {
+                        role: dto.role,
+                        siteIds,
+                        tokenHash: hashInviteToken(token),
+                        invitedByUserId: ctx.userId,
+                        expiresAt,
+                        status: "PENDING",
+                        acceptedAt: null,
+                    },
+                    select: {
+                        id: true,
+                        email: true,
+                        role: true,
+                        expiresAt: true,
+                    },
+                }),
+            {
+                // A live invitation of the same kind already counts this person.
+                addingIn: async (tx) =>
+                    (await tx.organizationInvitation.count({
+                        where: {
+                            organizationId: ctx.organizationId,
+                            email: dto.email,
+                            status: "PENDING",
+                            expiresAt: { gt: new Date() },
+                            role: reviewer
+                                ? UNMETERED_ROLE
+                                : { not: UNMETERED_ROLE },
+                        },
+                    })) > 0
+                        ? 0
+                        : 1,
             },
-            create: {
-                organizationId: ctx.organizationId,
-                email: dto.email,
-                role: dto.role,
-                siteIds,
-                tokenHash: hashInviteToken(token),
-                invitedByUserId: ctx.userId,
-                expiresAt,
-            },
-            update: {
-                role: dto.role,
-                siteIds,
-                tokenHash: hashInviteToken(token),
-                invitedByUserId: ctx.userId,
-                expiresAt,
-                status: "PENDING",
-                acceptedAt: null,
-            },
-            select: { id: true, email: true, role: true, expiresAt: true },
-        });
+        );
 
         const organization = await prisma.organization.findUnique({
             where: { id: ctx.organizationId },
@@ -599,8 +633,27 @@ export class OrganizationMembersService {
         const kept = extraActionsFor(dto.role, membership.extraActions);
         const extrasChanged = kept.length !== membership.extraActions.length;
 
+        // A Reviewer isn't counted on the plan's team members (U13); moved
+        // to any other role, they are one more. Checked first on the
+        // transaction, as it takes the meter's lock.
+        const joinsTheCount =
+            membership.role === UNMETERED_ROLE && dto.role !== UNMETERED_ROLE;
+        // Made a Reviewer from another role: one more on the Reviewers cap.
+        const becomesReviewer =
+            membership.role !== UNMETERED_ROLE && dto.role === UNMETERED_ROLE;
+
         await prisma.$transaction(
             async (tx) => {
+                if (joinsTheCount) {
+                    await planMeter.roomInTx(tx, ctx.organizationId, "members");
+                }
+                if (becomesReviewer) {
+                    await planMeter.roomInTx(
+                        tx,
+                        ctx.organizationId,
+                        "reviewers",
+                    );
+                }
                 await tx.membership.update({
                     where: {
                         organizationId_userId: {

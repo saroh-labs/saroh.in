@@ -19,8 +19,11 @@ import {
     payLinkRefusal,
     payLinkStanding,
 } from "../orders/order-pay-link";
+import type { PayInstructionsView } from "../organizations/business-pay-instructions";
+import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
+import { orderPayOnline } from "./order-pay-online";
 import type { CreateIntentResult } from "./payments.service";
 import { PaymentsService } from "./payments.service";
 import { parseIntentBody } from "./public-invoices.service";
@@ -50,11 +53,24 @@ export interface PublicOrderPayView {
     /** The business's site theme as `--site-*` variables; null for defaults. */
     theme: Record<string, string> | null;
     /**
+     * Whether the page offers "Pay" (`orderPayOnline`, R33): false on a plan
+     * without online payments, with Payments off, or with no provider that
+     * opens the checkout window. The page then shows the order view-only,
+     * with "Pay {business} directly", as the invoice page does.
+     */
+    payOnline: boolean;
+    /**
      * Where this link lives (DEC-069, plan L6): `orderPayLinkUrlFor`'s
      * answer, the business's own address or the apex. The renderer sends
      * a pay page opened on another host here.
      */
     payUrl: string;
+    /**
+     * "How to pay us" (R32): the business's UPI ID, bank details and note,
+     * while the order is DUE — the customer's own order, read by its link.
+     * Null when nothing is due or the business set none.
+     */
+    payInstructions: PayInstructionsView | null;
 }
 
 /** Reads per caller per minute: a page reload is fine, a scraper is not. */
@@ -141,15 +157,18 @@ export class PublicOrderPayService {
                 },
             });
             if (!order?.organization) notFound();
-            const site = await prisma.site.findFirst({
-                where: {
-                    organizationId: found.organizationId,
-                    deletedAt: null,
-                    currentPublicationId: { not: null },
-                },
-                orderBy: { createdAt: "asc" },
-                select: { style: true },
-            });
+            const [site, payOnline] = await Promise.all([
+                prisma.site.findFirst({
+                    where: {
+                        organizationId: found.organizationId,
+                        deletedAt: null,
+                        currentPublicationId: { not: null },
+                    },
+                    orderBy: { createdAt: "asc" },
+                    select: { style: true },
+                }),
+                orderPayOnline(prisma, found.organizationId, order.storeId),
+            ]);
             const status = payLinkStanding(order);
             const first = order.customer
                 ? (order.customer.firstName?.trim() ?? "")
@@ -174,10 +193,15 @@ export class PublicOrderPayService {
                 due: money(status === "DUE" ? dueCentsOf(order) : 0),
                 currency: order.currency,
                 status,
+                payOnline,
                 theme: site
                     ? siteStyleVariables(parseSiteStyle(site.style))
                     : null,
                 payUrl: await orderPayLinkUrlFor(found.organizationId, token),
+                payInstructions:
+                    status === "DUE"
+                        ? await businessPayInstructionsOf(found.organizationId)
+                        : null,
             };
         });
     }

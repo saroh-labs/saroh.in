@@ -1,7 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { AnalyticsEvent, Job } from "@saroh/database";
+import type { AnalyticsEvent, Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { planMeter } from "../billing/metering.service";
 import { SITE_VIEW_TYPE } from "./event-contract";
 
 /** The job `type` this handler is registered under. */
@@ -32,6 +33,15 @@ interface Bucket {
     count: number;
     /** Distinct non-null visitor hashes seen — its size is `uniqueCount`. */
     visitors: Set<string>;
+}
+
+/** The org-wide total of site views: the row visits a month are counted from. */
+function isVisitsTotal(bucket: Bucket): boolean {
+    return (
+        bucket.type === SITE_VIEW_TYPE &&
+        bucket.siteId === ALL_SITES &&
+        bucket.dimension === TOTAL_DIM
+    );
 }
 
 /**
@@ -74,38 +84,92 @@ export class AnalyticsAggregateHandler {
 
         // Recompute is idempotent: set absolute values via upsert.
         for (const bucket of buckets.values()) {
-            await prisma.analyticsDailyAggregate.upsert({
-                where: {
-                    organizationId_siteId_date_type_dimension_dimensionValue: {
-                        organizationId,
-                        siteId: bucket.siteId,
-                        date: dayStart,
-                        type: bucket.type,
-                        dimension: bucket.dimension,
-                        dimensionValue: bucket.dimensionValue,
-                    },
-                },
-                create: {
-                    organizationId,
-                    siteId: bucket.siteId,
-                    date: dayStart,
-                    type: bucket.type,
-                    dimension: bucket.dimension,
-                    dimensionValue: bucket.dimensionValue,
-                    count: bucket.count,
-                    uniqueCount: bucket.visitors.size,
-                },
-                update: {
-                    count: bucket.count,
-                    uniqueCount: bucket.visitors.size,
-                },
-            });
+            if (isVisitsTotal(bucket)) {
+                await this.writeVisitsTotal(organizationId, dayStart, bucket);
+                continue;
+            }
+            await this.upsert(prisma, organizationId, dayStart, bucket);
         }
 
         this.logger.log(
             `analytics.aggregate: org ${organizationId} ${dayStart.toISOString().slice(0, 10)} → ${events.length} events, ${buckets.size} aggregates.`,
         );
     };
+
+    /**
+     * The day's org-wide site views, the row the plan's visits a month
+     * (`visitsPerMonth`) count. Soft: the business is told when the month
+     * passes its visits, and nothing is ever refused — here, on the job,
+     * never on the visitor's request. What the recount adds over the row as
+     * it stood is what's metered; a failed meter never costs the rollup.
+     */
+    private async writeVisitsTotal(
+        organizationId: string,
+        dayStart: Date,
+        bucket: Bucket,
+    ): Promise<void> {
+        const key = this.uniqueKey(organizationId, dayStart, bucket);
+        try {
+            const before = await prisma.analyticsDailyAggregate.findUnique({
+                where: key,
+                select: { count: true },
+            });
+            await planMeter.withRoom(
+                organizationId,
+                "visits",
+                (db) => this.upsert(db, organizationId, dayStart, bucket),
+                {
+                    soft: true,
+                    adding: Math.max(0, bucket.count - (before?.count ?? 0)),
+                },
+            );
+        } catch (err) {
+            this.logger.warn(
+                `analytics.aggregate: visits meter failed org=${organizationId} error=${err instanceof Error ? err.name : "unknown"}`,
+            );
+            await this.upsert(prisma, organizationId, dayStart, bucket);
+        }
+    }
+
+    /** The aggregate row's unique key for one bucket. */
+    private uniqueKey(organizationId: string, dayStart: Date, bucket: Bucket) {
+        return {
+            organizationId_siteId_date_type_dimension_dimensionValue: {
+                organizationId,
+                siteId: bucket.siteId,
+                date: dayStart,
+                type: bucket.type,
+                dimension: bucket.dimension,
+                dimensionValue: bucket.dimensionValue,
+            },
+        };
+    }
+
+    /** Set one aggregate row's absolute counts. */
+    private async upsert(
+        db: Pick<Prisma.TransactionClient, "analyticsDailyAggregate">,
+        organizationId: string,
+        dayStart: Date,
+        bucket: Bucket,
+    ): Promise<void> {
+        await db.analyticsDailyAggregate.upsert({
+            where: this.uniqueKey(organizationId, dayStart, bucket),
+            create: {
+                organizationId,
+                siteId: bucket.siteId,
+                date: dayStart,
+                type: bucket.type,
+                dimension: bucket.dimension,
+                dimensionValue: bucket.dimensionValue,
+                count: bucket.count,
+                uniqueCount: bucket.visitors.size,
+            },
+            update: {
+                count: bucket.count,
+                uniqueCount: bucket.visitors.size,
+            },
+        });
+    }
 
     /**
      * Fold the day's events into aggregate buckets:

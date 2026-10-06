@@ -380,9 +380,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   (claim, what backs it, status); a new claim gets its row first.
 - **Current** — There are no customers, testimonials or case studies. Never
   fabricate them.
-- **Current** — Signup is waitlist-only. Social publishing is not a current
-  priority and must not be exposed as production-ready (§22). AI features are
-  deferred (DEC-015).
+- **Current** — Signup is waitlist-only. Open sign-up is built behind the one
+  launch switch, `NEXT_PUBLIC_LAUNCH_MODE=open` on saroh.in (plan U27): every
+  start button then goes to accounts `/signup?plan=&cycle=`, the plan rides
+  through verification to onboarding, is checked there against the live
+  catalogue, and a paid one goes on to its checkout once the business exists
+  (Free otherwise, and an unknown plan says so). Flipping the switch is
+  launch; until then no CTA points at sign-up. Social publishing is not a
+  current priority and must not be exposed as production-ready (§22). AI
+  features are deferred (DEC-015).
 - **Current** — The name Saroh and its wordmark are fixed; palette, type, shape,
   density and motion are open (confirmed 2026-08-04).
 

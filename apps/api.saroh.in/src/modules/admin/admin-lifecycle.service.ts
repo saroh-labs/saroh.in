@@ -644,7 +644,7 @@ function operatorContext(command: OperatorCommand): OrganizationContext {
     };
 }
 
-function assertNotProviderManaged(
+export function assertNotProviderManaged(
     subscription: { provider: string | null } | null,
 ): void {
     if (subscription?.provider) {
@@ -654,7 +654,7 @@ function assertNotProviderManaged(
     }
 }
 
-function requireReason(value: string): string {
+export function requireReason(value: string): string {
     const reason = value.trim();
     if (reason.length < 4) {
         throw new BadRequestException("Give a reason for this change.");

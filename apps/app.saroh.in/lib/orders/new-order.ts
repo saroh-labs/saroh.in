@@ -95,21 +95,31 @@ export function payOptions(input: {
     way: NewOrderWay["type"] | null;
     /** A pay link can be made here: `order:create` (B16) and a provider. */
     canLink: boolean;
+    /**
+     * The plan takes payment online (`takesOnlinePayment`). When it
+     * doesn't, the link isn't offered at all — not even greyed out — and
+     * the counter ways are the choices (R33). Absent: yes.
+     */
+    online?: boolean;
 }): { key: NewOrderPay; label: string; off: string | null }[] {
     const reach = reachOf(input.pick);
     return [
         { key: "CASH", label: "Cash", off: null },
         { key: "UPI", label: "UPI at the counter", off: null },
         { key: "CARD", label: "Card machine", off: null },
-        {
-            key: "LINK",
-            label: "Send a payment link",
-            off: !input.canLink
-                ? "Connect a payment provider to send a link"
-                : !reach
-                  ? "Needs a customer with a phone or email"
-                  : null,
-        },
+        ...(input.online === false
+            ? []
+            : [
+                  {
+                      key: "LINK" as const,
+                      label: "Send a payment link",
+                      off: !input.canLink
+                          ? "Connect a payment provider to send a link"
+                          : !reach
+                            ? "Needs a customer with a phone or email"
+                            : null,
+                  },
+              ]),
         {
             key: "LATER",
             label: "Pay on collection",

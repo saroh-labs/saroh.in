@@ -182,6 +182,15 @@ export interface EditOrderInput {
 export interface EditOrderOutcome {
     differenceCents: number;
     settleCents: number;
+    /**
+     * Still owed after the edit. Asked for online when `online`; else the
+     * business is paid at the counter and records it ("Record payment").
+     * Absent from an API before the audit of 6 Oct 2026.
+     */
+    dueCents?: number;
+    online?: boolean;
+    /** Of what goes back, the part to give from the till (paid by hand). */
+    handBackCents?: number;
     refund: { amountCents: number; status: string } | null;
     moneyError: string | null;
 }
@@ -195,6 +204,25 @@ export function editOrderBeforePreparing(
         "PATCH",
         input,
         "The order wasn't changed. Try again.",
+    );
+}
+
+/** How the money still owed on a paid order was paid at the counter. */
+export type CounterPayment = "CASH" | "UPI" | "CARD";
+
+/**
+ * "Record payment": what a paid order still owes — an edit's difference —
+ * was paid in cash, by UPI or by card. The API works out the amount.
+ */
+export function recordOrderPayment(
+    orderId: string,
+    kind: CounterPayment,
+): Promise<CrmResult<{ amountCents: number }>> {
+    return mutate(
+        path(orderId, "/record-payment"),
+        "POST",
+        { kind },
+        "The payment wasn't recorded. Try again.",
     );
 }
 

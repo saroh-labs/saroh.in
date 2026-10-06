@@ -1,10 +1,12 @@
 import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { SubscriptionsScreen } from "@/components/subscriptions/subscriptions-screen";
+import { membershipPlansLock, onlinePaymentsLock } from "@/lib/billing/access";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
 import {
@@ -60,14 +62,18 @@ export default async function SubscriptionsPage({
             listPlansOptional(),
             modulesOrUnknown(),
         ]);
-    const [contacts, renewals, charges, settings, autopay] = await Promise.all([
-        canWrite ? contactPickerOptions() : Promise.resolve([]),
-        getRenewals().catch(() => null),
-        listChargesBySubscription(),
-        getSubscriptionSettings(),
-        // Whether the copy may promise autopay (D14).
-        getAutopayOffer(),
-    ]);
+    const [contacts, renewals, charges, settings, autopay, access] =
+        await Promise.all([
+            canWrite ? contactPickerOptions() : Promise.resolve([]),
+            getRenewals().catch(() => null),
+            listChargesBySubscription(),
+            getSubscriptionSettings(),
+            // Whether the copy may promise autopay (D14).
+            getAutopayOffer(),
+            // A plan without memberships or online payments starts no new one;
+            // the ones it has keep renewing.
+            billingAccessOrNull(),
+        ]);
     const plans = planRead.state === "ok" ? planRead.data : null;
     const appointments = modules
         ? modules.some(
@@ -104,6 +110,8 @@ export default async function SubscriptionsPage({
                 nowIso={now.toISOString()}
                 settings={settings}
                 autopayOffered={autopay?.offered ?? false}
+                newLocked={onlinePaymentsLock(access, "subscriptions")}
+                plansLocked={membershipPlansLock(access)}
             />
         </PageContainer>
     );

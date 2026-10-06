@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { SIGN_IN_URL } from "@/lib/links";
+import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
 
 import { CtaLink } from "./cta-link";
 import type { NavItem, NavSection } from "./nav-items";
@@ -19,7 +19,8 @@ const ROW =
 /**
  * The phone nav (below 760px, Nav design): the start button and a Menu
  * button that opens a full-screen sheet with Features, Solutions and (when
- * any page is live) Resources as accordions — the section the page is in starts open — then Sign in
+ * any page is live) Resources as accordions — the section the page is in
+ * starts open — then Pricing (once the launch switch is open), Sign in
  * and the start button. Esc or × closes it and returns focus to Menu; while
  * it is open, focus stays inside.
  */
@@ -155,6 +156,16 @@ function Sheet({
                     open={resourcesOpen}
                     onToggle={() => setResourcesOpen(!resourcesOpen)}
                 />
+            ) : null}
+            {LAUNCH_MODE === "open" ? (
+                <Link
+                    href="/pricing"
+                    onClick={onClose}
+                    aria-current={pathname === "/pricing" ? "page" : undefined}
+                    className={ROW}
+                >
+                    Pricing
+                </Link>
             ) : null}
             <a href={SIGN_IN_URL} className={ROW}>
                 Sign in

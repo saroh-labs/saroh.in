@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { faqs, HOME_FAQ, solutionFaq } from "./faq";
 import { features } from "./features";
-import { CTA_BAND, FREE_PLAN_LINE, home } from "./home";
+import { CTA_BAND, FREE_PLAN_LINE, home, PLAN_TEASERS } from "./home";
 import { shots } from "./shots";
 import { segmentViews, solutions } from "./solutions";
 import type { ShotRef } from "./types";
@@ -150,6 +150,7 @@ describe("solution pages", () => {
                 );
             }
             expect(faqs[s.faq], `${slug}: ${s.faq}`).toBeDefined();
+            expect(s.pricing.featured).not.toBe(s.pricing.second);
         },
     );
 
@@ -258,14 +259,14 @@ describe("the shot manifest", () => {
 
 /**
  * The repo is public: no prices and no plan limits in content (MKT brief).
- * Until Pricing is published, no page names a plan's price, limits or
- * contents (Gate W).
+ * Plans appear by name only; prices render a placeholder.
  */
 describe("no prices or plan limits", () => {
     const everything = JSON.stringify({
         features,
         solutions,
         faqs,
+        PLAN_TEASERS,
         FREE_PLAN_LINE,
         home,
         CTA_BAND,

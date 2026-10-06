@@ -298,6 +298,7 @@ function OneToOne({
                 currency={b.service.currency ?? null}
                 who={whoFor(b)}
                 canLink={ctx.desk.canLink}
+                online={ctx.desk.online}
                 variant="outline"
                 triggerClassName={btn.ghost}
             />,

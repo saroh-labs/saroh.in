@@ -112,6 +112,7 @@ export function CalendarScreen({
     can,
     newBooking,
     notices = null,
+    limitNotice = null,
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -130,12 +131,19 @@ export function CalendarScreen({
         hours: boolean;
         order?: boolean;
         /** Take payment at the desk, and send a pay link instead (P2). */
-        desk?: { canTake: boolean; canLink: boolean };
+        desk?: {
+            canTake: boolean;
+            canLink: boolean;
+            /** The plan takes payment online (R33); else no link is offered. */
+            online?: boolean;
+        };
     };
     /** The full New booking dialog, for any service at any open time. */
     newBooking: ReactNode;
     /** What the business can tell its customers with (A14). */
     notices?: NoticeChannels | null;
+    /** The plan's bookings-a-month notice at 80% and 100% (U14). */
+    limitNotice?: ReactNode;
 }) {
     const router = useRouter();
     const { hold, undo, pending } = useHeld();
@@ -509,6 +517,7 @@ export function CalendarScreen({
                 </div>
             </BookingsTopBar>
             <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+                {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
                 <div className="mb-3 flex flex-wrap items-center gap-3">
                     <h1 className="m-0 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
                         {heading}

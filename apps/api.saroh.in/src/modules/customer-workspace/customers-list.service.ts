@@ -476,7 +476,7 @@ export class CustomersListService {
             WHERE l."organizationId" = ${organizationId}
               AND l."contactId" = ANY(${contactIds}::text[])
               AND o."organizationId" = ${organizationId}
-              AND NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID')
+              AND NOT (o."placedOnline" AND NOT o."payOnHandover" AND o."paymentStatus" = 'UNPAID')
             ORDER BY l."contactId", o."createdAt" DESC, o.id DESC`;
         for (const r of rows) out.set(r.contactId, { id: r.id, name: r.name });
         return out;

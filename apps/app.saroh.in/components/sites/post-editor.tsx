@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import { MediaPicker } from "@/components/sites/media-picker";
@@ -214,7 +215,9 @@ export function PostEditor({
         const res = await publishPost(siteId, id);
         setPublishing(false);
         if (!res.ok) {
-            showError(res.error);
+            // At the plan's blog-posts limit (U13): its notice, not a toast.
+            if (res.plan) showPlanRefusal(res.plan);
+            else showError(res.error);
             return;
         }
         setLive(true);

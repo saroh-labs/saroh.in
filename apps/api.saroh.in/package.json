@@ -30,6 +30,7 @@
     "@saroh/database": "workspace:*",
     "@saroh/integrations": "workspace:*",
     "@saroh/object-storage": "workspace:*",
+    "@saroh/pricing-catalog": "workspace:*",
     "@saroh/templates": "workspace:*",
     "@thallesp/nestjs-better-auth": "^2.7.0",
     "better-auth": "^1.6.26",

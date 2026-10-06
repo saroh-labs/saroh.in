@@ -26,6 +26,16 @@ const NOT_TENANT_OWNED: Record<string, string> = {
     FeatureFlag:
         "Platform-wide flag definitions; no organizationId column (per-org overrides live in FeatureFlagOverride, which has its own policy).",
     Plan: "The global plan catalogue, shared by every organization.",
+    PricingCatalogVersion:
+        "A published pricing catalogue snapshot; global, offered to every organization.",
+    PricingCatalogDraft:
+        "Saroh staff's one shared draft of the pricing catalogue; no organization.",
+    PricingCoupon:
+        "A Saroh billing coupon code, global; who redeemed it is PricingCouponRedemption, which has its own policy.",
+    PricingProviderPlan:
+        "The billing provider's plan id for one global Plan row; no organization.",
+    SarohInvoiceSequence:
+        "The count behind Saroh's own invoice series (U17); Saroh's, shared by every organization it bills.",
     PlatformAdmin: "Saroh staff, not a business.",
     PlatformAdminRoleAssignment: "Saroh staff roles, not a business.",
     AdminOperation:
