@@ -11,6 +11,8 @@ export interface WaitlistSummary {
     /** U30: everyone still waiting by kind of business, and by city. */
     byKind: { kind: string | null; count: number }[];
     byCity: { city: string; count: number }[];
+    /** Everyone still waiting by country, as saroh.in's host saw them; null: unknown. */
+    byCountry: { country: string | null; count: number }[];
     /** U30: who sent the most people, across the whole list. */
     topReferrers: {
         id: string;
@@ -32,6 +34,8 @@ export interface WaitlistRow {
     businessName: string | null;
     kind: string | null;
     city: string | null;
+    /** Two letters, as saroh.in's host saw the connection; null before 5 Oct 2026. */
+    country: string | null;
     plan: string | null;
     position: number;
     /** How many people joined through this entry's link. */
@@ -54,6 +58,7 @@ export function listWaitlist(params: {
     source?: string;
     kind?: string;
     city?: string;
+    country?: string;
     cursor?: string;
 }): Promise<{ items: WaitlistRow[]; nextCursor?: string } | null> {
     const search = new URLSearchParams();

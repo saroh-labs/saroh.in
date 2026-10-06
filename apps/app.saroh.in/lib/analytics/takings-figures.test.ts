@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { compareSpans, shares, takingsFigures } from "./takings-figures";
+import {
+    compareSoFar,
+    compareSpans,
+    shares,
+    takingsFigures,
+} from "./takings-figures";
 import { takingsRead } from "./takings.fixture";
 
 // Twelve weeks from 6 Jul: the last four are 31 Aug – 27 Sep, the four
@@ -178,5 +183,64 @@ describe("takingsFigures", () => {
             }),
         );
         expect(soon.state).toBe("NOT_YET");
+    });
+});
+
+describe("the week in progress", () => {
+    const soFar = {
+        start: "2026-09-28",
+        through: "2026-09-30",
+        takingsMinor: 0,
+        orders: 0,
+        payments: 0,
+        sameDaysLastWeekMinor: 0,
+        sameDaysLastWeekPayments: 0,
+    };
+
+    it("is set against the same days of last week, with the same floor as the months", () => {
+        expect(
+            compareSoFar({
+                ...soFar,
+                takingsMinor: 11_200,
+                sameDaysLastWeekMinor: 10_000,
+                sameDaysLastWeekPayments: 3,
+            }),
+        ).toEqual({ kind: "AHEAD", percent: 12 });
+        expect(
+            compareSoFar({
+                ...soFar,
+                takingsMinor: 10_020,
+                sameDaysLastWeekMinor: 10_000,
+                sameDaysLastWeekPayments: 3,
+            }),
+        ).toEqual({ kind: "LEVEL" });
+        expect(
+            compareSoFar({
+                ...soFar,
+                takingsMinor: 10_000,
+                sameDaysLastWeekMinor: 10_000,
+                sameDaysLastWeekPayments: 2,
+            }),
+        ).toEqual({ kind: "THIN" });
+    });
+
+    it("stretches the scale when it passes the best week, and never ranks among the twelve", () => {
+        const f = takingsFigures(
+            takingsRead([...Array<number>(11).fill(5_000), 10_000], {
+                thisWeek: { ...soFar, takingsMinor: 20_000_00 },
+            }),
+        );
+        expect(f.soFar.heightPercent).toBe(100);
+        expect(f.bars.at(-1)).toMatchObject({ peak: true, heightPercent: 50 });
+        expect(f.best?.start).toBe("2026-09-21");
+    });
+
+    it("marks which weeks the first answer compares", () => {
+        const f = takingsFigures(takingsRead(Array<number>(12).fill(5_000)));
+        expect(f.bars.map((b) => b.window)).toEqual([
+            ...Array<string>(4).fill("EARLIER"),
+            ...Array<string>(4).fill("PRIOR4"),
+            ...Array<string>(4).fill("LAST4"),
+        ]);
     });
 });

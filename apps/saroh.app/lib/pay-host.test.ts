@@ -10,6 +10,13 @@ describe("isPayPath", () => {
         expect(isPayPath("/pay/abc/")).toBe(true);
     });
 
+    it("is an invoice link's PDF (DEC-083), and no order link's", () => {
+        expect(isPayPath("/pay/abc/pdf")).toBe(true);
+        expect(isPayPath("/pay/abc/pdf/")).toBe(true);
+        expect(isPayPath("/pay/abc/pdf/extra")).toBe(false);
+        expect(isPayPath("/pay/o/abc/pdf")).toBe(false);
+    });
+
     it("is nothing under, beside or above them", () => {
         expect(isPayPath("/pay")).toBe(false);
         expect(isPayPath("/pay/")).toBe(false);

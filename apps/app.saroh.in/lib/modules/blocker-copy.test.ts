@@ -8,6 +8,8 @@ import {
     BLOCKER_COPY,
     BLOCKER_FALLBACK,
     blockerSentence,
+    moduleErrorSentence,
+    refusalSentence,
 } from "./blocker-copy";
 
 /**
@@ -163,5 +165,60 @@ describe("nothing renders a code straight to the screen (DEC-057)", () => {
                 "`${b.code} is off`",
             ),
         ).toBe(true);
+    });
+});
+
+describe("a refused module write's words (DEC-057)", () => {
+    it("keeps the API's own sentence", () => {
+        expect(
+            moduleErrorSentence(
+                "Class packs needs Appointments. Turn on Appointments first.",
+            ),
+        ).toBe("Class packs needs Appointments. Turn on Appointments first.");
+    });
+
+    it("turns a bare code into its words, never the code", () => {
+        expect(moduleErrorSentence("ROLLOUT_DISABLED")).toBe(
+            BLOCKER_COPY.ROLLOUT_DISABLED,
+        );
+        expect(moduleErrorSentence("MODULE_DEACTIVATION_BLOCKED")).toBe(
+            BLOCKER_FALLBACK,
+        );
+    });
+
+    it("says the role line for a permission key", () => {
+        expect(
+            moduleErrorSentence(
+                'Role "MEMBER" may not perform "module:manage"',
+            ),
+        ).toBe(BLOCKER_COPY.UNAUTHORIZED);
+    });
+
+    it("says the fallback for a key, a status or an empty message", () => {
+        for (const said of [
+            "Unknown module: SOMETHING",
+            "PUT /modules/CRM failed: 500",
+            "Internal server error",
+            "",
+            null,
+        ]) {
+            const out = moduleErrorSentence(
+                said,
+                "Could not update the module.",
+            );
+            expect(out).toBe("Could not update the module.");
+        }
+    });
+
+    it("reads a refusal's first blocker before its message", () => {
+        expect(
+            refusalSentence({
+                error: "MODULE_DEACTIVATION_BLOCKED",
+                blockers: [{ code: "COMMERCE_OPEN_ORDERS" }],
+            }),
+        ).toBe(BLOCKER_COPY.COMMERCE_OPEN_ORDERS);
+        expect(refusalSentence({ error: "ROLLOUT_DISABLED" })).not.toMatch(
+            /ROLLOUT_DISABLED/,
+        );
     });
 });

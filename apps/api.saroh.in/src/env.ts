@@ -143,6 +143,10 @@ const envSchema = z.object({
     // the moment it is made. The owner's number, set per instance, never
     // committed. Unset, no invite can be sent and none grants an offer.
     LAUNCH_OFFER_DAYS: z.coerce.number().int().min(1).max(366).optional(),
+    // Web addresses kept for Saroh beyond the built-in list in
+    // `sites/site-address.ts`: comma-separated, set per instance. People's
+    // names (the founders' own sites) live here, not in the public repo.
+    RESERVED_ADDRESSES_EXTRA: z.string().optional(),
     // The customer account area on merchant sites (round-2 plan A, A5):
     // `on` serves `public/site-accounts/me`, home and receipts; anything else
     // (unset included) answers 404, so the area stays dark until A6–A8 and
@@ -158,6 +162,11 @@ const envSchema = z.object({
     // credential is en/decrypted) and throws a clear error if it is
     // missing/malformed. Never logged.
     PAYMENTS_ENC_KEY: z.string().optional(),
+    // Which Cashfree the API talks to, for merchants' payments and Saroh's own
+    // billing alike: `sandbox` for test credentials, `production` (default)
+    // for live ones. The API sends the mode with every checkout's client
+    // parameters, so the browser drop-in opens where the order was made.
+    CASHFREE_ENV: z.enum(["production", "sandbox"]).default("production"),
 
     // Saroh's own invoices to businesses for their plan (pricing catalogue
     // U17), read at use by `billing/saroh-seller.ts`. All optional so dev and
@@ -218,6 +227,40 @@ const envSchema = z.object({
     npm_package_version: z.string().optional(),
 });
 
+/**
+ * Variables a deployed API cannot do without (NODE_ENV=production): unset,
+ * it would send customers and staff links to production's sites from any
+ * host (the fallbacks used to be `https://saroh.app` and
+ * `https://app.saroh.in`), or mail from an address nobody chose. Required
+ * at boot, so a missing one stops the deploy instead (plan
+ * 2026-10-05-001, KTD-2).
+ */
+const REQUIRED_IN_PRODUCTION = [
+    "RENDERER_URL",
+    "APP_URL",
+    "EMAIL_FROM",
+] as const;
+
+const checkedSchema = envSchema.superRefine((value, ctx) => {
+    if (value.NODE_ENV !== "production") return;
+    for (const key of REQUIRED_IN_PRODUCTION) {
+        if (!value[key]) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: [key],
+                message: "required when NODE_ENV=production",
+            });
+        }
+    }
+});
+
+/** Parse an environment the way the API does at boot (exported for tests). */
+export function parseEnv(
+    source: Record<string, string | undefined>,
+): ReturnType<typeof checkedSchema.safeParse> {
+    return checkedSchema.safeParse(source);
+}
+
 function loadEnv(): z.infer<typeof envSchema> {
     if (process.env.SKIP_ENV_VALIDATION) {
         return process.env as unknown as z.infer<typeof envSchema>;
@@ -230,7 +273,7 @@ function loadEnv(): z.infer<typeof envSchema> {
         source[key] = value === "" ? undefined : value;
     }
 
-    const parsed = envSchema.safeParse(source);
+    const parsed = parseEnv(source);
     if (!parsed.success) {
         const issues = parsed.error.issues
             .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)

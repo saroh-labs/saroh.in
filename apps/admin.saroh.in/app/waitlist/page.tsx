@@ -11,7 +11,7 @@ import { InviteBatch } from "@/components/waitlist/invite-batch";
 import { InviteState } from "@/components/waitlist/invite-state";
 import { RemoveEntry } from "@/components/waitlist/remove-entry";
 import { can, requireStaff } from "@/lib/console";
-import { formatDate, formatRelative } from "@/lib/format";
+import { countryName, formatDate, formatRelative } from "@/lib/format";
 import { param } from "@/lib/params";
 import {
     getWaitlistSummary,
@@ -41,6 +41,7 @@ export default async function WaitlistPage({
         source: param(raw.source),
         kind: param(raw.kind),
         city: param(raw.city),
+        country: param(raw.country),
         cursor: param(raw.cursor),
     };
     const [summary, page] = await Promise.all([
@@ -55,7 +56,11 @@ export default async function WaitlistPage({
         can(staff, "waitlist:invite") && summary?.canInvite === true;
     const canRemove = can(staff, "waitlist:invite");
     const filtered = Boolean(
-        params.state ?? params.source ?? params.kind ?? params.city,
+        params.state ??
+        params.source ??
+        params.kind ??
+        params.city ??
+        params.country,
     );
 
     return (
@@ -141,6 +146,17 @@ export default async function WaitlistPage({
                             }))}
                         />
                         <CountPanel
+                            title="Countries"
+                            description="Where people joined from, as saroh.in saw their connection. Not recorded before 5 Oct 2026."
+                            rows={summary.byCountry.map((row) => ({
+                                key: row.country ?? "none",
+                                label: row.country
+                                    ? countryName(row.country)
+                                    : "Not recorded",
+                                count: row.count,
+                            }))}
+                        />
+                        <CountPanel
                             title="Top referrers"
                             description="Who sent the most people through their link. A self-referral is not counted."
                             rows={summary.topReferrers.map((row) => ({
@@ -180,6 +196,24 @@ export default async function WaitlistPage({
                                 label: row.city,
                             })),
                             { value: "none", label: "Not given" },
+                        ]}
+                    />
+                    <FilterSelect
+                        label="Country"
+                        name="country"
+                        defaultValue={params.country}
+                        options={[
+                            ...(summary?.byCountry ?? []).flatMap((row) =>
+                                row.country
+                                    ? [
+                                          {
+                                              value: row.country,
+                                              label: countryName(row.country),
+                                          },
+                                      ]
+                                    : [],
+                            ),
+                            { value: "none", label: "Not recorded" },
                         ]}
                     />
                     <FilterSelect
@@ -277,6 +311,13 @@ export default async function WaitlistPage({
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 {row.city ?? "—"}
+                                                {row.country && (
+                                                    <div className="text-muted-foreground">
+                                                        {countryName(
+                                                            row.country,
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-2.5 text-muted-foreground">
                                                 {row.source ?? "—"}

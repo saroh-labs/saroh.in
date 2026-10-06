@@ -279,6 +279,42 @@ assumptions made are listed in `docs/architecture/PRICING_ROLLOUT.md` →
 transaction as its row and ignores one older than the last applied
 (`Subscription.providerEventAt`).
 
+## Media storage — **Current**
+
+One R2 bucket per environment in the Saroh labs Cloudflare account:
+`saroh-media` (`media.saroh.in`) and `saroh-media-dev` (`media.saroh.io`),
+each with its own Object Read & Write key that can't reach the other. With
+the `R2_*` variables unset the API falls back to in-memory storage and the
+admin health page says so; a deployed API must not run that way.
+
+- **Public by address, never listable.** Everything in these buckets is meant
+  to be seen (logos, site and product images). Keys are server-built and carry
+  a random UUID, so a file can't be guessed. **Nothing private goes in them**
+  — invoices, customer documents or ID proofs need a separate private bucket
+  with no public domain, served through short-lived signed GETs after an
+  access check.
+- **Images and videos only.** The allowlist is JPEG, PNG, WebP, GIF and AVIF;
+  MP4 and MOV join under the video purpose. No documents, no text, no SVG.
+  On completion the first bytes must be the format the type says, or the
+  upload is marked FAILED and its object deleted.
+- **A presigned upload fixes its type and size.** The adapter signs
+  `content-type` and `content-length`, so R2 refuses any other. When a test
+  fakes the presigner, keep one that signs for real and reads the URL.
+- **CORS allows only the uploader's origin**, PUT, `Content-Type`. Images are
+  shown with plain `<img>` and fetched server-side by Next, so no GET rule.
+  An app that starts uploading gets its origin added then.
+- `r2.dev` access stays off; the custom domain is the only public way in.
+- **Same parent domain, for now (5 Oct 2026).** Media is served from
+  `media.saroh.in` rather than a separate domain (the way Google uses
+  `googleusercontent.com`). With images and videos only, signed types, byte
+  checks and the sandbox headers, a separate domain adds little. Revisit it
+  if Saroh ever accepts other file types. Stored URLs (`logoUrl`, site
+  content) would then need rewriting, so it is cheapest early.
+- **The media domains can't run a page.** A Cloudflare response-header rule
+  on `media.saroh.in` and `media.saroh.io` sets `Content-Security-Policy:
+default-src 'none'; img-src 'self'; media-src 'self'; sandbox` and
+  `X-Content-Type-Options: nosniff`, so even a mislabelled file is inert.
+
 ## Razorpay recurring payments (D11 spike) — **Current**
 
 Test mode, 2026-09-29, on a business's own connection (Northwind). Docs:

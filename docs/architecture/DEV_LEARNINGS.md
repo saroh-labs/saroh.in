@@ -2581,3 +2581,204 @@ already does (`packages/ui/src/components/ui/data-state.tsx`).
 prefer a semantic token. Check a screen's empty and failed states in dark,
 not only its full one (`saroh-four-scenes`).
 **Category**: frontend · design system · `packages/ui/src/components/ui/data-state.tsx`
+
+## Frontend — the calendar's layout switch was 29px tall on a phone
+
+**Symptom**: CI's phone `four-scenes` touch-target spec failed on Bookings with
+"Day by person" and "Agenda" at 29px, on a batch that did not touch Bookings.
+**Root cause**: The layout radios (`calendar-screen.tsx`) were sized only by
+`py-[5px]`, with no `coarse:` height. The spec checks every control on the
+page, so the miss sat in `development` until a run reached it.
+**Fix**: `coarse:min-h-11` on each radio.
+**Rule**: Every hand-rolled button carries a `coarse:` height of 44px
+(`coarse:h-11`, `coarse:min-h-11` or `coarse:size-11`); the phone touch-target
+spec is the check.
+**Category**: frontend · touch targets · `e2e/tests/four-scenes.spec.ts`
+
+## E2E — the touch-target spec passed locally on a page it never measured
+
+**Symptom**: CI's phone `four-scenes` touch-target spec failed on the calendar's
+29px layout switch (PR #783) while `pnpm prepush --all` had passed the same
+spec on the same commit, in 0.3s against CI's 1.8s.
+**Root cause**: The spec measured every button straight after `page.goto`,
+before the calendar had arrived. Locally the page was measured with no
+calendar on it, so nothing was undersized; on CI's slower runner the
+calendar had already rendered. Proved by removing the fix: with a guard
+waiting for the calendar, the local run fails exactly as CI did.
+**Fix**: The spec waits for the calendar's "Layout" radiogroup before it
+measures (`e2e/tests/four-scenes.spec.ts`).
+**Rule**: A spec that measures or scans a page ("every button", "no
+undersized control", axe) first asserts that the thing it is about is
+visible. A scan of a page that hasn't arrived passes vacuously.
+**Sweep (4 Oct)**: the same hole was in 11 more specs (a11y's sixteen
+screens, four-scenes' viewport/overlap/tab-bar scenes, phone-reflow,
+orders-list, business-settings, calendar-week, invoices-without-payments,
+order-detail, site-account, site-review, marketing). Each now waits for its
+own landmark. Waiting found one more real bug at once: the calendar's two
+rule links overlapping on a phone.
+**Category**: e2e · flaky-by-timing · `e2e/tests/four-scenes.spec.ts`
+
+## Release — the waitlist dropped every join for two days, unseen
+
+**Symptom**: Production's waitlist had 0 entries on 5 Oct, two days after
+Gate W put the form live. The API log showed one join ever reaching it.
+**Root cause**: The Vercel project for saroh.in had no environment
+variables at all. Gate W's runbook step ("`API_URL` and `SITE_RELAY_SECRET`
+on Vercel `web`") was never done, and `/api/waitlist` answers
+`NOT_CONFIGURED` without `API_URL` — a 500 the visitor saw as an error,
+logged only on Vercel. Nothing failed loudly: `API_URL` is optional in
+`env.ts` so previews can build.
+**Fix**: Both variables set on Vercel Production (the secret piped from the
+API container, never printed), production redeployed, a join confirmed in
+the database. `next.config.js` now refuses to build a Vercel production
+deployment without `API_URL`.
+**Rule**: A runbook step that sets a production variable is checked on
+production before the release is called done — the variable's name in the
+container or project, and the path it feeds (a request that writes
+nothing). A variable that a production feature cannot work without fails
+the production build when missing.
+**Category**: release · env · `apps/saroh.in/next.config.js`
+
+## Analytics — GA's "visitors" were our own browser tests
+
+**Symptom**: GA showed ~1,000 users in 28 days, ~800 from the US, split
+almost evenly Windows/Android and desktop/mobile, nearly all Chrome.
+**Root cause**: The GA tag was hard-coded into saroh.in's root layout and
+loaded everywhere: local dev, `prepush` and CI browser runs, Vercel
+previews. The `desk` project emulates Desktop Chrome (a Windows user agent)
+and `phone` a Pixel 7 (Android); CI runs on GitHub's US runners.
+**Fix**: The measurement id is `NEXT_PUBLIC_GA_MEASUREMENT_ID`, set on
+Vercel Production only, and `lib/ga.ts` loads GA only when `VERCEL_ENV` is
+`production` as well — a local `.env` with the id still loads nothing. The
+marketing spec fails if any page requests googletagmanager.
+**Rule**: Third-party analytics load only on the production deployment,
+never by default; a browser spec proves no page loads them under test.
+**Category**: analytics · `apps/saroh.in/lib/ga.ts`, `e2e/tests/marketing.spec.ts`
+
+## Bookings — short bookings too small to tap, double bookings on top of each other
+
+**Symptom**: On a weekday the phone touch-target and overlap specs failed on
+`/bookings`: a 45-minute booking 36px tall, drawn over another booking of the
+same person at the same time. On a weekend the specs passed.
+**Root cause**: The day view drew 0.8px a minute everywhere, so anything
+under 55 minutes was under 44px on a phone, and every booking of a person
+was placed full width, so overlapping ones covered each other. The seeded
+day has no short or overlapping booking; on a weekday another spec's own
+booking lands on the same day and person, which is what exposed both.
+**Fix**: On a touch screen the day view draws 1.6px a minute (`--ppm`), a
+booking is at least 44px tall, and overlapping bookings sit side by side
+(`lib/services/diary-lanes.ts`, counting a short booking at its drawn
+length so it never covers the next). The closed-hours click works out the
+minute from the column's height, at any scale.
+**Rule**: A timeline that draws time as height sets its scale for the
+pointer it's on, and lays out overlaps; a spec that passes only on the
+seed's own day isn't evidence.
+**Category**: frontend · bookings · `apps/app.saroh.in/components/bookings/calendar/day-by-person.tsx`
+
+## Config — production fallbacks across the repo, and Cashfree always live
+
+**Symptom**: After the waitlist's missing `API_URL`, a scan of the repo
+(5 Oct) found about twenty `?? "https://api.saroh.in"`-style fallbacks across
+the Next apps, the API emailing `https://saroh.app` and `https://app.saroh.in`
+links from any non-development host when `RENDERER_URL`/`APP_URL` were
+unset, and Cashfree's host and browser drop-in fixed to production, so
+nothing could run against its sandbox. No secrets were committed.
+**Root cause**: Every address variable was optional with a production
+default, and the "deployed" switch was `NODE_ENV`, which is `production` on
+every Vercel build and every non-local API.
+**Fix**: plan `docs/plans/2026-10-05-001-fix-env-config-plan.md`: the API
+requires `RENDERER_URL`, `APP_URL` and `EMAIL_FROM` in production; every
+Vercel app's production build names and refuses missing addresses; one
+resolver per address; `CASHFREE_ENV` on the API, sent to the browser as the
+checkout's `mode`.
+**Rule**: `docs/patterns/devops-environments-and-flags.md` → "A missing
+production variable fails loudly".
+**Category**: config · env · `apps/*/next.config.*`, `apps/api.saroh.in/src/env.ts`
+
+## Storage — a presigned upload accepted any content type
+
+**Symptom**: Setting up R2 (5 Oct), a PUT to a presigned "image/png" upload
+URL sent as `text/html` was stored, and `media.saroh.io` served it as
+`text/html`: anyone signed in to a workspace could host a page on the media
+domain. Production had no uploads yet.
+**Root cause**: `getSignedUrl` signs `Content-Length` but leaves
+`Content-Type` out of a presigned PUT's signature unless it is named in
+`signableHeaders`; the adapter's comment said both were signed, and its test
+used a fake presigner, so nothing checked what the real signature covered.
+**Fix**: the R2 adapter signs `content-type`; R2 now refuses another type,
+or none, with 403. A test signs for real and reads `X-Amz-SignedHeaders`.
+**Rule**: `docs/patterns/backend-integrations.md` → "Media storage".
+**Category**: security · storage · `packages/object-storage/src/r2-adapter.ts`
+
+## Tooling — the local gate oversubscribed the laptop and timed out
+
+**Symptom**: `pnpm prepush --all` failed vitest on a demo-seed test ("Test
+timed out in 120000ms") that passed alone; the same morning `prisma
+generate` hit a bus error and a Jest worker segfaulted, each passing on a
+re-run. Under the gate vitest took 138s; alone, 20s.
+**Root cause**: The static burst starts lint, typecheck, Jest and every
+package's Vitest at once beside five production Next builds for the browser
+run, and Jest and Vitest each start a worker per core: several times the
+12 cores, near the 24 GB of memory. Integration then ran on one database
+because the local gate set `PREPUSH_INT_DBS=1`, though this Postgres trusts
+local connections.
+**Fix**: the gate caps turbo concurrency, Jest and Vitest workers, and runs
+the database package's seed tests as their own `seeds` step after the burst;
+the local run uses three integration databases; local Postgres has
+`max_locks_per_transaction = 256`.
+**Rule**: `docs/patterns/devops-tooling-and-deploy.md` → "Capped workers in
+the static burst".
+**Category**: tooling · gate · `scripts/prepush.sh`
+
+## Invoices — a treatment's balance printed today's seller, not its deposit's
+
+**Symptom**: a treatment's balance invoice, raised when the rest was paid
+after a deposit, printed the business's address, GSTIN and state as they
+were that day. A business that moved or re-registered between the two got
+a balance that disagreed with its deposit, and its place of supply and
+CGST + SGST vs IGST split were worked out afresh against the new state.
+**Root cause**: `ensureTreatmentBalanceInvoice` built the paper with
+`buildManualInvoice` from `loadTaxProfile`, patching only `registered` and
+(in DEC-082) the name, legal name and email from the deposit. ADR-008 says
+a correction takes its original's seller; the desk's balance, credit notes
+and supplementary invoices already did, through `buildCorrection`. Each
+frozen field added since was patched in one at a time, and the rest missed.
+**Fix**: the balance is built with `buildCorrection` from the deposit's
+row, so every frozen seller field, the place of supply and the tax type
+come from the deposit. Unit specs mock a settings change; `visits.db.spec`
+changes the profile between deposit and balance.
+**Rule**: `docs/patterns/backend-billing-and-classes.md` → "Issued paper
+never changes"; ADR-008 → "A balance after a deposit".
+**Category**: invoices · GST · `apps/api.saroh.in/src/modules/invoices/order-invoicing.ts`
+
+## Shop checkout — the bag's name and phone were asked for twice, and lost
+
+**Symptom**: a customer who typed their name and phone in the bag was asked
+for the phone again in Razorpay's window, and their account's "My details"
+said "Add your name" after the order. Found filming the checkout demo.
+**Root cause**: `CheckoutPay` built the window's prefill from the signed-in
+customer only (a first sign-in has no name, and never a phone), dropping the
+bag's delivery address. On the API, `createCheckoutOrder` never named the
+account's contact, though a first booking does (`accountContactInTx`).
+**Fix**: the bag hands its delivery to `CheckoutPay`, whose prefill falls
+back to its name and phone (digits only). The checkout names an unnamed
+contact from the delivery name, through `resolveContact`, and keeps a name
+it has. `shop.test.tsx` and `public-checkout.db.spec.ts` cover both.
+**Rule**: what a customer typed once is never asked for again in the same
+flow; a signed-in flow fills the contact's empty name, as bookings do.
+**Category**: shop · checkout · `packages/site-blocks/src/shop/checkout-sheet.tsx`,
+`apps/api.saroh.in/src/modules/orders/checkout-order.ts`
+
+## Discounts — an empty percentage said only "Validation failed"
+
+**Symptom**: saving a discount code with the percentage (or amount) empty
+showed a toast reading "Validation failed", with nothing under the field.
+**Root cause**: the form's schema took any string for `percent` and
+`amount`; the API's DTO refused it with class-validator, whose array of
+messages the exceptions filter sends as the bare "Validation failed" with no
+`field`, so the form could only toast it.
+**Fix**: `lib/discounts/value.ts` checks the chosen kind's value with the
+API's rules, and the form's `superRefine` puts the problem under its field.
+**Rule**: `docs/patterns/frontend-forms.md` → "The schema checks what the API's DTO
+checks".
+**Category**: discounts · forms · `apps/app.saroh.in/components/stores/discount-form.tsx`

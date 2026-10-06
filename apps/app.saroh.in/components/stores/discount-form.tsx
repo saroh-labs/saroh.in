@@ -39,29 +39,41 @@ import type {
     DiscountInput,
     DiscountReach,
 } from "@/lib/discounts/service";
+import { amountProblem, percentProblem } from "@/lib/discounts/value";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AUD", "CAD", "SGD", "AED"];
 
-const formSchema = z.object({
-    code: z
-        .string()
-        .trim()
-        .min(2, { message: "At least 2 characters" })
-        .max(32)
-        .regex(/^[A-Za-z0-9_-]+$/, {
-            message: "Letters, digits, dashes or underscores — no spaces",
-        }),
-    description: z.string().max(200),
-    kind: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
-    percent: z.string(),
-    amount: z.string(),
-    currency: z.string(),
-    startsAt: z.date().optional(),
-    endsAt: z.date().optional(),
-    usageLimit: z
-        .string()
-        .regex(/^\d*$/, { message: "A whole number, or empty for no cap" }),
-});
+const formSchema = z
+    .object({
+        code: z
+            .string()
+            .trim()
+            .min(2, { message: "At least 2 characters" })
+            .max(32)
+            .regex(/^[A-Za-z0-9_-]+$/, {
+                message: "Letters, digits, dashes or underscores — no spaces",
+            }),
+        description: z.string().max(200),
+        kind: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
+        percent: z.string(),
+        amount: z.string(),
+        currency: z.string(),
+        startsAt: z.date().optional(),
+        endsAt: z.date().optional(),
+        usageLimit: z
+            .string()
+            .regex(/^\d*$/, { message: "A whole number, or empty for no cap" }),
+    })
+    .superRefine((v, ctx) => {
+        // Only the kind chosen is checked: the other's field is hidden.
+        const problem =
+            v.kind === "PERCENTAGE"
+                ? percentProblem(v.percent)
+                : amountProblem(v.amount);
+        const path = v.kind === "PERCENTAGE" ? "percent" : "amount";
+        if (problem)
+            ctx.addIssue({ code: "custom", path: [path], message: problem });
+    });
 
 type FormValues = z.infer<typeof formSchema>;
 

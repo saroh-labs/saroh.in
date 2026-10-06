@@ -156,6 +156,39 @@ describe("WaitlistForm", () => {
         expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
     });
 
+    it("tells someone outside India that Saroh opens there first", async () => {
+        answer({
+            status: "success",
+            created: true,
+            position: 9,
+            ref: "abcd2345",
+            outsideIndia: true,
+        });
+        renderForm();
+        fill();
+        await submit();
+
+        await screen.findByText("Glow Studio is #9 on the list.");
+        expect(screen.getByTestId("waitlist-outside-india").textContent).toBe(
+            "Saroh opens in India first. We'll email you when it's ready where you are.",
+        );
+    });
+
+    it("says nothing about countries to someone in India", async () => {
+        answer({
+            status: "success",
+            created: true,
+            position: 3,
+            ref: "abcd2345",
+        });
+        renderForm();
+        fill();
+        await submit();
+
+        await screen.findByText("Glow Studio is #3 on the list.");
+        expect(screen.queryByTestId("waitlist-outside-india")).toBeNull();
+    });
+
     it("keeps the form and asks to try again when the send fails", async () => {
         fetchMock.mockRejectedValue(new Error("offline"));
         renderForm();

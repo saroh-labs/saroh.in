@@ -140,7 +140,7 @@ describe("Insights takings (DB)", () => {
         // are Sunday in UTC.
         await order(rye.id, hill, "100", new Date("2026-09-20T18:15:00.000Z"));
         await order(rye.id, hill, "200", new Date("2026-09-20T18:45:00.000Z"));
-        // Monday 28 Sep in Mumbai: the week in progress, not counted yet.
+        // Monday 28 Sep in Mumbai: the week in progress, read on its own.
         await order(rye.id, hill, "999", new Date("2026-09-27T18:45:00.000Z"));
 
         // The week of 21 Sep, at two locations and online.
@@ -291,6 +291,22 @@ describe("Insights takings (DB)", () => {
                 { key: INVOICES_PLACE, kind: "INVOICES", name: null },
             ]),
         );
+    });
+
+    it("reads the week in progress so far, beside the same days of last week", async () => {
+        const read = await service.read(ctx(rye.id), NOW);
+        // Sunday 4 Oct: Monday to Sunday so far, against all of last week.
+        expect(read.thisWeek).toEqual({
+            start: "2026-09-28",
+            through: "2026-10-04",
+            takingsMinor: 99_900,
+            orders: 1,
+            payments: 1,
+            sameDaysLastWeekMinor: 195_000,
+            sameDaysLastWeekPayments: 5,
+        });
+        // Never one of the twelve whole weeks.
+        expect(read.weeks.map((w) => w.start)).not.toContain("2026-09-28");
     });
 
     it("dates the first money the business ever took", async () => {

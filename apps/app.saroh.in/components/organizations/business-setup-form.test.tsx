@@ -184,14 +184,27 @@ describe("What are you setting up? (DEC-070)", () => {
             name: "Asha Rao",
             kind: "SOLO",
             address: "asha-rao",
-            profile: { type: "individual", country: "IN" },
+            profile: { type: "individual", registered: false, country: "IN" },
+        });
+    });
+
+    it("keeps Registered as said, with no type guessed (prelaunch)", async () => {
+        act(() => radio("A business").click());
+        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+        act(() => radio("Registered").click());
+        await submit();
+        expect(createOrganization).toHaveBeenCalledWith({
+            name: "Rye & Co. Bakery",
+            kind: "BUSINESS",
+            address: "rye-co-bakery",
+            profile: { registered: true, country: "IN" },
         });
     });
 
     it("never asks a site for my work if it is a company, and sends no type", async () => {
         // A type picked under another answer first is not sent.
         act(() => radio("Just me").click());
-        act(() => radio("Not registered").click());
+        act(() => radio("Registered").click());
         act(() => radio("A site for my work").click());
 
         expect(text()).not.toContain("Is it registered as a company?");

@@ -136,8 +136,9 @@ process.stdin.on("data", (c) => chunks.push(c));
 process.stdin.on("end", async () => {
     const parser = new PDFParse({ data: new Uint8Array(Buffer.concat(chunks)) });
     const result = await parser.getText();
+    const meta = await parser.getInfo();
     await parser.destroy();
-    process.stdout.write(JSON.stringify({ text: result.text, pages: result.total }));
+    process.stdout.write(JSON.stringify({ text: result.text, pages: result.total, info: meta.info }));
 });
 `;
 
@@ -147,12 +148,22 @@ async function pdfText(r: InvoiceRow, business: PaperBusiness = RYE) {
     const out = execFileSync(process.execPath, ["-e", EXTRACT], {
         input: file,
     });
-    const { text, pages } = JSON.parse(out.toString()) as {
+    const { text, pages, info } = JSON.parse(out.toString()) as {
         text: string;
         pages: number;
+        info: Record<string, string>;
     };
-    return { file, text, pages };
+    return { file, text, pages, info };
 }
+
+describe("the PDF file's own details", () => {
+    it("names the business as its maker, never Saroh", async () => {
+        const { info } = await pdfText(taxInvoice());
+        expect(info.Author).toBe(RYE.name);
+        expect(info.Creator).toBe(RYE.name);
+        expect(info.Producer).toBe(RYE.name);
+    });
+});
 
 describe("the invoice's paper as words", () => {
     it("formats money and dates as the screen does, with the year", () => {
@@ -407,5 +418,67 @@ describe("the PDF", () => {
         expect(text).toContain("Invoice RYE/26-27/0012, continued");
         expect(text).toContain(`RYE/26-27/0012 · page ${pages} of ${pages}`);
         expect(text).toContain("₹20,000");
+    });
+});
+
+describe("an issued paper names the seller as it was at issue (DEC-082)", () => {
+    /** What Rye's paper froze when it was issued. */
+    const FROZEN = {
+        sellerName: "Rye & Co.",
+        sellerLegalName: "Rye and Company Bakery LLP",
+        sellerEmail: "hello@rye.example",
+    };
+    /** The business since: renamed, a new legal name and email. */
+    const RENAMED: PaperBusiness = {
+        name: "Rye Bakehouse",
+        legalName: "Rye Bakehouse Private Limited",
+        email: "orders@ryebakehouse.example",
+    };
+
+    it("prints the frozen name, legal name and email, not today's settings", () => {
+        const v = view(taxInvoice(FROZEN), RENAMED);
+        expect(v.seller.name).toBe("Rye & Co.");
+        expect(v.seller.lines).toEqual([
+            "Rye and Company Bakery LLP",
+            "22 Hill Road, Indiranagar, Bengaluru 560038, Karnataka",
+            "hello@rye.example",
+        ]);
+    });
+
+    it("a receipt's footer names the business as it was", () => {
+        const v = view(row(FROZEN), RENAMED);
+        expect(v.footer).toBe(
+            "Rye & Co. is not registered for GST, so no tax is charged.",
+        );
+    });
+
+    it("a legal name or email left blank at issue stays blank", () => {
+        const v = view(
+            taxInvoice({
+                sellerName: "Rye & Co.",
+                sellerLegalName: null,
+                sellerEmail: null,
+            }),
+            RENAMED,
+        );
+        expect(v.seller.name).toBe("Rye & Co.");
+        expect(v.seller.lines).toEqual([
+            "22 Hill Road, Indiranagar, Bengaluru 560038, Karnataka",
+        ]);
+    });
+
+    it("falls back to today's settings only for a row that froze none", () => {
+        const v = view(taxInvoice(), RENAMED);
+        expect(v.seller.name).toBe("Rye Bakehouse");
+        expect(v.seller.lines).toContain("orders@ryebakehouse.example");
+    });
+
+    it("the PDF's text carries the frozen seller after a rename", async () => {
+        const { text } = await pdfText(taxInvoice(FROZEN), RENAMED);
+        expect(text).toContain("Rye & Co.");
+        expect(text).toContain("Rye and Company Bakery LLP");
+        expect(text).toContain("hello@rye.example");
+        expect(text).not.toContain("Rye Bakehouse");
+        expect(text).not.toContain("orders@ryebakehouse.example");
     });
 });

@@ -398,6 +398,12 @@ export class ListWaitlistDto {
     @MaxLength(80)
     city?: string;
 
+    /** A two-letter country, or "none" for entries without one. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(4)
+    country?: string;
+
     @IsOptional()
     @IsString()
     @MaxLength(200)

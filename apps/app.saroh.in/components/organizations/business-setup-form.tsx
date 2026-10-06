@@ -58,9 +58,9 @@ const COMMON_COUNTRIES = [
 /**
  * Setup asks only whether the business is registered; Settings › Business
  * offers the six types (F10). Registered saves no type: "registered" is this
- * form's own value and never reaches the API, so a Pvt Ltd, LLP or
- * partnership isn't guessed at. They pick the real one in Settings before
- * they go live.
+ * form's own value, sent as `registered: true`, so a Pvt Ltd, LLP or
+ * partnership isn't guessed at. The take-money checklist then asks for the
+ * real one before they go live (`ready.ts`).
  */
 const TYPES = [
     {
@@ -217,9 +217,12 @@ export function BusinessSetupForm({
             kind: values.kind,
             address: values.address,
             profile: {
-                // Registered leaves the type unset (see TYPES).
+                // Registered leaves the type unset and says so (see TYPES).
                 ...(asked && values.type === "individual"
-                    ? { type: "individual" }
+                    ? { type: "individual", registered: false }
+                    : {}),
+                ...(asked && values.type === "registered"
+                    ? { registered: true }
                     : {}),
                 country: values.country,
             },

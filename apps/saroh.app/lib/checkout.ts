@@ -1,6 +1,6 @@
-import { env } from "@/env";
 import { isTestReleaseRefusal, TEST_RELEASE_MESSAGE } from "@saroh/site-blocks";
 
+import { publicApiUrl } from "./api-url";
 import type { CheckoutIntent, CheckoutReceipt } from "./checkout-shape";
 import { isIntent, isReceipt } from "./checkout-shape";
 
@@ -30,7 +30,7 @@ export type {
  * "use client" component).
  */
 
-const API_URL = env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+const API_URL = publicApiUrl();
 
 /** Discriminated result so the UI can surface a message inline. */
 export type CheckoutResult<T> =

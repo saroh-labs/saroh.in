@@ -34,6 +34,23 @@ export interface TakingsWeek {
     places: { key: string; takingsMinor: number }[];
 }
 
+/**
+ * The week in progress so far, Monday to today: never one of the whole
+ * weeks, and compared only with the same days of the week before.
+ */
+export interface TakingsSoFar {
+    /** Monday, `2026-09-28`. */
+    start: string;
+    /** Today, `2026-10-01`. */
+    through: string;
+    takingsMinor: number;
+    orders: number;
+    payments: number;
+    /** Last week's Monday to the same weekday as today. */
+    sameDaysLastWeekMinor: number;
+    sameDaysLastWeekPayments: number;
+}
+
 export interface TakingsRead {
     zone: string;
     currency: string | null;
@@ -42,6 +59,8 @@ export interface TakingsRead {
     firstSaleOn: string | null;
     /** Monday of the week in progress, which the weeks stop short of. */
     thisWeekStart: string;
+    /** The week in progress so far. */
+    thisWeek: TakingsSoFar;
     /** Open locations. */
     locations: number;
     places: TakingsPlace[];

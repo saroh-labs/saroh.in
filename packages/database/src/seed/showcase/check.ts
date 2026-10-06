@@ -91,6 +91,18 @@ export async function checkShowcase(
                        OR i.tax <> i.cgst + i.sgst + i.igst)))`,
     );
 
+    // Issued paper names the seller as it was at issue (DEC-082), as the
+    // API writes it; only a draft leaves it to today's settings.
+    fail(
+        "issued paper without the seller it was issued by",
+        await prisma.$queryRaw<Row[]>`
+            SELECT i.id, i.number FROM "Invoice" i
+            JOIN "Organization" o ON o.id = i."organizationId"
+            WHERE i."organizationId" = ANY(${orgs}) AND i.status <> 'DRAFT'
+              AND (i."sellerName" IS DISTINCT FROM o.name
+                   OR i."sellerAddress" IS NULL)`,
+    );
+
     // GST on every line of a tax invoice, as the API derives it: the
     // taxable value is the inclusive amount at its rate, rounded to the
     // paisa; the rest is tax, CGST + SGST halves in the business's own state

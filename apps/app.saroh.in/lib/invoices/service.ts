@@ -196,6 +196,13 @@ export interface Invoice {
      * null on a draft, which prints today's.
      */
     sellerAddress?: string | null;
+    /**
+     * The business's name, legal name and contact email as they were on
+     * issue (DEC-082); null on a draft, which prints today's.
+     */
+    sellerName?: string | null;
+    sellerLegalName?: string | null;
+    sellerEmail?: string | null;
     currency: string;
     subtotal: string;
     tax: string;

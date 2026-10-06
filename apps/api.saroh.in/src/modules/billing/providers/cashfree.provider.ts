@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { Logger } from "@nestjs/common";
 
+import { cashfreeBaseUrl } from "../../../common/providers/cashfree-env";
 import type {
     BillingProvider,
     CreateSubscriptionInput,
@@ -33,7 +34,10 @@ import {
 export class CashfreeBillingProvider implements BillingProvider {
     readonly name = "CASHFREE";
     private readonly logger = new Logger(CashfreeBillingProvider.name);
-    private readonly baseUrl = "https://api.cashfree.com/pg";
+    /** Live or sandbox, per `CASHFREE_ENV` (read per call). */
+    private get baseUrl(): string {
+        return cashfreeBaseUrl();
+    }
     private readonly signatureHeaderName = "x-webhook-signature";
     private readonly timestampHeaderName = "x-webhook-timestamp";
 

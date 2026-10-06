@@ -498,7 +498,7 @@ export function CalendarScreen({
                             aria-checked={layout === id}
                             onClick={() => go(id, date)}
                             className={cn(
-                                "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 coarse:min-h-11",
                                 layout === id
                                     ? "bg-card text-foreground"
                                     : "text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
@@ -802,27 +802,25 @@ function RulesNote({
     rules: BookingRules | null;
     canHours: boolean;
 }) {
+    // The links sit on their own row, each a whole tap target on a phone:
+    // inline in the sentence, "Change hours and rules" wrapped across two
+    // lines and shared one with "Every booking as a list".
+    const link =
+        "inline-flex items-center text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground coarse:min-h-11";
     return (
-        <p className="mt-3 text-[11.5px] text-muted-foreground">
-            {rulesSentence(rules)}{" "}
-            {canHours ? (
-                <>
-                    <Link
-                        href="/bookings/availability"
-                        className="text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground"
-                    >
+        <div className="mt-3 text-[11.5px] text-muted-foreground">
+            <p>{rulesSentence(rules)}</p>
+            <div className="mt-1 flex flex-wrap gap-x-4">
+                {canHours ? (
+                    <Link href="/bookings/availability" className={link}>
                         Change hours and rules
                     </Link>
-                    {" · "}
-                </>
-            ) : null}
-            <Link
-                href="/bookings/all"
-                className="text-brand underline decoration-brand/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-current active:text-muted-foreground"
-            >
-                Every booking as a list
-            </Link>
-        </p>
+                ) : null}
+                <Link href="/bookings/all" className={link}>
+                    Every booking as a list
+                </Link>
+            </div>
+        </div>
     );
 }
 

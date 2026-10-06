@@ -175,3 +175,25 @@ describe("CashfreeProvider.findRefund", () => {
         );
     });
 });
+
+describe("CashfreeProvider.createOrderIntent", () => {
+    it("makes the order on the live host and tells the drop-in to open there", async () => {
+        fetchMock.mockReturnValue(
+            answer(200, { cf_order_id: "cf_1", payment_session_id: "sess_1" }),
+        );
+
+        const result = await new CashfreeProvider().createOrderIntent({
+            amountCents: 25050,
+            currency: "INR",
+            orderId: "order_1",
+            credentials: CREDS,
+        });
+
+        const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(url).toBe("https://api.cashfree.com/pg/orders");
+        expect(result.clientParams).toMatchObject({
+            paymentSessionId: "sess_1",
+            mode: "production",
+        });
+    });
+});

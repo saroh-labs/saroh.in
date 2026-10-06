@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     getTrustedOrigins,
@@ -408,5 +408,23 @@ describe("resolveServerSession — signed out vs. could not tell", () => {
         expect(err.name).toBe("SessionUnavailableError");
         expect(err.reason).toBe("http");
         expect(err.statusCode).toBe(502);
+    });
+});
+
+describe("sessionCookiePrefix", () => {
+    const before = process.env.AUTH_COOKIE_PREFIX;
+    afterEach(() => {
+        if (before === undefined) delete process.env.AUTH_COOKIE_PREFIX;
+        else process.env.AUTH_COOKIE_PREFIX = before;
+    });
+
+    it("is Better Auth's own name unless an environment names its own", async () => {
+        const { sessionCookiePrefix } = await import("./constants");
+        delete process.env.AUTH_COOKIE_PREFIX;
+        expect(sessionCookiePrefix()).toBe("better-auth");
+        process.env.AUTH_COOKIE_PREFIX = "saroh-dev";
+        expect(sessionCookiePrefix()).toBe("saroh-dev");
+        process.env.AUTH_COOKIE_PREFIX = "";
+        expect(sessionCookiePrefix()).toBe("better-auth");
     });
 });

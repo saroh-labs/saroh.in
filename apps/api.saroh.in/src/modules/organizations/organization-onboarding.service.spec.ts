@@ -148,6 +148,44 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
     });
 
+    describe('setup\'s "Is it registered?" (prelaunch)', () => {
+        it("keeps Registered, which sends no type, so go-live can ask for the real one", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { registered: true, country: "IN" },
+            });
+            const { data } = profileCreate.mock.lastCall?.[0] as {
+                data: Record<string, unknown>;
+            };
+            expect(data.legallyRegistered).toBe(true);
+            expect(data.type).toBeUndefined();
+        });
+
+        it("reads Not registered (the individual type) as not registered", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { type: "individual" },
+            });
+            expect(profileCreate).toHaveBeenLastCalledWith({
+                data: expect.objectContaining({
+                    type: "individual",
+                    legallyRegistered: false,
+                }),
+            });
+        });
+
+        it("leaves it unasked when setup didn't ask", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { country: "IN" },
+            });
+            const { data } = profileCreate.mock.lastCall?.[0] as {
+                data: Record<string, unknown>;
+            };
+            expect(data.legallyRegistered).toBeUndefined();
+        });
+    });
+
     it("emits an organization.onboard SUCCESS audit event after commit", async () => {
         await service.onboard("user_1", { name: "Acme" });
 

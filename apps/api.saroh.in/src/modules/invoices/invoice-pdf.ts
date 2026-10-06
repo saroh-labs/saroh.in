@@ -89,9 +89,11 @@ export function renderInvoicePdf(
         bufferPages: true,
         info: {
             Title: `${view.title} ${view.number}`,
+            // The business's paper, never Saroh's brand (a customer's PDF
+            // reader shows these): the seller made it.
             Author: view.seller.name,
-            Creator: "Saroh",
-            Producer: "Saroh",
+            Creator: view.seller.name,
+            Producer: view.seller.name,
         },
     });
     doc.registerFont("Regular", regular);

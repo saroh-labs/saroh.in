@@ -959,3 +959,66 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the workspace formatted every number and amount with `en-GB`, so ₹20,44,971 read as ₹2,044,971. Saroh's merchants read money in lakh and crore.
 - Decision: numbers and money in `app.saroh.in` format with `NUMBER_LOCALE = "en-IN"` (lakh and crore grouping, "45K" and "45L" compact). Dates stay on `DISPLAY_LOCALE = "en-GB"` ("3 Aug 2026"). Both stay pinned constants, never the runtime's locale, so server and browser render the same string.
 - Consequences: a per-user or per-business locale, when it comes, replaces both constants. Merchant sites keep their own locale (`packages/site-blocks`).
+
+## DEC-080 Insights answers "how is this week going?" and opens its rows
+
+**Status: Accepted — 2026-10-04** · user · extends DEC-075 after the Insights UX audit
+
+- Context: the audit of Insights (6/10) found the takings stopped at last Sunday, nothing on the page led anywhere, the phone chart's dates truncated, the best week was said three times and "Anything to watch?" restated records. The owner asked for every finding fixed, at full width.
+- Decision:
+    - The takings read carries the week in progress (`thisWeek`): Monday to today, beside the same days of last week. It leads the answers ("How is this week going?") and is drawn hatched beside the twelve, never ranked among them or used in the twelve's comparisons. A change against the same days needs 3 payments, as the months do.
+    - Every figure with rows behind it opens them: tiles, the best week, every bar, "Anything to watch?" and the week in progress go to the Orders list filtered to those days (`date=custom&payment=paid`; the list filters by the day placed, so links say "placed"). Enquiries open Leads.
+    - Bars are buttons: hover, focus or tap puts the value in a readout above the chart, with its link. No value lives only in a hover. The website's chart uses the same component and writes days "4 Sep".
+    - "Anything to watch?" speaks only on a signal (three falling weeks ending below usual; a week 30% or more below usual; a place down 30% or more on the four before) and otherwise says "Nothing unusual in the last four weeks." It waits for four weeks on record.
+    - The section is full width, its sentences held to a 68ch measure. The footer says what the figures were counted from, and "How takings are counted" explains the rule.
+    - A business that has never taken money sees one message with "Take an order" and "Send an invoice", not an answers card plus an empty state.
+- The word is **Sales**, not "Takings" (owner, 2026-10-04, audit F15): the section, its figures, "How sales are counted" and Home's "Sales so far". It still means money actually taken — paid, less refunds — as "How sales are counted" says. Code names (`takings*`) stay; they are not read by merchants.
+- Consequences: elsewhere the word is unchanged (a class pack's "Sales and takings" is its own screen).
+
+## DEC-081 The dev environment lives on saroh.io, behind a key
+
+**Status: Accepted — 2026-10-05** · user
+
+- Context: the dev API answered on `dev-api.saroh.in`, so its session cookie was set for `.saroh.in` — the same name and domain as production's, sent to both. Two-level names (`app.dev.saroh.in`) fail TLS on Cloudflare's free certificate, and the dev environment was open to anyone who found it.
+- Decision:
+    - `development` deploys to **saroh.io** (`app.`, `accounts.`, `admin.`, `api.` and the apex); merchant sites stay on `*.dev.saroh.app`. saroh.io may later give way to a dedicated domain such as saroh.dev.
+    - Dev's session cookie has its own prefix (`AUTH_COOKIE_PREFIX`); production's is unchanged.
+    - The dev apps admit only browsers that opened a page with `?access=<key>` (`DEV_ACCESS_KEY`); everyone else lands on the same page in production.
+    - A `development`-branch build refuses to start without the dev environment's variables, as a production build does without production's.
+- For now Vercel's preview protection (a Vercel team login) stays on in front of the dev apps, since only the owner uses them, and the key is the second lock. When others need dev, the saroh.io domains come out from behind Vercel's login (a Deployment Protection Exception, or protection off for those projects) and the key alone decides.
+- Consequences: the dev API and merchant sites stay reachable without the key. A new Vercel app joining the dev environment needs the gate in its middleware and its variables on the `development` branch.
+
+## DEC-082 An issued invoice prints the seller as it was at issue
+
+**Status: Accepted — 2026-10-05** · user · extends ADR-008's frozen seller (GSTIN, state, address)
+
+- Context: an issued invoice already froze the buyer, and the seller's GSTIN, state and registered address, but its paper read the business's **name, legal name and contact email** live from settings. Renaming the business changed every old invoice, its PDF and the customer's pay and receipt links.
+- Decision:
+    - Once issued, an invoice's printed data never changes. `Invoice.sellerName`, `sellerLegalName` and `sellerEmail` are written wherever the GSTIN and address are (`documentColumns`, from `loadTaxProfile`: `Organization.name`, `BusinessProfile.legalName`, `BusinessProfile.contactEmail`). A credit note or supplementary invoice copies its original's, as it does the GSTIN.
+    - Everything that draws an issued paper reads the frozen values: Invoice Detail and the quick look, the PDF, the pay page and the customer's receipt. A frozen name marks all three as frozen; a legal name or email blank at issue stays blank.
+    - A draft, and only a draft, prints today's settings (`serializeInvoice` sends null for its frozen seller fields).
+    - Migration `20261022110000_invoice_seller_frozen` backfilled every invoice that is not a draft from today's settings — what its paper printed until then. A row still without them (written outside the API, like a seed) falls back to today's rather than print no seller.
+    - **The logo stays live**: it is branding, not a particular rule 46 asks a tax invoice to carry, and a business replacing its logo expects its paper to follow.
+- Consequences: what is sent _now_ still names the business as it is now — the invoice email's sender line, an order's pay link and the booking page are not issued paper. `printedSeller` (API `invoices/invoice-paper-view.ts`, app `lib/invoices/seller.ts`) is the one rule.
+
+## DEC-083 Customers get the invoice PDF: attached to its email and downloadable from the pay link and receipts
+
+**Status: Accepted — 2026-10-05** · user · supersedes round-2 default 106 (the pay page keeps no PDF)
+
+- Context: only the merchant could download an issued invoice's PDF (D16, default 37). The customer got a link by email, and a pay page or receipt with the browser's print. Default 106 had dropped the pay page's PDF.
+- Decision:
+    - **One PDF.** The customer gets the same PDF the merchant downloads: the issued paper, the seller as at issue (DEC-082), the business's own name and logo, no Saroh brand. Drawn on request and never stored (`invoices/issued-invoice-pdf.ts`).
+    - **Attached to the invoice email**, the send and every reminder. The send job draws it as it hands the email to the business's own provider (Saroh's email is still never used). Resend takes attachments; the SendGrid and SMTP relays, reached through the same Resend-shaped request, are not given one. Where the provider can't carry it, or the PDF can't be drawn or is over 5 MB, the email goes with its link alone, as before. A send is never failed for its attachment.
+    - **Download PDF on the pay link** (`GET /public/invoices/:token/pdf`): the token alone, found by its hash as the pay read is; a replaced or revoked link, a draft and a void invoice are a 404. Limited per caller as the pay read is, and to 10 drawings per invoice per 10 minutes. `Content-Disposition: attachment`, named as the merchant's (`pdfFileName`), `Cache-Control: private, no-store`, `nosniff`. saroh.app asks it server to server from `/pay/<token>/pdf`, so the token never goes from the browser to the API.
+    - **Download PDF on a receipt** (`GET /public/site-accounts/me/receipts/:id/pdf`): the customer's session and the site's relay, exactly as the receipt's read; anyone else's invoice is a 404.
+    - On saroh.app it sits beside Print where the page offers a copy (a business that doesn't take payment online, and receipts), and as a quiet line under the pay page's own actions otherwise, in the business's `--site-*` tokens.
+    - **Order pay links** (`/pay/o/<token>`) get none: the page is the order, not a paper, the link retires once the order is paid online, and an order can carry an invoice, a supplementary invoice and credit notes. The customer's order invoices are in their receipts, with the PDF.
+- Consequences: the invoice email's words are unchanged — they don't promise an attachment a provider may not carry. A provider adapter that learns to carry attachments says so (`takesAttachments`) and starts sending it.
+
+## DEC-084 A business that said it is registered names its type before it goes live
+
+**Status: Accepted — 2026-10-05** · user · from the pre-launch list (2026-09-28)
+
+- Context: setup's "Registered" chip saved nothing, so a registered business could go live with no legal type (Pvt Ltd, LLP, partnership, …) and the checklist could not tell it from one never asked.
+- Decision: setup stores the answer (`BusinessProfile.legallyRegistered`). A business that said Registered and takes money or invoices gets a "Choose your business type" step on its go-live checklist (Settings and Home) until it picks one. Every other business gets a gentle suggestion in Settings, never a block.
+- Consequences: businesses set up before this release read as "not asked" (the old answer was never saved), so they get the suggestion only. The API must deploy before the app: an older API refuses the new field.

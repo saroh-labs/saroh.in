@@ -222,6 +222,14 @@ hours") and blocked real deploys. So work reaches GitHub in batches:
   `--changedSince` and vitest `--changed`, counted from the newest commit on
   the branch whose tree passed that step (else the merge base). `--int` and
   `--all` run the full suites.
+- **Capped workers in the static burst.** Lint, typecheck and the unit tests
+  start together beside the browser run's production builds, so the gate caps
+  them: turbo `--concurrency=3` (`PREPUSH_TURBO_CONCURRENCY`), Jest
+  `--maxWorkers=4` (`PREPUSH_JEST_WORKERS`), Vitest `--maxWorkers=2` per
+  package (`PREPUSH_VITEST_WORKERS`). Uncapped, every runner started a worker
+  per core and vitest ran 7x slower than alone, timing out a seed test. The
+  database package's demo-seed tests run as their own `seeds` step after the
+  burst. CI is unchanged: each job has its own machine.
 - **Parallel integration.** `jest --shard=k/16` on `PREPUSH_INT_DBS`
   (default 3) databases named after `TEST_DATABASE_URL` plus `-1`, `-2`, …,
   created if missing. Each worker owns one database and its own `TMPDIR`,

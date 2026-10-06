@@ -2,8 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { appBase } from "../../common/app-url";
 import { fromMinor } from "../../common/money";
-import { env } from "../../env";
 import { CommunicationsService } from "../communications/communications.service";
 import { escapeHtml } from "../communications/transactional";
 import { formatMoney } from "../invoices/invoice-send.service";
@@ -227,7 +227,7 @@ export function renderAlertEmail(
     alert: Pick<WordedAlert, "event" | "title" | "body" | "path">,
     business: string,
 ): { subject: string; body: string } {
-    const base = (env.APP_URL ?? "https://app.saroh.in").replace(/\/$/, "");
+    const base = appBase();
     const lines = [
         `<p><strong>${escapeHtml(alert.title)}</strong></p>`,
         alert.body ? `<p>${escapeHtml(alert.body)}</p>` : "",

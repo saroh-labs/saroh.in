@@ -27,6 +27,10 @@ import { urls } from "../playwright.config";
  *   sitemap lists exactly the indexable pages and robots.txt keeps out
  *   the rest.
  *
+ * - No page loads Google Analytics: the tag is production's alone, so a
+ *   test run never counts as a visitor (until 5 Oct they were most of GA's
+ *   "visitors", Windows from the desk project and Android from the phone).
+ *
  * Read-only but for the waitlist join. The site runs on the seeded stack
  * at `E2E_WEB_URL` (3002 in CI and `pnpm prepush --e2e`), portless's
  * `https://saroh.localhost` otherwise.
@@ -147,6 +151,11 @@ test.describe("every page", () => {
             for (const width of [390, 320]) {
                 await page.setViewportSize({ width, height: 844 });
                 await page.goto(`${WEB}${path}`, { waitUntil: "load" });
+                // The page is drawn before it is measured: an empty one
+                // is never wide.
+                await expect(
+                    page.locator("main, [role=main]").first(),
+                ).toBeVisible();
                 // Against the width we set: a phone viewport widens
                 // innerWidth to fit an overflow rather than scrolling.
                 await expect
@@ -485,4 +494,22 @@ test.describe("links, redirects and the sitemap", () => {
         const hook = await request.post(`${WEB}/api/revalidate`);
         expect(hook.status()).toBe(401);
     });
+});
+
+test("no page loads Google Analytics outside production", async ({ page }) => {
+    const gaRequests: string[] = [];
+    page.on("request", (req) => {
+        const url = req.url();
+        if (/googletagmanager\.com|google-analytics\.com/.test(url)) {
+            gaRequests.push(url);
+        }
+    });
+    for (const path of PAGES) {
+        await page.goto(`${WEB}${path}`);
+        await expect(page.locator("main")).toBeVisible();
+        await expect(
+            page.locator('script[src*="googletagmanager"]'),
+        ).toHaveCount(0);
+    }
+    expect(gaRequests).toEqual([]);
 });

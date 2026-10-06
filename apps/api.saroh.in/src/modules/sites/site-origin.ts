@@ -51,13 +51,24 @@ export function platformOrigin(address: string): string {
     return `https://${address}.${rendererHost()}`;
 }
 
-/** The renderer's apex host: `saroh.app`, or `saroh.app.localhost` in dev. */
-export function rendererHost(): string {
+/**
+ * The renderer's own origin, with no trailing slash: `RENDERER_URL`, which a
+ * deployed API must set (`env.ts`), else the local renderer in development
+ * and `https://saroh.app` in tests. The one place this is worked out (plan
+ * 2026-10-05-001 KTD-4): pay links, review links and site origins all read it.
+ */
+export function rendererBase(): string {
     const base =
         env.RENDERER_URL ??
         (env.NODE_ENV === "development"
             ? "https://saroh.app.localhost"
             : "https://saroh.app");
+    return base.replace(/\/$/, "");
+}
+
+/** The renderer's apex host: `saroh.app`, or `saroh.app.localhost` in dev. */
+export function rendererHost(): string {
+    const base = rendererBase();
     try {
         return new URL(base).host;
     } catch {

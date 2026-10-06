@@ -140,7 +140,6 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
       NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
-      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
     steps:
       - uses: actions/checkout@v4
         with:
@@ -195,7 +194,6 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
       NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
-      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
     steps:
       - uses: actions/checkout@v4
         with:
@@ -239,7 +237,6 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
       NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
-      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
     steps:
       - uses: actions/checkout@v4
         with:
@@ -306,7 +303,6 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
       NEXT_PUBLIC_ROOT_DOMAIN: saroh.app
-      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_test
       TEST_RLS: ${{ matrix.mode == 'rls' && 'on' || '' }}
     # The test DB name contains "test" so it passes the S0-003 guard.
@@ -491,7 +487,6 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://localhost:3003
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
-      NEXT_PUBLIC_APP_DOMAIN: app.saroh.in
       # `localhost`, not `saroh.app`: this is the renderer's OWN apex, and on a
       # runner that is what it is reached at. Told `saroh.app`, the middleware
       # reads `localhost` as a tenant subdomain and rewrites every request —

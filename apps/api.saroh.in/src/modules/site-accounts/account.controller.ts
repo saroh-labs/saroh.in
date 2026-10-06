@@ -8,6 +8,7 @@ import {
     Param,
     Patch,
     Post,
+    StreamableFile,
     UseGuards,
 } from "@nestjs/common";
 
@@ -31,6 +32,7 @@ import {
 } from "./dto";
 import type { EmailChanged } from "./email-change.service";
 import { EmailChangeService } from "./email-change.service";
+import { ReceiptPdfService } from "./receipt-pdf.service";
 import type { CodeRequested } from "./sign-in-codes.service";
 import type { SiteRelay } from "./site-relay";
 import { RelayContext } from "./site-relay";
@@ -53,6 +55,7 @@ export class AccountController {
     constructor(
         private readonly account: AccountHomeService,
         private readonly emailChange: EmailChangeService,
+        private readonly receiptPdfs: ReceiptPdfService,
     ) {}
 
     /** Who is signed in, their details, and the tabs this business shows. */
@@ -120,6 +123,28 @@ export class AccountController {
         @Param("invoiceId") invoiceId: string,
     ): Promise<PublicInvoiceView> {
         return this.account.receipt(customer, invoiceId);
+    }
+
+    /**
+     * One receipt as a PDF (DEC-083), named for its number: the issued
+     * paper, drawn on request and never stored. Another person's is a 404.
+     */
+    @Get("receipts/:invoiceId/pdf")
+    @Header("Cache-Control", "private, no-store")
+    @Header("X-Content-Type-Options", "nosniff")
+    async receiptPdf(
+        @CurrentCustomer() customer: CustomerContext,
+        @Param("invoiceId") invoiceId: string,
+    ): Promise<StreamableFile> {
+        const { file, fileName } = await this.receiptPdfs.pdf(
+            customer,
+            invoiceId,
+        );
+        return new StreamableFile(file, {
+            type: "application/pdf",
+            disposition: `attachment; filename="${fileName}"`,
+            length: file.length,
+        });
     }
 
     /** The health notes this customer sent (404 until C12). */

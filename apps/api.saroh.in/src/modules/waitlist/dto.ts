@@ -5,6 +5,7 @@ import {
     IsNotEmpty,
     IsOptional,
     IsString,
+    Matches,
     MaxLength,
     ValidateIf,
 } from "class-validator";
@@ -21,6 +22,13 @@ const trim = ({ value }: { value: unknown }): unknown =>
 /** An empty optional field is no field: "" from a blank input is not a city. */
 const blankToUndefined = ({ value }: { value: unknown }): unknown => {
     const trimmed = trim({ value });
+    return trimmed === "" ? undefined : trimmed;
+};
+
+/** A country code in capitals, or no field when blank. */
+const upperOrUndefined = ({ value }: { value: unknown }): unknown => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim().toUpperCase();
     return trimmed === "" ? undefined : trimmed;
 };
 
@@ -62,6 +70,16 @@ export class JoinWaitlistDto {
     @IsString()
     @MaxLength(80)
     city?: string;
+
+    /**
+     * The visitor's country, two letters, as saroh.in's host saw their
+     * connection — the site adds it, the visitor never types it. Anything
+     * else is refused rather than stored.
+     */
+    @IsOptional()
+    @Transform(upperOrUndefined)
+    @Matches(/^[A-Z]{2}$/)
+    country?: string;
 
     @IsOptional()
     @IsIn(WAITLIST_PLANS)

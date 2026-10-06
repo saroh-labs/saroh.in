@@ -46,6 +46,17 @@ export function isSupportedComms(
  */
 export type CommsCredentials = Record<string, string>;
 
+/**
+ * A file sent with an email (DEC-083: the invoice's PDF). Drawn for the
+ * one send and never stored; only an adapter whose provider says it takes
+ * attachments ({@link CommsProvider.takesAttachments}) is given one.
+ */
+export interface CommsAttachment {
+    fileName: string;
+    contentType: string;
+    content: Buffer;
+}
+
 /** The single message an adapter is asked to hand to its provider. */
 export interface CommsSendInput {
     to: string;
@@ -53,6 +64,8 @@ export interface CommsSendInput {
     subject?: string;
     body: string;
     credentials: CommsCredentials;
+    /** Files to send with it; absent or empty, the message alone. */
+    attachments?: CommsAttachment[];
 }
 
 /** The provider's accepted-for-delivery receipt. */
@@ -70,6 +83,12 @@ export interface CommsSendResult {
 export interface CommsProvider {
     readonly channel: CommsChannel;
     supports(provider: string): boolean;
+    /**
+     * Whether this provider is known to take attachments. An adapter
+     * without it, or one answering false, is never given any: the message
+     * goes as it is, never failed for a file it can't carry.
+     */
+    takesAttachments?(provider: string): boolean;
     send(input: CommsSendInput): Promise<CommsSendResult>;
 }
 

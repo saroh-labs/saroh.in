@@ -91,6 +91,9 @@ const rngFor = (...parts: string[]) =>
     createRng((SHOWCASE_SEED ^ hashKey(KEY, ...parts)) >>> 0);
 
 const NAME = "Rye & Co.";
+/** Its legal name and contact email, as the profile holds them and its paper prints them (DEC-082). */
+const LEGAL_NAME = "Rye & Co. Bakers LLP";
+const CONTACT_EMAIL = "hello@ryeandco.example.in";
 const DAY = 86_400_000;
 const IST = 330 * 60_000;
 const CURRENCY = "INR";
@@ -519,10 +522,10 @@ export async function seedBakery(
         create: { id: orgId, name: NAME, slug: RYE.slug, createdAt },
     });
     const profile = {
-        legalName: "Rye & Co. Bakers LLP",
+        legalName: LEGAL_NAME,
         country: "India",
         taxId: RYE_GSTIN,
-        contactEmail: "hello@ryeandco.example.in",
+        contactEmail: CONTACT_EMAIL,
         timezone: TIMEZONE,
         gstRegistered: true,
         gstState: GST.state,
@@ -2727,6 +2730,11 @@ async function writeDocuments(prisma: Db, orgId: string, docs: DocSpec[]) {
             sellerGstin: RYE_GSTIN,
             sellerState: GST.state,
             sellerAddress: RYE_ADDRESS_PRINTED,
+            // Frozen at issue, as the API writes them (DEC-082); a draft
+            // prints today's settings.
+            sellerName: isIssued ? NAME : null,
+            sellerLegalName: isIssued ? LEGAL_NAME : null,
+            sellerEmail: isIssued ? CONTACT_EMAIL : null,
             placeOfSupply: d.placeOfSupply,
             taxType: inter ? "INTER" : "INTRA",
             cgst: rupees(cgst),

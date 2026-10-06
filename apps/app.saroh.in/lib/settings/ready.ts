@@ -1,6 +1,10 @@
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
+import {
+    BUSINESS_TYPE_ANCHOR,
+    businessTypeOf,
+} from "@/lib/organizations/business-types";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -72,7 +76,13 @@ export function providersTabNote(attention: EmailAttention | null) {
 }
 
 export type ReadyStepKey =
-    "payments" | "address" | "tax" | "catalogue" | "site" | "shop";
+    | "payments"
+    | "address"
+    | "businessType"
+    | "tax"
+    | "catalogue"
+    | "site"
+    | "shop";
 
 /** The API's Website step: the shop waits on "Sells from" (P4). */
 export const WEBSITE_SHOP_NOT_CHOSEN = "WEBSITE_SHOP_NOT_CHOSEN";
@@ -220,6 +230,29 @@ function address(
     };
 }
 
+/**
+ * The real business type, for a business that said Registered at setup.
+ * Registered saves no type, so a Pvt Ltd, LLP or partnership is never
+ * guessed at; until one is chosen the business isn't ready to take money.
+ * A business that said Not registered, or wasn't asked, is not held by it:
+ * Settings only suggests a type to them (`nudges.ts`).
+ */
+function businessType(
+    profile: OrganizationSettings["profile"] | undefined,
+): Check | null {
+    if (profile?.registered !== true) return null;
+    return {
+        key: "businessType",
+        label: "Choose your business type",
+        why: "You said your business is registered. Choose which kind — private limited, LLP, partnership or another — so your business details are right before you take money.",
+        cta: "Choose type",
+        // Straight to the Type field, not the top of the tab.
+        href: `${business("identity")}#${BUSINESS_TYPE_ANCHOR}`,
+        broken: false,
+        left: businessTypeOf(profile.type) === "",
+    };
+}
+
 function tax(
     settings: Pick<OrganizationSettings, "tax" | "profile">,
 ): Check | null {
@@ -363,8 +396,10 @@ function shop(modules: readonly ModuleView[]): Check | null {
 
 /**
  * The steps to take money, in order: connect payments, the registered
- * address (once something invoices or takes money, `handlesMoney`), GST, a first product or service, publishing the site and,
- * while its shop waits on it, choosing the storefront it sells from.
+ * address and, for a business that said Registered at setup, its real type
+ * (both once something invoices or takes money, `handlesMoney`), GST, a
+ * first product or service, publishing the site and, while its shop waits
+ * on it, choosing the storefront it sells from.
  *
  * Each check is left, done, or not a step at all. Unknown — the list behind
  * it could not be read — is left out, so the count never claims a step is
@@ -384,18 +419,19 @@ export function readyChecklist({
 }): ReadyChecklist {
     // Never a step for a module Saroh has not rolled out (DEC-057).
     const modules = all ? rolledOut(all) : null;
+    const money = handlesMoney(modules, settings.setup) !== false;
     const checks = [
         modules ? payments(modules) : null,
         // Absent from an API older than the registered address: unknown.
         // Asked only once something invoices or takes money (DEC-070).
-        settings.registeredAddress &&
-        handlesMoney(modules, settings.setup) !== false
+        settings.registeredAddress && money
             ? address(
                   settings.registeredAddress,
                   settings.profile?.country,
                   settings.kind,
               )
             : null,
+        money ? businessType(settings.profile) : null,
         tax(settings),
         modules ? catalogue(modules, settings.setup) : null,
         modules ? site(modules, settings.setup) : null,

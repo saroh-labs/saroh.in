@@ -32,6 +32,8 @@ test.describe("the account area while it is switched off", () => {
         const res = await page.goto(`${SITE}/account`);
         expect(res?.status()).toBe(404);
         await page.goto(SITE);
+        // The header is drawn: before it is, no Sign in says nothing.
+        await expect(page.getByRole("banner").first()).toBeVisible();
         await expect(
             page.getByRole("banner").getByRole("button", { name: "Sign in" }),
         ).toHaveCount(0);

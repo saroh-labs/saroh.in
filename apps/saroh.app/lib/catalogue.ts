@@ -1,8 +1,7 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import { env } from "@/env";
-
+import { serverApiUrl } from "./api-url";
 import type {
     Catalogue,
     CatalogueLookup,
@@ -36,8 +35,7 @@ export type {
  * the call goes unsigned and the API counts this server instead — the page
  * still renders.
  */
-const API_URL =
-    env.API_URL ?? env.NEXT_PUBLIC_API_URL ?? "https://api.saroh.in";
+const API_URL = serverApiUrl();
 
 export async function shopFetch(path: string): Promise<Response | null> {
     const requestHeaders = await headers();

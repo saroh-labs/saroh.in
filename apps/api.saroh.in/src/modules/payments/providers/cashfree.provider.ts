@@ -1,5 +1,9 @@
 import { Logger } from "@nestjs/common";
 
+import {
+    cashfreeBaseUrl,
+    cashfreeMode,
+} from "../../../common/providers/cashfree-env";
 import { providerCallSignal } from "./provider-call";
 import type {
     CreateOrderIntentInput,
@@ -27,7 +31,10 @@ import { readRefundAnswer, RefundCallError } from "./provider.port";
 export class CashfreeProvider implements MerchantProvider {
     readonly name = "CASHFREE";
     private readonly logger = new Logger(CashfreeProvider.name);
-    private readonly baseUrl = "https://api.cashfree.com/pg";
+    /** Live or sandbox, per `CASHFREE_ENV` (read per call). */
+    private get baseUrl(): string {
+        return cashfreeBaseUrl();
+    }
     private readonly apiVersion = "2023-08-01";
 
     async createOrderIntent(
@@ -89,6 +96,8 @@ export class CashfreeProvider implements MerchantProvider {
             clientParams: {
                 cashfreeOrderId: providerIntentId,
                 paymentSessionId: body.payment_session_id ?? null,
+                // Where the drop-in must open: where this order was made.
+                mode: cashfreeMode(),
                 amount: Number((amountCents / 100).toFixed(2)),
                 currency,
             },

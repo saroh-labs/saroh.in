@@ -292,7 +292,6 @@ e2e_stack() {
     export NEXT_PUBLIC_APP_URL=http://localhost:3003
     export NEXT_PUBLIC_API_URL=http://localhost:3333
     export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
-    export NEXT_PUBLIC_APP_DOMAIN=app.saroh.in
     export NEXT_PUBLIC_ROOT_DOMAIN=localhost
     export EMAIL_FROM="Saroh <noreply@saroh.in>"
     export E2E_APP_URL=http://localhost:3003
@@ -811,22 +810,33 @@ since() {
     done
     echo "$MB"
 }
+# Capped, because everything below starts at once beside the browser run's
+# five production builds. Uncapped, Jest and every package's Vitest each start
+# a worker per core: on a 12-core, 24 GB laptop vitest ran 7x slower than
+# alone (138s against 20s), a 120s seed test timed out, and prisma generate
+# and Jest workers crashed (DEV_LEARNINGS, 5 Oct 2026). CI runs each job on
+# its own machine and is unchanged.
+GATE_TURBO="$TURBO --concurrency=${PREPUSH_TURBO_CONCURRENCY:-3}"
+JEST_WORKERS="--maxWorkers=${PREPUSH_JEST_WORKERS:-4}"
+VITEST_WORKERS="--maxWorkers=${PREPUSH_VITEST_WORKERS:-2}"
 if [ "$QUICK" = 1 ]; then
-    API_UNIT=api-unit:changed; VITEST=vitest:changed
-    JEST_ARGS="-- --changedSince=$(since api-unit:changed api-unit)"
-    VITEST_ARGS="-- --changed=$(since vitest:changed vitest) --passWithNoTests"
+    API_UNIT=api-unit:changed; VITEST=vitest:changed; SEEDS=seeds:changed
+    JEST_ARGS="-- --changedSince=$(since api-unit:changed api-unit) $JEST_WORKERS"
+    VITEST_ARGS="-- --changed=$(since vitest:changed vitest) --passWithNoTests $VITEST_WORKERS"
+    SEED_ARGS="-- --changed=$(since seeds:changed seeds) --passWithNoTests $VITEST_WORKERS"
 else
-    API_UNIT=api-unit; VITEST=vitest
-    JEST_ARGS=""; VITEST_ARGS=""
+    API_UNIT=api-unit; VITEST=vitest; SEEDS=seeds
+    JEST_ARGS="-- $JEST_WORKERS"; VITEST_ARGS="-- $VITEST_WORKERS"
+    SEED_ARGS="-- $VITEST_WORKERS"
 fi
 
 if ! cached lint || ! cached typecheck || ! cached "$API_UNIT" api-unit ||
-    ! cached "$VITEST" vitest; then
+    ! cached "$VITEST" vitest || ! cached "$SEEDS" seeds; then
     step deps test_deps
 fi
 # lint and typecheck over the affected packages, as CI's static job.
-bg_step lint $TURBO lint --only --filter="...[$MB]"
-bg_step typecheck $TURBO typecheck --only --filter="...[$MB]"
+bg_step lint $GATE_TURBO lint --only --filter="...[$MB]"
+bg_step typecheck $GATE_TURBO typecheck --only --filter="...[$MB]"
 if cached "$API_UNIT" api-unit; then
     BG="$BG $API_UNIT"; echo cached >"$W/$API_UNIT.rc"
 elif ! affected @saroh/api; then
@@ -836,11 +846,19 @@ else
     bg_step "$API_UNIT" env SKIP_ENV_VALIDATION=1 $TURBO test:unit --only \
         --filter=@saroh/api $JEST_ARGS
 fi
-# Every other package with a `test` script, as CI's unit job runs them.
+# Every other package with a `test` script, as CI's unit job runs them, but
+# the database package: its demo-seed tests build 70 days of a business and
+# take most of a minute alone, so they run after this burst, not inside it.
 # shellcheck disable=SC2086
-bg_step "$VITEST" $TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
-    $VITEST_ARGS
+bg_step "$VITEST" $GATE_TURBO test --only --filter="...[$MB]" --filter='!@saroh/api' \
+    --filter='!@saroh/database' $VITEST_ARGS
 bg_report
+if cached "$SEEDS" seeds; then
+    say "$SEEDS" "PASS (cached)"
+elif affected @saroh/database; then
+    # shellcheck disable=SC2086
+    step "$SEEDS" $TURBO test --only --filter=@saroh/database $SEED_ARGS
+fi
 
 # A new migration must replay onto an empty database and match schema.prisma.
 # REPLAY_DATABASE_URL names a throwaway database (its name must contain "test"),

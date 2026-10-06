@@ -71,6 +71,8 @@ export interface R2StorageConfig {
 /** Presigning options subset this package uses (superset accepted, e.g. by the SDK). */
 export interface PresignOptions {
     expiresIn?: number;
+    /** Headers the signature must cover (lower-case), beyond the SDK's own. */
+    signableHeaders?: Set<string>;
 }
 
 /** Signature of the injectable presigner. */
@@ -154,13 +156,20 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
             const command = new PutObjectCommand({
                 Bucket: config.bucket,
                 Key: key,
-                // Signed into the URL — the client must send these exact values.
+                // Signed into the URL — the client must send these exact values
+                // (see signableHeaders below).
                 ContentType: parsed.contentType,
                 ContentLength: parsed.contentLength,
             });
 
+            // The SDK leaves Content-Type out of a presigned PUT's signature
+            // unless told otherwise, and R2 then stores whatever type the
+            // client sends: an "image" could be uploaded as text/html and
+            // served from the media domain. Signing it makes R2 refuse any
+            // other type (and none at all). Content-Length is signed already.
             const url = await presign(client, command, {
                 expiresIn: uploadExpiry,
+                signableHeaders: new Set(["content-type"]),
             });
 
             return {

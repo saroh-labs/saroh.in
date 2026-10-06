@@ -355,6 +355,104 @@ describe("a treatment sold as one order (E9, real database)", () => {
         expect(after.money).toMatchObject({ paid: "12000.00", due: "0.00" });
     });
 
+    it("the balance prints the deposit's seller and is taxed as it was, though the settings changed between (ADR-008, DEC-082)", async () => {
+        const { organizationId } = owner;
+        const was = await prisma.businessProfile.findUniqueOrThrow({
+            where: { organizationId },
+        });
+        const crowns = await service(organizationId, {
+            name: "Crown fitting",
+            visits: 2,
+            depositMode: "PERCENT_50",
+        });
+        await prisma.service.update({
+            where: { id: crowns },
+            data: { gstRate: "18", sacCode: "999312" },
+        });
+        // Registered in Karnataka when the deposit is paid.
+        await prisma.businessProfile.update({
+            where: { organizationId },
+            data: {
+                gstRegistered: true,
+                gstState: "29",
+                taxId: "29AAGCR4375J1ZU",
+                legalName: "Kavi Dental LLP",
+                contactEmail: "desk@kavi.in",
+            },
+        });
+        try {
+            const booking = await bookedAndPaid(
+                crowns,
+                "imran@example.in",
+                "DEPOSIT",
+            );
+            const orderId = booking.orderId ?? "";
+            const deposit = await prisma.invoice.findFirstOrThrow({
+                where: { orderId, kind: "INVOICE" },
+            });
+            expect(deposit).toMatchObject({
+                sellerGstin: "29AAGCR4375J1ZU",
+                sellerState: "29",
+                sellerLegalName: "Kavi Dental LLP",
+                placeOfSupply: "29",
+                taxType: "INTRA",
+            });
+
+            // Moved to Mumbai, re-registered there, renamed.
+            await prisma.businessProfile.update({
+                where: { organizationId },
+                data: {
+                    gstState: "27",
+                    taxId: "27AAGCR4375J1ZV",
+                    addressLine1: "12 Marine Drive",
+                    city: "Mumbai",
+                    postalCode: "400020",
+                    legalName: "Kavi Dental Private Limited",
+                    contactEmail: "hello@kavi.in",
+                },
+            });
+            await orders.updateStatus(storeId, orderId, owner.userId, {
+                paymentStatus: "PAID",
+            });
+
+            const balance = await prisma.invoice.findFirstOrThrow({
+                where: { orderId, kind: "SUPPLEMENTARY" },
+            });
+            expect(balance.relatedInvoiceId).toBe(deposit.id);
+            expect(balance).toMatchObject({
+                sellerGstin: deposit.sellerGstin,
+                sellerState: deposit.sellerState,
+                sellerAddress: deposit.sellerAddress,
+                sellerName: deposit.sellerName,
+                sellerLegalName: deposit.sellerLegalName,
+                sellerEmail: deposit.sellerEmail,
+                placeOfSupply: "29",
+                taxType: "INTRA",
+            });
+            expect(deposit.sellerAddress).toContain("Bengaluru");
+            expect(String(balance.total)).toBe("6000");
+            expect(Number(balance.igst)).toBe(0);
+            expect(Number(balance.cgst)).toBeGreaterThan(0);
+            expect(Number(balance.cgst) + Number(balance.sgst)).toBe(
+                Number(balance.tax),
+            );
+        } finally {
+            await prisma.businessProfile.update({
+                where: { organizationId },
+                data: {
+                    gstRegistered: was.gstRegistered,
+                    gstState: was.gstState,
+                    taxId: was.taxId,
+                    addressLine1: was.addressLine1,
+                    city: was.city,
+                    postalCode: was.postalCode,
+                    legalName: was.legalName,
+                    contactEmail: was.contactEmail,
+                },
+            });
+        }
+    });
+
     it("paid at the desk: the order's one invoice when it is paid, at the service's rate and SAC", async () => {
         keySeq += 1;
         const { booking } = await publicBookings.bookOnline(

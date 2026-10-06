@@ -298,6 +298,8 @@ test.describe("phone reflow: Customer Detail", () => {
         const notice = page.getByRole("note").filter({
             hasText: "Looks like the same person",
         });
+        // The notice is what the long names are measured in.
+        await expect(notice).toBeVisible();
         await noSidewaysScroll(page, "Customer Detail with a duplicate");
         await notice.getByRole("button", { name: "Merge…" }).click();
         const dialog = page.getByRole("dialog", {

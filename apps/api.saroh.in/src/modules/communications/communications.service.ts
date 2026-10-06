@@ -24,7 +24,10 @@ import type {
 } from "../site-accounts/notice-reach";
 import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
 import type { MessageSendPayload } from "./message-send.handler";
-import { MESSAGE_SEND_TYPE } from "./message-send.handler";
+import {
+    INVOICE_PDF_ATTACHMENT,
+    MESSAGE_SEND_TYPE,
+} from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
 import type {
     AutopayTemplate,
@@ -79,6 +82,12 @@ export interface TransactionalSend {
     secretLink?: () => Promise<string>;
     /** The invoice it is about, recorded on the Message. */
     invoiceId?: string;
+    /**
+     * Attach the invoice's PDF (DEC-083): `invoiceId`'s paper, drawn by the
+     * send job when it hands the email over, where the provider takes
+     * attachments. Nothing is drawn or stored now.
+     */
+    attachInvoicePdf?: boolean;
     /** The staff member who sent it; null when Saroh did. */
     createdByUserId: string | null;
 }
@@ -754,6 +763,9 @@ export class CommunicationsService {
             messageId: message.id,
             deliveryId: delivery.id,
             ...(link ? { link: encryptSecret(link) } : {}),
+            ...(input.attachInvoicePdf && input.invoiceId
+                ? { attach: INVOICE_PDF_ATTACHMENT }
+                : {}),
         };
         await tx.job.create({
             data: {
