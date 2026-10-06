@@ -4,8 +4,9 @@ import { PageContainer } from "@/components/shared/page-container";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { payLinkPossible } from "@/lib/invoices/payments-on";
 import { listInvoices } from "@/lib/invoices/service";
-import { getInvoiceBusiness } from "@/lib/invoices/tax";
+import { detailsOnFileOf } from "@/lib/organizations/business-details";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { readOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "New invoice" };
@@ -25,14 +26,15 @@ export default async function NewInvoicePage({
     const [
         contacts,
         invoices,
-        business,
+        settings,
         provider,
         organization,
         { contactId },
     ] = await Promise.all([
         contactPickerOptions(),
         listInvoices(),
-        getInvoiceBusiness(),
+        // GST standing, and the details Issue needs (#838), in one read.
+        readOrganizationSettings(),
         // A pay link needs Payments on too (DEC-070).
         payLinkPossible(),
         resolveActiveOrganization(),
@@ -56,9 +58,12 @@ export default async function NewInvoicePage({
                     // The currency the business last invoiced in.
                     defaultCurrency={invoices.rows.at(0)?.currency ?? "INR"}
                     initialContactId={forContact?.id}
-                    registered={business?.registered ?? false}
+                    registered={
+                        settings.ok && (settings.data.tax?.registered ?? false)
+                    }
                     businessName={organization?.name ?? "This business"}
                     providerConnected={provider}
+                    detailsOnFile={detailsOnFileOf(settings)}
                 />
             </div>
         </PageContainer>

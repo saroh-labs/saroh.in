@@ -6,8 +6,9 @@ import { PageContainer } from "@/components/shared/page-container";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { payLinkPossible } from "@/lib/invoices/payments-on";
 import { getInvoice } from "@/lib/invoices/service";
-import { getInvoiceBusiness } from "@/lib/invoices/tax";
+import { detailsOnFileOf } from "@/lib/organizations/business-details";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { readOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Edit invoice" };
@@ -20,11 +21,12 @@ export default async function EditInvoicePage({
 }) {
     await requireSession();
     const { invoiceId } = await params;
-    const [invoice, contacts, business, provider, organization] =
+    const [invoice, contacts, settings, provider, organization] =
         await Promise.all([
             getInvoice(invoiceId),
             contactPickerOptions(),
-            getInvoiceBusiness(),
+            // GST standing, and the details Issue needs (#838), in one read.
+            readOrganizationSettings(),
             // A pay link needs Payments on too (DEC-070).
             payLinkPossible(),
             resolveActiveOrganization(),
@@ -47,10 +49,13 @@ export default async function EditInvoicePage({
                     defaultCurrency={invoice.currency}
                     draft={invoice}
                     registered={
-                        invoice.gst != null || (business?.registered ?? false)
+                        invoice.gst != null ||
+                        (settings.ok &&
+                            (settings.data.tax?.registered ?? false))
                     }
                     businessName={organization?.name ?? "This business"}
                     providerConnected={provider}
+                    detailsOnFile={detailsOnFileOf(settings)}
                 />
             </div>
         </PageContainer>

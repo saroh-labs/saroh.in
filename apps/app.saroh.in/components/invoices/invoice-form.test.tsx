@@ -13,7 +13,11 @@ vi.mock("@/lib/invoices/actions", () => ({
     updateInvoice: vi.fn(),
 }));
 vi.mock("@/components/organizations/use-business-details-step", () => ({
-    useBusinessDetailsStep: () => ({ run: vi.fn(), step: null }),
+    useBusinessDetailsStep: () => ({
+        run: vi.fn(),
+        ensure: vi.fn(),
+        step: null,
+    }),
 }));
 
 /**

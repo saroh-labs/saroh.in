@@ -19,7 +19,10 @@ import { SignInSheet } from "./sign-in-sheet";
  * while the account area is switched on.
  *
  * The sheet's options (the business's phone, whether a challenge is likely)
- * are read when "Sign in" is pressed, not on every page view.
+ * are read when "Sign in" is pressed, not on every page view — but the sheet
+ * opens at once, on what the page already knows, and takes them when they
+ * land (#838). Waiting for the read first left a second or more where the
+ * press showed nothing, and whatever was typed then went nowhere.
  */
 export function AccountEntry({
     customer,
@@ -36,8 +39,8 @@ export function AccountEntry({
     variant?: "header" | "page";
 }) {
     const router = useRouter();
+    const [open, setOpen] = useState(false);
     const [options, setOptions] = useState<SignInOptions | null>(null);
-    const [busy, setBusy] = useState(false);
 
     if (customer) {
         return (
@@ -55,26 +58,23 @@ export function AccountEntry({
         );
     }
 
-    async function open() {
-        if (busy) return;
-        setBusy(true);
-        const loaded = await loadOptions().catch(() => null);
-        setBusy(false);
-        setOptions(
-            loaded ?? {
-                businessName,
-                phone: null,
-                challenge: { required: false, siteKey: null },
-            },
-        );
+    function openSheet() {
+        setOpen(true);
+        // Read afresh on every open: whether a challenge is likely changes.
+        // Until it lands the sheet goes without the phone line; a challenge
+        // it missed, the API asks for when the code is requested.
+        void loadOptions()
+            .then((loaded) => {
+                if (loaded) setOptions(loaded);
+            })
+            .catch(() => undefined);
     }
 
     return (
         <>
             <button
                 type="button"
-                onClick={() => void open()}
-                aria-busy={busy || undefined}
+                onClick={openSheet}
                 className={
                     variant === "page"
                         ? buttonClasses(true)
@@ -86,11 +86,17 @@ export function AccountEntry({
             >
                 Sign in
             </button>
-            {options ? (
+            {open ? (
                 <SignInSheet
                     open
-                    onClose={() => setOptions(null)}
-                    options={options}
+                    onClose={() => setOpen(false)}
+                    options={
+                        options ?? {
+                            businessName,
+                            phone: null,
+                            challenge: { required: false, siteKey: null },
+                        }
+                    }
                     api={api}
                     onSignedIn={() => {
                         router.push("/account");

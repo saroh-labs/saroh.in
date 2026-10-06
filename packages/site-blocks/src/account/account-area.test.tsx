@@ -1,10 +1,4 @@
-import {
-    act,
-    fireEvent,
-    render,
-    screen,
-    waitFor,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountEntry } from "./account-entry";
@@ -506,8 +500,14 @@ describe("the header's account entry", () => {
         expect(link).toHaveTextContent("FK");
     });
 
-    it("Sign in reads the sheet's options, then opens it", async () => {
-        const loadOptions = vi.fn().mockResolvedValue(OPTIONS);
+    it("Sign in opens the sheet at once and reads its options behind it (#838)", async () => {
+        let land: (options: typeof OPTIONS) => void = () => undefined;
+        const loadOptions = vi.fn(
+            () =>
+                new Promise<typeof OPTIONS>((resolve) => {
+                    land = resolve;
+                }),
+        );
         render(
             <AccountEntry
                 customer={null}
@@ -517,11 +517,19 @@ describe("the header's account entry", () => {
             />,
         );
         fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-        await waitFor(() =>
-            expect(
-                screen.getByRole("heading", { name: "Sign in — Kavi Dental" }),
-            ).toBeInTheDocument(),
-        );
+        // Open before the read answers, with the field ready for typing.
+        expect(
+            screen.getByRole("heading", { name: "Sign in — Kavi Dental" }),
+        ).toBeInTheDocument();
+        expect(screen.getByLabelText("Email")).toHaveFocus();
         expect(loadOptions).toHaveBeenCalledTimes(1);
+        fireEvent.change(screen.getByLabelText("Email"), {
+            target: { value: "farah@example.in" },
+        });
+        await act(async () => {
+            land(OPTIONS);
+            await Promise.resolve();
+        });
+        expect(screen.getByLabelText("Email")).toHaveValue("farah@example.in");
     });
 });
