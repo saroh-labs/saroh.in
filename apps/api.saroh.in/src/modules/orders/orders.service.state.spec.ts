@@ -218,6 +218,39 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
         });
     });
 
+    it("marked paid with a way (#834): the invoice keeps it and the timeline says it", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+            organizationId: ORG,
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "PAID",
+            paidHow: "UPI",
+        });
+
+        expect(ensureOrderInvoice).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+            { method: "UPI" },
+        );
+        expect(eventCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                organizationId: ORG,
+                orderId: ORDER,
+                kind: "STATUS",
+                actorUserId: USER,
+                note: "Marked paid · UPI",
+                // The whole total, nothing having been paid online.
+                amountCents: 25000,
+            }),
+        });
+    });
+
     it("re-recording an order already paid leaves its link alone", async () => {
         const service = makeService();
         orderFindFirst.mockResolvedValue({

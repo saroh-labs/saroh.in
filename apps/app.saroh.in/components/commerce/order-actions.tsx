@@ -12,6 +12,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import type { PaymentMethod } from "@/lib/invoices/service";
 import { updateOrder } from "@/lib/orders/actions";
 import {
     canCancel,
@@ -20,7 +21,12 @@ import {
 } from "@/lib/orders/lifecycle";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
 
-type Pending = { kind: "cancel" } | { kind: "payment"; to: PaymentStatus };
+import { RecordPaidDialog } from "./record-paid-dialog";
+
+type Pending =
+    | { kind: "cancel" }
+    // `how`: a way already known when it opens ("Paid in cash", #834).
+    | { kind: "payment"; to: PaymentStatus; how?: PaymentMethod };
 export type { Pending as OrderMenuPending };
 
 /**
@@ -29,7 +35,8 @@ export type { Pending as OrderMenuPending };
  * through the kitchen stepper instead (ADR-008), which has an Undo.
  *
  * `pending` can be opened from outside — the payment banner's "Paid in cash"
- * asks the same question as the menu's "Record as paid".
+ * asks the same question as the menu's "Record as paid", with Cash picked.
+ * Recording it paid asks how it was paid (#834).
  */
 export function OrderActions({
     storeId,
@@ -74,12 +81,12 @@ export function OrderActions({
     );
     const cancellable = withCancel && canRefund && canCancel(status);
 
-    async function commit(p: Pending) {
+    async function commit(p: Pending, how?: PaymentMethod) {
         const res = await updateOrder(
             storeId,
             orderId,
             p.kind === "payment"
-                ? { paymentStatus: p.to }
+                ? { paymentStatus: p.to, ...(how ? { paidHow: how } : {}) }
                 : { status: "CANCELLED" },
         );
         if (!res.ok) {
@@ -94,7 +101,10 @@ export function OrderActions({
         router.refresh();
     }
 
-    const confirm = pending ? confirmCopy(pending) : null;
+    // Marking it paid asks how (#834), and is not destructive.
+    const recordingPaid =
+        pending?.kind === "payment" && pending.to === "PAID" ? pending : null;
+    const confirm = pending && !recordingPaid ? confirmCopy(pending) : null;
 
     return (
         <>
@@ -132,6 +142,19 @@ export function OrderActions({
                     </DropdownMenuContent>
                 </DropdownMenu>
             ) : null}
+            {recordingPaid ? (
+                <RecordPaidDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) setPending(null);
+                    }}
+                    initial={recordingPaid.how}
+                    onRecord={(how) => {
+                        setPending(null);
+                        void commit(recordingPaid, how);
+                    }}
+                />
+            ) : null}
             {confirm ? (
                 <ConfirmDialog
                     open
@@ -166,7 +189,8 @@ function confirmCopy(p: Pending): {
         };
     }
     const bodies: Record<PaymentStatus, string> = {
-        PAID: "For a payment taken outside Saroh — cash, or a bank transfer. Nothing is charged, and nothing is sent to the customer.",
+        // Asked by RecordPaidDialog instead (#834).
+        PAID: "",
         FAILED: "The customer tried to pay and it did not go through. They can still pay later.",
         REFUNDED:
             "For money returned outside Saroh. Nothing is sent back from here — to refund a card payment, use Refund.",

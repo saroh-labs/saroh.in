@@ -72,3 +72,18 @@ describe("MoneyCard after an edit", () => {
         ).not.toContain("Record payment");
     });
 });
+
+describe("MoneyCard's Paid by for a payment recorded by hand (#834)", () => {
+    it("names how it was paid", () => {
+        const out = html(
+            money({ paid: "480.00", due: "0.00", paidHow: "UPI" }),
+        );
+        expect(out).toContain("UPI · recorded by hand");
+    });
+
+    it("says only recorded by hand when the way was never asked", () => {
+        const out = html(money({ paid: "480.00", due: "0.00", paidHow: null }));
+        expect(out).toContain("Recorded by hand");
+        expect(out).not.toContain("· recorded by hand");
+    });
+});

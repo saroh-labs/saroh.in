@@ -17,6 +17,7 @@
 
 import type { Prisma } from "@saroh/database";
 
+import type { PaymentMethod } from "../invoices/invoice-state";
 import type { CounterPayment } from "./new-order.dto";
 import { orderMoneyIntents } from "./treatment-ledger";
 
@@ -75,20 +76,38 @@ export const DIFFERENCE_PAID_NOTE: Record<CounterPayment, string> = {
 };
 
 /**
+ * How an order marked paid by hand ("Record as paid", #834) reads on its
+ * timeline, by how the business says it was paid. No amount, as above.
+ * An app that sends no way says only that it was marked paid.
+ */
+export const MARKED_PAID_NOTE: Record<PaymentMethod, string> = {
+    CASH: "Marked paid · cash",
+    UPI: "Marked paid · UPI",
+    BANK_TRANSFER: "Marked paid · bank transfer",
+    CARD: "Marked paid · card at the counter",
+    OTHER: "Marked paid · another way",
+};
+
+export function markedPaidNote(how: PaymentMethod | undefined): string {
+    return how ? MARKED_PAID_NOTE[how] : "Marked paid by hand";
+}
+
+/**
  * Marked paid by hand ("Record as paid"): what it was paid outside Saroh is
  * what its total leaves after the payments it received online, kept on the
  * order, so an edit later asks only for the difference. Under the order's
- * row lock, in the caller's transaction.
+ * row lock, in the caller's transaction. Returns what was recorded, in
+ * minor units.
  */
 export async function recordPaidByHandInTx(
     tx: Pick<Prisma.TransactionClient, "order" | "paymentIntent">,
     orderId: string,
-): Promise<void> {
+): Promise<number> {
     const order = await tx.order.findUnique({
         where: { id: orderId },
         select: { total: true },
     });
-    if (!order) return;
+    if (!order) return 0;
     const online = await tx.paymentIntent.findMany({
         where: { ...orderMoneyIntents(orderId), status: "SUCCEEDED" },
         select: {
@@ -104,4 +123,5 @@ export async function recordPaidByHandInTx(
         where: { id: orderId },
         data: { paidByHand: (byHand / 100).toFixed(2) },
     });
+    return byHand;
 }

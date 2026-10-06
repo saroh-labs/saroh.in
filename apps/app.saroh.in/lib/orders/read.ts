@@ -2,6 +2,7 @@ import type {
     AttentionKind,
     AttentionSource,
 } from "@/lib/customer-workspace/attention";
+import type { PaymentMethod } from "@/lib/invoices/service";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
 
 /**
@@ -143,6 +144,11 @@ export interface OrderReadMoney {
     due: string;
     /** Paid outside a provider — cash, a transfer — and recorded by hand. */
     recordedByHand: boolean;
+    /**
+     * Recorded by hand, how (#834). Null when paid online or marked paid
+     * before the way was asked; absent from an API before it.
+     */
+    paidHow?: PaymentMethod | null;
     discountCode: { code: string; rule: string } | null;
     /**
      * Refunds the provider hasn't answered for yet: the money is held (and

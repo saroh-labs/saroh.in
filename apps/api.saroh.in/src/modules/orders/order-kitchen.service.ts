@@ -1177,6 +1177,8 @@ const READ_INCLUDE = {
             kind: true,
             status: true,
             source: true,
+            // How it was paid by hand (#834), for the money card.
+            paymentMethod: true,
             paymentIntents: LEDGER_PAYMENTS,
             // What the paper is called (D15): frozen on issue.
             ...INVOICE_TITLE_SELECT,

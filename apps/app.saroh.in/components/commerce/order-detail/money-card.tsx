@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { OrderPayments } from "@/components/stores/order-payments";
 import type { CounterPayment } from "@/lib/orders/kitchen-service";
+import { paidByHandWords } from "@/lib/orders/paid-how";
 import type { OrderRead, OrderReadMoney } from "@/lib/orders/read";
 import { refundLines } from "@/lib/orders/refund-line";
 import { providerName } from "@/lib/payments/providers";
@@ -102,7 +103,7 @@ export function MoneyCard({
         payments?.intents.find((i) => i.status === "SUCCEEDED")?.provider ??
         null;
     const paidBy = money.recordedByHand
-        ? "Recorded by hand"
+        ? paidByHandWords(money.paidHow)
         : provider
           ? providerName(provider)
           : n(money.paid) > 0
