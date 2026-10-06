@@ -13,7 +13,9 @@ import { urls } from "../playwright.config";
  * - the article draws its five real screenshots (each loaded, not a
  *   placeholder), rings the controls it names, and carries HowTo JSON-LD;
  * - at 390 the product areas are a Topics menu, and nothing hides sideways;
- * - every Next link and every link in the side nav answers 200.
+ * - every Next link and every link in the side nav answers 200;
+ * - the bookings, plans and website articles draw every step's screen,
+ *   ringed, at desk and phone width.
  *
  * Help publishes on 17 Oct (KTD-2): before then the pages are 404 unless
  * the site runs with `RESOURCES_PREVIEW=1` (local and preview only), so
@@ -139,3 +141,52 @@ test("at 390 the areas are a Topics menu, and nothing hides sideways", async ({
     await expect(page.getByRole("list", { name: "Results" })).toBeVisible();
     await expectNothingHiddenSideways(page);
 });
+
+/** The bookings, plans and website articles: each step's real screen, ringed. */
+const MORE = [
+    { slug: "set-your-teams-hours", title: "Set your team's hours", steps: 5 },
+    {
+        slug: "take-a-deposit-when-they-book",
+        title: "Take a deposit when they book",
+        steps: 5,
+    },
+    { slug: "set-up-a-monthly-plan", title: "Set up a monthly plan", steps: 6 },
+    {
+        slug: "connect-your-own-domain",
+        title: "Connect your own domain",
+        steps: 5,
+    },
+    {
+        slug: "make-your-link-look-right-when-shared",
+        title: "Make your link look right when shared",
+        steps: 4,
+    },
+];
+
+for (const a of MORE) {
+    test(`${a.title}: every step's screen loads, ringed, and nothing hides sideways`, async ({
+        page,
+    }) => {
+        await page.goto(`${WEB}/help/${a.slug}`);
+        await expect(
+            page.getByRole("heading", { level: 1, name: a.title }),
+        ).toBeVisible();
+        const shots = page.locator("main [data-shot^='help-']");
+        await expect(shots).toHaveCount(a.steps);
+        for (const shot of await shots.all()) {
+            const img = shot.locator("img");
+            await img.scrollIntoViewIfNeeded();
+            await expect
+                .poll(() =>
+                    img.evaluate(
+                        (el) =>
+                            (el as HTMLImageElement).complete &&
+                            (el as HTMLImageElement).naturalWidth,
+                    ),
+                )
+                .toBeGreaterThan(0);
+            await expect(shot.locator("[data-marker]")).toHaveCount(1);
+        }
+        await expectNothingHiddenSideways(page);
+    });
+}
