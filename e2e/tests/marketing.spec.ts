@@ -74,6 +74,8 @@ const RESOURCE_PREFIXES = [
     "/integrations",
     "/tools/",
     "/privacy",
+    "/terms",
+    "/refunds",
 ];
 
 /**
