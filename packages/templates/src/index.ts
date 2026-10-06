@@ -74,3 +74,11 @@ export {
     PORTFOLIO_TEMPLATE_ID,
     portfolioTemplate,
 } from "./templates/portfolio";
+
+// The Dietician industry template (industry templates plan, U7).
+export {
+    DIETICIAN_GALLERY_SAMPLE,
+    DIETICIAN_TEMPLATE_ID,
+    dieticianServiceIds,
+    dieticianTemplate,
+} from "./templates/dietician";
