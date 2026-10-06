@@ -6,6 +6,7 @@ import type {
 } from "@/lib/invoices/invoice-number";
 
 import type { OrganizationKind } from "./kind";
+import type { PayInstructionsSettings, PayValues } from "./pay-instructions";
 
 /**
  * Organization settings access (name + business profile).
@@ -120,6 +121,12 @@ export interface OrganizationSettings {
      * is set, absent from an API older than it.
      */
     logo?: BusinessLogo | null;
+    /**
+     * "How to pay us" (R32): the UPI ID, bank details and note customers
+     * see on their own unpaid invoices, orders and desk bookings. Absent
+     * from an API older than it: none set.
+     */
+    payInstructions?: PayInstructionsSettings;
 }
 
 export interface BusinessLogo {
@@ -150,6 +157,8 @@ export interface OrganizationSettingsInput {
     registeredAddress?: Partial<
         Record<"line1" | "line2" | "city" | "postalCode", string>
     >;
+    /** How to pay us (R32): only the fields changed; "" clears one. */
+    payInstructions?: Partial<PayValues>;
 }
 
 /** A refusal names the field it is about when the API says which. */

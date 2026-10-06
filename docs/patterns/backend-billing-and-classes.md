@@ -344,7 +344,8 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, currency, status, billed-to name, and `payOnline`) served
+  tax, total, currency, status, billed-to name, `payOnline`, and on an owed
+  view-only invoice `payInstructions`, R32) served
   server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
   rate-limited per link. With `payOnline` false (DEC-070) the page shows the
   invoice with no Pay button, only "Print or save as PDF", and starting a payment or autopay
@@ -358,6 +359,35 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   PAID (`ONLINE`) under its row lock; success on one already PAID or VOID is
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
+
+## How to pay us: offline payment details — **Current** (R32)
+
+- **Every business, every plan,** can tell customers how to pay it offline:
+  a UPI ID, bank details (name on the account, number, IFSC, bank) and a
+  short note. Six nullable columns on `BusinessProfile` (`payUpiId`,
+  `payBank*`, `payNote`), read and written with the rest of the business's
+  settings (`org:settings:read` / `org:update`, Owner and Admin) as
+  `payInstructions` on the settings PATCH. Rules, normalising and the reads
+  are `organizations/business-pay-instructions.ts`: a UPI ID is
+  `name@handle` (lower-cased), an IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`, an account
+  number 9–18 digits (CHECKs in the migration), and bank details are taken
+  whole or not at all. Never logged; the audit stream names the change, never
+  the value (`NAME_ONLY_FIELDS`).
+- **Shown only on a customer's own record.** The public sees them only
+  inside: the invoice pay link's read (owed, and `payOnline` false), the
+  order pay link's read (while DUE), and a signed-in desk booking's answer
+  (`account-bookings.controller.ts`). Never a standalone endpoint that hands
+  a business's bank details to anyone with its slug.
+  `businessPayInstructionsOf` is the one read, and re-checks every value on
+  the way out.
+- **The invoice email names the ways** ("see how to pay ‹business› by UPI or
+  bank transfer here") on a view link, never the details: a stored message
+  body never carries an account number. The invoice PDF has no payment
+  section and carries none.
+- **Drawn by one block:** `PayInstructionsCard` in `packages/site-blocks`
+  (QR from `uqr`, the UPI deep link `upi://pay?pa=…&pn=…&am=…&cu=INR&tn=…`,
+  copy buttons), used by the invoice and order pay pages, the booking
+  confirmation, and the Settings › Business › How to pay us preview.
 
 ## Paying for a booking online — **Current** (U19, ADR-008)
 

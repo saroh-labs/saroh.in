@@ -1,3 +1,5 @@
+import type { PayInstructions } from "@saroh/site-blocks";
+
 /**
  * The public order an order pay link shows (plan B, B11), and the check that
  * narrows it. Kept apart from `order-pay.ts`, which reads the app's env, so
@@ -32,6 +34,11 @@ export interface PayOrder {
      * the apex. Null or absent (an older API): served wherever opened.
      */
     payUrl?: string | null;
+    /**
+     * "How to pay us" (R32): the business's UPI ID, bank details and note,
+     * while the order is due. Null or absent: none set.
+     */
+    payInstructions?: PayInstructions | null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

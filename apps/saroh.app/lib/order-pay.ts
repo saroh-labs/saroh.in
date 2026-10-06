@@ -1,3 +1,5 @@
+import { payInstructionsOf } from "@saroh/site-blocks";
+
 import { serverApiUrl } from "./api-url";
 import { isIntent } from "./checkout-shape";
 import type { StartResult } from "./invoice-pay";
@@ -39,7 +41,12 @@ export async function getPayOrder(token: string): Promise<OrderPayLookup> {
             ? {
                   ok: true,
                   // Where the link lives (DEC-069, L6), checked.
-                  order: { ...body, payUrl: payUrlOf(body.payUrl) },
+                  order: {
+                      ...body,
+                      payUrl: payUrlOf(body.payUrl),
+                      // How to pay offline (R32), checked field by field.
+                      payInstructions: payInstructionsOf(body.payInstructions),
+                  },
               }
             : { ok: false, reason: "unavailable" };
     }

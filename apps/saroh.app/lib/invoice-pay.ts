@@ -1,4 +1,5 @@
 import type { AutopayDoneState, AutopayStartResult } from "@saroh/site-blocks";
+import { payInstructionsOf } from "@saroh/site-blocks";
 
 import { serverApiUrl } from "./api-url";
 import { autopayDoneAnswer, autopayStartAnswer } from "./autopay-shape";
@@ -62,6 +63,8 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
                       payUrl: payUrlOf(body.payUrl),
                       // Whether Pay is offered at all (DEC-070).
                       payOnline: payOnlineOf(body.payOnline),
+                      // How to pay offline (R32), checked field by field.
+                      payInstructions: payInstructionsOf(body.payInstructions),
                   },
               }
             : { ok: false, reason: "unavailable" };

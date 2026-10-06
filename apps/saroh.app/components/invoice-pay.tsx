@@ -1,6 +1,12 @@
 "use client";
 
-import { ctaClasses, destructiveAlertClasses } from "@saroh/site-blocks";
+import {
+    ctaClasses,
+    destructiveAlertClasses,
+    hasPayInstructions,
+    PayInstructionsCard,
+    payWaysText,
+} from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -34,7 +40,8 @@ import { hasCustomerPdf } from "@/lib/invoice-pdf";
  * A business that doesn't take payment online (`payOnline` false, DEC-070)
  * sends the same link to view the invoice: no Pay button, its PDF to
  * download or a copy to print, and "Pay ‹business› the way they've asked
- * you to".
+ * you to" — or, where the business set them (R32), its UPI ID as a QR,
+ * its bank details and its note (`PayInstructionsCard`).
  *
  * Wherever the page has a `pdfHref`, the customer can download the invoice
  * as the business issued it (DEC-083): beside Print where the page offers
@@ -241,20 +248,36 @@ export function InvoicePay({
                 </div>
             ) : offer === "elsewhere" ? (
                 <div className="mt-6 space-y-4">
-                    <div
-                        role="status"
-                        className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
-                    >
-                        <p className="font-semibold text-site-fg">
-                            Pay {invoice.businessName} the way they&apos;ve
-                            asked you to.
-                        </p>
-                        <p className="mt-1 text-sm text-site-muted">
-                            {invoice.businessName} doesn&apos;t take payment
-                            online. Keep a copy of this invoice for your
-                            records.
-                        </p>
-                    </div>
+                    {hasPayInstructions(invoice.payInstructions) ? (
+                        // How the business asked to be paid (R32).
+                        <PayInstructionsCard
+                            instructions={invoice.payInstructions}
+                            businessName={invoice.businessName}
+                            amount={invoice.total}
+                            currency={invoice.currency}
+                            reference={`${payTitle(invoice)} ${invoice.number}`}
+                            lead={offlineLead(
+                                invoice.businessName,
+                                money(invoice.total),
+                                payWaysText(invoice.payInstructions),
+                            )}
+                        />
+                    ) : (
+                        <div
+                            role="status"
+                            className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
+                        >
+                            <p className="font-semibold text-site-fg">
+                                Pay {invoice.businessName} the way they&apos;ve
+                                asked you to.
+                            </p>
+                            <p className="mt-1 text-sm text-site-muted">
+                                {invoice.businessName} doesn&apos;t take payment
+                                online. Keep a copy of this invoice for your
+                                records.
+                            </p>
+                        </div>
+                    )}
                     {pdf ? (
                         <InvoiceCopyActions
                             pdfHref={pdf}
@@ -332,6 +355,21 @@ export function InvoicePay({
             ) : null}
         </section>
     );
+}
+
+/**
+ * The line under "How to pay ‹business›" (R32), true to what is set:
+ * "Pay ₹1,400.00 by UPI or bank transfer", or only the copy to keep when
+ * the business left a note alone.
+ */
+function offlineLead(
+    business: string,
+    total: string,
+    ways: string | null,
+): string {
+    return ways
+        ? `${business} doesn't take payment online. Pay ${total} by ${ways}, and keep a copy of this invoice for your records.`
+        : `${business} doesn't take payment online. Keep a copy of this invoice for your records.`;
 }
 
 function Fact({ label, value }: { label: string; value: string }) {

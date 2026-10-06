@@ -426,6 +426,24 @@ model BusinessProfile {
   // date). A plan's `autopayChargeTiming` wins when set. A CHECK constraint
   // holds the values. No profile yet reads as DAY_AFTER_RENEWAL.
   autopayChargeTiming String @default("DAY_AFTER_RENEWAL")
+
+  // "How to pay us" (R32): how a customer pays the business offline, on
+  // every plan. Shown only on a customer's own unpaid invoice, order and
+  // booking pages (the public reads by token or session), never listed by
+  // slug. All optional; nothing set keeps the generic "pay them the way
+  // they've asked" line. Checked and trimmed by the API
+  // (`organizations/business-pay-instructions.ts`) and never logged; the
+  // audit stream names a change, never the value.
+  // A UPI ID ("name@bank"), lower-cased; the page draws its QR.
+  payUpiId             String?
+  // Bank transfer: the name on the account, its number (digits only, CHECK),
+  // the IFSC (CHECK) and the bank's name.
+  payBankAccountName   String?
+  payBankAccountNumber String?
+  payBankIfsc          String?
+  payBankName          String?
+  // A short note under them ("Send a screenshot to 98450 12345 once paid").
+  payNote              String?
 }
 
 // Membership: links a User to an Organization with a role (renamed from

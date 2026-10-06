@@ -5,6 +5,7 @@
  */
 
 import { siteMoney } from "../lib/money";
+import type { PayInstructions } from "../pay-instructions/model";
 
 /** Where a service happens (E7): the customer chooses for EITHER. */
 export type ServiceWhere = "IN_PERSON" | "ONLINE" | "EITHER";
@@ -105,6 +106,12 @@ export interface BookResult {
     state: HoldState;
     holdExpiresAt: string | null;
     payToken: string | null;
+    /**
+     * Booked to pay at the desk (R32): how the business says it can be paid
+     * ahead — UPI, bank transfer, a note. Null or absent: none set, or not
+     * a desk booking.
+     */
+    payInstructions?: PayInstructions | null;
 }
 
 /** Where a pay-now hold stands: `GET /public/services/holds/:token`. */

@@ -19,6 +19,8 @@ import {
     payLinkRefusal,
     payLinkStanding,
 } from "../orders/order-pay-link";
+import type { PayInstructionsView } from "../organizations/business-pay-instructions";
+import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import type { CreateIntentResult } from "./payments.service";
@@ -55,6 +57,12 @@ export interface PublicOrderPayView {
      * a pay page opened on another host here.
      */
     payUrl: string;
+    /**
+     * "How to pay us" (R32): the business's UPI ID, bank details and note,
+     * while the order is DUE — the customer's own order, read by its link.
+     * Null when nothing is due or the business set none.
+     */
+    payInstructions: PayInstructionsView | null;
 }
 
 /** Reads per caller per minute: a page reload is fine, a scraper is not. */
@@ -178,6 +186,10 @@ export class PublicOrderPayService {
                     ? siteStyleVariables(parseSiteStyle(site.style))
                     : null,
                 payUrl: await orderPayLinkUrlFor(found.organizationId, token),
+                payInstructions:
+                    status === "DUE"
+                        ? await businessPayInstructionsOf(found.organizationId)
+                        : null,
             };
         });
     }

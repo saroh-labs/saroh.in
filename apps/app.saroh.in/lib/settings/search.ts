@@ -123,6 +123,12 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     business("Delivery SAC", "tax"),
     business("Opening hours", "hours"),
     {
+        ...business("How to pay us", "pay"),
+        // What customers pay with when the business doesn't take payment
+        // online (R32).
+        words: ["UPI", "UPI ID", "QR", "Bank details", "IFSC", "Bank transfer"],
+    },
+    {
         ...business("Registered address", "address"),
         // The tab and its row were once a bare "Address"; it is the one
         // invoices print.
