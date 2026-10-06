@@ -27,6 +27,7 @@ export default async function NewServicePage() {
         staff,
         hasPage,
         hasStorefront,
+        payment,
         canEdit,
         timezone,
         currency,
@@ -43,6 +44,7 @@ export default async function NewServicePage() {
             kindUp={showKind(services, null)}
             hasPage={hasPage}
             hasStorefront={hasStorefront}
+            payment={payment}
         />
     );
 }

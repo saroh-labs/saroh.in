@@ -11,8 +11,10 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import type { AvailabilityRuleWindow } from "../bookings/availability";
 import { withinIntervals, workingIntervals } from "../bookings/availability";
 import { requireBookingPower } from "../bookings/booking-access";
+import type { BookingPaymentView } from "../bookings/booking-payment";
+import { bookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
-import { loadBookingRules } from "../bookings/booking-rules";
+import { bookingPaymentOf, loadBookingRules } from "../bookings/booking-rules";
 import { loadOpeningHours } from "../bookings/opening-hours";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
 import type { ClosureView } from "./closures.service";
@@ -565,6 +567,14 @@ export class StaffService {
         return loadBookingRules(prisma, ctx.organizationId);
     }
 
+    /** How people pay when they book, and whether online can be taken. */
+    async getBookingPayment(
+        ctx: OrganizationContext,
+    ): Promise<BookingPaymentView> {
+        requireBookingPower(ctx, "service:read");
+        return bookingPaymentView(ctx.organizationId);
+    }
+
     /** Set the business's rules; an absent field is left, `null` clears it. */
     async updateBookingRules(
         ctx: OrganizationContext,
@@ -584,6 +594,9 @@ export class StaffService {
             ...(dto.refundInTimeCancels !== undefined
                 ? { refundInTimeCancels: dto.refundInTimeCancels }
                 : {}),
+            ...(dto.bookingPayment !== undefined
+                ? { bookingPayment: dto.bookingPayment }
+                : {}),
         };
         const row = await prisma.bookingRules.upsert({
             where: { organizationId: ctx.organizationId },
@@ -594,9 +607,10 @@ export class StaffService {
                 latestBookingMinutes: true,
                 freeCancelHours: true,
                 refundInTimeCancels: true,
+                bookingPayment: true,
             },
         });
-        return row;
+        return { ...row, bookingPayment: bookingPaymentOf(row.bookingPayment) };
     }
 
     // ── Internals ──────────────────────────────────────────────────────────

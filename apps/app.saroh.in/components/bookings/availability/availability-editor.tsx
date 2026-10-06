@@ -17,6 +17,7 @@ import type {
 } from "@/lib/services/availability-rules";
 import {
     draftFrom,
+    payWayOf,
     REFUND_POLICY,
     refundsInTime,
     ruleChoices,
@@ -41,11 +42,13 @@ import type {
     BookingBrief,
     BookingRules,
     Closure,
+    OnlineBlocker,
     StaffView,
     WeeklyRange,
 } from "@/lib/staff/types";
 
 import { AddPersonDialog } from "./add-person-dialog";
+import { PayWayRow } from "./pay-way-row";
 import { OffRow, TimeOffCard } from "./time-off-card";
 import { WeeklyHours } from "./weekly-hours";
 
@@ -109,6 +112,7 @@ export function AvailabilityEditor({
     bookedOn,
     takesClasses,
     canEdit,
+    onlineBlocker,
 }: {
     staff: StaffView[];
     /** When the whole business is closed (E3). */
@@ -125,6 +129,11 @@ export function AvailabilityEditor({
     /** Who teaches a class — their dot is the class colour. */
     takesClasses: string[];
     canEdit: boolean;
+    /**
+     * Why the booking page can't take money online now (DEC-088); null
+     * when it can, undefined when it couldn't be told.
+     */
+    onlineBlocker?: OnlineBlocker | null;
 }) {
     const router = useRouter();
     const people = staff.filter((p) => p.status === "ACTIVE");
@@ -504,6 +513,17 @@ export function AvailabilityEditor({
                                 />
                             </div>
                         ))}
+                        {/* How people pay when they book (DEC-088). */}
+                        <PayWayRow
+                            way={payWayOf(d.rules)}
+                            blocker={onlineBlocker}
+                            disabled={!canEdit}
+                            onChange={(way) =>
+                                edit((x) => {
+                                    x.rules.bookingPayment = way;
+                                })
+                            }
+                        />
                         {/* The business's refund policy (E30, DEC-058). */}
                         <div className="flex items-center gap-2 py-1.5">
                             <span className="flex-1 text-[13px]">

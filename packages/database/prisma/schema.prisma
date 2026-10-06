@@ -4368,6 +4368,13 @@ model BookingRules {
   /// set it. Never more than was received; a late cancel is never refunded
   /// automatically.
   refundInTimeCancels Boolean @default(true)
+
+  /// How people pay when they book on the booking page (DEC-088, #821,
+  /// #822): ONLINE | DESK | BOTH, CHECKed. BOTH — the default, and what
+  /// every business had before — offers paying online (when a provider can
+  /// take it) and at the desk. A deposit or full price at booking is always
+  /// paid online, so DESK leaves a service that asks one unbookable online.
+  bookingPayment String @default("BOTH")
 }
 
 /// What has happened to a Booking, in order (#121).

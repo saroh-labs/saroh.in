@@ -2,8 +2,6 @@ import { NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { paymentsOn } from "../invoices/payments-on";
-import { OPENS_CHECKOUT } from "../payments/public-key";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type { OpeningHours, Slot } from "./availability";
 import {
@@ -14,8 +12,13 @@ import {
     outsideClosures,
     staffSlots,
 } from "./availability";
+import { onlinePaymentBlocker } from "./booking-payment";
 import type { BookingRulesValue } from "./booking-rules";
-import { loadBookingRules, withinBookingWindow } from "./booking-rules";
+import {
+    allowsOnline,
+    loadBookingRules,
+    withinBookingWindow,
+} from "./booking-rules";
 import type { Staffing } from "./booking-slots";
 import {
     busyOverlapping,
@@ -86,7 +89,11 @@ export interface PublicBookingPage {
     /** False when the business has Appointments switched off. */
     open: boolean;
     timezone: string;
-    /** Whether pay now is on offer: Payments on and a provider connected. */
+    /**
+     * Whether pay now is on offer: the business lets people pay online
+     * (its booking rules, DEC-088), Payments is on and a provider is
+     * connected. Whether the desk is on offer is `rules.bookingPayment`.
+     */
     payOnline: boolean;
     rules: BookingRulesValue;
     services: {
@@ -333,8 +340,9 @@ export function offeredOnSite(organizationId: string, siteId: string) {
 /**
  * What a site's booking page opens with (U19): the business, the services
  * it may offer (active, of this site or of no site, Appointments on), who
- * takes each — names only — the booking rules and whether it can take
- * payment online. A site that is not published is a 404, like its pages.
+ * takes each — names only — the booking rules (how people pay among them,
+ * DEC-088) and whether it can take payment online. A site that is not
+ * published is a 404, like its pages.
  */
 export async function publicBookingPage(
     siteId: string,
@@ -384,7 +392,7 @@ export async function publicBookingPage(
         businessName: site.organization.name,
         open,
         timezone: zone,
-        payOnline: online,
+        payOnline: online && allowsOnline(rules),
         rules,
         services: services.map((svc) => ({
             id: svc.id,
@@ -459,19 +467,13 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
 /**
  * Payments on, and a provider connected to take the money — one whose
  * checkout window can open: a Razorpay connection still missing its public
- * key id is not (DEC-054).
+ * key id is not (DEC-054). Whether the business lets people pay online is
+ * its booking rules' (DEC-088), read beside this.
  */
 export async function takesOnlinePayment(
     organizationId: string,
 ): Promise<boolean> {
-    const [on, provider] = await Promise.all([
-        paymentsOn(prisma, organizationId),
-        prisma.merchantPaymentProvider.findFirst({
-            where: { organizationId, status: "CONNECTED", ...OPENS_CHECKOUT },
-            select: { id: true },
-        }),
-    ]);
-    return on && provider !== null;
+    return (await onlinePaymentBlocker(organizationId)) === null;
 }
 
 /**

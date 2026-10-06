@@ -2051,6 +2051,135 @@ describe("a deposit at booking (E8)", () => {
         expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
         expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
     });
+
+    it("shows no payment line beside the get-in-touch message, even with a time chosen (#822)", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={{ ...DEPOSIT_PAGE, payOnline: false }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(
+            within(aside).getByText(
+                "Pulse Fitness can't take the deposit online right now. Get in touch with them to book.",
+            ),
+        ).toBeInTheDocument();
+        expect(within(aside).queryByText(/at the desk/)).toBeNull();
+        expect(within(aside).queryByText(/₹/)).toBeNull();
+        expect(screen.queryByText("Pay at the desk")).toBeNull();
+        expect(
+            within(aside).getByRole("button", { name: "Book" }),
+        ).toHaveAttribute("aria-disabled", "true");
+        fireEvent.click(within(aside).getByRole("button", { name: "Book" }));
+        expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
+    });
+});
+
+describe("how the business takes payment (DEC-088)", () => {
+    const withWay = (
+        bookingPayment: "ONLINE" | "DESK" | "BOTH",
+        over: Partial<BookingPageData> = {},
+    ): BookingPageData => ({
+        ...PAGE,
+        ...over,
+        rules: { ...PAGE.rules, bookingPayment },
+    });
+
+    function payWays() {
+        const group = screen.queryByRole("radiogroup", { name: "Paying" });
+        return group
+            ? within(group)
+                  .getAllByRole("radio")
+                  .map((r) => r.getAttribute("aria-label") ?? r.textContent)
+            : [];
+    }
+
+    it("online only: pay now, and no desk", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("ONLINE")}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const ways = payWays();
+        expect(ways).toHaveLength(1);
+        expect(ways[0]).toMatch(/^Pay ₹1,200 now/);
+        expect(screen.queryByText(/at the desk/)).toBeNull();
+    });
+
+    it("at the desk only: the desk, and no paying online", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("DESK")}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const ways = payWays();
+        expect(ways).toHaveLength(1);
+        expect(ways[0]).toMatch(/^Pay at the desk/);
+        expect(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        ).toBeInTheDocument();
+    });
+
+    it("online only with no provider: get in touch, and no payment line", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("ONLINE", { payOnline: false })}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(
+            within(aside).getByText(
+                "Pulse Fitness can't take payment online right now. Get in touch with them to book.",
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
+        expect(within(aside).queryByText(/₹/)).toBeNull();
+        expect(screen.queryByText(/at the desk/)).toBeNull();
+    });
+
+    it("at the desk only, with a deposit: get in touch, and no payment line", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("DESK", {
+                    services: [{ ...PAGE.services[0], depositCents: 60_000 }],
+                })}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(
+            within(aside).getByText(
+                "Pulse Fitness can't take the deposit online right now. Get in touch with them to book.",
+            ),
+        ).toBeInTheDocument();
+        expect(within(aside).queryByText(/₹/)).toBeNull();
+        expect(screen.queryByText(/at the desk/)).toBeNull();
+    });
 });
 
 describe("the header's facts (E6)", () => {
