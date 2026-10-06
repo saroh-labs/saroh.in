@@ -1,9 +1,10 @@
 // @covers app:/settings/providers app:/open api:communications api:organizations api:billing
-import type { Page } from "@playwright/test";
+import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import type { OwnBusiness } from "../fixtures/own-business";
 import { makeBusiness } from "../fixtures/own-business";
+import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
@@ -11,32 +12,27 @@ import { urls } from "../playwright.config";
  * business has no email of its own, Saroh sends its booking emails, and the
  * owner sees that, the month's allowance and the way to connect their own.
  *
- * Each test runs on a business it sets up for itself (`makeBusiness`, as
- * Asha), so connecting and disconnecting email touches nobody else.
+ * Route off: a business the test sets up for itself (`makeBusiness`, as
+ * Asha), which no flag reaches, so the screen is as it was.
  *
- * The route is off unless a business's `SAROH_BUSINESS_EMAIL` flag is on,
- * plan limits are enforced, and its plan's catalogue version carries the
- * `saroh-emails` allowance — none of which the seed sets, since every other
- * spec reads what a booking emails. So the first test (route off: the
- * screen is as it was) always runs, and the second runs only where the
- * stack was prepared for it and says so with `E2E_SAROH_EMAIL=1`: the
- * `SAROH_BUSINESS_EMAIL` and `PLAN_ENFORCEMENT` global defaults on (admin →
- * Flags), a live catalogue version whose Free plan has `saroh-emails` with
- * a monthly number, and Communications available to a new business.
- *
- * The spec can't arrange that for itself: the flags and the catalogue are
- * written only through `/admin` (staff), and the e2e stack has no staff
- * session and no database access (DEV_LEARNINGS "a Shop page can't be shown
- * in the browser suite"). Until it does, the route-on proof is the API's
- * `saroh-email-state.db.spec.ts` (the state with the real defaults) and
- * `saroh-email-allowance.db.spec.ts`.
+ * Route on: the route needs the business's `SAROH_BUSINESS_EMAIL` flag on,
+ * plan limits enforced (`PLAN_ENFORCEMENT`) and a live catalogue version
+ * whose plan has a `saroh-emails` allowance — written only through
+ * `/admin` in production, and the stack has no staff session. So the seed
+ * writes them (`packages/database/src/seed/saroh-email.ts`) for two of
+ * Asha's businesses that nothing else reads, one per browser
+ * (`seed_org_saroh-email_desk` / `_phone`), since each connects and
+ * disconnects an email: the flags are on for those two alone, the
+ * allowance is the sample catalogue's made-up number. Every other business
+ * reads what it did. The test puts its business back to where the seed
+ * left it first (no email of its own, no contact email), so a retry starts
+ * clean.
  *
  * The words for each state (near, paused, unread) and the Disconnect
  * warning are covered by `apps/app.saroh.in/lib/providers/rows.test.ts`;
- * the state itself by the API's `saroh-email-state.spec.ts`.
+ * the state itself by the API's `saroh-email-state.spec.ts` and, with the
+ * real defaults, `saroh-email-state.db.spec.ts`.
  */
-
-const ROUTE_READY = process.env.E2E_SAROH_EMAIL === "1";
 
 type SarohEmailState =
     | { state: "OFF"; takesOver: boolean }
@@ -90,11 +86,7 @@ async function noSideways(page: Page) {
 test("with Saroh's route off, Providers is as it was: no booking-emails block", async ({
     page,
 }, testInfo) => {
-    // This business's switch is off unless the stack turned it on for all.
-    test.skip(
-        ROUTE_READY,
-        "The stack sends booking emails for every new business",
-    );
+    // No flag reaches a business made here: Saroh's route is off for it.
     const b = await makeBusiness(page, testInfo, "se-off");
     expect((await stateOf(page, b)).state).toBe("OFF");
 
@@ -105,16 +97,45 @@ test("with Saroh's route off, Providers is as it was: no booking-emails block", 
     );
 });
 
-test.describe("with Saroh sending a business's booking emails", () => {
-    test.skip(
-        !ROUTE_READY,
-        "Needs the stack prepared for Saroh's email (E2E_SAROH_EMAIL=1)",
-    );
+/**
+ * The seeded business this browser's copy of the test owns (`saroh-email.ts`
+ * in the seed), put back to how the seed left it: no email of its own and
+ * no contact email.
+ */
+async function sarohEmailBusiness(
+    page: Page,
+    testInfo: TestInfo,
+): Promise<OwnBusiness> {
+    await useSession(page, "founder");
+    const browser = testInfo.project.name.startsWith("phone")
+        ? "phone"
+        : "desk";
+    const b: OwnBusiness = {
+        id: `seed_org_saroh-email_${browser}`,
+        address: `saroh-email-${browser}`,
+        name: "Asha's Pottery",
+    };
+    const before = await stateOf(page, b);
+    if (before.state === "OFF" && before.takesOver) {
+        const off = await page.request.delete(
+            api(b, "/comms-providers/EMAIL"),
+            { headers: headers(b) },
+        );
+        expect(off.ok(), await off.text()).toBe(true);
+    }
+    const cleared = await page.request.patch(api(b, ""), {
+        headers: headers(b),
+        data: { profile: { contactEmail: "" } },
+    });
+    expect(cleared.ok(), await cleared.text()).toBe(true);
+    return b;
+}
 
+test.describe("with Saroh sending a business's booking emails", () => {
     test("the block says so above Available, then goes when the business connects its own email", async ({
         page,
     }, testInfo) => {
-        const b = await makeBusiness(page, testInfo, "se-on");
+        const b = await sarohEmailBusiness(page, testInfo);
         const state = await stateOf(page, b);
         expect(state.state).toBe("SENDING");
         if (state.state !== "SENDING") return;
