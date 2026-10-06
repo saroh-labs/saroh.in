@@ -30,8 +30,10 @@
 #         people can book", "Latest they can book", "Free cancellation
 #         until", "Cancelled in time"); pay-way-row.tsx, PAY_WAY and
 #         payWayHint ("How people pay when they book": Both, Online, At the
-#         desk; "A deposit is always paid online."; "Right now no payment
-#         provider is connected, …", "Connect a provider"); DEC-088
+#         desk; "A deposit is paid online, or at the desk when you can't
+#         take payment online."; "Right now no payment provider is
+#         connected, so everything is paid at the desk.", "Connect a
+#         provider"); DEC-088, DEC-089
 #   ADD   .../bookings/availability/add-person-dialog.tsx ("They need no
 #         account. Their hours start empty, so nobody can book them until
 #         you add some.")
@@ -97,7 +99,7 @@ steps:
       marker: Add day off
     # RULES, SLOTS.
     - title: Set the booking rules
-      body: "Booking rules are for the whole business. Choose how far ahead people can book, the latest they can book before a time, until when they can cancel for free, and whether a cancel in time gets back what they paid online. How people pay when they book is Both, Online or At the desk. A deposit is always paid online, so with At the desk a service that takes one can't be booked online. If online payment can't be taken right now, Saroh says why under it, with a link to fix it. These rules are for your booking page; your team can still book someone in by hand."
+      body: "Booking rules are for the whole business. Choose how far ahead people can book, the latest they can book before a time, until when they can cancel for free, and whether a cancel in time gets back what they paid online. How people pay when they book is Both, Online or At the desk. A deposit is paid online when it can be; with At the desk, or with Both while online payment can't be taken, it's paid at the desk instead. If online payment can't be taken right now, Saroh says why under it, with a link to fix it. These rules are for your booking page; your team can still book someone in by hand."
       shot: help-team-hours-6
       caption: "The booking rules at Kavi Dental (demo clinic), for the whole business, with how people pay when they book."
       marker: How people pay when they book

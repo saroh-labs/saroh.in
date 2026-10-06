@@ -377,7 +377,7 @@ const HELP_SHOTS_B: Shot[] = [
         route: "/services",
         viewport: { width: 1024, height: 760 },
         mark: 'a[aria-label="Edit Root canal treatment"]',
-        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button; the root canal is marked Can't be booked online, as no payment provider is connected",
+        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button",
         caption: "Services at Kavi Dental, with Edit on the root canal",
     },
     {
@@ -388,7 +388,7 @@ const HELP_SHOTS_B: Shot[] = [
         viewport: { width: 1280, height: 1400 },
         clip: { selector: KAVI_PRICE, pad: 12 },
         mark: 'section:has(h2:text-is("Price")) [role="radio"][aria-checked="true"]',
-        alt: "The root canal's price at Kavi Dental (demo clinic), with At booking, they pay set to a 50% deposit, what that means, and the warning that people can't book it online while no payment provider is connected",
+        alt: "The root canal's price at Kavi Dental (demo clinic), with At booking, they pay set to a 50% deposit, what that means, and the note that it's paid at the desk for now, as no payment provider is connected",
         caption: "The root canal's price, with a 50% deposit at booking",
     },
     {
@@ -435,10 +435,10 @@ const HELP_SHOTS_B: Shot[] = [
         route: "site:/book?service=seed_sc_kavi_service_2",
         viewport: { width: 1280, height: 900 },
         clip: { selector: 'aside[aria-label="Your booking"]', pad: 12 },
-        mark: 'aside[aria-label="Your booking"] p[role="status"]',
-        alt: "The booking summary on the site of Kavi Dental (demo clinic), saying it can't take the deposit online right now",
+        mark: 'aside[aria-label="Your booking"] div:has(> span:text-is("Pay at the desk"))',
+        alt: "The booking summary on the site of Kavi Dental (demo clinic), with the root canal paid at the desk, as no payment provider is connected",
         caption:
-            "Kavi Dental's booking page, with no way to take the deposit online",
+            "Kavi Dental's booking page, with the deposit paid at the desk",
     },
 
     // ── Set up a monthly plan (Rye & Co., Northwind) ──────────────────
