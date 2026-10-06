@@ -1,5 +1,4 @@
 import type { TemplateContext, TemplateManifest } from "../manifest";
-import { escapeHtml } from "./html";
 
 /**
  * `dietician` — the Dietician industry template (industry templates plan,
@@ -7,21 +6,33 @@ import { escapeHtml } from "./html";
  * opens on the practitioner and their qualifications, then how they work,
  * what a consultation is and costs, what they are asked about most, their
  * writing, and how to get an appointment. One page, read top to bottom, as
- * the design is. No grid of offers, nothing urgent, no claim to treat or cure.
+ * the design is, its sections leading the header menu (How I work ·
+ * Consultations · Areas · Writing). No grid of offers, nothing urgent, no
+ * claim to treat or cure.
+ *
+ * The design's look (DEC-090): its exact Sage and Clay colours, Source
+ * Serif over Inter, a 1080px frame with 17px body copy at a reading
+ * measure. The practitioner opens the page as its `h1` (`person`,
+ * `portrait` look) with their qualifications as rows under the portrait,
+ * a facts row under them, the stages as numbered steps, one consultation
+ * as a price card beside what it includes, the areas in two columns with
+ * the medical disclaimer under them, and the writing as a counted archive.
  *
  * What is the business's own, never typed here (ADR-004, KTD-4):
  * - the consultation's name, length and price: the business's Services, read
  *   live (`servicesList`), laid down only with Appointments on and a service
- *   to list. Each card's "Ask for a time" opens the booking page on it;
+ *   to list — one service as the design's price card, several as cards.
+ *   "Ask for a time" opens the booking page on it;
  * - the writing: the site's own posts (`journal`, archive look), which draws
  *   nothing until a post is live;
  * - the hours appointments are kept: the business's hours (`hours`), which
  *   draws nothing until hours are saved;
  * - the name (the organization's) and the email (the business profile's).
  *
- * What is the owner's to replace: the role line, the qualifications and the
- * few lines about them are placeholders that say what goes there, so a site
- * published untouched never shows a credential as fact. The steps, what a
+ * What is the owner's to replace: the role line, the qualifications, the
+ * few lines about them, the facts row and the footer's line are placeholders
+ * that say what goes there (in words the pre-publish check names), so a
+ * site published untouched never shows a credential or a figure as fact. The steps, what a
  * consultation includes and the areas are the design's words, written to be
  * edited. The medical disclaimer stays: it is honest, and the owner can edit
  * it. Copy is in the first person, as the practitioner.
@@ -109,11 +120,30 @@ const STEPS = [
  * service's, so neither is written here.
  */
 const INCLUDES = [
-    { title: "The consultation itself, in person or by video" },
-    { title: "A written plan afterwards, in plain language, by email" },
-    { title: "Review of any blood work or notes you bring" },
-    { title: "One short follow-up question by email within the first month" },
+    "The consultation itself, in person or by video",
+    "A written plan afterwards, in plain language, by email",
+    "Review of any blood work or notes you bring",
+    "One short follow-up question by email within the first month",
 ] as const;
+
+/**
+ * The facts row under the practitioner (the design's "14 years / In
+ * practice"). Each is the owner's to state, and nothing the template can
+ * read gives it: a consultation's length is the service's and shows on the
+ * price card, so it is not repeated here as a typed figure. Each label says
+ * what to write, and the check names it until it is replaced.
+ */
+const FACTS = [
+    { value: "Years", title: "Say how long you have been in practice" },
+    { value: "Languages", title: "Say which languages you consult in" },
+    { value: "Where", title: "Say where you see people, and whether by video" },
+] as const;
+
+/** The consultation's two paragraphs, as the design sets them. */
+const ONE_PRICE =
+    "There is one appointment type and one price. If a follow-up is useful I will say so at the end of the first one, and if it is not I will say that instead.";
+const BY_VIDEO =
+    "Video consultations work as well as in-person for almost everything. Bring the same notes and blood work either way.";
 
 /** What I am asked about most: the design's six areas. */
 const AREAS = [
@@ -163,6 +193,30 @@ const ENQUIRY_FIELDS = [
     },
 ] as const;
 
+/** Where the menu's Consultations lands, whichever block draws them. */
+const CONSULTATION_FRAME = {
+    anchor: "consultation",
+    navLabel: "Consultations",
+} as const;
+
+/** Both colourways: the design's margins and its soft corners. */
+const SCALARS = {
+    pageMargin: 44,
+    sectionPadding: 64,
+    cornerRadius: 4,
+} as const;
+
+/**
+ * The design's type: the name at 40px, 17px body copy in a reading
+ * measure, a 1080px frame, section titles as plain headings.
+ */
+const TYPE = {
+    displaySize: 40,
+    bodySize: 17,
+    measure: 66,
+    contentWidth: 1080,
+} as const;
+
 export const dieticianTemplate: TemplateManifest = {
     id: DIETICIAN_TEMPLATE_ID,
     version: 1,
@@ -187,12 +241,25 @@ export const dieticianTemplate: TemplateManifest = {
                     ctaBand: "graphite",
                     footer: "chalk",
                 },
-                scalars: {
-                    pageMargin: 44,
-                    sectionPadding: 64,
-                    cornerRadius: 4,
-                },
+                scalars: SCALARS,
                 fontPair: "source-serif-inter",
+                palette: {
+                    bg: "#FBFAF6",
+                    surface: "#EDF2EC",
+                    fg: "#1C2620",
+                    body: "#24322B",
+                    muted: "#47564D",
+                    border: "#E4EBE1",
+                    accent: "#2F6B4F",
+                    accentFg: "#FFFFFF",
+                    heroBg: "#FBFAF6",
+                    heroFg: "#1C2620",
+                    ctaBg: "#2F6B4F",
+                    ctaFg: "#FFFFFF",
+                    footerBg: "#FBFAF6",
+                    footerFg: "#1C2620",
+                },
+                type: TYPE,
             },
         },
         {
@@ -207,15 +274,35 @@ export const dieticianTemplate: TemplateManifest = {
                     ctaBand: "clay",
                     footer: "chalk",
                 },
-                scalars: {
-                    pageMargin: 44,
-                    sectionPadding: 64,
-                    cornerRadius: 4,
-                },
+                scalars: SCALARS,
                 fontPair: "source-serif-inter",
+                // The same page recoloured, lightness held: clay paper and
+                // terracotta, the inks warmed to match.
+                palette: {
+                    bg: "#FDF9F7",
+                    surface: "#F1E6DF",
+                    fg: "#28201C",
+                    body: "#362B26",
+                    muted: "#5A4A43",
+                    border: "#EDE1DA",
+                    accent: "#8A483B",
+                    accentFg: "#FFFFFF",
+                    heroBg: "#FDF9F7",
+                    heroFg: "#28201C",
+                    ctaBg: "#8A483B",
+                    ctaFg: "#FFFFFF",
+                    footerBg: "#FDF9F7",
+                    footerFg: "#28201C",
+                },
+                type: TYPE,
             },
         },
     ],
+    /*
+     * The design's foot: the name and where the practice is. The owner's
+     * words to write, in Site settings.
+     */
+    footer: { line: "Your neighbourhood and city", layout: "left" },
     pages: [
         {
             path: "/",
@@ -223,11 +310,14 @@ export const dieticianTemplate: TemplateManifest = {
             isHome: true,
             sections: [
                 {
-                    // The practitioner: portrait, name, role, qualifications.
+                    // The practitioner opens the page: portrait, name as the
+                    // page's h1, role, qualifications as rows, their words.
                     type: "person",
                     contractVersion: 1,
                     content: (ctx: TemplateContext) => ({
-                        variant: "default",
+                        anchor: "intro",
+                        variant: "portrait",
+                        asTitle: true,
                         imageBrief:
                             "Professional portrait, seated, plain background, no white coat",
                         name: ctx.organizationName,
@@ -235,19 +325,39 @@ export const dieticianTemplate: TemplateManifest = {
                             ctx.tagline ??
                             "Your title and your town — for example, Registered dietician · Pune",
                         credentials: [
-                            "Your degree — the subject, where you studied and the year",
-                            "Your registration — and the body you are registered with",
-                            "Anything else you hold, and the year you started practising",
+                            {
+                                title: "Your degree — the subject",
+                                detail: "Where you studied, and the year",
+                            },
+                            {
+                                title: "Your registration — what it is",
+                                detail: "The body you are registered with",
+                            },
+                            {
+                                title: "Your other training — if any",
+                                detail: "Who it is from, or the year you began practising",
+                            },
                         ],
                         bio:
-                            "Write two or three short paragraphs in your own voice: who comes to see you, what they usually arrive with, and how you work with them.\n" +
+                            "Write two or three short paragraphs in your own voice: who comes to see you, what they usually arrive with, and how you work with them.\n\n" +
                             "Say plainly what you do not do, too — people trust a practitioner who tells them.",
                     }),
+                },
+                {
+                    // A few facts worth knowing first, each the owner's.
+                    type: "features",
+                    contractVersion: 1,
+                    content: {
+                        variant: "facts",
+                        items: FACTS.map((f) => ({ ...f })),
+                    },
                 },
                 {
                     type: "features",
                     contractVersion: 1,
                     content: {
+                        anchor: "how",
+                        navLabel: "How I work",
                         variant: "steps",
                         heading: "How I work",
                         intro: `${countWord(STEPS.length)} stages, and the whole of the first one is listening.`,
@@ -255,77 +365,97 @@ export const dieticianTemplate: TemplateManifest = {
                     },
                 },
                 {
-                    // The consultation: the business's own services, live.
+                    // One consultation: the business's own service as the
+                    // design's price card — its name, price and length read
+                    // live — beside what it includes.
                     type: "servicesList",
                     contractVersion: 1,
-                    when: bookable,
-                    content: (ctx: TemplateContext) => {
-                        const ids = dieticianServiceIds(ctx);
-                        const one = ids.length === 1;
-                        return {
-                            // Not a count: a service archived later drops
-                            // out of the list, and a number would go stale.
-                            heading: one ? "One consultation" : "Consultations",
-                            intro: one
-                                ? "There is one appointment type and one price. If a follow-up is useful I will say so at the end of the first one, and if it is not I will say that instead."
-                                : "If a follow-up is useful I will say so at the end of the first appointment, and if it is not I will say that instead.",
-                            serviceIds: ids,
-                            showPrices: true,
-                            layout: "cards",
-                            buttonLabel: "Ask for a time",
-                        };
+                    when: (ctx) => dieticianServiceIds(ctx).length === 1,
+                    content: (ctx: TemplateContext) => ({
+                        ...CONSULTATION_FRAME,
+                        variant: "priceCard",
+                        heading: "One consultation",
+                        intro: `${ONE_PRICE}\n\n${BY_VIDEO}`,
+                        serviceIds: dieticianServiceIds(ctx),
+                        showPrices: true,
+                        buttonLabel: "Ask for a time",
+                        modeLine: "In person, or by video",
+                        followUpLine:
+                            "Follow-ups are usually six weeks apart. I will tell you if you do not need one.",
+                        includesLabel: "What it includes",
+                        includes: [...INCLUDES],
+                    }),
+                },
+                {
+                    // Several: each as a card, what they include under them.
+                    type: "servicesList",
+                    contractVersion: 1,
+                    when: (ctx) => dieticianServiceIds(ctx).length > 1,
+                    content: (ctx: TemplateContext) => ({
+                        ...CONSULTATION_FRAME,
+                        heading: "Consultations",
+                        intro: "If a follow-up is useful I will say so at the end of the first appointment, and if it is not I will say that instead.",
+                        serviceIds: dieticianServiceIds(ctx),
+                        showPrices: true,
+                        layout: "cards",
+                        buttonLabel: "Ask for a time",
+                    }),
+                },
+                {
+                    type: "features",
+                    contractVersion: 1,
+                    when: (ctx) => dieticianServiceIds(ctx).length > 1,
+                    content: {
+                        variant: "list",
+                        heading: "What it includes",
+                        intro: BY_VIDEO,
+                        items: INCLUDES.map((title) => ({ title })),
                     },
                 },
                 {
-                    // What it includes: under the services, or standing in
-                    // for them while there are none to book.
+                    // Nothing to book yet: the consultation described, with
+                    // no price or length the template could only invent.
                     type: "features",
                     contractVersion: 1,
-                    content: (ctx: TemplateContext) =>
-                        bookable(ctx)
-                            ? {
-                                  variant: "list",
-                                  heading: "What it includes",
-                                  intro: "Video consultations work as well as in-person for almost everything. Bring the same notes and blood work either way.",
-                                  items: INCLUDES.map((i) => ({ ...i })),
-                              }
-                            : {
-                                  variant: "list",
-                                  heading: "One consultation",
-                                  intro: "If a follow-up is useful I will say so at the end of the first one, and if it is not I will say that instead. Video consultations work as well as in-person for almost everything.",
-                                  items: INCLUDES.map((i) => ({ ...i })),
-                              },
+                    when: (ctx) => !bookable(ctx),
+                    content: {
+                        ...CONSULTATION_FRAME,
+                        variant: "list",
+                        heading: "One consultation",
+                        intro: "If a follow-up is useful I will say so at the end of the first one, and if it is not I will say that instead. Video consultations work as well as in-person for almost everything.",
+                        items: INCLUDES.map((title) => ({ title })),
+                    },
                 },
                 {
+                    // The areas in two columns, the disclaimer under them.
                     type: "features",
                     contractVersion: 1,
                     content: (ctx: TemplateContext) => ({
+                        anchor: "areas",
+                        navLabel: "Areas",
                         variant: "list",
+                        columns: 2,
                         heading: "What I am asked about most",
                         intro:
                             `Most of my work sits in these ${countWord(AREAS.length).toLowerCase()}. ` +
                             `If what you need is not here, say so ${ctx.contactEmail ? "in your email" : "when you write"} ` +
                             "and I will tell you honestly whether I am the right person.",
                         items: AREAS.map((a) => ({ ...a })),
+                        note: DISCLAIMER,
                     }),
                 },
                 {
-                    type: "richText",
-                    contractVersion: 1,
-                    content: {
-                        format: "html",
-                        value: `<p>${escapeHtml(DISCLAIMER)}</p>`,
-                    },
-                },
-                {
-                    // The site's own posts, every one, dated. Nothing until
-                    // a post is live.
+                    // The site's own posts, every one, dated and counted.
+                    // Nothing until a post is live.
                     type: "journal",
                     contractVersion: 1,
                     content: {
+                        anchor: "writing",
+                        navLabel: "Writing",
                         variant: "archive",
                         title: "Writing",
                         showExcerpts: true,
+                        showTotal: true,
                     },
                 },
                 {
@@ -334,6 +464,7 @@ export const dieticianTemplate: TemplateManifest = {
                     contractVersion: 1,
                     when: (ctx: TemplateContext) => Boolean(ctx.contactEmail),
                     content: (ctx: TemplateContext) => ({
+                        anchor: "contact",
                         heading: "Getting an appointment",
                         intro: `Email ${ASKING}`,
                         email: ctx.contactEmail,
@@ -345,6 +476,7 @@ export const dieticianTemplate: TemplateManifest = {
                     contractVersion: 1,
                     when: (ctx: TemplateContext) => !ctx.contactEmail,
                     content: {
+                        anchor: "contact",
                         title: "Getting an appointment",
                         description: `Write ${ASKING}`,
                         submitLabel: "Send",
@@ -355,12 +487,14 @@ export const dieticianTemplate: TemplateManifest = {
                 },
                 {
                     // The days and hours appointments are kept: the
-                    // business's own week. Nothing until hours are saved.
+                    // business's own week, runs of days on one line.
+                    // Nothing until hours are saved.
                     type: "hours",
                     contractVersion: 1,
                     content: {
                         variant: "default",
                         title: "Appointments",
+                        groupDays: true,
                     },
                 },
             ],

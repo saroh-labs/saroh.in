@@ -1,4 +1,10 @@
-import { isFontPairKey, parseSectionContent } from "@saroh/block-contract";
+import {
+    inPageNavigation,
+    isFontPairKey,
+    parsePalette,
+    parseSectionContent,
+    parseTypeScale,
+} from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantiateTemplate } from "../instantiate";
@@ -118,6 +124,39 @@ describe("dietician@1 (industry templates U7)", () => {
         expect(styles[1]?.style.colours?.accent).toBe("clay");
     });
 
+    it("draws Sage and Clay in the design's exact colours, every pairing readable", () => {
+        const [sage, clay] = dieticianTemplate.styles ?? [];
+        expect(sage.style.palette).toMatchObject({
+            bg: "#FBFAF6",
+            surface: "#EDF2EC",
+            fg: "#1C2620",
+            body: "#24322B",
+            muted: "#47564D",
+            accent: "#2F6B4F",
+        });
+        expect(clay.style.palette).toMatchObject({
+            bg: "#FDF9F7",
+            surface: "#F1E6DF",
+            accent: "#8A483B",
+        });
+        for (const s of [sage, clay]) {
+            expect(parsePalette(s.style.palette)).toMatchObject({ ok: true });
+            expect(parseTypeScale(s.style.type)).toEqual({
+                ok: true,
+                type: {
+                    displaySize: 40,
+                    bodySize: 17,
+                    measure: 66,
+                    contentWidth: 1080,
+                },
+            });
+        }
+        expect(dieticianTemplate.footer).toEqual({
+            line: "Your neighbourhood and city",
+            layout: "left",
+        });
+    });
+
     it.each(profiles)(
         "instantiates, and every section passes the contract, for %s",
         (_label, ctx) => {
@@ -139,40 +178,72 @@ describe("dietician@1 (industry templates U7)", () => {
         },
     );
 
-    it("lays the page down in the design's order, with the services when they can be booked", () => {
+    it("lays the page down in the design's order, one service as a price card", () => {
         expect(types(oneService)).toEqual([
             "person",
             "features",
+            "features",
             "servicesList",
             "features",
-            "features",
-            "richText",
             "journal",
             "contact",
             "hours",
         ]);
-        const consultation = home(oneService).sections[2]?.content;
-        expect(consultation).toMatchObject({
+        const consultation = home(oneService).sections[3]?.content as {
+            intro: string;
+        };
+        expect(consultation.intro).toMatch(
+            /^There is one appointment type and one price\.[^]*\n\nVideo consultations/,
+        );
+        expect(consultation).toEqual({
+            anchor: "consultation",
+            navLabel: "Consultations",
+            variant: "priceCard",
             heading: "One consultation",
+            intro: consultation.intro,
             serviceIds: ["svc_initial"],
             showPrices: true,
-            layout: "cards",
             buttonLabel: "Ask for a time",
-        });
-        expect(home(oneService).sections[3]?.content).toMatchObject({
-            heading: "What it includes",
+            modeLine: "In person, or by video",
+            followUpLine:
+                "Follow-ups are usually six weeks apart. I will tell you if you do not need one.",
+            includesLabel: "What it includes",
+            includes: [
+                "The consultation itself, in person or by video",
+                "A written plan afterwards, in plain language, by email",
+                "Review of any blood work or notes you bring",
+                "One short follow-up question by email within the first month",
+            ],
         });
     });
 
-    it("says one price only when there is one service", () => {
-        const one = home(oneService).sections[2]?.content as { intro: string };
-        expect(one.intro).toMatch(/one appointment type and one price/);
-        const two = home(twoServices).sections[2]?.content as {
+    it("lists several services as cards, what they include under them", () => {
+        expect(types(twoServices)).toEqual([
+            "person",
+            "features",
+            "features",
+            "servicesList",
+            "features",
+            "features",
+            "journal",
+            "contact",
+            "hours",
+        ]);
+        const list = home(twoServices).sections[3]?.content as {
             heading: string;
             intro: string;
+            layout: string;
+            anchor: string;
         };
-        expect(two.heading).toBe("Consultations");
-        expect(two.intro).not.toMatch(/one price/);
+        expect(list).toMatchObject({
+            heading: "Consultations",
+            layout: "cards",
+            anchor: "consultation",
+        });
+        expect(list.intro).not.toMatch(/one price/);
+        expect(home(twoServices).sections[4]?.content).toMatchObject({
+            heading: "What it includes",
+        });
     });
 
     it.each([
@@ -183,12 +254,26 @@ describe("dietician@1 (industry templates U7)", () => {
         "with %s, the consultation is described, not listed",
         (_label, ctx) => {
             expect(types(ctx)).not.toContain("servicesList");
-            expect(home(ctx).sections[2]).toMatchObject({
+            expect(home(ctx).sections[3]).toMatchObject({
                 type: "features",
-                content: { heading: "One consultation" },
+                content: {
+                    heading: "One consultation",
+                    anchor: "consultation",
+                },
             });
         },
     );
+
+    it("leads the header with the design's four sections", () => {
+        for (const ctx of [oneService, twoServices, nameOnly]) {
+            expect(inPageNavigation(home(ctx).sections)).toEqual([
+                { label: "How I work", href: "/#how" },
+                { label: "Consultations", href: "/#consultation" },
+                { label: "Areas", href: "/#areas" },
+                { label: "Writing", href: "/#writing" },
+            ]);
+        }
+    });
 
     it("asks for an appointment by email when there is one, else by a form", () => {
         expect(types(withEmail)).toContain("contact");
@@ -209,19 +294,37 @@ describe("dietician@1 (industry templates U7)", () => {
         expect(form.formId).toBeUndefined();
     });
 
-    it("opens on the practitioner by the business's name, with a portrait brief and no photo", () => {
+    it("opens on the practitioner by the business's name, as the page's title, with a portrait brief and no photo", () => {
         const person = home(nameOnly).sections[0]?.content as {
+            variant: string;
+            asTitle: boolean;
             name: string;
             image?: unknown;
             imageBrief: string;
-            credentials: string[];
+            credentials: { title: string; detail: string }[];
         };
+        expect(person.variant).toBe("portrait");
+        expect(person.asTitle).toBe(true);
         expect(person.name).toBe("Dr Sample Name");
         expect(person.image).toBeUndefined();
         expect(person.imageBrief).toBe(
             "Professional portrait, seated, plain background, no white coat",
         );
         expect(person.credentials.length).toBeGreaterThan(0);
+    });
+
+    it("puts a facts row under the practitioner, every fact the owner's to state", () => {
+        const facts = home(withEmail).sections[1]?.content as {
+            variant: string;
+            items: { value: string; title: string }[];
+        };
+        expect(facts.variant).toBe("facts");
+        expect(facts.items).toHaveLength(3);
+        for (const item of facts.items) {
+            // A word, never a figure the template made up.
+            expect(item.value).not.toMatch(/\d/);
+            expect(item.title).toMatch(/^Say (how|which|where)/);
+        }
     });
 
     it.each(profiles)(
@@ -235,12 +338,12 @@ describe("dietician@1 (industry templates U7)", () => {
                 /Manipal|Dietetic Association|Sample credentials/,
             );
             expect(text).not.toContain("Priya");
-            // Every qualification line says what to write there.
+            // Every qualification row says what to write there.
             const person = home(ctx).sections[0]?.content as {
-                credentials: string[];
+                credentials: { title: string; detail: string }[];
             };
-            for (const line of person.credentials) {
-                expect(line).toMatch(/^(Your|Anything)/);
+            for (const row of person.credentials) {
+                expect(row.title).toMatch(/^Your [^—]+ — /);
             }
         },
     );
@@ -266,7 +369,7 @@ describe("dietician@1 (industry templates U7)", () => {
 
     it("derives every count from the list it counts", () => {
         const sections = home(withEmail).sections;
-        const how = sections[1]?.content as {
+        const how = sections[2]?.content as {
             intro: string;
             items: unknown[];
             variant: string;
@@ -276,32 +379,38 @@ describe("dietician@1 (industry templates U7)", () => {
         expect(how.intro).toBe(
             "Four stages, and the whole of the first one is listening.",
         );
-        const areas = sections[3]?.content as {
+        const areas = sections[4]?.content as {
             heading: string;
             intro: string;
             items: unknown[];
+            columns: number;
         };
         expect(areas.heading).toBe("What I am asked about most");
         expect(areas.items).toHaveLength(6);
+        expect(areas.columns).toBe(2);
         expect(areas.intro).toMatch(/^Most of my work sits in these six\./);
         expect(areas.intro).toContain("in your email");
-        const noEmail = home(nameOnly).sections[3]?.content as {
+        const noEmail = home(nameOnly).sections[4]?.content as {
             intro: string;
         };
         expect(noEmail.intro).not.toContain("email");
     });
 
     it("keeps the medical disclaimer under the areas", () => {
-        const text = home(withEmail).sections[4]?.content as { value: string };
-        expect(text.value).toContain(
-            "I work alongside your doctor and I do not change prescribed medication or treatment.",
+        const areas = home(withEmail).sections[4]?.content as { note: string };
+        expect(areas.note).toBe(
+            "I work alongside your doctor and I do not change prescribed medication or treatment. Nothing here is a diagnosis, and nothing I do replaces medical care.",
         );
     });
 
-    it("lists the writing as an archive, which the site's own posts fill", () => {
+    it("lists the writing as a counted archive, which the site's own posts fill", () => {
         expect(
             home(withEmail).sections.find((s) => s.type === "journal")?.content,
-        ).toMatchObject({ variant: "archive", title: "Writing" });
+        ).toMatchObject({
+            variant: "archive",
+            title: "Writing",
+            showTotal: true,
+        });
     });
 
     it("reads the appointment hours from the business, never types them", () => {
@@ -310,6 +419,7 @@ describe("dietician@1 (industry templates U7)", () => {
         expect(hours?.content).toEqual({
             variant: "default",
             title: "Appointments",
+            groupDays: true,
         });
     });
 

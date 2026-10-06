@@ -107,9 +107,9 @@ function renderHome(ctx: TemplateContext, journal: JournalFeed) {
     );
 }
 
-/** Each `h2`, in page order. */
+/** Each `h1` and `h2`, in page order. */
 function headings(container: HTMLElement): string[] {
-    return Array.from(container.querySelectorAll("h2")).map(
+    return Array.from(container.querySelectorAll("h1, h2")).map(
         (h) => h.textContent,
     );
 }
@@ -128,12 +128,32 @@ describe("the Dietician template, rendered live", () => {
             "Dr Sample Nair",
             "How I work",
             "One consultation",
-            "What it includes",
             "What I am asked about most",
             "Writing",
             "Getting an appointment",
             "Appointments",
         ]);
+        // The practitioner is the page's one h1.
+        expect(container.querySelectorAll("h1")).toHaveLength(1);
+        expect(container.querySelector("h1")?.textContent).toBe(
+            "Dr Sample Nair",
+        );
+        // What it includes sits beside the price card, under its label.
+        expect(
+            screen.getByRole("list", { name: "What it includes" }),
+        ).toBeTruthy();
+        // The writing counts itself; the disclaimer is under the areas.
+        expect(container.textContent).toMatch(/2 pieces/);
+    });
+
+    it("sets out the facts row and the qualifications as rows the owner fills in", () => {
+        stubApi();
+        const { container } = renderHome(bookable, POSTS);
+        expect(container.textContent).toContain("Qualifications");
+        expect(container.textContent).toContain("Your degree — the subject");
+        expect(container.textContent).toContain(
+            "Say how long you have been in practice",
+        );
     });
 
     it("numbers the four stages, and says how many there are", async () => {
@@ -157,7 +177,7 @@ describe("the Dietician template, rendered live", () => {
         stubApi();
         renderHome(bookable, POSTS);
         await screen.findByText("Initial consultation");
-        expect(screen.getByText("45 min")).toBeTruthy();
+        expect(screen.getByText(/45 min/)).toBeTruthy();
         expect(screen.getByText(/₹\s?2,500/)).toBeTruthy();
         expect(
             screen.getByRole("link", {

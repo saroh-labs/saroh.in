@@ -1,4 +1,10 @@
-import { isFontPairKey, parseSectionContent } from "@saroh/block-contract";
+import {
+    inPageNavigation,
+    isFontPairKey,
+    parsePalette,
+    parseSectionContent,
+    parseTypeScale,
+} from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantiateTemplate } from "../instantiate";
@@ -91,6 +97,7 @@ describe("gym@1 (industry templates, U6)", () => {
             expect(style.colours?.pageGround).toBe("slate");
             expect(style.colours?.text).toBe("chalk");
             expect(style.scalars?.cornerRadius).toBe(0);
+            expect(style.scalars?.gridGap).toBe(2);
         }
         // The colourway changes the accent, and only the accent.
         const [acid, ice] = styles;
@@ -99,6 +106,34 @@ describe("gym@1 (industry templates, U6)", () => {
         expect({ ...ice.style.colours, accent: "moss" }).toEqual(
             acid.style.colours,
         );
+    });
+
+    it("draws each colourway in the design's exact colours, every pairing readable", () => {
+        const [acid, ice] = gymTemplate.styles ?? [];
+        expect(acid.style.palette).toMatchObject({
+            bg: "#0B0B0A",
+            surface: "#171715",
+            accent: "#D7FF3E",
+        });
+        expect(ice.style.palette).toMatchObject({
+            bg: "#0A0B0D",
+            surface: "#15171A",
+            accent: "#BCF8FE",
+        });
+        for (const { style } of [acid, ice]) {
+            expect(parsePalette(style.palette)).toMatchObject({ ok: true });
+            expect(parseTypeScale(style.type)).toEqual({
+                ok: true,
+                type: { bodySize: 15.5, measure: 52, contentWidth: 1240 },
+            });
+        }
+    });
+
+    it("starts the footer on a line the owner replaces", () => {
+        expect(gymTemplate.footer).toEqual({
+            line: "Your neighbourhood and city · your phone number",
+            layout: "left",
+        });
     });
 
     it.each(profiles)(
@@ -130,10 +165,11 @@ describe("gym@1 (industry templates, U6)", () => {
                 path: "/",
                 sections: [
                     "hero:none",
-                    "timetable:grid",
+                    "timetable:accent",
+                    "person:team",
                     "plans",
                     "packs",
-                    "features:list",
+                    "features:steps",
                     "hours",
                 ],
             },
@@ -143,19 +179,27 @@ describe("gym@1 (industry templates, U6)", () => {
             },
             {
                 path: "/membership",
-                sections: ["hero:none", "plans", "packs", "features:list"],
+                sections: ["hero:none", "plans", "packs", "features:steps"],
             },
             {
                 path: "/trainers",
-                sections: ["hero:none", "person", "person"],
+                sections: ["hero:none", "person:team"],
             },
         ]);
     });
 
     it("with no module known: no timetable, no prices and no page for either", () => {
         expect(layout(nameOnly)).toEqual([
-            { path: "/", sections: ["hero:none", "features:list", "hours"] },
-            { path: "/trainers", sections: ["hero:none", "person", "person"] },
+            {
+                path: "/",
+                sections: [
+                    "hero:none",
+                    "person:team",
+                    "features:steps",
+                    "hours",
+                ],
+            },
+            { path: "/trainers", sections: ["hero:none", "person:team"] },
         ]);
         // A malformed module list is "not known", never "on".
         expect(
@@ -173,21 +217,71 @@ describe("gym@1 (industry templates, U6)", () => {
         ]);
         expect(layout(classesOnly)[0]?.sections).toEqual([
             "hero:none",
-            "timetable:grid",
-            "features:list",
+            "timetable:accent",
+            "person:team",
+            "features:steps",
             "hours",
         ]);
         expect(layout(plansOnly)).toEqual([
             {
                 path: "/",
-                sections: ["hero:none", "plans", "features:list", "hours"],
+                sections: [
+                    "hero:none",
+                    "person:team",
+                    "plans",
+                    "features:steps",
+                    "hours",
+                ],
             },
             {
                 path: "/membership",
-                sections: ["hero:none", "plans", "features:list"],
+                sections: ["hero:none", "plans", "features:steps"],
             },
-            { path: "/trainers", sections: ["hero:none", "person", "person"] },
+            { path: "/trainers", sections: ["hero:none", "person:team"] },
         ]);
+    });
+
+    it("leads the header with Home's sections, as the design's menu reads", () => {
+        const home = (ctx: WithModules) =>
+            instantiateTemplate(gymTemplate, ctx).pages[0]?.sections ?? [];
+        expect(inPageNavigation(home(everythingOn))).toEqual([
+            { label: "Timetable", href: "/#timetable" },
+            { label: "Trainers", href: "/#trainers" },
+            { label: "Membership", href: "/#membership" },
+            { label: "First visit", href: "/#visit" },
+        ]);
+        // Each entry only with a section to land on.
+        expect(inPageNavigation(home(nameOnly)).map((i) => i.label)).toEqual([
+            "Trainers",
+            "First visit",
+        ]);
+        // Class packs alone carry Membership when no plan can be sold.
+        const packsOnly = home({
+            organizationName: "x",
+            modules: ["CLASS_PACKS"],
+        });
+        expect(
+            packsOnly.find((s) => s.type === "packs")?.content,
+        ).toMatchObject({ anchor: "membership", navLabel: "Membership" });
+        const everyPacks = home(everythingOn).find((s) => s.type === "packs");
+        expect(everyPacks?.content).not.toHaveProperty("anchor");
+    });
+
+    it("sets the first visit and the hours on card-coloured bands, the hours grouped with the address", () => {
+        const [home] = instantiateTemplate(gymTemplate, everythingOn).pages;
+        const visit = home.sections.find((s) => s.type === "features");
+        expect(visit?.content).toMatchObject({
+            variant: "steps",
+            band: "surface",
+            heading: "Your first visit",
+        });
+        const hours = home.sections.find((s) => s.type === "hours");
+        expect(hours?.content).toEqual({
+            band: "surface",
+            title: "Where and when",
+            groupDays: true,
+            showAddress: true,
+        });
     });
 
     it("binds the timetable, prices and hours, and stores none of their data", () => {
@@ -198,55 +292,76 @@ describe("gym@1 (industry templates, U6)", () => {
         const timetable = sections.find((s) => s.type === "timetable");
         // Every class the booking page offers, with trainer and places.
         expect(timetable?.content).toEqual({
-            variant: "grid",
+            anchor: "timetable",
+            navLabel: "Timetable",
+            variant: "accent",
             title: "This week",
-            intro: "Who is coaching each class and how many places are left. Book from your phone on the way in.",
+            intro: "Book from your phone on the way in.",
             showTrainer: true,
             showPlacesLeft: true,
+            weekdaysOnly: true,
+            showCounts: true,
         });
         expect(timetable?.content).not.toHaveProperty("serviceIds");
         // No highlight: "Most chosen" is a claim the owner makes, not us.
         for (const plans of sections.filter((s) => s.type === "plans")) {
             expect(plans.content).toMatchObject({ highlight: "none" });
         }
-        const hours = sections.find((s) => s.type === "hours");
-        expect(hours?.content).not.toHaveProperty("storeId");
+        for (const hours of sections.filter((s) => s.type === "hours")) {
+            expect(hours.content).not.toHaveProperty("storeId");
+        }
         // No price, time or session anywhere in the template's own words.
         const copy = sections.flatMap((s) => strings(s.content)).join(" ");
         expect(copy).not.toMatch(/₹|\$|£|\d{1,2}:\d{2}|\d+ (classes|sessions)/);
     });
 
-    it("heads Home with the business's name, as the page title", () => {
+    it("gives Home the business's name as its h1, for screen readers only", () => {
         const home = instantiateTemplate(gymTemplate, nameOnly).pages[0];
         expect(home.sections[0]?.content).toEqual({
             variant: "none",
             heading: "Sample Gym",
-        });
-        const own = instantiateTemplate(gymTemplate, {
-            ...nameOnly,
-            tagline: "Barbells, before work.",
-        }).pages[0];
-        expect(own.sections[0]?.content).toMatchObject({
-            subheading: "Barbells, before work.",
+            titleVisible: false,
         });
     });
 
     it("invents no coach and no member: the coaches are placeholders with photo briefs", () => {
         const { pages } = instantiateTemplate(gymTemplate, everythingOn);
-        const people = pages
+        const teams = pages
             .flatMap((p) => p.sections)
             .filter((s) => s.type === "person")
-            .map((s) => s.content as Record<string, unknown>);
-        expect(people).toHaveLength(2);
-        for (const person of people) {
-            expect(person.bio).toMatch(/^A placeholder\./);
-            expect(person.image).toBeUndefined();
-            expect(String(person.imageBrief).length).toBeGreaterThan(0);
+            .map(
+                (s) =>
+                    s.content as {
+                        variant: string;
+                        name: string;
+                        bio: string;
+                        image?: unknown;
+                        imageBrief: string;
+                        people: {
+                            name: string;
+                            bio: string;
+                            image?: unknown;
+                            imageBrief: string;
+                        }[];
+                    },
+            );
+        // Home's coaches and the Trainers page's.
+        expect(teams).toHaveLength(2);
+        for (const team of teams) {
+            expect(team.variant).toBe("team");
+            const people = [team, ...team.people];
+            expect(people.map((p) => p.name)).toEqual([
+                "Your first coach",
+                "Your second coach",
+                "Your third coach",
+                "Your fourth coach",
+            ]);
+            for (const person of people) {
+                expect(person.bio).toMatch(/^A placeholder\./);
+                expect(person.image).toBeUndefined();
+                expect(person.imageBrief.length).toBeGreaterThan(0);
+            }
         }
-        expect(people.map((p) => p.name)).toEqual([
-            "Your first coach",
-            "Another coach",
-        ]);
         // The design's member quote is the sample gym's: not laid down.
         const types = pages.flatMap((p) => p.sections.map((s) => s.type));
         expect(types).not.toContain("testimonials");
