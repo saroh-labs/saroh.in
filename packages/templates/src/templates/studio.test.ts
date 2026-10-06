@@ -1,4 +1,11 @@
-import { isFontPairKey, parseSectionContent } from "@saroh/block-contract";
+import {
+    contrastRatio,
+    inPageNavigation,
+    isFontPairKey,
+    parsePalette,
+    parseSectionContent,
+    parseTypeScale,
+} from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantiateTemplate } from "../instantiate";
@@ -83,6 +90,55 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
         expect(styles[1].style.colours?.pageGround).toBe("sand");
     });
 
+    it("draws the design's exact colours, with no coloured accent: the accent is the ink", () => {
+        const [mono, ivory] = studioTemplate.styles ?? [];
+        expect(mono.style.palette).toMatchObject({
+            bg: "#F7F7F6",
+            surface: "#E8E8E6",
+            fg: "#131313",
+        });
+        expect(ivory.style.palette).toMatchObject({
+            bg: "#FDF6EE",
+            surface: "#EEE6DF",
+            fg: "#17120D",
+        });
+        for (const preset of [mono, ivory]) {
+            const palette = preset.style.palette;
+            expect(palette?.accent).toBe(palette?.fg);
+            expect(palette?.accentFg).toBe(palette?.bg);
+            const parsed = parsePalette(palette);
+            expect(parsed.ok).toBe(true);
+            if (parsed.ok) {
+                expect(
+                    contrastRatio(parsed.palette.muted, parsed.palette.bg),
+                ).toBeGreaterThanOrEqual(4.5);
+            }
+        }
+    });
+
+    it("sets a 1320px frame with 3px between photographs", () => {
+        for (const preset of studioTemplate.styles ?? []) {
+            expect(preset.style.type).toMatchObject({
+                contentWidth: 1320,
+                labelStyle: "eyebrow",
+            });
+            expect(parseTypeScale(preset.style.type).ok).toBe(true);
+            expect(preset.style.scalars?.gridGap).toBe(3);
+        }
+    });
+
+    it("leads the header with Work, Studio and Contact, and starts the footer on a line to write over", () => {
+        expect(inPageNavigation(home(full).sections)).toEqual([
+            { label: "Work", href: "/#work" },
+            { label: "Studio", href: "/#studio" },
+            { label: "Contact", href: "/#contact" },
+        ]);
+        expect(studioTemplate.footer).toEqual({
+            line: "Your studio's street and city",
+            layout: "left",
+        });
+    });
+
     it.each(profiles)(
         "instantiates and every section passes the contract, for %s",
         (_label, ctx) => {
@@ -110,8 +166,8 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
             ]),
         ).toEqual([
             ["hero", "none"],
-            ["projects", "cards"],
-            ["richText", undefined],
+            ["projects", "rhythm"],
+            ["richText", "left"],
             ["enquiry", undefined],
             ["contact", undefined],
         ]);
@@ -142,15 +198,16 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
         expect(contact?.content).toEqual({ email: "hello@studio.example" });
     });
 
-    it("heads the page with the name, small, and the owner's line when given", () => {
+    it("keeps the page's h1 for screen readers only: the first project is the top", () => {
         expect(home(full).sections[0].content).toEqual({
             variant: "none",
             heading: "Sample Studio",
-            subheading: "Identity, packaging and signage.",
+            titleVisible: false,
         });
         expect(home(nameOnly).sections[0].content).toEqual({
             variant: "none",
             heading: "Sample Maker",
+            titleVisible: false,
         });
     });
 
@@ -158,9 +215,19 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
         const projects = home(full).sections.find((s) => s.type === "projects");
         const items = (
             projects?.content as {
-                items: { title: string; summary: string; imageBrief: string }[];
+                items: {
+                    title: string;
+                    summary: string;
+                    caption: string;
+                    imageBrief: string;
+                }[];
             }
         ).items;
+        // Over the photo, in the rhythm's lead, pair and offset order.
+        expect(projects?.content).toMatchObject({
+            variant: "rhythm",
+            captionPlacement: "over",
+        });
         expect(items).toHaveLength(5);
         expect(items.map((i) => i.imageBrief)).toEqual([
             ...STUDIO_PROJECT_BRIEFS,
@@ -168,6 +235,7 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
         for (const item of items) {
             expect(item.title).toMatch(/^Your \w+ project$/);
             expect(item.summary).toMatch(/^A placeholder\./);
+            expect(item.caption).toBe("What you made · the year");
             expect(item).not.toHaveProperty("image");
             expect(item).not.toHaveProperty("link");
         }
@@ -208,9 +276,9 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
         expect(html).toContain("This is a placeholder");
         expect(html).toContain("Replace all three paragraphs with your own.");
         expect(html.match(/<p>/g)).toHaveLength(3);
-        expect(html.match(/<li>/g)).toHaveLength(3);
-        for (const label of ["Studio:", "Who:", "Since:"]) {
-            expect(html).toContain(`<strong>${label}</strong>`);
+        expect(html.match(/<dt>/g)).toHaveLength(3);
+        for (const label of ["Studio", "Who", "Since"]) {
+            expect(html).toContain(`<dt>${label}</dt>`);
         }
     });
 

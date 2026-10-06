@@ -48,7 +48,7 @@ function headings(container: HTMLElement): string[] {
 }
 
 describe("the studio template, rendered live", () => {
-    it("opens on the name and goes straight to the work, then the studio and the brief", () => {
+    it("opens on the work: the name for screen readers only, then the studio and the brief", () => {
         const { container } = renderHome(full);
         expect(headings(container)).toEqual([
             "H1 Sample Studio",
@@ -56,17 +56,29 @@ describe("the studio template, rendered live", () => {
             "H2 Studio",
             "H2 If you have something that needs drawing, describe it badly.",
         ]);
-        expect(
-            container.querySelector("h1")?.nextElementSibling?.textContent,
-        ).toBe("Identity, packaging and signage.");
+        // The header shows the name: the h1 is not drawn twice, and no
+        // line stands between the header and the first project.
+        expect(container.querySelector("h1")?.className).toContain("sr-only");
+        expect(container.textContent).not.toContain(
+            "Identity, packaging and signage.",
+        );
     });
 
-    it("draws the five projects in the design's order, as placeholders, with no photo or link", () => {
+    it("anchors Work, Studio and Contact for the header's in-page menu", () => {
+        const { container } = renderHome(full);
+        for (const id of ["work", "studio", "contact"]) {
+            expect(container.querySelector(`#${id}`)).not.toBeNull();
+        }
+    });
+
+    it("draws the five projects in the rhythm, words over the photo frame, with no photo or link", () => {
         const { container } = renderHome(full);
         const work = within(container)
             .getByRole("heading", { level: 2, name: "Work" })
             .closest("section");
         if (!work) throw new Error("No work section");
+        // The bounded band over each frame (DEC-090).
+        expect(work.querySelectorAll("[data-plate-band]")).toHaveLength(5);
         const projects = within(work).getAllByRole("article");
         expect(
             projects.map(
@@ -79,7 +91,11 @@ describe("the studio template, rendered live", () => {
             "Your fourth project",
             "Your fifth project",
         ]);
-        expect(within(work).getAllByText(/^A placeholder\./)).toHaveLength(5);
+        // The caption says what to write; the summary's placeholder note is
+        // for the pre-publish check, and the rhythm does not draw it.
+        expect(
+            within(work).getAllByText("What you made · the year"),
+        ).toHaveLength(5);
         expect(within(work).queryByRole("link")).toBeNull();
         // The briefs are notes to the owner, never drawn for a visitor.
         expect(container.textContent).not.toMatch(
@@ -91,8 +107,8 @@ describe("the studio template, rendered live", () => {
     it("introduces the studio second, with its three facts", () => {
         const { container } = renderHome(full);
         const page = within(container);
-        expect(page.getByText(/Who:/)).toBeTruthy();
-        expect(page.getByText(/Since:/)).toBeTruthy();
+        expect(page.getByText("Who").tagName).toBe("DT");
+        expect(page.getByText("Since").tagName).toBe("DT");
         expect(page.getByText(/^This is a placeholder for who/)).toBeTruthy();
     });
 

@@ -9,8 +9,8 @@ import SectionRenderer from "./section-renderer";
 /**
  * The Developer template (industry templates U9) drawn as the live site
  * draws it. One page, in the design's order: the name and the owner's line,
- * the intro, Work as a list, one case study, the rates, availability, and a
- * form. Every block is static, so there is no feed to give it; the form is
+ * the intro, Work as hairline rows, one case study, the rates, availability,
+ * and a form. Every block is static, so there is no feed to give it; the form is
  * given the Form id the API adds when it makes the site.
  */
 
@@ -69,7 +69,7 @@ describe("the Developer template, rendered live", () => {
         ).toBeVisible();
         for (const name of [
             "Work",
-            "One in detail",
+            /^Your case study — /,
             "What I charge",
             "Availability",
         ]) {
@@ -81,14 +81,16 @@ describe("the Developer template, rendered live", () => {
             "Based",
             "Work",
             "Your most recent engagement",
-            "One in detail",
+            "Your case study",
             "The problem",
             "What I would do differently",
             "What changed",
             "What I charge",
             "Day rate",
             "Retainer",
+            "Placeholders: replace each",
             "Availability",
+            "Your next opening",
             "Not looking for",
             "Work with Sample Engineer",
         ].map((word) => at(container, word));
@@ -96,14 +98,40 @@ describe("the Developer template, rendered live", () => {
         expect([...order].sort((a, b) => a - b)).toEqual(order);
     });
 
-    it("lists the work one engagement per row, the facts on their own line", () => {
+    it("lists the work one engagement per row: year, the work and its stack, role", () => {
         const { container } = renderHome();
-        const work = container.querySelectorAll("article");
-        expect(work).toHaveLength(3);
-        expect(work[0].textContent).toContain("Year · your role · the stack");
+        const page = within(container);
+        // The count beside the title is the block's, from the rows.
+        expect(page.getByText("3 projects")).toBeVisible();
+        const work = page
+            .getByRole("heading", { level: 2, name: "Work" })
+            .closest("section");
+        if (!work) throw new Error("No work section");
+        const rows = within(work).getAllByRole("listitem");
+        expect(rows).toHaveLength(3);
+        for (const text of [
+            "Year",
+            "Your most recent engagement",
+            "The stack · one word each",
+            "Your role",
+        ]) {
+            expect(rows[0].textContent).toContain(text);
+        }
         // No photo and no link were laid down, so neither is drawn.
         expect(container.querySelectorAll("img")).toHaveLength(0);
         expect(within(container).queryByText("View project")).toBeNull();
+    });
+
+    it("sets the case study's parts as labels and what changed in a box", () => {
+        const { container } = renderHome();
+        const result = within(container).getByRole("complementary", {
+            name: "What changed",
+        });
+        expect(result.textContent).toMatch(/A placeholder\./);
+        const free = within(container).getByRole("complementary", {
+            name: /^Your next opening/,
+        });
+        expect(free.textContent).toContain("Not looking for");
     });
 
     it("shows no figure and no brief to a visitor", () => {

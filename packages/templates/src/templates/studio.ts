@@ -7,25 +7,32 @@ import { escapeHtml } from "./html";
  * and no hero: the first project IS the top of the page, and the studio does
  * not introduce itself until the second section.
  *
- * - **The page's name**, small (hero `none`): the page keeps its one `h1`
- *   for a screen reader and a search engine, and goes straight on.
- * - **Work**: five projects, the design's lead, pair and offset, in its
- *   order. They are placeholders and say so, each carrying the design's
- *   photograph as a brief (KTD-5): the design's clients (a coffee brand, a
- *   van fleet, a café group) would be invented clients on someone's live
- *   site, so none of their names is shipped.
+ * - **The page's name** for screen readers only (hero `none`, title
+ *   hidden): the header shows it, and the page goes straight to the work.
+ * - **Work**: five projects in the Projects block's `rhythm` look — a wide
+ *   lead, an equal pair, then a portrait beside a landscape — with each
+ *   name and line on a bounded band over its photograph. They are
+ *   placeholders and say so, each carrying the design's photograph as a
+ *   brief (KTD-5): the design's clients (a coffee brand, a van fleet, a
+ *   café group) would be invented clients on someone's live site, so none
+ *   of their names is shipped.
  * - **Studio**: who the studio is, how much it takes on and what it is good
- *   at, then three facts, all written over by the owner.
+ *   at, then three facts as a definition list, all written over by the
+ *   owner.
  * - **Contact**: the design's invitation to describe the problem badly, as
  *   an enquiry form, and the email beside it when the business has one.
+ *
+ * Work, Studio and Contact lead the header menu as in-page links. The page
+ * is a 1320px frame with 3px between photographs.
  *
  * Left out, on purpose: the design's "Worked with" list. Saroh holds no
  * client list, the design draws the section only when there are clients, and
  * a placeholder list would put made-up names (or the words "Client name") on
  * a live site. An owner who wants one adds a Features or text section.
  *
- * No accent colour in the design, and no prices anywhere: nothing here is
- * for sale. Copy names the owner, never "we", so one person or a studio of
+ * No accent colour in the design — the accent IS the ink, so links, focus
+ * and buttons are near-black — and no prices anywhere: nothing here is for
+ * sale. Copy names the owner, never "we", so one person or a studio of
  * five reads it the same.
  */
 
@@ -47,26 +54,31 @@ export const STUDIO_PROJECT_BRIEFS = [
 const SAMPLE_PROJECTS = [
     {
         title: "Your lead project",
+        caption: "What you made · the year",
         summary:
             "A placeholder. The project the page opens on: name the client, what you made for them and the year, then add the photograph.",
     },
     {
         title: "Your second project",
+        caption: "What you made · the year",
         summary:
             "A placeholder. Pick something that shows a different kind of work, such as a website beside an identity.",
     },
     {
         title: "Your third project",
+        caption: "What you made · the year",
         summary:
             "A placeholder. Work that had to survive the real world (a van, a shopfront, a label) earns its place here.",
     },
     {
         title: "Your fourth project",
+        caption: "What you made · the year",
         summary:
             "A placeholder. A tall photograph suits this one: something held, worn or hung.",
     },
     {
         title: "Your fifth project",
+        caption: "What you made · the year",
         summary:
             "A placeholder. Add a link if the work lives somewhere else, or remove this one.",
     },
@@ -91,11 +103,6 @@ const ENQUIRY_FIELDS = [
     },
 ] as const;
 
-/** What the owner has said about the work, if anything. */
-function ownWords(ctx: TemplateContext): string | undefined {
-    return ctx.tagline ?? ctx.description;
-}
-
 /**
  * Whether the business has an email to show beside the form. Read
  * defensively: the contact block refuses anything that is not an address,
@@ -113,9 +120,17 @@ export function studioHasEmail(ctx: TemplateContext): boolean {
 const SCALARS = {
     pageMargin: 28,
     sectionPadding: 64,
-    gridGap: 6,
+    gridGap: 3,
     cornerRadius: 0,
     headingScale: 1,
+} as const;
+
+/** A 1320px frame, 17px body, section labels as small capitals. */
+const TYPE = {
+    bodySize: 17,
+    measure: 70,
+    contentWidth: 1320,
+    labelStyle: "eyebrow",
 } as const;
 
 export const studioTemplate: TemplateManifest = {
@@ -133,6 +148,7 @@ export const studioTemplate: TemplateManifest = {
     styles: [
         {
             // Near-white, near-black; hierarchy by scale, crop and space.
+            // No accent colour: the accent is the ink.
             id: "mono",
             name: "Mono",
             style: {
@@ -146,10 +162,21 @@ export const studioTemplate: TemplateManifest = {
                 },
                 scalars: SCALARS,
                 fontPair: "archivo",
+                palette: {
+                    bg: "#F7F7F6",
+                    surface: "#E8E8E6",
+                    fg: "#131313",
+                    body: "#2A2A29",
+                    muted: "#575756",
+                    border: "#E2E2E0",
+                    accent: "#131313",
+                    accentFg: "#F7F7F6",
+                },
+                type: TYPE,
             },
         },
         {
-            // The same page in ivory and walnut.
+            // The same page in ivory and walnut, lightness held.
             id: "ivory",
             name: "Ivory",
             style: {
@@ -163,9 +190,25 @@ export const studioTemplate: TemplateManifest = {
                 },
                 scalars: SCALARS,
                 fontPair: "archivo",
+                palette: {
+                    bg: "#FDF6EE",
+                    surface: "#EEE6DF",
+                    fg: "#17120D",
+                    body: "#302921",
+                    muted: "#5D564E",
+                    border: "#E8DFD6",
+                    accent: "#17120D",
+                    accentFg: "#FDF6EE",
+                },
+                type: TYPE,
             },
         },
     ],
+    // The design's footer line, as words for the owner to write over.
+    footer: {
+        line: "Your studio's street and city",
+        layout: "left",
+    },
     pages: [
         {
             path: "/",
@@ -173,25 +216,28 @@ export const studioTemplate: TemplateManifest = {
             isHome: true,
             sections: [
                 {
-                    // No hero: the page's heading, small, and straight on.
+                    // No hero: the name is in the header, the h1 is for
+                    // screen readers, and the first project is the top.
                     type: "hero",
                     contractVersion: 1,
-                    content: (ctx: TemplateContext) => {
-                        const own = ownWords(ctx);
-                        return {
-                            variant: "none",
-                            heading: ctx.organizationName,
-                            ...(own ? { subheading: own } : {}),
-                        };
-                    },
+                    content: (ctx: TemplateContext) => ({
+                        variant: "none",
+                        heading: ctx.organizationName,
+                        titleVisible: false,
+                    }),
                 },
                 {
                     // The owner's own work, typed in by them (a static block).
                     type: "projects",
                     contractVersion: 1,
                     content: () => ({
-                        variant: "cards",
+                        variant: "rhythm",
+                        // A small label, so the projects' h3s sit under an
+                        // h2 rather than straight under the hidden h1.
                         title: "Work",
+                        anchor: "work",
+                        navLabel: "Work",
+                        captionPlacement: "over",
                         items: sampleProjects(),
                     }),
                 },
@@ -199,6 +245,9 @@ export const studioTemplate: TemplateManifest = {
                     type: "richText",
                     contractVersion: 1,
                     content: (ctx: TemplateContext) => ({
+                        variant: "left",
+                        anchor: "studio",
+                        navLabel: "Studio",
                         format: "html",
                         value:
                             `<h2>Studio</h2>` +
@@ -212,17 +261,19 @@ export const studioTemplate: TemplateManifest = {
                             `<p>Say what the studio is better at, and what it ` +
                             `will say early if a project needs something else. ` +
                             `Replace all three paragraphs with your own.</p>` +
-                            `<ul>` +
-                            `<li><strong>Studio:</strong> where you work</li>` +
-                            `<li><strong>Who:</strong> your names</li>` +
-                            `<li><strong>Since:</strong> the year you started</li>` +
-                            `</ul>`,
+                            `<dl>` +
+                            `<dt>Studio</dt><dd>Where you work</dd>` +
+                            `<dt>Who</dt><dd>Your names</dd>` +
+                            `<dt>Since</dt><dd>The year you started</dd>` +
+                            `</dl>`,
                     }),
                 },
                 {
                     type: "enquiry",
                     contractVersion: 1,
                     content: {
+                        anchor: "contact",
+                        navLabel: "Contact",
                         title: "If you have something that needs drawing, describe it badly.",
                         description:
                             "A paragraph is plenty. The useful questions come after, and the messy version of the problem is more use than a tidy brief that has already decided the answer.",
