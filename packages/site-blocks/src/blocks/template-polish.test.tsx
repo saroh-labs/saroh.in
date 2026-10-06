@@ -4,6 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import FeaturesSection from "./features";
+import RichTextSection from "./rich-text";
 
 /**
  * The block extensions of the template polish. Every one is absent by
@@ -64,5 +65,54 @@ describe("features: figures, two columns, a note, the facts row", () => {
         };
         const { container } = render(<FeaturesSection content={content} />);
         expect(container.innerHTML).toBe("");
+    });
+});
+
+describe("richText: left-aligned, photo above, part labels, a callout", () => {
+    it("sits the left look on the page's width, not the centred column", () => {
+        const { container } = render(
+            <RichTextSection content={BLOCK_META.richText.fixtures.left} />,
+        );
+        expect(container.querySelector("section")?.className).toContain(
+            "max-w-screen-xl",
+        );
+        const centred = render(
+            <RichTextSection content={BLOCK_META.richText.fixtures.default} />,
+        );
+        expect(centred.container.querySelector("section")?.className).toContain(
+            "max-w-screen-md",
+        );
+    });
+
+    it("puts the photo above the text at 16:9, labels the parts, boxes the result", () => {
+        const { container } = render(
+            <RichTextSection content={BLOCK_META.richText.cases.caseStudy} />,
+        );
+        const photo = screen.getByAltText("The dispatch board as shipped");
+        expect(photo.className).toContain("aspect-video");
+        // The photo comes before the words in reading order.
+        const heading = screen.getByRole("heading", {
+            name: /Taking a warehouse/,
+        });
+        expect(
+            photo.compareDocumentPosition(heading) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        expect(container.querySelector(".prose")?.className).toContain(
+            "prose-h3:uppercase",
+        );
+        const box = screen.getByRole("complementary", { name: "What changed" });
+        expect(box.className).toContain("border-site-accent");
+        expect(box.textContent).toContain("no day of downtime");
+    });
+
+    it("draws no box and no labels by default", () => {
+        const { container } = render(
+            <RichTextSection content={BLOCK_META.richText.fixtures.default} />,
+        );
+        expect(container.querySelector("aside")).toBeNull();
+        expect(container.querySelector(".prose")?.className).not.toContain(
+            "prose-h3:uppercase",
+        );
     });
 });

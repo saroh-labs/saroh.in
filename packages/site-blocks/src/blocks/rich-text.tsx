@@ -1,4 +1,5 @@
 import type { RenderedRichText } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 
 /**
  * `richText` v1 — authored rich content.
@@ -34,6 +35,18 @@ export default function RichTextSection({
     align?: "column" | "cards";
 }) {
     const cards = align === "cards";
+    // The left-aligned look (template polish): the column at the page's
+    // left edge, as the module page's intro already sits.
+    const left = resolveVariant("richText", content) === "left";
+    const wide = cards || left;
+    /*
+     * Part labels (template polish): the text's h3s as small capitals, as a
+     * case study names its parts. Utilities on the prose wrapper, so the
+     * sanitized markup itself is untouched.
+     */
+    const labels = content.partLabels
+        ? " prose-h3:font-site-body prose-h3:text-site-muted prose-h3:mb-2 prose-h3:mt-8 prose-h3:text-[13px] prose-h3:font-semibold prose-h3:uppercase prose-h3:tracking-[0.1em]"
+        : "";
     /*
      * A template's type scale (DEC-090) sets the body size and the reading
      * width through `--site-body-size` and `--site-measure`; without one the
@@ -47,7 +60,7 @@ export default function RichTextSection({
                    text colour (#189), and `dark:prose-invert` is gone with
                    them: once a palette is chosen, a visitor's OS setting
                    must not repaint a storefront its owner picked. */
-                className="prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]"
+                className={`prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]${labels}`}
                 // Sanitized at publish (see the safety note above).
                 dangerouslySetInnerHTML={{ __html: content.value }}
             />
@@ -57,6 +70,10 @@ export default function RichTextSection({
             </div>
         );
 
+    const callout = content.callout?.text?.trim() ? (
+        <Callout label={content.callout.label} text={content.callout.text} />
+    ) : null;
+
     /*
      * Without a photo this is the single column it has always been, markup
      * and all: every text block published before photos existed draws
@@ -64,13 +81,49 @@ export default function RichTextSection({
      */
     const image = content.image?.src ? content.image : null;
     if (!image) {
-        return cards ? (
+        return wide ? (
             <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-                <div className="max-w-[65ch]">{text}</div>
+                <div className="max-w-[65ch]">
+                    {text}
+                    {callout}
+                </div>
             </section>
         ) : (
             <section className="mx-auto w-full max-w-screen-md px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
                 {text}
+                {callout}
+            </section>
+        );
+    }
+
+    /*
+     * The photo above the text (template polish), at 16:9 and the width of
+     * the text's column, as a case study opens on the thing it built.
+     */
+    if (content.imageSide === "above") {
+        const photo = (
+            <img
+                src={image.src}
+                alt={image.alt ?? ""}
+                width={image.width}
+                height={image.height}
+                loading="lazy"
+                className="bg-site-surface mb-8 aspect-video h-auto w-full rounded-[var(--site-radius)] object-cover"
+            />
+        );
+        return wide ? (
+            <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+                <div className="max-w-[65ch]">
+                    {photo}
+                    {text}
+                    {callout}
+                </div>
+            </section>
+        ) : (
+            <section className="mx-auto w-full max-w-screen-md px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+                {photo}
+                {text}
+                {callout}
             </section>
         );
     }
@@ -80,7 +133,7 @@ export default function RichTextSection({
      * side the merchant chose — the right unless they said left. On a phone
      * the two stack, photo first, the way a card reads.
      */
-    const left = content.imageSide === "left";
+    const photoLeft = content.imageSide === "left";
     return (
         <section
             className={
@@ -100,13 +153,42 @@ export default function RichTextSection({
                     height={image.height}
                     loading="lazy"
                     className={
-                        left
+                        photoLeft
                             ? "h-auto w-full rounded-[var(--site-radius)] object-cover"
                             : "h-auto w-full rounded-[var(--site-radius)] object-cover md:order-last"
                     }
                 />
-                <div className="min-w-0">{text}</div>
+                <div className="min-w-0">
+                    {text}
+                    {callout}
+                </div>
             </div>
         </section>
+    );
+}
+
+/**
+ * The boxed line after the text (template polish): the accent as a rule on
+ * its left, never as the text's colour, so it reads at 4.5:1 on any palette;
+ * the label says what the box is, so the rule is not the only signal.
+ */
+function Callout({ label, text }: { label?: string; text: string }) {
+    const name = label?.trim();
+    return (
+        <aside
+            aria-label={name || undefined}
+            className="border-site-accent bg-site-surface text-site-fg mt-8 max-w-[var(--site-measure,65ch)] border-l-2 px-5 py-4"
+        >
+            {name ? (
+                <p className="text-[13px] font-semibold uppercase tracking-[0.1em]">
+                    {name}
+                </p>
+            ) : null}
+            <p
+                className={`whitespace-pre-line text-[length:var(--site-body-size,1rem)] leading-relaxed${name ? "mt-1.5" : ""}`}
+            >
+                {text.trim()}
+            </p>
+        </aside>
     );
 }

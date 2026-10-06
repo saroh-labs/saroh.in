@@ -101,8 +101,12 @@ export interface RichTextContent {
     image?: ImageValue;
     /** The photo a template says belongs here (KTD-5). */
     imageBrief?: string;
-    /** Which side the photo sits on; absent is the right. */
-    imageSide?: "left" | "right";
+    /** Where the photo sits: a side, or above the text; absent is the right. */
+    imageSide?: "left" | "right" | "above";
+    /** A boxed line after the text, ruled in the accent (template polish). */
+    callout?: { label?: string; text: string };
+    /** The text's h3s as small capitals part labels. */
+    partLabels?: boolean;
 }
 
 export type CtaContent = CtaValue;

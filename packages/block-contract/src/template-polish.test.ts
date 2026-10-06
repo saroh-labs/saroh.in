@@ -54,3 +54,38 @@ describe("features: figures, two columns, a note and the facts row", () => {
         ).toBe(true);
     });
 });
+
+describe("richText: left-aligned, photo above, part labels, a callout", () => {
+    const value = "<h3>The problem</h3><p>Three spreadsheets.</p>";
+
+    it("saves the left look, a photo above, labels and a callout", () => {
+        expect(
+            parseSectionContent("richText", 1, {
+                variant: "left",
+                value,
+                image: { src: "/a.jpg", alt: "The board" },
+                imageSide: "above",
+                partLabels: true,
+                callout: { label: "What changed", text: "No downtime." },
+            }).success,
+        ).toBe(true);
+    });
+
+    it("refuses a callout with no words, and an unknown side", () => {
+        expect(
+            parseSectionContent("richText", 1, {
+                value,
+                callout: { label: "What changed", text: " " },
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("richText", 1, { value, imageSide: "below" })
+                .success,
+        ).toBe(false);
+    });
+
+    it("knows the left look; content with none is the centred column", () => {
+        expect(resolveVariant("richText", { variant: "left" })).toBe("left");
+        expect(resolveVariant("richText", { value })).toBe("default");
+    });
+});

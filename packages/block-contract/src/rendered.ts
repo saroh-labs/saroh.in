@@ -144,7 +144,13 @@ const renderedRichText = z.object({
     /** One photo beside the text (G7); absent side is the right. */
     image: renderedImageSchema.optional(),
     imageBrief: z.string().optional(),
-    imageSide: z.enum(["left", "right"]).optional(),
+    // A side this build does not know draws as the right, as absent does.
+    imageSide: z.string().optional(),
+    /** A boxed line after the text, ruled in the accent (template polish). */
+    callout: z
+        .object({ label: z.string().optional(), text: z.string() })
+        .optional(),
+    partLabels: z.boolean().optional(),
 });
 
 const renderedCta = renderedCtaSchema.extend({ variant, padding });

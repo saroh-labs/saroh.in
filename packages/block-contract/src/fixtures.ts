@@ -234,12 +234,34 @@ export const BLOCK_META = {
         label: "Rich text",
         description:
             "A block of written copy. Sanitized at publish, so what reaches a page is already clean.",
-        variants: soleVariant("A single column of prose."),
+        /*
+         * `default` first: the centred column every text block has always
+         * been. `left` sits the same column on the page's left edge, level
+         * with the blocks around it (template polish).
+         */
+        variants: [
+            {
+                id: "default",
+                label: "Centred column",
+                description: "A single column of prose, centred on the page.",
+            },
+            {
+                id: "left",
+                label: "Left-aligned",
+                description:
+                    "The same column of prose on the page's left edge, in line with the blocks around it.",
+            },
+        ] as const,
         fixtures: {
             default: {
                 variant: "default",
                 format: "html",
                 value: "<h2>About the bakery</h2><p>We have been on the same corner since 1998.</p>",
+            },
+            left: {
+                variant: "left",
+                format: "html",
+                value: "<h2>The starter</h2><p>It was made in a rented kitchen in 2015, and it has been fed almost every evening since.</p>",
             },
         },
         cases: {
@@ -256,6 +278,24 @@ export const BLOCK_META = {
                     height: 600,
                 },
                 imageSide: "left",
+            },
+            // A case study: the photo above, parts labelled, a result boxed.
+            caseStudy: {
+                variant: "left",
+                format: "html",
+                value: "<h2>Taking a warehouse off three spreadsheets</h2><h3>The problem</h3><p>Dispatch ran on three spreadsheets that disagreed by the middle of every morning.</p><h3>What I decided</h3><p>The new system read the old sheets for six weeks, so both were true at once.</p>",
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Crect width='1600' height='900' fill='%23efefec'/%3E%3Crect x='160' y='140' width='1280' height='620' rx='12' fill='%23ffffff'/%3E%3Crect x='220' y='210' width='360' height='40' rx='6' fill='%2355575c'/%3E%3C/svg%3E",
+                    alt: "The dispatch board as shipped",
+                    width: 1600,
+                    height: 900,
+                },
+                imageSide: "above",
+                partLabels: true,
+                callout: {
+                    label: "What changed",
+                    text: "Dispatch moved off the spreadsheets in five months with no day of downtime.",
+                },
             },
         },
     },

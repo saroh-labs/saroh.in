@@ -304,8 +304,15 @@ const heroV1 = z.object({
  * would lose the photo. The pre-publish check flags a photo with no
  * description instead (`site-flags.ts`), as it does every other gap.
  */
-export const TEXT_IMAGE_SIDES = ["left", "right"] as const;
+/**
+ * `above` (template polish) puts the photo over the text at 16:9, as the
+ * developer design opens its case study; the text keeps its own column.
+ */
+export const TEXT_IMAGE_SIDES = ["left", "right", "above"] as const;
 export type TextImageSide = (typeof TEXT_IMAGE_SIDES)[number];
+
+/** How long a text block's callout may run. */
+export const TEXT_CALLOUT_MAX = 600;
 
 const richTextV1 = z.object({
     variant,
@@ -316,6 +323,23 @@ const richTextV1 = z.object({
     /** The photo beside the text, until it has one (KTD-5). */
     imageBrief,
     imageSide: z.enum(TEXT_IMAGE_SIDES).optional(),
+    /**
+     * A boxed line after the text, ruled on its left in the accent — "What
+     * changed: …" (template polish). Plain text, so it is not sanitized and
+     * cannot carry markup; ABSENT draws nothing.
+     */
+    callout: z
+        .object({
+            label: z.string().trim().max(60).optional(),
+            text: z.string().trim().min(1).max(TEXT_CALLOUT_MAX),
+        })
+        .optional(),
+    /**
+     * Sets the text's `h3`s as small capitals labels, the way a case study
+     * names its parts ("The problem", "What I decided"). ABSENT keeps them
+     * as headings.
+     */
+    partLabels: z.boolean().optional(),
 });
 
 /** cta v1 — a standalone call-to-action button. */
