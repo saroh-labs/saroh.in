@@ -230,6 +230,12 @@ export interface OrderRead extends FulfilmentFields {
      * from before it sends none.
      */
     placedOnline?: boolean;
+    /**
+     * Placed on the website to be paid when it is collected or delivered
+     * ("Pay when you collect", "Pay on delivery"): it is made and brought
+     * first, and handed over once marked paid. Absent from an older API.
+     */
+    payOnHandover?: boolean;
     updatedAt: string;
     store: { id: string; name: string };
     status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";

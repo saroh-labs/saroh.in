@@ -75,6 +75,9 @@ export function arrivalOf(params: {
  * Why the order can't take a step now, or null when it can: the same rule
  * as Order Detail's button (nothing moves before it is paid, unless it was
  * taken to pay later and has started), plus done, refunded and cancelled.
+ * An order the customer pays at the handover (website, "Pay when you
+ * collect", "Pay on delivery") is made and brought first: only its
+ * handover waits for the money.
  */
 function stepBlock(order: {
     status: string;
@@ -82,10 +85,17 @@ function stepBlock(order: {
     stage: string;
     refunded: boolean;
     done: boolean;
+    payOnHandover?: boolean;
+    to?: KitchenStage;
 }): string | null {
     if (order.status === "CANCELLED") return "It's cancelled.";
     if (order.refunded) return "It's refunded in full.";
     if (order.done) return "Nothing left to do.";
+    if (order.payOnHandover && order.paymentStatus !== "PAID") {
+        return order.to === "COLLECTED" || order.to === "DELIVERED"
+            ? "Not paid yet."
+            : null;
+    }
     if (
         order.paymentStatus === "FAILED" ||
         (order.paymentStatus === "UNPAID" && order.stage === "NEW")
@@ -119,7 +129,8 @@ export function quickNext(
         | "refundStanding"
         | "fulfilmentType"
         | "next"
-    >,
+    > &
+        Partial<Pick<OrderRead, "payOnHandover">>,
     can: Pick<OrderAbilities, "stage">,
 ): NextStep | null {
     if (!can.stage || isAppointment(order.fulfilmentType)) return null;
@@ -131,6 +142,8 @@ export function quickNext(
         stage: order.stage,
         refunded: order.refundStanding === "REFUNDED",
         done: false,
+        payOnHandover: order.payOnHandover,
+        to: step.to,
     });
     return blocked ? null : step;
 }
@@ -171,7 +184,8 @@ type MenuRow = Pick<
     | "unpaidAmount"
     | "ticketName"
     | "payLinkCreatedAt"
->;
+> &
+    Partial<Pick<OrderRow, "payOnHandover">>;
 
 /** The row's next step, from its type's steps and where it stands. */
 export function rowNext(row: MenuRow): {
@@ -187,6 +201,8 @@ export function rowNext(row: MenuRow): {
         stage: row.stage,
         refunded: row.payment === "REFUNDED",
         done: step === null,
+        payOnHandover: row.payOnHandover,
+        to: step?.to,
     });
     return { step, disabled };
 }

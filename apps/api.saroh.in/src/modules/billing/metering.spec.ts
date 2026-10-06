@@ -159,7 +159,7 @@ describe("what each count asks", () => {
                 store: { organizationId: "org" },
                 createdAt: { gte: start },
                 status: { not: "CANCELLED" },
-                NOT: { placedOnline: true, paidAt: null },
+                NOT: { placedOnline: true, payOnHandover: false, paidAt: null },
             },
         });
     });

@@ -21,6 +21,7 @@ import {
     waiting,
 } from "@/lib/orders/lifecycle";
 import type { StepTone } from "@/lib/orders/list-row";
+import { handoverPayment } from "@/lib/orders/pay-on-handover";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
 import type { Arrival } from "@/lib/orders/row-menu";
 import type { Sellable } from "@/lib/orders/sellables";
@@ -162,12 +163,15 @@ export function OrderDetail({
               ),
           )
         : headerStep(order);
+    // Paid at the handover (website checkout): made and brought first.
+    const handover = handoverPayment(order);
     const unpaid =
         order.status !== "CANCELLED" &&
         (order.paymentStatus === "FAILED" ||
-            (order.paymentStatus === "UNPAID" && order.stage === "NEW"));
+            (order.paymentStatus === "UNPAID" &&
+                (order.stage === "NEW" || handover !== null)));
     const next: KitchenStage | null =
-        can.stage && !unpaid && !appointment
+        can.stage && (!unpaid || handover !== null) && !appointment
             ? (order.next.stages[0] ?? null)
             : null;
     const open = isOpen(order);
@@ -350,6 +354,7 @@ export function OrderDetail({
                             linkable && can.payOnline ? payLink.ask : undefined
                         }
                         sending={payLink.busy}
+                        handover={handover ?? undefined}
                     />
                 ) : null}
                 {appointment ? (
@@ -556,6 +561,7 @@ export function OrderDetail({
                                 money={money}
                                 delivery={delivery}
                                 way={order.fulfilmentLabel}
+                                handover={handover ?? undefined}
                                 appointment={appointment}
                                 paymentStatus={order.paymentStatus}
                                 refundStanding={order.refundStanding}

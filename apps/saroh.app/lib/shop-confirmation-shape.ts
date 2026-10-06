@@ -91,6 +91,8 @@ export function confirmationOf(body: unknown): OrderConfirmationData | null {
         total: body.total,
         fulfilment,
         refunded: body.refunded,
+        // Placed to be paid at the handover; absent from an older API.
+        toPay: isString(body.toPay) ? body.toPay : null,
     };
 }
 

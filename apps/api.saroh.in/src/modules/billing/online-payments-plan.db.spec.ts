@@ -2,8 +2,9 @@
  * The plan's say over taking money online (`online-payments-plan.ts`)
  * against a real Postgres: on a plan without online payments, new online
  * payments and new subscriptions stop — no first provider connection, no
- * pay link that charges for the business's own invoice, no site checkout,
- * no booking page or plan join paid online, nobody subscribed — while a
+ * pay link that charges for the business's own invoice, no site checkout
+ * paid online (it takes payment at the handover instead), no booking page
+ * or plan join paid online, nobody subscribed — while a
  * subscription the business already has keeps renewing and its renewal
  * invoice stays payable online. Invoicing by hand goes on (DEC-070), and
  * PAYMENTS stays available. With `PLAN_ENFORCEMENT` off, none of it is
@@ -277,9 +278,11 @@ describe("new online payments on a plan without them (DB)", () => {
             },
         });
 
+        // The site's checkout still takes orders, paid at the handover
+        // (2026-10-06: Free takes money offline) — never online.
         await expect(
             checkoutReadiness(prisma, b.orgId, store.id),
-        ).resolves.toEqual({ ok: false, reason: "plan" });
+        ).resolves.toEqual({ ok: true, online: false, onHandover: true });
         expect(await takesOnlinePayment(b.orgId)).toBe(false);
     });
 

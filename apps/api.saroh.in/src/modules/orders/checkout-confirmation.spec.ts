@@ -63,7 +63,31 @@ describe("confirmationView (P4)", () => {
                 deliverTo: null,
             },
             refunded: false,
+            toPay: null,
         });
+    });
+
+    it("says what is still to pay on an order paid at the handover", () => {
+        expect(
+            confirmationView(
+                row({ payOnHandover: true, paymentStatus: "UNPAID" }),
+            ).toPay,
+        ).toBe("Pay when you collect");
+        expect(
+            confirmationView(
+                row({
+                    payOnHandover: true,
+                    paymentStatus: "UNPAID",
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            ).toPay,
+        ).toBe("Pay on delivery");
+        // Paid at the counter since: nothing left to pay.
+        expect(
+            confirmationView(
+                row({ payOnHandover: true, paymentStatus: "PAID" }),
+            ).toPay,
+        ).toBeNull();
     });
 
     it("reads a delivery: the fee and the address as they typed it", () => {

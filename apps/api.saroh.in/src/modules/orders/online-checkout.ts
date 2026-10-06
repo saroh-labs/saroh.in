@@ -12,6 +12,11 @@ import type { Prisma } from "@saroh/database";
  * A checkout nobody paid for is closed after a day by the job below. A
  * payment that loses the last unit, or arrives after the close, closes it
  * too and is refunded automatically (DEC-032).
+ *
+ * An order the customer chose to pay on handover ("Pay when you collect",
+ * "Pay on delivery", `payOnHandover`) is none of this: it is a real order
+ * from the start, as a staff pay-later order is — it promises its units
+ * when it is made, is never closed by the job, and is marked paid by staff.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -24,6 +29,35 @@ export const CHECKOUT_OPEN_MS = 24 * 60 * 60 * 1000;
 
 /** Unpaid checkouts one account may have open at once, business-wide. */
 export const MAX_OPEN_CHECKOUTS = 3;
+
+/**
+ * Whether an order is a checkout still waiting on its online payment's
+ * webhook to hold its units: placed at the site's checkout, and not to be
+ * paid on handover. Its payment is applied by `applyOnlineOrderSuccess`;
+ * any other order's, as a staff order's.
+ */
+export function holdsOnPayment(order: {
+    placedOnline: boolean;
+    payOnHandover?: boolean | null;
+}): boolean {
+    return order.placedOnline && order.payOnHandover !== true;
+}
+
+/**
+ * How an order to be paid on handover reads to staff: "pay on collection"
+ * for a pick-up, "pay on delivery" for one the business brings.
+ */
+export function payOnHandoverWords(fulfilment: string): string {
+    return fulfilment === "PICKUP" ? "pay on collection" : "pay on delivery";
+}
+
+/**
+ * Said when one account has as many orders waiting to be paid on handover
+ * as {@link MAX_OPEN_CHECKOUTS}: each promises its units, so a few is
+ * plenty until one is collected or delivered.
+ */
+export const PAY_ON_HANDOVER_WAITING =
+    "You have orders waiting to be paid for when they reach you. Once one is collected or delivered, you can order again.";
 
 /**
  * Said when the cap is reached. A new checkout at a storefront closes the
@@ -47,7 +81,8 @@ export const CHECKOUT_PAID_LATE =
  * sent, and nothing is released: its lines never held.
  *
  * Only a checkout still PENDING and not paid closes; anything else — paid
- * a moment ago, or closed already — is left as it is and reads false. Takes
+ * a moment ago, closed already, or an order to be paid on handover, which
+ * holds its units and is a real order — is left as it is and reads false. Takes
  * the order's row lock, the first lock of every order flow.
  */
 export async function closeCheckoutInTx(
@@ -60,13 +95,15 @@ export async function closeCheckoutInTx(
             status: string;
             paymentStatus: string;
             placedOnline: boolean;
+            payOnHandover: boolean;
             organizationId: string | null;
         }[]
-    >`SELECT status, "paymentStatus", "placedOnline", "organizationId"
+    >`SELECT status, "paymentStatus", "placedOnline", "payOnHandover", "organizationId"
       FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
     const order = rows.length > 0 ? rows[0] : null;
     if (
-        !order?.placedOnline ||
+        !order ||
+        !holdsOnPayment(order) ||
         !order.organizationId ||
         order.status !== "PENDING" ||
         (order.paymentStatus !== "UNPAID" && order.paymentStatus !== "FAILED")

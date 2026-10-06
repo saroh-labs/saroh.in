@@ -166,6 +166,7 @@ export async function listOrderRows(
                   walkInPhone: true,
                   status: true,
                   paymentStatus: true,
+                  payOnHandover: true,
                   stage: true,
                   fulfilment: true,
                   currency: true,

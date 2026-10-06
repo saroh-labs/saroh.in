@@ -3,6 +3,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
+import { onHandoverLabel } from "./checkout-readiness";
 import type { FulfilmentType } from "./fulfilment";
 import { FULFILMENT_RULES, shipsToAddress, typeOf } from "./fulfilment";
 
@@ -19,7 +20,9 @@ import { FULFILMENT_RULES, shipsToAddress, typeOf } from "./fulfilment";
  * - **Only once placed.** An order still being paid, closed unpaid, or
  *   refused and refunded is not an order yet (B1): 404, and the bag sheet
  *   keeps telling that story. A placed order that was refunded later still
- *   reads, as its Track does.
+ *   reads, as its Track does. An order placed to be paid on handover is
+ *   placed from the start, and reads until it is cancelled, saying it is
+ *   still to be paid.
  * - **Only what the customer gave or is owed.** Items, amounts, how it
  *   leaves and where: the storefront's pick-up address, or the delivery
  *   address they typed. Never staff notes, stock or payment ids.
@@ -63,6 +66,12 @@ export interface CheckoutConfirmation {
     };
     /** Refunded after it was placed: said, never hidden. */
     refunded: boolean;
+    /**
+     * Placed to be paid on handover and not paid yet: "Pay when you
+     * collect" or "Pay on delivery". Null once paid, and for an order
+     * paid online.
+     */
+    toPay: string | null;
 }
 
 /** What the read selects, and all {@link confirmationView} needs. */
@@ -76,6 +85,7 @@ export interface ConfirmationRow {
     discount: { toString(): string };
     total: { toString(): string };
     paymentStatus: string;
+    payOnHandover?: boolean;
     fulfilment: string;
     deliveryName: string | null;
     deliveryLine1: string | null;
@@ -150,6 +160,10 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
                     : null,
         },
         refunded: row.paymentStatus === "REFUNDED",
+        toPay:
+            row.payOnHandover && row.paymentStatus === "UNPAID"
+                ? (onHandoverLabel(type) ?? "Pay when it reaches you")
+                : null,
     };
 }
 
@@ -174,7 +188,14 @@ export class CheckoutConfirmationService {
                     organizationId: customer.organizationId,
                     customerAccountId: customer.accountId,
                     placedOnline: true,
-                    paymentStatus: { in: PLACED },
+                    OR: [
+                        { paymentStatus: { in: PLACED } },
+                        {
+                            payOnHandover: true,
+                            paymentStatus: "UNPAID",
+                            status: { not: "CANCELLED" },
+                        },
+                    ],
                 },
                 select: {
                     orderId: true,
@@ -186,6 +207,7 @@ export class CheckoutConfirmationService {
                     discount: true,
                     total: true,
                     paymentStatus: true,
+                    payOnHandover: true,
                     fulfilment: true,
                     deliveryName: true,
                     deliveryLine1: true,

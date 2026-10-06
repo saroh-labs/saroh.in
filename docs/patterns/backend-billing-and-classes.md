@@ -252,7 +252,21 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
 - **Staff orders hold when made**, under the rows' locks with a conditional
   can-sell update; the refusal is the storefront's words from
   `stock/stock-words.ts` — "Sourdough — Sold out", "… — Only 2 left at Hill
-  Road". An online order holds only when paid: `reserveOnPayment` is
+  Road". **A site order paid at the handover holds when made too**
+  (2026-10-06, `Order.payOnHandover`): "Pay when you collect" / "Pay on
+  delivery" at the site's checkout makes the order unpaid and real at once
+  — it holds as a staff pay-later order does (`createCheckoutOrder`), is
+  never replaced or closed as an abandoned checkout (`holdsOnPayment` is
+  false for it, so `closeCheckoutInTx`, the webhook's online-order path and
+  `realOrderWhere` all treat it as a staff order), counts on
+  `ordersPerMonth` from the start (soft at the site), tells the team at
+  once, and is invoiced when staff mark it paid (DEC-023). Its kitchen runs
+  before the money; only the handover (collected, delivered) waits for it
+  (`moveAwaitsPayment`). Nothing releases it on a timer: staff cancel it,
+  as a pay-later order. Offered always on a plan without online payments,
+  beside online where the storefront turns it on
+  (`StoreSettings.offerPayOnHandover`, `checkoutReadiness`); never for a
+  shipment. An online order holds only when paid: `reserveOnPayment` is
   idempotent per intent: a payment that held records a `STOCK_HELD`
   attempt, so its webhook repeating reads HELD even after the order
   closed, while any other payment reaching a closed order is refunded

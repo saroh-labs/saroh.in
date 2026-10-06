@@ -158,6 +158,12 @@ export interface OrderReadDto extends FulfilmentView, LateView {
     placedAt: Date;
     /** Placed by the customer at the site's checkout (G13). */
     placedOnline: boolean;
+    /**
+     * Placed at the site's checkout to be paid when it is collected or
+     * delivered ("Pay when you collect", "Pay on delivery"): staff take the
+     * money at the handover and mark it paid.
+     */
+    payOnHandover: boolean;
     updatedAt: Date;
     store: { id: string; name: string };
     status: string;
@@ -257,6 +263,7 @@ export interface RawOrderRead {
     orderId: string;
     createdAt: Date;
     placedOnline?: boolean;
+    payOnHandover?: boolean;
     updatedAt: Date;
     status: string;
     paymentStatus: string;
@@ -477,6 +484,7 @@ export function serializeOrderRead(
         orderId: order.orderId,
         placedAt: order.createdAt,
         placedOnline: order.placedOnline ?? false,
+        payOnHandover: order.payOnHandover ?? false,
         updatedAt: order.updatedAt,
         // Only who it is: the settings row the late rule read stays here.
         store: { id: order.store.id, name: order.store.name },
@@ -587,6 +595,7 @@ export function serializeOrderRead(
                 status: order.status,
                 paymentStatus: order.paymentStatus,
                 fulfilment: order.fulfilment as OrderFulfilment,
+                payOnHandover: order.payOnHandover ?? false,
             }),
             undo: undoableStep(order.events, opts.now),
             // A treatment's order changes through its visits (E9).

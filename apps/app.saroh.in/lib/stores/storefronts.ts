@@ -79,6 +79,16 @@ export interface StorefrontSettings extends StorefrontSummary {
     lateAfterMinutes?: LateAfterMinutes;
     tipsEnabled: boolean;
     guestCheckout: boolean;
+    /**
+     * "Pay when you collect" and "Pay on delivery" at the website's
+     * checkout, beside paying online. Absent from an older API.
+     */
+    offerPayOnHandover?: boolean;
+    /**
+     * Whether the plan takes payment online: without it the website's
+     * checkout always takes payment on handover. Absent from an older API.
+     */
+    onlinePaymentsPlan?: boolean;
     pausedAt: string | null;
     /**
      * The website checkout's flat fees for Local delivery and Shipping (G13):
@@ -117,6 +127,7 @@ export type StorefrontInput = Partial<
         | "collectionEnabled"
         | "tipsEnabled"
         | "guestCheckout"
+        | "offerPayOnHandover"
         | "checkoutProvider"
         | "fulfilmentTypes"
         | "localDeliveryFee"

@@ -10,7 +10,7 @@
  * | Limit key          | Counts                                                                 |
  * | ------------------ | ---------------------------------------------------------------------- |
  * | `products`         | products not archived                                                  |
- * | `ordersPerMonth`   | orders placed this month that stand: not cancelled, and not an online checkout nobody paid (OQ-7) |
+ * | `ordersPerMonth`   | orders placed this month that stand: not cancelled, and not an online checkout nobody paid (OQ-7); one to be paid on handover stands from the start |
  * | `bookingsPerMonth` | bookings made this month that stand (CONFIRMED), a course's sessions left out |
  * | `blogPosts`        | posts live on a site that isn't deleted                                |
  * | `teamMembers`      | people in the business, plus invitations still open; Reviewers left out (they only look at the website) |
@@ -182,7 +182,8 @@ export function standingOrders(since: Date): Prisma.OrderWhereInput {
     return {
         createdAt: { gte: since },
         status: { not: "CANCELLED" },
-        NOT: { placedOnline: true, paidAt: null },
+        // An order to be paid on handover stands from the start.
+        NOT: { placedOnline: true, payOnHandover: false, paidAt: null },
     };
 }
 

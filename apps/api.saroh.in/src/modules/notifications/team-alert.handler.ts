@@ -7,6 +7,7 @@ import { fromMinor } from "../../common/money";
 import { CommunicationsService } from "../communications/communications.service";
 import { escapeHtml } from "../communications/transactional";
 import { formatMoney } from "../invoices/invoice-send.service";
+import { holdsOnPayment, payOnHandoverWords } from "../orders/online-checkout";
 import { orderPartyName } from "../orders/walk-in";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import type { AlertEvent } from "./alert-preferences";
@@ -277,6 +278,8 @@ async function wordOrder(
             status: true,
             paymentStatus: true,
             placedOnline: true,
+            payOnHandover: true,
+            fulfilment: true,
             customerId: true,
             walkInName: true,
             customer: {
@@ -285,17 +288,16 @@ async function wordOrder(
         },
     });
     if (!order || order.status === "CANCELLED") return null;
-    // An online checkout is an order only once it is paid (G13).
-    if (order.placedOnline && order.paymentStatus !== "PAID") return null;
+    // An online checkout is an order only once it is paid (G13); one to be
+    // paid on handover is an order from the start.
+    if (holdsOnPayment(order) && order.paymentStatus !== "PAID") return null;
     return {
         event: "order",
         eventKey: `team:order:${order.id}`,
         notificationId: null,
         type: ORDER_NEW_NOTIFICATION_TYPE,
         title: `New order ${order.orderId} from ${orderPartyName(order)}`,
-        body: `${formatMoney(order.total, order.currency)}, ${
-            order.placedOnline ? "paid online" : "at the counter"
-        }.`,
+        body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
         orderId: order.id,
@@ -485,4 +487,19 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
         default:
             return null;
     }
+}
+
+/** "paid online", "at the counter", or "to pay on collection". */
+function orderPaidWords(order: {
+    placedOnline: boolean;
+    payOnHandover: boolean;
+    paymentStatus: string;
+    fulfilment: string;
+}): string {
+    if (order.payOnHandover) {
+        return order.paymentStatus === "PAID"
+            ? "paid on handover"
+            : `to ${payOnHandoverWords(order.fulfilment)}`;
+    }
+    return order.placedOnline ? "paid online" : "at the counter";
 }
