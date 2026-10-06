@@ -14,6 +14,10 @@ import { checklistHeading } from "@/lib/settings/ready";
  * Settings also asks for — email, business type, logo, a pipeline
  * (`settingsChecklist`, DEC-056). Its heading follows the steps (DEC-070):
  * with nothing that invoices or takes money, it is about the site.
+ *
+ * What the plan holds back (taking payment online on a plan without it,
+ * DEC-092) is listed under the steps, outside the count, with the plan that
+ * has it and See plans — so the count can reach all done without it.
  */
 export function ReadyChecklist({ list }: { list: Checklist }) {
     if (list.left.length === 0 || list.total === 0) return null;
@@ -75,6 +79,43 @@ export function ReadyChecklist({ list }: { list: Checklist }) {
                     </li>
                 ))}
             </ul>
+            {list.outside.length > 0 ? (
+                <ul
+                    aria-label="Not counted: comes with another plan"
+                    className="grid gap-2 border-t border-highlight-border pt-2"
+                >
+                    {list.outside.map((item) => (
+                        <li
+                            key={item.key}
+                            className="flex flex-wrap items-center gap-2.5 text-[13px]"
+                        >
+                            <span
+                                aria-hidden
+                                className="size-[7px] shrink-0 rounded-full border border-border-strong"
+                            />
+                            <span className="grid min-w-0 flex-[1_1_220px] gap-px">
+                                <span className="flex flex-wrap items-center gap-2">
+                                    {item.label}
+                                    <span className="rounded-full bg-muted px-2 py-px text-[11.5px] font-medium text-muted-foreground">
+                                        {item.comesWith}
+                                    </span>
+                                </span>
+                                <span className="text-pretty text-[12.5px] leading-[1.45] text-foreground/80">
+                                    {item.why}
+                                </span>
+                            </span>
+                            <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="wk-press"
+                            >
+                                <Link href={item.href}>{item.cta}</Link>
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
         </section>
     );
 }

@@ -1,3 +1,5 @@
+import type { UpgradeTo } from "@/lib/billing/access";
+import { upgradeHref } from "@/lib/billing/access";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
@@ -10,7 +12,6 @@ import type {
     SetupFacts,
 } from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
-import { PLAN_FIX } from "@/lib/services/online-booking";
 
 import { BUSINESS_TAB_PARAM } from "./search";
 
@@ -109,6 +110,20 @@ export interface ReadyStep extends ReadyItem {
     done: boolean;
 }
 
+/**
+ * Something the plan holds back, shown beside the steps but never counted
+ * (DEC-092): a business on a plan without it can still reach all done.
+ */
+export interface ReadyAside {
+    key: "payments";
+    label: string;
+    why: string;
+    /** "Comes with ‹plan›", or "Comes with a paid plan". */
+    comesWith: string;
+    cta: string;
+    href: string;
+}
+
 export interface ReadyChecklist {
     /** Every step that could be checked, in the order to do them. */
     steps: ReadyStep[];
@@ -116,6 +131,8 @@ export interface ReadyChecklist {
     left: ReadyItem[];
     done: number;
     total: number;
+    /** What the plan holds back: shown, outside `done` and `total`. */
+    outside: ReadyAside[];
 }
 
 export const business = (section: string) =>
@@ -156,20 +173,36 @@ const connect = (href: string): ReadyItem => ({
 });
 
 /**
- * On a plan without online payments (#835): connecting a provider would
- * change nothing, so the step says what would — a paid plan — with the
- * Service Editor's link (`lib/services/online-booking.ts`), and that
- * customers can still pay by How to pay us meanwhile.
+ * On a plan without online payments (#835, DEC-092): connecting a provider
+ * would change nothing, and nothing the business can do in setup would
+ * either, so it is not a step. It is said beside the steps, outside the
+ * count — the plan that has it (the catalogue's `payments` row names it;
+ * otherwise "a paid plan") and See plans — so a business on that plan can
+ * reach all done. The plan is asked first, as the API asks it
+ * (`onlinePaymentBlocker`): Payments on or off, a provider or none. Only
+ * where taking money applies: Payments is on, or something that sells is.
  */
-const planStep: Check = {
-    key: "payments",
-    label: "Take payment online",
-    why: "Online payment comes with a paid plan. Until then, customers pay you the ways you set in How to pay us.",
-    cta: PLAN_FIX.label,
-    href: PLAN_FIX.href,
-    broken: false,
-    left: true,
-};
+function onlinePaymentsAside(
+    modules: readonly ModuleView[],
+    setup: Pick<SetupFacts, "onlinePaymentsInPlan"> | undefined,
+    upgrade: UpgradeTo | null | undefined,
+): ReadyAside | null {
+    if (setup?.onlinePaymentsInPlan !== false) return null;
+    const view = modules.find((m) => m.key === "PAYMENTS");
+    if (!view) return null;
+    const selling = SELLING.some((k) => on(modules, k));
+    if (view.lifecycle !== "ENABLED" && !selling) return null;
+    return {
+        key: "payments",
+        label: "Take payment online",
+        why: "Until then, customers pay you the ways you set in How to pay us.",
+        comesWith: upgrade
+            ? `Comes with ${upgrade.name}`
+            : "Comes with a paid plan",
+        cta: "See plans",
+        href: upgradeHref(upgrade?.planId),
+    };
+}
 
 function payments(
     modules: readonly ModuleView[],
@@ -181,10 +214,8 @@ function payments(
     if (!view) return null;
     const selling = SELLING.some((k) => on(modules, k));
     // The plan is asked first, as the API asks it (`onlinePaymentBlocker`):
-    // Payments on or off, a provider or none, the plan is what decides.
-    if (setup?.onlinePaymentsInPlan === false) {
-        return view.lifecycle === "ENABLED" || selling ? planStep : null;
-    }
+    // without online payments it is no step at all (`onlinePaymentsAside`).
+    if (setup?.onlinePaymentsInPlan === false) return null;
     if (view.lifecycle !== "ENABLED") {
         // Nothing that sells is on either: no money to take yet, so the step
         // does not apply. Something sells: Payments has to come on first.
@@ -436,12 +467,15 @@ function shop(modules: readonly ModuleView[]): Check | null {
 export function readyChecklist({
     settings,
     modules: all,
+    onlineUpgrade,
 }: {
     settings: Pick<
         OrganizationSettings,
         "tax" | "profile" | "registeredAddress" | "setup" | "kind"
     >;
     modules: readonly ModuleView[] | null;
+    /** The plan that takes payment online, when the catalogue names one. */
+    onlineUpgrade?: UpgradeTo | null;
 }): ReadyChecklist {
     // Never a step for a module Saroh has not rolled out (DEC-057).
     const modules = all ? rolledOut(all) : null;
@@ -476,6 +510,11 @@ export function readyChecklist({
         left,
         done: steps.length - left.length,
         total: steps.length,
+        outside: modules
+            ? [
+                  onlinePaymentsAside(modules, settings.setup, onlineUpgrade),
+              ].filter((a): a is ReadyAside => a !== null)
+            : [],
     };
 }
 
@@ -490,9 +529,18 @@ const MONEY_STEPS: ReadonlySet<ReadyItem["key"]> = new Set<ReadyItem["key"]>([
     "logo",
 ]);
 
-/** Whether any step, done or left, is about money (DEC-070). */
-export function takesMoney(list: Pick<ReadyChecklist, "steps">): boolean {
-    return list.steps.some((s) => MONEY_STEPS.has(s.key));
+/**
+ * Whether any step, done or left, is about money (DEC-070) — or what the
+ * plan holds back beside them (taking payment online, DEC-092).
+ */
+export function takesMoney(
+    list: Pick<ReadyChecklist, "steps"> &
+        Partial<Pick<ReadyChecklist, "outside">>,
+): boolean {
+    return (
+        list.steps.some((s) => MONEY_STEPS.has(s.key)) ||
+        (list.outside?.length ?? 0) > 0
+    );
 }
 
 /**
@@ -503,7 +551,8 @@ export function takesMoney(list: Pick<ReadyChecklist, "steps">): boolean {
  * "Finish setting up".
  */
 export function checklistHeading(
-    list: Pick<ReadyChecklist, "steps">,
+    list: Pick<ReadyChecklist, "steps"> &
+        Partial<Pick<ReadyChecklist, "outside">>,
     where: "home" | "settings",
 ): string {
     if (takesMoney(list)) {

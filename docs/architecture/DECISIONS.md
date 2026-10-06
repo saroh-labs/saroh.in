@@ -1056,3 +1056,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the catalogue's `integrations` row ("Third-party connections") meters connected payment and messaging providers, but it was off on every plan. With plan rules on, no business could connect its own email provider or its Razorpay or Cashfree account, which contradicts DEC-086's "connect your own email" and Grow's online payments.
 - Decision: the row is now "Your own email and payment accounts". It is included with no cap on paid plans and locked on Free. Payment and messaging providers both count towards it. Free relies on Saroh's small booking-email allowance (DEC-086) and takes money offline, and upgrades to connect its own.
 - Consequences: the published catalogue needs a new version with the row on for paid plans before plan rules are switched on anywhere. Settings and the Saroh-email notices on Free offer an upgrade rather than "Connect your email". The sample catalogue (`seed.ts`) follows with no caps.
+
+## DEC-092 Taking payment online is not a setup step on a plan without it
+
+**Status: Accepted — 2026-10-06** · user · from #835
+
+- Context: on a plan without online payments, the "Ready to take payments" checklist (Settings › Business) and Home's "Get ready to take money" counted "Take payment online" as a step left (#835). Nothing in setup could finish it, so a Free business could never reach all done.
+- Decision: that step is not counted. Both checklists show it beside the steps, outside the count and the bar, as "Comes with ‹plan›" when the catalogue's `payments` row names the plan that has it, otherwise "Comes with a paid plan", with See plans to `/settings/billing#change-plan`. Payments' other steps (connect, finish connecting, reconnect) still count on a plan that takes payment online.
+- Consequences: `readyChecklist` returns the plan's asides as `outside`, apart from `done` and `total`; `loadReadyChecklist` and `loadSettingsChecklist` read billing access only on such a plan, best-effort. Once every counted step is done the checklists hide, aside included; the plan page and the Payment panel still say it.
