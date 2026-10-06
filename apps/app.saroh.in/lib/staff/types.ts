@@ -84,6 +84,31 @@ export interface BookingRules {
      * than it, which always refunded: read as on.
      */
     refundInTimeCancels?: boolean;
+    /**
+     * How people pay when they book on the booking page (DEC-088): online
+     * only, at the desk only, or both. Absent from an API older than it:
+     * both, which is what every business had.
+     */
+    bookingPayment?: BookingPayment;
+}
+
+/** How people pay when they book (DEC-088). */
+export type BookingPayment = "ONLINE" | "DESK" | "BOTH";
+
+/**
+ * Why the booking page can't take money online now (DEC-088): Payments is
+ * switched off, or no payment provider is connected that can take it.
+ */
+export type OnlineBlocker = "PAYMENTS_OFF" | "NO_PROVIDER";
+
+/**
+ * `GET booking-rules/payment`: how people pay when they book, and why
+ * online can't be taken now, if it can't — what the Service Editor and the
+ * Services list read to say a service can't be booked online (#821).
+ */
+export interface BookingPaymentView {
+    bookingPayment: BookingPayment;
+    onlineBlocker: OnlineBlocker | null;
 }
 
 /** A kept booking the API reports after hours or time off change. */

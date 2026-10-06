@@ -22,7 +22,11 @@ import {
 } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 import type { BookingRules, StaffList } from "@/lib/staff/service";
-import { getBookingRules, listStaff } from "@/lib/staff/service";
+import {
+    getBookingRules,
+    listStaff,
+    readBookingPayment,
+} from "@/lib/staff/service";
 
 /**
  * Bookings › Availability (U16): each person's weekly hours, time off and
@@ -39,6 +43,7 @@ const NO_RULES: BookingRules = {
     latestBookingMinutes: null,
     freeCancelHours: null,
     refundInTimeCancels: true,
+    bookingPayment: "BOTH",
 };
 
 async function readStaff(): Promise<StaffList | null> {
@@ -51,12 +56,14 @@ async function readStaff(): Promise<StaffList | null> {
 
 export default async function AvailabilityPage() {
     await requireSession();
-    const [organization, staffList, rules, services] = await Promise.all([
-        resolveActiveOrganization(),
-        readStaff(),
-        getBookingRules().catch(() => null),
-        listServices(),
-    ]);
+    const [organization, staffList, rules, services, payment] =
+        await Promise.all([
+            resolveActiveOrganization(),
+            readStaff(),
+            getBookingRules().catch(() => null),
+            listServices(),
+            readBookingPayment(),
+        ]);
 
     if (!staffList) {
         return (
@@ -165,6 +172,7 @@ export default async function AvailabilityPage() {
                         )
                         .map((p) => p.id)}
                     canEdit={may("service:write")}
+                    onlineBlocker={payment?.onlineBlocker}
                 />
             </div>
         </PageContainer>
