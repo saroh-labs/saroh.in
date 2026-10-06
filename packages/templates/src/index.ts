@@ -74,3 +74,6 @@ export {
     PORTFOLIO_TEMPLATE_ID,
     portfolioTemplate,
 } from "./templates/portfolio";
+
+// The Gym industry template (industry templates plan, U6).
+export { GYM_TEMPLATE_ID, gymTemplate } from "./templates/gym";

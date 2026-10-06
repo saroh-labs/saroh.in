@@ -82,8 +82,9 @@ export class TemplateInstantiationError extends Error {
  *      `parseSectionContent(type, version, content)`, and
  *   3. stores the NORMALIZED content with an `order` from its array position.
  *
- * A section whose `when` says no for this context is left out first, and
- * `order` counts only the sections laid down.
+ * A page or section whose `when` says no for this context is left out
+ * first (the home page always stays), and `order` counts only the sections
+ * laid down.
  *
  * Throws {@link TemplateInstantiationError} on the first section that fails its
  * contract — so a caller that gets a result back is guaranteed every section is
@@ -93,7 +94,10 @@ export function instantiateTemplate(
     template: TemplateManifest,
     context: TemplateContext,
 ): InstantiatedTemplate {
-    const pages: InstantiatedPage[] = template.pages.map((page) => {
+    const laidDown = template.pages.filter(
+        (page) => page.isHome === true || !page.when || page.when(context),
+    );
+    const pages: InstantiatedPage[] = laidDown.map((page) => {
         const included = page.sections.flatMap((section, sectionIndex) =>
             !section.when || section.when(context)
                 ? [{ section, sectionIndex }]
