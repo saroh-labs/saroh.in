@@ -126,6 +126,7 @@ describe("which rows metering counts", () => {
             blog: "blogPosts",
             products: "products",
             orders: "ordersPerMonth",
+            reviewers: "reviewers",
             bookings: "bookingsPerMonth",
             members: "teamMembers",
             integrations: "integrations",
@@ -335,7 +336,7 @@ describe("crossing a notice's line", () => {
         const row = { plan: "Plan A", upgradeTo: "Plan B", soft: true };
         expect(limitNoticeWords(row, "visitsPerMonth", 11, 9, "warn")).toEqual({
             title: "You've used 9 of 11 site visits a month on Plan A",
-            body: "Nothing stops at 11. Plan B gives you more.",
+            body: "Nothing stops at 11; we'll let you know when you reach it. Plan B gives you more.",
         });
         const over = limitNoticeWords(row, "storageGb", 1, 1.5, "over");
         expect(over.title).toBe(

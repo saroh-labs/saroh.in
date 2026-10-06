@@ -80,6 +80,7 @@ describe("plan keys", () => {
                 "payments",
                 "products",
                 "review",
+                "reviewers",
                 "reviews",
                 "roles",
                 "sites",

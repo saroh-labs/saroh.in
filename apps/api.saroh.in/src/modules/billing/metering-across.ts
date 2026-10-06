@@ -12,6 +12,7 @@ import {
     countedRole,
     monthFirstDay,
     monthWindow,
+    reviewerRole,
     SHOP_KIND,
     siteViewTotals,
     standingBookings,
@@ -186,11 +187,13 @@ export async function countUsageAcross(
             }
             return out;
         }
-        case "teamMembers": {
+        case "teamMembers":
+        case "reviewers": {
+            const roleFilter = key === "reviewers" ? reviewerRole : countedRole;
             const [members, invites] = await Promise.all([
                 db.membership.groupBy({
                     by: ["organizationId"],
-                    where: { organizationId: { in: ids }, ...countedRole },
+                    where: { organizationId: { in: ids }, ...roleFilter },
                     _count: { _all: true },
                 }),
                 db.organizationInvitation.groupBy({
@@ -199,7 +202,7 @@ export async function countUsageAcross(
                         organizationId: { in: ids },
                         status: "PENDING",
                         expiresAt: { gt: now },
-                        ...countedRole,
+                        ...roleFilter,
                     },
                     _count: { _all: true },
                 }),

@@ -14,6 +14,7 @@
  * | `bookingsPerMonth` | bookings made this month that stand (CONFIRMED), a course's sessions left out |
  * | `blogPosts`        | posts live on a site that isn't deleted                                |
  * | `teamMembers`      | people in the business, plus invitations still open; Reviewers left out (they only look at the website) |
+ * | `reviewers`        | Reviewers in the business, plus Reviewer invitations still open |
  * | `integrations`     | connected payment and messaging providers                              |
  * | `shopLocations`    | locations not deleted whose settings say `SHOP` (customers visit); an online-only one, or one with no settings, never counts |
  * | `sites`            | websites not deleted                                                   |
@@ -44,6 +45,7 @@ export const METERED_LIMIT_KEYS = [
     "bookingsPerMonth",
     "blogPosts",
     "teamMembers",
+    "reviewers",
     "integrations",
     "shopLocations",
     "sites",
@@ -153,6 +155,9 @@ export function monthFirstDay(now: Date, zone: string): Date {
 /** People who count: everyone but a Reviewer. */
 export const countedRole = { role: { not: UNMETERED_ROLE } } as const;
 
+/** Only Reviewers: what the `reviewers` cap counts. */
+export const reviewerRole = { role: UNMETERED_ROLE } as const;
+
 /** Media that holds space: uploaded and checked. */
 export const STORED = "READY";
 
@@ -228,17 +233,19 @@ export async function countUsage(
                     site: { organizationId, deletedAt: null },
                 },
             });
-        case "teamMembers": {
+        case "teamMembers":
+        case "reviewers": {
+            const roleFilter = key === "reviewers" ? reviewerRole : countedRole;
             const [members, invites] = await Promise.all([
                 db.membership.count({
-                    where: { organizationId, ...countedRole },
+                    where: { organizationId, ...roleFilter },
                 }),
                 db.organizationInvitation.count({
                     where: {
                         organizationId,
                         status: "PENDING",
                         expiresAt: { gt: now },
-                        ...countedRole,
+                        ...roleFilter,
                     },
                 }),
             ]);

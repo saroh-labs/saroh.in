@@ -296,10 +296,12 @@ export class OrganizationMembersService {
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
         // The plan's team members cap counts people and open invitations
         // (U13), Reviewers left out: a new invitation is checked; sending a
-        // live one again adds nobody, and neither does inviting a Reviewer.
+        // live one again adds nobody. A Reviewer is checked against the
+        // plan's own Reviewers cap instead, the same way.
+        const reviewer = dto.role === UNMETERED_ROLE;
         const invitation = await planMeter.withRoom(
             ctx.organizationId,
-            "members",
+            reviewer ? "reviewers" : "members",
             (tx) =>
                 tx.organizationInvitation.upsert({
                     where: {
@@ -334,15 +336,17 @@ export class OrganizationMembersService {
                     },
                 }),
             {
+                // A live invitation of the same kind already counts this person.
                 addingIn: async (tx) =>
-                    dto.role === UNMETERED_ROLE ||
                     (await tx.organizationInvitation.count({
                         where: {
                             organizationId: ctx.organizationId,
                             email: dto.email,
                             status: "PENDING",
                             expiresAt: { gt: new Date() },
-                            role: { not: UNMETERED_ROLE },
+                            role: reviewer
+                                ? UNMETERED_ROLE
+                                : { not: UNMETERED_ROLE },
                         },
                     })) > 0
                         ? 0
@@ -634,11 +638,21 @@ export class OrganizationMembersService {
         // transaction, as it takes the meter's lock.
         const joinsTheCount =
             membership.role === UNMETERED_ROLE && dto.role !== UNMETERED_ROLE;
+        // Made a Reviewer from another role: one more on the Reviewers cap.
+        const becomesReviewer =
+            membership.role !== UNMETERED_ROLE && dto.role === UNMETERED_ROLE;
 
         await prisma.$transaction(
             async (tx) => {
                 if (joinsTheCount) {
                     await planMeter.roomInTx(tx, ctx.organizationId, "members");
+                }
+                if (becomesReviewer) {
+                    await planMeter.roomInTx(
+                        tx,
+                        ctx.organizationId,
+                        "reviewers",
+                    );
                 }
                 await tx.membership.update({
                     where: {

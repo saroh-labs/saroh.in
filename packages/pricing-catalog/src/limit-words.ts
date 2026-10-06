@@ -42,6 +42,11 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         paused: "New invites are paused. Everyone already on the team keeps access.",
         monthly: false,
     },
+    reviewers: {
+        what: "reviewers",
+        paused: "New reviewer invites are paused. Reviewers you have keep access.",
+        monthly: false,
+    },
     shopLocations: {
         what: "places customers visit",
         paused: "You can't add another place customers visit.",
