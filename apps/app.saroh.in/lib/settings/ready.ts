@@ -10,6 +10,7 @@ import type {
     SetupFacts,
 } from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
+import { PLAN_FIX } from "@/lib/services/online-booking";
 
 import { BUSINESS_TAB_PARAM } from "./search";
 
@@ -154,15 +155,40 @@ const connect = (href: string): ReadyItem => ({
     broken: false,
 });
 
-function payments(modules: readonly ModuleView[]): Check | null {
+/**
+ * On a plan without online payments (#835): connecting a provider would
+ * change nothing, so the step says what would — a paid plan — with the
+ * Service Editor's link (`lib/services/online-booking.ts`), and that
+ * customers can still pay by How to pay us meanwhile.
+ */
+const planStep: Check = {
+    key: "payments",
+    label: "Take payment online",
+    why: "Online payment comes with a paid plan. Until then, customers pay you the ways you set in How to pay us.",
+    cta: PLAN_FIX.label,
+    href: PLAN_FIX.href,
+    broken: false,
+    left: true,
+};
+
+function payments(
+    modules: readonly ModuleView[],
+    setup: Pick<SetupFacts, "onlinePaymentsInPlan"> | undefined,
+): Check | null {
     const view = modules.find((m) => m.key === "PAYMENTS");
     // Not offered to this business at all (its rollout hasn't reached it):
     // nothing it could do about it here, so not a step.
     if (!view) return null;
+    const selling = SELLING.some((k) => on(modules, k));
+    // The plan is asked first, as the API asks it (`onlinePaymentBlocker`):
+    // Payments on or off, a provider or none, the plan is what decides.
+    if (setup?.onlinePaymentsInPlan === false) {
+        return view.lifecycle === "ENABLED" || selling ? planStep : null;
+    }
     if (view.lifecycle !== "ENABLED") {
         // Nothing that sells is on either: no money to take yet, so the step
         // does not apply. Something sells: Payments has to come on first.
-        if (!SELLING.some((k) => on(modules, k))) return null;
+        if (!selling) return null;
         return {
             ...connect("/settings/modules"),
             why: "Turn on Payments, then connect your provider, so money reaches your bank.",
@@ -421,7 +447,7 @@ export function readyChecklist({
     const modules = all ? rolledOut(all) : null;
     const money = handlesMoney(modules, settings.setup) !== false;
     const checks = [
-        modules ? payments(modules) : null,
+        modules ? payments(modules, settings.setup) : null,
         // Absent from an API older than the registered address: unknown.
         // Asked only once something invoices or takes money (DEC-070).
         settings.registeredAddress && money

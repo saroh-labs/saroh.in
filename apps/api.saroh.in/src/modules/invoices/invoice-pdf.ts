@@ -379,6 +379,25 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
         y = doc.y;
     }
 
+    // ── How to pay us, on an unpaid invoice (#833) ──────────────────────
+    if (view.howToPay) {
+        doc.font("Regular").fontSize(9);
+        const payH = view.howToPay.reduce(
+            (h, line) => h + doc.heightOfString(line, { width }) + 2,
+            0,
+        );
+        y += 18;
+        if (y + 14 + payH + 20 + footerH > bottom()) y = continued();
+        y = label("How to pay us", left, y, width);
+        for (const line of view.howToPay) {
+            doc.font("Regular")
+                .fontSize(9)
+                .fillColor(INK)
+                .text(line, left, y, { width, lineGap: 1.5 });
+            y = doc.y + 2;
+        }
+    }
+
     y += 18;
     doc.moveTo(left, y)
         .lineTo(left + width, y)
