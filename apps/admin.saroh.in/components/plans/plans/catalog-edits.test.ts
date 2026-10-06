@@ -12,6 +12,7 @@ import {
     moveModule,
     parseLimit,
     parseRupees,
+    patchIncluded,
     rupeesText,
     sameCell,
     setModuleGroup,
@@ -55,14 +56,42 @@ describe("cells", () => {
     it("compares cells field by field", () => {
         expect(
             sameCell(
-                { inc: true, text: "a", card: "", limit: null, per: "" },
-                { inc: true, text: "a", card: "", limit: null, per: "" },
+                {
+                    inc: true,
+                    text: "a",
+                    card: "",
+                    limit: null,
+                    per: "",
+                    soft: false,
+                },
+                {
+                    inc: true,
+                    text: "a",
+                    card: "",
+                    limit: null,
+                    per: "",
+                    soft: false,
+                },
             ),
         ).toBe(true);
         expect(
             sameCell(
-                { inc: true, text: "a", card: "", limit: 1, per: "" },
-                { inc: true, text: "a", card: "", limit: 1, per: "month" },
+                {
+                    inc: true,
+                    text: "a",
+                    card: "",
+                    limit: 1,
+                    per: "",
+                    soft: false,
+                },
+                {
+                    inc: true,
+                    text: "a",
+                    card: "",
+                    limit: 1,
+                    per: "month",
+                    soft: false,
+                },
             ),
         ).toBe(false);
         expect(
@@ -71,6 +100,32 @@ describe("cells", () => {
                 { inc: false, off: "hidden" },
             ),
         ).toBe(false);
+    });
+});
+
+describe("soft caps", () => {
+    it("counts soft and hard as different cells", () => {
+        const cell = {
+            inc: true,
+            text: "a",
+            card: "",
+            limit: 3,
+            per: "",
+        } as const;
+        expect(
+            sameCell({ ...cell, soft: true }, { ...cell, soft: false }),
+        ).toBe(false);
+    });
+
+    it("turns a cap soft, and clears soft with the limit", () => {
+        const c = tabCatalog();
+        patchIncluded(c, "things", "a", { soft: true });
+        expect(c.modules[0]?.cells.a).toMatchObject({ limit: 11, soft: true });
+        patchIncluded(c, "things", "a", { limit: null });
+        expect(c.modules[0]?.cells.a).toMatchObject({
+            limit: null,
+            soft: false,
+        });
     });
 });
 
@@ -169,7 +224,14 @@ describe("the usage line", () => {
             line,
         }) satisfies ModuleUsage;
     const capped = (limit: number | null) =>
-        ({ inc: true, text: "", card: "", limit, per: "" }) as const;
+        ({
+            inc: true,
+            text: "",
+            card: "",
+            limit,
+            per: "",
+            soft: false,
+        }) as const;
 
     it("says the plan has nobody, or nobody using it", () => {
         expect(usageLine(usage([]), "Plan A", capped(5))).toBe(

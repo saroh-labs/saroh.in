@@ -30,7 +30,8 @@ export function sameCell(a: Cell, b: Cell): boolean {
         a.text === b.text &&
         a.card === b.card &&
         a.limit === b.limit &&
-        a.per === b.per
+        a.per === b.per &&
+        a.soft === b.soft
     );
 }
 
@@ -95,7 +96,14 @@ export function isNewModule(live: Catalog | null, moduleId: string): boolean {
  */
 export function includedCell(liveCell: Cell | null): IncludedCell {
     if (liveCell?.inc) return { ...liveCell };
-    return { inc: true, text: "Included", card: "", limit: null, per: "" };
+    return {
+        inc: true,
+        text: "Included",
+        card: "",
+        limit: null,
+        per: "",
+        soft: false,
+    };
 }
 
 /** Ticking it off: live's Locked or Hidden when live had it off, else Locked. */
@@ -116,7 +124,11 @@ export function setCell(
     if (m) m.cells[planId] = next;
 }
 
-/** Patch an included cell; does nothing to an excluded one. */
+/**
+ * Patch an included cell; does nothing to an excluded one. Clearing the
+ * limit clears "soft" too: a soft cap without a cap is a setting nobody can
+ * see or change.
+ */
 export function patchIncluded(
     catalog: Catalog,
     moduleId: string,
@@ -127,10 +139,12 @@ export function patchIncluded(
     if (!m) return;
     const c = cellOf(m, planId);
     if (!c.inc) return;
-    m.cells[planId] = { ...c, ...patch };
+    const next = { ...c, ...patch };
+    if (next.limit == null) next.soft = false;
+    m.cells[planId] = next;
 }
 
-/** "Limit 123 a month", as the matrix cell says it. */
+/** "123 a month", as the matrix cell says it after "Limit". */
 export function limitWords(cell: Cell): string | null {
     if (!cell.inc || cell.limit == null) return null;
     return formatCount(cell.limit) + (cell.per === "month" ? " a month" : "");

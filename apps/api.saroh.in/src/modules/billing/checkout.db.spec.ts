@@ -622,6 +622,7 @@ describe("moves and the provider", () => {
                     limit: 12,
                     card: "",
                     per: "",
+                    soft: false,
                 };
             }),
             { held: true },

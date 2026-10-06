@@ -146,6 +146,7 @@ describe("access from the catalogue (DB, U12)", () => {
                     card: "",
                     limit: 33,
                     per: "",
+                    soft: false,
                 };
             }),
             new Date(Date.now() + 30 * DAY),

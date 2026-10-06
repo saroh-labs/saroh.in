@@ -39,6 +39,47 @@ describe("rowNotice", () => {
         });
     });
 
+    it("tells, never refuses, at a soft cap (storage in GB)", () => {
+        const storage = (usage: number) =>
+            rowNotice(
+                access({
+                    modules: [
+                        row({
+                            moduleId: "storage",
+                            limit: 5,
+                            soft: true,
+                            usage,
+                        }),
+                    ],
+                }),
+                "storage",
+            );
+        expect(storage(4)).toMatchObject({
+            on: true,
+            full: false,
+            soft: true,
+            title: "You've used 4 of 5 GB of photos and videos on Plan A",
+            body: "Nothing stops at 5; we'll let you know when you reach it. Plan B gives you more.",
+        });
+        const full = storage(6);
+        expect(full).toMatchObject({
+            full: true,
+            soft: true,
+            title: "You've reached your 5 GB of photos and videos on Plan A",
+            why: "",
+        });
+        expect(full.on && full.body).toMatch(/^Nothing is blocked/);
+        expect(full.on && full.body).not.toMatch(/stopped|paused|can't/);
+    });
+
+    it("reads a row without soft (an older API) as a hard cap", () => {
+        const n = rowNotice(
+            access({ modules: [row({ usage: 10 })] }),
+            "products",
+        );
+        expect(n).toMatchObject({ soft: false });
+    });
+
     it("says the team's paused line as the design does", () => {
         const n = rowNotice(
             access({
@@ -159,7 +200,7 @@ describe("rowNotice on a soft cap", () => {
         expect(rowNotice(storage(9), "storage")).toMatchObject({
             on: true,
             full: false,
-            body: "Nothing stops at 11. Plan B gives you more.",
+            body: "Nothing stops at 11; we'll let you know when you reach it. Plan B gives you more.",
         });
     });
 

@@ -24,6 +24,7 @@ export async function PlanLimitNotice({
     return (
         <LimitNoticeBlock
             full={n.full}
+            soft={n.soft}
             title={n.title}
             pct={n.pct}
             body={n.body}

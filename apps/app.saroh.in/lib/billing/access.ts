@@ -32,8 +32,8 @@ export interface ModuleAccessView {
     limit: number | null;
     per: "" | "month";
     /**
-     * A soft cap: counted and told, never refused (storage, visits). Absent
-     * from an API before it was sent: read as a hard cap.
+     * A soft cap counts and tells the business, and never refuses (storage,
+     * site visits). Absent from an API that predates it: a hard cap.
      */
     soft?: boolean;
     text: string;
@@ -85,7 +85,8 @@ const OFF: LimitNotice = { on: false, full: false };
  * The 80% / 100% notice for one row, in the design's words (`limitNotice`,
  * `LIMIT_WORDS`) — or none: under 80%, a row with no cap, a business the
  * catalogue doesn't reach, or while limits aren't enforced (nothing would
- * stop them, so "you'll be stopped" would be untrue).
+ * stop them, so "you'll be stopped" would be untrue). A soft cap's notice
+ * informs and never says anything stops.
  */
 export function rowNotice(
     view: BillingAccessView | null,
@@ -95,30 +96,18 @@ export function rowNotice(
     const row = accessRow(view, moduleId);
     const words = limitWordsFor(moduleId);
     if (!row || !words || row.state !== "on" || row.usage === null) return OFF;
-    const upgradeTo = row.upgradeTo?.name ?? "";
     const notice = limitNotice(
         {
             inc: true,
             limit: row.limit,
             plan: view.plan?.name ?? "",
-            upgradeTo,
+            upgradeTo: row.upgradeTo?.name ?? "",
+            soft: row.soft === true,
         },
         row.usage,
         words.what,
         words.paused,
     );
-    // A soft cap stops nothing, so its 80% notice can't say "you'll be
-    // stopped" (the API's inbox notice says the same).
-    if (row.soft && notice.on && !notice.full && row.limit !== null) {
-        return {
-            ...notice,
-            body:
-                `Nothing stops at ${row.limit.toLocaleString("en-IN")}.` +
-                (upgradeTo
-                    ? ` ${upgradeTo} gives you more.`
-                    : " An add-on gives you more."),
-        };
-    }
     return notice;
 }
 

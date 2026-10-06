@@ -4,6 +4,7 @@ import type { CatalogModule, Cell, LimitPeriod } from "@saroh/pricing-catalog";
 import { cellOf } from "@saroh/pricing-catalog";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { cn } from "@saroh/ui/lib/utils";
+import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { forwardRef } from "react";
 
@@ -13,8 +14,9 @@ import { FIELD, Field, NumberField, SELECT, SMALL_FIELD } from "./fields";
 /**
  * One module on one plan, in the Plans tab (plans catalogue U7): the
  * include tick, "Changed", the usage line, and either what the plan gets
- * (Comparison table, Plan card, Limit, Counted) or how it shows when the
- * plan hasn't got it (Locked | Hidden).
+ * (Comparison table, Plan card, Limit, Counted, and with a limit whether
+ * it's a soft cap) or how it shows when the plan hasn't got it
+ * (Locked | Hidden).
  */
 
 export interface ModuleRowProps {
@@ -33,6 +35,7 @@ export interface ModuleRowProps {
         card?: string;
         limit?: number | null;
         per?: LimitPeriod;
+        soft?: boolean;
     }) => void;
     onOff: (off: "locked" | "hidden") => void;
 }
@@ -55,6 +58,7 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
     ) {
         const cell: Cell = cellOf(module, planId);
         const tickId = `inc-${module.id}`;
+        const softId = `soft-${module.id}`;
         return (
             <div
                 data-module={module.id}
@@ -161,6 +165,37 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                                 </select>
                             )}
                         </Field>
+                        {cell.limit != null && (
+                            <div className="col-span-full flex items-start gap-2.5">
+                                <Switch
+                                    id={softId}
+                                    checked={cell.soft}
+                                    disabled={disabled}
+                                    onCheckedChange={(soft) =>
+                                        onPatch({ soft })
+                                    }
+                                    aria-describedby={`${softId}-note`}
+                                    className="mt-px h-5 w-9 [&>span]:size-4 [&>span]:data-[state=checked]:translate-x-4"
+                                />
+                                <div className="grid gap-0.5">
+                                    <label
+                                        htmlFor={softId}
+                                        className="cursor-pointer text-[12.5px] font-semibold text-foreground"
+                                    >
+                                        Soft cap: count and tell the business,
+                                        never refuse
+                                    </label>
+                                    <span
+                                        id={`${softId}-note`}
+                                        className="text-[12px] leading-[1.45] text-muted-foreground"
+                                    >
+                                        {cell.soft
+                                            ? "On: at the limit the business is told, and nothing stops."
+                                            : "Off: at the limit the business can't add more."}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="flex flex-wrap items-center gap-2">

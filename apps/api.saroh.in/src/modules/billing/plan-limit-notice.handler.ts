@@ -59,27 +59,15 @@ export function limitNoticeWords(
             body: `${overBody(key, soft)} ${more}`,
         };
     }
+    // The shared rule words a soft cap too, so the inbox and the screen agree.
     const n = limitNotice(
-        { inc: true, limit, plan: row.plan, upgradeTo: row.upgradeTo },
+        { inc: true, limit, plan: row.plan, upgradeTo: row.upgradeTo, soft },
         used,
         words.what,
         words.paused,
     );
     if (!n.on) return { title: "", body: "" };
-    if (soft && !n.full) {
-        return { title: n.title, body: softWarnBody(limit, row.upgradeTo) };
-    }
     return { title: n.title, body: n.body };
-}
-
-/** A soft cap's 80% body: nothing will stop; where more comes from. */
-export function softWarnBody(limit: number, upgradeTo: string): string {
-    return (
-        `Nothing stops at ${limit.toLocaleString("en-IN")}.` +
-        (upgradeTo
-            ? ` ${upgradeTo} gives you more.`
-            : " An add-on gives you more.")
-    );
 }
 
 function parsePayload(payload: unknown): PlanLimitNoticePayload | null {

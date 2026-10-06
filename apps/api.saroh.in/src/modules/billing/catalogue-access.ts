@@ -243,7 +243,7 @@ export interface ModuleAccessView {
     /** The cap, null for none. */
     limit: number | null;
     per: ModuleAccess["per"];
-    /** A soft cap: counted and told, never refused (storage, visits). */
+    /** A soft cap counts and tells the business, and never refuses. */
     soft: boolean;
     text: string;
     /** Why it differs from the plan, in the design's words; empty if not. */
@@ -310,7 +310,7 @@ export function moduleAccessViews(
             state: a.state,
             limit: a.state === "on" ? a.limit : null,
             per: a.per,
-            soft: a.state === "on" && a.soft === true,
+            soft: a.state === "on" && a.limit !== null && a.soft,
             text: a.text,
             override: a.override,
             usage:
