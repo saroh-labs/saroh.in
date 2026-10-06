@@ -8,8 +8,8 @@ import Link from "next/link";
 import { AdminAuditTable } from "@/components/admin-audit-table";
 import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
-import { getStaffIdentity, listAudit } from "@/lib/control-plane";
-import { requireSession } from "@/lib/session";
+import { requireStaff } from "@/lib/console";
+import { listAudit } from "@/lib/control-plane";
 
 export const metadata = { title: "Audit trail" };
 
@@ -25,12 +25,9 @@ export default async function AuditPage({
 }: {
     searchParams?: Promise<AuditSearchParams>;
 }) {
-    const session = await requireSession();
-
-    const staff = await getStaffIdentity();
-    if (!staff?.permissions.includes("audit:read")) {
-        return <NotAuthorized email={session.user.email} />;
-    }
+    const gate = await requireStaff("audit:read");
+    if (!gate.ok) return gate.screen;
+    const { staff } = gate;
 
     const rawQuery = (await searchParams) ?? {};
     const query = {
@@ -40,7 +37,7 @@ export default async function AuditPage({
         action: clean(rawQuery.action),
     };
     const page = await listAudit({ ...query, limit: 50 });
-    if (!page) return <NotAuthorized email={session.user.email} />;
+    if (!page) return <NotAuthorized email={staff.email} staff={staff} />;
 
     return (
         <AdminShell staff={staff}>
