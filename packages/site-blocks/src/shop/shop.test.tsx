@@ -788,3 +788,95 @@ describe("the bag on a test release (DEC-071, T6)", () => {
         expect(start).toHaveBeenCalledTimes(1);
     });
 });
+
+describe("paying at the handover (2026-10-06: Free takes money offline)", () => {
+    const COLLECT = {
+        type: "ON_HANDOVER" as const,
+        label: "Pay when you collect",
+    };
+    const ONLINE = { type: "ONLINE" as const, label: "Pay online" };
+    const PLACED_TO_PAY: CheckoutStarted = {
+        ...STARTED,
+        payBy: "ON_HANDOVER",
+        payment: null,
+    };
+
+    it("offers only paying when they collect, places it with nothing to pay, and says it's unpaid", async () => {
+        const { start, openCheckout } = setup({
+            signedIn: true,
+            quote: { ok: true, data: quoteOf({ payments: [COLLECT] }) },
+            start: { ok: true, data: PLACED_TO_PAY },
+        });
+        await openTheBag();
+        expect(
+            screen.getByText(
+                "You'll pay when you collect your order. Your order is placed now.",
+            ),
+        ).toBeInTheDocument();
+        // One way to pay: nothing to choose.
+        expect(screen.queryByRole("radio", { name: "Pay online" })).toBeNull();
+
+        fireEvent.click(
+            screen.getByRole("button", { name: /^Place order · / }),
+        );
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(
+            screen.getByText(/You'll pay when you collect your order\./),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("link", { name: "See your order" }),
+        ).toHaveAttribute("href", `/shop/order/${STARTED.orderId}`);
+        expect(start.mock.calls[0][0]).toMatchObject({
+            fulfilment: "PICKUP",
+            payment: "ON_HANDOVER",
+        });
+        expect(openCheckout).not.toHaveBeenCalled();
+        expect(readBag(SITE)).toEqual([]);
+    });
+
+    it("lets them choose when the shop takes both, online first", async () => {
+        const { start } = setup({
+            signedIn: true,
+            quote: { ok: true, data: quoteOf({ payments: [ONLINE, COLLECT] }) },
+            start: { ok: true, data: PLACED_TO_PAY },
+        });
+        await openTheBag();
+        expect(
+            screen.getByRole("radio", { name: "Pay online" }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByText(/You pay online in a secure window/),
+        ).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("radio", { name: "Pay when you collect" }),
+        );
+        expect(
+            screen.getByRole("radio", { name: "Pay when you collect" }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(
+            screen.getByText(
+                "You'll pay when you collect your order. Your order is placed now.",
+            ),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^Place order · / }),
+        );
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(start.mock.calls[0][0].payment).toBe("ON_HANDOVER");
+    });
+
+    it("pays online as before when online is chosen, sending no payment field", async () => {
+        const { start, openCheckout } = setup({
+            signedIn: true,
+            quote: { ok: true, data: quoteOf({ payments: [ONLINE, COLLECT] }) },
+        });
+        await openTheBag();
+        fireEvent.click(
+            screen.getByRole("button", { name: /^Place order · / }),
+        );
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(start.mock.calls[0][0]).not.toHaveProperty("payment");
+        expect(openCheckout).toHaveBeenCalled();
+    });
+});

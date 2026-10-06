@@ -10,7 +10,8 @@ import { businessTypeLabel } from "@/lib/organizations/business-types";
 import { KIND_CHOICES } from "@/lib/organizations/kind";
 
 /** The Business settings tab a field is on. */
-export type BusinessTab = "identity" | "contact" | "tax" | "hours" | "address";
+export type BusinessTab =
+    "identity" | "contact" | "tax" | "hours" | "pay" | "address";
 
 /**
  * Every field a settings save records: how a sentence names it, how the
@@ -88,6 +89,33 @@ export const FIELD_PHRASES: Partial<
         phrase: "the opening hours",
         label: "Opening hours",
         tab: "hours",
+    },
+    // How to pay us (R32); recorded by name only.
+    payUpiId: { phrase: "the UPI ID", label: "UPI ID", tab: "pay" },
+    payBankAccountName: {
+        phrase: "the bank details",
+        label: "Bank details",
+        tab: "pay",
+    },
+    payBankAccountNumber: {
+        phrase: "the bank details",
+        label: "Bank details",
+        tab: "pay",
+    },
+    payBankIfsc: {
+        phrase: "the bank details",
+        label: "Bank details",
+        tab: "pay",
+    },
+    payBankName: {
+        phrase: "the bank details",
+        label: "Bank details",
+        tab: "pay",
+    },
+    payNote: {
+        phrase: "the note on how to pay",
+        label: "Note on how to pay",
+        tab: "pay",
     },
     registeredAddress: {
         phrase: "the registered address",

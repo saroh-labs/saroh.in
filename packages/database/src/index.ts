@@ -44,6 +44,17 @@ export * from "./backfill/store-members-to-memberships";
 // The F10b business-type backfill (`company` → `pvt`), exported so the API's
 // integration suite can run it twice and check what it did.
 export * from "./backfill/business-type-pvt";
+// The plans catalogue U5 grandfather backfill, exported so the API's
+// integration suite can run it twice and check it against LEGACY_PLAN_KEYS.
+export * from "./backfill/pricing-grandfather";
+// The plans catalogue U12 Free-rows backfill (OQ-2), for the same suite.
+export * from "./backfill/pricing-free-subscriptions";
 // The P3 order-number backfill (DEC-066), exported so the API's integration
 // suite can run it twice and check what it did.
 export * from "./backfill/order-numbers";
+// Pricing catalogue versions (plan 2026-09-29 U1): store a published
+// snapshot and its Plan rows, and read which one is live.
+export * from "./pricing-catalogue";
+// The guard every seed and backfill runs before writing, exported so a CLI
+// in the API can refuse a database nobody asked for in the same words.
+export { assertDatabaseTarget } from "./database-target";

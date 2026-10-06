@@ -13,6 +13,7 @@ import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { Chip } from "@/components/shared/chip";
 import { pickName } from "@/lib/customers/picker";
@@ -48,6 +49,7 @@ export function NewOrderSheet({
     stores,
     initialStoreId,
     canLink,
+    online = true,
     canSearch,
 }: {
     open: boolean;
@@ -55,6 +57,8 @@ export function NewOrderSheet({
     stores: Store[];
     initialStoreId: string;
     canLink: boolean;
+    /** The plan takes payment online (R33); else no link is offered. */
+    online?: boolean;
     canSearch: boolean;
 }) {
     const [session, setSession] = useState(0);
@@ -106,6 +110,7 @@ export function NewOrderSheet({
                         stores={stores}
                         initialStoreId={initialStoreId}
                         canLink={canLink}
+                        online={online}
                         canSearch={canSearch}
                         onDirty={setDirty}
                         onClose={() => {
@@ -124,6 +129,7 @@ function NewOrderBody({
     stores,
     initialStoreId,
     canLink,
+    online,
     canSearch,
     onDirty,
     onClose,
@@ -131,12 +137,18 @@ function NewOrderBody({
     stores: Store[];
     initialStoreId: string;
     canLink: boolean;
+    online: boolean;
     canSearch: boolean;
     onDirty: (dirty: boolean) => void;
     onClose: () => void;
 }) {
     const router = useRouter();
-    const o = useNewOrder({ initialStoreId, canLink, canSearch });
+    const o = useNewOrder({
+        initialStoreId,
+        canLink,
+        online,
+        canSearch,
+    });
     const [saving, setSaving] = useState(false);
     const details = useBusinessDetailsStep({
         then: "make the order and its pay link",
@@ -178,6 +190,8 @@ function NewOrderBody({
         setSaving(false);
         if (!res) return;
         if (!res.ok) {
+            // At the plan's orders-a-month limit (U13): its notice too.
+            if (res.plan) showPlanRefusal(res.plan);
             setFailed({ key: sent, message: res.error });
             return;
         }

@@ -2,16 +2,19 @@ import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
+import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
-import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
 import type { LocalDate } from "@/lib/services/diary";
@@ -86,14 +89,15 @@ export default async function BookingsPage({
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
     // New booking finds the customer by search (E4, `contact:read`) and can
-    // send a pay link when the viewer may issue the invoice and a provider
-    // is connected to take the money.
+    // send a pay link when the viewer may issue the invoice, the plan takes
+    // online payment and a provider is connected to take the money. On a
+    // plan without online payments it starts on "Pays at the session" (R33).
     const people = {
         canSearch: may("contact:read"),
         payLink:
             may("booking:write") &&
             may("invoice:write") &&
-            (await hasPaymentProvider().catch(() => false)),
+            (await onlinePayReady()),
     };
     const timezone = staffList?.timezone ?? "Asia/Kolkata";
     const now = readNow();
@@ -154,16 +158,18 @@ export default async function BookingsPage({
                 services={services}
                 rules={rules}
                 notices={notices}
+                limitNotice={<PlanLimitNotice moduleId="bookings" />}
                 people={people}
                 can={{
                     book: may("booking:write"),
                     hours: may("service:write"),
                     order: may("order:read"),
                     // "Take ₹X" (P2): the pair a pay link needs, and the
-                    // link itself only with a provider connected.
+                    // link itself only where the plan and a provider take it.
                     desk: {
                         canTake: may("booking:write") && may("invoice:write"),
                         canLink: people.payLink,
+                        online: takesOnlinePayment(await billingAccessOrNull()),
                     },
                 }}
                 newBooking={

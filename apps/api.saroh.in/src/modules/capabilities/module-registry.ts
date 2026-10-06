@@ -12,7 +12,10 @@
  * The four gates are deliberately separate decisions (see ADR-003):
  *   1. Rollout flag        — Saroh's kill switch          (`rolloutFlag`)
  *   2. Module installation — the Organization's choice    (persisted, Task 2)
- *   3. Entitlement         — commercial rights/limits      (`entitlementKey`)
+ *   3. Entitlement         — commercial rights/limits      (`entitlementKey`,
+ *                            and the plans catalogue's rows under the module:
+ *                            `MODULE_MAP` in `@saroh/pricing-catalog`, read by
+ *                            ModuleAvailabilityService behind PLAN_ENFORCEMENT)
  *   4. Authorization       — what the actor may do         (`requiredAction`)
  *
  * Readiness (`SETUP_REQUIRED` / `ACTIVE` / `ATTENTION_REQUIRED`) is *derived*,

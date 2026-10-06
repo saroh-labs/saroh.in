@@ -18,7 +18,7 @@ export function SolutionHero({
     freeLine,
 }: {
     solution: Solution;
-    /** The free-plan line (`FREE_PLAN_LINE`). */
+    /** The free-plan line, from the catalogue (`freePlanLine`). */
     freeLine: string;
 }) {
     return (

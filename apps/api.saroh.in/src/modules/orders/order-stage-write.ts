@@ -120,6 +120,7 @@ export async function writeStageMove(
             status: order.status,
             paymentStatus: order.paymentStatus,
             fulfilment: order.fulfilment,
+            payOnHandover: order.payOnHandover,
         },
         dto.to,
     );

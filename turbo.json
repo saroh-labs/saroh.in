@@ -53,6 +53,8 @@
         "SMTP_SECURE",
         "SMTP_USER",
         "SMTP_PASS",
+        // Where the admin console opens the pricing page and its preview.
+        "MARKETING_SITE_URL",
         "USER_ACCOUNT",
         "USER_PASSWORD",
         "TEST_DATABASE_URL",
@@ -70,6 +72,10 @@
         "R2_PUBLIC_BASE_URL",
         // Signs saroh.app's calls to the api's site sign-in routes (ADR-011).
         "SITE_RELAY_SECRET",
+        // saroh.in's pricing revalidation hook (plans catalogue U24, KTD-10).
+        "PRICING_REVALIDATE_SECRET",
+        // Set by Next itself while building; saroh.in's pricing read checks it.
+        "NEXT_PHASE",
         "VERCEL_ENV",
         "AUTH_COOKIE_PREFIX",
         "DEV_ACCESS_KEY",
@@ -77,6 +83,9 @@
         "DEV_REDIRECT_ORIGIN",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+        // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
+        // plan sections appear once it is "open"; read at build.
+        "NEXT_PUBLIC_LAUNCH_MODE",
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.
         "SAROH_BUILT_ROUTES",

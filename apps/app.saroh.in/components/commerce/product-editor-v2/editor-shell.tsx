@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { currencySymbol } from "@/lib/format/money";
 import { createProduct } from "@/lib/products/actions";
@@ -191,7 +192,9 @@ function EditorBody({
         }
         if (!res.ok) {
             setCreatingNow(false);
-            showError(res.error);
+            // At the plan's products limit (U13): its notice, not a toast.
+            if (res.plan) showPlanRefusal(res.plan);
+            else showError(res.error);
             return;
         }
         const photosOk = await afterCreateAll(res.data.id);

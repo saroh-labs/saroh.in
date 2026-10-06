@@ -33,3 +33,18 @@
   the fix), check access logs for the exposure window, and add a
   `.gitleaksignore` entry only for a reviewed false positive.
 - **Adopted** — Design for rotation: one place per credential, referenced by name.
+
+## Private values: real prices and limits
+
+Saroh's plan prices and limits are not secrets, but they are not the repo's
+either: they live in the database, entered and published through the admin
+console's Plans screen (`docs/architecture/PRICING_ROLLOUT.md`). Code, tests
+and the seed use the sample catalogue in `@saroh/pricing-catalog/seed`,
+whose numbers are made up.
+
+`pnpm prepush` runs `scripts/check-private-terms.sh` (step `private`, never
+cached). It fails when a tracked file matches one of the owner's private
+values, read from `$SAROH_PRIVATE_TERMS` or
+`~/.config/saroh/private-terms.txt` (one Perl-style regex per line). That
+file lives only on the owner's machine, so the values it guards never reach
+the repo through the check itself. Without it the step says SKIP, never PASS.

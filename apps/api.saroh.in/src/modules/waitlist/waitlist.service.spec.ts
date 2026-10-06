@@ -9,7 +9,7 @@ jest.mock("@saroh/database", () => ({
 // Nothing a join does may send mail: every sender is a spy that must stay
 // untouched, and nodemailer itself cannot open a connection.
 jest.mock("../../common/email", () => ({
-    sendWaitlistInvitationEmail: jest.fn(),
+    sendWaitlistLaunchInviteEmail: jest.fn(),
     sendEnquiryNotificationEmail: jest.fn(),
     sendVerificationOtpEmail: jest.fn(),
 }));

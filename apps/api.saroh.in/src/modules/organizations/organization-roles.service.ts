@@ -12,6 +12,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import {
     CAPABILITY_BY_ACTION,
     grantableCapabilities,
@@ -175,6 +176,9 @@ export class OrganizationRolesService {
 
         const actions = this.vetActions(input.actions);
         this.assertCanGrant(ctx, key, actions);
+        // Custom roles are a plan row (U13): refused where the plan leaves
+        // it off. Roles made before stay, and keep working.
+        await planMeter.assertIncluded(organizationId, "roles");
 
         const created = await prisma.organizationRole.create({
             data: {

@@ -63,6 +63,8 @@ import { STARTER_TEMPLATE_ID } from "@saroh/templates";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
+import { planMeter } from "../billing/metering.service";
+import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
 import type { CreateSiteFromTemplateDto } from "./dto";
 import { SitesService } from "./sites.service";
 
@@ -149,6 +151,50 @@ describe("SitesService.createFromTemplate", () => {
         expect(transaction).not.toHaveBeenCalled();
         expect(siteCount).toHaveBeenCalledWith({
             where: { organizationId: "org_1", deletedAt: null },
+        });
+    });
+
+    describe("where the catalogue governs websites (its `sites` row, U13)", () => {
+        let enforcedRow: jest.SpyInstance;
+        let roomInTx: jest.SpyInstance;
+        beforeEach(() => {
+            enforcedRow = jest
+                .spyOn(planMeter, "enforcedRow")
+                .mockResolvedValue({ moduleId: "sites" } as never);
+            roomInTx = jest
+                .spyOn(planMeter, "roomInTx")
+                .mockResolvedValue(null);
+        });
+        afterEach(() => {
+            enforcedRow.mockRestore();
+            roomInTx.mockRestore();
+        });
+
+        it("lets a second website be made, metered on the write's transaction", async () => {
+            siteCount.mockResolvedValue(1);
+            await expect(
+                service.createFromTemplate(ctx(), { name: "Acme" }),
+            ).resolves.toHaveProperty("siteId", "site_1");
+            // The old one-website floor and entitlement aren't asked.
+            expect(entCheck).not.toHaveBeenCalled();
+            expect(roomInTx).toHaveBeenCalledWith(
+                expect.anything(),
+                "org_1",
+                "sites",
+            );
+        });
+
+        it("stops at the product's ceiling first, whatever the plan sells", async () => {
+            siteCount.mockResolvedValue(MAX_WEBSITES_PER_BUSINESS);
+            await expect(
+                service.createFromTemplate(ctx(), { name: "Acme" }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    message: expect.stringMatching(/as many as Saroh allows/),
+                },
+            });
+            expect(transaction).not.toHaveBeenCalled();
         });
     });
 

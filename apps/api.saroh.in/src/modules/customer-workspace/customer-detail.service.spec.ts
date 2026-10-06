@@ -1183,6 +1183,7 @@ describe("CustomerDetailService", () => {
             // Never an abandoned site checkout.
             NOT: {
                 placedOnline: true,
+                payOnHandover: false,
                 paymentStatus: "UNPAID",
                 paymentIntents: { none: { status: "SUCCEEDED" } },
             },

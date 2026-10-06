@@ -310,3 +310,21 @@ describe("rowCustomer", () => {
         expect(rowInitials(walkIn)).toBe("RK");
     });
 });
+
+describe("rowMoney on an order paid at the handover (2026-10-06)", () => {
+    it("says how it will be paid", () => {
+        const owed = { payment: "UNPAID" as const, unpaidAmount: "480.00" };
+        expect(rowMoney(row({ ...owed, payOnHandover: true })).unpaid).toBe(
+            "₹480 to pay on collection",
+        );
+        expect(
+            rowMoney(
+                row({
+                    ...owed,
+                    payOnHandover: true,
+                    fulfilmentType: "LOCAL_DELIVERY",
+                }),
+            ).unpaid,
+        ).toBe("₹480 to pay on delivery");
+    });
+});

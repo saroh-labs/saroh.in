@@ -412,6 +412,24 @@ describe("amountDueCents", () => {
         ).toBe(0);
     });
 
+    it("money recorded by hand counts: an order paid at the counter and edited up owes the difference", () => {
+        expect(
+            amountDueCents({
+                total: "480.00",
+                status: "PENDING",
+                paymentStatus: "PAID",
+                paidByHand: "360.00",
+                paymentIntents: [],
+            }),
+        ).toBe(12000);
+    });
+
+    it("paid online, with the difference recorded by hand, owes nothing", () => {
+        expect(
+            amountDueCents({ ...order("480.00"), paidByHand: "120.00" }),
+        ).toBe(0);
+    });
+
     it("a line refund never makes money due", () => {
         expect(
             amountDueCents(
@@ -500,6 +518,25 @@ describe("amountDueCents", () => {
             expect.objectContaining({
                 paid: "400.00",
                 due: "0.00",
+                recordedByHand: true,
+            }),
+        );
+    });
+
+    it("reads a counter payment edited up as what was taken, and the difference due", () => {
+        const read = serializeOrderRead(
+            {
+                ...base,
+                total: "520.00",
+                paidByHand: "400.00",
+                paymentIntents: [],
+            },
+            opts(true),
+        );
+        expect(read.money).toEqual(
+            expect.objectContaining({
+                paid: "400.00",
+                due: "120.00",
                 recordedByHand: true,
             }),
         );

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { MADE_BY } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
-import { SIGN_IN_URL } from "@/lib/links";
+import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
 
 import { CookieChoicesButton } from "./cookie-choices-button";
 import type { NavItem } from "./nav-items";
@@ -15,8 +15,8 @@ const LINK =
 
 /**
  * The footer (Footer design): Saroh and who it is for, then Features,
- * Solutions, Resources (plan U1, when any is live), Saroh (Questions,
- * Contact, Sign in) and Follow Saroh (Saroh's accounts and its public
+ * Solutions, Resources (plan U1, when any is live), Saroh (Pricing once the launch
+ * switch is open, Questions, Contact, Sign in) and Follow Saroh (Saroh's accounts and its public
  * code), in columns that wrap at 150px (180px before Resources made six). Under them, who makes Saroh and the
  * legal pages that are published (R6): Privacy from its date, and "Cookie
  * choices" where the cookie notice can appear. No Terms until they're
@@ -73,6 +73,11 @@ export function SiteFooter({
                 </Column>
             ) : null}
             <Column title="Saroh">
+                {LAUNCH_MODE === "open" ? (
+                    <Link href="/pricing" className={LINK}>
+                        Pricing
+                    </Link>
+                ) : null}
                 <Link href="/#faq" className={LINK}>
                     Questions
                 </Link>

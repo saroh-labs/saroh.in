@@ -7,14 +7,17 @@ import { fromMinor } from "../../common/money";
 import { CommunicationsService } from "../communications/communications.service";
 import { escapeHtml } from "../communications/transactional";
 import { formatMoney } from "../invoices/invoice-send.service";
+import { holdsOnPayment, payOnHandoverWords } from "../orders/online-checkout";
 import { orderPartyName } from "../orders/walk-in";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
-import type { TeamAlertPayload } from "./team-alerts";
+import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
+import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
 
 export { TEAM_ALERT_TYPE } from "./team-alerts";
+export { ORDER_UNCOLLECTED_NOTIFICATION_TYPE } from "./uncollected-alert";
 
 /** The inbox notice types F14's alerts write (see `ALERT_NOTIFICATION_TYPES`). */
 export const ORDER_NEW_NOTIFICATION_TYPE = "order.new";
@@ -25,27 +28,7 @@ export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live";
 
 type Tx = Prisma.TransactionClient;
 
-/** An alert, worded. */
-export interface WordedAlert {
-    event: AlertEvent;
-    /** Unique per business: claimed once, so the alert goes out once. */
-    eventKey: string;
-    /** The inbox notice already written (a booking's), or null to write one. */
-    notificationId: string | null;
-    type: string;
-    title: string;
-    body: string;
-    /** Where it opens in the workspace, for the email. */
-    path: string | null;
-    /** Not emailed about their own doing. */
-    skipUserId: string | null;
-    /**
-     * Emailed whatever they chose, while still on the team: whoever
-     * scheduled a go-live hears how it went (DEC-071, T10).
-     */
-    alwaysUserId?: string | null;
-    orderId?: string;
-}
+export type { WordedAlert } from "./team-alerts";
 
 /** What a row is called in the grid, for the email's footer. */
 const ROW_LABEL: Record<AlertEvent, string> = {
@@ -66,8 +49,10 @@ const BUILT_IN_LABEL: Partial<Record<string, string>> = {
 /**
  * Consumer for `team.alert` (round-2 F14): tells the business's team about
  * a new order, a booking the customer made, moved or cancelled, a failed
- * payment, someone joining, or a scheduled go-live of the website that ran
- * (DEC-071, T10), as each person chose in Settings › Your profile.
+ * payment, someone joining, a scheduled go-live of the website that ran
+ * (DEC-071, T10), or a website order to pay on handover nobody came for in
+ * three days (R34, on the New order row), as each person chose in
+ * Settings › Your profile.
  *
  * On one transaction, in the business's RLS context:
  *  1. What it is about is read again now, and worded. Something that no
@@ -101,10 +86,19 @@ export class TeamAlertHandler {
             return;
         }
         const organizationId = job.organizationId;
+        const now = new Date();
         await runInOrgContext(organizationId, () =>
-            prisma.$transaction((tx) =>
-                tellTeam(tx, this.comms, organizationId, payload),
-            ),
+            prisma.$transaction(async (tx) => {
+                // An uncollected order not due yet (its business moved its
+                // zone since) waits for its day rather than being dropped.
+                if (
+                    payload.event === "uncollected" &&
+                    (await putOffUntilDue(tx, organizationId, payload, now))
+                ) {
+                    return { told: false, emailed: 0 };
+                }
+                return tellTeam(tx, this.comms, organizationId, payload, now);
+            }),
         );
     };
 }
@@ -115,8 +109,9 @@ export async function tellTeam(
     comms: Pick<CommunicationsService, "emailConnected" | "queueTransactional">,
     organizationId: string,
     payload: TeamAlertPayload,
+    now: Date = new Date(),
 ): Promise<{ told: boolean; emailed: number }> {
-    const alert = await wordAlert(tx, organizationId, payload);
+    const alert = await wordAlert(tx, organizationId, payload, now);
     if (!alert) return { told: false, emailed: 0 };
 
     // Claimed first, skipping a duplicate: a Postgres transaction can't go
@@ -247,6 +242,7 @@ export async function wordAlert(
     tx: Tx,
     organizationId: string,
     payload: TeamAlertPayload,
+    now: Date = new Date(),
 ): Promise<WordedAlert | null> {
     switch (payload.event) {
         case "order":
@@ -259,6 +255,8 @@ export async function wordAlert(
             return wordBooking(tx, organizationId, payload);
         case "site":
             return wordSite(tx, organizationId, payload);
+        case "uncollected":
+            return wordUncollected(tx, organizationId, payload, now);
     }
 }
 
@@ -277,6 +275,8 @@ async function wordOrder(
             status: true,
             paymentStatus: true,
             placedOnline: true,
+            payOnHandover: true,
+            fulfilment: true,
             customerId: true,
             walkInName: true,
             customer: {
@@ -285,17 +285,16 @@ async function wordOrder(
         },
     });
     if (!order || order.status === "CANCELLED") return null;
-    // An online checkout is an order only once it is paid (G13).
-    if (order.placedOnline && order.paymentStatus !== "PAID") return null;
+    // An online checkout is an order only once it is paid (G13); one to be
+    // paid on handover is an order from the start.
+    if (holdsOnPayment(order) && order.paymentStatus !== "PAID") return null;
     return {
         event: "order",
         eventKey: `team:order:${order.id}`,
         notificationId: null,
         type: ORDER_NEW_NOTIFICATION_TYPE,
         title: `New order ${order.orderId} from ${orderPartyName(order)}`,
-        body: `${formatMoney(order.total, order.currency)}, ${
-            order.placedOnline ? "paid online" : "at the counter"
-        }.`,
+        body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
         orderId: order.id,
@@ -475,6 +474,8 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
                 : null;
         case "booking":
             return str("notificationId") ? (p as TeamAlertPayload) : null;
+        case "uncollected":
+            return str("orderId") ? (p as TeamAlertPayload) : null;
         case "site":
             return str("testReleaseId") &&
                 str("goLiveAt") &&
@@ -485,4 +486,19 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
         default:
             return null;
     }
+}
+
+/** "paid online", "at the counter", or "to pay on collection". */
+function orderPaidWords(order: {
+    placedOnline: boolean;
+    payOnHandover: boolean;
+    paymentStatus: string;
+    fulfilment: string;
+}): string {
+    if (order.payOnHandover) {
+        return order.paymentStatus === "PAID"
+            ? "paid on handover"
+            : `to ${payOnHandoverWords(order.fulfilment)}`;
+    }
+    return order.placedOnline ? "paid online" : "at the counter";
 }

@@ -19,6 +19,7 @@ import { Info, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
@@ -624,7 +625,9 @@ function NewRoleDialog({
         startTransition(async () => {
             const res = await createRole({ label: label.trim(), actions });
             if (!res.ok) {
-                showError(res.error);
+                // Custom roles aren't in the plan (U13): the way up.
+                if (res.plan) showPlanRefusal(res.plan);
+                else showError(res.error);
                 return;
             }
             showSuccess(`${res.data.label} created`);

@@ -143,11 +143,14 @@ export function ServicesScreen({
                             : "Free";
                         const who = takers(s.id);
                         // Only a live service on the booking page is
-                        // booked online at all.
-                        const problem =
+                        // booked online at all; one paid at the desk
+                        // instead still books, so only a service that
+                        // can't be booked is marked (DEC-089).
+                        const found =
                             live && s.showOnBookingPage
                                 ? onlineBookingProblem(s, payment)
                                 : null;
+                        const problem = found?.blocked ? found : null;
                         return (
                             <li
                                 key={s.id}

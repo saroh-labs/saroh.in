@@ -42,6 +42,11 @@ export interface OrderConfirmationData {
         deliverTo: { name: string | null; lines: string[] } | null;
     };
     refunded: boolean;
+    /**
+     * Placed to be paid at the handover and not paid yet: "Pay when you
+     * collect" or "Pay on delivery". Null once paid, or paid online.
+     */
+    toPay: string | null;
 }
 
 /**
@@ -134,7 +139,11 @@ function Summary({ order }: { order: OrderConfirmationData }) {
                 ) : null}
                 <div className="flex justify-between gap-3 pt-1.5 text-base font-semibold">
                     <dt className="text-site-fg">
-                        {order.refunded ? "Paid, then refunded" : "Paid"}
+                        {order.refunded
+                            ? "Paid, then refunded"
+                            : order.toPay
+                              ? toPayTotal(order.toPay)
+                              : "Paid"}
                     </dt>
                     <dd className="text-site-fg tabular-nums">
                         {money(order.total)}
@@ -247,7 +256,9 @@ export function OrderConfirmation({
             <p className="text-site-body mt-2 text-sm">
                 {order.refunded
                     ? `${businessName} has sent your money back.`
-                    : `${businessName} will be in touch when it's ready.`}
+                    : order.toPay
+                      ? `${toPayLead(order.toPay)} ${businessName} will be in touch when it's ready.`
+                      : `${businessName} will be in touch when it's ready.`}
             </p>
             <Summary order={order} />
             <Handover order={order} />
@@ -263,6 +274,20 @@ export function OrderConfirmation({
             </div>
         </Frame>
     );
+}
+
+/** "You'll pay when you collect your order." — said where it is placed. */
+export function toPayLead(toPay: string): string {
+    return toPay === "Pay on delivery"
+        ? "You'll pay when your order is delivered."
+        : "You'll pay when you collect your order.";
+}
+
+/** The total's label on an order still to be paid at the handover. */
+function toPayTotal(toPay: string): string {
+    return toPay === "Pay on delivery"
+        ? "To pay on delivery"
+        : "To pay when you collect";
 }
 
 /** Where a placed order's confirmation lives, on the business's site. */

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { useSyncExternalStore } from "react";
 
@@ -16,11 +17,15 @@ import {
 /** Before the browser has been asked (the server's render): show nothing. */
 const UNREAD = "unread";
 
+import { isPreviewPath } from "@/lib/pricing-preview";
+
 /**
  * Google Analytics, given a measurement id — which the layout passes only
  * on a Vercel production deployment (`lib/ga.ts`). Without one nothing
  * loads and no notice shows, so previews, local dev and the browser tests
- * never reach GA.
+ * never reach GA. Never on a pricing draft preview (KTD-10): a staff member
+ * checking a draft is not a visit, and the preview address must not reach a
+ * third party.
  *
  * With one, GA loads only after the visitor accepts the cookie notice. Until
  * they answer, the notice sits in a corner (not a wall: the page works
@@ -36,12 +41,13 @@ export function GoogleAnalytics({
     /** The Privacy page, once it is published; the notice links it. */
     privacyHref?: string;
 }) {
+    const pathname = usePathname();
     const choice = useSyncExternalStore<Consent | null | typeof UNREAD>(
         subscribeConsent,
         readConsent,
         () => UNREAD,
     );
-    if (!id || choice === UNREAD) return null;
+    if (!id || isPreviewPath(pathname) || choice === UNREAD) return null;
     if (choice === "granted") return <GaTag id={id} />;
     if (choice === "refused") return null;
     return <CookieNotice privacyHref={privacyHref} />;

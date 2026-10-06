@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { takesOnlinePayment } from "@/lib/billing/access";
+import { offlinePlan, onlinePlan } from "@/lib/billing/fixtures.test-data";
+
 import type { OrderRow } from "@/lib/orders/business-service";
 import type { FulfilmentStep, OrderRead } from "@/lib/orders/read";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
@@ -252,6 +255,21 @@ describe("rowMenu", () => {
                     "pay-link",
                 )?.disabled,
             ).toBe("Connect a payment provider first.");
+        });
+
+        it("isn't drawn on a plan without online payments, and is on one with them (R33)", () => {
+            // The Orders pages pass `payLink: powers.payLink && takesOnlinePayment(…)`.
+            const on = (plan: Parameters<typeof takesOnlinePayment>[0]) => ({
+                ...OWNER,
+                payLink: OWNER.payLink && takesOnlinePayment(plan),
+            });
+            expect(kinds(rowMenu(row(owed), on(offlinePlan())))).not.toContain(
+                "pay-link",
+            );
+            expect(
+                item(rowMenu(row(owed), on(onlinePlan())), "pay-link")
+                    ?.disabled,
+            ).toBeNull();
         });
 
         it("isn't drawn for a role that can neither take nor change orders (B16)", () => {
@@ -537,5 +555,46 @@ describe("Order Detail, opened from the list", () => {
         expect(arrivalOf({})).toBeNull();
         expect(arrivalOf({ panel: "edit" })).toBeNull();
         expect(arrivalOf({ print: "0" })).toBeNull();
+    });
+});
+
+describe("an order paid at the handover (website, 2026-10-06)", () => {
+    const unpaid = { paymentStatus: "UNPAID", payment: "UNPAID" as const };
+
+    it("moves on before it is paid, as far as the handover", () => {
+        const fresh = row({
+            ...unpaid,
+            payOnHandover: true,
+            status: "PENDING",
+            stage: "NEW",
+            stepIndex: 0,
+        });
+        expect(rowNext(fresh)).toMatchObject({
+            step: { to: "PREPARING" },
+            disabled: null,
+        });
+        const ready = row({
+            ...unpaid,
+            payOnHandover: true,
+            stage: "READY",
+            stepIndex: 2,
+        });
+        expect(rowNext(ready)).toMatchObject({
+            step: { to: "COLLECTED" },
+            disabled: "Not paid yet.",
+        });
+    });
+
+    it("leaves every other unpaid order waiting in New", () => {
+        expect(
+            rowNext(
+                row({
+                    ...unpaid,
+                    status: "PENDING",
+                    stage: "NEW",
+                    stepIndex: 0,
+                }),
+            ).disabled,
+        ).toBe("Not paid yet.");
     });
 });

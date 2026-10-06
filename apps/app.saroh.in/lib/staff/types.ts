@@ -105,7 +105,7 @@ export type BookingPayment = "ONLINE" | "DESK" | "BOTH";
  * Why the booking page can't take money online now (DEC-088): Payments is
  * switched off, or no payment provider is connected that can take it.
  */
-export type OnlineBlocker = "PAYMENTS_OFF" | "NO_PROVIDER";
+export type OnlineBlocker = "PLAN" | "PAYMENTS_OFF" | "NO_PROVIDER";
 
 /**
  * `GET booking-rules/payment`: how people pay when they book, and why

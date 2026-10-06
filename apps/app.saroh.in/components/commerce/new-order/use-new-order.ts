@@ -42,11 +42,14 @@ const AMOUNT = /^\d+(\.\d{1,2})?$/;
 export function useNewOrder({
     initialStoreId,
     canLink,
+    online = true,
     canSearch,
 }: {
     initialStoreId: string;
     /** May make a pay link (`order:create`, B16). */
     canLink: boolean;
+    /** The plan takes payment online (R33); else no link is offered. */
+    online?: boolean;
     /** Holds `contact:read`: search, and read a picked person's notes. */
     canSearch: boolean;
 }) {
@@ -170,6 +173,7 @@ export function useNewOrder({
         pick,
         way,
         canLink: canLink && !!data?.takesPayments,
+        online,
     });
     // A chip that went off (a delivery chosen, the phone removed) hands
     // over to one that isn't, as the design does: pay later → card.

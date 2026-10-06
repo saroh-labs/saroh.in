@@ -297,3 +297,37 @@ describe("the business type a business that said Registered still owes (prelaunc
         expect(typeField()?.textContent).not.toContain("You said at setup");
     });
 });
+
+describe("How to pay us (R32)", () => {
+    it("is a tab of its own, after Tax, with its own preview in place of the invoice's", () => {
+        params = new URLSearchParams("section=pay");
+        draw(
+            settings({
+                payInstructions: {
+                    upiId: "northwind.supply@okexample",
+                    bankAccountName: null,
+                    bankAccountNumber: null,
+                    bankIfsc: null,
+                    bankName: null,
+                    note: null,
+                },
+            }),
+        );
+        const tabs = Array.from(host.querySelectorAll('[role="tab"]')).map(
+            (t) => t.textContent.trim(),
+        );
+        expect(tabs.indexOf("How to pay us")).toBe(
+            tabs.indexOf("Tax and invoices") + 1,
+        );
+        const panel = host.querySelector<HTMLElement>("#business-pay-panel");
+        expect(panel?.closest(".hidden")).toBeNull();
+        expect(panel?.textContent).toContain("northwind.supply@okexample");
+        expect(
+            host
+                .querySelector('aside[aria-label="How it prints"]')
+                ?.classList.contains("hidden"),
+        ).toBe(true);
+        // Another tab: the card is kept, out of sight.
+        expect(host.querySelector("#business-panel")).toBeNull();
+    });
+});

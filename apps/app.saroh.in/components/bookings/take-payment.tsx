@@ -51,6 +51,7 @@ export function TakePayment({
     currency,
     who,
     canLink,
+    online = true,
     variant = "default",
     triggerClassName,
     onTaken,
@@ -62,6 +63,11 @@ export function TakePayment({
     who: string;
     /** `booking:write` and `invoice:write`, with a provider connected. */
     canLink: boolean;
+    /**
+     * The plan takes payment online (R33). When it doesn't, "Send a pay
+     * link" isn't offered at all; the counter ways are. Absent: yes.
+     */
+    online?: boolean;
     /** Outline beside another primary action (the quick look's Check in). */
     variant?: "default" | "outline";
     triggerClassName?: string;
@@ -79,7 +85,7 @@ export function TakePayment({
 
     const format = (cents: number) => formatMoney(cents, currency) ?? "";
     const amount = format(take.cents);
-    const choices = deskChoices({ take, canLink });
+    const choices = deskChoices({ take, canLink, online });
     const change = deskChange(given, take.cents);
     const problem = deskProblem(choice, given, take.cents, format);
 

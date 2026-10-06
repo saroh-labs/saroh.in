@@ -1,5 +1,7 @@
 import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
 import { ServiceEditor } from "@/components/services/service-editor/service-editor";
+import { rowLock } from "@/lib/billing/access";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { loadEditorContext } from "@/lib/services/editor-data";
 import { listRules, readService } from "@/lib/services/service";
 import { showKind } from "@/lib/services/service-editor";
@@ -22,10 +24,12 @@ export default async function ServiceEditorPage({
     const { serviceId } = await params;
     await requireSession();
 
-    const [read, context, rules] = await Promise.all([
+    const [read, context, rules, access] = await Promise.all([
         readService(serviceId),
         loadEditorContext(),
         listRules(serviceId),
+        // Deposits are taken online: locked on a plan without it.
+        billingAccessOrNull(),
     ]);
     if (!read.ok) {
         return (
@@ -70,6 +74,7 @@ export default async function ServiceEditorPage({
             kindUp={showKind(services, service)}
             hasPage={hasPage}
             hasStorefront={hasStorefront}
+            paymentsLock={rowLock(access, "payments")}
             payment={payment}
         />
     );

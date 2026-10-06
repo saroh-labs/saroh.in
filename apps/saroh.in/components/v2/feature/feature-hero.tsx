@@ -14,14 +14,15 @@ import { ScreenshotFrame } from "../screenshot-frame";
  * then the page's screenshot, which enlarges on click.
  *
  * "See it in action · 2 min" shows only once a tour video is configured
- * (KTD-12, deviation D-3).
+ * (KTD-12, deviation D-3). The free-plan line comes from the pricing
+ * catalogue, the placeholder line without one (the public-repo rule).
  */
 export function FeatureHero({
     feature,
     freeLine,
 }: {
     feature: Feature;
-    /** The free-plan line (`FREE_PLAN_LINE`). */
+    /** The free-plan line, from the catalogue (`freePlanLine`). */
     freeLine: string;
 }) {
     return (

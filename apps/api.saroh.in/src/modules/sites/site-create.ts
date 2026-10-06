@@ -16,7 +16,11 @@ import { randomUUID } from "node:crypto";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
-import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
+import { planMeter } from "../billing/metering.service";
+import {
+    LEGACY_WEBSITES_PER_BUSINESS,
+    MAX_WEBSITES_PER_BUSINESS,
+} from "../organizations/business-limits";
 import { organizationKind } from "../organizations/organization-kind";
 import { authorize } from "../organizations/organization-policy";
 import { automaticStorefront } from "./sells-from";
@@ -115,22 +119,30 @@ export async function planSiteFromTemplate(
 ): Promise<SitePlan> {
     authorize(ctx, "site:create");
 
-    // Two caps on the org's live sites (soft-deleted excluded). The
-    // product's comes first (ADR-006): one website per business for now,
-    // whatever the plan says, and upgrading would not help — so it is a
-    // 409 in plain words, not "upgrade to add more". Then the
-    // subscription's `sites` entitlement (S7-005), a 403 at the plan
-    // limit. The lower of the two wins.
+    // Caps on the org's live sites (soft-deleted excluded). The product's
+    // comes first, whatever the plan says: upgrading would not help, so it
+    // is a 409 in plain words, not "upgrade to add more". Then the plan's:
+    // where the catalogue governs websites (its `sites` row, behind
+    // PLAN_ENFORCEMENT), metering counts them on the write's transaction
+    // (`writeSiteFromTemplate`); elsewhere one website per business as
+    // before (ADR-006), and the `sites` floor (S7-005), a 403.
     const siteCount = await prisma.site.count({
         where: { organizationId: ctx.organizationId, deletedAt: null },
     });
     if (siteCount >= MAX_WEBSITES_PER_BUSINESS) {
         throw new ConflictException({
-            message:
-                "This business already has its website. Change its pages, look and address from Website.",
+            message: `This business has ${siteCount} websites, as many as Saroh allows. Delete one it no longer uses to add another.`,
         });
     }
-    await entitlements.check(ctx.organizationId, "sites", siteCount);
+    if (!(await planMeter.enforcedRow(ctx.organizationId, "sites"))) {
+        if (siteCount >= LEGACY_WEBSITES_PER_BUSINESS) {
+            throw new ConflictException({
+                message:
+                    "This business already has its website. Change its pages, look and address from Website.",
+            });
+        }
+        await entitlements.check(ctx.organizationId, "sites", siteCount);
+    }
 
     // The kind picks a default only; an explicit choice always wins.
     const templateId =
@@ -276,6 +288,10 @@ export async function writeSiteFromTemplate(
     options: { subdomain?: string; addressField?: string } = {},
 ): Promise<CreatedSite> {
     const field = options.addressField ?? "subdomain";
+
+    // The plan's websites, first on the transaction (it takes the meter's
+    // lock): nothing where the catalogue doesn't govern them.
+    await planMeter.roomInTx(tx, ctx.organizationId, "sites");
 
     // Fail fast on a taken slug with a clear 409 (the unique is
     // [organizationId, slug]); the check + create share the txn.

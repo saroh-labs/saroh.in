@@ -56,6 +56,24 @@ requireProvider: false })`), the email says "view it and download a copy",
   doesn't take payment online." Automatic invoicing (renewals, packs,
   courses, subscribe) still stops with Payments off (`payments-on.ts`).
 
+## Saroh's own invoices — **Current** (pricing catalogue U17)
+
+Saroh billing a business for its plan is not the business's paper: it is
+`SarohInvoice` (Saroh's series, Saroh as seller from env), never an
+`Invoice` row, and never numbered from a business's `InvoiceSequence`. It
+reuses the pure GST helpers (`invoices/gst.ts`, `gst-states.ts`,
+`numbering.ts`'s financial year) and the D16 PDF renderer through its own
+paper view. Written by the billing webhook with the charge, once per
+charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
+invoices (U17)".
+
+Trials, coupons and add-ons (U16) ride the same path: a coupon is
+redeemed and its discount invoiced with the charge it comes off, never at
+checkout, and an add-on is a line on the charge after the period it covers
+(`SubscriptionAddonCharge`). The amount the provider charges and the
+invoice's lines are worked out by one rule each, so they agree. Rules in
+`PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
+
 ## Business details before money — **Current** (DEC-068, M3)
 
 Every invoice prints the business's registered address, and a
@@ -234,7 +252,23 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
 - **Staff orders hold when made**, under the rows' locks with a conditional
   can-sell update; the refusal is the storefront's words from
   `stock/stock-words.ts` — "Sourdough — Sold out", "… — Only 2 left at Hill
-  Road". An online order holds only when paid: `reserveOnPayment` is
+  Road". **A site order paid at the handover holds when made too**
+  (2026-10-06, `Order.payOnHandover`): "Pay when you collect" / "Pay on
+  delivery" at the site's checkout makes the order unpaid and real at once
+  — it holds as a staff pay-later order does (`createCheckoutOrder`), is
+  never replaced or closed as an abandoned checkout (`holdsOnPayment` is
+  false for it, so `closeCheckoutInTx`, the webhook's online-order path and
+  `realOrderWhere` all treat it as a staff order), counts on
+  `ordersPerMonth` from the start (soft at the site), tells the team at
+  once, and is invoiced when staff mark it paid (DEC-023). Its kitchen runs
+  before the money; only the handover (collected, delivered) waits for it
+  (`moveAwaitsPayment`). Nothing releases it on a timer: staff cancel it,
+  as a pay-later order. Three days on, still unpaid and not handed over,
+  Home shows it under Attention and the team is told once (R34,
+  `orders/uncollected.ts`; `backend-jobs.md` → Team alerts). Offered always on a plan without online payments,
+  beside online where the storefront turns it on
+  (`StoreSettings.offerPayOnHandover`, `checkoutReadiness`); never for a
+  shipment. An online order holds only when paid: `reserveOnPayment` is
   idempotent per intent: a payment that held records a `STOCK_HELD`
   attempt, so its webhook repeating reads HELD even after the order
   closed, while any other payment reaching a closed order is refunded
@@ -326,7 +360,8 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, currency, status, billed-to name, and `payOnline`) served
+  tax, total, currency, status, billed-to name, `payOnline`, and on an owed
+  view-only invoice `payInstructions`, R32) served
   server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
   rate-limited per link. With `payOnline` false (DEC-070) the page shows the
   invoice with no Pay button, only "Print or save as PDF", and starting a payment or autopay
@@ -340,6 +375,35 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   PAID (`ONLINE`) under its row lock; success on one already PAID or VOID is
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
+
+## How to pay us: offline payment details — **Current** (R32)
+
+- **Every business, every plan,** can tell customers how to pay it offline:
+  a UPI ID, bank details (name on the account, number, IFSC, bank) and a
+  short note. Six nullable columns on `BusinessProfile` (`payUpiId`,
+  `payBank*`, `payNote`), read and written with the rest of the business's
+  settings (`org:settings:read` / `org:update`, Owner and Admin) as
+  `payInstructions` on the settings PATCH. Rules, normalising and the reads
+  are `organizations/business-pay-instructions.ts`: a UPI ID is
+  `name@handle` (lower-cased), an IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`, an account
+  number 9–18 digits (CHECKs in the migration), and bank details are taken
+  whole or not at all. Never logged; the audit stream names the change, never
+  the value (`NAME_ONLY_FIELDS`).
+- **Shown only on a customer's own record.** The public sees them only
+  inside: the invoice pay link's read (owed, and `payOnline` false), the
+  order pay link's read (while DUE), and a signed-in desk booking's answer
+  (`account-bookings.controller.ts`). Never a standalone endpoint that hands
+  a business's bank details to anyone with its slug.
+  `businessPayInstructionsOf` is the one read, and re-checks every value on
+  the way out.
+- **The invoice email names the ways** ("see how to pay ‹business› by UPI or
+  bank transfer here") on a view link, never the details: a stored message
+  body never carries an account number. The invoice PDF has no payment
+  section and carries none.
+- **Drawn by one block:** `PayInstructionsCard` in `packages/site-blocks`
+  (QR from `uqr`, the UPI deep link `upi://pay?pa=…&pn=…&am=…&cu=INR&tn=…`,
+  copy buttons), used by the invoice and order pay pages, the booking
+  confirmation, and the Settings › Business › How to pay us preview.
 
 ## Paying for a booking online — **Current** (U19, ADR-008)
 

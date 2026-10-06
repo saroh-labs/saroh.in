@@ -282,6 +282,45 @@ export class RegisteredAddressDto {
 }
 
 /**
+ * "How to pay us" (R32): a UPI ID, bank details and a short note, shown to a
+ * customer on their own unpaid invoice, order or booking. "" clears a
+ * field. Only the type and an outer length are checked here; the shapes
+ * (UPI ID, IFSC, account number) and that bank details go together are the
+ * service's (`business-pay-instructions.ts`), which names the field.
+ */
+export class PayInstructionsDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(300)
+    upiId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(300)
+    bankAccountName?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    bankAccountNumber?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(32)
+    bankIfsc?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(300)
+    bankName?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(600)
+    note?: string;
+}
+
+/**
  * Payload for `PATCH /organizations/:organizationId`. Both fields are optional
  * so a caller can rename the org, edit the business profile, or both.
  *
@@ -316,6 +355,12 @@ export class UpdateOrganizationDto {
     @ValidateNested()
     @Type(() => RegisteredAddressDto)
     registeredAddress?: RegisteredAddressDto;
+
+    /** How to pay us (R32): shown on a customer's own unpaid paper. */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => PayInstructionsDto)
+    payInstructions?: PayInstructionsDto;
 
     /**
      * What is being set up (DEC-070): BUSINESS, SOLO ("Just me") or WORK

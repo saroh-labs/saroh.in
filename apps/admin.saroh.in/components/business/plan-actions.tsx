@@ -10,7 +10,7 @@ import {
     trialAction,
 } from "@/lib/business-actions";
 import type { PlanOption } from "@/lib/businesses";
-import { camelToWords, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 import { OperatorDialog } from "../operator-dialog";
 
@@ -62,7 +62,7 @@ export function PlanActions({
     plans: PlanOption[];
     currentPlanId: string | null;
     subscriptionStatus: string | null;
-    numericLimits: { key: string; planValue: number }[];
+    numericLimits: { key: string; label: string; planValue: number }[];
 }) {
     const trialing = subscriptionStatus === "TRIALING";
     const needsPlanForTrial =
@@ -152,8 +152,8 @@ export function PlanActions({
                                             key={limit.key}
                                             value={limit.key}
                                         >
-                                            {camelToWords(limit.key)} (plan
-                                            allows {limit.planValue})
+                                            {limit.label} (plan allows{" "}
+                                            {limit.planValue})
                                         </option>
                                     ))}
                                 </select>

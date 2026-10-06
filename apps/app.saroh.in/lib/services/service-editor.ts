@@ -415,7 +415,9 @@ const DEPOSIT_PERCENT: Record<DepositMode, number> = {
 /**
  * The note under "At booking, they pay" (the design's): what a customer
  * pays when booking and at the visit, worked out from the price as typed,
- * rounded to the paisa as the server rounds it.
+ * rounded to the paisa as the server rounds it. A business that takes
+ * payment at the desk only takes nothing when booking, a deposit or not
+ * (DEC-089).
  */
 export function depositNote(
     deposit: DepositMode,
@@ -434,6 +436,9 @@ export function depositNote(
             ? `They pay ${money(cents)} online when booking: your booking rules take payment online only.`
             : "No card needed to book. No-shows cost you the slot.";
     }
+    if (way === "DESK" && cents > 0) {
+        return `They pay ${money(cents)} ${visits > 1 ? "over the visits" : "at the visit"}.`;
+    }
     const now = Math.round((cents * DEPOSIT_PERCENT[deposit]) / 100);
     const split =
         deposit === "FULL"
@@ -441,6 +446,13 @@ export function depositNote(
             : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) ${visits > 1 ? "over the visits" : "at the visit"}.`;
     return `${split} Refunded if they cancel in time.`;
 }
+
+/**
+ * The note under "At booking, they pay" for a deposit the plan can't take
+ * online: kept, and not taken until it can (6 Oct 2026).
+ */
+export const depositPausedNote =
+    "Paused: customers book and pay at the visit, and nothing is taken when booking.";
 
 /** The note under Where. */
 export function whereNote(where: LocationType): string {

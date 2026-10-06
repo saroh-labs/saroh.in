@@ -5,20 +5,26 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
+import { NOT_CATALOGUE_PLAN } from "../billing/plans.service";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
+import { AdminOverridesService } from "./admin-overrides.service";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 import {
     AddNoteDto,
+    CatalogueMoveDto,
     ChangePlanDto,
     ConfirmedOperatorDto,
     ListOrganizationsDto,
+    ModuleOverrideDto,
     OpenAdminAccessSessionDto,
     OperatorReasonDto,
+    PlanOverrideDto,
+    PriceOverrideDto,
     RaiseLimitDto,
     RevokeAdminAccessSessionDto,
     ScheduleDeletionDto,
@@ -38,6 +44,7 @@ export class AdminOrganizationsController {
         private readonly organizations: AdminOrganizationsService,
         private readonly organizationView: AdminOrganizationViewService,
         private readonly lifecycle: AdminLifecycleService,
+        private readonly overrides: AdminOverridesService,
         private readonly access: AdminAccessService,
         private readonly adminAudit: AdminAuditService,
         private readonly idempotency: IdempotencyService,
@@ -79,12 +86,16 @@ export class AdminOrganizationsController {
         return this.organizations.summary(organizationId);
     }
 
-    /** The plans an operator can move a business to. */
+    /**
+     * The plans an operator can move a business to. Catalogue rows
+     * (`catalog.<plan>`) are moved to from Plans & modules and the business
+     * page's catalogue actions (U11), not this legacy picker.
+     */
     @Get("plans")
     @RequireAdminPermission(AdminPermission.SubscriptionRead)
     plans() {
         return prisma.plan.findMany({
-            where: { active: true },
+            where: { active: true, ...NOT_CATALOGUE_PLAN },
             select: {
                 id: true,
                 key: true,
@@ -311,6 +322,130 @@ export class AdminOrganizationsController {
                     organizationId,
                     reason: dto.reason,
                     overrideId,
+                }),
+        );
+    }
+
+    /** Grant, remove, or set the limit of one catalogue row (pricing U11). */
+    @Post("organizations/:organizationId/overrides/modules")
+    @RequireAdminPermission(AdminPermission.PricingOverride)
+    setModuleOverride(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: ModuleOverrideDto,
+    ) {
+        return this.once(
+            "organization.override.module",
+            staff,
+            organizationId,
+            dto,
+            () =>
+                this.overrides.setModuleOverride({
+                    staff,
+                    organizationId,
+                    reason: dto.reason,
+                    kind: dto.kind,
+                    moduleKey: dto.moduleKey,
+                    value: dto.value,
+                    expiresAt: dto.expiresAt,
+                }),
+        );
+    }
+
+    /** A custom monthly price: an override and a price change, so both. */
+    @Post("organizations/:organizationId/overrides/price")
+    @RequireAdminPermission(
+        AdminPermission.PricingOverride,
+        AdminPermission.PricingPublish,
+    )
+    setPriceOverride(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: PriceOverrideDto,
+    ) {
+        return this.once(
+            "organization.override.price",
+            staff,
+            organizationId,
+            dto,
+            () =>
+                this.overrides.setPrice({
+                    staff,
+                    organizationId,
+                    reason: dto.reason,
+                    pricePaise: dto.pricePaise,
+                    expiresAt: dto.expiresAt,
+                }),
+        );
+    }
+
+    /** Put the business on a catalogue plan until a date, or extend it. */
+    @Post("organizations/:organizationId/overrides/plan")
+    @RequireAdminPermission(AdminPermission.PricingOverride)
+    setPlanOverride(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: PlanOverrideDto,
+    ) {
+        return this.once(
+            "organization.override.plan",
+            staff,
+            organizationId,
+            dto,
+            () =>
+                this.overrides.setPlan({
+                    staff,
+                    organizationId,
+                    reason: dto.reason,
+                    planKey: dto.planKey,
+                    expiresAt: dto.expiresAt,
+                }),
+        );
+    }
+
+    /** End one catalogue override (a custom price also needs publish). */
+    @Delete("organizations/:organizationId/overrides/:overrideId")
+    @RequireAdminPermission(AdminPermission.PricingOverride)
+    removeOverride(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Param("overrideId") overrideId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.once(
+            "organization.override.revoke",
+            staff,
+            organizationId,
+            { ...dto, overrideId },
+            () =>
+                this.overrides.removeOverride({
+                    staff,
+                    organizationId,
+                    reason: dto.reason,
+                    overrideId,
+                }),
+        );
+    }
+
+    /** Move the business to the live catalogue version, now or at renewal. */
+    @Post("organizations/:organizationId/catalogue-move")
+    @RequireAdminPermission(AdminPermission.PricingOverride)
+    moveToLive(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: CatalogueMoveDto,
+    ) {
+        return this.once(
+            "organization.catalogue-move",
+            staff,
+            organizationId,
+            dto,
+            () =>
+                this.overrides.moveToLive({
+                    staff,
+                    organizationId,
+                    reason: dto.reason,
+                    when: dto.when,
                 }),
         );
     }

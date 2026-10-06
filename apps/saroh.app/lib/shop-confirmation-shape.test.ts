@@ -26,6 +26,7 @@ const BODY = {
         deliverTo: null,
     },
     refunded: false,
+    toPay: null,
 };
 
 describe("confirmationOf", () => {
@@ -81,6 +82,16 @@ describe("confirmationOf", () => {
                 },
             }),
         ).toBeNull();
+    });
+});
+
+describe("an order paid at the handover (2026-10-06)", () => {
+    it("keeps what is still to pay, and reads an older API's answer as nothing", () => {
+        expect(
+            confirmationOf({ ...BODY, toPay: "Pay when you collect" })?.toPay,
+        ).toBe("Pay when you collect");
+        const { toPay: _gone, ...older } = BODY;
+        expect(confirmationOf(older)?.toPay).toBeNull();
     });
 });
 

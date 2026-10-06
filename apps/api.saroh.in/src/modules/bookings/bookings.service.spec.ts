@@ -95,8 +95,10 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { validationPipeOptions } from "../../common/validation";
+import { planMeter } from "../billing/metering.service";
 import type { PaymentsService } from "../payments/payments.service";
 import { BookingsService } from "./bookings.service";
 import { CreateServiceDto, UpdateServiceDto } from "./dto";
@@ -1706,6 +1708,127 @@ describe("service fields: visits, Either, deposit, booking page (E1)", () => {
             });
             expect(bookingCreate).toHaveBeenCalledTimes(1);
         });
+    });
+});
+
+describe("a deposit comes with online payments on the plan (6 Oct 2026)", () => {
+    const serviceUpdate = prisma.service.update as jest.Mock;
+    const PRICED = { ...SERVICE, priceCents: 150_000, currency: "INR" };
+    const create = (over: Record<string, unknown>) =>
+        new BookingsService().createService(ctx(), {
+            name: "Root canal",
+            durationMinutes: 60,
+            timezone: "UTC",
+            priceCents: 150_000,
+            currency: "INR",
+            ...over,
+        });
+    const update = (over: Record<string, unknown>) =>
+        new BookingsService().updateService(ctx(), "svc_1", over);
+
+    /** On `plan` (made-up catalogue); null: nothing enforced. */
+    function onPlan(plan: "free" | "grow" | null) {
+        jest.spyOn(planMeter, "enforcedRow").mockImplementation(
+            (_org: string, moduleId: string) =>
+                Promise.resolve(
+                    plan === null || moduleId !== "payments"
+                        ? null
+                        : fakePaymentsRow(plan, moduleId),
+                ),
+        );
+    }
+
+    async function locked(p: Promise<unknown>) {
+        const err = await p.then(
+            () => null,
+            (e: unknown) => e,
+        );
+        expect(err).toBeInstanceOf(ForbiddenException);
+        return (err as ForbiddenException).getResponse() as {
+            details: Record<string, unknown>;
+        };
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        serviceCreate.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) => ({
+                ...SERVICE,
+                ...data,
+                id: "svc_new",
+            }),
+        );
+        serviceUpdate.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) => ({
+                ...PRICED,
+                ...data,
+            }),
+        );
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("refuses setting a deposit on a plan without online payments, with MODULE_LOCKED", async () => {
+        onPlan("free");
+        const body = await locked(create({ depositMode: "PERCENT_25" }));
+        expect(body.details).toMatchObject({
+            code: "MODULE_LOCKED",
+            moduleId: "payments",
+        });
+        expect(serviceCreate).not.toHaveBeenCalled();
+
+        serviceFindUnique.mockResolvedValue(PRICED);
+        await locked(update({ depositMode: "FULL" }));
+        expect(serviceUpdate).not.toHaveBeenCalled();
+    });
+
+    it("always lets a service take no deposit, and keeps one it already has", async () => {
+        onPlan("free");
+        await expect(create({ depositMode: "NONE" })).resolves.toMatchObject({
+            depositMode: "NONE",
+        });
+        await expect(create({})).resolves.toMatchObject({
+            depositMode: "NONE",
+        });
+
+        serviceFindUnique.mockResolvedValue({
+            ...PRICED,
+            depositMode: "PERCENT_50",
+        });
+        // Taking it off is allowed.
+        await update({ depositMode: "NONE" });
+        expect(serviceUpdate.mock.calls[0][0].data).toEqual({
+            depositMode: "NONE",
+        });
+        // Saving the service with the deposit it has, or anything else
+        // about it, is too: the stored deposit is kept for an upgrade.
+        await update({
+            name: "Root canal, first visit",
+            depositMode: "PERCENT_50",
+        });
+        await update({ priceCents: 160_000 });
+        expect(serviceUpdate).toHaveBeenCalledTimes(3);
+
+        // Changing it to another deposit is setting one.
+        await locked(update({ depositMode: "PERCENT_25" }));
+        expect(serviceUpdate).toHaveBeenCalledTimes(3);
+    });
+
+    it("sets one on a plan with online payments", async () => {
+        onPlan("grow");
+        await expect(
+            create({ depositMode: "PERCENT_50" }),
+        ).resolves.toMatchObject({ depositMode: "PERCENT_50" });
+        serviceFindUnique.mockResolvedValue(PRICED);
+        await expect(update({ depositMode: "FULL" })).resolves.toMatchObject({
+            depositMode: "FULL",
+        });
+    });
+
+    it("sets one with enforcement off, or the plan unread", async () => {
+        onPlan(null);
+        await expect(
+            create({ depositMode: "PERCENT_25" }),
+        ).resolves.toMatchObject({ depositMode: "PERCENT_25" });
     });
 });
 

@@ -13,12 +13,15 @@ export const revalidate = 300;
 
 /**
  * Every page worth indexing (plan U26, `lib/site-pages.ts`), with the
- * Resources pages that are published and built (plan U1).
+ * Resources pages that are published and built (plan U1). The pricing
+ * draft and its preview link are never listed: they are noindex, and
+ * robots.txt keeps crawlers out of them.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
     return indexedPaths(LAUNCH_MODE, resourcesContext()).map((path) => ({
         url: `${SITE_URL}${path}`,
-        changeFrequency: path === "/" ? "weekly" : "monthly",
-        priority: path === "/" ? 1 : 0.7,
+        changeFrequency:
+            path === "/" || path === "/pricing" ? "weekly" : "monthly",
+        priority: path === "/" ? 1 : path === "/pricing" ? 0.9 : 0.7,
     }));
 }

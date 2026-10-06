@@ -43,7 +43,9 @@ jest.mock("@saroh/database", () => {
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { InvoicesService } from "./invoices.service";
 import { hashPayToken } from "./pay-token";
 
@@ -251,6 +253,66 @@ describe("making a pay link", () => {
         );
         expect(db.invoice.findFirst).not.toHaveBeenCalled();
         expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("a pay link on a plan without online payments", () => {
+    beforeEach(() => {
+        jest.spyOn(planMeter, "enforcedRow").mockImplementation(
+            (_org: string, moduleId: string) =>
+                Promise.resolve(
+                    fakePaymentsRow(
+                        "free",
+                        moduleId as "payments" | "subscriptions",
+                    ),
+                ),
+        );
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("refuses one for the business's own invoice: 403 MODULE_LOCKED, no token kept", async () => {
+        const err = await service.createPayLink(owner, "inv_1").then(
+            () => null,
+            (e: unknown) => e,
+        );
+        expect(err).toBeInstanceOf(ForbiddenException);
+        expect((err as ForbiddenException).getResponse()).toMatchObject({
+            details: { code: "MODULE_LOCKED", moduleId: "payments" },
+        });
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("still makes one for a renewal of a subscription the business already has", async () => {
+        db.invoice.findFirst?.mockResolvedValue(
+            row({ source: "SUBSCRIPTION", subscriptionId: "sub_1" }),
+        );
+
+        const { token } = await service.createPayLink(owner, "inv_1");
+
+        expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        expect(db.invoice.updateMany).toHaveBeenCalled();
+    });
+
+    it("still makes a view link, which takes no money (DEC-070)", async () => {
+        const own = {
+            invoice: {
+                findFirst: jest.fn().mockResolvedValue(row()),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+            merchantPaymentProvider: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
+            organizationModule: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
+            paymentIntent: { findMany: jest.fn().mockResolvedValue([]) },
+        };
+        await expect(
+            service.createPayLinkInTx(own as never, owner, "inv_1", {
+                requireProvider: false,
+            }),
+        ).resolves.toHaveProperty("token");
+        expect(own.invoice.updateMany).toHaveBeenCalled();
     });
 });
 

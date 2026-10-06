@@ -15,7 +15,9 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { CounterPayment } from "./new-order.dto";
 import {
+    COUNTER_PAYMENTS,
     NewOrderCustomerInput,
     NewOrderPaymentInput,
     WalkInInput,
@@ -395,6 +397,16 @@ export class EditOrderDto {
     )
     @MaxLength(500)
     trackingUrl?: string | null;
+}
+
+/**
+ * "Record payment" on a paid order that still owes money — an edit's
+ * difference, paid at the counter or by UPI rather than online. The amount
+ * is the API's: what the order still owes.
+ */
+export class RecordDifferenceDto {
+    @IsIn(COUNTER_PAYMENTS, { message: "Pick how it was paid." })
+    kind!: CounterPayment;
 }
 
 export class UpdateOrderDto {

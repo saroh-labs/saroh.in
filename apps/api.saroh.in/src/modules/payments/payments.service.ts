@@ -12,8 +12,14 @@ import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
+import {
+    assertPlanTakesOnlinePayment,
+    planTakesOnlinePayment,
+} from "../billing/online-payments-plan";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
+import { NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
 import type {
     LineRefundRequest,
@@ -409,6 +415,21 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
  *     client input. Credentials are decrypted in-memory only at the instant of
  *     the provider call.
  */
+/**
+ * A customer's online payment on a plan that takes none
+ * (`billing/online-payments-plan.ts`): 409 in the pay page's own words,
+ * naming no plan — the business hears why from its own screens.
+ */
+async function assertCustomerCanPayOnline(
+    organizationId: string,
+): Promise<void> {
+    if (await planTakesOnlinePayment(organizationId)) return;
+    throw new ConflictException({
+        message: NOT_PAID_ONLINE,
+        details: { reason: "not-paid-online" },
+    });
+}
+
 @Injectable()
 export class PaymentsService {
     private readonly logger = new Logger(PaymentsService.name);
@@ -445,6 +466,19 @@ export class PaymentsService {
         // invoiced: the business details before the keys are kept (DEC-068).
         await assertBusinessDetails(prisma, ctx.organizationId);
 
+        // A first connection starts taking money online, which the plan
+        // must include (403 MODULE_LOCKED). Re-entering the keys of one
+        // already made is never refused: renewals the business already has
+        // are charged through it (ADR-003).
+        if (!(await planTakesOnlinePayment(ctx.organizationId))) {
+            const known = await prisma.merchantPaymentProvider.count({
+                where: { organizationId: ctx.organizationId, provider },
+            });
+            if (known === 0) {
+                await assertPlanTakesOnlinePayment(ctx.organizationId);
+            }
+        }
+
         // Seal { keyId, keySecret, webhookSecret? } as one blob. Plaintext
         // (incl. the webhook secret) is NEVER persisted or logged.
         const sealed = encryptSecret(
@@ -457,30 +491,49 @@ export class PaymentsService {
             }),
         );
 
-        const row = await prisma.merchantPaymentProvider.upsert({
-            where: {
-                organizationId_provider: {
-                    organizationId: ctx.organizationId,
-                    provider,
-                },
+        // The plan's integrations cap (U13): a new connection is checked;
+        // changing the keys of a connected one adds nothing.
+        const row = await planMeter.withRoom(
+            ctx.organizationId,
+            "integrations",
+            (tx) =>
+                tx.merchantPaymentProvider.upsert({
+                    where: {
+                        organizationId_provider: {
+                            organizationId: ctx.organizationId,
+                            provider,
+                        },
+                    },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        provider,
+                        status: "CONNECTED",
+                        publicKey,
+                        encryptedCredentials: sealed.ciphertext,
+                        credentialsIv: sealed.iv,
+                        credentialsAuthTag: sealed.authTag,
+                    },
+                    update: {
+                        status: "CONNECTED",
+                        publicKey,
+                        encryptedCredentials: sealed.ciphertext,
+                        credentialsIv: sealed.iv,
+                        credentialsAuthTag: sealed.authTag,
+                    },
+                }),
+            {
+                addingIn: async (tx) =>
+                    (await tx.merchantPaymentProvider.count({
+                        where: {
+                            organizationId: ctx.organizationId,
+                            provider,
+                            status: "CONNECTED",
+                        },
+                    })) > 0
+                        ? 0
+                        : 1,
             },
-            create: {
-                organizationId: ctx.organizationId,
-                provider,
-                status: "CONNECTED",
-                publicKey,
-                encryptedCredentials: sealed.ciphertext,
-                credentialsIv: sealed.iv,
-                credentialsAuthTag: sealed.authTag,
-            },
-            update: {
-                status: "CONNECTED",
-                publicKey,
-                encryptedCredentials: sealed.ciphertext,
-                credentialsIv: sealed.iv,
-                credentialsAuthTag: sealed.authTag,
-            },
-        });
+        );
 
         return redact(row);
     }
@@ -757,6 +810,8 @@ export class PaymentsService {
         if (amountCents <= 0) {
             throw new BadRequestException("Nothing more to take on this order");
         }
+        // A new online payment: the plan must take one (403 MODULE_LOCKED).
+        await assertPlanTakesOnlinePayment(ctx.organizationId);
         return this.createIntentFor(
             ctx.organizationId,
             {
@@ -1375,6 +1430,7 @@ export class PaymentsService {
     ): Promise<CreateIntentResult> {
         authorize(ctx, "payment:manage");
         const order = await this.requireOwnedOrder(ctx, orderId);
+        await assertPlanTakesOnlinePayment(ctx.organizationId);
         return this.createIntentInternal(ctx.organizationId, order, options);
     }
 
@@ -1395,6 +1451,7 @@ export class PaymentsService {
     ): Promise<CreateIntentResult> {
         const order = await this.requirePayableOrder(orderId);
         await assertOrganizationOpen(order.organizationId);
+        await assertCustomerCanPayOnline(order.organizationId);
         return this.createIntentInternal(order.organizationId, order, options);
     }
 
@@ -1511,6 +1568,8 @@ export class PaymentsService {
         },
         options: { idempotencyKey?: string } = {},
     ): Promise<CreateIntentResult> {
+        // A pay link that charges is a new online payment (the plan's).
+        await assertCustomerCanPayOnline(order.organizationId);
         return this.createIntentFor(
             order.organizationId,
             {

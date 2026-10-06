@@ -14,8 +14,8 @@ import { resourcesContext } from "@/lib/resources-context";
  * out here, on the server, from `content/resources.ts` (plan U1): only
  * pages that are published and built.
  *
- * The waitlist (`(standalone)`) draws its own chrome, so it sits outside
- * this group.
+ * The waitlist (`(standalone)`) and the pricing draft (`(preview)`) draw
+ * their own chrome, so they sit outside this group.
  */
 export default function V2Layout({ children }: { children: React.ReactNode }) {
     const ctx = resourcesContext();

@@ -10,7 +10,8 @@ import { StepHead } from "./step-head";
  * and the rest at the visit (E8); or at the desk. The choices and their
  * words come from `payChoices` and `creditChoice`: a class is "for this
  * class", an appointment is paid "now", and a service that takes a deposit
- * is never paid at the desk (Pulse Fitness, Kavi Dental).
+ * is paid at the desk only when online can't take it (Pulse Fitness, Kavi
+ * Dental, DEC-089).
  */
 export function PayStep({
     choices,

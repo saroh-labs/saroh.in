@@ -47,7 +47,10 @@ jest.mock("@saroh/database", () => {
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
+import { NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { encryptSecret } from "./crypto";
 import { PaymentsService } from "./payments.service";
 import {
@@ -484,5 +487,63 @@ describe("Storefront settings on the buyer's path", () => {
             openingHours: null,
             acceptingPayments: false,
         });
+    });
+});
+
+describe("a customer's online payment on a plan without online payments", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.spyOn(planMeter, "enforcedRow").mockResolvedValue(
+            fakePaymentsRow("free", "payments"),
+        );
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    /** 409 in the pay page's words, naming no plan; no provider call. */
+    async function notOnline(p: Promise<unknown>, fake: FakeMerchantProvider) {
+        const err = await p.then(
+            () => null,
+            (e: unknown) => e,
+        );
+        expect(err).toBeInstanceOf(ConflictException);
+        expect((err as ConflictException).getResponse()).toEqual({
+            message: NOT_PAID_ONLINE,
+            details: { reason: "not-paid-online" },
+        });
+        expect(fake.calls).toHaveLength(0);
+        expect(intentCreate).not.toHaveBeenCalled();
+    }
+
+    it("refuses the order checkout's intent", async () => {
+        const { service, fake } = makeService();
+        orderFindUnique.mockResolvedValue({
+            id: "order_1",
+            storeId: "store_1",
+            store: { name: "High Street", settings: null },
+            organizationId: "org_1",
+            total: "42.50",
+            currency: "INR",
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+        });
+        providerFindMany.mockResolvedValue([connectedRow()]);
+
+        await notOnline(service.createIntentForOrderPublic("order_1"), fake);
+    });
+
+    it("refuses an order pay link's intent: a pay link that charges", async () => {
+        const { service, fake } = makeService();
+        providerFindMany.mockResolvedValue([connectedRow()]);
+
+        await notOnline(
+            service.createIntentForOrderPayLink({
+                id: "order_1",
+                organizationId: "org_1",
+                storeId: "store_1",
+                amountCents: 4250,
+                currency: "INR",
+            }),
+            fake,
+        );
     });
 });

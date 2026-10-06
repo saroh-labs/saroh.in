@@ -1,5 +1,6 @@
 "use client";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { SettingsPanelHeader } from "@/components/settings/settings-panel";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -34,9 +35,10 @@ import {
     SheetDescription,
     SheetTitle,
 } from "@saroh/ui/sheet";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { Check, Info, Mail, Plus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
@@ -197,6 +199,8 @@ export function TeamScreen({
     catalogue,
     myActions,
     joinedFromStorefronts = [],
+    teamLimit = null,
+    limitNotice = null,
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -216,12 +220,30 @@ export function TeamScreen({
      * notice. Empty for anyone who may not change roles.
      */
     joinedFromStorefronts?: StorefrontTeamNoticePerson[];
+    /**
+     * The plan's team-members limit (plans catalogue U14): `full` once the
+     * team and its open invites reach it, with the reason the design says.
+     */
+    teamLimit?: { full: boolean; why: string } | null;
+    /** Its 80% / 100% notice, above the tab's content. */
+    limitNotice?: ReactNode;
 }) {
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [removing, setRemoving] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
+    // Inviting while the team is full says why, as the design flashes it:
+    // the invite would be refused, invites count too, and where more is.
+    const openInvite = () => {
+        if (teamLimit?.full) {
+            showInfo(
+                `${teamLimit.why} (invites count too). Upgrade or add more in Plan and billing.`,
+            );
+            return;
+        }
+        setInviteOpen(true);
+    };
 
     const byKey = new Map(roles.map((r) => [r.key, r]));
     const book: RoleBook = {
@@ -280,9 +302,11 @@ export function TeamScreen({
                     actions={
                         // On People, where the person invited will appear.
                         canManage && tab === "people" ? (
-                            <Button onClick={() => setInviteOpen(true)}>
+                            <Button onClick={openInvite}>
                                 <Plus className="mr-1.5 size-4" />
-                                Invite someone
+                                {teamLimit?.full
+                                    ? "Team is full"
+                                    : "Invite someone"}
                             </Button>
                         ) : undefined
                     }
@@ -327,6 +351,8 @@ export function TeamScreen({
                 </div>
             </div>
 
+            {limitNotice}
+
             {tab === "roles" ? (
                 <RolesTab
                     roles={roles}
@@ -352,11 +378,10 @@ export function TeamScreen({
                         them nothing in any other.
                     </p>
                     {canManage ? (
-                        <Button
-                            className="mt-1"
-                            onClick={() => setInviteOpen(true)}
-                        >
-                            Invite someone
+                        <Button className="mt-1" onClick={openInvite}>
+                            {teamLimit?.full
+                                ? "Team is full"
+                                : "Invite someone"}
                         </Button>
                     ) : null}
                 </div>
@@ -1142,6 +1167,12 @@ function InviteDialog({
             ...(values.role === "REVIEWER" ? { siteIds: values.siteIds } : {}),
         });
         if (!res.ok) {
+            // The plan's team limit (U13): its notice, not a toast.
+            if (res.plan) {
+                onOpenChange(false);
+                showPlanRefusal(res.plan);
+                return;
+            }
             // A refusal about the address ("already in this workspace") goes
             // on the field; anything else is a toast.
             if (res.field === "email") {

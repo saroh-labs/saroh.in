@@ -1,4 +1,4 @@
-// @covers web:/ web:/features web:/solutions web:/waitlist web:/api/waitlist api:waitlist
+// @covers web:/ web:/features web:/solutions web:/pricing web:/pricing/draft web:/pricing/preview web:/waitlist web:/api/waitlist web:/api/revalidate api:waitlist api:pricing
 // @covers web:/integrations pkg:integrations
 import { createRequire } from "node:module";
 
@@ -22,9 +22,8 @@ import { urls } from "../playwright.config";
  * - The nav menus open and close by keyboard, desk and phone.
  * - The waitlist form refuses what it should and takes a join through to
  *   the API (its own address, stamped, so it runs beside everything else).
- * - Pricing isn't published (Gate W): no page links to `/pricing`, names
- *   "Compare every plan" or draws a plan card, and `/pricing` itself is a
- *   temporary redirect to the waitlist.
+ * - Pricing's switches work, whether or not the stack has a catalogue
+ *   (no catalogue: the placeholder, and no switches). No figure is read.
  * - Every internal link on every page answers 200, or one 301 to a 200;
  *   every redirect in `apps/saroh.in/redirects.js` lands in one hop; the
  *   sitemap lists the indexable pages (plus published Resources pages)
@@ -55,8 +54,16 @@ const FEATURES = [
 const SOLUTIONS = ["shops", "gyms", "clinics"];
 
 /** The pages a search engine should find, in the launch mode the stack runs (waitlist). */
+/**
+ * Whether this stack's site is built with the launch switch open
+ * (`NEXT_PUBLIC_LAUNCH_MODE`, plan KTD-16). Before launch, Pricing waits at
+ * the waitlist (Gate W) and isn't indexed.
+ */
+const OPEN = process.env.NEXT_PUBLIC_LAUNCH_MODE === "open";
+
 const INDEXED = [
     "/",
+    ...(OPEN ? ["/pricing"] : []),
     ...FEATURES.map((s) => `/features/${s}`),
     ...SOLUTIONS.map((s) => `/solutions/${s}`),
     "/waitlist",
@@ -84,9 +91,10 @@ const RESOURCE_PREFIXES = [
  */
 const INTEGRATIONS = ["razorpay", "cashfree", "email"];
 
-/** Every page a visitor can land on. */
+/** Every page a visitor can land on: the indexed ones, the integrations, and the pricing draft (no preview cookie: "ended"). */
 const PAGES = [
     ...INDEXED,
+    "/pricing/draft",
     ...[
         "/integrations",
         ...INTEGRATIONS.map((s) => `/integrations/${s}`),
@@ -94,7 +102,7 @@ const PAGES = [
 ];
 
 /** Kept out of search: robots.txt disallows each. */
-const NOT_INDEXED = ["/api/"];
+const NOT_INDEXED = ["/api/", "/pricing/draft", "/pricing/preview"];
 
 interface Redirect {
     source: string;
@@ -102,9 +110,9 @@ interface Redirect {
     statusCode: number;
 }
 // The site's own list, so a redirect added there is checked here too.
-const { REDIRECTS, TEMPORARY } = createRequire(__filename)(
+const { REDIRECTS } = createRequire(__filename)(
     "../../apps/saroh.in/redirects.js",
-) as { REDIRECTS: Redirect[]; TEMPORARY: Redirect[] };
+) as { REDIRECTS: Redirect[] };
 
 /** WCAG 2.0–2.2 A and AA, and axe's best practices (heading order, unique landmarks). */
 const AXE_TAGS = [
@@ -388,36 +396,57 @@ test.describe("waitlist", () => {
     });
 });
 
-test.describe("no pricing yet", () => {
-    test("no page links to /pricing or shows a plan", async ({ page }) => {
-        for (const path of PAGES) {
-            await page.goto(`${WEB}${path}`);
-            // The page is drawn before anything is said to be missing.
-            await expect(
-                page.locator("main, [role=main]").first(),
-            ).toBeVisible();
-            await expect(
-                page.locator(
-                    'a[href^="/pricing"], a[href*="saroh.in/pricing"]',
-                ),
-                `${path} links to /pricing`,
-            ).toHaveCount(0);
-            await expect(
-                page.locator("[data-plan]"),
-                `${path} draws a plan card`,
-            ).toHaveCount(0);
-            await expect(page.locator("#pricing")).toHaveCount(0);
-            await expect(page.getByText("Compare every plan")).toHaveCount(0);
-        }
-    });
-
-    test("/pricing is a temporary redirect to the waitlist", async ({
+test.describe("pricing", () => {
+    test("before launch, Pricing waits at the waitlist (Gate W)", async ({
         request,
-    }, testInfo) => {
-        test.skip(!isDesk(testInfo), "HTTP only; once is enough");
-        const res = await head(request, `${WEB}/pricing`);
+    }) => {
+        test.skip(OPEN, "the launch switch is open: Pricing is published");
+        const res = await request.get(`${WEB}/pricing`, { maxRedirects: 0 });
+        // Temporary, so nothing remembers it: Pricing comes back at launch.
         expect(res.status()).toBe(302);
         expect(new URL(res.headers().location, WEB).pathname).toBe("/waitlist");
+    });
+
+    test("the switches work, or the placeholder shows without them", async ({
+        page,
+    }) => {
+        test.skip(!OPEN, "Pricing is published when the launch switch opens");
+        await page.goto(`${WEB}/pricing`);
+        const plans = page.getByRole("region", { name: "Plans" });
+        await expect(plans.locator("[data-plan]").first()).toBeVisible();
+        const billing = plans.getByRole("radiogroup", { name: "Billing" });
+        const gst = plans.getByRole("checkbox", {
+            name: "Show prices with GST",
+        });
+
+        if ((await billing.count()) === 0 && (await gst.count()) === 0) {
+            // No catalogue on this stack: names and the placeholder only.
+            await expect(
+                page.getByText("Pricing announced at launch").first(),
+            ).toBeVisible();
+            return;
+        }
+
+        if (await billing.count()) {
+            const monthly = billing.getByRole("radio").first();
+            const yearly = billing.getByRole("radio").last();
+            await expect(monthly).toHaveAttribute("aria-checked", "true");
+            await yearly.click();
+            await expect(yearly).toHaveAttribute("aria-checked", "true");
+            await expect(monthly).toHaveAttribute("aria-checked", "false");
+            // One tab stop; the arrows choose as they move.
+            await page.keyboard.press("ArrowLeft");
+            await expect(monthly).toHaveAttribute("aria-checked", "true");
+            await expect(monthly).toBeFocused();
+        }
+        if (await gst.count()) {
+            const was = await gst.isChecked();
+            await gst.click();
+            await expect(gst).toBeChecked({ checked: !was });
+            await page.keyboard.press("Space");
+            await expect(gst).toBeChecked({ checked: was });
+        }
+        await expect(plans.locator("[data-plan]").first()).toBeVisible();
     });
 });
 
@@ -455,7 +484,7 @@ test.describe("links, redirects and the sitemap", () => {
     }, testInfo) => {
         test.skip(!isDesk(testInfo), "HTTP only; once is enough");
         expect(REDIRECTS.length).toBeGreaterThan(0);
-        for (const r of [...REDIRECTS, ...TEMPORARY]) {
+        for (const r of REDIRECTS) {
             // A pattern gets a made-up value: it is the catch-all for slugs
             // that no longer exist.
             const source = r.source.replace(/:(\w+)/g, "no-such-$1");
@@ -499,9 +528,19 @@ test.describe("links, redirects and the sitemap", () => {
                 `Disallow: ${path}`,
             );
         expect(robots).toMatch(/Sitemap: \S+\/sitemap\.xml/);
+
+        // The draft and its link say noindex themselves too.
+        const draft = await head(request, `${WEB}/pricing/draft`);
+        expect(draft.headers()["x-robots-tag"]).toContain("noindex");
+        const preview = await head(request, `${WEB}/pricing/preview`);
+        expect(preview.status()).toBe(303);
+        expect(preview.headers()["x-robots-tag"]).toContain("noindex");
+        expect(new URL(preview.headers().location, WEB).pathname).toBe(
+            "/pricing",
+        );
     });
 
-    test("the waitlist route refuses a join with no email", async ({
+    test("the site's API routes refuse what they should", async ({
         request,
     }, testInfo) => {
         test.skip(!isDesk(testInfo), "HTTP only; once is enough");
@@ -510,6 +549,9 @@ test.describe("links, redirects and the sitemap", () => {
             data: { business: "No address" },
         });
         expect(bad.status()).toBe(400);
+        // The revalidate hook wants its secret.
+        const hook = await request.post(`${WEB}/api/revalidate`);
+        expect(hook.status()).toBe(401);
     });
 });
 

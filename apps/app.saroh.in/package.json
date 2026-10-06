@@ -42,6 +42,7 @@
         "@radix-ui/react-tooltip": "^1.2.16",
         "@saroh/auth": "workspace:*",
         "@saroh/block-contract": "workspace:*",
+        "@saroh/pricing-catalog": "workspace:*",
         "@saroh/site-blocks": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",

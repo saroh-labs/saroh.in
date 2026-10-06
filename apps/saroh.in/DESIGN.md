@@ -1,8 +1,7 @@
 # Design System: Saroh Marketing Site V2 (saroh.in)
 
 The marketing site is built from the Marketing Site V2 designs (Home,
-Features, Solutions, Pricing, Waitlist) in Saroh's design project. Pricing
-and the plan sections of Home and Solutions are not built yet (Gate W). **The build
+Features, Solutions, Pricing, Waitlist) in Saroh's design project. **The build
 matches the design exactly**: type, sizes, spacing, colours, icons, copy and
 layout. Where this file and a design disagree, the design wins and this file
 is fixed.
@@ -12,10 +11,10 @@ is fixed.
 - **Light only.** No dark theme, no `dark:` classes, no `prefers-color-scheme`
   styles, no theme toggle. `color-scheme: light` is set on `<html>` and in
   `app/site.css`.
-- **No prices, limits or plan terms in this repo, and none on a page.** No
-  page names a plan's price, limits or contents until Pricing is published;
-  the free-plan line under each hero is the fixed, neutral
-  `FREE_PLAN_LINE`. Plan names (Free, Grow, Pro) may appear in copy.
+- **No prices, limits or plan terms in this repo.** Pages read the published
+  pricing catalogue through `lib/pricing.ts`; with none, every price is the
+  `—` placeholder with "Pricing announced at launch". Plan names (Free, Grow,
+  Pro) may appear in copy.
 - **Every "start" button goes through `cta()` in `lib/links.ts`** (label and
   address together), so the launch switch (`NEXT_PUBLIC_LAUNCH_MODE`) moves
   them all at once. No page hard-codes a CTA.
@@ -61,7 +60,7 @@ sideways.
 
 V2 components live in `components/v2/`: nav and footer, buttons and CTA links,
 cards, pills, the screenshot frame and lightbox, FAQ, CTA band, and the
-per-page parts (`home/`, `feature/`, `solution/`, `waitlist/`).
+per-page parts (`home/`, `feature/`, `solution/`, `pricing/`, `waitlist/`).
 Words live in `content/`, never in a component. Screenshots come from the
 manifest in `content/shots.ts`, each with alt text.
 

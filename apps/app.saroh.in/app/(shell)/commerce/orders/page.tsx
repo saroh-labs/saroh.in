@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
+import { takesOnlinePayment } from "@/lib/billing/access";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
     orderPowers,
@@ -22,6 +24,7 @@ import {
 } from "@/lib/orders/list-query";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCataloguePage } from "@/lib/products/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
@@ -80,8 +83,13 @@ export default async function OrdersPage({
     // What this person may do to orders, each the power its endpoint asks
     // (B16): what they can't do isn't drawn.
     const powers = orderPowers(organization);
+    // On a plan without online payments no pay link is offered at all —
+    // not on a row, not in New order (R33); "Paid in cash" and the counter
+    // ways stay. The API refuses one anyway.
+    const online = takesOnlinePayment(await billingAccessOrNull());
+    const linkable = powers.payLink && online;
     const payOnline =
-        powers.payLink && access.money
+        linkable && access.money
             ? hasPaymentProvider().catch(() => false)
             : Promise.resolve(false);
     // New order (B13) is for someone who may take orders (`order:create`),
@@ -126,6 +134,7 @@ export default async function OrdersPage({
         <PageContainer width="full">
             {/* B17: storefronts still on the 2-hour Pick-up default. */}
             <LateRuleNotice />
+            <PlanLimitNotice moduleId="orders" className="mb-4" />
             <OrdersScreen
                 query={query}
                 page={page}
@@ -149,6 +158,7 @@ export default async function OrdersPage({
                               // "New order" land here with ?new=1.
                               openOnArrival: params.new === "1",
                               canSearch: may("contact:read"),
+                              online,
                           }
                         : null
                 }
@@ -156,7 +166,7 @@ export default async function OrdersPage({
                     // Without resolved actions a Member still stages (DEC-024).
                     stage: powers.stage,
                     create: powers.create,
-                    payLink: powers.payLink,
+                    payLink: linkable,
                     refund: powers.refund,
                     export: powers.export,
                     payOnline: canPayOnline,

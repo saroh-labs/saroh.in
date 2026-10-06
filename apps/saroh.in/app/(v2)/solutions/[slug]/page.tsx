@@ -6,10 +6,10 @@ import { CtaBand } from "@/components/v2/cta-band";
 import { Faq } from "@/components/v2/faq";
 import { SectionHeading } from "@/components/v2/section-heading";
 import { SolutionHero } from "@/components/v2/solution/solution-hero";
+import { SolutionPricing } from "@/components/v2/solution/solution-pricing";
 import { SolutionSegment } from "@/components/v2/solution/solution-segment";
 import { faqItems, solutionFaq } from "@/content/faq";
 import { features } from "@/content/features";
-import { FREE_PLAN_LINE } from "@/content/home";
 import {
     isSolutionSlug,
     segmentViews,
@@ -17,13 +17,20 @@ import {
     solutions,
 } from "@/content/solutions";
 import { SOLUTION_SLUGS } from "@/content/types";
+import { LAUNCH_MODE } from "@/lib/links";
+import {
+    freePlanLine,
+    planTeaserFootnote,
+    solutionPlanTeasers,
+} from "@/lib/plan-teasers";
+import { readLivePricing } from "@/lib/pricing";
 import { pageMetadata } from "@/lib/seo";
 
 /**
  * `/solutions/shops`, `/solutions/gyms`, `/solutions/clinics` (plan U23): ONE
  * template, the Solutions design, fed by `content/solutions.ts`. Any other
- * slug is a 404. No plan section: no page names a plan's price, limits or
- * contents until Pricing is published.
+ * slug is a 404. Prices and the free-plan line come from the published
+ * pricing catalogue, refreshed every five minutes and on publish (KTD-10).
  */
 export const dynamicParams = false;
 
@@ -52,10 +59,11 @@ export default async function SolutionPage({ params }: Props) {
     if (!isSolutionSlug(slug)) notFound();
     const s = solutions[slug];
     const segments = segmentViews(s.segments, (f) => features[f].name);
+    const catalog = await readLivePricing();
 
     return (
         <>
-            <SolutionHero solution={s} freeLine={FREE_PLAN_LINE} />
+            <SolutionHero solution={s} freeLine={freePlanLine(catalog)} />
 
             <Container as="section" aria-labelledby="changes-title">
                 <SectionHeading
@@ -74,6 +82,16 @@ export default async function SolutionPage({ params }: Props) {
                     ))}
                 </div>
             </Container>
+
+            {/* Plans show once the launch switch opens (Gate W). */}
+            {LAUNCH_MODE === "open" ? (
+                <SolutionPricing
+                    title={s.pricing.title}
+                    plans={solutionPlanTeasers(catalog, s.pricing)}
+                    footnote={planTeaserFootnote(catalog)}
+                    src={`solutions-${slug}-pricing`}
+                />
+            ) : null}
 
             <Faq items={faqItems(solutionFaq(s.faq))} className="pt-[120px]" />
 

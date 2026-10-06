@@ -2,10 +2,11 @@ import type { LaunchOfferTerms } from "@/content/waitlist";
 import { env } from "@/env";
 
 /**
- * The launch offer, read from api.saroh.in (`GET /public/waitlist/offer`):
- * the plan the opening-day offer puts a business on, by name, and the API's
- * `LAUNCH_OFFER_DAYS`. The length is set on the API only, so it is never
- * written in this repo.
+ * The launch offer, read from api.saroh.in (`GET /public/waitlist/offer`,
+ * marketing plan U31): the plan the opening-day invites put a business on,
+ * named as the live catalogue names it, and `LAUNCH_OFFER_DAYS`. The page
+ * and the invites read the same setting, so they can't disagree, and
+ * neither number is ever written in this repo.
  *
  * Cached for five minutes (ISR), the API's own `max-age`. Anything short of
  * a valid offer — no `API_URL`, a 404 (no offer set), an error, a slow or

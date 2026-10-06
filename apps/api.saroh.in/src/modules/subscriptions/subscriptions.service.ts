@@ -11,6 +11,7 @@ import { DateTime, IANAZone } from "luxon";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { isPastDue } from "../invoices/invoice-state";
@@ -697,6 +698,10 @@ export class SubscriptionsService {
             },
         });
         if (live > 0) alreadyOn(plan.name);
+        // A new subscription needs a plan with memberships and online
+        // payments (403 MODULE_LOCKED); renewals of ones the business
+        // already has never ask (`online-payments-plan.ts`).
+        await assertPlanStartsSubscriptions(organizationId);
 
         const id = await prisma
             .$transaction(async (tx) => {

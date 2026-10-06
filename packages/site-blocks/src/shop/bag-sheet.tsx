@@ -11,6 +11,7 @@ import type {
     DeliveryAddress,
     QuoteLine,
     ShopCheckoutApi,
+    ShopPayment,
     ShopProblem,
     ShopWay,
     StartCheckout,
@@ -30,8 +31,13 @@ import { sheetButton, SheetFrame } from "./sheet-frame";
  * Every amount is the server's quote, fetched again whenever the bag or the
  * way changes: a price that moved since the item was added shows before
  * paying, and a line that can't be sold now says so and holds the button.
- * There is no "Pay with" choice: the provider's window shows the ways the
- * business takes (DEC-059).
+ *
+ * How to pay comes with the quote: online, or at the handover — "Pay when
+ * you collect", "Pay on delivery" — where the shop takes it (always on a
+ * plan without online payments; beside online where the shop turns it on).
+ * With both, the customer picks; with one, the sheet says which. Online
+ * never names a method: the provider's window shows the ways the business
+ * takes (DEC-059).
  */
 
 type Load =
@@ -104,6 +110,8 @@ const stepper = cn(
  */
 export interface BagDraft {
     way: ShopWay | null;
+    /** How they'll pay; null until picked (the first offered then). */
+    pay: ShopPayment | null;
     address: DeliveryAddress;
     /** One key per request: the same bag placed again is the same order. */
     checkout: { print: string; key: string } | null;
@@ -117,6 +125,7 @@ export interface BagPriced {
 
 export const EMPTY_DRAFT: BagDraft = {
     way: null,
+    pay: null,
     address: EMPTY_ADDRESS,
     checkout: null,
 };
@@ -153,6 +162,7 @@ export function BagSheet({
 }) {
     const { way, address } = draft;
     const setWay = (next: ShopWay) => onDraft((d) => ({ ...d, way: next }));
+    const setPay = (next: ShopPayment) => onDraft((d) => ({ ...d, pay: next }));
     const setAddress = (change: (a: DeliveryAddress) => DeliveryAddress) =>
         onDraft((d) => ({ ...d, address: change(d.address) }));
     const [load, setLoad] = useState<Load>({ kind: "loading" });
@@ -210,11 +220,14 @@ export function BagSheet({
     const quote = load.kind === "ready" ? load.quote : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressOk = !needsAddress(way) || addressReady(address);
+    const pays = paysOf(quote);
+    const pay = payChosen(pays, draft.pay);
     const canPlace =
         !!quote &&
         quote.ready &&
         quote.fulfilment === way &&
         addressOk &&
+        pay !== null &&
         !busy;
     const total = quote ? formatAmount(quote.total, quote.currency) : "";
 
@@ -224,6 +237,7 @@ export function BagSheet({
             lines: [...items],
             fulfilment: way,
             ...(needsAddress(way) ? { address: trimmed(address) } : {}),
+            ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
         };
         const print = JSON.stringify(body);
         const checkout =
@@ -409,6 +423,39 @@ export function BagSheet({
                         </p>
                     )}
 
+                    {pays.length > 1 ? (
+                        <>
+                            <p
+                                id={`${site}-pay`}
+                                className="text-site-muted mb-1.5 mt-3.5 text-xs font-bold uppercase tracking-[0.08em]"
+                            >
+                                Pay
+                            </p>
+                            <div
+                                role="radiogroup"
+                                aria-labelledby={`${site}-pay`}
+                                className="grid gap-1.5"
+                            >
+                                {pays.map((p) => (
+                                    <button
+                                        key={p.type}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={pay?.type === p.type}
+                                        onClick={() => setPay(p.type)}
+                                        className={optionClasses(
+                                            pay?.type === p.type,
+                                        )}
+                                    >
+                                        <span className="text-[14.5px] font-semibold">
+                                            {p.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    ) : null}
+
                     {needsAddress(way) ? (
                         <fieldset className="mt-3.5">
                             <legend className="text-site-muted mb-1 text-xs font-bold uppercase tracking-[0.08em]">
@@ -430,8 +477,7 @@ export function BagSheet({
             ) : null}
 
             <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
-                You pay online in a secure window. Your order is placed once the
-                payment goes through.
+                {payWords(pay)}
             </p>
             <button
                 type="button"
@@ -445,6 +491,34 @@ export function BagSheet({
             </button>
         </SheetFrame>
     );
+}
+
+/** How the quote's chosen way can be paid; online for an older API. */
+function paysOf(
+    quote: CheckoutQuote | null,
+): { type: ShopPayment; label: string }[] {
+    if (!quote) return [];
+    return quote.payments ?? [{ type: "ONLINE", label: "Pay online" }];
+}
+
+/** The way to pay picked, if still offered; else the first offered. */
+export function payChosen(
+    pays: readonly { type: ShopPayment; label: string }[],
+    picked: ShopPayment | null,
+): { type: ShopPayment; label: string } | null {
+    return pays.find((p) => p.type === picked) ?? pays.at(0) ?? null;
+}
+
+/** What the customer is told about paying, above the button. */
+export function payWords(
+    pay: { type: ShopPayment; label: string } | null,
+): string {
+    if (pay?.type === "ON_HANDOVER") {
+        return pay.label === "Pay on delivery"
+            ? "You'll pay when your order is delivered. Your order is placed now."
+            : "You'll pay when you collect your order. Your order is placed now.";
+    }
+    return "You pay online in a secure window. Your order is placed once the payment goes through.";
 }
 
 function AddressFields({

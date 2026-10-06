@@ -7,6 +7,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { authorize } from "../organizations/organization-policy";
 import { sanitizeRichHtml } from "../sites/sanitize";
 import { assertSiteInOrg, reviewerScope } from "../sites/site-access";
@@ -237,6 +238,7 @@ export class PostsService {
                 image: true,
                 featured: true,
                 publishedAt: true,
+                currentPublicationId: true,
                 category: { select: { name: true, slug: true } },
                 author: { select: { name: true } },
             },
@@ -268,6 +270,10 @@ export class PostsService {
         };
 
         return prisma.$transaction(async (tx) => {
+            // The plan's blog posts cap counts posts that are live (U13):
+            // putting one live is checked, republishing a live one isn't.
+            if (post.currentPublicationId === null)
+                await planMeter.roomInTx(tx, ctx.organizationId, "blog");
             const publication = await tx.publication.create({
                 data: {
                     siteId,

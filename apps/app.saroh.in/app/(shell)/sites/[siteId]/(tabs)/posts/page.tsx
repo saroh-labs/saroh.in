@@ -5,6 +5,7 @@ import { NotebookPen } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { Post } from "@/lib/content/service";
@@ -75,62 +76,68 @@ export default async function SitePostsPage({
     }
 
     return (
-        <ListCard
-            main="Post"
-            end="Date"
-            note="Drafts are visible to the team and to nobody else."
-        >
-            {posts.map((post) => {
-                const pill = postPill(post);
-                return (
-                    <li
-                        key={post.id}
-                        className="border-b border-border last:border-b-0"
-                    >
-                        <Link
-                            href={`${base}/${post.id}`}
-                            aria-label={`${post.title}, ${pill.label.toLowerCase()}`}
-                            className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        <>
+            <PlanLimitNotice moduleId="blog" className="mb-4" />
+            <ListCard
+                main="Post"
+                end="Date"
+                note="Drafts are visible to the team and to nobody else."
+            >
+                {posts.map((post) => {
+                    const pill = postPill(post);
+                    return (
+                        <li
+                            key={post.id}
+                            className="border-b border-border last:border-b-0"
                         >
-                            <ListRow
-                                title={post.title}
-                                tag={
-                                    <>
-                                        <Badge variant={pill.variant}>
-                                            {pill.label}
-                                        </Badge>
-                                        {post.featured ? (
-                                            <Badge variant="neutral">
-                                                Featured
+                            <Link
+                                href={`${base}/${post.id}`}
+                                aria-label={`${post.title}, ${pill.label.toLowerCase()}`}
+                                className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                            >
+                                <ListRow
+                                    title={post.title}
+                                    tag={
+                                        <>
+                                            <Badge variant={pill.variant}>
+                                                {pill.label}
                                             </Badge>
-                                        ) : null}
-                                    </>
-                                }
-                                sub={
-                                    <>
-                                        <span className="font-mono">
-                                            /{prefix}/{post.slug}
+                                            {post.featured ? (
+                                                <Badge variant="neutral">
+                                                    Featured
+                                                </Badge>
+                                            ) : null}
+                                        </>
+                                    }
+                                    sub={
+                                        <>
+                                            <span className="font-mono">
+                                                /{prefix}/{post.slug}
+                                            </span>
+                                            {" · "}
+                                            {post.category?.name ??
+                                                "Uncategorized"}
+                                            {post.author
+                                                ? ` · ${post.author}`
+                                                : ""}
+                                        </>
+                                    }
+                                    end={
+                                        <span className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
+                                            <ViewerDate
+                                                iso={
+                                                    post.publishedAt ??
+                                                    post.createdAt
+                                                }
+                                            />
                                         </span>
-                                        {" · "}
-                                        {post.category?.name ?? "Uncategorized"}
-                                        {post.author ? ` · ${post.author}` : ""}
-                                    </>
-                                }
-                                end={
-                                    <span className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
-                                        <ViewerDate
-                                            iso={
-                                                post.publishedAt ??
-                                                post.createdAt
-                                            }
-                                        />
-                                    </span>
-                                }
-                            />
-                        </Link>
-                    </li>
-                );
-            })}
-        </ListCard>
+                                    }
+                                />
+                            </Link>
+                        </li>
+                    );
+                })}
+            </ListCard>
+        </>
     );
 }

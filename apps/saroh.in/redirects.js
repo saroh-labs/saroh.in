@@ -15,9 +15,12 @@
  *   and Contacts, so they follow those. Automations went to Coming soon, so
  *   it follows it to the waitlist; What it will not do goes Home.
  *
- * `/pricing` is not published yet (Gate W), so it is a TEMPORARY (302)
- * redirect to the waitlist, in `TEMPORARY`: a browser or search engine must
- * not remember it, because Pricing comes back at its own address.
+ * `/pricing` is not published until the site's launch switch opens
+ * (`NEXT_PUBLIC_LAUNCH_MODE=open`, plan KTD-16; Gate W kept it unpublished),
+ * so until then it is a temporary (302) redirect to the waitlist, from
+ * `temporary()`: a browser or search engine must not remember it, because
+ * Pricing comes back at its own address. `next.config.js` passes the switch
+ * in at build, as it reads it.
  */
 
 /** @typedef {{ source: string; destination: string; statusCode: 301 | 302 }} Redirect */
@@ -69,8 +72,16 @@ const REDIRECTS = [
 
 /** Pages not published yet: temporary, so nothing caches them. */
 /** @type {Redirect[]} */
-const TEMPORARY = [
-    { source: "/pricing", destination: "/waitlist", statusCode: 302 },
-];
+/**
+ * The temporary redirects for the site's launch mode: Pricing to the
+ * waitlist until the switch is "open".
+ *
+ * @param {string | undefined} launchMode `NEXT_PUBLIC_LAUNCH_MODE`
+ * @returns {Redirect[]}
+ */
+const temporary = (launchMode) =>
+    launchMode === "open"
+        ? []
+        : [{ source: "/pricing", destination: "/waitlist", statusCode: 302 }];
 
-module.exports = { REDIRECTS, TEMPORARY };
+module.exports = { REDIRECTS, temporary };

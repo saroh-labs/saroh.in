@@ -140,7 +140,10 @@ export type VerificationOtpType =
  * plugin config in @saroh/auth).
  *
  * The console fallback prints the code so local dev, which has no SMTP, can
- * still complete a signup.
+ * still complete a signup. Where the fake code transport is allowed (never in
+ * production, `siteCodesFakeAllowed`), it also leaves the code in the
+ * temp-directory outbox, so a browser test can sign up a new account from
+ * the marketing site end to end (plan U27, `signup-from-marketing.spec.ts`).
  */
 export function sendVerificationOtpEmail(
     to: string,
@@ -152,6 +155,9 @@ export function sendVerificationOtpEmail(
     const minutes = Math.max(1, Math.round(expiresInSeconds / 60));
     if (!transporter) {
         console.info(`[${copy.heading}] (no SMTP) ${to}: code ${otp}`);
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            writeSiteCodeOutbox(to, otp);
+        }
         return Promise.resolve();
     }
     void transporter.sendMail({
@@ -409,18 +415,27 @@ export async function sendReviewInvitationEmail(
 }
 
 /**
- * Invite someone off the waitlist to create their account (admin console
- * U11). Awaited, like the review invitation: a person is only marked invited
- * once their email has left, so the waitlist never claims an invitation that
- * nobody received. Without SMTP it prints only in development.
+ * The opening-day invite off the waitlist (marketing plan U31): "Your Saroh
+ * invite", with a link that is the invitee's alone. Awaited and it says how
+ * it went, like the review invitation: the batch records an invite as sent
+ * only once its email has left.
+ *
+ * With no SMTP it never leaves the process: where the fake transport is
+ * allowed (development, or `SITE_CODES_EMAIL_FAKE` named off production,
+ * `siteCodesFakeAllowed`), `log` prints it and counts it sent and `fail`
+ * fails it; anywhere else nothing left. `businessName` is what the visitor
+ * typed, so it is escaped. The email names no offer length or price: the
+ * waitlist page says what the offer is.
  */
-export async function sendWaitlistInvitationEmail(
+export async function sendWaitlistLaunchInviteEmail(
     to: string,
-    signupUrl: string,
+    details: { url: string; businessName: string | null; validDays: number },
 ): Promise<EmailOutcome> {
+    const { url, businessName, validDays } = details;
     if (!transporter) {
-        if (env.NODE_ENV === "development") {
-            console.info(`[Waitlist invite] (no SMTP) ${to}: ${signupUrl}`);
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            console.info(`[Saroh invite] (no SMTP) ${to}: ${url}`);
             return "sent";
         }
         return "not-configured";
@@ -429,13 +444,86 @@ export async function sendWaitlistInvitationEmail(
         await transporter.sendMail({
             from: FROM,
             to,
-            subject: "Your Saroh account is ready to create",
-            html: actionEmail(
-                "You're in",
-                "You asked to hear when Saroh was ready for you. It is: create your account with this email address and set up your business.",
-                signupUrl,
-                "Create your account",
-            ),
+            subject: LAUNCH_INVITE_SUBJECT,
+            html: launchInviteEmail(url, businessName, validDays),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+export const LAUNCH_INVITE_SUBJECT = "Your Saroh invite";
+
+/** The invite's body; every value in it is escaped. */
+export function launchInviteEmail(
+    url: string,
+    businessName: string | null,
+    validDays: number,
+): string {
+    const href = esc(url);
+    const what = businessName ? esc(businessName) : "your business";
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Saroh is open, and you're in</h2>
+  <p>You joined the waitlist and we promised one email, on opening day. This is it.</p>
+  <p>Create your account with this email address and set up ${what}. It starts on the launch offer from the waitlist page, and you add no payment details to begin.</p>
+  <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Set up ${what}</a></p>
+  <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${validDays} days. Or paste it: ${href}</p>
+</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Saroh's own billing mail (pricing catalogue U17)
+// ---------------------------------------------------------------------------
+
+/** One Saroh billing email: an invoice, a failed payment, a trial ending. */
+export interface SarohBillingEmail {
+    to: string[];
+    subject: string;
+    html: string;
+    /** Where a reply goes (`SAROH_BILLING_EMAIL`), when set. */
+    replyTo?: string | null;
+    attachments?: { filename: string; content: Buffer }[];
+}
+
+/**
+ * Send Saroh's own billing mail to a business (U17): Saroh billing the
+ * business for its plan, from Saroh's identity transport. Awaited, and it
+ * says how it went, because the `billing.email` job retries a failure and
+ * records a send.
+ *
+ * With no SMTP it never reaches the network: the fake transport the code
+ * email uses (`SITE_CODES_EMAIL_FAKE`, development by default) logs the
+ * subject and how many it was for — never the addresses or the body — or
+ * fails every send with `fail`. Anywhere else with no SMTP, nothing left.
+ */
+export async function sendSarohBillingEmail(
+    email: SarohBillingEmail,
+): Promise<EmailOutcome> {
+    if (email.to.length === 0) return "not-configured";
+    if (!transporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            const files = email.attachments?.length ?? 0;
+            console.info(
+                `[Saroh billing] (no SMTP) ${email.subject} to ${email.to.length} recipient(s)${files ? `, ${files} attachment(s)` : ""}`,
+            );
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to: email.to,
+            ...(email.replyTo ? { replyTo: email.replyTo } : {}),
+            subject: email.subject,
+            html: email.html,
+            attachments: email.attachments?.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                contentType: "application/pdf",
+            })),
         });
         return "sent";
     } catch {

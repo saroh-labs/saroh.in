@@ -385,13 +385,18 @@ describe("paying at booking (E8)", () => {
         expect(pays({}, false)).toEqual(["DESK"]);
     });
 
-    it("a deposit that can't be taken online offers nothing, and says so", () => {
-        expect(pays({ depositCents: 30_000 }, false)).toEqual([]);
+    it("a deposit that can't be taken online is paid at the desk, under Both (DEC-089)", () => {
+        const choices = payChoices(
+            service({ depositCents: 30_000 }),
+            false,
+            "Kavi Dental",
+        );
+        expect(choices.map((c) => [c.pay, c.label, c.amount])).toEqual([
+            ["DESK", "Pay at the desk", "₹1,200"],
+        ]);
         expect(
             unpayableText(service({ depositCents: 30_000 }), false, "Kavi"),
-        ).toBe(
-            "Kavi can't take the deposit online right now. Get in touch with them to book.",
-        );
+        ).toBeNull();
         expect(
             unpayableText(service({ depositCents: 30_000 }), true, "Kavi"),
         ).toBeNull();
@@ -416,12 +421,14 @@ describe("paying at booking (E8)", () => {
 
         it.each([
             // way, payOnline, no deposit, a deposit, the full price
+            // A deposit online can't take is paid at the desk wherever the
+            // desk is allowed (DEC-089); under online only, nothing.
             ["BOTH", true, ["NOW", "DESK"], ["DEPOSIT", "NOW"], ["NOW"]],
-            ["BOTH", false, ["DESK"], [], []],
+            ["BOTH", false, ["DESK"], ["DESK"], ["DESK"]],
             ["ONLINE", true, ["NOW"], ["DEPOSIT", "NOW"], ["NOW"]],
             ["ONLINE", false, [], [], []],
-            ["DESK", true, ["DESK"], [], []],
-            ["DESK", false, ["DESK"], [], []],
+            ["DESK", true, ["DESK"], ["DESK"], ["DESK"]],
+            ["DESK", false, ["DESK"], ["DESK"], ["DESK"]],
         ] as const)(
             "%s, online %s: no deposit %j, a deposit %j, the full price %j",
             (way, online, none, part, full) => {
@@ -449,9 +456,17 @@ describe("paying at booking (E8)", () => {
             expect(unpayable({}, false, "ONLINE")).toBe(
                 "Kavi Dental can't take payment online right now. Get in touch with them to book.",
             );
-            expect(unpayable({ depositCents: 30_000 }, true, "DESK")).toBe(
+            expect(unpayable({ depositCents: 30_000 }, false, "ONLINE")).toBe(
                 "Kavi Dental can't take the deposit online right now. Get in touch with them to book.",
             );
+            // Both and At the desk never say get in touch (DEC-089).
+            for (const way of ["BOTH", "DESK"] as const) {
+                for (const online of [true, false]) {
+                    expect(
+                        unpayable({ depositCents: 30_000 }, online, way),
+                    ).toBeNull();
+                }
+            }
         });
 
         it("a service with no price books with nothing to pay, whatever the rule", () => {

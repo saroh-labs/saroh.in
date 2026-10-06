@@ -66,6 +66,8 @@ module.exports = {
         // commands, and the readiness registry — all with mocked Prisma/flags/
         // entitlements (no DB, no network).
         "<rootDir>/src/modules/capabilities/module-availability.service.spec.ts",
+        // U12: the plan step, and PAYMENTS locking actions, never the module.
+        "<rootDir>/src/modules/capabilities/module-availability.catalogue.spec.ts",
         "<rootDir>/src/modules/capabilities/module-lifecycle.service.spec.ts",
         "<rootDir>/src/modules/capabilities/readiness/module-readiness.registry.spec.ts",
         // #115 module API controller (mocked services).
@@ -215,6 +217,15 @@ module.exports = {
         // G13: the site bag's pricing, DB-free. The real rows are in
         // public-checkout.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
+        // Whether the site can take an online order, with the plan's say
+        // over online payments — DB-free.
+        "<rootDir>/src/modules/orders/checkout-readiness.spec.ts",
+        // Paying at the handover at the site's checkout (2026-10-06): the
+        // order's write and the service's choice, with a mocked database.
+        "<rootDir>/src/modules/orders/offline-checkout-order.spec.ts",
+        "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
+        // R34: an order to pay on handover nobody came for, pure.
+        "<rootDir>/src/modules/orders/uncollected.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
@@ -278,6 +289,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
         // G20: a plan joined online — its snapshot and waiting joins. Pure.
         "<rootDir>/src/modules/subscriptions/plan-join.spec.ts",
+        // 6 Oct 2026: memberships need the plan's rows to be set up.
+        "<rootDir>/src/modules/subscriptions/membership-plan-lock.spec.ts",
+        "<rootDir>/src/modules/subscriptions/public-plans.lock.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
@@ -338,6 +352,10 @@ module.exports = {
         // the billing webhook inbox (signature-before-write, idempotent replay).
         // Jest-mocked Prisma + fake provider; never touch a DB or the network.
         "<rootDir>/src/modules/billing/**/*.spec.ts",
+        // Plans catalogue U3: the draft-preview token, the public view of a
+        // snapshot and the impact rules — pure. The *.db.spec.ts beside them
+        // run in the integration project.
+        "<rootDir>/src/modules/pricing/**/*.spec.ts",
         // Public waitlist capture: normalization, idempotency (including the
         // concurrent-insert P2002 race), and that a full address never reaches
         // the logs. Jest-mocked Prisma; no DB.

@@ -9,6 +9,11 @@ import { DomainsModule } from "../domains/domains.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { HealthModule } from "../health/health.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { AdminPricingController } from "../pricing/admin-pricing.controller";
+import { CatalogueWritesService } from "../pricing/catalogue-writes.service";
+import { CouponsService } from "../pricing/coupons.service";
+import { PricingModule } from "../pricing/pricing.module";
+import { WaitlistModule } from "../waitlist/waitlist.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
@@ -22,6 +27,7 @@ import { AdminOperationsService } from "./admin-operations.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsController } from "./admin-organizations.controller";
 import { AdminOrganizationsService } from "./admin-organizations.service";
+import { AdminOverridesService } from "./admin-overrides.service";
 import { AdminPeopleController } from "./admin-people.controller";
 import { AdminPeopleService } from "./admin-people.service";
 import { AdminStaffController } from "./admin-staff.controller";
@@ -45,6 +51,8 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         DomainsModule,
         HealthModule,
         WebhooksModule,
+        PricingModule,
+        WaitlistModule,
     ],
     controllers: [
         AdminController,
@@ -53,6 +61,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminPeopleController,
         AdminMachineryController,
         AdminWaitlistController,
+        AdminPricingController,
     ],
     providers: [
         IdempotencyService,
@@ -63,12 +72,16 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminOrganizationViewService,
         AdminOrganizationsService,
         AdminLifecycleService,
+        AdminOverridesService,
         AdminStaffService,
         AdminPeopleService,
         AdminMachineryService,
         AdminOperationsService,
         AdminHealthService,
         AdminWaitlistService,
+        // Pricing catalogue writes (U4): they audit through AdminAuditService.
+        CatalogueWritesService,
+        CouponsService,
         PlatformAdminGuard,
         PlatformPermissionGuard,
         OrganizationAccessSessionGuard,

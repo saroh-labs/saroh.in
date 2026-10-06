@@ -1,9 +1,14 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import { liveCatalogueVersion, prisma } from "@saroh/database";
+import type { AccessState, LimitPeriod } from "@saroh/pricing-catalog";
+import { resolveAllAccess } from "@saroh/pricing-catalog";
 
+import { mapEntry } from "../billing/catalogue-access";
+import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import type { EntitlementMap } from "../billing/entitlement.service";
 import { EntitlementService } from "../billing/entitlement.service";
 import { MODULES } from "../capabilities/module-registry";
+import { catalogueUsage } from "./catalogue-usage";
 
 const PANEL_ROWS = 20;
 
@@ -62,13 +67,86 @@ export interface OrganizationModuleRow {
     dependencies: readonly string[];
 }
 
+/** One catalogue row as this business gets it (pricing U11). */
+export interface CatalogueModuleRow {
+    moduleId: string;
+    name: string;
+    /** What applies now: on, or how it shows when off. */
+    state: AccessState;
+    /** The cap now, null for none or when off. */
+    limit: number | null;
+    per: LimitPeriod;
+    /** Its plan's own cell, before any override or add-on. */
+    planState: AccessState;
+    planLimit: number | null;
+    /** Why it differs from the plan, in the design's words; empty if not. */
+    override: string;
+    /** How many are in use, where the page can count them; else null. */
+    usage: number | null;
+    /** Whether the row has a limit to set (`MODULE_MAP.limitKey`). */
+    limitable: boolean;
+}
+
+/** A live override on the business, of any kind. */
+export interface OrganizationOverride {
+    id: string;
+    kind: string;
+    /** A raise's entitlement key; the catalogue row otherwise. */
+    key: string;
+    moduleKey: string | null;
+    planKey: string | null;
+    value: number | null;
+    expiresAt: Date | null;
+    reason: string;
+    createdAt: Date;
+}
+
+/** The business read through the pricing catalogue (U12), for U11's actions. */
+export interface OrganizationCatalogue {
+    /** The version it is on, and the live one (null if none is live). */
+    version: number;
+    liveVersion: number | null;
+    /** The plan it is on after a plan override, and its subscription's. */
+    planId: string;
+    planName: string;
+    basePlanId: string;
+    /** What it pays a month before GST, and its plan's own price (paise). */
+    pricePaise: number;
+    planPricePaise: number;
+    planOverride: {
+        id: string;
+        planKey: string;
+        expiresAt: Date | null;
+    } | null;
+    pendingMove: { planId: string; version: number; from: Date } | null;
+    /** The plans of its version, for putting it on one. */
+    plans: { id: string; name: string }[];
+    modules: CatalogueModuleRow[];
+}
+
 export interface OrganizationPlan {
     subscription: {
         status: string;
-        plan: { id: string; key: string; name: string; version: number };
+        plan: {
+            id: string;
+            key: string;
+            name: string;
+            version: number;
+            interval: string;
+        };
+        provider: string | null;
         currentPeriodEnd: Date | null;
         cancelAtPeriodEnd: boolean;
     } | null;
+    /** Null while the catalogue doesn't reach the business (`legacyReason`). */
+    catalogue: OrganizationCatalogue | null;
+    legacyReason: string | null;
+    /** Every live override, newest first. */
+    overrides: OrganizationOverride[];
+    /**
+     * The limits no catalogue row covers (`sites`, `storefronts`, …) — or,
+     * off the catalogue, every key its plan sets.
+     */
     limits: {
         key: string;
         /** What the plan (or the free floor) grants. */
@@ -147,7 +225,10 @@ export interface OrganizationSupportView {
 export class AdminOrganizationViewService {
     private readonly logger = new Logger(AdminOrganizationViewService.name);
 
-    constructor(private readonly entitlements: EntitlementService) {}
+    constructor(
+        private readonly entitlements: EntitlementService,
+        private readonly access: CatalogueAccessService,
+    ) {}
 
     async view(
         organizationId: string,
@@ -365,12 +446,14 @@ export class AdminOrganizationViewService {
         organizationId: string,
         counts: OrganizationFacts["counts"],
     ): Promise<OrganizationPlan> {
-        const [subscription, planValues, effective, overrides] =
+        const now = new Date();
+        const [subscription, access, raises, overrides, usage, live] =
             await Promise.all([
                 prisma.subscription.findUnique({
                     where: { organizationId },
                     select: {
                         status: true,
+                        provider: true,
                         currentPeriodEnd: true,
                         cancelAtPeriodEnd: true,
                         plan: {
@@ -379,36 +462,110 @@ export class AdminOrganizationViewService {
                                 key: true,
                                 name: true,
                                 version: true,
+                                interval: true,
                             },
                         },
                     },
                 }),
-                this.entitlements.getPlanEntitlements(organizationId),
-                this.entitlements.getEntitlements(organizationId),
+                this.access.resolve(organizationId, now),
                 this.entitlements.liveOverrides(organizationId),
+                prisma.entitlementOverride.findMany({
+                    where: {
+                        organizationId,
+                        revokedAt: null,
+                        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+                    },
+                    select: {
+                        id: true,
+                        kind: true,
+                        key: true,
+                        moduleKey: true,
+                        planKey: true,
+                        value: true,
+                        expiresAt: true,
+                        reason: true,
+                        createdAt: true,
+                    },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                }),
+                catalogueUsage(organizationId),
+                liveCatalogueVersion(prisma, now),
             ]);
+        const planValues = access.planEntitlements;
+        const effective = access.entitlements;
 
         // Usage the instance can count. A limit whose usage nobody measures
         // says so (null) rather than showing zero.
-        const usage: Record<string, number> = {
+        const keyUsage: Record<string, number> = {
             sites: counts.sites,
             teamMembers: counts.members,
         };
 
-        const keys = new Set([
-            ...Object.keys(planValues),
-            ...Object.keys(effective),
-        ]);
+        let catalogue: OrganizationCatalogue | null = null;
+        // Keys a catalogue row shows: its id and its legacy key.
+        const covered = new Set<string>();
+        if (access.source === "catalogue") {
+            const { catalog } = access;
+            const own = resolveAllAccess({
+                catalog,
+                planId: access.planId,
+                now,
+            });
+            for (const m of catalog.modules) {
+                covered.add(m.id);
+                const legacyKey = mapEntry(m.id)?.legacyEntitlementKey;
+                if (legacyKey) covered.add(legacyKey);
+            }
+            catalogue = {
+                version: access.version,
+                liveVersion: live?.version ?? null,
+                planId: access.planId,
+                planName: access.planName,
+                basePlanId: access.basePlanId,
+                pricePaise: access.pricePaise,
+                planPricePaise:
+                    catalog.plans.find((p) => p.id === access.planId)
+                        ?.pricePaise ?? 0,
+                planOverride: access.planOverride,
+                pendingMove: access.pendingMove,
+                plans: catalog.plans.map((p) => ({ id: p.id, name: p.name })),
+                modules: access.modules.map((a) => {
+                    const plan = own.find((o) => o.moduleId === a.moduleId);
+                    return {
+                        moduleId: a.moduleId,
+                        name: a.name,
+                        state: a.state,
+                        limit: a.state === "on" ? a.limit : null,
+                        per: a.per,
+                        planState: plan?.state ?? a.state,
+                        planLimit:
+                            plan?.state === "on" ? (plan.limit ?? null) : null,
+                        override: a.override,
+                        usage: usage[a.moduleId] ?? null,
+                        limitable: Boolean(mapEntry(a.moduleId)?.limitKey),
+                    };
+                }),
+            };
+        }
+
+        const keys = new Set(
+            [...Object.keys(planValues), ...Object.keys(effective)].filter(
+                (key) => !covered.has(key),
+            ),
+        );
 
         return {
             subscription,
+            catalogue,
+            legacyReason: access.source === "legacy" ? access.reason : null,
+            overrides,
             limits: [...keys].sort().map((key) => {
-                const override = overrides.find((row) => row.key === key);
+                const override = raises.find((row) => row.key === key);
                 return {
                     key,
                     planValue: pick(planValues, key),
                     effective: pick(effective, key),
-                    usage: usage[key] ?? null,
+                    usage: keyUsage[key] ?? null,
                     override: override
                         ? {
                               id: override.id,

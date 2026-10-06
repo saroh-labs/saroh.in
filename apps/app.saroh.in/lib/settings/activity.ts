@@ -125,6 +125,7 @@ const TAB_LABEL: Record<BusinessTab, string> = {
     contact: "Contact",
     tax: "Tax and invoices",
     hours: "Hours",
+    pay: "How to pay us",
     address: "Registered address",
 };
 

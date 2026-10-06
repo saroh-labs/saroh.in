@@ -1,3 +1,5 @@
+import { cn } from "@saroh/ui/lib/utils";
+
 /**
  * "How it prints" ("Saroh Settings" design): the top of an invoice as the
  * business's details put it, live while a section is being edited, so an edit
@@ -7,6 +9,7 @@
  * it keeps the design's fixed paper and ink in dark theme as well.
  */
 export function BusinessPrintPreview({
+    hidden = false,
     live,
     logoUrl,
     registered,
@@ -20,6 +23,8 @@ export function BusinessPrintPreview({
     deliverySac,
     deliveryRate,
 }: {
+    /** Another card shows its own preview (How to pay us). */
+    hidden?: boolean;
     /** A section is being edited: say the preview shows the unsaved edit. */
     live: boolean;
     /** The logo printed above the legal name, when there is one. */
@@ -39,7 +44,10 @@ export function BusinessPrintPreview({
     return (
         <aside
             aria-label="How it prints"
-            className="grid min-w-[260px] flex-[0_1_320px] gap-2 self-start min-[1100px]:sticky min-[1100px]:top-4"
+            className={cn(
+                "grid min-w-[260px] flex-[0_1_320px] gap-2 self-start min-[1100px]:sticky min-[1100px]:top-4",
+                hidden && "hidden",
+            )}
         >
             <div className="flex items-baseline gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">

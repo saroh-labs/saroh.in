@@ -14,6 +14,8 @@ import type { PublicCredit } from "../bookings/booking-credit";
 import type { PublicBookingResult } from "../bookings/public-bookings.controller";
 import { publicBookingResult } from "../bookings/public-bookings.controller";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
+import type { PayInstructionsView } from "../organizations/business-pay-instructions";
+import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import type { CustomerContext } from "./customer-context.decorator";
 import { CurrentCustomer } from "./customer-context.decorator";
 import { CustomerSessionGuard } from "./customer-session.guard";
@@ -47,7 +49,9 @@ export class AccountBookingsController {
         @CurrentCustomer() customer: CustomerContext,
         @RelayContext() relay: SiteRelay,
         @Body() dto: AccountBookDto,
-    ): Promise<PublicBookingResult> {
+    ): Promise<
+        PublicBookingResult & { payInstructions?: PayInstructionsView | null }
+    > {
         const { booking, payToken } = await this.bookings.bookOnline(
             dto.serviceId,
             {
@@ -73,7 +77,20 @@ export class AccountBookingsController {
                 contactId: customer.contactId,
             },
         );
-        return publicBookingResult(booking, payToken);
+        const result = publicBookingResult(booking, payToken);
+        // Booked to pay at the desk (R32): how to pay the business ahead,
+        // if it says — the customer's own booking, in the business the
+        // session resolved to.
+        return booking.paidWith === "DESK" &&
+            !payToken &&
+            result.state === "CONFIRMED"
+            ? {
+                  ...result,
+                  payInstructions: await businessPayInstructionsOf(
+                      customer.organizationId,
+                  ),
+              }
+            : result;
     }
 
     /**

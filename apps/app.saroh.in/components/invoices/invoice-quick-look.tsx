@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
@@ -120,7 +121,7 @@ export function InvoiceQuickLook({
         setBusy(true);
         const res = await createPayLink(i.id);
         setBusy(false);
-        if (!res.ok) return showError(res.error);
+        if (!res.ok) return reportFailure(res);
         try {
             await navigator.clipboard.writeText(res.data.url);
             setCopied(true);

@@ -49,6 +49,15 @@ export function plansPayOnline(body: unknown): boolean {
     return (body as { payOnline?: unknown } | null)?.payOnline === true;
 }
 
+/**
+ * Whether the business's Saroh plan includes memberships (6 Oct 2026). Only
+ * an explicit `offered: false` says no: an older API that doesn't say, yes.
+ * When no, the read's plans are empty whatever is on sale.
+ */
+export function plansOffered(body: unknown): boolean {
+    return (body as { offered?: unknown } | null)?.offered !== false;
+}
+
 /** The autopay methods the plans read names (D12); none when it names none. */
 export function plansAutopayMethods(body: unknown): AutopayMethod[] {
     return autopayMethodsOf(

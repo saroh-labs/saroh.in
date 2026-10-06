@@ -58,15 +58,15 @@ const HERO: [string, string][] = [
 
 /**
  * Static, refreshed every five minutes (ISR), the window the launch offer
- * is cached for.
+ * is cached for, and at once when the API calls `/api/revalidate`.
  */
 export const revalidate = 300;
 
 /**
  * The waitlist (Waitlist design, plan U30): the site's one ask until
  * launch. It has its own header and footer, as the design draws them, so it
- * sits outside the `(v2)` chrome. The launch offer is the API's
- * (`GET /public/waitlist/offer`); with none, the form says it is announced at launch. The page reads no query, so
+ * sits outside the `(v2)` chrome. The launch offer is the API's (U31); with
+ * none, the form says it is announced at launch. The page reads no query, so
  * it stays static: the form reads `?plan=`, `?src=` (the CTA builder,
  * `lib/links.ts`) and `?ref=` (a referral link) in the browser as it sends.
  */

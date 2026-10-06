@@ -38,7 +38,7 @@ const LIVE_ACCOUNT = ["ACTIVE", "BLOCKED"] as const;
 export const PAID_ORDER = Prisma.sql`o."paymentStatus" IN ('PAID', 'REFUNDED')`;
 
 /** An order that counts at all: never an abandoned checkout (plan B, B1). */
-const REAL_ORDER = Prisma.sql`NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID')`;
+const REAL_ORDER = Prisma.sql`NOT (o."placedOnline" AND NOT o."payOnHandover" AND o."paymentStatus" = 'UNPAID')`;
 
 /** True when `column` holds one of `contact-email.ts`'s placeholders. */
 function reservedEmail(column: Prisma.Sql): Prisma.Sql {

@@ -49,7 +49,9 @@ module.exports = {
     // organizations `*.db.spec.ts` (F19's role reach) is the exception.
     testPathIgnorePatterns: [
         "<rootDir>/src/modules/organizations/(?!.*\\.db\\.spec\\.ts$)",
-        "<rootDir>/src/modules/admin/",
+        // Admin specs mock Prisma and run in the unit project; only the
+        // admin *.db.spec.ts (U11's overrides) run here.
+        "<rootDir>/src/modules/admin/(?!.*\\.db\\.spec\\.ts$)",
         "\\.authorization\\.spec\\.ts$",
         // #384 customer delete: mocked Prisma, runs in the unit project.
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
@@ -68,6 +70,9 @@ module.exports = {
         // The waitlist's mocked specs run in the default/unit project; only
         // waitlist.db.spec.ts (U30) runs here.
         "<rootDir>/src/modules/waitlist/(?!.*\\.db\\.spec\\.ts$)",
+        // Plans catalogue U3: pure specs run in the unit project; only the
+        // pricing *.db.spec.ts run here.
+        "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",
         // DB-free specs that mock @saroh/database and run in the unit project:
         // the discount redemption core and the storefront settings spec.
         "<rootDir>/src/modules/discounts/discount-state.spec.ts",
@@ -78,6 +83,11 @@ module.exports = {
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
         // P4: the order confirmation's view, pure.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
+        // Paying at the handover (2026-10-06): mocked database, unit project.
+        "<rootDir>/src/modules/orders/offline-checkout-order.spec.ts",
+        "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
+        // R34: pure; home.uncollected.db.spec.ts runs here.
+        "<rootDir>/src/modules/orders/uncollected.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",
@@ -147,6 +157,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
         // G20: pure; the real rows are in public-plan-join.db.spec.ts.
         "<rootDir>/src/modules/subscriptions/plan-join.spec.ts",
+        // Mocked; the real rows are in membership-plan-lock.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/membership-plan-lock.spec.ts",
+        "<rootDir>/src/modules/subscriptions/public-plans.lock.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         // E14: pure; the real rows are in class-packs.drafts.db.spec.ts.
         "<rootDir>/src/modules/class-packs/pack-on-sale.spec.ts",

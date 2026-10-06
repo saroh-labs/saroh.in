@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { OrderReviews } from "@/components/stores/order-reviews";
+import { takesOnlinePayment } from "@/lib/billing/access";
 import { customerHref } from "@/lib/customers/links";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
@@ -22,6 +23,7 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrderPayments } from "@/lib/payments/service";
 import { invitationState } from "@/lib/product-reviews/service";
 import { listProducts } from "@/lib/products/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Order" };
@@ -71,14 +73,19 @@ export default async function OrderPage({
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
     // What this person may do to it, each the power its endpoint asks (B16).
+    // A pay link is offered only on a plan that takes payment online
+    // (R33): elsewhere the order is paid in cash or at the counter, and no
+    // link is drawn at all.
     const powers = orderPowers(organization);
+    const linkable =
+        powers.payLink && takesOnlinePayment(await billingAccessOrNull());
 
     const contactId = order.customer?.contactId ?? null;
     // A pay link (B11) is offered only to someone who may take or change
     // orders, on an order that shows money, and only while a provider can
     // open the checkout window (DEC-054).
     const payOnline =
-        powers.payLink && order.money
+        linkable && order.money
             ? hasPaymentProvider().catch(() => false)
             : Promise.resolve(false);
     // The allergy check reads the order's own Needs attention (B15), which
@@ -133,7 +140,7 @@ export default async function OrderPage({
             can={{
                 stage: powers.stage,
                 edit: powers.edit,
-                payLink: powers.payLink,
+                payLink: linkable,
                 refund: powers.refund,
                 payOnline: canPayOnline,
                 manageProviders: may("payment:manage"),

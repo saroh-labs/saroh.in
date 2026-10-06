@@ -30,7 +30,8 @@ export function resourceItems(pages: readonly ResourcePage[]): NavItem[] {
     return pages.map((p) => ({ name: p.name, line: p.line, href: p.href }));
 }
 
-export type NavSection = "features" | "solutions" | "resources" | null;
+export type NavSection =
+    "features" | "solutions" | "pricing" | "resources" | null;
 
 /** Whether `pathname` is the page `href` or a page under it. */
 const within = (pathname: string, href: string) =>
@@ -43,6 +44,7 @@ export function sectionOf(
 ): NavSection {
     if (FEATURE_ITEMS.some((i) => i.href === pathname)) return "features";
     if (SOLUTION_ITEMS.some((i) => i.href === pathname)) return "solutions";
+    if (pathname === "/pricing") return "pricing";
     if (resources.some((i) => within(pathname, i.href))) return "resources";
     return null;
 }

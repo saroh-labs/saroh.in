@@ -5,7 +5,7 @@
 # CI round trip. Every step here exists because CI once caught it first —
 # docs/architecture/DEV_LEARNINGS.md has the stories.
 #
-#   pnpm prepush                 secrets, lint, types, checks, and the unit
+#   pnpm prepush                 secrets, private prices, lint, types, checks, and the unit
 #                                tests and vitest specs the branch's changes
 #                                reach (what .husky/pre-push runs)
 #   pnpm prepush --int           … plus the full unit suites and the API
@@ -134,9 +134,7 @@ if [ -n "$TREE" ]; then
     done
 fi
 
-# A template with its X's works on GNU and BSD mktemp alike; `-t prepush`
-# fails on Linux ("too few X's") and left every step without a log dir.
-W=$(mktemp -d "${TMPDIR:-/tmp}/prepush.XXXXXX")
+W=$(mktemp -d -t prepush)
 LOG=$W/step.log
 FAILED=""
 # cached <step> [<step that also counts>…]
@@ -145,14 +143,14 @@ cached() {
     [ "$USE_CACHE" = 1 ] && [ -n "$TREE" ] || return 1
     # Never cached: a leak lives in history, an advisory is published after
     # the tree passed, and a build is a means.
-    case "$1" in secrets | audit | int-build | deps) return 1 ;; esac
+    case "$1" in secrets | private | audit | int-build | deps) return 1 ;; esac
     for t in $SAME_CODE; do
         for s in "$@"; do [ -f "$PASSES/$t-$s" ] && return 0; done
     done
     return 1
 }
 record() {
-    case "$1" in secrets | audit | int-build | deps) return 0 ;; esac
+    case "$1" in secrets | private | audit | int-build | deps) return 0 ;; esac
     [ -n "$TREE" ] && date +%s >"$PASSES/$TREE-$1"; return 0
 }
 say() { printf '=== %-16s %s\n' "$1" "$2"; }
@@ -290,7 +288,7 @@ e2e_stack() {
     export APP_URL=http://localhost:3003
     export NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
     # Where accounts sends a new account (onboarding); unset, a production
-    # build falls back to https://app.saroh.in.
+    # build falls back to https://app.saroh.in (signup-from-marketing.spec).
     export NEXT_PUBLIC_APP_URL=http://localhost:3003
     export NEXT_PUBLIC_API_URL=http://localhost:3333
     export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
@@ -302,8 +300,9 @@ e2e_stack() {
     export E2E_RENDERER_URL=http://localhost:3005
     # The marketing site (saroh.in, the `web` package), built and started
     # only when a spec that opens it runs (marketing, link-preview, resources,
-    # help and privacy specs; plan U29), as
-    # CI does: its waitlist forwards to this stack's API.
+    # help and privacy specs; plan U29), as CI does: its waitlist forwards to
+    # this stack's API, and pricing reads the catalogue there (the
+    # placeholder when there is none).
     export E2E_WEB_URL=http://localhost:3002
     # Resources pages before their publish date, as CI: without it the Help
     # and Privacy specs skip themselves and test nothing.
@@ -624,7 +623,7 @@ e2e_start() {
     [ -n "$(git status --porcelain)" ] && \
         echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
     SHA=$(git rev-parse HEAD)
-    E2E_LOGS=$(mktemp -d "${TMPDIR:-/tmp}/prepush-e2e-logs.XXXXXX")
+    E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
     [ "$E2E_STATUS" = run ] &&
         echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
     [ "$PERM_STATUS" = run ] &&
@@ -730,6 +729,11 @@ if command -v gitleaks >/dev/null 2>&1; then
 else
     echo "=== secrets          SKIP — install gitleaks (brew install gitleaks); CI runs it"
 fi
+
+# Saroh's real prices and limits never enter the public repo; they live in
+# the database. The values to look for live on the owner's machine only
+# (scripts/check-private-terms.sh says where). Never cached, like secrets.
+step private scripts/check-private-terms.sh "$STEP_SKIP"
 
 # CI's dependency audit (critical only), the same rule: a critical advisory
 # fails; an unreachable registry is a SKIP, which CI runs again. Never cached,

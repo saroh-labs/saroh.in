@@ -29,7 +29,7 @@ export function CtaLink({
     /** Where on the site this button is, e.g. `nav`, `home-hero`. */
     src: string;
     plan?: string;
-    /** The plan's name and whether it costs anything. */
+    /** The plan's name and whether it costs anything, from the catalogue. */
     planName?: string;
     paid?: boolean;
     trialDays?: number;

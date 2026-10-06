@@ -1,4 +1,8 @@
-import type { AutopayChecks, AutopayMethod } from "@saroh/site-blocks";
+import type {
+    AutopayChecks,
+    AutopayMethod,
+    PayInstructions,
+} from "@saroh/site-blocks";
 import {
     autopayChecksOf,
     autopayMethodsOf,
@@ -73,6 +77,13 @@ export interface PayInvoice {
      * area's receipt): as before, Pay is offered.
      */
     payOnline?: boolean;
+    /**
+     * "How to pay us" (R32): the business's UPI ID, bank details and note,
+     * sent with an owed invoice the business doesn't take payment for
+     * online. Null or absent: none set, or not that page — the generic
+     * "pay them the way they've asked" line stands.
+     */
+    payInstructions?: PayInstructions | null;
 }
 
 /** `payOnline` from the API, checked: only a real `false` turns Pay off. */

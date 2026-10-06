@@ -60,9 +60,21 @@ export const VALUE_FIELDS = [
 
 /**
  * Personal details: recorded as "changed", never with a value. A contact
- * email or a phone is a person's; a website can be one too.
+ * email or a phone is a person's; a website can be one too. How to pay the
+ * business (R32) — a UPI ID, a bank account — is shown to its customers,
+ * but an account number does not belong in an audit trail.
  */
-export const NAME_ONLY_FIELDS = ["contactEmail", "phone", "website"] as const;
+export const NAME_ONLY_FIELDS = [
+    "contactEmail",
+    "phone",
+    "website",
+    "payUpiId",
+    "payBankAccountName",
+    "payBankAccountNumber",
+    "payBankIfsc",
+    "payBankName",
+    "payNote",
+] as const;
 
 const WITH_VALUES: ReadonlySet<string> = new Set(VALUE_FIELDS);
 const NEVER_VALUES: ReadonlySet<string> = new Set(NAME_ONLY_FIELDS);

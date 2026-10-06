@@ -27,6 +27,7 @@ jest.mock("@saroh/database", () => {
     const client = {
         merchantPaymentProvider: {
             upsert: jest.fn(),
+            count: jest.fn(),
             findMany: jest.fn(),
             findUnique: jest.fn(),
             update: jest.fn(),
@@ -77,7 +78,9 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { encryptSecret } from "./crypto";
 import { PaymentsService } from "./payments.service";
 import {
@@ -351,6 +354,85 @@ describe("PaymentsService.connectProvider — the public key (DEC-054)", () => {
             publicKey: "  cf_public  ",
         });
         expect(withKey.publicKey).toBe("cf_public");
+    });
+});
+
+describe("PaymentsService on a plan without online payments", () => {
+    const providerCount = prisma.merchantPaymentProvider.count as jest.Mock;
+    const KEYS = {
+        provider: "razorpay",
+        publicKey: "rzp_test_Key123",
+        keyId: "rzp_test_Key123",
+        keySecret: "super-secret-value",
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.spyOn(planMeter, "enforcedRow").mockImplementation(
+            (_org: string, moduleId: string) =>
+                Promise.resolve(
+                    fakePaymentsRow(
+                        "free",
+                        moduleId as "payments" | "subscriptions",
+                    ),
+                ),
+        );
+        providerUpsert.mockImplementation(
+            ({ create }: { create: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "mpp_1",
+                    createdAt: new Date("2026-01-01"),
+                    updatedAt: new Date("2026-01-01"),
+                    ...create,
+                }),
+        );
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    async function locked(p: Promise<unknown>) {
+        const err = await p.then(
+            () => null,
+            (e: unknown) => e,
+        );
+        expect(err).toBeInstanceOf(ForbiddenException);
+        expect((err as ForbiddenException).getResponse()).toMatchObject({
+            details: { code: "MODULE_LOCKED", moduleId: "payments" },
+        });
+    }
+
+    it("refuses connecting a provider for the first time: 403 MODULE_LOCKED, nothing stored", async () => {
+        const { service } = makeService();
+        providerCount.mockResolvedValue(0);
+
+        await locked(service.connectProvider(ctx(), KEYS));
+        expect(providerUpsert).not.toHaveBeenCalled();
+        expect(providerCount).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", provider: "RAZORPAY" },
+        });
+    });
+
+    it("lets a business re-enter the keys of a provider it already connected (renewals charge through it)", async () => {
+        const { service } = makeService();
+        providerCount.mockResolvedValue(1);
+
+        await expect(
+            service.connectProvider(ctx(), KEYS),
+        ).resolves.toMatchObject({ provider: "RAZORPAY" });
+        expect(providerUpsert).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses taking an order's payment online from the workspace", async () => {
+        const { service, fake } = makeService();
+        orderFindUnique.mockResolvedValue({
+            id: "order_1",
+            organizationId: "org_1",
+            total: "42.50",
+            currency: "INR",
+        });
+
+        await locked(service.createIntentForOrder(ctx(), "order_1"));
+        expect(fake.calls).toHaveLength(0);
+        expect(intentCreate).not.toHaveBeenCalled();
     });
 });
 

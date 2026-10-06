@@ -42,6 +42,18 @@ export const AdminPermission = {
     StaffGrant: "staff:grant",
     AuditRead: "audit:read",
     WaitlistInvite: "waitlist:invite",
+    // Plans & modules: the catalogue, its versions and impact (pricing U3).
+    PricingRead: "pricing:read",
+    // Catalogue writes (pricing U4): save or discard the shared draft.
+    PricingEdit: "pricing:edit",
+    // Publish, schedule, cancel a scheduled version, roll back.
+    PricingPublish: "pricing:publish",
+    // Coupons apply the moment they are saved, outside versions.
+    CouponsManage: "coupons:manage",
+    // One business's catalogue exceptions (pricing U11): grant, remove or
+    // limit a row, put it on a plan, move it to the live version. A custom
+    // price needs this and pricing:publish.
+    PricingOverride: "pricing:override",
 } as const;
 
 export type AdminPermission =
@@ -78,6 +90,11 @@ const ROLE_PERMISSIONS = {
         AdminPermission.OrganizationRead,
         AdminPermission.SubscriptionRead,
         AdminPermission.SubscriptionOverride,
+        AdminPermission.PricingRead,
+        AdminPermission.PricingEdit,
+        AdminPermission.PricingOverride,
+        // Coupons are the Billing team's to run (owner, 2026-10-03).
+        AdminPermission.CouponsManage,
     ],
     [AdminRole.ReleaseManager]: [
         AdminPermission.PlatformRead,
@@ -95,6 +112,7 @@ const ROLE_PERMISSIONS = {
         AdminPermission.FlagsRead,
         AdminPermission.StaffRead,
         AdminPermission.AuditRead,
+        AdminPermission.PricingRead,
     ],
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;
 

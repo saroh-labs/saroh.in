@@ -290,16 +290,16 @@ describe("how people pay when they book (DEC-088)", () => {
 
     it("says what each way means, and why online can't be taken when it matters", () => {
         expect(payWayHint("BOTH", null)).toBe(
-            "People pay online when they book, or at the desk. A deposit is always paid online.",
+            "People pay online when they book, or at the desk. A deposit is paid online, or at the desk when you can't take payment online.",
         );
         expect(payWayHint("DESK", "NO_PROVIDER")).toBe(
-            "Nobody pays on the booking page; they pay when they come. A service that takes a deposit can't be booked online.",
+            "Nobody pays on the booking page; they pay when they come, a deposit too.",
         );
         expect(payWayHint("ONLINE", "NO_PROVIDER")).toBe(
             "Everyone pays on the booking page when they book. Free services book with nothing to pay. Right now no payment provider is connected, so nobody can book a service with a price online.",
         );
         expect(payWayHint("BOTH", "PAYMENTS_OFF")).toBe(
-            "People pay online when they book, or at the desk. A deposit is always paid online. Right now Payments is switched off, so only services with no deposit can be booked online, to pay at the desk.",
+            "People pay online when they book, or at the desk. A deposit is paid online, or at the desk when you can't take payment online. Right now Payments is switched off, so everything is paid at the desk.",
         );
         // Couldn't tell: says nothing more.
         expect(payWayHint("ONLINE", undefined)).toBe(

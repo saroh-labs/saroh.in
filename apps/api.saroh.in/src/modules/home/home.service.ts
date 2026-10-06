@@ -45,6 +45,7 @@ import { NO_SCHEDULE, readSchedule } from "./home-schedule";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { isStaffView, readStaffNarrow, WHOLE_BUSINESS } from "./home-staff";
 import { readToday, todayScope } from "./home-today";
+import { uncollectedOrders } from "./home-uncollected";
 import { readWeek, weekScope } from "./home-week";
 
 export type {
@@ -291,6 +292,7 @@ export class HomeService {
             messages,
             refundsFailed,
             detailsGap,
+            uncollected,
         ] = await Promise.all([
             active.has("CRM") && canReadLeads
                 ? guard(
@@ -524,6 +526,23 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // Website orders to pay on handover that nobody came for in
+            // three days (R34): whoever works orders sees them, the amount
+            // only with `order:read`. Never cancelled for them.
+            available.has("COMMERCE") &&
+            (holds(input, "order:read") || holds(input, "order:stage"))
+                ? guard(
+                      { moduleKey: "COMMERCE", label: "Uncollected orders" },
+                      () =>
+                          uncollectedOrders(this.db, input.organizationId, {
+                              now,
+                              zone,
+                              money: holds(input, "order:read"),
+                              storeIds: stores,
+                          }),
+                      null,
+                  )
+                : skip(null),
         ]);
         const unavailable = slots.flat();
 
@@ -583,6 +602,7 @@ export class HomeService {
                 evidence: owed.evidence,
             });
         }
+        if (uncollected) actions.push(uncollected);
         if (refundsFailed) actions.push(refundsFailed);
         if (detailsGap) actions.push(detailsGap);
         if (renewals) actions.push(renewals);

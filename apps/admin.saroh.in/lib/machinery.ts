@@ -81,7 +81,7 @@ export interface ProviderRollup {
 
 export interface OperationSummary {
     id: string;
-    kind: "jobs.retry" | "webhooks.replay";
+    kind: "jobs.retry" | "webhooks.replay" | "waitlist.invite";
     status: "PENDING" | "RUNNING" | "DONE" | "FAILED";
     actorUserId: string;
     reason: string;
