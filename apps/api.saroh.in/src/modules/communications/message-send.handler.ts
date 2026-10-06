@@ -164,8 +164,15 @@ export class MessageSendHandler {
         // the route stamped when it was queued wins, so a provider connected
         // since never sends it a second way.
         if (delivery.provider === SAROH_PROVIDER) {
-            if (await deliverThroughSaroh(delivery.id, message)) {
-                await this.stamp(message);
+            try {
+                if (await deliverThroughSaroh(delivery.id, message)) {
+                    await this.stamp(message);
+                }
+            } catch (err) {
+                if (job.attempts + 1 >= job.maxAttempts) {
+                    await this.sarohGaveUp(delivery.id, message.organizationId);
+                }
+                throw err;
             }
             return;
         }
@@ -305,6 +312,29 @@ export class MessageSendHandler {
             );
             return [];
         }
+    }
+
+    /**
+     * The last attempt at a Saroh send ended with it still QUEUED (its
+     * switch couldn't be read each time, DEC-086): nothing more will try
+     * it, yet a QUEUED delivery counts against the business's allowance
+     * and nobody is told. Said once at WARN, by business only — never the
+     * address or the words — so someone can look.
+     */
+    private async sarohGaveUp(
+        deliveryId: string,
+        organizationId: string,
+    ): Promise<void> {
+        try {
+            const now = await prisma.delivery.findUnique({
+                where: { id: deliveryId },
+                select: { status: true },
+            });
+            if (now?.status !== "QUEUED") return;
+        } catch {
+            // Unreadable now too: it is most likely still QUEUED; say so.
+        }
+        this.logger.warn(`saroh_business_email_gave_up org=${organizationId}`);
     }
 
     /** Mark the Delivery FAILED (+ sanitized error, attempts++) and Message FAILED. */

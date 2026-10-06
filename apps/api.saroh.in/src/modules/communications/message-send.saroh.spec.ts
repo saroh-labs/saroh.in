@@ -26,6 +26,7 @@ jest.mock("@saroh/database", () => ({
     },
 }));
 
+import { Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
@@ -136,6 +137,39 @@ describe("message.send through Saroh (DEC-086)", () => {
         expect(send).not.toHaveBeenCalled();
         expect(deliveryUpdate).not.toHaveBeenCalled();
         expect(messageUpdate).not.toHaveBeenCalled();
+    });
+
+    it("the last attempt ends still QUEUED: said once at WARN, by business only, and still thrown", async () => {
+        const warn = jest
+            .spyOn(Logger.prototype, "warn")
+            .mockImplementation(() => undefined);
+        switchesOn.mockRejectedValue(new Error("flag store down"));
+        // Not the last attempt: the worker retries it, nothing said.
+        await expect(handler.handle(job)).rejects.toThrow("flag store down");
+        expect(warn).not.toHaveBeenCalled();
+        // The last: it gives up with the delivery still QUEUED.
+        await expect(
+            handler.handle({ ...job, attempts: 4 } as Job),
+        ).rejects.toThrow("flag store down");
+        expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([
+            "saroh_business_email_gave_up org=org_1",
+        ]);
+        // A last attempt that recorded FAILED (not QUEUED) is said as FAILED.
+        warn.mockClear();
+        switchesOn.mockResolvedValue(true);
+        send.mockResolvedValue("failed");
+        (prisma.delivery.findUnique as jest.Mock)
+            .mockResolvedValueOnce({
+                id: "del_1",
+                status: "QUEUED",
+                provider: "SAROH",
+            })
+            .mockResolvedValueOnce({ status: "FAILED" });
+        await expect(
+            handler.handle({ ...job, attempts: 4 } as Job),
+        ).rejects.toThrow();
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
     });
 
     it("a failed send is FAILED and thrown, so the worker retries it as any send", async () => {
