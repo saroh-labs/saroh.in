@@ -37,6 +37,7 @@ import { organizationKind } from "../../organizations/organization-kind";
 import { authorize } from "../../organizations/organization-policy";
 import { siteDefaults } from "../../sites/site-address";
 import { kindTemplate } from "../../sites/site-template";
+import { templateCatalogue } from "../../sites/template-catalogue";
 import { ModuleLifecycleService } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
 import { MODULE_BY_KEY, moduleRolledOut } from "../module-registry";
@@ -93,6 +94,15 @@ export interface ModuleSetupDefaults {
      * Portfolio". Said, not asked: `/sites/new` is where another is picked.
      */
     template?: { id: string; name: string };
+    /**
+     * Website only, with no site yet: the templates it could start from
+     * instead (industry templates U12), with what the sheet needs to
+     * suggest a few for this business: who each is for and the modules it
+     * reads. The sheet offers the suggested ones as a choice.
+     */
+    templates?: { id: string; name: string; kinds: string[]; uses: string[] }[];
+    /** With `templates`: what is being set up, which the suggestion reads. */
+    kind?: OrganizationKind;
 }
 
 /** Opening hours, one row per weekday (0 = Sunday). */
@@ -275,6 +285,15 @@ export class ModuleSetupService {
                     setup: { ...address },
                     existing: null,
                     template: kindTemplate(kind),
+                    templates: templateCatalogue().map(
+                        ({ id, name, kinds, uses }) => ({
+                            id,
+                            name,
+                            kinds,
+                            uses,
+                        }),
+                    ),
+                    kind,
                 };
             }
             default:

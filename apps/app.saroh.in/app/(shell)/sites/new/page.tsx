@@ -9,30 +9,51 @@ import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { CreateSiteForm } from "@/components/sites/create-site-form";
 import { mayAddWebsite } from "@/lib/business-limits";
+import { modulesOrUnknown } from "@/lib/modules/guard";
 import { kindDefaults } from "@/lib/organizations/kind";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import type { Template } from "@/lib/sites/service";
 import {
     getNewSiteDefaults,
     listSites,
     listTemplates,
 } from "@/lib/sites/service";
+import {
+    moduleStates,
+    startingTemplate,
+    suggestedTemplates,
+} from "@/lib/sites/template-picker";
 
 export const metadata = { title: "New site" };
 
 /**
  * New-site page (S2-004). Mirrors the create-store page: a back link, a
  * heading, and the client CreateSiteForm. Templates are fetched server-side
- * and handed to the form so the author can pick one to seed the site.
+ * and handed to the form so the author can pick one to seed the site (U12:
+ * suggested for the business first, from its kind and its modules).
+ *
+ * `?template=<id or slug>` starts the picker on that template, as the
+ * gallery's "Use this template" will link.
  */
-export default async function NewSitePage() {
+export default async function NewSitePage({
+    searchParams,
+}: {
+    searchParams: Promise<{ template?: string | string[] }>;
+}) {
     await requireSession();
 
-    const [templates, organization, sites] = await Promise.all([
-        listTemplates(),
-        resolveActiveOrganization(),
-        listSites().catch(() => []),
-    ]);
+    const [templates, organization, sites, modules, params] = await Promise.all(
+        [
+            // A failed catalogue is said in the form, not a failed page: the
+            // site can still be made from the kind's template.
+            listTemplates().catch((): Template[] | null => null),
+            resolveActiveOrganization(),
+            listSites().catch(() => []),
+            modulesOrUnknown(),
+            searchParams,
+        ],
+    );
 
     /*
      * Said before the work, not after it (§30).
@@ -84,6 +105,13 @@ export default async function NewSitePage() {
     // The business's own address, or a free one like it (DEC-069, L5).
     const defaults = await getNewSiteDefaults();
 
+    const kind = organization?.kind;
+    // The kind's template, picked to start with (DEC-070, K15).
+    const kindTemplate = kindDefaults(kind).starterTemplate;
+    const states = moduleStates(modules);
+    const listed = templates ?? [];
+    const asked = typeof params.template === "string" ? params.template : null;
+
     return (
         <PageContainer width="form">
             <PageHeader
@@ -93,10 +121,15 @@ export default async function NewSitePage() {
             <CreateSiteForm
                 templates={templates}
                 defaults={defaults}
-                // The kind's template, picked to start with (DEC-070, K15).
-                defaultTemplateId={
-                    kindDefaults(organization?.kind).starterTemplate
-                }
+                defaultTemplateId={kindTemplate}
+                startTemplateId={startingTemplate(listed, asked, kindTemplate)}
+                suggested={suggestedTemplates(
+                    listed,
+                    kind,
+                    states,
+                    kindTemplate,
+                ).map((t) => t.id)}
+                modules={states}
             />
         </PageContainer>
     );
