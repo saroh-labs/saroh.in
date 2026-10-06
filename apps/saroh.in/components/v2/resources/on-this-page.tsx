@@ -16,9 +16,9 @@ export function OnThisPage({ headings }: { headings: PageHeading[] }) {
     return (
         <nav
             aria-label="On this page"
-            className="hidden min-w-0 min-[1100px]:block"
+            className="hidden min-w-0 min-[1100px]:sticky min-[1100px]:top-6 min-[1100px]:block min-[1100px]:max-h-[calc(100dvh-3rem)] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain"
         >
-            <div className="sticky top-6 grid gap-2">
+            <div className="grid gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                     On this page
                 </span>
