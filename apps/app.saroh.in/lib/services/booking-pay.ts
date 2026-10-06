@@ -9,7 +9,10 @@ import type { CustomerPick } from "@/lib/customers/picker";
 export interface BookingPeople {
     /** `contact:read`: search customers and see their Needs attention. */
     canSearch: boolean;
-    /** `booking:write` and `invoice:write`, with a provider connected. */
+    /**
+     * `booking:write` and `invoice:write`, on a plan that takes payment
+     * online, with a provider connected (`offersOnlinePay`, R33).
+     */
     payLink: boolean;
 }
 
@@ -18,8 +21,9 @@ export type PayChoice = "LINK" | "DESK" | "PAID";
 
 /**
  * The choices in the design's order. "Send a pay link" is offered only for
- * a priced booking by someone who may issue its invoice, with a payment
- * provider connected; it is then the default, as the design has it.
+ * a priced booking by someone who may issue its invoice, on a plan that
+ * takes payment online, with a payment provider connected; it is then the
+ * default, as the design has it. Otherwise "Pays at the session" leads.
  */
 export function payChoices(offerLink: boolean): {
     key: PayChoice;

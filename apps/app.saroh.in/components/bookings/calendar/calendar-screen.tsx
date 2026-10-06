@@ -131,7 +131,12 @@ export function CalendarScreen({
         hours: boolean;
         order?: boolean;
         /** Take payment at the desk, and send a pay link instead (P2). */
-        desk?: { canTake: boolean; canLink: boolean };
+        desk?: {
+            canTake: boolean;
+            canLink: boolean;
+            /** The plan takes payment online (R33); else no link is offered. */
+            online?: boolean;
+        };
     };
     /** The full New booking dialog, for any service at any open time. */
     newBooking: ReactNode;

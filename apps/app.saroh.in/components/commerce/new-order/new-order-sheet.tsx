@@ -49,6 +49,7 @@ export function NewOrderSheet({
     stores,
     initialStoreId,
     canLink,
+    online = true,
     canSearch,
 }: {
     open: boolean;
@@ -56,6 +57,8 @@ export function NewOrderSheet({
     stores: Store[];
     initialStoreId: string;
     canLink: boolean;
+    /** The plan takes payment online (R33); else no link is offered. */
+    online?: boolean;
     canSearch: boolean;
 }) {
     const [session, setSession] = useState(0);
@@ -107,6 +110,7 @@ export function NewOrderSheet({
                         stores={stores}
                         initialStoreId={initialStoreId}
                         canLink={canLink}
+                        online={online}
                         canSearch={canSearch}
                         onDirty={setDirty}
                         onClose={() => {
@@ -125,6 +129,7 @@ function NewOrderBody({
     stores,
     initialStoreId,
     canLink,
+    online,
     canSearch,
     onDirty,
     onClose,
@@ -132,12 +137,18 @@ function NewOrderBody({
     stores: Store[];
     initialStoreId: string;
     canLink: boolean;
+    online: boolean;
     canSearch: boolean;
     onDirty: (dirty: boolean) => void;
     onClose: () => void;
 }) {
     const router = useRouter();
-    const o = useNewOrder({ initialStoreId, canLink, canSearch });
+    const o = useNewOrder({
+        initialStoreId,
+        canLink,
+        online,
+        canSearch,
+    });
     const [saving, setSaving] = useState(false);
     const details = useBusinessDetailsStep({
         then: "make the order and its pay link",
