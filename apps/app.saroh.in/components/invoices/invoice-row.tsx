@@ -26,7 +26,13 @@ export function InvoiceRow({
     invoice: i,
     selected,
     onOpen,
+    timeZone,
 }: {
+    /**
+     * The business's zone, which the invoice's dates are written in
+     * (#836), as on the paper the customer gets. Absent, the viewer's.
+     */
+    timeZone?: string;
     invoice: Invoice;
     selected: boolean;
     onOpen: () => void;
@@ -54,7 +60,11 @@ export function InvoiceRow({
                 </span>
                 <span className="mt-0.5 block text-[12px] text-muted-foreground">
                     {i.issuedAt ? (
-                        <ViewerDate iso={i.issuedAt} variant="dayMonth" />
+                        <ViewerDate
+                            iso={i.issuedAt}
+                            variant="dayMonth"
+                            timeZone={timeZone}
+                        />
                     ) : (
                         "Not issued yet"
                     )}
@@ -80,7 +90,11 @@ export function InvoiceRow({
                 >
                     {when.before}
                     {when.date ? (
-                        <ViewerDate iso={when.date} variant="dayMonth" />
+                        <ViewerDate
+                            iso={when.date}
+                            variant="dayMonth"
+                            timeZone={timeZone}
+                        />
                     ) : null}
                     {when.after}
                 </span>

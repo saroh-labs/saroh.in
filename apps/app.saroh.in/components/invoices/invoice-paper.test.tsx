@@ -226,6 +226,7 @@ describe("InvoicePaper's seller (DEC-082)", () => {
         state: { code: "29", name: "Karnataka" },
         address: "1 New Road, Bengaluru 560001, Karnataka",
         logo: "https://cdn.example/rye-logo.png",
+        timeZone: "Asia/Kolkata",
     };
     const FROZEN = {
         sellerName: "Rye & Co.",
@@ -315,5 +316,50 @@ describe("InvoicePaper's lines on a phone (T6)", () => {
         expect(out).not.toContain("70px");
         // A line of one with no rate has nothing for a second line.
         expect(out).not.toContain("data-phone-line");
+    });
+});
+
+describe("InvoicePaper's issue date (#836)", () => {
+    const business = (timeZone: string | null): InvoiceBusiness => ({
+        name: "Rye",
+        legalName: null,
+        email: null,
+        registered: true,
+        gstin: GST.sellerGstin,
+        state: null,
+        address: null,
+        logo: null,
+        timeZone,
+    });
+    // Rendered as the server renders it, whose own zone is UTC.
+    const issued = (issuedAt: string, zone: string | null) =>
+        renderToStaticMarkup(
+            <InvoicePaper
+                invoice={invoice({ issuedAt, dueAt: null })}
+                business={business(zone)}
+                businessName="Rye"
+            />,
+        );
+
+    it("writes an evening-IST issue on the business's day", () => {
+        // 6 Oct 2026, 20:29 IST.
+        expect(issued("2026-10-06T14:59:00Z", "Asia/Kolkata")).toContain(
+            ">6 Oct</time>",
+        );
+    });
+
+    it("writes the business's day where UTC is still on the day before", () => {
+        // 6 Oct 2026, 00:30 IST — 5 Oct in UTC.
+        const out = issued("2026-10-05T19:00:00Z", "Asia/Kolkata");
+        expect(out).toContain(">6 Oct</time>");
+        expect(out).not.toContain(">5 Oct</time>");
+    });
+
+    it("follows a business in another zone, and India's with none set", () => {
+        // 6 Oct 2026, 20:30 in New York — 7 Oct in UTC.
+        expect(issued("2026-10-07T00:30:00Z", "America/New_York")).toContain(
+            ">6 Oct</time>",
+        );
+        expect(issued("2026-10-05T19:00:00Z", null)).toContain(">6 Oct</time>");
     });
 });
