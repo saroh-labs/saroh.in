@@ -50,6 +50,7 @@ import VisitUsSection from "./blocks/visit-us";
 import type { ModulePageTopContent } from "./module-page-top";
 import { ModulePageTop } from "./module-page-top";
 import type { PricesActions } from "./prices/api";
+import type { SiteFixtures } from "./site-fixtures";
 
 /**
  * One section of a published page, as the snapshot carries it.
@@ -89,9 +90,16 @@ export default function SectionRenderer({
     prices,
     thread,
     productGrid,
+    fixtures,
     modulePage = false,
 }: {
     section: Section;
+    /**
+     * The business's live data, given (`site-fixtures.ts`): the blocks that
+     * read it in the browser draw these instead and fetch nothing. Only the
+     * renderer's template renders pass it.
+     */
+    fixtures?: SiteFixtures;
     /**
      * The section is on a module page (DEC-073 #9): a rich-text intro lines
      * up with the cards rather than sitting in the centred reading column.
@@ -154,6 +162,8 @@ export default function SectionRenderer({
                     apiUrl={apiUrl}
                     bookHref={bookHref}
                     siteId={siteId}
+                    visit={fixtures?.visit}
+                    today={fixtures?.today}
                 />
             );
         case "richText":
@@ -199,6 +209,7 @@ export default function SectionRenderer({
                     content={section.content as RenderedServicesList}
                     apiUrl={apiUrl}
                     bookHref={bookHref}
+                    services={fixtures?.services}
                 />
             );
         case "contact":
@@ -211,6 +222,7 @@ export default function SectionRenderer({
                     content={section.content as RenderedVisitUs}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                    visit={fixtures?.visit}
                 />
             );
         case "journal":
@@ -264,6 +276,7 @@ export default function SectionRenderer({
                     apiUrl={apiUrl}
                     siteId={siteId}
                     bookHref={bookHref}
+                    timetable={fixtures?.timetable}
                 />
             );
         case "hours":
@@ -272,6 +285,7 @@ export default function SectionRenderer({
                     content={section.content as RenderedHours}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                    visit={fixtures?.visit}
                 />
             );
         case "person":
@@ -352,6 +366,7 @@ export function PageSections({
     prices,
     thread,
     productGrids,
+    fixtures,
     top = null,
     modulePage = top !== null,
 }: {
@@ -390,6 +405,11 @@ export function PageSections({
      * `sections`: every grid asks for its own.
      */
     productGrids?: readonly (ProductGridFeed | undefined)[];
+    /**
+     * The business's live data, given rather than read (`site-fixtures.ts`):
+     * the renderer's template renders only. A live site never passes it.
+     */
+    fixtures?: SiteFixtures;
 }) {
     return (
         <>
@@ -410,6 +430,7 @@ export function PageSections({
                         prices={prices}
                         thread={thread}
                         productGrid={productGrids?.[i]}
+                        fixtures={fixtures}
                         modulePage={modulePage}
                     />
                 );
