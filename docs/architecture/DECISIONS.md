@@ -1040,3 +1040,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the booking page offered "pay now" whenever Payments was on and a provider connected, and "Pay at the desk" only when no deposit was due. The business had no say, and a deposit with no provider left a service that couldn't be booked online at all, while the summary still showed a desk line (#822).
 - Decision: Booking rules gain "How people pay when they book": Online, At the desk, or Both (default Both, which keeps today's behaviour). The booking page offers only the methods the business allows, and online only when a provider can take it. A deposit or full price at booking needs online: when online isn't allowed or no provider is connected, the service editor says so where the deposit is chosen (#821), and the booking page never shows a payment line it can't honour.
 - Consequences: existing businesses read as Both. One setting for the whole business, beside the other booking rules, since bookings aren't tied to a storefront.
+
+## DEC-089 A deposit that can't be taken online follows the business's payment setting
+
+**Status: Accepted — 2026-10-06** · user · amends DEC-088
+
+- Context: DEC-088 blocked a booking whose service asks a deposit (or the full price) at booking whenever online payment wasn't possible, with "‹business› can't take the deposit online right now. Get in touch with them to book." The pricing line (mkt/plan-deposits) took the opposite view: book it and pay at the desk.
+- Decision: the business's "How people pay when they book" decides. With Both or At the desk, a deposit that can't be taken online (desk only, Payments off, or no provider) is paid at the desk: the booking goes through as pay at the desk, and the summary shows that line. With Online only, the booking page says to get in touch and the booking can't be made, as before.
+- Consequences: the API accepts DESK for a deposit service whenever the business allows the desk and online isn't possible. The service editor's warning says what will happen (paid at the desk, or can't be booked online). Supersedes the blocking part of DEC-088 for Both and At the desk.
