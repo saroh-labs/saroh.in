@@ -375,6 +375,18 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   due at the visit (`booking-money.ts`). A service with a deposit is never
   booked to pay at the desk (`payAtBooking`), and a FULL deposit is paying
   now. The public read serves `depositCents`, never the mode.
+- **The business decides how a booking is paid** (DEC-088, #821, #822):
+  `BookingRules.bookingPayment` is ONLINE, DESK or BOTH (default, as
+  before). The page's `payOnline` is the rule allowing it AND a provider
+  that can take it (`onlinePaymentBlocker`, `bookings/booking-payment.ts`);
+  `bookOnline` refuses a way the rule doesn't allow before anything is
+  held (`refuseDisallowedPay`; a credit and a service with no price are
+  never refused). A priced service nothing allowed can pay for (a deposit,
+  or online only, with nothing online) can't be booked on the page, which
+  says to get in touch and draws no payment line (`unpayableText`). The
+  merchant's screens read `GET booking-rules/payment` and say why
+  (`lib/services/online-booking.ts`). Packs and plans ignore the rule: it
+  is about bookings.
 - **The free-cancel deadline is fixed at booking** (`Booking.freeCancelUntil`,
   DEC-051), written by `reserveInTx` from the rule of that moment. A move
   never changes it; `isLateCancel` reads it, falling back to the start and
