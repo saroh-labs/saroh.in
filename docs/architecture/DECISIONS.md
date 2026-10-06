@@ -1022,3 +1022,19 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: setup's "Registered" chip saved nothing, so a registered business could go live with no legal type (Pvt Ltd, LLP, partnership, …) and the checklist could not tell it from one never asked.
 - Decision: setup stores the answer (`BusinessProfile.legallyRegistered`). A business that said Registered and takes money or invoices gets a "Choose your business type" step on its go-live checklist (Settings and Home) until it picks one. Every other business gets a gentle suggestion in Settings, never a block.
 - Consequences: businesses set up before this release read as "not asked" (the old answer was never saved), so they get the suggestion only. The API must deploy before the app: an older API refuses the new field.
+
+## DEC-087 An in-person booking is offered only inside the business's opening hours
+
+**Status: Accepted — 2026-10-06** · user · from #820
+
+- Context: opening hours are kept per walk-in storefront (`Store.kind` SHOP, `openingHours`; Settings › Hours writes every storefront), but the slot engine never read them. Free times came only from each person's hours, or a service's own hours, so a business could offer times it says it is closed.
+- Decision: when a business has a SHOP storefront with opening hours, every in-person booking (a service that is `IN_PERSON`, or `EITHER` booked in person) is offered only inside those hours: a person's or service's hours are cut to them. Online bookings (`ONLINE`, or `EITHER` booked online) are not cut. A business with no SHOP storefront, or none with hours set, works as before. If its storefronts' hours differ, a time is offered when any of them is open.
+- Consequences: the Availability page shows the hours that fall outside opening hours as not bookable, and says why, so the merchant can see the cut. Bookings already made are never moved or cancelled. Supersedes nothing.
+
+## DEC-088 The business decides how a booking is paid: online, at the desk, or both
+
+**Status: Accepted — 2026-10-06** · user · from #821 and #822
+
+- Context: the booking page offered "pay now" whenever Payments was on and a provider connected, and "Pay at the desk" only when no deposit was due. The business had no say, and a deposit with no provider left a service that couldn't be booked online at all, while the summary still showed a desk line (#822).
+- Decision: Booking rules gain "How people pay when they book": Online, At the desk, or Both (default Both, which keeps today's behaviour). The booking page offers only the methods the business allows, and online only when a provider can take it. A deposit or full price at booking needs online: when online isn't allowed or no provider is connected, the service editor says so where the deposit is chosen (#821), and the booking page never shows a payment line it can't honour.
+- Consequences: existing businesses read as Both. One setting for the whole business, beside the other booking rules, since bookings aren't tied to a storefront.

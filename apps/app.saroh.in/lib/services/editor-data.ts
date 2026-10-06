@@ -1,8 +1,8 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listSites } from "@/lib/sites/service";
-import type { StaffList } from "@/lib/staff/service";
-import { listStaff } from "@/lib/staff/service";
+import type { BookingPaymentView, StaffList } from "@/lib/staff/service";
+import { listStaff, readBookingPayment } from "@/lib/staff/service";
 
 import type { Service } from "./service";
 import { readServices } from "./service";
@@ -75,6 +75,11 @@ export interface EditorContext {
     hasPage: boolean | null;
     /** A storefront to sell treatments from (E10); null when unknown. */
     hasStorefront: boolean | null;
+    /**
+     * How people pay when they book, and whether online can be taken
+     * (DEC-088); null when unknown, which warns about nothing.
+     */
+    payment: BookingPaymentView | null;
     canEdit: boolean;
     /** The business's zone: the diary's, else its services', else India. */
     timezone: string;
@@ -85,13 +90,15 @@ export interface EditorContext {
 export async function loadEditorContext(): Promise<
     { ok: true; context: EditorContext } | { ok: false; forbidden: boolean }
 > {
-    const [read, staff, hasPage, canEdit, hasStorefront] = await Promise.all([
-        readServices(),
-        readStaffOrNull(),
-        readHasBookingPage(),
-        readCanEditServices(),
-        readHasStorefront(),
-    ]);
+    const [read, staff, hasPage, canEdit, hasStorefront, payment] =
+        await Promise.all([
+            readServices(),
+            readStaffOrNull(),
+            readHasBookingPage(),
+            readCanEditServices(),
+            readHasStorefront(),
+            readBookingPayment(),
+        ]);
     if (!read.ok) return read;
     return {
         ok: true,
@@ -100,6 +107,7 @@ export async function loadEditorContext(): Promise<
             staff,
             hasPage,
             hasStorefront,
+            payment,
             canEdit,
             timezone:
                 staff?.timezone ??

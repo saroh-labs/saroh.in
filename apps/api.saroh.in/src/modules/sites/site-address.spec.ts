@@ -1,3 +1,4 @@
+import { env } from "../../env";
 import {
     addressProblem,
     addressTaken,
@@ -85,17 +86,17 @@ describe("addressProblem", () => {
     });
 
     describe("the instance's own list (RESERVED_ADDRESSES_EXTRA)", () => {
-        const before = process.env.RESERVED_ADDRESSES_EXTRA;
+        // Through `env`, as the code reads it: locally that is a parsed copy of
+        // process.env, on CI (SKIP_ENV_VALIDATION) process.env itself.
+        const before = env.RESERVED_ADDRESSES_EXTRA;
         afterEach(() => {
-            if (before === undefined)
-                delete process.env.RESERVED_ADDRESSES_EXTRA;
-            else process.env.RESERVED_ADDRESSES_EXTRA = before;
+            if (before === undefined) env.RESERVED_ADDRESSES_EXTRA = undefined;
+            else env.RESERVED_ADDRESSES_EXTRA = before;
             resetReservedExtraForTests();
         });
 
         it("keeps each name it lists, trimmed and lower-cased", () => {
-            process.env.RESERVED_ADDRESSES_EXTRA =
-                " Founder-One ,founderone,, ";
+            env.RESERVED_ADDRESSES_EXTRA = " Founder-One ,founderone,, ";
             resetReservedExtraForTests();
             expect(addressProblem("founder-one")).toBe(
                 "That address is kept for Saroh",
@@ -107,7 +108,7 @@ describe("addressProblem", () => {
         });
 
         it("keeps nothing extra when unset", () => {
-            delete process.env.RESERVED_ADDRESSES_EXTRA;
+            env.RESERVED_ADDRESSES_EXTRA = undefined;
             resetReservedExtraForTests();
             expect(addressProblem("founder-one")).toBeNull();
         });

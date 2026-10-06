@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { BookingDay, BookingService } from "./model";
 import {
     asksWhere,
+    bookingPaymentOf,
     buildIcs,
     changeText,
     creditChoice,
@@ -10,7 +11,6 @@ import {
     dateText,
     dayAria,
     dayCountLabel,
-    depositUnpayable,
     firstVisitText,
     formatMoney,
     groupStarts,
@@ -30,6 +30,7 @@ import {
     serviceLine,
     serviceWhere,
     timeIn,
+    unpayableText,
     visitsOf,
     whereLabel,
     whereText,
@@ -386,13 +387,97 @@ describe("paying at booking (E8)", () => {
 
     it("a deposit that can't be taken online offers nothing, and says so", () => {
         expect(pays({ depositCents: 30_000 }, false)).toEqual([]);
-        expect(depositUnpayable(service({ depositCents: 30_000 }), false)).toBe(
-            true,
+        expect(
+            unpayableText(service({ depositCents: 30_000 }), false, "Kavi"),
+        ).toBe(
+            "Kavi can't take the deposit online right now. Get in touch with them to book.",
         );
-        expect(depositUnpayable(service({ depositCents: 30_000 }), true)).toBe(
-            false,
+        expect(
+            unpayableText(service({ depositCents: 30_000 }), true, "Kavi"),
+        ).toBeNull();
+        expect(unpayableText(service(), false, "Kavi")).toBeNull();
+    });
+
+    describe("as the business allows (DEC-088)", () => {
+        const ways = ["BOTH", "ONLINE", "DESK"] as const;
+        const choose = (
+            over: Partial<BookingService>,
+            online: boolean,
+            way: (typeof ways)[number],
+        ) =>
+            payChoices(service(over), online, "Kavi Dental", way).map(
+                (c) => c.pay,
+            );
+        const unpayable = (
+            over: Partial<BookingService>,
+            online: boolean,
+            way: (typeof ways)[number],
+        ) => unpayableText(service(over), online, "Kavi Dental", way);
+
+        it.each([
+            // way, payOnline, no deposit, a deposit, the full price
+            ["BOTH", true, ["NOW", "DESK"], ["DEPOSIT", "NOW"], ["NOW"]],
+            ["BOTH", false, ["DESK"], [], []],
+            ["ONLINE", true, ["NOW"], ["DEPOSIT", "NOW"], ["NOW"]],
+            ["ONLINE", false, [], [], []],
+            ["DESK", true, ["DESK"], [], []],
+            ["DESK", false, ["DESK"], [], []],
+        ] as const)(
+            "%s, online %s: no deposit %j, a deposit %j, the full price %j",
+            (way, online, none, part, full) => {
+                expect(choose({}, online, way)).toEqual(none);
+                expect(choose({ depositCents: 30_000 }, online, way)).toEqual(
+                    part,
+                );
+                expect(choose({ depositCents: 120_000 }, online, way)).toEqual(
+                    full,
+                );
+            },
         );
-        expect(depositUnpayable(service(), false)).toBe(false);
+
+        it("says get in touch exactly when a priced service has nothing to pay with", () => {
+            for (const way of ways) {
+                for (const online of [true, false]) {
+                    for (const deposit of [null, 30_000]) {
+                        const over = { depositCents: deposit };
+                        expect(unpayable(over, online, way) !== null).toBe(
+                            choose(over, online, way).length === 0,
+                        );
+                    }
+                }
+            }
+            expect(unpayable({}, false, "ONLINE")).toBe(
+                "Kavi Dental can't take payment online right now. Get in touch with them to book.",
+            );
+            expect(unpayable({ depositCents: 30_000 }, true, "DESK")).toBe(
+                "Kavi Dental can't take the deposit online right now. Get in touch with them to book.",
+            );
+        });
+
+        it("a service with no price books with nothing to pay, whatever the rule", () => {
+            for (const way of ways) {
+                expect(choose({ priceCents: null }, false, way)).toEqual([]);
+                expect(unpayable({ priceCents: null }, false, way)).toBeNull();
+            }
+        });
+
+        it("reads an absent or unknown way as both", () => {
+            const rules = {
+                bookAheadDays: null,
+                latestBookingMinutes: null,
+                freeCancelHours: null,
+            };
+            expect(bookingPaymentOf(rules)).toBe("BOTH");
+            expect(
+                bookingPaymentOf({
+                    ...rules,
+                    bookingPayment: "CASH" as never,
+                }),
+            ).toBe("BOTH");
+            expect(bookingPaymentOf({ ...rules, bookingPayment: "DESK" })).toBe(
+                "DESK",
+            );
+        });
     });
 
     it("no price, nothing to choose", () => {

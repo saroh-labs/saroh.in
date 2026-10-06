@@ -54,6 +54,20 @@ export interface BookingRules {
      * back on its own when cancelled in time. Absent from an older API: on.
      */
     refundInTimeCancels?: boolean;
+    /**
+     * How people pay when they book (DEC-088): online only, at the desk
+     * only, or both. Absent from an older API: both.
+     */
+    bookingPayment?: BookingPayment;
+}
+
+/** How the business lets people pay when they book (DEC-088). */
+export type BookingPayment = "ONLINE" | "DESK" | "BOTH";
+
+/** The rules' way to pay; absent or unknown reads as both, as before. */
+export function bookingPaymentOf(rules: BookingRules): BookingPayment {
+    const way = rules.bookingPayment;
+    return way === "ONLINE" || way === "DESK" ? way : "BOTH";
 }
 
 /** What the page opens with: `GET /public/sites/:siteId/booking`. */
@@ -62,7 +76,10 @@ export interface BookingPageData {
     /** False when the business has switched Appointments off. */
     open: boolean;
     timezone: string;
-    /** Pay now is on offer: Payments on and a provider connected. */
+    /**
+     * Pay now is on offer: the business allows it (DEC-088), Payments is on
+     * and a provider is connected.
+     */
     payOnline: boolean;
     rules: BookingRules;
     services: BookingService[];
@@ -75,6 +92,11 @@ export interface BookingStart {
     staffId: string | null;
     staffName: string | null;
     placesLeft: number | null;
+    /**
+     * A service offered either way: set when this start can be had only
+     * one way — online outside the business's opening hours (DEC-087).
+     */
+    only?: BookingWhere;
 }
 
 export interface BookingDay {
@@ -177,7 +199,11 @@ function isStart(v: unknown): v is BookingStart {
         isInstant(v.endAt) &&
         strOrNull(v.staffId) &&
         strOrNull(v.staffName) &&
-        numOrNull(v.placesLeft)
+        numOrNull(v.placesLeft) &&
+        (v.only === undefined ||
+            v.only === null ||
+            v.only === "IN_PERSON" ||
+            v.only === "ONLINE")
     );
 }
 
@@ -384,16 +410,21 @@ export function creditUsedText(credit: OfferedCredit): string {
  * deposit is paid online — its deposit, or the whole price — and never at
  * the desk; one whose deposit is the full price is simply paid now.
  * Without a deposit: now, when the business takes money online, or at the
- * desk. None when a deposit is asked for and the business can't take it
- * online, and none for a service with no price.
+ * desk. Only what the business allows (DEC-088): `way` online only drops
+ * the desk, at the desk only drops paying online. None when nothing it
+ * allows can be taken — a deposit, or online only, with no way to pay
+ * online — and none for a service with no price.
  */
 export function payChoices(
     service: BookingService,
     payOnline: boolean,
     business: string,
+    way: BookingPayment = "BOTH",
 ): PayChoice[] {
     const price = formatMoney(service.priceCents, service.currency);
     if (!price || !service.priceCents || service.priceCents <= 0) return [];
+    const online = payOnline && way !== "DESK";
+    const atDesk = way !== "ONLINE";
     const isClass = service.kind === "class";
     const place = isClass ? "place" : "appointment";
     // A treatment is paid for whole (E10): "for all 3 visits".
@@ -409,7 +440,7 @@ export function payChoices(
     };
     const deposit = service.depositCents ?? null;
     if (deposit !== null && deposit > 0) {
-        if (!payOnline) return [];
+        if (!online) return [];
         if (deposit >= service.priceCents) return [payNow];
         const part = formatMoney(deposit, service.currency) ?? "";
         const rest = restAfterDeposit(service) ?? "";
@@ -433,20 +464,28 @@ export function payChoices(
         sub: "Held for you; pay when you arrive",
         amount: price,
     };
-    return payOnline ? [payNow, desk] : [desk];
+    return [...(online ? [payNow] : []), ...(atDesk ? [desk] : [])];
 }
 
-/** A deposit is asked for, and there is no way to pay it here (E8). */
-export function depositUnpayable(
+/**
+ * Why a priced service can't be booked here at all, or null when it can
+ * (E8, DEC-088, #822): it asks a deposit, or the business takes payment
+ * only online, and there is no way to pay online — the business chose the
+ * desk only, or has no provider connected. The page then shows this and
+ * no payment line.
+ */
+export function unpayableText(
     service: BookingService | null,
     payOnline: boolean,
-): boolean {
-    return (
-        !!service &&
-        !payOnline &&
-        (service.depositCents ?? null) !== null &&
-        (service.depositCents ?? 0) > 0
-    );
+    business: string,
+    way: BookingPayment = "BOTH",
+): string | null {
+    if (!service) return null;
+    if (payChoices(service, payOnline, business, way).length > 0) return null;
+    if (!service.priceCents || service.priceCents <= 0) return null;
+    return (service.depositCents ?? 0) > 0
+        ? `${business} can't take the deposit online right now. Get in touch with them to book.`
+        : `${business} can't take payment online right now. Get in touch with them to book.`;
 }
 
 /**

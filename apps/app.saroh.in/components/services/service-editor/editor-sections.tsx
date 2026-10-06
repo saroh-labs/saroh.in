@@ -8,15 +8,17 @@ import { useId } from "react";
 
 import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import { currencySymbol } from "@/lib/format/money";
+import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { ServiceDraft } from "@/lib/services/service-editor";
 import {
     bookingPageNote,
     draftVisits,
     staffNote,
     timeNote,
+    toMinor,
     wholeNumber,
 } from "@/lib/services/service-editor";
-import type { StaffView } from "@/lib/staff/types";
+import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
 import { DepositField } from "./deposit-field";
 import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
@@ -160,8 +162,23 @@ export function PriceSection({
     draft,
     set,
     currency,
-}: Edit & { currency: string }) {
+    payment,
+}: Edit & {
+    currency: string;
+    /** How people pay when they book (DEC-088); null when unknown. */
+    payment: BookingPaymentView | null;
+}) {
     const id = useId();
+    // Only a service on the booking page is booked online at all.
+    const problem = draft.showOnBookingPage
+        ? onlineBookingProblem(
+              {
+                  priceCents: toMinor(draft.price),
+                  depositMode: draft.deposit,
+              },
+              payment,
+          )
+        : null;
     return (
         <Section title="Price">
             <label htmlFor={id} className={LABEL}>
@@ -179,6 +196,8 @@ export function PriceSection({
                 price={draft.price}
                 currency={currency}
                 visits={draftVisits(draft)}
+                way={payment?.bookingPayment}
+                problem={problem}
                 onChange={(deposit) => set({ deposit })}
             />
         </Section>

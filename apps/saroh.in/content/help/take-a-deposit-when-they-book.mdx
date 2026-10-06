@@ -29,11 +29,23 @@
 #         paid · … due at the visit"); components/bookings/take-payment.tsx
 #         ("Take …", "What's left after the deposit … paid online.")
 #   PROV  nav-items.tsx (Settings › Providers)
+#   WARN  apps/app.saroh.in/lib/services/online-booking.ts ("People can't
+#         book this online: it takes payment when they book, and …"; "Connect
+#         one in Settings › Providers", "Change it in Booking rules"), shown
+#         under At booking, they pay (deposit-field.tsx) and as "Can't be
+#         booked online: …" on the Services card (services-screen.tsx);
+#         DEC-088, #821
+#   RULE  apps/app.saroh.in/lib/services/availability-rules.ts PAY_WAY ("How
+#         people pay when they book": Both, Online, At the desk); booking
+#         page shows no payment line when it can't take the deposit (#822)
 # Where the design said otherwise, the app won: content/help/README.md.
-# The service screen doesn't warn when no provider is connected; only the
-# booking page does (step 5), so the article says it. A paid deposit on a
-# booking couldn't be captured without a real payment: step 4 says in words
-# how it reads (DESK).
+# Words updated for DEC-088 (6 Oct) without new shots. Shot 5 is OUT OF
+# DATE: captured before #822, it shows "Pay at the desk ₹12,000" beside the
+# get-in-touch line, which the booking page no longer draws — re-capture.
+# Shot 2 shows no warning only while the demo clinic has a provider
+# connected. A paid deposit on a booking couldn't
+# be captured without a real payment: step 4 says in words how it reads
+# (DESK).
 title: Take a deposit when they book
 slug: take-a-deposit-when-they-book
 area: Bookings
@@ -53,7 +65,7 @@ steps:
       marker: Edit
     # PRICE, NOTE.
     - title: Choose what they pay at booking
-      body: "Under Price, At booking, they pay has four choices: Nothing — they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first."
+      body: "Under Price, At booking, they pay has four choices: Nothing — they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If people couldn't pay it online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says so right under it, with a link to what fixes it."
       shot: help-take-deposit-2
       caption: "The root canal's price at Kavi Dental (demo clinic), with a 50% deposit at booking."
       tip: "In time means before the free cancellation time in your booking rules, under Bookings › Availability. A late cancel keeps the deposit."
@@ -72,7 +84,7 @@ steps:
       marker: Pay the deposit now
     # PAY, PROV.
     - title: Connect a payment provider
-      body: "A deposit is paid online, through your own Razorpay or Cashfree account, connected under Settings › Providers. With Payments off or no provider connected, the booking page can't take the deposit: it tells the customer to get in touch with you to book, and they can't book the service online."
+      body: "A deposit is paid online, through your own Razorpay or Cashfree account, connected under Settings › Providers. How people pay when they book, in your booking rules under Bookings › Availability, has to be Online or Both. With Payments off, no provider connected, or At the desk chosen, the booking page can't take the deposit: it tells the customer to get in touch with you to book, and they can't book the service online. Bookings › Services marks such a service Can't be booked online, with the way to fix it."
       shot: help-take-deposit-5
       caption: "The booking page of Kavi Dental (demo clinic), with no way to take the deposit online."
       marker: can't take the deposit online
