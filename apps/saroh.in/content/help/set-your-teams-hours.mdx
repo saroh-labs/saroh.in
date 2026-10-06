@@ -17,10 +17,21 @@
 #         ("Time off": From, To, When "All day" / "Part of the day", Who
 #         "Just ‹name›" / "Everyone — business closed", "Reason — team
 #         only", "Add day off")
+#   OPEN  availability-editor.tsx ("In-person bookings are only offered
+#         while you're open, so hours outside your opening hours aren't
+#         bookable in person. Opening hours are in Settings › Hours.");
+#         weekly-hours.tsx (a stretch wholly outside opening hours drawn
+#         dashed); lib/services/in-person-hours.ts openingNote ("19:00–20:00
+#         isn't bookable in person — you're open 09:00–19:00."); DEC-087
+#         (in-person bookings only inside a walk-in storefront's opening
+#         hours; online bookings aren't cut; no hours set works as before)
 #   RULES availability-editor.tsx, lib/services/availability-rules.ts
 #         ("Booking rules", "For the whole business.", "How far ahead
 #         people can book", "Latest they can book", "Free cancellation
-#         until", "Cancelled in time")
+#         until", "Cancelled in time"); pay-way-row.tsx, PAY_WAY and
+#         payWayHint ("How people pay when they book": Both, Online, At the
+#         desk; "A deposit is always paid online."; "Right now no payment
+#         provider is connected, …", "Connect a provider"); DEC-088
 #   ADD   .../bookings/availability/add-person-dialog.tsx ("They need no
 #         account. Their hours start empty, so nobody can book them until
 #         you add some.")
@@ -33,48 +44,62 @@
 # Where the design said otherwise, the app won: content/help/README.md.
 # The hours are set on one page for the whole team, not on each person's
 # page; Settings › Team is for sign-ins and roles, not hours.
+# Shots re-taken on 6 Oct at Kavi Dental (was Pulse Fitness): it is the
+# demo business whose storefront has opening hours, so the page shows the
+# opening-hours note. The dentists' seeded hours all fall inside them, so
+# shots 2–4 add 19:00–20:00 on Dr. Pillai's Saturday as a draft (never
+# saved) to show a stretch that isn't bookable in person. The demo
+# clinic's provider can't open a checkout, so shot 6's hint says no
+# payment provider is connected.
 title: Set your team's hours
 slug: set-your-teams-hours
 area: Bookings
 group: Take bookings
 order: 10
-intro: "Your booking page only offers times when someone who takes that service is working. You set each person's weekly hours, their time off and the rules for the whole business on one page. This takes about five minutes."
+intro: "Your booking page only offers times when someone who takes that service is working, and for an in-person visit, while you're open. You set each person's weekly hours, their time off and the rules for the whole business on one page. This takes about five minutes."
 description: "Set each person's weekly hours and time off in Saroh, and the booking rules, so customers only see the times you can really see them."
-readMinutes: 3
+readMinutes: 4
 updated: "2026-10-06"
 publishOn: "2026-10-17"
 steps:
-    # NAV, PAGE, ADD.
+    # NAV, PAGE, ADD, OPEN.
     - title: Open Availability
-      body: "In Saroh, open Bookings › Availability in the sidebar. Everyone who takes bookings is across the top: pick a person to see their hours. Someone new? Press + Add someone and give their name. They need no account, and nobody can book them until you add their hours."
+      body: "In Saroh, open Bookings › Availability in the sidebar. Everyone who takes bookings is across the top: pick a person to see their hours. Someone new? Press + Add someone and give their name. They need no account, and nobody can book them until you add their hours. If you've set opening hours, a line under the page's intro says in-person bookings are only offered while you're open."
       shot: help-team-hours-1
-      caption: "Availability at Pulse Fitness (demo gym), with Ritu Kapoor picked."
-      marker: Ritu Kapoor
+      caption: "Availability at Kavi Dental (demo clinic), with Dr. Arun Pillai picked."
+      marker: Dr. Arun Pillai
     # WEEK.
     - title: Add their weekly hours
       body: "Under Weekly hours, each day shows the hours they can be booked. Press + Hours on a day, choose when it starts and ends, and press Add. A day can have more than one stretch, like a morning and an evening. Press the × on a stretch to take it away. Same hours every weekday? Set Monday, then press Copy Monday to weekdays."
       shot: help-team-hours-2
-      caption: "Ritu Kapoor's weekly hours at Pulse Fitness (demo gym), with new hours being added on Saturday."
+      caption: "Dr. Arun Pillai's weekly hours at Kavi Dental (demo clinic), with 19:00 to 20:00 being added on Saturday."
       tip: "A day with no hours says Not bookable. Bookings already made then stay booked; the page tells you which ones, so you can move them from the calendar."
       marker: Add
+    # OPEN, SLOTS.
+    - title: Check what's bookable in person
+      body: "With opening hours set, in Settings › Hours, people can book an in-person visit only while you're open. Hours outside them stay on the page, but under the day Saroh says which aren't bookable in person and when you're open, and a stretch wholly outside them is drawn dashed. A service booked online, like a video consultation, isn't limited by opening hours. If the hours are right, change your opening hours instead."
+      shot: help-team-hours-3
+      caption: "Dr. Arun Pillai's Saturday at Kavi Dental (demo clinic): 19:00 to 20:00 is after the clinic closes, so it isn't bookable in person."
+      tip: "No opening hours set? Then every hour on this page can be booked, in person or online."
+      marker: isn't bookable in person
     # PAGE (the bar), SLOTS.
     - title: Save the hours
       body: "Your changes aren't live yet: a bar at the bottom says so. Press Save hours. From then on the calendar and your booking page offer free times inside these hours only, less their bookings and the gap after each. Changing hours never moves a booking that's already made. Press Discard to start again."
-      shot: help-team-hours-3
-      caption: "A change to Ritu Kapoor's hours at Pulse Fitness (demo gym), waiting for Save hours."
+      shot: help-team-hours-4
+      caption: "A change to Dr. Arun Pillai's hours at Kavi Dental (demo clinic), waiting for Save hours."
       marker: Save hours
     # OFF, PAGE (extra hours).
     - title: Add time off
       body: "Under Time off, choose the first and last day, and whether it's all day or part of the day. Under Who, keep it to this person, or choose Everyone — business closed for a holiday. Add a reason if you like; only your team sees it. Then press Add day off, and press Save hours. Nobody can book them then."
-      shot: help-team-hours-4
-      caption: "Sameer Khan's time off at Pulse Fitness (demo gym), and the form to add a day off."
+      shot: help-team-hours-5
+      caption: "Dr. Arun Pillai's time off at Kavi Dental (demo clinic): a day at a conference, the clinic closed for Diwali, and the form to add a day off."
       tip: "Working an extra day just once? Click the closed time on the calendar to open it for bookings. It shows here under One-off extra hours."
       marker: Add day off
     # RULES, SLOTS.
     - title: Set the booking rules
-      body: "Booking rules are for the whole business. Choose how far ahead people can book, the latest they can book before a time, until when they can cancel for free, and whether a cancel in time gets back what they paid online. These rules are for your booking page; your team can still book someone in by hand."
-      shot: help-team-hours-5
-      caption: "The booking rules at Pulse Fitness (demo gym), for the whole business."
-      marker: How far ahead people can book
+      body: "Booking rules are for the whole business. Choose how far ahead people can book, the latest they can book before a time, until when they can cancel for free, and whether a cancel in time gets back what they paid online. How people pay when they book is Both, Online or At the desk. A deposit is always paid online, so with At the desk a service that takes one can't be booked online. If online payment can't be taken right now, Saroh says why under it, with a link to fix it. These rules are for your booking page; your team can still book someone in by hand."
+      shot: help-team-hours-6
+      caption: "The booking rules at Kavi Dental (demo clinic), for the whole business, with how people pay when they book."
+      marker: How people pay when they book
 next: [take-a-deposit-when-they-book]
 ---

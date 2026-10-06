@@ -1,0 +1,73 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. Sources, from the repo root:
+#   NAV    apps/app.saroh.in/components/shared/nav-items.tsx (Sell › Stock,
+#          shown while the business tracks stock)
+#   SCREEN apps/app.saroh.in/components/commerce/stock/stock-screen.tsx
+#          ("Record stock", "Move stock" only with more than one location,
+#          "Count stock"; tabs Levels, Log, Checks; the "Counting." note)
+#   LEVELS .../stock/levels-panel.tsx, levels-table.tsx and
+#          apps/app.saroh.in/lib/stock/screen.ts ("All", "Needs you", a chip
+#          per location, "Find a product or SKU", "can sell", "on hand",
+#          "promised", "Not sold here", "Log says N", "Matches the log",
+#          "−1 against the log", "N counted · N differ from the log")
+#   COUNT  .../stock/count-bar.tsx ("Cancel", "Save count"); toast
+#          lib/stock/levels.ts ("Count saved: …", with Undo)
+#   MOVE   .../stock/move-dialog.tsx ("Move stock", What, From, To, "How
+#          many", "Hill Road has 10 to spare, Online has 8 on hand.",
+#          "Move"; only units not promised to orders can move), toast
+#          "Moved 4 to Online." with Undo
+#   LOG    .../stock/log-list.tsx, lib/stock/log.ts ("Everything", "Baked
+#          and received", "Sold and returned", "Moved", "Wasted", "Counted";
+#          "Entries can't be deleted. A mistake is fixed with a new entry")
+#   RECORD .../stock/entry-sheet.tsx ("Record stock": Received, Baked,
+#          Wasted; "Record")
+# Rye & Co. sells at Hill Road and Online, so it shows Move stock. Nothing
+# was saved: the count is typed and never saved, and the move is filled
+# and never made (Rye is look-only). The Log step shows the seed's own move
+# from Hill Road to Online, made before the capture, not the one filled in.
+title: Count and move stock
+slug: count-and-move-stock
+area: Products
+group: Sell products
+order: 30
+intro: "Saroh keeps a count of each product, and of each size, at each of your locations. Count the shelf to put it right, and move stock from one location to another when one runs low. This takes a few minutes."
+description: "Count stock in Saroh against what the log expects, save the count, move stock between your locations, and see every change in the Log."
+readMinutes: 3
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # NAV, SCREEN, LEVELS.
+    - title: Open Stock
+      body: "In Saroh, open Sell › Stock. Levels has a row for each product, or each size of it, and a column for each location: how many it can sell, then how many are on hand and how many are promised to orders. Needs you shows what's at or under its warning level."
+      shot: help-count-stock-1
+      caption: "Stock at Rye & Co. (demo bakery), with a column each for Hill Road and Online."
+      tip: "A product only shows here once Track stock is on in its editor. Products that aren't tracked are listed under the table, and always sell."
+      marker: Needs you
+    # SCREEN, LEVELS.
+    - title: Count what's on the shelf
+      body: "Press Count stock. Each shelf turns into a box, with what the log expects under it: Log says 12. Type what you count. Under the box, Saroh tells you whether it matches the log or how far off it is. Leave a box empty to skip it."
+      shot: help-count-stock-2
+      caption: "A count at Rye & Co. (demo bakery): one shelf matches the log, one is 1 under it."
+      marker: Almond croissant Box of 4 counted at Hill Road
+    # COUNT.
+    - title: Save the count
+      body: "The bar at the foot of the screen keeps the tally, such as 2 counted · 1 differ from the log. Press Save count. Saroh sets each shelf to what you counted and records the difference in the Log. Changed your mind? Press Cancel, or Undo on the message after saving."
+      shot: help-count-stock-3
+      caption: "The count bar at Rye & Co. (demo bakery): 2 counted, 1 differs from the log."
+      marker: Save count
+    # MOVE.
+    - title: Move stock to another location
+      body: "With more than one location, press Move stock. Under What, pick the product or size, then choose From and To, and type How many. The line underneath tells you how many the first location has to spare. Only stock that isn't promised to an order can move. Press Move."
+      shot: help-count-stock-4
+      caption: "Moving 4 Sourdough loaves from Hill Road to Online at Rye & Co. (demo bakery)."
+      tip: "Stock that came in, was baked or was thrown away? Press Record stock and choose Received, Baked or Wasted."
+      marker: Move
+    # LOG.
+    - title: See every change in the Log
+      body: "Open the Log tab to see each change: who made it, when, and the count before and after. Pick Moved, Counted or another kind to see only those. A move shows twice, once leaving one location and once arriving at the other. Entries can't be deleted: a mistake is fixed with a new entry."
+      shot: help-count-stock-5
+      caption: "The Log at Rye & Co. (demo bakery), showing a move from Hill Road to Online."
+      marker: Moved
+next: [add-sizes-and-options, take-your-first-order]
+---

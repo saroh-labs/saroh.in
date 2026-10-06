@@ -1,5 +1,11 @@
 # help.saroh.in
 
+> **Moving to saroh.in/help on 17 Oct 2026.** From midnight in India that
+> day, `proxy.ts` sends every request here to its page on saroh.in/help with
+> a 308 (`lib/moved-to-saroh-in.ts`: the old-to-new map, and the day, which
+> mirrors Help's `publishOn` in `apps/saroh.in/content/resources.ts`). Before
+> then, this site behaves as it always has.
+
 Product help for the people **using** Saroh to run a business — not for
 developers contributing to the repo. (Developer docs live in
 [`docs.saroh.in`](../docs.saroh.in).)
@@ -47,12 +53,15 @@ pnpm install
 pnpm --filter help dev       # https://help.saroh.localhost
 ```
 
-No environment variables and no backend.
+No backend. One optional variable: `MARKETING_URL`, the marketing site's
+origin the move sends people to (unset: `https://www.saroh.in`; see
+`env.ts`).
 
 ## Verification
 
 ```bash
 pnpm --filter help typecheck
 pnpm --filter help lint
+pnpm --filter help test
 pnpm --filter help build
 ```

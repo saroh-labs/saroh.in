@@ -1,7 +1,11 @@
+import Link from "next/link";
+
 import { cn } from "@/lib/cn";
 
+import type { FeatureHelpLink } from "@/content/feature-help";
 import type { Feature } from "@/content/types";
 
+import { Arrow } from "../arrow";
 import { Container } from "../container";
 import { ScreenshotFrame } from "../screenshot-frame";
 import { SectionHeading } from "../section-heading";
@@ -11,8 +15,17 @@ import { SectionHeading } from "../section-heading";
  * alternating sides (text left on the first, right on the second…). A step
  * is a numbered Saffron ring (40px inside its 2px line, as drawn), its title, body and the business it is shown
  * at. Below 788px the two halves wrap, text above the shot.
+ *
+ * Under the steps, a quiet "How to … →" link to each matching Help article
+ * that is shown (`featureHelpLinks`, plan U7); none before Help opens.
  */
-export function FeatureSteps({ feature }: { feature: Feature }) {
+export function FeatureSteps({
+    feature,
+    help = [],
+}: {
+    feature: Feature;
+    help?: readonly FeatureHelpLink[];
+}) {
     const titleId = "how-it-works";
     return (
         <section aria-labelledby={titleId}>
@@ -60,6 +73,20 @@ export function FeatureSteps({ feature }: { feature: Feature }) {
                     </li>
                 ))}
             </Container>
+            {help.length > 0 ? (
+                <Container className="flex flex-wrap gap-x-8 gap-y-3 pt-14">
+                    {help.map((link) => (
+                        <Link
+                            key={link.href}
+                            href={link.href}
+                            className="rounded-sm text-[15px] font-semibold text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                        >
+                            {link.label}
+                            <Arrow />
+                        </Link>
+                    ))}
+                </Container>
+            ) : null}
         </section>
     );
 }
