@@ -306,14 +306,14 @@ export const CAPTURED: Record<
     },
     "help-take-deposit-1": {
         src: "/shots/help/help-take-deposit-1.webp",
-        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button; the root canal is marked Can't be booked online, as no payment provider is connected",
+        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button",
         width: 2048,
         height: 1520,
-        mark: { x: 0.1064, y: 0.9369, w: 0.0704, h: 0.0658 },
+        mark: { x: 0.1064, y: 0.8191, w: 0.0704, h: 0.0658 },
     },
     "help-take-deposit-2": {
         src: "/shots/help/help-take-deposit-2.webp",
-        alt: "The root canal's price at Kavi Dental (demo clinic), with At booking, they pay set to a 50% deposit, what that means, and the warning that people can't book it online while no payment provider is connected",
+        alt: "The root canal's price at Kavi Dental (demo clinic), with At booking, they pay set to a 50% deposit, what that means, and the note that it's paid at the desk for now, as no payment provider is connected",
         width: 1404,
         height: 616,
         mark: { x: 0.4993, y: 0.5, w: 0.1648, h: 0.1494 },
@@ -334,10 +334,10 @@ export const CAPTURED: Record<
     },
     "help-take-deposit-5": {
         src: "/shots/help/help-take-deposit-5.webp",
-        alt: "The booking summary on the site of Kavi Dental (demo clinic), saying it can't take the deposit online right now",
+        alt: "The booking summary on the site of Kavi Dental (demo clinic), with the root canal paid at the desk, as no payment provider is connected",
         width: 648,
-        height: 924,
-        mark: { x: 0.0864, y: 0.5589, w: 0.8273, h: 0.1103 },
+        height: 1000,
+        mark: { x: 0.0864, y: 0.521, w: 0.8273, h: 0.114 },
     },
     "help-monthly-plan-1": {
         src: "/shots/help/help-monthly-plan-1.webp",
