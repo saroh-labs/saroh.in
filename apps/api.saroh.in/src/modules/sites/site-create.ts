@@ -6,10 +6,12 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { TemplateManifest } from "@saroh/templates";
 import {
     getTemplate,
     instantiateTemplate,
     TemplateInstantiationError,
+    templateStylePreset,
 } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
 
@@ -26,6 +28,8 @@ import {
     freeAddress,
     releaseExpired,
 } from "./site-address";
+import type { SiteStyle } from "./site-style";
+import { parseSiteStyle } from "./site-style";
 import {
     buildTemplateContext,
     KIND_TEMPLATE,
@@ -61,6 +65,12 @@ export interface SitePlan {
     name: string;
     slug: string;
     pages: ReturnType<typeof instantiateTemplate>["pages"];
+    /**
+     * The look the site starts in: the template's colourway, validated as a
+     * saved style is. Absent when the template has none — the site keeps the
+     * default look, as every site did before templates carried styles.
+     */
+    style?: { id: string; value: SiteStyle };
 }
 
 /** What a caller asks for: the `/sites/new` body's fields. */
@@ -70,6 +80,42 @@ export interface SiteRequest {
     subdomain?: string;
     templateId?: string;
     templateVersion?: number;
+    /** One of the template's colourways; its first when absent. */
+    styleId?: string;
+}
+
+/**
+ * The colourway a site made from `template` starts in (plan KTD-1), parsed
+ * through the same rules as a style the merchant saves, so a template can
+ * only choose what Website › Style could have.
+ *
+ * - No `styleId`: the template's first colourway, or none if it has none.
+ * - A `styleId` the template has: that one.
+ * - A `styleId` it does not have: a 400 on the field, rather than a site in a
+ *   look nobody asked for.
+ *
+ * A shipped template whose colourway fails the style rules is a server bug
+ * (a template unit's spec catches it first), reported as one.
+ */
+export function planTemplateStyle(
+    template: Pick<TemplateManifest, "id" | "version" | "styles">,
+    styleId?: string,
+): SitePlan["style"] {
+    const preset = templateStylePreset(template, styleId);
+    if (preset === null) {
+        throw new BadRequestException({
+            message: `"${styleId}" is not one of this template's colourways`,
+            details: { field: "styleId" },
+        });
+    }
+    if (!preset) return undefined;
+    try {
+        return { id: preset.id, value: parseSiteStyle(preset.style) };
+    } catch {
+        throw new InternalServerErrorException(
+            `Template "${template.id}" v${template.version} has an invalid style "${preset.id}"`,
+        );
+    }
 }
 
 /**
@@ -145,6 +191,9 @@ export async function planSiteFromTemplate(
         );
     }
 
+    // Before any read: a colourway the template lacks is the caller's error.
+    const style = planTemplateStyle(template, dto.styleId);
+
     const slug = slugify(dto.slug ?? dto.name);
     if (!slug) {
         throw new BadRequestException(
@@ -159,6 +208,7 @@ export async function planSiteFromTemplate(
             name: dto.name,
             slug,
             pages: instantiateTemplate(template, context).pages,
+            ...(style ? { style } : {}),
         };
     } catch (error) {
         if (error instanceof TemplateInstantiationError) {
@@ -311,6 +361,13 @@ export async function writeSiteFromTemplate(
                 // Where it sells from (G11): set only when there is
                 // exactly one candidate, and the settings say so.
                 storefrontId: await automaticStorefront(tx, ctx.organizationId),
+                // The template's colourway (KTD-1), if it has one.
+                ...(plan.style
+                    ? {
+                          style: plan.style
+                              .value as unknown as Prisma.InputJsonValue,
+                      }
+                    : {}),
             },
             select: { id: true, slug: true },
         });

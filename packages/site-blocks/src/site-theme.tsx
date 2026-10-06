@@ -10,7 +10,65 @@
  * without moving this would have let them drift apart again the same way.
  */
 
+import type { SiteFontPair } from "@saroh/block-contract";
+import { findFontPair, fontStack } from "@saroh/block-contract";
+
 import { SITE_FONT_STACK } from "./tailwind-preset";
+
+/**
+ * The faces an app has loaded, by Google Fonts family name ("Fraunces"), each
+ * mapped to the CSS family its loader registered — `next/font` hashes it, so
+ * the plain name would not find the file. `saroh.app` loads them
+ * (`lib/site-fonts.ts`), and the editor for its previews; anywhere without
+ * them a pair falls back to the plain family name and then to its stack.
+ */
+export type LoadedSiteFaces = Readonly<Record<string, string>>;
+
+/** The two `--site-font-*` variables, and the role each one sets. */
+const FONT_ROLES: Partial<
+    Record<string, keyof Pick<SiteFontPair, "heading" | "body">>
+> = {
+    "--site-font-heading": "heading",
+    "--site-font-body": "body",
+};
+
+/**
+ * A loader's registered family, if it is one a stylesheet can safely carry:
+ * quoted or bare names, commas and spaces. It comes from the app's own build,
+ * never from a snapshot, but it is interpolated into a `<style>` element, so
+ * it is checked like everything else written there.
+ */
+function safeLoadedFamily(
+    faces: LoadedSiteFaces | undefined,
+    family: string | null,
+): string | undefined {
+    if (!faces || family === null) return undefined;
+    const loaded = faces[family];
+    return typeof loaded === "string" && /^[\w '",-]{1,200}$/.test(loaded)
+        ? loaded
+        : undefined;
+}
+
+/**
+ * The `font-family` stacks for a pair's key (KTD-2), or null for a key that is
+ * not in the list. The snapshot carries only the KEY; this is where it becomes
+ * CSS, from the curated list, so nothing a publication holds is ever written
+ * into a stylesheet as a font name.
+ */
+export function fontPairStacks(
+    key: unknown,
+    faces?: LoadedSiteFaces,
+): { heading: string; body: string } | null {
+    const pair = findFontPair(key);
+    if (!pair) return null;
+    return {
+        heading: fontStack(
+            pair.heading,
+            safeLoadedFamily(faces, pair.heading.family),
+        ),
+        body: fontStack(pair.body, safeLoadedFamily(faces, pair.body.family)),
+    };
+}
 
 /**
  * Per-publication theme (#189).
@@ -32,8 +90,14 @@ import { SITE_FONT_STACK } from "./tailwind-preset";
 export function SiteTheme({
     variables,
     selector = ":root",
+    faces,
 }: {
     variables?: Record<string, string> | null;
+    /**
+     * The faces this app loaded ({@link LoadedSiteFaces}). The variables name
+     * a font pair by key; this is how the key finds the files.
+     */
+    faces?: LoadedSiteFaces;
     /**
      * What the variables are declared on. `:root` — the default, and what the
      * live renderer and the editor preview both want — themes the whole
@@ -50,7 +114,7 @@ export function SiteTheme({
      */
     selector?: string;
 }) {
-    const custom = cssVariables(variables);
+    const custom = cssVariables(variables, faces);
     const at = safeSelector(selector);
 
     return (
@@ -174,6 +238,7 @@ function safeSelector(selector: string): string {
  */
 function cssVariables(
     variables: Record<string, string> | null | undefined,
+    faces?: LoadedSiteFaces,
 ): string | null {
     if (!variables) return null;
     const safeName = /^--site-[a-z-]+$/;
@@ -181,11 +246,23 @@ function cssVariables(
     const safeValue = /^[a-zA-Z0-9 .%]{1,64}$/;
 
     const declarations = Object.entries(variables)
+        .map(([name, value]): [string, unknown] => {
+            // The two font variables carry a pair's KEY (KTD-2), translated
+            // here from the curated list; an unknown key is dropped, leaving
+            // the system stack. The value itself is never written.
+            const role = FONT_ROLES[name];
+            if (role) {
+                return [name, fontPairStacks(value, faces)?.[role] ?? ""];
+            }
+            return [name, value];
+        })
         .filter(
-            ([name, value]) =>
-                safeName.test(name) &&
-                typeof value === "string" &&
-                safeValue.test(value),
+            (entry): entry is [string, string] =>
+                safeName.test(entry[0]) &&
+                typeof entry[1] === "string" &&
+                (FONT_ROLES[entry[0]]
+                    ? entry[1] !== ""
+                    : safeValue.test(entry[1])),
         )
         .map(([name, value]) => `                ${name}: ${value};`);
 
@@ -203,9 +280,11 @@ function cssVariables(
 export function SiteThemeScope({
     variables,
     name,
+    faces,
     children,
 }: {
     variables?: Record<string, string> | null;
+    faces?: LoadedSiteFaces;
     /** Distinguishes this scope from the others on the page. */
     name: string;
     children: React.ReactNode;
@@ -213,7 +292,11 @@ export function SiteThemeScope({
     const scope = `site-theme-${name.replace(/[^\w-]/g, "")}`;
     return (
         <div className={scope}>
-            <SiteTheme variables={variables} selector={`.${scope}`} />
+            <SiteTheme
+                variables={variables}
+                selector={`.${scope}`}
+                faces={faces}
+            />
             {children}
         </div>
     );

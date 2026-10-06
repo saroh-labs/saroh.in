@@ -5,6 +5,7 @@ import { SiteTheme } from "@saroh/site-blocks";
 
 import { PreviewGone } from "@/components/preview-gone";
 import { getPreviewByToken } from "@/lib/publication";
+import { SITE_FACES } from "@/lib/site-fonts";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 /**
@@ -51,7 +52,10 @@ export default async function PreviewLayout({
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
             <PreviewBar siteName={siteName} expiresAt={expiresAt} />
-            <SiteTheme variables={snapshot.site.styleVariables} />
+            <SiteTheme
+                variables={snapshot.site.styleVariables}
+                faces={SITE_FACES}
+            />
             <SiteHeader
                 name={snapshot.site.name}
                 navigation={snapshot.site.navigation ?? []}

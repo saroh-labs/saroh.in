@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { useSiteFaces } from "@/components/sites/site-faces";
 import { SiteTheme } from "@saroh/site-blocks";
 
 /**
@@ -44,6 +45,8 @@ export function BlockThumbnail({
     height?: number;
     children: React.ReactNode;
 }) {
+    // The merchant faces the editor loaded, for the site's typeface.
+    const faces = useSiteFaces();
     const [doc, setDoc] = useState<Document | null>(null);
     const [scale, setScale] = useState(0.2);
 
@@ -108,7 +111,7 @@ export function BlockThumbnail({
                           inert
                           className="min-h-screen bg-site-bg text-site-fg"
                       >
-                          <SiteTheme variables={variables} />
+                          <SiteTheme variables={variables} faces={faces} />
                           {children}
                       </div>,
                       doc.body,

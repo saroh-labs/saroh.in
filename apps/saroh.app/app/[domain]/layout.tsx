@@ -36,6 +36,7 @@ import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
+import { SITE_FACES } from "@/lib/site-fonts";
 import {
     loadSignInOptions,
     requestSignInCode,
@@ -279,7 +280,10 @@ export default async function SiteLayout({
                         <style>{HEADER_BELOW_BAR}</style>
                     </>
                 ) : null}
-                <SiteTheme variables={snapshot.site.styleVariables} />
+                <SiteTheme
+                    variables={snapshot.site.styleVariables}
+                    faces={SITE_FACES}
+                />
                 {/* The account area draws its own compact header and no
                 footer (DEC-073 #10): the frame leaves these out there. */}
                 <SiteChromeFrame

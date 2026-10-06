@@ -1,4 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
+import type { FontPairKey } from "@saroh/templates";
+import { DEFAULT_FONT_PAIR, FONT_PAIRS, isFontPairKey } from "@saroh/templates";
 
 /**
  * A site's look: six colour choices and five spacing scalars (#189).
@@ -148,6 +150,14 @@ export const STYLE_SCALAR_KEYS = Object.keys(STYLE_SCALARS) as StyleScalar[];
 export interface SiteStyle {
     colours: Record<StyleRow, string>;
     scalars: Record<StyleScalar, number>;
+    /**
+     * The typeface pair (KTD-2), a key from `FONT_PAIRS`. ABSENT for the
+     * default (system) pair rather than written as `"system"`: every snapshot
+     * published before fonts existed has no such field, and the pending-change
+     * count compares `style` byte for byte, so a default written out would
+     * report "the style changed" on every live site nobody touched.
+     */
+    fontPair?: FontPairKey;
 }
 
 /** The look a site has before anyone chooses anything: today's appearance. */
@@ -180,7 +190,11 @@ export function parseSiteStyle(input: unknown): SiteStyle {
     if (typeof input !== "object" || Array.isArray(input)) {
         throw new BadRequestException("style must be an object");
     }
-    const raw = input as { colours?: unknown; scalars?: unknown };
+    const raw = input as {
+        colours?: unknown;
+        scalars?: unknown;
+        fontPair?: unknown;
+    };
 
     if (raw.colours !== undefined) {
         if (typeof raw.colours !== "object" || raw.colours === null) {
@@ -221,6 +235,19 @@ export function parseSiteStyle(input: unknown): SiteStyle {
             const { min, max } = STYLE_SCALARS[key];
             base.scalars[key] = Math.min(max, Math.max(min, value));
         }
+    }
+
+    // Refused, not coerced, like a colour: only a listed pair reaches the
+    // renderer, so no font name a client sent is ever written into CSS. Null
+    // is "back to the default", the same as absent.
+    if (raw.fontPair !== undefined && raw.fontPair !== null) {
+        if (!isFontPairKey(raw.fontPair)) {
+            throw new BadRequestException({
+                message: "Choose one of the typefaces offered",
+                details: { field: "fontPair" },
+            });
+        }
+        if (raw.fontPair !== DEFAULT_FONT_PAIR) base.fontPair = raw.fontPair;
     }
 
     return base;
@@ -355,6 +382,21 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
         "--site-grid-gap": `${style.scalars.gridGap}px`,
         "--site-radius": `${style.scalars.cornerRadius}px`,
         "--site-heading-scale": `${style.scalars.headingScale}`,
+        /*
+         * The typeface, as the pair's KEY rather than a font stack (KTD-2).
+         * The renderer loads the faces and owns their CSS family names (the
+         * loader hashes them), so it translates the key; `SiteTheme` writes
+         * only stacks from its own list, never a value from here. A renderer
+         * that does not know the key drops it and keeps the system stack.
+         * Absent for the default pair, so a site that chose nothing resolves
+         * to exactly the variables it always did.
+         */
+        ...(style.fontPair
+            ? {
+                  "--site-font-heading": style.fontPair,
+                  "--site-font-body": style.fontPair,
+              }
+            : {}),
     };
 }
 
@@ -388,6 +430,8 @@ export interface SiteStyleOptions {
          */
         default: number;
     }[];
+    /** The typeface pairs Website › Style offers, the default first. */
+    fontPairs: { key: string; name: string }[];
 }
 
 export function siteStyleOptions(): SiteStyleOptions {
@@ -401,5 +445,6 @@ export function siteStyleOptions(): SiteStyleOptions {
             key,
             ...STYLE_SCALARS[key],
         })),
+        fontPairs: FONT_PAIRS.map((p) => ({ key: p.key, name: p.name })),
     };
 }

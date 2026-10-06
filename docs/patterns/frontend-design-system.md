@@ -23,7 +23,8 @@
   and footer, preview frames). A surface that draws no block goes on the list
   with its reason; a block goes in the package. **G7:** no Saroh typeface on a
   merchant's site — no `font-sans`, `font-display` or `font-mono` in a block,
-  and no `packages/ui/fonts` path or `next/font` import in `apps/saroh.app`.
+  no `packages/ui/fonts` path in `apps/saroh.app`, and `next/font` only in its
+  merchant font list, `lib/site-fonts.ts`.
   Blocks set type with `font-site-heading` and `font-site-body` (see "Type and
   the mark").
 - **Current** — Every `siteColors` key has a default in `SiteTheme` (`muted` and
@@ -201,6 +202,17 @@
   mounts. The root layout imports no `next/font`, and a block never writes
   `font-sans`, `font-display` or `font-mono`, which all resolve to Saroh's
   faces. Gate G7 enforces both.
+- **Current** — **A site's typeface is a pair from `FONT_PAIRS`**
+  (`@saroh/block-contract`, industry templates KTD-2): `Site.style.fontPair`
+  holds a key, the API refuses any other, and `siteStyleVariables()` emits the
+  KEY as `--site-font-heading/body` (nothing for the default `system` pair).
+  `SiteTheme` turns the key into stacks from the list — a snapshot's value is
+  never written into CSS — using the faces the app loaded (`faces` prop). The
+  faces are loaded with `next/font/google` (latin, swap, `preload: false`) in
+  `apps/saroh.app/lib/site-fonts.ts` and, for the editor's previews,
+  `apps/app.saroh.in/lib/sites/site-fonts.ts` (`SiteFacesProvider`); a
+  browser fetches only the pair the page is set in. A new pair is a list entry
+  plus a loader in both files; tests hold the three in step.
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app

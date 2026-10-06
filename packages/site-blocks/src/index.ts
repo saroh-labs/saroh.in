@@ -373,7 +373,11 @@ export { ModulePageUnavailable } from "./module-page-unavailable";
 export { ModulePageTop, modulePageTopOf } from "./module-page-top";
 export type { ModulePageTopContent } from "./module-page-top";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
-export { SiteTheme, SiteThemeScope } from "./site-theme";
+export { SiteTheme, SiteThemeScope, fontPairStacks } from "./site-theme";
+export type { LoadedSiteFaces } from "./site-theme";
+// The typeface pairs (KTD-2), for the renderer's loader and the Style panel.
+export { FONT_PAIRS, findFontPair, isFontPairKey } from "@saroh/block-contract";
+export type { FontPairKey, SiteFontPair } from "@saroh/block-contract";
 
 // A test release (DEC-071, T6): the layout's provider, the hook the flows
 // read, the stop they show instead of taking a real order, booking,

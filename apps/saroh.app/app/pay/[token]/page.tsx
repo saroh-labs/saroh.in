@@ -9,6 +9,7 @@ import { publicApiUrl } from "@/lib/api-url";
 import { getPayInvoice } from "@/lib/invoice-pay";
 import { payPdfHref } from "@/lib/invoice-pdf";
 import { payRedirect, TENANT_HOST_HEADER } from "@/lib/pay-host";
+import { SITE_FACES } from "@/lib/site-fonts";
 
 /**
  * A customer paying an invoice from its pay link (ADR-007, U13), wearing
@@ -76,7 +77,9 @@ export default async function PayPage({
     if (elsewhere) redirect(elsewhere);
     return (
         <main className="min-h-screen bg-site-bg text-site-body">
-            {invoice.theme ? <SiteTheme variables={invoice.theme} /> : null}
+            {invoice.theme ? (
+                <SiteTheme variables={invoice.theme} faces={SITE_FACES} />
+            ) : null}
             <InvoicePay
                 token={token}
                 invoice={invoice}
