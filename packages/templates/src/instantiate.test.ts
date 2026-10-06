@@ -63,12 +63,12 @@ describe("registry", () => {
     });
 
     it("registers the DEC-070 templates beside the starter (K15)", () => {
-        expect(listTemplates().map((t) => `${t.id}@${t.version}`)).toEqual([
-            "starter@2",
-            "personal@1",
-            "portfolio@1",
-            "writing@1",
-        ]);
+        // First, in this order; the industry templates follow them.
+        expect(
+            listTemplates()
+                .map((t) => `${t.id}@${t.version}`)
+                .slice(0, 4),
+        ).toEqual(["starter@2", "personal@1", "portfolio@1", "writing@1"]);
         for (const id of ["personal", "portfolio", "writing"]) {
             expect(getTemplate(id)?.id).toBe(id);
             expect(getTemplate(id, 1)?.version).toBe(1);

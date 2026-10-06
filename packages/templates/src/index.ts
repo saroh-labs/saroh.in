@@ -74,3 +74,10 @@ export {
     PORTFOLIO_TEMPLATE_ID,
     portfolioTemplate,
 } from "./templates/portfolio";
+
+// The Bakery industry template (industry templates plan, U4).
+export {
+    BAKERY_IMAGE_BRIEFS,
+    BAKERY_TEMPLATE_ID,
+    bakeryTemplate,
+} from "./templates/bakery";

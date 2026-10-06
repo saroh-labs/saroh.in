@@ -1,4 +1,5 @@
 import type { TemplateManifest } from "./manifest";
+import { bakeryTemplate } from "./templates/bakery";
 import { personalTemplate } from "./templates/personal";
 import { portfolioTemplate } from "./templates/portfolio";
 import { starterTemplate, starterTemplateV1 } from "./templates/starter";
@@ -16,7 +17,8 @@ function key(id: string, version: number): string {
  * keep resolving it.
  *
  * In the order the picker offers them: the starter, then the three DEC-070
- * added for someone working for themselves or showing their work (K15).
+ * added for someone working for themselves or showing their work (K15),
+ * then the industry templates (industry templates plan, Phase B).
  */
 const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
     [
@@ -25,6 +27,7 @@ const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
         personalTemplate,
         portfolioTemplate,
         writingTemplate,
+        bakeryTemplate,
     ].map((t) => [key(t.id, t.version), t]),
 );
 
