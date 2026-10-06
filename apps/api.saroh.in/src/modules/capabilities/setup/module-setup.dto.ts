@@ -8,6 +8,7 @@ import {
     IsIn,
     IsInt,
     IsObject,
+    IsOptional,
     IsString,
     Matches,
     Max,
@@ -16,6 +17,8 @@ import {
     MinLength,
     ValidateNested,
 } from "class-validator";
+
+import { listTemplates } from "@saroh/templates";
 
 import type { StorefrontFulfilmentType } from "../../orders/fulfilment";
 import { STOREFRONT_FULFILMENT_TYPES } from "../../orders/fulfilment";
@@ -124,6 +127,17 @@ export class WebsiteSetupDto {
     @MinLength(1, { message: "Choose your web address." })
     @MaxLength(63, { message: "Keep the address to 63 characters or fewer." })
     address!: string;
+
+    /**
+     * The template the new site starts from, when the sheet's choice was
+     * changed (industry templates U12); absent: the kind's (DEC-070, K15).
+     * Ignored when the business already has its website.
+     */
+    @IsOptional()
+    @IsIn(listTemplates().map((t) => t.id), {
+        message: "Choose one of the templates offered.",
+    })
+    templateId?: string;
 }
 
 /**
