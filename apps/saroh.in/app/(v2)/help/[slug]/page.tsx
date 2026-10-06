@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ComponentProps } from "react";
 
 import { Arrow } from "@/components/v2/arrow";
 import { HelpStep } from "@/components/v2/help/help-step";
@@ -81,6 +82,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 const NEXT_LINK =
     "w-fit cursor-pointer rounded-sm text-mk-faq font-semibold text-brand-700 no-underline underline-offset-[3px] transition-colors duration-fast ease-out hover:underline active:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
 
+const PROSE_LINK =
+    "rounded-sm font-semibold text-brand-700 underline underline-offset-[3px] transition-colors duration-fast ease-out hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]";
+
 export default async function HelpArticlePage({ params }: Props) {
     const { slug } = await params;
     const ctx = resourcesContext();
@@ -151,6 +155,19 @@ export default async function HelpArticlePage({ params }: Props) {
                                         className="m-0 text-[17px] leading-[1.7] text-mk-prose [text-wrap:pretty]"
                                         {...props}
                                     />
+                                ),
+                                // A link in the prose: another page of the
+                                // site, such as an integration's own.
+                                a: ({
+                                    href,
+                                    children,
+                                }: ComponentProps<"a">) => (
+                                    <Link
+                                        href={href ?? ""}
+                                        className={PROSE_LINK}
+                                    >
+                                        {children}
+                                    </Link>
                                 ),
                             }}
                         />

@@ -13,6 +13,7 @@ import { urls } from "../playwright.config";
  * - the article draws its five real screenshots (each loaded, not a
  *   placeholder), rings the controls it names, and carries HowTo JSON-LD;
  * - at 390 the product areas are a Topics menu, and nothing hides sideways;
+ * - the other articles draw a ringed real screen for every step;
  * - every Next link and every link in the side nav answers 200.
  *
  * Help publishes on 17 Oct (KTD-2): before then the pages are 404 unless
@@ -93,6 +94,39 @@ test("the article draws its five real screens, ringed where a step names a contr
         .find((d) => d["@type"] === "HowTo");
     expect(howTo?.step).toHaveLength(5);
 });
+
+/** The other articles, each with how many steps it has. */
+const MORE = [
+    ["create-your-business", 5],
+    ["add-your-gstin", 5],
+    ["take-your-first-order", 6],
+    ["connect-razorpay", 4],
+    ["connect-cashfree", 5],
+] as const;
+
+for (const [slug, steps] of MORE) {
+    test(`${slug} draws a real, ringed screen for each of its ${steps} steps`, async ({
+        page,
+    }) => {
+        await page.goto(`${WEB}/help/${slug}`);
+        const shots = page.locator(`main [data-shot^='help-']`);
+        await expect(shots).toHaveCount(steps);
+        for (const shot of await shots.all()) {
+            const img = shot.locator("img");
+            await img.scrollIntoViewIfNeeded();
+            await expect
+                .poll(() =>
+                    img.evaluate(
+                        (el) =>
+                            (el as HTMLImageElement).complete &&
+                            (el as HTMLImageElement).naturalWidth,
+                    ),
+                )
+                .toBeGreaterThan(0);
+            await expect(shot.locator("[data-marker]")).toHaveCount(1);
+        }
+    });
+}
 
 test("every link in the side nav and Next answers, and none is the page itself", async ({
     page,

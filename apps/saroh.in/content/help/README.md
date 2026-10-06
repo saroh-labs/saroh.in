@@ -49,7 +49,15 @@ drawing (KTD-6). Add one entry per step to `HELP_SHOTS` in
 `e2e/marketing-shots/shots.config.ts`, keyed `help-<slug>-<n>`:
 
 - `route` and `business`: Rye & Co., Pulse Fitness and Kavi Dental are
-  look-only; a shot that needs a write first takes it on Northwind;
+  look-only; a shot that needs a write first takes it on Northwind.
+  `accounts:/signup` is the accounts app; sign-up and setup shots open no
+  business;
+- `role`: `owner` (the demo owner) for most; `founder` (Asha, whose
+  Asha's Bakery has nothing turned on yet); `visitor`, signed out; and
+  `newcomer`, an account with no business. The seed has no such account,
+  so before capturing a `newcomer` shot, sign up as `new.owner@saroh.dev`
+  with `demo-password-123` on your stack (the code is printed in the API's
+  log, `(no SMTP) … code`) and stop at Set up Saroh;
 - `viewport`: `HELP_DESK` (1024 wide) for a whole screen, or a `clip` around
   one section (`selector`, optional `until`, `pad`), so it reads at about its
   real size in the 680px column;
@@ -82,9 +90,11 @@ Then run `pnpm --filter web test` and `e2e/tests/help.spec.ts` with
 
 ## Still to write
 
-The audit's ten (plan U5): create your business, connect Razorpay, connect
-Cashfree, set your team's hours, take a deposit, set up a monthly plan, take
-your first order, connect your domain, make your link look right, add your
-GSTIN. When one lands, add it to `next` of the articles that should point at
-it (the first article's design named sizes and options, counting and moving
-stock, and taking your first order).
+The rest of the audit's ten (plan U5): set your team's hours, take a
+deposit, set up a monthly plan, connect your domain, make your link look
+right. When one lands, add it to `next` of the articles that should point at
+it (the first article's design also named sizes and options, and counting
+and moving stock).
+
+A link in an article's MDX body (the prose before the steps) is drawn as a
+link: the payment articles point at their integration page that way.

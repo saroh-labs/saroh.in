@@ -54,7 +54,14 @@ describe("/help", () => {
         const groups = screen
             .getAllByRole("heading", { level: 3 })
             .map((h) => h.textContent);
-        expect(groups).toEqual(["Sell products"]);
+        // In the home's order (HELP_GROUPS).
+        expect(groups).toEqual([
+            "Get set up",
+            "Sell products",
+            "Take orders",
+            "Get paid",
+            "Invoices and GST",
+        ]);
         expect(
             screen
                 .getByRole("link", { name: "Add your first product" })

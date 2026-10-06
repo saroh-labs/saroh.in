@@ -1,0 +1,64 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. The facts are the ones
+# content/integrations/razorpay.mdx takes from the same code, so Help and
+# Integrations say the same. Sources, from the repo root:
+#   PAGE   apps/app.saroh.in/app/(shell)/settings/(sections)/providers/page.tsx
+#          (Settings › Providers)
+#   ROWS   apps/app.saroh.in/lib/providers/rows.ts (a row's Connect; its
+#          last-payment-update line; "Add webhook secret")
+#   SETUP  apps/app.saroh.in/components/providers/provider-setup-dialog.tsx
+#          ("Payments"; step 1 "Your API keys", "Key ID (public)", "Key
+#          secret" and the hint; "Connect Razorpay", off until all is in;
+#          the business details step first, "Save and connect")
+#   HOOK   apps/app.saroh.in/components/providers/payment-webhook-steps.tsx
+#          (step 2 "Tell Razorpay where to send payment updates", "Webhook
+#          URL", "Copy", "Tick these events", the test-mode note; step 3
+#          "Webhook signing secret", "Generate one")
+#   WORDS  apps/app.saroh.in/lib/providers/webhook.ts ("Accounts & Settings ›
+#          Webhooks › Add New Webhook", lastUpdateLine)
+#   PATH   packages/integrations/src/index.ts (WEBHOOK_EVENTS.RAZORPAY)
+#   DETAIL apps/app.saroh.in/components/organizations/use-business-details-step.tsx
+# Shots are Northwind, whose Razorpay is disconnected in the seed; the keys
+# are made up and nothing is connected. The address in them is the one
+# merchants see (API_PUBLIC_URL set to the live API for the capture).
+title: Connect Razorpay
+slug: connect-razorpay
+area: Payments
+group: Get paid
+order: 10
+intro: "Connect your own Razorpay account and customers can pay you online by UPI, card or whatever else your account has switched on. The money goes straight to your Razorpay account; Saroh never holds it. This takes about five minutes, with Razorpay's dashboard open beside Saroh."
+description: "Connect your Razorpay account to Saroh: your API keys, the webhook address and its events, and the signing secret. Four steps, with a picture of each screen."
+readMinutes: 4
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # PAGE, ROWS.
+    - title: Open Settings › Providers
+      body: "In Saroh, open Settings › Providers. It lists the services behind your business, connected ones first. Press Connect on Razorpay's row."
+      shot: help-connect-razorpay-1
+      caption: "Providers at Northwind Supply (a demo shop), with Connect on Razorpay's row."
+      marker: Connect
+    # SETUP.
+    - title: Add your API keys
+      body: "Under Your API keys, enter the Key ID and Key secret from API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it; the secret never leaves Saroh. Your keys are sealed when saved and never shown again."
+      shot: help-connect-razorpay-2
+      caption: "Your API keys while connecting Razorpay at Northwind Supply (a demo shop), with a test key id."
+      marker: Key ID (public)
+    # HOOK, WORDS, PATH.
+    - title: Tell Razorpay where to send payment updates
+      body: "In Razorpay, open Accounts & Settings › Webhooks › Add New Webhook. Press Copy beside the Webhook URL in Saroh and paste it there, tick the five events Saroh lists (payment.captured, payment.failed, order.paid, refund.processed and refund.failed) and save. Using an rzp_test_ key? Add the webhook in Razorpay's test dashboard too."
+      shot: help-connect-razorpay-3
+      caption: "The webhook URL and the events to tick, for Northwind Supply (a demo shop)."
+      marker: Copy
+    # HOOK, SETUP, DETAIL.
+    - title: Add the signing secret and connect
+      body: "Use the same webhook signing secret in both places: type the one you set in Razorpay, or press Generate one and paste it into Razorpay's webhook form. Saroh uses it to check that each payment update really came from Razorpay, so Connect Razorpay stays off until it's in. Then press Connect Razorpay."
+      shot: help-connect-razorpay-4
+      caption: "A generated signing secret and Connect Razorpay, at Northwind Supply (a demo shop)."
+      tip: "No registered address yet? Saroh asks for your business details first, because online payments are invoiced, then connects. After a test payment, Razorpay's row says when the last payment update arrived; one there means the webhook and the secret match."
+      marker: Connect Razorpay
+next: [connect-cashfree, take-your-first-order, add-your-gstin]
+---
+
+Razorpay's side of it, the keys, the webhook and the events, is also on [Razorpay on Saroh](/integrations/razorpay).

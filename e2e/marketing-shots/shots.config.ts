@@ -41,16 +41,30 @@ export const BUSINESSES = {
         name: "Northwind Supply",
         site: "northwind-supply",
     },
+    /** Asha's first business, with nothing turned on yet (`founder.ts`). */
+    asha: {
+        id: "seed_org_first-run_business",
+        name: "Asha's Bakery",
+        site: "first-run-business",
+    },
 } as const;
 
 export type Business = keyof typeof BUSINESSES;
 
-/** Who signs in. All shots are taken as the demo owner. */
+/**
+ * Who signs in. Most shots are taken as the demo owner. Help's "Create your
+ * business" also needs Asha, the seed's founder, whose first business has
+ * nothing turned on, and a newcomer: an account with no business at all,
+ * which the seed has none of. Make it by hand on the throwaway database
+ * before the capture (`content/help/README.md`). A `visitor` is signed out.
+ */
 export const ROLES = {
     owner: "demo@saroh.dev",
+    founder: "founder@saroh.dev",
+    newcomer: "new.owner@saroh.dev",
 } as const;
 
-export type Role = keyof typeof ROLES;
+export type Role = keyof typeof ROLES | "visitor";
 
 /** The width and height the page is laid out at, in CSS pixels. */
 export interface Viewport {
@@ -91,11 +105,13 @@ export type Clip = {
 
 export interface Shot {
     key: string;
-    business: Business;
+    /** The business opened first; none for sign-up and setup. */
+    business?: Business;
     role: Role;
     /**
-     * A workspace path (`/commerce/orders`), or `site:<path>` for the
-     * business's own site on the renderer. `{nextMonday}` is replaced with
+     * A workspace path (`/commerce/orders`), `site:<path>` for the
+     * business's own site on the renderer, or `accounts:<path>` for the
+     * accounts app (sign-up). `{nextMonday}` is replaced with
      * the coming Monday (YYYY-MM-DD), since the seed moves with the calendar.
      */
     route: string;
@@ -215,6 +231,443 @@ const HELP_SHOTS: Shot[] = [
         mark: '[aria-labelledby="sec-stock"] [role="switch"]',
         alt: "Variants and Stock for the Sourdough loaf at Rye & Co. (demo bakery): 800g and 400g with their own SKU and price, and Track stock on with On hand and Warn at for each",
         caption: "The Sourdough loaf's sizes and stock, with Track stock on",
+    },
+];
+
+/* Create your business. */
+
+/** The setup form, answered as a florist would, never created. */
+const SETUP_FILLED: Step[] = [
+    { waitFor: 'text="What are you setting up?"' },
+    { click: '[role="radio"]:has-text("A business")' },
+    { fill: 'input[autocomplete="organization"]', value: "Tulsi Florist" },
+    { waitFor: 'text="Free — your website will live here."' },
+];
+
+/** A setup form item: the field's own block, label to description. */
+const setupItem = (label: string) =>
+    `form > div.space-y-2:has(label:text-is("${label}"))`;
+
+const CREATE_BUSINESS_SHOTS: Shot[] = [
+    {
+        key: "help-create-business-1",
+        role: "visitor",
+        route: "accounts:/signup",
+        viewport: { width: 1024, height: 820 },
+        steps: [
+            { fill: 'input[placeholder="Your name"]', value: "Kiran Desai" },
+            { fill: 'input[type="email"]', value: "kiran@tulsiflorist.in" },
+            { fill: 'input[type="password"]', value: "a-long-password" },
+            { click: "h1" },
+        ],
+        clip: { selector: "form", pad: 12 },
+        mark: 'button:has-text("Send the code")',
+        alt: "Make your account on Saroh: your name, email and password, and the Send the code button",
+        caption: "Make your account: name, email, password, then Send the code",
+    },
+    {
+        key: "help-create-business-2",
+        role: "newcomer",
+        route: "/onboarding",
+        viewport: { width: 1024, height: 760 },
+        steps: [{ waitFor: 'text="What are you setting up?"' }],
+        clip: { selector: "form", pad: 16 },
+        mark: '[role="radio"]:has-text("A business")',
+        alt: "Set up Saroh, asking what you are setting up: a business, just me, or a site for my work",
+        caption:
+            "What are you setting up? A business, Just me, or A site for my work",
+    },
+    {
+        key: "help-create-business-3",
+        role: "newcomer",
+        route: "/onboarding",
+        viewport: { width: 1024, height: 1000 },
+        steps: [...SETUP_FILLED, { click: "h1" }],
+        clip: {
+            selector: setupItem("What is it called?"),
+            until: setupItem("Its address on Saroh"),
+            pad: 16,
+        },
+        mark: `${setupItem("Its address on Saroh")} div.font-mono`,
+        alt: "Setting up Tulsi Florist (a demo florist): its name, and its address on Saroh, tulsi-florist.saroh.app, marked free",
+        caption: "The name, and the address on Saroh made from it",
+    },
+    {
+        key: "help-create-business-4",
+        role: "newcomer",
+        route: "/onboarding",
+        viewport: { width: 1024, height: 1400 },
+        steps: [
+            ...SETUP_FILLED,
+            { click: '[role="radio"]:has-text("Not registered")' },
+            { click: "h1" },
+        ],
+        clip: {
+            selector: setupItem("Is it registered as a company?"),
+            until: 'form button[type="submit"]',
+            pad: 16,
+        },
+        mark: 'button:has-text("Create the business")',
+        alt: "Setting up Tulsi Florist (a demo florist): Not registered chosen, India as where it trades, and the Create the business button",
+        caption: "Registered or not, where it trades, then Create the business",
+    },
+    {
+        key: "help-create-business-5",
+        business: "asha",
+        role: "founder",
+        route: "/",
+        viewport: HELP_DESK,
+        steps: [
+            { click: 'button:has-text("Sell things")' },
+            { waitFor: '[role="dialog"]' },
+        ],
+        mark: '[role="dialog"] button:text-is("Turn on")',
+        alt: "Home at Asha's Bakery (demo bakery), new and with nothing on yet: What will you do first?, with Turn on Sell open",
+        caption:
+            "What will you do first? at Asha's Bakery, with Turn on Sell open",
+    },
+];
+
+/* Add your GSTIN: Northwind, which isn't GST-registered in the seed. */
+
+const NW_TAX = "/settings/organization?section=tax";
+
+/** GST switched on and a GSTIN typed, never saved. */
+const GST_ON: Step[] = [
+    { click: '#business-panel button:text-is("Edit")' },
+    { click: '[role="switch"][aria-label="GST-registered"]' },
+    {
+        fill: '#business-panel input[placeholder="29ABCDE1234F1ZW"]',
+        value: "29AAGCN4821K1Z5",
+    },
+    { click: '[role="tab"]:text-is("Tax and invoices")' },
+];
+
+const GSTIN_SHOTS: Shot[] = [
+    {
+        key: "help-add-gstin-1",
+        business: "northwind",
+        role: "owner",
+        route: NW_TAX,
+        viewport: HELP_DESK,
+        mark: '#business-panel button:text-is("Edit")',
+        alt: "Settings, Business, Tax and invoices at Northwind Supply (demo shop): not GST-registered yet, with the Edit button",
+        caption: "Tax and invoices at Northwind Supply, not GST-registered yet",
+    },
+    {
+        key: "help-add-gstin-2",
+        business: "northwind",
+        role: "owner",
+        route: NW_TAX,
+        viewport: { width: 1280, height: 1100 },
+        steps: GST_ON,
+        clip: {
+            selector:
+                '#business-panel div.space-y-2:has(> div > button[role="switch"])',
+            until: '#business-panel div.space-y-2:has(> input[placeholder="29ABCDE1234F1ZW"])',
+            pad: 14,
+        },
+        mark: '#business-panel input[placeholder="29ABCDE1234F1ZW"]',
+        alt: "Northwind Supply (demo shop) with GST-registered switched on and a GSTIN typed, its state code, PAN, entity, Z and check character shown under it",
+        caption: "GST-registered on, and the GSTIN broken into its parts",
+    },
+    {
+        key: "help-add-gstin-3",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/organization?section=address",
+        viewport: HELP_DESK,
+        mark: '[role="tab"]:text-is("Registered address")',
+        alt: "The Registered address tab at Northwind Supply (demo shop): the address, city, PIN and state printed under the legal name",
+        caption:
+            "Northwind Supply's registered address, printed under its legal name",
+    },
+    {
+        key: "help-add-gstin-4",
+        business: "northwind",
+        role: "owner",
+        route: NW_TAX,
+        viewport: { width: 1440, height: 1000 },
+        steps: GST_ON,
+        clip: { selector: 'aside[aria-label="How it prints"]', pad: 12 },
+        mark: 'aside[aria-label="How it prints"] span:text-is("Tax invoice")',
+        alt: "How it prints at Northwind Supply (demo shop), showing the unsaved edit: a tax invoice with the GSTIN and Karnataka",
+        caption: "How it prints, now a tax invoice with the GSTIN",
+    },
+    {
+        key: "help-add-gstin-5",
+        business: "northwind",
+        role: "owner",
+        route: NW_TAX,
+        viewport: HELP_DESK,
+        clip: {
+            selector: 'section[aria-label="Ready to take payments"]',
+            pad: 12,
+        },
+        mark: 'section[aria-label="Ready to take payments"] :text-is("Choose type")',
+        alt: "Ready to take payments at Northwind Supply (demo shop): Choose your business type, with the Choose type button",
+        caption:
+            "Ready to take payments at Northwind Supply: Choose your business type",
+    },
+];
+
+/* Take your first order: Northwind's counter. */
+
+/** A counter order for Meera Iyer, never created. */
+const COUNTER_ORDER: Step[] = [
+    { waitFor: '[role="dialog"]' },
+    { click: '[role="dialog"] :text-is("Meera Iyer")' },
+    { click: '[role="dialog"] :text("Standard · ₹260")' },
+];
+
+const ORDER_SHOTS: Shot[] = [
+    {
+        key: "help-take-order-1",
+        business: "northwind",
+        role: "owner",
+        route: "/commerce/orders",
+        viewport: HELP_DESK,
+        steps: [LATE_RULE_NOTICE],
+        mark: 'main button:has-text("New order")',
+        alt: "Orders at Northwind Supply (demo shop), with the New order button",
+        caption: "Orders at Northwind Supply, with New order at the top right",
+    },
+    {
+        key: "help-take-order-2",
+        business: "northwind",
+        role: "owner",
+        route: "/commerce/orders?new=1",
+        viewport: { width: 1280, height: 900 },
+        steps: COUNTER_ORDER,
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] :text-is("Meera Iyer")',
+        alt: "New order at Northwind Supply (demo shop): taken at the store, Meera Iyer picked as the customer, and a hi-vis vest added",
+        caption: "New order: where it's taken, the customer, and the items",
+    },
+    {
+        key: "help-take-order-3",
+        business: "northwind",
+        role: "owner",
+        route: "/commerce/orders?new=1",
+        viewport: { width: 1280, height: 900 },
+        steps: [
+            ...COUNTER_ORDER,
+            {
+                fill: '[role="dialog"] input[placeholder="Delivery address"]',
+                value: "14 MG Road",
+            },
+            {
+                fill: '[role="dialog"] input[placeholder="Town or city"]',
+                value: "Bengaluru",
+            },
+            {
+                fill: '[role="dialog"] input[placeholder="State"]',
+                value: "Karnataka",
+            },
+            {
+                fill: '[role="dialog"] input[aria-label="PIN code"]',
+                value: "560001",
+            },
+            { click: '[role="dialog"] button:text-is("UPI at the counter")' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:has-text("UPI received · create")',
+        alt: "New order at Northwind Supply (demo shop): local delivery to an address, UPI at the counter, and the UPI received, create button",
+        caption:
+            "How it leaves and how it's paid, then the button that creates it",
+    },
+    {
+        key: "help-take-order-4",
+        business: "northwind",
+        role: "owner",
+        // #ORD-004: a paid pick-up order, ready.
+        route: "/commerce/orders/seed_order_3",
+        viewport: HELP_DESK,
+        mark: 'main button:has-text("Mark collected")',
+        alt: "Order #ORD-004 at Northwind Supply (demo shop): a pick-up order at Ready, with the Mark collected button",
+        caption:
+            "Order #ORD-004 at Ready, with Mark collected at the top right",
+    },
+    {
+        key: "help-take-order-5",
+        business: "northwind",
+        role: "owner",
+        // #ORD-002: a local delivery not paid yet.
+        route: "/commerce/orders/seed_order_1",
+        viewport: HELP_DESK,
+        mark: 'main button:has-text("Paid in cash")',
+        alt: "Order #ORD-002 at Northwind Supply (demo shop), not paid yet, with the Paid in cash button",
+        caption: "Order #ORD-002, not paid yet, with Paid in cash",
+    },
+    {
+        key: "help-take-order-6",
+        business: "northwind",
+        role: "owner",
+        route: "/commerce/orders",
+        viewport: HELP_DESK,
+        steps: [
+            LATE_RULE_NOTICE,
+            { click: 'main button:has-text("All locations")' },
+            { waitFor: '[role="listbox"], [role="menu"]' },
+        ],
+        mark: 'main button:has-text("All locations")',
+        alt: "Orders at Northwind Supply (demo shop), with All locations open on its two locations, Northwind Supply Store and Online",
+        caption: "Orders at Northwind Supply, filtered by location",
+    },
+];
+
+/* Connect Razorpay (Northwind) and Cashfree (Rye & Co.): filled, never connected. */
+
+/** The payments setup dialog's numbered step, by its heading's words. */
+const paySection = (words: string) =>
+    `[role="dialog"] section:has(h3:has-text("${words}"))`;
+
+const RAZORPAY_KEYS: Step[] = [
+    { click: 'button[aria-label="Connect Razorpay"]' },
+    { waitFor: '[role="dialog"]' },
+    { fill: '[role="dialog"] input >> nth=0', value: "rzp_test_Q4dMx9fA3fA9" },
+    {
+        fill: '[role="dialog"] input[type="password"] >> nth=0',
+        value: "a-key-secret",
+    },
+    // Out of the field, so no focus ring is in the picture.
+    { click: '[role="dialog"] h2:text-is("Payments")' },
+];
+
+const CASHFREE_KEYS: Step[] = [
+    { click: 'button[aria-label="Connect Cashfree"]' },
+    { waitFor: '[role="dialog"]' },
+    { fill: '[role="dialog"] input >> nth=0', value: "TEST10427c21" },
+    {
+        fill: '[role="dialog"] input[type="password"] >> nth=0',
+        value: "a-key-secret",
+    },
+    // Out of the field, so no focus ring is in the picture.
+    { click: '[role="dialog"] h2:text-is("Payments")' },
+];
+
+const PAYMENT_SHOTS: Shot[] = [
+    {
+        key: "help-connect-razorpay-1",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: HELP_DESK,
+        mark: 'button[aria-label="Connect Razorpay"]',
+        alt: "Settings, Providers at Northwind Supply (demo shop): Razorpay disconnected, with its Connect button",
+        caption: "Providers at Northwind Supply, Razorpay with Connect",
+    },
+    {
+        key: "help-connect-razorpay-2",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: RAZORPAY_KEYS,
+        clip: { selector: paySection("Your API keys"), pad: 12 },
+        mark: `${paySection("Your API keys")} input >> nth=0`,
+        alt: "Connecting Razorpay at Northwind Supply (demo shop): Key ID (public) and Key secret filled in",
+        caption: "Your API keys: the key id and the key secret",
+    },
+    {
+        key: "help-connect-razorpay-3",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: RAZORPAY_KEYS,
+        clip: {
+            selector: paySection("where to send payment updates"),
+            pad: 12,
+        },
+        mark: 'button[aria-label="Copy webhook URL"]',
+        alt: "Connecting Razorpay at Northwind Supply (demo shop): the webhook URL to copy, and the five events to tick",
+        caption: "The webhook URL to copy, and the events to tick",
+    },
+    {
+        key: "help-connect-razorpay-4",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: [
+            ...RAZORPAY_KEYS,
+            { click: 'button[aria-label="Generate a webhook signing secret"]' },
+        ],
+        clip: {
+            selector: paySection("Webhook signing secret"),
+            until: '[role="dialog"] button[type="submit"]',
+            pad: 12,
+        },
+        mark: '[role="dialog"] button[type="submit"]',
+        alt: "Connecting Razorpay at Northwind Supply (demo shop): a webhook signing secret generated, and the Connect Razorpay button",
+        caption: "The webhook signing secret, then Connect Razorpay",
+    },
+    {
+        key: "help-connect-cashfree-1",
+        business: "rye",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: HELP_DESK,
+        mark: 'button[aria-label="Connect Cashfree"]',
+        alt: "Settings, Providers at Rye & Co. (demo bakery): Cashfree under Available, with its Connect button",
+        caption: "Providers at Rye & Co., Cashfree with Connect",
+    },
+    {
+        key: "help-connect-cashfree-2",
+        business: "rye",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: CASHFREE_KEYS,
+        clip: { selector: paySection("Your API keys"), pad: 12 },
+        mark: `${paySection("Your API keys")} input >> nth=0`,
+        alt: "Connecting Cashfree at Rye & Co. (demo bakery): Key ID and Key secret filled in, and the optional Public key",
+        caption:
+            "Your API keys: Key ID, Key secret and the optional public key",
+    },
+    {
+        key: "help-connect-cashfree-3",
+        business: "rye",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: CASHFREE_KEYS,
+        clip: {
+            selector: paySection("where to send payment updates"),
+            pad: 12,
+        },
+        mark: 'button[aria-label="Copy webhook URL"]',
+        alt: "Connecting Cashfree at Rye & Co. (demo bakery): the webhook URL to copy, and the four events to tick",
+        caption: "The webhook URL to copy, and the events to tick",
+    },
+    {
+        key: "help-connect-cashfree-4",
+        business: "rye",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: CASHFREE_KEYS,
+        clip: {
+            selector:
+                '[role="dialog"] p:has-text("so there\'s no separate secret to add")',
+            until: '[role="dialog"] button[type="submit"]',
+            pad: 12,
+        },
+        mark: '[role="dialog"] button[type="submit"]',
+        alt: "Connecting Cashfree at Rye & Co. (demo bakery): no separate secret to add, and the Connect Cashfree button",
+        caption: "No separate secret for Cashfree, then Connect Cashfree",
+    },
+    {
+        key: "help-connect-cashfree-5",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: HELP_DESK,
+        mark: 'main :text("No payment updates received yet")',
+        alt: "Settings, Providers at Northwind Supply (demo shop): Cashfree connected, with no payment updates received yet",
+        caption:
+            "Cashfree connected at Northwind Supply, waiting for its first payment update",
     },
 ];
 
@@ -611,4 +1064,8 @@ export const SHOTS: Shot[] = [
             "Kavi Dental's own site on Saroh: free times today and Book an appointment",
     },
     ...HELP_SHOTS,
+    ...CREATE_BUSINESS_SHOTS,
+    ...GSTIN_SHOTS,
+    ...ORDER_SHOTS,
+    ...PAYMENT_SHOTS,
 ];

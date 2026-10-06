@@ -90,7 +90,12 @@ function nextMonday(): string {
 
 function urlOf(shot: Shot): string {
     const route = shot.route.replace("{nextMonday}", nextMonday());
+    if (route.startsWith("accounts:")) {
+        return `${urls.ACCOUNTS_URL}${route.slice("accounts:".length)}`;
+    }
     if (route.startsWith("site:")) {
+        if (!shot.business)
+            throw new Error(`${shot.key}: a site needs a business`);
         const renderer = new URL(urls.RENDERER_URL);
         const host = `${BUSINESSES[shot.business].site}.${renderer.host}`;
         return `${renderer.protocol}//${host}${route.slice("site:".length)}`;
@@ -98,8 +103,15 @@ function urlOf(shot: Shot): string {
     return `${urls.APP_URL}${route}`;
 }
 
-/** Sign in once per role through the real form; keep the session on disk. */
-async function sessionFor(browser: Browser, role: Role): Promise<string> {
+/**
+ * Sign in once per role through the real form; keep the session on disk.
+ * A visitor has none.
+ */
+async function sessionFor(
+    browser: Browser,
+    role: Role,
+): Promise<string | undefined> {
+    if (role === "visitor") return undefined;
     const file = path.join(AUTH_DIR, `marketing-shots-${role}.json`);
     if (fs.existsSync(file)) return file;
     fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -291,10 +303,10 @@ async function main() {
     const browser = await chromium.launch();
     const failed: string[] = [];
     try {
-        const sessions = new Map<Role, string>();
+        const sessions = new Map<Role, string | undefined>();
         for (const shot of shots) {
             let storageState = sessions.get(shot.role);
-            if (!storageState) {
+            if (!sessions.has(shot.role)) {
                 storageState = await sessionFor(browser, shot.role);
                 sessions.set(shot.role, storageState);
             }
@@ -310,7 +322,7 @@ async function main() {
             });
             const page = await context.newPage();
             try {
-                await open(page, shot.business);
+                if (shot.business) await open(page, shot.business);
                 const { png, mark } = await capture(page, shot);
                 const webp = await sharp(png).webp(WEBP).toBuffer();
                 fs.mkdirSync(path.dirname(fileOf(shot.key)), {
