@@ -8,7 +8,8 @@
         "install:browsers": "playwright install --with-deps chromium",
         "lint": "eslint . && node --test eslint.config.test.mjs",
         "typecheck": "tsc --noEmit",
-        "test:permissions": "playwright test --config=permissions.config.ts"
+        "test:permissions": "playwright test --config=permissions.config.ts",
+        "shots": "tsx marketing-shots/capture.ts"
     },
     "devDependencies": {
         "@axe-core/playwright": "^4.13.0",

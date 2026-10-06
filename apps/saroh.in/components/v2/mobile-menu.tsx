@@ -18,18 +18,20 @@ const ROW =
 
 /**
  * The phone nav (below 760px, Nav design): the start button and a Menu
- * button that opens a full-screen sheet with Features and Solutions as
- * accordions — the section the page is in starts open — then Sign in
+ * button that opens a full-screen sheet with Features, Solutions and (when
+ * any page is live) Resources as accordions — the section the page is in starts open — then Sign in
  * and the start button. Esc or × closes it and returns focus to Menu; while
  * it is open, focus stays inside.
  */
 export function MobileMenu({
     section,
     pathname,
+    resources = [],
     className,
 }: {
     section: NavSection;
     pathname: string;
+    resources?: NavItem[];
     className?: string;
 }) {
     const [open, setOpen] = useState(false);
@@ -77,7 +79,12 @@ export function MobileMenu({
                 </span>
             </button>
             {open ? (
-                <Sheet section={section} pathname={pathname} onClose={close} />
+                <Sheet
+                    section={section}
+                    pathname={pathname}
+                    resources={resources}
+                    onClose={close}
+                />
             ) : null}
         </div>
     );
@@ -86,16 +93,19 @@ export function MobileMenu({
 function Sheet({
     section,
     pathname,
+    resources,
     onClose,
 }: {
     section: NavSection;
     pathname: string;
+    resources: NavItem[];
     onClose: () => void;
 }) {
     const root = useRef<HTMLDivElement>(null);
     useFocusTrap(root, true, onClose);
     const [features, setFeatures] = useState(section === "features");
     const [solutions, setSolutions] = useState(section === "solutions");
+    const [resourcesOpen, setResourcesOpen] = useState(section === "resources");
 
     return (
         <div
@@ -136,6 +146,16 @@ function Sheet({
                 open={solutions}
                 onToggle={() => setSolutions(!solutions)}
             />
+            {resources.length > 0 ? (
+                <Accordion
+                    id="resources"
+                    label="Resources"
+                    items={resources}
+                    pathname={pathname}
+                    open={resourcesOpen}
+                    onToggle={() => setResourcesOpen(!resourcesOpen)}
+                />
+            ) : null}
             <a href={SIGN_IN_URL} className={ROW}>
                 Sign in
             </a>

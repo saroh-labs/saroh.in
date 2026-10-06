@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { OrderCardFrame } from "@/components/commerce/orders/order-row";
+
 import type { DetailOrder } from "@/lib/customer-workspace/detail";
 import type { OrderFilter } from "@/lib/customer-workspace/view";
 import {
@@ -19,8 +21,9 @@ const COLS =
     "grid grid-cols-[70px_minmax(0,1.6fr)_90px_90px_100px_90px] gap-2.5";
 
 /**
- * Their orders, newest first, from the store customers linked to them. The
- * table scrolls inside its card on a phone rather than the page.
+ * Their orders, newest first, from the store customers linked to them. At
+ * the desk a table; on a phone (under 760px) a card per order in the Orders
+ * list's own frame, so nothing hides sideways.
  */
 export function OrdersTab({
     rows,
@@ -60,7 +63,7 @@ export function OrdersTab({
                     { key: "past", label: "Past" },
                 ]}
             />
-            <div className="overflow-x-auto rounded-xl border border-border bg-card px-[18px] pb-1.5">
+            <div className="overflow-x-auto rounded-xl border border-border bg-card px-[18px] pb-1.5 max-[759px]:hidden">
                 <div className="min-w-[560px]">
                     <div
                         className={`${COLS} border-b border-foreground/10 pb-[7px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground`}
@@ -113,6 +116,56 @@ export function OrdersTab({
                     ) : null}
                 </div>
             </div>
+            {shown.length ? (
+                <ul
+                    aria-label="Their orders"
+                    className="flex flex-col gap-2 min-[760px]:hidden"
+                >
+                    {shown.map((o) => (
+                        <OrderCardFrame
+                            key={o.id}
+                            href={`/commerce/orders/${o.id}`}
+                            title={
+                                <>
+                                    {orderWhat(o)}
+                                    <span className="sr-only">
+                                        , order #{o.number}
+                                    </span>
+                                </>
+                            }
+                            aside={
+                                o.total && o.currency ? (
+                                    <span className="font-display text-[14px] font-semibold tabular-nums">
+                                        {money(o.total, o.currency)}
+                                    </span>
+                                ) : null
+                            }
+                            meta={
+                                <>
+                                    <span className="font-mono">
+                                        #{o.number}
+                                    </span>
+                                    <RowPill tone={isOpen(o) ? "ok" : "off"}>
+                                        {orderStatus(o)}
+                                    </RowPill>
+                                </>
+                            }
+                            footer={
+                                <div className="text-[12px] text-muted-foreground">
+                                    {whenText(o.placedAt, timeZone, now)}
+                                    {` · ${o.via.storefront.name}`}
+                                </div>
+                            }
+                        />
+                    ))}
+                </ul>
+            ) : (
+                <p className="rounded-xl border border-border bg-card p-3 text-[13px] text-muted-foreground min-[760px]:hidden">
+                    {filter === "open"
+                        ? "Nothing open — every order is done."
+                        : "No past orders yet."}
+                </p>
+            )}
             {count > rows.length ? (
                 <p className="mt-2 text-[12px] text-muted-foreground">
                     The latest {rows.length} of {count} orders.{" "}

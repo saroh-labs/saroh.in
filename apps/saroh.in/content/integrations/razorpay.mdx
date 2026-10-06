@@ -1,0 +1,146 @@
+---
+# Every screen, label, path and event below is copied from the code (audit
+# R4). Sources, from the repo root:
+#   SETUP  apps/app.saroh.in/components/providers/provider-setup-dialog.tsx
+#   HOOK   apps/app.saroh.in/components/providers/payment-webhook-steps.tsx
+#   WORDS  apps/app.saroh.in/lib/providers/webhook.ts
+#   ROWS   apps/app.saroh.in/lib/providers/rows.ts
+#   PAGE   apps/app.saroh.in/app/(shell)/settings/(sections)/providers/page.tsx
+#   PATH   packages/integrations/src/index.ts (webhookPath, WEBHOOK_EVENTS),
+#          used by apps/api.saroh.in/src/modules/payments/webhook-setup.ts
+#   SECRET apps/api.saroh.in/src/modules/payments/webhook-secret.ts
+# content/integrations.test.ts checks webhookPath and events against PATH.
+slug: razorpay
+name: Razorpay
+category: Payments
+title: "Razorpay on Saroh: take payments into your own account · Saroh"
+description: "Connect your own Razorpay account to Saroh in five steps: your API keys, the webhook address, the events to tick and the signing secret. The money goes straight to you."
+intro: "Saroh's Razorpay integration takes payments through your own Razorpay account. Customers pay by UPI, card or the other methods your account has switched on, and the money goes straight to you. Saroh never holds it."
+doesTitle: What it does in Saroh
+# PAGE: the screen is titled "Providers"; SETUP: Razorpay is a provider in it.
+panelPath: [Settings, Providers, Razorpay]
+# PATH: webhookPath("RAZORPAY", "your-business-id").
+webhookPath: /public/webhooks/razorpay/your-business-id
+# PATH: WEBHOOK_EVENTS.RAZORPAY, in Settings' order (HOOK, "Tick these events").
+events:
+    - payment.captured
+    - payment.failed
+    - order.paid
+    - refund.processed
+    - refund.failed
+initialStep: 2
+steps:
+    # ROWS: a provider not yet connected has a "Connect" button and type "Payments".
+    # SETUP: the "Provider" select offers Razorpay and Cashfree.
+    - title: Open Settings › Providers
+      cta: Connect
+      body: "Providers lists the services behind your business, Razorpay and Cashfree among them. Press Connect on Razorpay's row. The form shows your webhook address straight away, before you connect anything."
+      rows:
+          - { label: Provider, value: Razorpay }
+          - { label: Type, value: Payments }
+    # SETUP: step 1 "Your API keys", fields "Key ID (public)" and "Key secret",
+    # the hint under them, and the dialog's "sealed when saved" line.
+    - title: Add your API keys
+      body: "Both are under API Keys in Razorpay's dashboard. The key id starts rzp_live_ or rzp_test_ and opens your checkout window, so customers see it. The key secret never leaves Saroh. Your keys are sealed when saved and never shown again."
+      rows:
+          - {
+                label: Key ID (public),
+                value: "rzp_test_••••••3fA9",
+                mono: true,
+                done: true,
+            }
+          - {
+                label: Key secret,
+                value: "••••••••••••••••",
+                note: Sealed,
+                mono: true,
+                done: true,
+            }
+    # HOOK: step 2 "Tell Razorpay where to send payment updates", "Webhook URL"
+    # with "Copy", "Tick these events", the test-mode note and
+    # "Autopay adds its own events when it is switched on."
+    # WORDS: WEBHOOK_PLACE.RAZORPAY = "Accounts & Settings › Webhooks › Add New Webhook".
+    - title: Tell Razorpay where to send payment updates
+      body: "In Razorpay, open Accounts & Settings › Webhooks › Add New Webhook. Paste this address, tick the five events and save. The address is made for your business. The id in it isn't a secret, because Saroh checks every message's signature. Using an rzp_test_ key? Add the webhook in Razorpay's test dashboard too. Autopay adds its own events when it is switched on."
+      rows:
+          - {
+                label: Webhook URL,
+                value: "https://api.saroh.in/public/webhooks/razorpay/your-business-id",
+                note: Copy,
+                tone: ok,
+                mono: true,
+            }
+          - {
+                label: Tick these events,
+                value: "payment.captured, payment.failed, order.paid, refund.processed, refund.failed",
+                mono: true,
+            }
+    # HOOK: step 3 "Webhook signing secret", "Generate one" and its hint.
+    # SECRET: Razorpay signs with its own webhook secret; without it every
+    # webhook is refused and a customer who paid stays "Awaiting payment".
+    # SETUP: Connect stays disabled without it; the button reads "Connect Razorpay".
+    - title: Add the webhook signing secret
+      cta: Connect Razorpay
+      body: "Use the same secret here and in Razorpay: type the one you set there, or press Generate one and paste it into Razorpay's webhook form. Saroh won't connect Razorpay without it, because Razorpay's payment updates would be refused and a customer who paid would stay 'Awaiting payment'."
+      rows:
+          - {
+                label: Webhook signing secret,
+                value: "••••••••••••",
+                note: Required,
+                tone: required,
+                mono: true,
+            }
+    # WORDS: lastUpdateLine(), "Last payment update from Razorpay: just now."
+    # and "No payment updates received yet — check the webhook in Razorpay."
+    # ROWS: the "Connected" pill. SETUP: a connected provider's button is "Save keys".
+    - title: Check that payment updates arrive
+      body: "Make a test payment, such as a booking deposit or an invoice's pay link. Razorpay's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook and the secret match. When you're ready, enter your live keys and add the same webhook in Razorpay's live mode."
+      rows:
+          - {
+                label: Razorpay,
+                value: Payments,
+                note: Connected,
+                tone: ok,
+                done: true,
+            }
+          - {
+                label: Payment updates,
+                value: "Last payment update from Razorpay: just now.",
+                done: true,
+            }
+faq:
+    # SECRET: Saroh checks the signature before believing a webhook.
+    - q: Why do I need a webhook?
+      a: "It's how Razorpay tells Saroh a payment went through, failed or was refunded. Saroh checks each message's signature with your webhook signing secret before believing it. Without the webhook, a customer who paid would stay 'Awaiting payment'."
+    # ROWS: "Needs its webhook signing secret — payments can't be confirmed
+    # until you add it." with the button "Add webhook secret".
+    - q: What if Saroh says the webhook signing secret is missing?
+      a: "Razorpay's row in Settings › Providers shows Add webhook secret. Press it and enter your keys again with the same secret you set in Razorpay's webhook. Keys can't be read back once saved, so they're entered again too."
+    - q: Where does the money go?
+      a: "Straight into your Razorpay account, and from there to your bank on Razorpay's usual schedule. Saroh never holds it."
+    - q: Who charges the payment fees?
+      a: "Razorpay charges its usual fees on your account, as it would anywhere else."
+    # SETUP: several payment providers can be connected at once.
+    - q: Can I use Cashfree instead?
+      a: "Yes. Cashfree works the same way. Connect whichever account your business already has, or both."
+links:
+    - { label: Use Cashfree instead, href: /integrations/cashfree }
+---
+
+{/*
+Each line below is backed in the code and in docs/architecture/MARKETING_CLAIMS.md:
+deposits: BK8 (Service.depositMode); pay links: BI8 (public-invoices.*);
+matched for you: apps/api.saroh.in/src/modules/webhooks/providers/razorpay.webhook.ts
+(payment.captured / order.paid → SUCCEEDED, payment.failed → FAILED,
+refund.processed → REFUNDED); renewals: the DEC-075 D1 wording (F3, SU2),
+autopay being Razorpay's only (payments/providers/razorpay.provider.ts) and
+behind the RAZORPAY_AUTOPAY flag, so the line says "can" and names the pay link.
+*/}
+
+**Deposits when someone books.** Ask for nothing, a quarter, half or all of the price when a customer books on your site.
+
+**Pay links on invoices.** Every invoice and reminder can carry a link to pay it by UPI or card.
+
+**Payments matched for you.** When Razorpay confirms a payment, the booking, order or invoice it was for is marked paid on its own. A failed payment or a refund is recorded the same way.
+
+**Plans that can renew on their own.** Memberships and regular orders can renew by UPI Autopay where you've set it up on your Razorpay account. Otherwise each renewal is invoiced with a pay link.

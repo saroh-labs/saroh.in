@@ -2,6 +2,7 @@
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { makeOrder } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
@@ -267,6 +268,9 @@ test.describe("orders list", () => {
             sw: document.documentElement.scrollWidth,
         }));
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
+        // The page fitting is not enough: no card or box inside it may hide
+        // a column sideways (Phone Tables audit T10).
+        await expectNothingHiddenSideways(page);
 
         // The filters are behind one button now (B5), so the first card
         // starts above the fold rather than under a wall of menus.

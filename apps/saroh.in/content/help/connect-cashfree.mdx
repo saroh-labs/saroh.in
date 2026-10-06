@@ -1,0 +1,75 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. The facts are the ones
+# content/integrations/cashfree.mdx takes from the same code, so Help and
+# Integrations say the same. Sources, from the repo root:
+#   PAGE   apps/app.saroh.in/app/(shell)/settings/(sections)/providers/page.tsx
+#          (Settings › Providers)
+#   ROWS   apps/app.saroh.in/lib/providers/rows.ts (Connect under
+#          Available; "Connected"; the last-payment-update line)
+#   SETUP  apps/app.saroh.in/components/providers/provider-setup-dialog.tsx
+#          (step 1 "Your API keys": "Key ID", "Key secret", "Public key"
+#          optional, "Shown to the checkout; not a secret."; "Cashfree signs
+#          its payment updates with your key secret, so there's no separate
+#          secret to add."; "Connect Cashfree"; the business details step)
+#   HOOK   apps/app.saroh.in/components/providers/payment-webhook-steps.tsx
+#          (step 2 "Tell Cashfree where to send payment updates", "Webhook
+#          URL", "Copy", "Tick these events")
+#   WORDS  apps/app.saroh.in/lib/providers/webhook.ts ("Developers ›
+#          Webhooks › Add Webhook Endpoint"; "No payment updates received
+#          yet — check the webhook in Cashfree."; "Last payment update from
+#          Cashfree: …")
+#   PATH   packages/integrations/src/index.ts (WEBHOOK_EVENTS.CASHFREE)
+#   KEYS   apps/api.saroh.in/src/modules/payments/providers/cashfree.provider.ts
+#          (Key ID and Key secret are the app's client ID and secret)
+# Steps 1–4 are Rye & Co., where Cashfree isn't connected in the seed
+# (filled, never connected); step 5 is Northwind, whose Cashfree is.
+# The dialog also prints "Autopay adds its own events when it is switched
+# on." for Cashfree, which has no autopay (the integrations page says so):
+# not repeated here.
+title: Connect Cashfree
+slug: connect-cashfree
+area: Payments
+group: Get paid
+order: 20
+intro: "Already take payments with Cashfree? Connect your account and customers can pay you online by UPI, card or whatever else your account has switched on. The money goes straight to your Cashfree account; Saroh never holds it. This takes about five minutes."
+description: "Connect your Cashfree account to Saroh: your keys, the webhook address and its events, then check payment updates arrive. Five steps, with a picture of each."
+readMinutes: 4
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # PAGE, ROWS.
+    - title: Open Settings › Providers
+      body: "In Saroh, open Settings › Providers. It lists the services behind your business, connected ones first, then those available. Press Connect on Cashfree's row."
+      shot: help-connect-cashfree-1
+      caption: "Providers at Rye & Co. (a demo bakery), with Connect on Cashfree's row."
+      marker: Connect
+    # SETUP, KEYS.
+    - title: Add your API keys
+      body: "Under Your API keys, enter Key ID and Key secret: they're your Cashfree app's client ID and client secret. The public key is optional; it's shown to the checkout and isn't a secret. Your keys are sealed when saved and never shown again."
+      shot: help-connect-cashfree-2
+      caption: "Your API keys while connecting Cashfree at Rye & Co. (a demo bakery)."
+      marker: Key ID
+    # HOOK, WORDS, PATH.
+    - title: Tell Cashfree where to send payment updates
+      body: "In Cashfree, open Developers › Webhooks › Add Webhook Endpoint. Press Copy beside the Webhook URL in Saroh and paste it there, tick the four events Saroh lists (PAYMENT_SUCCESS_WEBHOOK, PAYMENT_FAILED_WEBHOOK, PAYMENT_USER_DROPPED_WEBHOOK and REFUND_STATUS_WEBHOOK) and save."
+      shot: help-connect-cashfree-3
+      caption: "The webhook URL and the events to tick, for Rye & Co. (a demo bakery)."
+      marker: Copy
+    # SETUP, DETAIL.
+    - title: Connect
+      body: "Cashfree signs its payment updates with your key secret, so there's no separate secret to add. Press Connect Cashfree."
+      shot: help-connect-cashfree-4
+      caption: "No separate secret for Cashfree, and Connect Cashfree, at Rye & Co. (a demo bakery)."
+      tip: "No registered address yet? Saroh asks for your business details first, because online payments are invoiced, then connects."
+      marker: Connect Cashfree
+    # ROWS, WORDS.
+    - title: Check that payment updates arrive
+      body: "Make a test payment, such as an invoice's pay link. Cashfree's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says No payment updates received yet — check the webhook in Cashfree."
+      shot: help-connect-cashfree-5
+      caption: "Cashfree connected at Northwind Supply (a demo shop), waiting for its first payment update."
+      marker: No payment updates received yet
+next: [connect-razorpay, take-your-first-order, add-your-gstin]
+---
+
+Cashfree's side of it, the keys, the webhook and the events, is also on [Cashfree on Saroh](/integrations/cashfree).

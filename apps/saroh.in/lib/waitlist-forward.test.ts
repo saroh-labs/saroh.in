@@ -144,6 +144,13 @@ describe("joinBody", () => {
         });
     });
 
+    it("takes the changelog's email-only join with its source (plan U4)", () => {
+        expect(joinBody({ email: "a@b.in", src: "changelog" })).toEqual({
+            email: "a@b.in",
+            source: "changelog",
+        });
+    });
+
     it("refuses what is not a join", () => {
         expect(joinBody(null)).toBeNull();
         expect(joinBody({ business: "B" })).toBeNull();

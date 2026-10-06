@@ -1,7 +1,7 @@
 import { buttonVariants } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { ScrollX } from "@saroh/ui/scroll-x";
 import {
-    Table,
     TableBody,
     TableCell,
     TableHead,
@@ -46,8 +46,15 @@ export function AdminAuditTable({
 
     return (
         <>
-            <div className="overflow-x-auto rounded-lg border">
-                <Table className="min-w-[980px]">
+            {/*
+             * The ledger keeps its columns at every width, so it scrolls
+             * sideways and says so: ScrollX fades the side with more and
+             * hints once (Phone Tables audit T9). A bare <table>, not
+             * <Table>, whose own overflow wrapper would be the box that
+             * scrolls, unmarked, inside this one.
+             */}
+            <ScrollX label="Audit events" className="rounded-lg border">
+                <table className="w-full min-w-[980px] caption-bottom text-sm">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Time</TableHead>
@@ -107,8 +114,8 @@ export function AdminAuditTable({
                             </TableRow>
                         ))}
                     </TableBody>
-                </Table>
-            </div>
+                </table>
+            </ScrollX>
 
             <div className="mt-4 flex items-center justify-between gap-4">
                 {query.cursor ? (

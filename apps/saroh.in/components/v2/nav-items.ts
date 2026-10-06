@@ -1,4 +1,5 @@
 import { featureHref, featureList } from "@/content/features";
+import type { ResourcePage } from "@/content/resources";
 import { solutionHref, solutionList } from "@/content/solutions";
 
 export interface NavItem {
@@ -21,11 +22,27 @@ export const SOLUTION_ITEMS: NavItem[] = solutionList.map((s) => ({
     href: solutionHref(s.slug),
 }));
 
-export type NavSection = "features" | "solutions" | null;
+/**
+ * The Resources menu: the pages `content/resources.ts` shows now, which the
+ * server works out (published, and built) and hands to the nav.
+ */
+export function resourceItems(pages: readonly ResourcePage[]): NavItem[] {
+    return pages.map((p) => ({ name: p.name, line: p.line, href: p.href }));
+}
+
+export type NavSection = "features" | "solutions" | "resources" | null;
+
+/** Whether `pathname` is the page `href` or a page under it. */
+const within = (pathname: string, href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
 
 /** Which top-level section a path is in, for the saffron underline. */
-export function sectionOf(pathname: string): NavSection {
+export function sectionOf(
+    pathname: string,
+    resources: readonly NavItem[] = [],
+): NavSection {
     if (FEATURE_ITEMS.some((i) => i.href === pathname)) return "features";
     if (SOLUTION_ITEMS.some((i) => i.href === pathname)) return "solutions";
+    if (resources.some((i) => within(pathname, i.href))) return "resources";
     return null;
 }

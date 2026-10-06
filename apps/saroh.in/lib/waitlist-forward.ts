@@ -85,9 +85,10 @@ const text = (value: unknown, max: number): string | undefined =>
 /**
  * The API body for what the page posted, or null when it is not a join.
  * The V2 form sends `business` and `kind` (and `src` for its source). An
- * email alone, the V1 form's body, is still taken, with its old source
- * "saroh.in": U26 removed that form, but a V1 page left open in a browser
- * across the release can still post it.
+ * email alone is the changelog's "Get one email when something ships"
+ * (plan U4, KTD-5), which names its `src` (`changelog`); without one it is
+ * the V1 form's body, still taken with its old source "saroh.in": U26
+ * removed that form, but a V1 page left open across the release can post it.
  */
 export function joinBody(posted: unknown): JoinBody | null {
     if (typeof posted !== "object" || posted === null) return null;
@@ -95,7 +96,7 @@ export function joinBody(posted: unknown): JoinBody | null {
     const email = text(p.email, 320);
     if (!email) return null;
     const business = text(p.business, 120);
-    if (!business) return { email, source: "saroh.in" };
+    if (!business) return { email, source: text(p.src, 64) ?? "saroh.in" };
     return {
         email,
         business,

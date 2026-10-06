@@ -1,3 +1,7 @@
 # Exclude auth.ts due to prettier-plugin-tailwindcss bug
 # See: https://github.com/tailwindlabs/prettier-plugin-tailwindcss/issues
 apps/accounts.saroh.in/lib/auth.ts
+
+# Prettier's MDX parser is MDX 1 and rewrites MDX 2+ comments ({/* … */})
+# into broken text. The Resources pages' MDX cites its sources in them.
+apps/saroh.in/content/**/*.mdx

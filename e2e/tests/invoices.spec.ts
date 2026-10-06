@@ -77,6 +77,44 @@ test.describe("invoices", () => {
             page.getByText("Due", { exact: true }).first(),
         ).toBeVisible();
         await expect(page.getByText(what).first()).toBeVisible();
+        // On a 390px phone (T6) the paper's item has the row: its name
+        // takes a line or two, and nothing in main scrolls sideways.
+        if (testInfo.project.name.startsWith("phone")) {
+            await page.setViewportSize({ width: 390, height: 844 });
+            const paper = page.getByRole("article", { name: /as it prints$/ });
+            await expect(paper).toContainText(what);
+            const nameLines = await paper.evaluate((el, name) => {
+                const walk = document.createTreeWalker(
+                    el,
+                    NodeFilter.SHOW_TEXT,
+                );
+                for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+                    if (n.textContent !== name) continue;
+                    const range = document.createRange();
+                    range.selectNodeContents(n);
+                    const tops = [...range.getClientRects()].map((r) =>
+                        Math.round(r.top),
+                    );
+                    return new Set(tops).size;
+                }
+                return 0;
+            }, what);
+            expect(nameLines).toBeGreaterThan(0);
+            expect(nameLines).toBeLessThanOrEqual(2);
+            const sideways = await page
+                .locator("main")
+                .evaluate((main): string[] =>
+                    [main, ...Array.from(main.querySelectorAll("*"))]
+                        .filter((e) => e.scrollWidth > e.clientWidth + 1)
+                        .filter((e) =>
+                            /auto|scroll/.test(getComputedStyle(e).overflowX),
+                        )
+                        .map((e) =>
+                            (e.getAttribute("class") ?? e.tagName).slice(0, 80),
+                        ),
+                );
+            expect(sideways).toEqual([]);
+        }
         // Issued: the draft's actions are gone, the unpaid ones are here.
         await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
         await expect(

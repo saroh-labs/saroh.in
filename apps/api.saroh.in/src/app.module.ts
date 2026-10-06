@@ -32,6 +32,7 @@ import { ImportsModule } from "./modules/imports/imports.module";
 import { InvoicesModule } from "./modules/invoices/invoices.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { LeadsModule } from "./modules/leads/leads.module";
+import { LinkPreviewModule } from "./modules/link-preview/link-preview.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
@@ -129,6 +130,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         AnalyticsModule,
         BillingModule,
         WaitlistModule,
+        LinkPreviewModule,
         SelfTestModule,
     ],
 })

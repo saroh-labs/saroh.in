@@ -242,6 +242,10 @@ const NEVER: Record<string, string> = {
     "waitlist/waitlist.controller.ts": "public waitlist",
     "waitlist/public-offer.controller.ts":
         "the launch offer saroh.in's waitlist page shows, not a tenant surface",
+    // Resources plan U2: saroh.in's free link preview tool, used before any
+    // account or business exists. Behind the signed visitor relay instead.
+    "link-preview/link-preview.controller.ts":
+        "saroh.in's public link preview tool, not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

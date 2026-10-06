@@ -15,6 +15,18 @@ import { billedTo, spacedCode } from "@/lib/invoices/status";
 import type { InvoiceBusiness } from "@/lib/invoices/tax";
 
 /**
+ * Line rows: a phone (below `sm`) gives the item the row and the amount the
+ * right edge, with HSN, quantity × price and GST on a muted second line;
+ * the desk, and print, keep the columns (T6).
+ */
+const COLS = "grid grid-cols-[minmax(0,1fr)_auto] gap-x-2";
+const DESK =
+    "sm:grid-cols-[minmax(0,3fr)_56px_90px] print:grid-cols-[minmax(0,3fr)_56px_90px]";
+const DESK_WITH_HSN =
+    "sm:grid-cols-[minmax(0,3fr)_70px_56px_90px] print:grid-cols-[minmax(0,3fr)_70px_56px_90px]";
+const DESK_ONLY = "hidden sm:block print:block";
+
+/**
  * The invoice as the customer receives it, after "Saroh Invoice Detail": a
  * tax invoice for a GST-registered business — the seller's logo (today's,
  * not frozen on issue: it is branding, not a GST particular), its name,
@@ -80,6 +92,9 @@ export function InvoicePaper({
     const address = i.billTo?.address ?? i.billToGst?.address ?? null;
     const buyerGstin = i.billTo?.gstin ?? i.billToGst?.gstin ?? null;
     const typedTax = !gst && Number(i.tax) > 0;
+    // A bill of supply, a receipt or lines without codes: no HSN column.
+    const hsnColumn =
+        Boolean(gst) && (i.lines ?? []).some((l) => l.gst?.hsnSac?.trim());
 
     // No line with a rate set: no GST rows, just the total (DEC-072).
     const gstRows = taxed && showsGstTotals(i) ? taxed : null;
@@ -203,51 +218,103 @@ export function InvoicePaper({
                 ) : null}
             </div>
 
-            <div className="overflow-x-auto border-t border-border">
-                <div className="min-w-[300px]">
-                    <div className="grid grid-cols-[minmax(0,3fr)_70px_56px_90px] gap-2 border-b border-border py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                        <span>Item</span>
-                        <span>{gst ? "HSN / SAC" : ""}</span>
-                        <span className="text-right">Qty</span>
-                        <span className="text-right">Amount</span>
-                    </div>
-                    {(i.lines ?? []).map((l) => {
-                        const discount = Number(l.discount ?? 0);
-                        const sub = [
-                            lineGstNote(Boolean(taxed), l.gst ?? null, money),
-                            l.quantity > 1
-                                ? `${money(l.unitPrice)} each`
-                                : null,
-                            discount > 0
-                                ? `less ${money(String(discount))} discount`
-                                : null,
-                        ].filter(Boolean);
-                        return (
-                            <div
-                                key={l.id}
-                                className="grid grid-cols-[minmax(0,3fr)_70px_56px_90px] items-baseline gap-2 border-b border-border/60 py-[9px] text-[13px]"
-                            >
-                                <span className="min-w-0">
-                                    {l.description}
-                                    {sub.length ? (
-                                        <span className="block text-[11.5px] text-muted-foreground">
-                                            {sub.join(" · ")}
-                                        </span>
-                                    ) : null}
-                                </span>
-                                <span className="font-mono text-[11.5px] text-muted-foreground">
-                                    {gst ? spacedCode(l.gst?.hsnSac) : ""}
-                                </span>
-                                <span className="text-right tabular-nums">
-                                    {l.quantity}
-                                </span>
-                                <span className="text-right font-semibold tabular-nums">
-                                    {money(l.amount)}
-                                </span>
-                            </div>
-                        );
-                    })}
+            <div className="border-t border-border">
+                <div
+                    className={cn(
+                        COLS,
+                        hsnColumn ? DESK_WITH_HSN : DESK,
+                        "border-b border-border py-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
+                    )}
+                >
+                    <span>Item</span>
+                    {hsnColumn ? (
+                        <span className={DESK_ONLY}>HSN / SAC</span>
+                    ) : null}
+                    <span className={cn(DESK_ONLY, "text-right")}>Qty</span>
+                    <span className="text-right">Amount</span>
                 </div>
+                {(i.lines ?? []).map((l) => {
+                    const discount = Number(l.discount ?? 0);
+                    const gstNote = lineGstNote(
+                        Boolean(taxed),
+                        l.gst ?? null,
+                        money,
+                    );
+                    const less =
+                        discount > 0
+                            ? `less ${money(String(discount))} discount`
+                            : null;
+                    const code = gst ? spacedCode(l.gst?.hsnSac) : "";
+                    // The desk's note under the name: HSN and Qty have
+                    // columns of their own there.
+                    const sub = [
+                        gstNote,
+                        l.quantity > 1 ? `${money(l.unitPrice)} each` : null,
+                        less,
+                    ].filter(Boolean);
+                    // A phone's second line carries what the columns would.
+                    const phoneSub = [
+                        code ? `HSN ${code}` : null,
+                        l.quantity > 1
+                            ? `${l.quantity} × ${money(l.unitPrice)}`
+                            : null,
+                        gstNote,
+                        less,
+                    ].filter(Boolean);
+                    return (
+                        <div
+                            key={l.id}
+                            className={cn(
+                                COLS,
+                                hsnColumn ? DESK_WITH_HSN : DESK,
+                                "items-baseline border-b border-border/60 py-[9px] text-[13px]",
+                            )}
+                        >
+                            <span className="min-w-0">
+                                {l.description}
+                                {sub.length ? (
+                                    <span
+                                        className={cn(
+                                            DESK_ONLY,
+                                            "text-[11.5px] text-muted-foreground",
+                                        )}
+                                    >
+                                        {sub.join(" · ")}
+                                    </span>
+                                ) : null}
+                            </span>
+                            {hsnColumn ? (
+                                <span
+                                    className={cn(
+                                        DESK_ONLY,
+                                        "font-mono text-[11.5px] text-muted-foreground",
+                                    )}
+                                >
+                                    {code}
+                                </span>
+                            ) : null}
+                            <span
+                                className={cn(
+                                    DESK_ONLY,
+                                    "text-right tabular-nums",
+                                )}
+                            >
+                                {l.quantity}
+                            </span>
+                            <span className="text-right font-semibold tabular-nums">
+                                {money(l.amount)}
+                            </span>
+                            {phoneSub.length ? (
+                                <span
+                                    data-phone-line
+                                    className="col-span-full mt-0.5 text-[11.5px] text-muted-foreground sm:hidden print:hidden"
+                                >
+                                    {phoneSub.join(" · ")}
+                                </span>
+                            ) : null}
+                        </div>
+                    );
+                })}
             </div>
 
             <div className="flex justify-end pt-2.5">

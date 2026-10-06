@@ -23,6 +23,12 @@ import { WebhooksService } from "./webhooks.service";
  * The handler always answers 200 for a verified (or duplicate) delivery so the
  * provider stops retrying; only signature/verification failures surface as 401
  * and a genuinely unknown provider as 404.
+ *
+ * The route is written out, not imported, because the test-host route list
+ * reads `@Controller` paths as plain strings (`public-write-routes.ts`).
+ * `webhook-route.spec.ts` pins it to `WEBHOOK_ROUTE` from
+ * `@saroh/integrations`, the path the setup screen and the marketing site's
+ * integration pages name.
  */
 @Controller("public/webhooks")
 export class WebhooksController {

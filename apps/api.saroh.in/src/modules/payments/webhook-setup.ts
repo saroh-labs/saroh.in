@@ -1,5 +1,6 @@
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import { webhookPath } from "@saroh/integrations";
 
 import { env } from "../../env";
 import { decryptSecret } from "./crypto";
@@ -62,8 +63,9 @@ function apiBase(): string | null {
 
 /**
  * The address to register in the provider's dashboard for this business —
- * `webhooks.controller.ts`'s route. The organization id in it is not a
- * secret: trust comes from the signature, never the URL.
+ * `webhooks.controller.ts`'s route, from `@saroh/integrations` so the
+ * marketing site's integration pages name the same path. The organization
+ * id in it is not a secret: trust comes from the signature, never the URL.
  */
 export function webhookUrl(
     organizationId: string,
@@ -71,7 +73,7 @@ export function webhookUrl(
 ): string | null {
     const base = apiBase();
     if (!base) return null;
-    return `${base}/public/webhooks/${provider.toLowerCase()}/${encodeURIComponent(organizationId)}`;
+    return `${base}${webhookPath(provider, organizationId)}`;
 }
 
 /** A provider's webhook, as setup shows it (DEC-063). Nothing secret. */

@@ -14,7 +14,9 @@
     "portless": "saroh",
     "dependencies": {
         "@hookform/resolvers": "catalog:",
+        "@mdx-js/mdx": "^3.1.1",
         "@saroh/auth": "workspace:*",
+        "@saroh/integrations": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "clsx": "^2.1.1",
@@ -24,6 +26,7 @@
         "react-dom": "catalog:react19",
         "react-hook-form": "catalog:",
         "tailwind-merge": "^3.6.0",
+        "yaml": "^2.9.0",
         "zod": "catalog:"
     },
     "devDependencies": {

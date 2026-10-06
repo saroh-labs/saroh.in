@@ -10,7 +10,7 @@ const STORAGE_PREFIX = "saroh-view-mode:";
  * column, below it rows become cards. Collapsing the rail to 64px at 1100 is
  * what buys a table the width to reach down here.
  */
-const TABLE_MIN_WIDTH = 760;
+export const TABLE_MIN_WIDTH = 760;
 
 /**
  * In-memory overrides, so a click updates every mounted view of the same id
@@ -19,56 +19,115 @@ const TABLE_MIN_WIDTH = 760;
 const chosen = new Map<string, DataViewMode>();
 const listeners = new Set<() => void>();
 
+const WIDE_QUERY = `(min-width: ${TABLE_MIN_WIDTH}px)`;
+
 /**
- * A resize counts as a change too: with no stored preference the viewport
- * decides, so crossing the table boundary has to re-read it. A tablet that
- * rotates, or a window dragged narrow, otherwise keeps a table it no longer
- * has the width for.
+ * A resize counts as a change too: the viewport decides on a phone, so
+ * crossing the table boundary has to re-read it. A tablet that rotates, or a
+ * window dragged narrow, otherwise keeps a table it no longer has the width
+ * for.
  */
 function subscribe(onChange: () => void) {
     listeners.add(onChange);
-    const mq = window.matchMedia(`(min-width: ${TABLE_MIN_WIDTH}px)`);
-    mq.addEventListener("change", onChange);
+    const mq =
+        typeof window.matchMedia === "function"
+            ? window.matchMedia(WIDE_QUERY)
+            : null;
+    mq?.addEventListener("change", onChange);
     return () => {
         listeners.delete(onChange);
-        mq.removeEventListener("change", onChange);
+        mq?.removeEventListener("change", onChange);
     };
 }
 
-function readPreference(
-    viewId: string,
+/** What a phone shows: the list, whenever the view offers one. */
+export function phoneModeFor(
     available: DataViewMode[],
     defaultMode: DataViewMode,
 ): DataViewMode {
+    return available.includes("list") ? "list" : defaultMode;
+}
+
+/**
+ * The density rules, as one pure function so they can be tested without a
+ * browser (Phone Tables audit T8):
+ *
+ * 1. Below the table boundary the phone mode always wins. A choice saved on
+ *    a desk ("table") must not follow the merchant onto a phone, where a
+ *    table hides its right-hand columns behind a sideways scroll.
+ * 2. At or above it, a saved choice wins. Someone who deliberately picked
+ *    list on a desktop meant it, and having the layout argue back on every
+ *    reload is the kind of small betrayal that makes software feel hostile.
+ * 3. With no choice, the view's default.
+ */
+export function resolveViewMode({
+    available,
+    defaultMode,
+    wide,
+    saved,
+}: {
+    available: DataViewMode[];
+    defaultMode: DataViewMode;
+    wide: boolean;
+    saved?: string | null;
+}): DataViewMode {
+    if (!wide) return phoneModeFor(available, defaultMode);
+    if (saved && available.includes(saved as DataViewMode)) {
+        return saved as DataViewMode;
+    }
+    return defaultMode;
+}
+
+function isWide(): boolean {
+    // No matchMedia (a test's jsdom): treat it as a desk, the old default.
+    if (typeof window.matchMedia !== "function") return true;
+    return window.matchMedia(WIDE_QUERY).matches;
+}
+
+function readSaved(viewId: string): string | null {
     const override = chosen.get(viewId);
     if (override) return override;
-
     try {
-        const stored = window.localStorage.getItem(STORAGE_PREFIX + viewId);
-        if (stored && available.includes(stored as DataViewMode)) {
-            return stored as DataViewMode;
-        }
+        return window.localStorage.getItem(STORAGE_PREFIX + viewId);
     } catch {
-        // Blocked storage: fall through to the viewport rule. A missing
-        // preference is not worth failing a render over.
+        // Blocked storage: no preference. A missing preference is not worth
+        // failing a render over.
+        return null;
     }
+}
 
-    const wide = window.matchMedia(`(min-width: ${TABLE_MIN_WIDTH}px)`).matches;
-    const preferred = wide ? defaultMode : "list";
-    return available.includes(preferred) ? preferred : defaultMode;
+/**
+ * The client's answer, as one primitive so `useSyncExternalStore` can compare
+ * snapshots: `"wide:table"`, `"narrow:list"`.
+ */
+function readSnapshot(
+    viewId: string,
+    available: DataViewMode[],
+    defaultMode: DataViewMode,
+): string {
+    const wide = isWide();
+    const mode = resolveViewMode({
+        available,
+        defaultMode,
+        wide,
+        saved: wide ? readSaved(viewId) : null,
+    });
+    return `${wide ? "wide" : "narrow"}:${mode}`;
 }
 
 /**
  * The merchant's chosen density for one view, remembered.
  *
- * Two rules, and the second is the one that is easy to get wrong:
+ * The rules are `resolveViewMode`'s: a phone always gets the list, a desk
+ * gets the saved choice or the view's default.
  *
- * 1. A stored preference always wins. Someone who deliberately picked list on a
- *    desktop meant it, and having the layout argue back on every reload is the
- *    kind of small betrayal that makes software feel hostile.
- * 2. With no preference, the viewport decides — table on a wide screen, list on
- *    a phone, because a six-column table below `lg` is not a table, it is a
- *    horizontal scroll nobody asked for.
+ * ## No guess before hydration
+ *
+ * The server knows neither the viewport nor the saved choice, so it does not
+ * pick: `mode` is null, and DataView draws the desk rendering and the phone
+ * rendering side by side, each behind a `760px` media rule. The phone's first
+ * paint is the list, with no table flashed before it (Phone Tables audit T8);
+ * once hydrated, the rendering not in use is dropped.
  *
  * ## Why `useSyncExternalStore` and not the two obvious alternatives
  *
@@ -85,21 +144,33 @@ function readPreference(
  *   exists to stop.
  *
  * `useSyncExternalStore` is the API built for exactly this: `getServerSnapshot`
- * supplies the value used for SSR *and* for the hydration render, so both sides
- * agree by construction, and React then re-reads the client snapshot as part of
+ * (null) supplies the value used for SSR *and* for the hydration render, so
+ * both sides agree by construction, and React then re-reads the client snapshot as part of
  * its normal work rather than as a second render we scheduled ourselves.
  */
 export function useViewMode(
     viewId: string,
     available: DataViewMode[],
     defaultMode: DataViewMode,
-) {
-    const mode = useSyncExternalStore(
+): {
+    /** The mode to draw, or null while the server's HTML is being hydrated. */
+    mode: DataViewMode | null;
+    /** Whether the viewport is at the table boundary or wider (null: unknown). */
+    wide: boolean | null;
+    /** What the desk draws before anything is known: the view's default. */
+    deskMode: DataViewMode;
+    /** What a phone draws, always (`phoneModeFor`). */
+    phoneMode: DataViewMode;
+    choose: (next: DataViewMode) => void;
+} {
+    const snapshot = useSyncExternalStore(
         subscribe,
-        () => readPreference(viewId, available, defaultMode),
-        // The server has no storage and no viewport. Returning `defaultMode`
-        // here is what makes the hydration render match the HTML.
-        () => defaultMode,
+        () => readSnapshot(viewId, available, defaultMode),
+        // The server has no storage and no viewport, so it does not guess:
+        // `null` tells DataView to draw both the desk and the phone rendering
+        // and let a CSS media rule show one. A guess here ("table") was the
+        // phone's flash of table before hydration (T8).
+        () => null,
     );
 
     const choose = useCallback(
@@ -115,5 +186,15 @@ export function useViewMode(
         [viewId],
     );
 
-    return { mode, choose };
+    const [width, resolved] = snapshot
+        ? (snapshot.split(":") as [string, DataViewMode])
+        : [null, null];
+
+    return {
+        mode: resolved,
+        wide: width === null ? null : width === "wide",
+        deskMode: defaultMode,
+        phoneMode: phoneModeFor(available, defaultMode),
+        choose,
+    };
 }

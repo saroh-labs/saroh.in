@@ -66,6 +66,11 @@ const REFUSED = [
     "POST public/site-accounts/waitlist",
     "POST public/site-accounts/waitlist/leave",
     "POST public/waitlist",
+    // saroh.in's link preview tool: the check is a POST so the address
+    // stays out of request logs, and fetches a stranger's site; only
+    // saroh.in's server calls either, never a merchant's test release.
+    "POST public/tools/link-preview",
+    "POST public/tools/link-preview/report",
     // Plans, packs and autopay.
     "POST public/site-accounts/me/plans/:ref/join",
     "POST public/site-accounts/me/plan/:ref/cancel",

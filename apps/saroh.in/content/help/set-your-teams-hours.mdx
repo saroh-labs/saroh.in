@@ -1,0 +1,80 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. Sources, from the repo root:
+#   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Bookings ›
+#         Availability, /bookings/availability)
+#   PAGE  apps/app.saroh.in/components/bookings/availability/availability-editor.tsx
+#         ("When each person can be booked. Customers only ever see free
+#         times inside these hours, minus bookings and the gap after each.
+#         Changing hours never moves a booking that's already made.";
+#         the "Team member" chips, "+ Add someone"; the bar "Unsaved. …",
+#         "Discard", "Save hours"; "One-off extra hours", "None. Click
+#         closed time on the calendar to add some.")
+#   WEEK  .../bookings/availability/weekly-hours.tsx ("Weekly hours", "Copy
+#         Monday to weekdays", "+ Hours", From "to" To, "Add", "Not
+#         bookable"); lib/services/availability-rules.ts (half-hour steps)
+#   OFF   .../bookings/availability/time-off-card.tsx, lib/staff/time-off.ts
+#         ("Time off": From, To, When "All day" / "Part of the day", Who
+#         "Just ‹name›" / "Everyone — business closed", "Reason — team
+#         only", "Add day off")
+#   RULES availability-editor.tsx, lib/services/availability-rules.ts
+#         ("Booking rules", "For the whole business.", "How far ahead
+#         people can book", "Latest they can book", "Free cancellation
+#         until", "Cancelled in time")
+#   ADD   .../bookings/availability/add-person-dialog.tsx ("They need no
+#         account. Their hours start empty, so nobody can book them until
+#         you add some.")
+#   SLOTS apps/api.saroh.in/src/modules/bookings/booking-slots.ts,
+#         availability.ts, staff-availability.ts (a one-to-one service
+#         with people on it offers each person's hours, less time off,
+#         closures and their bookings; with nobody on it, the service's own
+#         weekly hours: More settings › "Its own weekly hours");
+#         booking-rules.ts (the rules bind the booking page only)
+# Where the design said otherwise, the app won: content/help/README.md.
+# The hours are set on one page for the whole team, not on each person's
+# page; Settings › Team is for sign-ins and roles, not hours.
+title: Set your team's hours
+slug: set-your-teams-hours
+area: Bookings
+group: Take bookings
+order: 10
+intro: "Your booking page only offers times when someone who takes that service is working. You set each person's weekly hours, their time off and the rules for the whole business on one page. This takes about five minutes."
+description: "Set each person's weekly hours and time off in Saroh, and the booking rules, so customers only see the times you can really see them."
+readMinutes: 3
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # NAV, PAGE, ADD.
+    - title: Open Availability
+      body: "In Saroh, open Bookings › Availability in the sidebar. Everyone who takes bookings is across the top: pick a person to see their hours. Someone new? Press + Add someone and give their name. They need no account, and nobody can book them until you add their hours."
+      shot: help-team-hours-1
+      caption: "Availability at Pulse Fitness (demo gym), with Ritu Kapoor picked."
+      marker: Ritu Kapoor
+    # WEEK.
+    - title: Add their weekly hours
+      body: "Under Weekly hours, each day shows the hours they can be booked. Press + Hours on a day, choose when it starts and ends, and press Add. A day can have more than one stretch, like a morning and an evening. Press the × on a stretch to take it away. Same hours every weekday? Set Monday, then press Copy Monday to weekdays."
+      shot: help-team-hours-2
+      caption: "Ritu Kapoor's weekly hours at Pulse Fitness (demo gym), with new hours being added on Saturday."
+      tip: "A day with no hours says Not bookable. Bookings already made then stay booked; the page tells you which ones, so you can move them from the calendar."
+      marker: Add
+    # PAGE (the bar), SLOTS.
+    - title: Save the hours
+      body: "Your changes aren't live yet: a bar at the bottom says so. Press Save hours. From then on the calendar and your booking page offer free times inside these hours only, less their bookings and the gap after each. Changing hours never moves a booking that's already made. Press Discard to start again."
+      shot: help-team-hours-3
+      caption: "A change to Ritu Kapoor's hours at Pulse Fitness (demo gym), waiting for Save hours."
+      marker: Save hours
+    # OFF, PAGE (extra hours).
+    - title: Add time off
+      body: "Under Time off, choose the first and last day, and whether it's all day or part of the day. Under Who, keep it to this person, or choose Everyone — business closed for a holiday. Add a reason if you like; only your team sees it. Then press Add day off, and press Save hours. Nobody can book them then."
+      shot: help-team-hours-4
+      caption: "Sameer Khan's time off at Pulse Fitness (demo gym), and the form to add a day off."
+      tip: "Working an extra day just once? Click the closed time on the calendar to open it for bookings. It shows here under One-off extra hours."
+      marker: Add day off
+    # RULES, SLOTS.
+    - title: Set the booking rules
+      body: "Booking rules are for the whole business. Choose how far ahead people can book, the latest they can book before a time, until when they can cancel for free, and whether a cancel in time gets back what they paid online. These rules are for your booking page; your team can still book someone in by hand."
+      shot: help-team-hours-5
+      caption: "The booking rules at Pulse Fitness (demo gym), for the whole business."
+      marker: How far ahead people can book
+next: [take-a-deposit-when-they-book]
+---
