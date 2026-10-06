@@ -1,7 +1,7 @@
 import { CircleHelp } from "lucide-react";
 
 import type { HelpTopic } from "@/lib/help/links";
-import { HELP_URL, helpUrl } from "@/lib/help/links";
+import { helpHomeUrl, helpUrl } from "@/lib/help/links";
 
 /**
  * The way out of a stuck moment.
@@ -20,7 +20,7 @@ import { HELP_URL, helpUrl } from "@/lib/help/links";
 export function HelpLink({ topic }: { topic?: HelpTopic }) {
     return (
         <a
-            href={topic ? helpUrl(topic) : HELP_URL}
+            href={topic ? helpUrl(topic) : helpHomeUrl()}
             target="_blank"
             rel="noreferrer"
             aria-label="Help centre (opens in a new tab)"

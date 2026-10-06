@@ -28,7 +28,14 @@ import { useEffect, useRef, useState } from "react";
 import type { StorefrontAllowance } from "@/lib/business-limits";
 import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
-import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
+import {
+    HELP_ARTICLES,
+    HELP_TOPICS,
+    helpArticleUrl,
+    helpHasMoved,
+    helpHomeUrl,
+    helpUrl,
+} from "@/lib/help/links";
 import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 import { searchSettings, settingsPageLabel } from "@/lib/settings/search";
@@ -77,7 +84,7 @@ const KIND_ORDER: SearchKind[] = ["contact", "lead", "order"];
  * Labels carry the plain word first ("Booking", "Payment") because that is what
  * gets typed, not our section names.
  */
-const HELP_ITEMS: { label: string; topic: HelpTopic }[] = [
+const OLD_HELP_ITEMS: { label: string; topic: HelpTopic }[] = [
     { label: "Help: getting started", topic: HELP_TOPICS.gettingStarted },
     {
         label: "Help: search, filters and views",
@@ -105,6 +112,30 @@ const HELP_ITEMS: { label: string; topic: HelpTopic }[] = [
         topic: HELP_TOPICS.capabilities,
     },
 ];
+
+/**
+ * The help rows, worked out when the palette is searched. Until Help moves to
+ * saroh.in (17 Oct) they are the old site's topics; from then on, one row per
+ * article, so typing "deposit" or "GSTIN" finds the page that answers it, and
+ * a last row for every article.
+ */
+function helpItems(now: Date): { key: string; label: string; href: string }[] {
+    if (!helpHasMoved(now)) {
+        return OLD_HELP_ITEMS.map((h) => ({
+            key: h.topic,
+            label: h.label,
+            href: helpUrl(h.topic, now),
+        }));
+    }
+    return [
+        ...HELP_ARTICLES.map((a) => ({
+            key: a.slug,
+            label: `Help: ${a.title.charAt(0).toLowerCase()}${a.title.slice(1)}`,
+            href: helpArticleUrl(a.slug),
+        })),
+        { key: "all", label: "Help: all articles", href: helpHomeUrl(now) },
+    ];
+}
 
 /**
  * Things you can DO, not just places you can go. Each is gated on the module
@@ -367,7 +398,7 @@ export function CommandMenu({
     // Only once something is typed: eight help rows in an empty palette would
     // bury the navigation it is mostly used for.
     const visibleHelp = needle
-        ? HELP_ITEMS.filter((h) => matches(h.label))
+        ? helpItems(new Date()).filter((h) => matches(h.label))
         : [];
 
     return (
@@ -640,8 +671,8 @@ export function CommandMenu({
                     <CommandGroup heading="Help">
                         {visibleHelp.map((item) => (
                             <CommandItem
-                                key={item.topic}
-                                value={item.topic}
+                                key={item.key}
+                                value={item.key}
                                 onSelect={() => {
                                     setOpen(false);
                                     setQuery("");
@@ -649,7 +680,7 @@ export function CommandMenu({
                                     // costs the merchant the screen they were
                                     // stuck on.
                                     window.open(
-                                        helpUrl(item.topic),
+                                        item.href,
                                         "_blank",
                                         "noopener,noreferrer",
                                     );

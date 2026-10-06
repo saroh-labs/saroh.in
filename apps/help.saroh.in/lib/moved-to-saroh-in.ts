@@ -19,12 +19,18 @@ export const HELP_MOVES_AT = new Date(`${HELP_MOVES_ON}T00:00:00+05:30`);
 export const DEFAULT_MARKETING_URL = "https://www.saroh.in";
 
 /**
- * The old pages with a clear match among the new articles. Every other
- * address (the welcome page, the broad guides, anything unknown) goes to
- * Help's home, `/help`, where the topics and search are.
+ * The old pages that have a new article to start from: the same mapping the
+ * app's help links use after the move (`apps/app.saroh.in/lib/help/links.ts`
+ * `TOPIC_ARTICLE`), so a link from the app and an old bookmark land on the
+ * same page. Every other address (the welcome page, the guides no one article
+ * answers, anything unknown) goes to Help's home, `/help`, where the topics
+ * and search are.
  */
 export const OLD_TO_NEW: Readonly<Record<string, string>> = {
     "/getting-started": "/help/create-your-business",
+    "/selling": "/help/add-your-first-product",
+    "/bookings": "/help/set-your-teams-hours",
+    "/website": "/help/connect-your-own-domain",
 };
 
 /** Whether Help has moved at `now`. */
