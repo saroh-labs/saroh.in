@@ -4,6 +4,7 @@ import { SiteTheme } from "@saroh/site-blocks";
 
 import { ReviewForm } from "@/components/review-form";
 import { getReviewInvitation } from "@/lib/reviews";
+import { SITE_FACES } from "@/lib/site-fonts";
 
 /**
  * A customer reviewing what they bought (product reviews, plan
@@ -71,7 +72,7 @@ export default async function ReviewPage({
     return (
         <main className="min-h-screen bg-site-bg text-site-body">
             {invitation.theme ? (
-                <SiteTheme variables={invitation.theme} />
+                <SiteTheme variables={invitation.theme} faces={SITE_FACES} />
             ) : null}
             <ReviewForm token={token} invitation={invitation} />
         </main>

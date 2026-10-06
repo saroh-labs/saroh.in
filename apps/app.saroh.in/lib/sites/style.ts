@@ -36,11 +36,18 @@ export interface SiteStyleOptions {
         /** What Reset returns to — the business's own starting look. */
         default: number;
     }[];
+    /**
+     * The typeface pairs on offer (KTD-2), the default first. Optional: an
+     * older API serves none, and the panel then offers no choice.
+     */
+    fontPairs?: { key: string; name: string }[];
 }
 
 export interface SiteStyle {
     colours: Record<string, string>;
     scalars: Record<string, number>;
+    /** A pair's key; absent is the default (system) pair. */
+    fontPair?: string;
 }
 
 /**
@@ -166,5 +173,11 @@ export function resolveStyleVariables(
     set("--site-grid-gap", `${num("gridGap")}px`);
     set("--site-radius", `${num("cornerRadius")}px`);
     set("--site-heading-scale", `${num("headingScale")}`);
+    // The pair's KEY, as the API's resolver emits it: `SiteTheme` turns it
+    // into stacks from its own list. None for the default pair, as there.
+    if (style.fontPair && style.fontPair !== "system") {
+        set("--site-font-heading", style.fontPair);
+        set("--site-font-body", style.fontPair);
+    }
     return vars;
 }

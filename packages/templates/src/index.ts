@@ -9,14 +9,36 @@
  */
 
 // Manifest types + content-builder helpers
-export { isContentBuilder, resolveContent } from "./manifest";
+export {
+    TEMPLATE_KINDS,
+    TEMPLATE_SHAPES,
+    isContentBuilder,
+    resolveContent,
+    templateStylePreset,
+} from "./manifest";
 export type {
     TemplateContent,
     TemplateContext,
+    TemplateKind,
     TemplateManifest,
     TemplatePage,
     TemplateSection,
+    TemplateShape,
+    TemplateStyle,
+    TemplateStylePreset,
 } from "./manifest";
+
+// The font pairs a site (and a template's style) may name (KTD-2). Re-exported
+// so the API, which depends on this package and not on the contract directly,
+// validates `Site.style.fontPair` against the same list the renderer loads.
+export {
+    DEFAULT_FONT_PAIR,
+    FONT_PAIRS,
+    FONT_PAIR_KEYS,
+    findFontPair,
+    isFontPairKey,
+} from "@saroh/block-contract";
+export type { FontPairKey, SiteFontPair } from "@saroh/block-contract";
 
 // Registry
 export { getTemplate, listTemplates } from "./registry";

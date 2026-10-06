@@ -22,6 +22,7 @@ import { SECTION_LABELS } from "@/components/sites/editor-constants";
 import { env } from "@/env";
 import { merchantLinkUrl, previewLinkTarget } from "@/lib/sites/merchant-link";
 
+import { useSiteFaces } from "@/components/sites/site-faces";
 import type { Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 // From the pure module, not the service: `lib/sites/service` reaches for
@@ -158,6 +159,8 @@ export function DraftPreview({
      */
     onFormBlocked?: () => void;
 }) {
+    // The merchant faces the editor loaded, for the site's typeface.
+    const faces = useSiteFaces();
     /*
      * The merchant's tokens, from the SAME component the live site uses.
      *
@@ -323,7 +326,11 @@ export function DraftPreview({
                 else showInfo(FORM_NOT_SENT, FORM_NOT_SENT_DETAIL);
             }}
         >
-            <SiteTheme variables={vars} selector={`.${PREVIEW_SCOPE}`} />
+            <SiteTheme
+                variables={vars}
+                selector={`.${PREVIEW_SCOPE}`}
+                faces={faces}
+            />
             {header && editing && onSelectChrome ? (
                 <CanvasBlock
                     label="Header"

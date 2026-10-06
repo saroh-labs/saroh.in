@@ -1,5 +1,6 @@
 "use client";
 
+import { useSiteFaces } from "@/components/sites/site-faces";
 import type { Section as RenderedSection } from "@saroh/site-blocks";
 import { PageSections, SiteTheme } from "@saroh/site-blocks";
 
@@ -28,6 +29,8 @@ export function PastVersionPreview({
     sections: RenderedSection[];
     variables?: Record<string, string> | null;
 }) {
+    // The merchant faces the editor loaded, for the site's typeface.
+    const faces = useSiteFaces();
     return (
         <div
             inert
@@ -37,7 +40,11 @@ export function PastVersionPreview({
             // one page.
             className={`${SCOPE} space-y-4 overflow-hidden rounded-[var(--site-radius)] border bg-[hsl(var(--site-bg))] p-[var(--site-page-margin)] text-[hsl(var(--site-fg))]`}
         >
-            <SiteTheme variables={variables ?? null} selector={`.${SCOPE}`} />
+            <SiteTheme
+                variables={variables ?? null}
+                selector={`.${SCOPE}`}
+                faces={faces}
+            />
             {sections.length === 0 ? (
                 <p className="p-8 text-center text-sm text-[hsl(var(--site-muted))]">
                     This page had no sections when it was published.

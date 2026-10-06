@@ -76,6 +76,13 @@ export class CreateSiteFromTemplateDto {
     @IsInt({ message: "templateVersion must be an integer" })
     @Min(1, { message: "templateVersion must be at least 1" })
     templateVersion?: number;
+
+    /** One of the template's colourways; its first when absent (KTD-1). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(60)
+    styleId?: string;
 }
 
 /**
