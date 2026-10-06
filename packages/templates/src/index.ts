@@ -77,3 +77,11 @@ export {
     PORTFOLIO_TEMPLATE_ID,
     portfolioTemplate,
 } from "./templates/portfolio";
+
+// Ceramics, the gallery's "Store" (industry templates plan, U5).
+export {
+    CERAMICS_COLLECTION_COUNT,
+    CERAMICS_TEMPLATE_ID,
+    ceramicsSellsProducts,
+    ceramicsTemplate,
+} from "./templates/ceramics";
