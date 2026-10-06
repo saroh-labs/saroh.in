@@ -4,6 +4,7 @@ import { helpHref, liveArticles, summarise } from "@/content/help";
 import type { PublishContext } from "@/content/resources";
 import { resourcePaths, routeExists } from "@/content/resources";
 import { solutionHref } from "@/content/solutions";
+import { galleryTemplates, templateHref } from "@/content/templates";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
 import { helpArticles } from "@/lib/help-docs";
 import type { LaunchMode } from "@/lib/links";
@@ -16,8 +17,8 @@ import type { LaunchMode } from "@/lib/links";
  * to the waitlist (`redirects.js`), and a sitemap never lists a redirect.
  *
  * Given a publish context (plan U1), the Resources and legal pages that are
- * published and built, the changelog's live entries and Help's live
- * articles, follow. Without
+ * published and built, the changelog's live entries, Help's live
+ * articles and the gallery's templates, follow. Without
  * one, only the fixed pages: what a redirect may always land on.
  */
 export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
@@ -34,6 +35,12 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
                   .map((a) => helpHref(a.slug))
                   .filter((path) => routeExists(path, ctx.routes))
             : [];
+    const templates =
+        ctx && resources.includes("/templates")
+            ? galleryTemplates()
+                  .map((t) => templateHref(t.slug))
+                  .filter((path) => routeExists(path, ctx.routes))
+            : [];
     return [
         "/",
         ...(mode === "open" ? ["/pricing"] : []),
@@ -43,6 +50,7 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
         ...resources,
         ...entries,
         ...help,
+        ...templates,
     ];
 }
 

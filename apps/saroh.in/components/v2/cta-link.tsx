@@ -20,6 +20,7 @@ export function CtaLink({
     trialDays,
     cycle,
     mode,
+    template,
     variant = "primary",
     size = "lg",
     className,
@@ -36,6 +37,8 @@ export function CtaLink({
     /** The cycle a paid plan's card shows; open mode carries it to sign-up. */
     cycle?: "month" | "year";
     mode?: LaunchMode;
+    /** A gallery template the button saves (`cta`'s `template`). */
+    template?: { slug: string; name: string };
     variant?: ButtonVariant;
     size?: ButtonSize;
     className?: string;
@@ -51,6 +54,7 @@ export function CtaLink({
         trialDays,
         cycle,
         mode,
+        template,
     });
     return (
         <ButtonLink
@@ -59,7 +63,12 @@ export function CtaLink({
             size={size}
             className={className}
             onClick={() => {
-                track("cta_click", { plan, page: src, mode: action.mode });
+                track("cta_click", {
+                    plan,
+                    page: src,
+                    mode: action.mode,
+                    template: template?.slug,
+                });
                 onNavigate?.();
             }}
         >

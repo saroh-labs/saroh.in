@@ -51,6 +51,20 @@ describe("cta", () => {
         ).toMatch(/\/signup\?plan=free&src=x$/);
     });
 
+    it("a gallery template: Save {Name} for early access, carried as ?template= (U13)", () => {
+        const gym = { slug: "gym", name: "Gym" };
+        expect(
+            cta({ src: "templates-gym", template: gym, mode: "waitlist" }),
+        ).toMatchObject({
+            label: "Save Gym for early access",
+            href: "/waitlist?template=gym&src=templates-gym",
+        });
+        // Open mode keeps its own label and carries the template to sign-up.
+        const open = cta({ src: "t", template: gym, mode: "open" });
+        expect(open.label).toBe("Start free");
+        expect(open.href).toMatch(/\/signup\?template=gym&src=t$/);
+    });
+
     it("waitlist mode never carries a cycle", () => {
         expect(
             cta({ src: "x", plan: "pro", cycle: "year", mode: "waitlist" })

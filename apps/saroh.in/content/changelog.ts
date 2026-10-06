@@ -108,9 +108,13 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
             {
                 name: "Your website",
                 // Design: "Start from a template made for your kind of
-                // business…" with "See templates". The industry templates
-                // and /templates aren't built (plan U6): neither is claimed.
+                // business…" with "See templates". /templates ships with
+                // this entry (industry templates U13), so the link is back,
+                // drawn only while the gallery is shown (`linkShown`). "Made
+                // for your kind of business" is still not claimed: not every
+                // kind has one yet (no salon). Ledger CL8.
                 body: "Start from a template, connect your own domain, and set how each page looks when it's shared on WhatsApp or Facebook.",
+                link: { label: "See templates", href: "/templates" },
             },
         ],
         signoff: "Team Saroh",

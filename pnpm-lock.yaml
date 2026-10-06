@@ -891,6 +891,9 @@ importers:
       '@saroh/pricing-catalog':
         specifier: workspace:*
         version: link:../../packages/pricing-catalog
+      '@saroh/templates':
+        specifier: workspace:*
+        version: link:../../packages/templates
       '@saroh/ui':
         specifier: workspace:*
         version: link:../../packages/ui

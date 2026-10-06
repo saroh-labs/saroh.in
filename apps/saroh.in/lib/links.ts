@@ -44,6 +44,12 @@ export interface CtaInput {
     cycle?: "month" | "year";
     /** Defaults to the site's mode; tests and previews pass one. */
     mode?: LaunchMode;
+    /**
+     * A gallery template the button saves (`/templates/[slug]`, plan U13):
+     * the waitlist remembers it (`?template=`); open mode carries it to
+     * sign-up for onboarding to read once it does.
+     */
+    template?: { slug: string; name: string };
 }
 
 export interface Cta {
@@ -61,7 +67,8 @@ export interface Cta {
  * either and flipping `NEXT_PUBLIC_LAUNCH_MODE` changes them all:
  *
  * - waitlist: "Join the waitlist" (or "Get early access · Grow" when a paid
- *   plan is named), to `/waitlist?plan=…&src=…`.
+ *   plan is named, or "Save Gym for early access" when a gallery template
+ *   is), to `/waitlist?plan=…&template=…&src=…`.
  * - open: the design's "Start free", "Choose Grow" or "Start N-day trial", to
  *   sign-up with `?plan=…&cycle=…` (a paid plan only) `&src=…`. Accounts
  *   carries the plan through sign-up and onboarding to the checkout (U27).
@@ -74,6 +81,7 @@ export function cta({
     trialDays,
     cycle,
     mode = LAUNCH_MODE,
+    template,
 }: CtaInput): Cta {
     const paid = plan !== undefined && (paidIn ?? plan !== "free");
     const name =
@@ -85,7 +93,17 @@ export function cta({
     if (mode === "waitlist") {
         const q = new URLSearchParams();
         if (plan) q.set("plan", plan);
+        if (template) q.set("template", template.slug);
         q.set("src", src);
+        if (template && !paid) {
+            return {
+                mode,
+                plan,
+                label: `Save ${template.name} for early access`,
+                shortLabel: "Save template",
+                href: `/waitlist?${q.toString()}`,
+            };
+        }
         return {
             mode,
             plan,
@@ -97,6 +115,7 @@ export function cta({
     const q = new URLSearchParams();
     if (plan) q.set("plan", plan);
     if (paid) q.set("cycle", cycle ?? "month");
+    if (template) q.set("template", template.slug);
     q.set("src", src);
     let label = "Start free";
     if (paid) {
