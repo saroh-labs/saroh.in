@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { BLOCK_META } from "./fixtures";
 import { parseRenderedContent } from "./rendered";
-import { FEATURE_VALUE_MAX, parseSectionContent } from "./section-contract";
+import {
+    FEATURE_VALUE_MAX,
+    parseSectionContent,
+    PERSON_TEAM_MAX,
+} from "./section-contract";
 import { resolveVariant } from "./variants";
 
 /**
@@ -184,5 +188,55 @@ describe("projects: rhythm and rows, year, role and meta, a count", () => {
                 ).success,
             ).toBe(true);
         }
+    });
+});
+
+describe("person: portrait, team, credential rows, the page's title", () => {
+    it("saves rows beside lines, a label, asTitle, a team title and people", () => {
+        expect(
+            parseSectionContent("person", 1, {
+                variant: "team",
+                name: "Devika",
+                asTitle: true,
+                title: "Who is coaching",
+                credentials: [
+                    "Registered Dietitian",
+                    { title: "MSc", detail: "Manipal, 2012" },
+                ],
+                credentialsLabel: "Qualifications",
+                people: [{ name: "Arjun", role: "Conditioning" }],
+            }).success,
+        ).toBe(true);
+    });
+
+    it("refuses a nameless team member, a row with no title, and too many people", () => {
+        expect(
+            parseSectionContent("person", 1, {
+                name: "Devika",
+                people: [{ name: " " }],
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("person", 1, {
+                name: "Devika",
+                credentials: [{ title: "", detail: "x" }],
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("person", 1, {
+                name: "Devika",
+                people: Array.from({ length: PERSON_TEAM_MAX + 1 }, () => ({
+                    name: "x",
+                })),
+            }).success,
+        ).toBe(false);
+    });
+
+    it("knows both looks; a person with none keeps the photo beside", () => {
+        expect(resolveVariant("person", { variant: "portrait" })).toBe(
+            "portrait",
+        );
+        expect(resolveVariant("person", { variant: "team" })).toBe("team");
+        expect(resolveVariant("person", { name: "x" })).toBe("default");
     });
 });

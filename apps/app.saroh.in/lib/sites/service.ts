@@ -342,9 +342,30 @@ export interface PersonContent {
     imageBrief?: string;
     name: string;
     role?: string;
-    credentials?: string[];
+    /** A line, or a row with where it came from (template polish). */
+    credentials?: PersonCredential[];
+    /** A visible label over the qualifications. */
+    credentialsLabel?: string;
     bio?: string;
     cta?: CtaValue;
+    /** The name as the page's h1, for a person who opens the page. */
+    asTitle?: boolean;
+    /** The team look's heading. */
+    title?: string;
+    /** The team look's other people. */
+    people?: PersonMember[];
+}
+
+/** One qualification: a line, or a title with where it came from. */
+export type PersonCredential = string | { title: string; detail?: string };
+
+/** Another person in the team look. */
+export interface PersonMember {
+    image?: ImageValue;
+    imageBrief?: string;
+    name: string;
+    role?: string;
+    bio?: string;
 }
 
 /** The field types an enquiry form supports (mirror of the section contract). */

@@ -1,4 +1,8 @@
-import type { RenderedFeatures, RenderedProjects } from "@saroh/block-contract";
+import type {
+    RenderedFeatures,
+    RenderedPerson,
+    RenderedProjects,
+} from "@saroh/block-contract";
 import { BLOCK_META } from "@saroh/block-contract";
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +14,7 @@ import {
 } from "../block-fixture-preview";
 import FeaturesSection from "./features";
 import HoursSection, { groupedHoursRows, hoursRows } from "./hours";
+import PersonSection, { credentialsOf } from "./person";
 import PlansSection from "./plans";
 import ProductGridSection, { availabilityLine } from "./product-grid";
 import ProjectsSection from "./projects";
@@ -344,6 +349,89 @@ describe("projects: rhythm and rows, a count", () => {
             items: [{ title: "  " }],
         };
         const { container } = render(<ProjectsSection content={content} />);
+        expect(container.innerHTML).toBe("");
+    });
+});
+
+describe("person: portrait, team, credential rows, the page's title", () => {
+    it("opens the page on the practitioner: an h1, the portrait column, labelled rows", () => {
+        const { container } = render(
+            <PersonSection content={BLOCK_META.person.fixtures.portrait} />,
+        );
+        expect(
+            screen.getByRole("heading", { level: 1, name: "Dr Anika Rao" }),
+        ).toBeTruthy();
+        expect(container.innerHTML).toContain(
+            "md:grid-cols-[300px_minmax(0,1fr)]",
+        );
+        const list = screen.getByRole("list", { name: "Qualifications" });
+        const rows = within(list).getAllByRole("listitem");
+        expect(rows[0]?.textContent).toBe(
+            "MSc Clinical NutritionA university, and the year",
+        );
+        expect(screen.getByText("Qualifications").tagName).toBe("P");
+    });
+
+    it("keeps the name an h2 unless the person opens the page", () => {
+        render(<PersonSection content={BLOCK_META.person.fixtures.default} />);
+        expect(
+            screen.getByRole("heading", { level: 2, name: "Dr Anika Rao" }),
+        ).toBeTruthy();
+        expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    });
+
+    it("draws the team: the person first, then everyone else, each named", () => {
+        const { container } = render(
+            <PersonSection content={BLOCK_META.person.fixtures.team} />,
+        );
+        expect(
+            screen.getByRole("heading", { level: 2, name: "Who is coaching" }),
+        ).toBeTruthy();
+        const names = screen
+            .getAllByRole("heading", { level: 3 })
+            .map((h) => h.textContent);
+        expect(names).toEqual([
+            "Devika Rane",
+            "Arjun Patel",
+            "Ritu Bansal",
+            "Sameer Khan",
+        ]);
+        expect(container.querySelector("ul")?.className).toContain(
+            "lg:grid-cols-4",
+        );
+        // One photo, so every member keeps a 3:4 frame and the row aligns.
+        expect(container.querySelectorAll(".aspect-\\[3\\/4\\]").length).toBe(
+            4,
+        );
+    });
+
+    it("draws no empty frames for a team with no photos yet", () => {
+        const content: RenderedPerson = {
+            ...BLOCK_META.person.fixtures.team,
+            image: undefined,
+        };
+        const { container } = render(<PersonSection content={content} />);
+        expect(container.querySelector(".aspect-\\[3\\/4\\]")).toBeNull();
+    });
+
+    it("reads lines and rows alike, leaving out blanks", () => {
+        expect(
+            credentialsOf([
+                "MSc",
+                " ",
+                { title: "RD", detail: "IDA" },
+                { title: " " },
+            ]),
+        ).toEqual([
+            { title: "MSc", detail: null },
+            { title: "RD", detail: "IDA" },
+        ]);
+    });
+
+    it("renders nothing for a person with no name", () => {
+        const { container } = render(
+            <PersonSection content={{ variant: "team", name: " " }} />,
+        );
         expect(container.innerHTML).toBe("");
     });
 });

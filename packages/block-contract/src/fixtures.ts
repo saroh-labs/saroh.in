@@ -999,10 +999,86 @@ export const BLOCK_META = {
         label: "Person",
         description:
             "One practitioner: a photo, their name, what they do, their qualifications and a few lines about them.",
-        variants: soleVariant(
-            "The photo beside the words, stacking on a phone; qualifications as a list.",
-        ),
+        /*
+         * `default` first: it needs nothing the others do not. `portrait`
+         * is the practitioner's page opening (a narrow portrait column with
+         * the qualifications under it); `team` lays several people out.
+         */
+        variants: [
+            {
+                id: "default",
+                label: "Photo beside",
+                description:
+                    "The photo beside the words, stacking on a phone; qualifications as a list.",
+            },
+            {
+                id: "portrait",
+                label: "Portrait column",
+                description:
+                    "A narrow portrait with the qualifications under it, the name, role and words beside. For a practitioner's page that opens on them.",
+            },
+            {
+                id: "team",
+                label: "Team",
+                description:
+                    "Several people side by side, each with a tall photo, their name, what they do and a line about them. Four across on a desk, two on a phone.",
+            },
+        ] as const,
         fixtures: {
+            portrait: {
+                variant: "portrait",
+                asTitle: true,
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1000'%3E%3Crect width='800' height='1000' fill='%23edf2ec'/%3E%3Ccircle cx='400' cy='380' r='150' fill='%23a8b5a4'/%3E%3Crect x='200' y='580' width='400' height='420' rx='180' fill='%238a9a86'/%3E%3C/svg%3E",
+                    alt: "Portrait of the dietician, seated",
+                    width: 800,
+                    height: 1000,
+                },
+                name: "Dr Anika Rao",
+                role: "Registered dietician · Pune",
+                credentialsLabel: "Qualifications",
+                credentials: [
+                    {
+                        title: "MSc Clinical Nutrition",
+                        detail: "A university, and the year",
+                    },
+                    {
+                        title: "Registered Dietitian",
+                        detail: "The body you are registered with",
+                    },
+                ],
+                bio: "I see people who have been told to change how they eat and have not been told how.\nMy work is mostly translation: from what you already eat to the smallest change that makes a difference.",
+            },
+            team: {
+                variant: "team",
+                title: "Who is coaching",
+                name: "Devika Rane",
+                role: "Strength",
+                bio: "Coaches the barbell sessions.",
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='800'%3E%3Crect width='600' height='800' fill='%23171715'/%3E%3Ccircle cx='300' cy='300' r='110' fill='%23595954'/%3E%3Crect x='150' y='450' width='300' height='350' rx='140' fill='%23454541'/%3E%3C/svg%3E",
+                    alt: "Devika beside a loaded bar, coaching",
+                    width: 600,
+                    height: 800,
+                },
+                people: [
+                    {
+                        name: "Arjun Patel",
+                        role: "Conditioning",
+                        bio: "Runs the lunchtime thirties.",
+                    },
+                    {
+                        name: "Ritu Bansal",
+                        role: "Mobility",
+                        bio: "Thursday mornings.",
+                    },
+                    {
+                        name: "Sameer Khan",
+                        role: "Boxing",
+                        bio: "Pads on Wednesdays.",
+                    },
+                ],
+            },
             default: {
                 variant: "default",
                 image: {

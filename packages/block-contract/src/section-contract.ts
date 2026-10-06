@@ -990,6 +990,36 @@ export const PERSON_BIO_MAX = 1200;
  * The photo's description is asked for before publishing, not on save
  * (`site-flags.ts`), as the text block's is.
  */
+/**
+ * One qualification (template polish): a line, as v1 always held, or a row —
+ * the title and where or when it came from ("MSc Clinical Nutrition" /
+ * "Manipal University, 2012"). A union rather than a second field, so a
+ * person's qualifications stay one list in one order.
+ */
+const credentialSchema = z.union([
+    z.string().trim().min(1).max(120),
+    z.object({
+        title: z.string().trim().min(1).max(120),
+        detail: z.string().trim().max(160).optional(),
+    }),
+]);
+
+/** How many more people a team carries beside the block's own person. */
+export const PERSON_TEAM_MAX = 11;
+
+/**
+ * Another person in the `team` look (template polish): their photo, name,
+ * what they do and a line about them. Plain text and a photo, as the
+ * block's own person is.
+ */
+const teamMemberSchema = z.object({
+    image: imageSchema.optional(),
+    imageBrief,
+    name: z.string().trim().min(1).max(120),
+    role: z.string().trim().max(160).optional(),
+    bio: z.string().trim().max(600).optional(),
+});
+
 const personV1 = z.object({
     variant,
     padding: paddingOverride,
@@ -999,11 +1029,34 @@ const personV1 = z.object({
     name: z.string().trim().min(1).max(120),
     role: z.string().trim().max(160).optional(),
     credentials: z
-        .array(z.string().trim().min(1).max(120))
+        .array(credentialSchema)
         .max(PERSON_CREDENTIALS_MAX)
         .optional(),
+    /**
+     * A visible label over the qualifications ("Qualifications", "Training").
+     * ABSENT: the portrait look says "Qualifications"; the default look keeps
+     * its list unlabelled on screen, as before.
+     */
+    credentialsLabel: z.string().trim().max(40).optional(),
     bio: z.string().trim().max(PERSON_BIO_MAX).optional(),
     cta: ctaSchemaV2.optional(),
+    /**
+     * The name as the page's `h1` (template polish), for a person who opens
+     * the page — the practitioner's site whose first section is them. ABSENT
+     * is the `h2` every section heading is. The pre-publish check names a
+     * second `h1` on a page.
+     */
+    asTitle: z.boolean().optional(),
+    /**
+     * The `team` look's heading over the grid ("Who is coaching"). The other
+     * looks have the person's name as their heading and ignore it.
+     */
+    title: z.string().trim().max(160).optional(),
+    /**
+     * The `team` look's other people, after the block's own person, who is
+     * always first. The other looks draw one person and ignore them.
+     */
+    people: z.array(teamMemberSchema).max(PERSON_TEAM_MAX).optional(),
 });
 
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */

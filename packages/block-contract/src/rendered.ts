@@ -434,9 +434,34 @@ const renderedPerson = z.object({
     imageBrief: z.string().optional(),
     name: z.string(),
     role: z.string().optional(),
-    credentials: z.array(z.string()).optional(),
+    // A line, or a row with where it came from (template polish).
+    credentials: z
+        .array(
+            z.union([
+                z.string(),
+                z.object({
+                    title: z.string(),
+                    detail: z.string().optional(),
+                }),
+            ]),
+        )
+        .optional(),
+    credentialsLabel: z.string().optional(),
     bio: z.string().optional(),
     cta: renderedCtaSchema.optional(),
+    asTitle: z.boolean().optional(),
+    title: z.string().optional(),
+    people: z
+        .array(
+            z.object({
+                image: renderedImageSchema.optional(),
+                imageBrief: z.string().optional(),
+                name: z.string(),
+                role: z.string().optional(),
+                bio: z.string().optional(),
+            }),
+        )
+        .optional(),
 });
 
 /**
