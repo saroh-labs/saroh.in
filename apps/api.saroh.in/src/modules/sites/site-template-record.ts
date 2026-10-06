@@ -1,4 +1,4 @@
-import { starterTemplate } from "@saroh/templates";
+import { getTemplate, starterTemplate } from "@saroh/templates";
 
 /**
  * Which template a site was made from (industry templates, KTD-7): set on
@@ -49,4 +49,17 @@ export function publicationTemplate(site: SiteTemplateColumns): {
     const own = siteTemplate(site);
     if (own) return { id: own.id, version: own.version };
     return { id: starterTemplate.id, version: starterTemplate.version };
+}
+
+/**
+ * The footer line the site's template started it with, for the pre-publish
+ * check (round 2): the manifest's own line for the template and version the
+ * site records. Null for a site with no record — never guessed — or a
+ * template that writes no line.
+ */
+export function templateFooterLine(site: SiteTemplateColumns): string | null {
+    const own = siteTemplate(site);
+    if (!own) return null;
+    const line = getTemplate(own.id, own.version)?.footer?.line?.trim();
+    return line === undefined || line === "" ? null : line;
 }
