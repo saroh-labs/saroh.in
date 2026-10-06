@@ -1,4 +1,10 @@
-import { isFontPairKey, parseSectionContent } from "@saroh/block-contract";
+import {
+    inPageNavigation,
+    isFontPairKey,
+    parsePalette,
+    parseSectionContent,
+    parseTypeScale,
+} from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantiateTemplate } from "../instantiate";
@@ -95,6 +101,52 @@ describe("developer@1 (industry templates U9)", () => {
         expect(styles[1]?.style.colours?.accent).toBe("steel");
     });
 
+    it("draws the design's exact colours: neutral, one green or one cobalt", () => {
+        const [green, cobalt] = developerTemplate.styles ?? [];
+        expect(green.style.palette).toMatchObject({
+            bg: "#FAFAF9",
+            fg: "#17181A",
+            surface: "#EFEFEC",
+            accent: "#1E6B3F",
+        });
+        expect(cobalt.style.palette).toEqual({
+            ...green.style.palette,
+            accent: "#285B9B",
+        });
+        for (const preset of developerTemplate.styles ?? []) {
+            expect(parsePalette(preset.style.palette).ok).toBe(true);
+        }
+    });
+
+    it("sets one 820px column with small capitals labels", () => {
+        for (const preset of developerTemplate.styles ?? []) {
+            expect(preset.style.type).toMatchObject({
+                contentWidth: 820,
+                labelStyle: "eyebrow",
+            });
+            expect(parseTypeScale(preset.style.type).ok).toBe(true);
+        }
+    });
+
+    it("leads the header with Work, Case study, Rates and Availability", () => {
+        const home = instantiateTemplate(developerTemplate, {
+            organizationName: "Sample Engineer",
+        }).pages[0];
+        expect(inPageNavigation(home.sections)).toEqual([
+            { label: "Work", href: "/#work" },
+            { label: "Case study", href: "/#case" },
+            { label: "Rates", href: "/#rates" },
+            { label: "Availability", href: "/#availability" },
+        ]);
+    });
+
+    it("starts the footer on a line for the owner to write over", () => {
+        expect(developerTemplate.footer).toEqual({
+            line: "Your city · your email address",
+            layout: "left",
+        });
+    });
+
     it.each(profiles)(
         "instantiates and every section passes the contract, for %s",
         (_label, ctx) => {
@@ -127,12 +179,11 @@ describe("developer@1 (industry templates U9)", () => {
                 isHome: true,
                 sections: [
                     ["hero", "none"],
-                    ["richText", null],
-                    ["projects", "list"],
-                    ["richText", null],
-                    ["richText", null],
+                    ["richText", "left"],
+                    ["projects", "rows"],
+                    ["richText", "left"],
                     ["features", "grid"],
-                    ["richText", null],
+                    ["richText", "left"],
                     ["enquiry", null],
                 ],
             },
@@ -158,21 +209,31 @@ describe("developer@1 (industry templates U9)", () => {
         });
     });
 
-    it("lists the work as placeholders, year, role and stack on their own line", () => {
+    it("lists the work as placeholder rows: year, the work and its stack, role", () => {
         const work = sections(profiles[1][1]).find(
             (s) => s.type === "projects",
         );
-        const { title, items } = work?.content as {
+        const { title, items, showCount } = work?.content as {
             title: string;
-            items: { title: string; summary: string; link?: string }[];
+            showCount?: boolean;
+            items: {
+                title: string;
+                summary: string;
+                year?: string;
+                role?: string;
+                meta?: string;
+                link?: string;
+            }[];
         };
         expect(title).toBe("Work");
+        // The count is the block's, from the rows: never typed.
+        expect(showCount).toBe(true);
         expect(items).toHaveLength(3);
         for (const item of items) {
             expect(item.summary).toMatch(/^A placeholder\./);
-            expect(item.summary).toMatch(
-                /\nYears? · your (role|title) · the stack$/,
-            );
+            expect(item.year).toMatch(/^Years?$/);
+            expect(item.role).toMatch(/^Your (role|title there)$/);
+            expect(item.meta).toMatch(/^The stack/);
             expect(item).not.toHaveProperty("link");
             expect(item).not.toHaveProperty("image");
         }
@@ -182,37 +243,70 @@ describe("developer@1 (industry templates U9)", () => {
         const texts = sections(profiles[1][1]).filter(
             (s) => s.type === "richText",
         );
-        expect(texts).toHaveLength(4);
-        const [, opening, parts] = texts;
-        const brief = (opening.content as { imageBrief?: string }).imageBrief;
-        expect(brief).toMatch(/as shipped/);
-        expect(opening.content).not.toHaveProperty("image");
-        const html = (parts.content as { value: string }).value;
+        expect(texts).toHaveLength(3);
+        const study = texts[1].content as {
+            value: string;
+            imageBrief?: string;
+            imageSide?: string;
+            partLabels?: boolean;
+            callout?: { label?: string; text: string };
+        };
+        expect(study.imageBrief).toMatch(/as shipped/);
+        expect(study.imageSide).toBe("above");
+        expect(study.partLabels).toBe(true);
+        expect(study).not.toHaveProperty("image");
         const order = [
             "The problem",
             "Constraints",
             "What I decided",
             "What I would do differently",
-            "What changed",
-        ].map((h) => html.indexOf(h));
+        ].map((h) => study.value.indexOf(`<h3>${h}</h3>`));
         expect(order.every((i) => i >= 0)).toBe(true);
         expect([...order].sort((a, b) => a - b)).toEqual(order);
+        // What changed: the box ruled in the accent, still a placeholder.
+        expect(study.callout?.label).toBe("What changed");
+        expect(study.callout?.text).toMatch(/^A placeholder\./);
     });
 
-    it("names the three kinds of rate and types no figure", () => {
+    it("names the three kinds of rate, each figure the owner's to write", () => {
         const rates = sections(profiles[1][1]).find(
             (s) => s.type === "features",
         );
-        const intro = (rates?.content as { intro?: string }).intro;
-        expect(intro).toMatch(/^Placeholders:/);
+        const note = (rates?.content as { note?: string }).note;
+        expect(note).toMatch(/^Placeholders:/);
         expect(rates?.content).toMatchObject({
             heading: "What I charge",
             items: [
-                { title: "Day rate" },
-                { title: "Project" },
-                { title: "Retainer" },
+                { title: "Day rate", value: "Your day rate" },
+                { title: "Project", value: "Your usual range" },
+                { title: "Retainer", value: "Your monthly rate" },
             ],
         });
+    });
+
+    it("says when the owner is free in a box ruled in the accent", () => {
+        const texts = sections(profiles[1][1]).filter(
+            (s) => s.type === "richText",
+        );
+        const free = texts[2].content as {
+            value: string;
+            callout?: { label?: string; text: string };
+        };
+        expect(free.value).toBe("<h2>Availability</h2>");
+        expect(free.callout?.label).toMatch(/^Your next opening — /);
+        expect(free.callout?.text).toMatch(/^A placeholder\./);
+        expect(free.callout?.text).toMatch(/\nNot looking for: /);
+    });
+
+    it("sets the intro's facts as a definition list", () => {
+        const intro = sections(profiles[1][1]).find(
+            (s) => s.type === "richText",
+        );
+        const html = (intro?.content as { value: string }).value;
+        expect(html).toContain(
+            "<dl><dt>Based</dt><dd>Your city and time zone</dd>",
+        );
+        expect(html).not.toContain("<table>");
     });
 
     it.each(profiles)(
