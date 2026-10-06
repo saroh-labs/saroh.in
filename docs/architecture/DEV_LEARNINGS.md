@@ -2703,3 +2703,35 @@ changes the profile between deposit and balance.
 **Rule**: `docs/patterns/backend-billing-and-classes.md` → "Issued paper
 never changes"; ADR-008 → "A balance after a deposit".
 **Category**: invoices · GST · `apps/api.saroh.in/src/modules/invoices/order-invoicing.ts`
+
+## Shop checkout — the bag's name and phone were asked for twice, and lost
+
+**Symptom**: a customer who typed their name and phone in the bag was asked
+for the phone again in Razorpay's window, and their account's "My details"
+said "Add your name" after the order. Found filming the checkout demo.
+**Root cause**: `CheckoutPay` built the window's prefill from the signed-in
+customer only (a first sign-in has no name, and never a phone), dropping the
+bag's delivery address. On the API, `createCheckoutOrder` never named the
+account's contact, though a first booking does (`accountContactInTx`).
+**Fix**: the bag hands its delivery to `CheckoutPay`, whose prefill falls
+back to its name and phone (digits only). The checkout names an unnamed
+contact from the delivery name, through `resolveContact`, and keeps a name
+it has. `shop.test.tsx` and `public-checkout.db.spec.ts` cover both.
+**Rule**: what a customer typed once is never asked for again in the same
+flow; a signed-in flow fills the contact's empty name, as bookings do.
+**Category**: shop · checkout · `packages/site-blocks/src/shop/checkout-sheet.tsx`,
+`apps/api.saroh.in/src/modules/orders/checkout-order.ts`
+
+## Discounts — an empty percentage said only "Validation failed"
+
+**Symptom**: saving a discount code with the percentage (or amount) empty
+showed a toast reading "Validation failed", with nothing under the field.
+**Root cause**: the form's schema took any string for `percent` and
+`amount`; the API's DTO refused it with class-validator, whose array of
+messages the exceptions filter sends as the bare "Validation failed" with no
+`field`, so the form could only toast it.
+**Fix**: `lib/discounts/value.ts` checks the chosen kind's value with the
+API's rules, and the form's `superRefine` puts the problem under its field.
+**Rule**: `docs/patterns/frontend-forms.md` → "The schema checks what the API's DTO
+checks".
+**Category**: discounts · forms · `apps/app.saroh.in/components/stores/discount-form.tsx`

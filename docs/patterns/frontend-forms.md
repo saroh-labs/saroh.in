@@ -80,6 +80,11 @@ typed form into the API's values and back.
     A server error that names a field goes on that field; anything else is a
     toast of the API's guarded message. Never hold a server error in `useState`.
 
+- **Adopted** (2026-10-05) — **The schema checks what the API's DTO
+  checks.** A class-validator refusal reaches the app as a bare
+  "Validation failed" with no field, so it can only be a toast. An empty or
+  malformed value is caught by zod and shown under its field first, e.g.
+  `lib/discounts/value.ts` in the discount form.
 - **Current** — **Money stays a string** from input to API
   (`price: values.price.trim()`). The API computes in cents.
 - **Current** — **Disable submit while the action runs.** All nine forms and

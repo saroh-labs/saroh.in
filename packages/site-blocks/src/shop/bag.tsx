@@ -59,7 +59,7 @@ type Step =
     | { kind: "closed" }
     | { kind: "bag" }
     | { kind: "sign-in"; then: StartCheckout }
-    | { kind: "pay"; started: CheckoutStarted }
+    | { kind: "pay"; started: CheckoutStarted; request: StartCheckout }
     | { kind: "test-release"; priced: BagPriced };
 
 export interface ShopBagProps {
@@ -181,7 +181,7 @@ export function ShopBag({
         setBusy(false);
         if (result.ok) {
             setCustomer(who);
-            setStep({ kind: "pay", started: result.data });
+            setStep({ kind: "pay", started: result.data, request });
             return;
         }
         if (result.reason === "signed-out") {
@@ -287,6 +287,7 @@ export function ShopBag({
                     api={api}
                     businessName={businessName}
                     customer={customer}
+                    delivery={step.request.address}
                     onPlaced={placed}
                     onConfirming={confirming}
                     onSettled={settled}

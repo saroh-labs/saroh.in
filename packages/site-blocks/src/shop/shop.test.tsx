@@ -283,6 +283,8 @@ function setup(
         start?: ShopResult<CheckoutStarted>;
         standing?: ShopResult<CheckoutStanding>;
         signedIn?: boolean;
+        /** The signed-in customer's name; none when null. */
+        name?: string | null;
         outcome?: CheckoutOutcome;
         /** Drawn on a test release (DEC-071, T6). */
         testRelease?: boolean;
@@ -332,7 +334,10 @@ function setup(
             api={api}
             account={{
                 customer: over.signedIn
-                    ? { email: "asha@example.in", name: "Asha" }
+                    ? {
+                          email: "asha@example.in",
+                          name: over.name === undefined ? "Asha" : over.name,
+                      }
                     : null,
                 options: OPTIONS,
                 signIn,
@@ -563,6 +568,52 @@ describe("the header's bag", () => {
         expect(
             screen.getByRole("button", { name: /^Place order/ }),
         ).toBeEnabled();
+    });
+
+    it("fills the payment window with the name and phone typed in the bag", async () => {
+        const { openCheckout } = setup({
+            signedIn: true,
+            name: null,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    ways: [
+                        {
+                            type: "LOCAL_DELIVERY",
+                            label: "Local delivery",
+                            fee: "60.00",
+                        },
+                    ],
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            },
+        });
+        await openTheBag();
+        fireEvent.click(screen.getByRole("radio", { name: /Local delivery/ }));
+        await screen.findByRole("button", { name: /^Place order/ });
+        for (const [label, value] of [
+            ["Name", "Kavya Iyer"],
+            ["Phone", "98450 12345"],
+            ["Address", "12 Hill Road"],
+            ["Town or city", "Mumbai"],
+            ["PIN code", "400050"],
+            ["State", "Maharashtra"],
+        ] as const) {
+            fireEvent.change(screen.getByLabelText(new RegExp(`^${label}`)), {
+                target: { value },
+            });
+        }
+        fireEvent.click(screen.getByRole("button", { name: /^Place order/ }));
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(openCheckout).toHaveBeenCalledWith(
+            expect.objectContaining({
+                booker: {
+                    name: "Kavya Iyer",
+                    email: "asha@example.in",
+                    phone: "9845012345",
+                },
+            }),
+        );
     });
 
     it("keeps the way, the address and the key when the customer goes back to the bag", async () => {

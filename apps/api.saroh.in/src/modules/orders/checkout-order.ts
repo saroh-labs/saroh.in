@@ -1,6 +1,9 @@
 import { ConflictException, HttpException } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { nextOrderNumberInTx, prisma } from "@saroh/database";
 
+import { splitName } from "../bookings/reservation";
+import { resolveContact } from "../customer-workspace/resolve-contact";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
 import type { ShopScope } from "./checkout-bag";
@@ -82,6 +85,12 @@ export async function createCheckoutOrder(
     for (let attempt = 0; attempt < 5; attempt++) {
         try {
             return await prisma.$transaction(async (tx) => {
+                const named = await nameContactInTx(
+                    tx,
+                    scope.organizationId,
+                    account,
+                    address?.name,
+                );
                 // Found whatever case staff typed it in, as a treatment's
                 // customer is; made only when there is none.
                 const customer =
@@ -101,8 +110,8 @@ export async function createCheckoutOrder(
                             storeId,
                             organizationId: scope.organizationId,
                             email: account.email,
-                            firstName: account.firstName,
-                            lastName: account.lastName,
+                            firstName: named.firstName,
+                            lastName: named.lastName,
                         },
                         select: { id: true },
                     }));
@@ -246,4 +255,44 @@ export async function createCheckoutOrder(
         }
     }
     throw new ConflictException("Couldn't start the checkout. Try again.");
+}
+
+/**
+ * The name the delivery was addressed to, given to the account's contact
+ * when it has none — so "My details" shows who signed in at the checkout,
+ * as a first booking names it. A name the contact already has is kept, and
+ * nothing else about it changes. The id comes from the session, so it goes
+ * through `resolveContact` (C9): a checkout racing a merge names the
+ * survivor, never the tombstone.
+ */
+async function nameContactInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    account: SiteAccount,
+    given: string | null | undefined,
+): Promise<{ firstName: string | null; lastName: string | null }> {
+    const kept = { firstName: account.firstName, lastName: account.lastName };
+    const { first, last } = splitName(given ?? undefined);
+    if (!first || account.firstName?.trim() || account.lastName?.trim()) {
+        return kept;
+    }
+    const resolved = await resolveContact(
+        tx,
+        account.contactId,
+        organizationId,
+    );
+    if (!resolved || resolved.removed) return kept;
+    // Only while still unnamed: a name staff gave it meanwhile stands.
+    await tx.contact.updateMany({
+        where: {
+            id: resolved.id,
+            organizationId,
+            AND: [
+                { OR: [{ firstName: null }, { firstName: "" }] },
+                { OR: [{ lastName: null }, { lastName: "" }] },
+            ],
+        },
+        data: { firstName: first, lastName: last ?? null },
+    });
+    return { firstName: first, lastName: last ?? null };
 }
