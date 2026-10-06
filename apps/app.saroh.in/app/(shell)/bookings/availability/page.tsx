@@ -154,6 +154,7 @@ export default async function AvailabilityPage() {
                 <AvailabilityEditor
                     staff={staffList.staff}
                     closures={staffList.closures}
+                    openingHours={staffList.openingHours ?? null}
                     rules={rules ?? NO_RULES}
                     timezone={timezone}
                     today={today}

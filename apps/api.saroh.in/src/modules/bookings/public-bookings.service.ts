@@ -46,6 +46,7 @@ import {
     toAvailabilityService,
 } from "./booking-slots";
 import type { BookPay } from "./dto";
+import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type {
     PublicBooking,
     PublicBookingPage,
@@ -376,6 +377,18 @@ export class PublicBookingsService {
             startAt,
             new Date(startAt.getTime() + service.durationMinutes * 60_000),
         );
+        // In person, only while the business is open (DEC-087).
+        const opening = await openingFor(service, place);
+        refuseOutsideOpening(
+            opening,
+            {
+                startAt,
+                endAt: new Date(
+                    startAt.getTime() + service.durationMinutes * 60_000,
+                ),
+            },
+            service.locationType === "EITHER",
+        );
         const availService = toAvailabilityService(service);
         const staffing = await loadStaffing(service);
         if (
@@ -466,6 +479,7 @@ export class PublicBookingsService {
                 input.staffId,
                 "public",
                 ownHold ?? undefined,
+                opening,
             );
         } catch (err) {
             const twin = await bookingByKey(serviceId, input);

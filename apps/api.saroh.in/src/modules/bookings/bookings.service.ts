@@ -58,6 +58,7 @@ import type {
     PaidWith,
     UpdateServiceDto,
 } from "./dto";
+import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type { BookInput, ReserveBy, ReserveWith } from "./reservation";
 import { loadBookableService, reserve, reserveInTx } from "./reservation";
 import type { ServiceView } from "./service-fields";
@@ -992,6 +993,9 @@ export class BookingsService {
             startAt.getTime() + service.durationMinutes * 60_000,
         );
         await refuseIfClosed(ctx.organizationId, startAt, endAt);
+        // By hand it is in person unless the service is online (DEC-087).
+        const opening = await openingFor(service, undefined);
+        refuseOutsideOpening(opening, { startAt, endAt });
         const staffing = await loadStaffing(service);
         if (
             !staffing.perPerson &&
@@ -1097,6 +1101,8 @@ export class BookingsService {
             startAt,
             dto.staffId,
             "team",
+            undefined,
+            opening,
         );
         const paidWith: PaidWith | null = withPack
             ? "PACK"

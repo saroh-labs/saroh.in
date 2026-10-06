@@ -8,6 +8,7 @@ import {
     withinBookingWindow,
 } from "../bookings/booking-rules";
 import { openSlots } from "../bookings/booking-slots";
+import type { BookingLocationType } from "../bookings/dto";
 import { bookingPaymentInTx } from "../payments/booking-refund";
 import type { AccountCancelTerms } from "./account-bookings-view";
 import type { CustomerContext } from "./customer-context.decorator";
@@ -154,13 +155,15 @@ export async function cancelTerms(
 
 /**
  * Free starts over the next two weeks — with one person, when named — that
- * the customer could book now: a few a day, as the sheet lists them.
+ * the customer could book now: a few a day, as the sheet lists them. `where`
+ * is where the booking happens: in person keeps to opening hours (DEC-087).
  */
 export async function freeTimes(
     service: Service,
     rules: BookingRulesValue,
     now: Date,
     staffId?: string,
+    where?: BookingLocationType | null,
 ): Promise<string[]> {
     const windows = await prisma.availabilityRule.findMany({
         where: { serviceId: service.id },
@@ -171,6 +174,7 @@ export async function freeTimes(
         now,
         new Date(now.getTime() + TIMES_DAYS * DAY),
         staffId,
+        where,
     );
     const perDay = new Map<string, number>();
     const out: string[] = [];

@@ -75,6 +75,11 @@ export interface BookingStart {
     staffId: string | null;
     staffName: string | null;
     placesLeft: number | null;
+    /**
+     * A service offered either way: set when this start can be had only
+     * one way — online outside the business's opening hours (DEC-087).
+     */
+    only?: BookingWhere;
 }
 
 export interface BookingDay {
@@ -177,7 +182,11 @@ function isStart(v: unknown): v is BookingStart {
         isInstant(v.endAt) &&
         strOrNull(v.staffId) &&
         strOrNull(v.staffName) &&
-        numOrNull(v.placesLeft)
+        numOrNull(v.placesLeft) &&
+        (v.only === undefined ||
+            v.only === null ||
+            v.only === "IN_PERSON" ||
+            v.only === "ONLINE")
     );
 }
 
