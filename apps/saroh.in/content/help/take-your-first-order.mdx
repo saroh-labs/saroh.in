@@ -1,0 +1,79 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots, and the flow was run end to
+# end on Northwind on a throwaway database (an order created, walked to
+# Delivered; another recorded as paid). Sources, from the repo root:
+#   NAV    apps/app.saroh.in/components/shared/nav-items.tsx (Sell › Orders)
+#   SHEET  apps/app.saroh.in/components/commerce/new-order/new-order-sheet.tsx
+#          ("New order", "At the counter or on the phone", "Taken at")
+#   CUST   .../new-order/customer-step.tsx (Customer, "Search by name or
+#          phone", Walk-in with Name and "Phone (if they give one)")
+#   LINES  .../new-order/lines-step.tsx ("Add a product — type to find it")
+#   LEAVES .../new-order/leaves-step.tsx ("How it leaves", the address)
+#   PAY    apps/app.saroh.in/lib/orders/new-order.ts (Cash, "UPI at the
+#          counter", "Card machine", "Send a payment link", "Pay on
+#          collection" and why each is off; the button: "UPI received ·
+#          create" and the others)
+#   STEPS  apps/app.saroh.in/lib/orders/lifecycle.ts ("Start preparing",
+#          "Mark ready", "Mark collected", "Send out for delivery", "Mark
+#          delivered", "Hand to courier"; Ready is held a moment to undo)
+#   PAID   apps/app.saroh.in/components/commerce/order-detail/change-panels.tsx
+#          ("Not paid yet", "Paid in cash"), components/commerce/order-actions.tsx
+#          ("Record this order as paid?", "Record as paid"),
+#          order-detail/pay-link.tsx ("Make a pay link")
+#   SITE   apps/app.saroh.in/components/commerce/orders/orders-screen.tsx
+#          (All locations, "Show orders taken at"),
+#          lib/orders/timeline-steps.ts ("Ordered on your website")
+# Northwind's store offers Local delivery and Shipping in the sheet, so the
+# shots take a delivery; the seed has no order placed on a website, so the
+# last step shows the location filter rather than one.
+title: Take your first order
+slug: take-your-first-order
+area: Orders
+group: Take orders
+order: 10
+intro: "An order at the counter or on the phone goes into Saroh the same way as one from your website, so your orders, stock and invoices stay in one place. Taking one takes about a minute."
+description: "Take an order in Saroh: pick the customer and items, how it leaves and how it's paid, then move it along to done. Six steps, with a picture of each screen."
+readMinutes: 3
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # NAV, SHEET.
+    - title: Open Orders
+      body: "In Saroh, open Sell › Orders in the sidebar and press New order at the top right. The New order sheet opens beside the list."
+      shot: help-take-order-1
+      caption: "Orders at Northwind Supply (a demo shop), with New order at the top right."
+      marker: New order
+    # SHEET, CUST, LINES.
+    - title: Customer and items
+      body: "If you sell at more than one location, choose where it's taken under Taken at. Under Customer, search by name or phone, or tap one of the people shown. For someone you don't know, tap Walk-in and type their name, and a phone if they give one: with a phone, they're kept as a customer. Then add what they're buying: type to find a product, or tap its size and price."
+      shot: help-take-order-2
+      caption: "A new order at Northwind Supply (a demo shop) for Meera Iyer, with one item added."
+      marker: Meera Iyer
+    # LEAVES, PAY.
+    - title: How it leaves and how it's paid
+      body: "Under How it leaves, choose from the ways your location offers, and add the address for a delivery. Under Payment, choose Cash, UPI at the counter or Card machine for money taken now, Send a payment link to send the customer a link, or Pay on collection for a pick-up they'll pay for later. The button at the bottom says what will happen, such as UPI received · create. Press it once the money is in."
+      shot: help-take-order-3
+      caption: "Northwind Supply (a demo shop): a local delivery paid by UPI at the counter, ready to create."
+      tip: "Send a payment link needs a payment provider connected and a customer with a phone or email. A delivery can't be paid on collection."
+      marker: UPI received · create
+    # STEPS.
+    - title: Move it along until it's done
+      body: "The order starts at New in the list. Open it and press the button at the top right as the work happens: Start preparing, then Mark ready, then Mark collected for a pick-up. A delivery has Send out for delivery and Mark delivered instead, and a shipment Hand to courier. Mark ready waits a few seconds before it's recorded, so you can undo it."
+      shot: help-take-order-4
+      caption: "Order #ORD-004 at Northwind Supply (a demo shop), ready, with Mark collected."
+      marker: Mark collected
+    # PAID.
+    - title: Take a payment that's still due
+      body: "An order that isn't paid says Not paid yet at the top: don't start it until it's paid. If they pay in cash or by bank transfer, press Paid in cash, then Record as paid. Nothing is charged or sent to the customer, and it can't be taken back. To have them pay online instead, press Make a pay link under Money."
+      shot: help-take-order-5
+      caption: "Order #ORD-002 at Northwind Supply (a demo shop), not paid yet, with Paid in cash."
+      marker: Paid in cash
+    # SITE.
+    - title: Orders from your website
+      body: "Orders customers place on your website land in the same list, at New, and you move them along the same way. On the order, What happened says it was ordered on your website. With more than one location, All locations narrows the list to the orders taken at one of them."
+      shot: help-take-order-6
+      caption: "Orders at Northwind Supply (a demo shop), with All locations open on its two locations."
+      marker: All locations
+next: [add-your-first-product, connect-razorpay, add-your-gstin]
+---

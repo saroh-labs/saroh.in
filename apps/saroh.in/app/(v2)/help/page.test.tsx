@@ -58,14 +58,16 @@ describe("/help", () => {
             .map((h) => h.textContent);
         // In the home's order; a group with no article isn't drawn.
         expect(groups).toEqual(HELP_GROUPS.filter((g) => groups.includes(g)));
-        expect(groups).toEqual(
-            expect.arrayContaining([
-                "Sell products",
-                "Take bookings",
-                "Monthly plans",
-                "Your website",
-            ]),
-        );
+        expect(groups).toEqual([
+            "Get set up",
+            "Sell products",
+            "Take orders",
+            "Take bookings",
+            "Get paid",
+            "Monthly plans",
+            "Your website",
+            "Invoices and GST",
+        ]);
         expect(
             screen
                 .getByRole("link", { name: "Add your first product" })

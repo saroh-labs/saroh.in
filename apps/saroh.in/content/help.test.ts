@@ -30,8 +30,9 @@ const at = (iso: string) => ({
     routes: null,
 });
 
+/** The first article, alone: its Next links point at none of the others. */
 function article(over: Partial<HelpFrontmatter> = {}): HelpFrontmatter {
-    return { ...first, ...over };
+    return { ...first, next: [], ...over };
 }
 
 describe("the real Help articles", () => {
@@ -126,7 +127,7 @@ describe("helpErrors catches", () => {
     });
 
     it("two articles with one slug", () => {
-        expect(errs([first, first])).toEqual([
+        expect(errs([article(), article()])).toEqual([
             "help add-your-first-product: two articles",
         ]);
     });

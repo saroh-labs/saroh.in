@@ -1,0 +1,70 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. Sources, from the repo root:
+#   NAV    apps/app.saroh.in/components/shared/nav-items.tsx
+#          (Settings › Business)
+#   FORM   apps/app.saroh.in/components/organizations/organization-settings-form.tsx
+#          (tabs Identity, Contact, "Tax and invoices", Hours, "Registered
+#          address"; Edit and Save; the "GST-registered" switch and its two
+#          lines; "GSTIN" and its hint; turning GST on needs a registered
+#          address, whose fields join the card when it is short;
+#          followRegistration: the default number takes the financial year)
+#   GUIDE  apps/app.saroh.in/components/organizations/gstin-guide.tsx (State
+#          code, PAN, Entity, Always Z, Check)
+#   ADDR   apps/app.saroh.in/components/organizations/registered-address-fields.tsx
+#   PRINT  apps/app.saroh.in/components/organizations/business-print-preview.tsx
+#          ("How it prints", "Showing your unsaved edit", "Tax invoice")
+#   TITLE  apps/api.saroh.in/src/modules/invoices/invoice-title.ts (tax
+#          invoice; every line exempt or nil-rated is a bill of supply;
+#          unregistered: invoice, then receipt once paid)
+#   READY  apps/app.saroh.in/lib/settings/ready.ts, lib/settings/nudges.ts
+#          ("Ready to take payments", "Choose your business type",
+#          "Choose type"; "Add your GSTIN", "Add GSTIN")
+# The brief said "tax invoice vs bill of supply". The app's three papers
+# are said as the code names them: a business that isn't registered sends
+# invoices and receipts, not bills of supply. Shots are Northwind, which
+# isn't GST-registered in the seed; nothing in them is saved.
+title: Add your GSTIN
+slug: add-your-gstin
+area: Billing
+group: Invoices and GST
+order: 10
+intro: "Once your business is GST-registered, every order and invoice Saroh makes becomes a tax invoice with your GSTIN on it. You switch it on and type the number once, in Settings. This takes about two minutes."
+description: "Turn on GST in Saroh: add your GSTIN and registered address, and see your invoices become tax invoices. Five steps, with a picture of each screen."
+readMinutes: 2
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # NAV, FORM.
+    - title: Open Tax and invoices
+      body: "In Saroh, open Settings › Business and choose the Tax and invoices tab. It says whether you're GST-registered and what every invoice carries. Press Edit to change it."
+      shot: help-add-gstin-1
+      caption: "Tax and invoices at Northwind Supply (a demo shop), not GST-registered yet."
+      marker: Edit
+    # FORM, GUIDE.
+    - title: Switch on GST and type your GSTIN
+      body: "Turn on GST-registered, then type your 15-character GSTIN. Under the field Saroh splits it into its parts, state code, PAN, entity number, Z and check character, and marks the part that's wrong. The state code sets your state, so you don't choose it separately."
+      shot: help-add-gstin-2
+      caption: "Northwind Supply (a demo shop) with GST-registered on and its GSTIN in five parts."
+      marker: GSTIN
+    # ADDR, FORM (addressInTax).
+    - title: Check your registered address
+      body: "A tax invoice prints your registered address, so Saroh needs its first line, city, PIN and state before it saves the GSTIN. It's on the Registered address tab. If it isn't complete yet, its fields appear on the Tax and invoices card too, so one Save covers both."
+      shot: help-add-gstin-3
+      caption: "Northwind Supply's registered address (a demo shop), printed under its legal name."
+      marker: Registered address
+    # PRINT, TITLE, followRegistration.
+    - title: Save, and see a tax invoice
+      body: "How it prints, beside the card, shows your unsaved edit: the paper is now a Tax invoice, with your GSTIN and your state. Press Save. From then on orders and invoices are tax invoices, split into CGST and SGST inside your state, or IGST outside it, with prices including GST. Unless you've set your own invoice number format, it changes to one with the financial year in it."
+      shot: help-add-gstin-4
+      caption: "How it prints at Northwind Supply (a demo shop): a tax invoice with the GSTIN, not yet saved."
+      tip: "Sell only exempt or nil-rated things, like a clinic's treatments? An invoice whose every line is at 0% is printed as a Bill of supply, with no tax columns, in the same number series."
+      marker: Tax invoice
+    # READY.
+    - title: Choose your business type
+      body: "Ready to take payments, at the top of Settings › Business, lists what's left before you take money. If you said your business is registered when you set it up, it asks you to choose your business type: private limited, LLP, partnership or another. Press Choose type, pick it under Identity and save."
+      shot: help-add-gstin-5
+      caption: "Ready to take payments at Northwind Supply (a demo shop), asking for its business type."
+      marker: Choose type
+next: [take-your-first-order, connect-razorpay]
+---
