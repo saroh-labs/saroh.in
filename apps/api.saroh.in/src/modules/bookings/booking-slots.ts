@@ -6,6 +6,7 @@ import type {
     AvailabilityRuleWindow,
     AvailabilityService,
     Interval,
+    OpeningHours,
     Slot,
     StaffSlot,
 } from "./availability";
@@ -13,6 +14,7 @@ import {
     availableSlots,
     countOverlapping,
     guarded,
+    insideOpening,
     intersectIntervals,
     isPersonSlotStart,
     outsideClosures,
@@ -22,7 +24,9 @@ import {
     workingIntervals,
 } from "./availability";
 import { holdsPlace } from "./booking-hold";
+import type { BookingLocationType } from "./dto";
 import { heldSeatIntervals } from "./held-seats";
+import { openingFor } from "./opening-hours";
 import type { ReserveWith } from "./reservation";
 import {
     businessTimezone,
@@ -61,7 +65,9 @@ export interface Staffing {
 /**
  * Open slots over `[from, to)`. A one-to-one somebody takes gets them per
  * person (U3); anything else from the service's own rules and capacity,
- * exactly as before — with its instructors named when it has any.
+ * exactly as before — with its instructors named when it has any. In
+ * person, only inside opening hours (DEC-087); `where` is the booker's
+ * choice for a service offered either way, in person when not said.
  */
 export async function openSlots(
     service: Service,
@@ -69,8 +75,12 @@ export async function openSlots(
     from: Date,
     to: Date,
     staffId?: string,
+    where?: BookingLocationType | null,
 ): Promise<AvailableSlot[]> {
-    const staffing = await loadStaffing(service);
+    const [staffing, opening] = await Promise.all([
+        loadStaffing(service),
+        openingFor(service, where),
+    ]);
     if (staffId && !staffing.people.some((p) => p.id === staffId)) {
         throw new BadRequestException({
             message: "That person doesn't take this service.",
@@ -96,6 +106,7 @@ export async function openSlots(
             staffing.zone,
             from,
             to,
+            opening,
         );
         return slots;
     }
@@ -106,9 +117,12 @@ export async function openSlots(
         busyOverlapping(service.id, reach.startAt, reach.endAt),
         loadClosures(prisma, service.organizationId, from, to),
     ]);
-    const slots = outsideClosures(
-        availableSlots(availService, rules, from, to, busy),
-        closed,
+    const slots = insideOpening(
+        outsideClosures(
+            availableSlots(availService, rules, from, to, busy),
+            closed,
+        ),
+        opening,
     );
     if (staffing.people.length === 0) return slots;
     const instructors = staffId
@@ -146,6 +160,8 @@ export async function resolvePerson(
     requested: string | undefined,
     audience: "public" | "team",
     excludeBookingId?: string,
+    /** In person: the opening hours it keeps to (DEC-087). */
+    opening: OpeningHours | null = null,
 ): Promise<ReserveWith> {
     const named = requested
         ? staffing.people.find((p) => p.id === requested)
@@ -192,6 +208,7 @@ export async function resolvePerson(
                 person,
                 staffing.zone,
                 startAt,
+                opening,
             )
         ) {
             const found = candidates[index];
@@ -239,6 +256,7 @@ export async function resolvePerson(
                 { ...person, busy: [], timeOff: [] },
                 zone,
                 startAt,
+                opening,
             ),
         )
     ) {

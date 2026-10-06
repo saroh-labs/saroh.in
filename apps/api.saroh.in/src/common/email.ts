@@ -531,6 +531,33 @@ export async function sendSarohBillingEmail(
     }
 }
 
+/**
+ * The link preview tool's report (resources plan U2, KTD-5), to the address
+ * the visitor typed to unlock it: plain text, Saroh's own words and the
+ * facts the API read itself — never text the caller sent. Awaited, so the
+ * page can say whether a copy went. Without SMTP it prints only in
+ * development (the fake transport); elsewhere nothing leaves.
+ */
+export async function sendLinkReportEmail(
+    to: string,
+    subject: string,
+    text: string,
+): Promise<EmailOutcome> {
+    if (!transporter) {
+        if (env.NODE_ENV === "development") {
+            console.info(`[Link report] (no SMTP) ${to}: ${subject}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({ from: FROM, to, subject, text });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Site sign-in codes (ADR-011; round-2 plan A, A2)
 // ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ import { useId } from "react";
 import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import type { PlanLock } from "@/lib/billing/access";
 import { currencySymbol } from "@/lib/format/money";
+import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
 import type { ServiceDraft } from "@/lib/services/service-editor";
 import {
@@ -16,9 +17,10 @@ import {
     draftVisits,
     staffNote,
     timeNote,
+    toMinor,
     wholeNumber,
 } from "@/lib/services/service-editor";
-import type { StaffView } from "@/lib/staff/types";
+import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
 import { DepositField } from "./deposit-field";
 import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
@@ -164,14 +166,27 @@ export function PriceSection({
     currency,
     savedDeposit,
     paymentsLock = null,
+    payment,
 }: Edit & {
     currency: string;
     /** The deposit the service has saved. */
     savedDeposit?: DepositMode;
     /** The plan's lock on online payments (deposits are taken online). */
     paymentsLock?: PlanLock | null;
+    /** How people pay when they book (DEC-088); null when unknown. */
+    payment: BookingPaymentView | null;
 }) {
     const id = useId();
+    // Only a service on the booking page is booked online at all.
+    const problem = draft.showOnBookingPage
+        ? onlineBookingProblem(
+              {
+                  priceCents: toMinor(draft.price),
+                  depositMode: draft.deposit,
+              },
+              payment,
+          )
+        : null;
     return (
         <Section title="Price">
             <label htmlFor={id} className={LABEL}>
@@ -191,6 +206,8 @@ export function PriceSection({
                 visits={draftVisits(draft)}
                 saved={savedDeposit}
                 paymentsLock={paymentsLock}
+                way={payment?.bookingPayment}
+                problem={problem}
                 onChange={(deposit) => set({ deposit })}
             />
         </Section>

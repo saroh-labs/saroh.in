@@ -141,6 +141,11 @@ const ENDPOINTS: [
     ["GET staff", ["service:read"], (c) => staff.list(c)],
     ["GET staff/:id", ["service:read"], (c) => staff.get(c, MISSING)],
     ["GET booking-rules", ["service:read"], (c) => staff.getBookingRules(c)],
+    [
+        "GET booking-rules/payment",
+        ["service:read"],
+        (c) => staff.getBookingPayment(c),
+    ],
     ["GET closures", ["service:read"], (c) => closures.list(c)],
     [
         "POST services",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CRAWL_DISALLOWED, SERVED_PATHS, indexedPaths } from "./lib/site-pages";
 import nextConfig from "./next.config.js";
-import { REDIRECTS } from "./redirects.js";
+import { REDIRECTS, temporary } from "./redirects.js";
 
 /** The URLs the V1 sitemap listed, and the addresses before it (plan U26). */
 const OLD_URLS = [
@@ -41,7 +41,19 @@ function resolve(path: string): string | null {
 
 describe("redirects", () => {
     it("is what next.config.js serves", async () => {
-        expect(await nextConfig.redirects?.()).toEqual(REDIRECTS);
+        // The tests run with the switch unset: waitlist mode.
+        expect(await nextConfig.redirects?.()).toEqual([
+            ...REDIRECTS,
+            ...temporary(undefined),
+        ]);
+    });
+
+    it("sends Pricing to the waitlist until the launch switch opens", () => {
+        expect(temporary(undefined)).toEqual([
+            { source: "/pricing", destination: "/waitlist", statusCode: 302 },
+        ]);
+        expect(temporary("waitlist")).toHaveLength(1);
+        expect(temporary("open")).toEqual([]);
     });
 
     it.each(OLD_URLS)("sends %s to a V2 page in one hop", (path) => {
@@ -70,10 +82,14 @@ describe("redirects", () => {
 });
 
 describe("indexed pages", () => {
-    it("lists Home, Pricing, 8 features, 3 solutions and the waitlist while it is the ask", () => {
+    it("lists Home, 8 features, 3 solutions and the waitlist while it is the ask; Pricing once it opens", () => {
         const waitlist = indexedPaths("waitlist");
-        expect(waitlist).toHaveLength(14);
+        expect(waitlist).toHaveLength(13);
         expect(waitlist).toContain("/waitlist");
+        // Pricing waits at the waitlist until launch, and a sitemap never
+        // lists a redirect.
+        expect(waitlist).not.toContain("/pricing");
+        expect(indexedPaths("open")).toContain("/pricing");
         expect(waitlist.filter((p) => p.startsWith("/features/"))).toHaveLength(
             8,
         );

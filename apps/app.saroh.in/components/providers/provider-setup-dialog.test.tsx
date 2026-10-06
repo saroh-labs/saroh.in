@@ -181,6 +181,7 @@ describe("Razorpay setup, as guided steps", () => {
         // Required, never "optional".
         expect(byLabel("Webhook signing secret").required).toBe(true);
         expect(t).not.toMatch(/Webhook signing secret\s*optional/);
+        expect(t).toContain("Autopay adds its own events");
     });
 
     it("copies the webhook URL and says so", async () => {
@@ -293,6 +294,8 @@ describe("Cashfree setup", () => {
         expect(byLabel("Webhook URL").value).toBe(HOOKS[1].url);
         expect(t).toContain("no separate secret to add");
         expect(() => byLabel("Webhook signing secret")).toThrow();
+        // Cashfree has no autopay (#824).
+        expect(t).not.toContain("Autopay");
 
         typeInto(byLabel("Key ID"), "TEST1234app");
         typeInto(byLabel("Key secret"), "cfsk_secret");

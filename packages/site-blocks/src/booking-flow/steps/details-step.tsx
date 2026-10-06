@@ -27,6 +27,7 @@ export function DetailsStep({
     onNotYou,
     asksWhere,
     where,
+    onlyWhere = null,
     note,
     onWhere,
     onNote,
@@ -45,6 +46,8 @@ export function DetailsStep({
     onNotYou: () => void;
     asksWhere: boolean;
     where: BookingWhere;
+    /** The one way the chosen time can be had, or null for either. */
+    onlyWhere?: BookingWhere | null;
     note: string;
     onWhere: (where: BookingWhere) => void;
     onNote: (note: string) => void;
@@ -104,6 +107,7 @@ export function DetailsStep({
                     business={business}
                     asksWhere={asksWhere}
                     where={where}
+                    onlyWhere={onlyWhere}
                     note={note}
                     onWhere={onWhere}
                     onNote={onNote}

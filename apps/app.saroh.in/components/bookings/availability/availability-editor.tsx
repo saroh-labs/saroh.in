@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo, showWarning } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -16,6 +17,7 @@ import type {
 } from "@/lib/services/availability-rules";
 import {
     draftFrom,
+    payWayOf,
     REFUND_POLICY,
     refundsInTime,
     ruleChoices,
@@ -40,10 +42,13 @@ import type {
     BookingBrief,
     BookingRules,
     Closure,
+    OnlineBlocker,
     StaffView,
+    WeeklyRange,
 } from "@/lib/staff/types";
 
 import { AddPersonDialog } from "./add-person-dialog";
+import { PayWayRow } from "./pay-way-row";
 import { OffRow, TimeOffCard } from "./time-off-card";
 import { WeeklyHours } from "./weekly-hours";
 
@@ -84,6 +89,9 @@ function rangeOfLine(line: OffLine, closed: boolean): TimeOffInput {
 }
 
 const card = "rounded-[12px] border border-border bg-card px-4 py-[13px]";
+
+/** Settings › Hours, where the business's opening hours are kept. */
+const HOURS = "/settings/organization?section=hours";
 const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
 
 /**
@@ -96,6 +104,7 @@ const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
 export function AvailabilityEditor({
     staff,
     closures,
+    openingHours,
     rules,
     timezone,
     today,
@@ -103,10 +112,13 @@ export function AvailabilityEditor({
     bookedOn,
     takesClasses,
     canEdit,
+    onlineBlocker,
 }: {
     staff: StaffView[];
     /** When the whole business is closed (E3). */
     closures: Closure[];
+    /** When the business is open (DEC-087), or null with no shop hours. */
+    openingHours: WeeklyRange[] | null;
     rules: BookingRules;
     timezone: string;
     today: LocalDate;
@@ -117,6 +129,11 @@ export function AvailabilityEditor({
     /** Who teaches a class — their dot is the class colour. */
     takesClasses: string[];
     canEdit: boolean;
+    /**
+     * Why the booking page can't take money online now (DEC-088); null
+     * when it can, undefined when it couldn't be told.
+     */
+    onlineBlocker?: OnlineBlocker | null;
 }) {
     const router = useRouter();
     const people = staff.filter((p) => p.status === "ACTIVE");
@@ -307,6 +324,20 @@ export function AvailabilityEditor({
                 times inside these hours, minus bookings and the gap after each.
                 Changing hours never moves a booking that&apos;s already made.
             </p>
+            {openingHours ? (
+                <p className="-mt-2 mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
+                    In-person bookings are only offered while you&apos;re open,
+                    so hours outside your opening hours aren&apos;t bookable in
+                    person. Opening hours are in{" "}
+                    <Link
+                        href={HOURS}
+                        className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+                    >
+                        Settings › Hours
+                    </Link>
+                    .
+                </p>
+            ) : null}
             {canEdit ? null : (
                 <ReadOnlyNote>
                     Your role can see these hours but not change them.
@@ -362,6 +393,7 @@ export function AvailabilityEditor({
                 <WeeklyHours
                     staffId={me.id}
                     hours={hours}
+                    opening={openingHours}
                     kept={kept}
                     canEdit={canEdit}
                     onChange={(next) =>
@@ -481,6 +513,17 @@ export function AvailabilityEditor({
                                 />
                             </div>
                         ))}
+                        {/* How people pay when they book (DEC-088). */}
+                        <PayWayRow
+                            way={payWayOf(d.rules)}
+                            blocker={onlineBlocker}
+                            disabled={!canEdit}
+                            onChange={(way) =>
+                                edit((x) => {
+                                    x.rules.bookingPayment = way;
+                                })
+                            }
+                        />
                         {/* The business's refund policy (E30, DEC-058). */}
                         <div className="flex items-center gap-2 py-1.5">
                             <span className="flex-1 text-[13px]">

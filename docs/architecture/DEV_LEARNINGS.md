@@ -2751,6 +2751,83 @@ changes the profile between deposit and balance.
 never changes"; ADR-008 → "A balance after a deposit".
 **Category**: invoices · GST · `apps/api.saroh.in/src/modules/invoices/order-invoicing.ts`
 
+## E2E — phone specs passed while tables hid 200–280px sideways
+
+**Symptom**: The Phone Tables audit (5 Oct, T10) found Stock, the product
+page's tabs and a customer's orders hiding 200–280px of columns — Can sell,
+Status — on a 390px phone, while every phone spec's "no sideways scroll"
+check passed on the same screens.
+**Root cause**: The specs measured the PAGE (`documentElement.scrollWidth
+<= innerWidth`). A 600px table inside an `overflow-x-auto` card keeps the
+page exactly the screen's width, so the check passed on the very bug. Nor
+did anything on screen say there was more: a phone draws no scrollbar.
+**Fix**: `e2e/fixtures/hidden-sideways.ts` — `hiddenSideways(page, allow)`
+lists every element inside `main` that clips or scrolls content wider than
+itself, and `expectNothingHiddenSideways(page)` polls it to empty. Scrollers
+that mean to scroll are allowed by default: `ScrollX` (`@saroh/ui/scroll-x`,
+marked `data-scroll-x`, which fades the side with more and hints "Swipe for
+more →" once), tab strips (`role=tablist`) and calendar grids
+(`role=grid`). DataView also stopped flashing its table on a phone before
+hydration (T8): the server draws the table and the list behind a 760px
+media rule and the client keeps the one in use.
+**Rule**: On a phone nothing hides sideways
+(`docs/patterns/frontend-verification.md`). A phone spec that checks the
+page fits also calls `expectNothingHiddenSideways`.
+**Category**: e2e · layout · `e2e/fixtures/hidden-sideways.ts`
+
+## Link preview — a public tool that emails stranger-supplied text is a relay
+
+**Symptom**: A security review of the link preview tool (5 Oct, before
+release) found its email gate could send any text to any inbox from
+Saroh's address: the report quoted the checked page's title, description,
+site name, picture address and tags, and named its domain in the subject.
+Anyone could host a page saying what they liked, type a stranger's email,
+and have Saroh deliver it — and tick "Also send me Saroh news" on their
+behalf. The caps on it were in one process's memory, the API took calls
+without saroh.in's relay, the checked address rode in a logged query
+string, and DNS for a stranger's name ran on libuv's four-thread pool
+(`dns.lookup`), where a never-answering nameserver could stall SMTP,
+database connects, zlib and crypto for every user.
+**Root cause**: The email was designed as "the report, mailed", without
+asking who chooses its words; and the tool was built like an internal
+endpoint (in-memory limits, GET, the system resolver) though anyone on the
+internet drives it.
+**Fix**: `report-email.ts` writes our words only: a fixed subject, the
+score, fix titles from a fixed list, size advice and one link back to the
+tool. No consent is asked or stored (`newsConsent` false). Both caps (3 a
+UTC day per address, 300 a day in all) are counted in `WaitlistSignup`.
+Both routes need the signed relay (`SiteRelayGuard`), the check is a POST,
+`redactUrl` drops `/public/tools/` query strings, and the stored link is
+origin and path. DNS goes over c-ares (`dns.promises.Resolver`, 1.5 s, one
+try) and at most 8 checks run at once (`busy` past that).
+**Rule**: `docs/patterns/backend-integrations.md` — "An email a stranger can
+trigger carries only our words".
+**Category**: security · email · `apps/api.saroh.in/src/modules/link-preview/`
+
+## Layout — a phone zoomed out on text it never showed
+
+**Symptom**: On the batch-2026-10-05-5 gate, a customer's Orders tab
+measured `innerWidth` 557 at a 375px phone, and New invoice's "Issue with
+pay link" could not be clicked on a Pixel 7: each try hit another element
+(the quantity box, the h1). Neither failed alone on a fresh seed.
+**Root cause**: Two widths no one could see. (1) An order card's
+`sr-only` ", order #1042" sits inside the truncated title link, but it is
+`position: absolute` and its containing block was the card's `li`
+(`relative`), so the link's `overflow: hidden` never clipped it: placed
+after a long title, it widened the page by 180px. (2) New invoice's left
+column was a `grid` with an implicit `auto` track, whose least width is
+its widest item's min-content — the contact picker's one-line
+"name · email". A parallel spec's 60-character email, first in the list,
+made it 1089px; the phone zoomed out and Playwright's clicks landed short.
+**Fix**: `OrderCardFrame` wraps the title in a `relative` span, so the
+truncated link clips its screen-reader words; the invoice form's column is
+`grid-cols-[minmax(0,1fr)]`.
+**Rule**: An `sr-only` inside truncated text needs a positioned ancestor
+inside the clip; a `grid` that holds one-line, truncating content names
+its track `minmax(0,1fr)` (`min-w-0` on the grid itself is not enough).
+**Category**: layout · phone · `components/commerce/orders/order-row.tsx`,
+`components/invoices/invoice-form.tsx`
+
 ## Shop checkout — the bag's name and phone were asked for twice, and lost
 
 **Symptom**: a customer who typed their name and phone in the bag was asked
@@ -2804,3 +2881,34 @@ an edit…") and `order-difference.db.spec.ts` cover it.
 **Rule**: "what the order was paid" is every payment it received — online
 and recorded by hand — read through `hand-payments.ts`, never intents alone.
 **Category**: orders · money · `apps/api.saroh.in/src/modules/orders/order-kitchen.service.ts`
+
+## Seeds — the clinic's 70-day sweep timed out on CI, not locally
+
+**Symptom**: PR #825's unit job failed twice on `clinic.test.ts` ("keeps
+every booking, bill and state, 70 days running"): 123s and 125s against a
+120s limit. The same test took 16s in `pnpm prepush`.
+**Root cause**: CI's unit job runs `turbo run test` across every affected
+package at once on a small runner, so the CPU-bound sweep (490 seeds) runs
+about 8 times slower than on a laptop. The database package's tests only run
+on CI when that package changes, so the seed's growth since the limit was set
+(E9's treatment orders) went unseen until a migration landed.
+**Fix**: the sweep's limit is 300s, with the reason beside it.
+**Rule**: a CPU-bound test's timeout gets at least 8 times its local time;
+don't set it just above what a laptop takes.
+**Category**: seeds · CI · `packages/database/src/seed/showcase/clinic.test.ts`
+
+## Gate — every integration spec failed after merging a schema change
+
+**Symptom**: after merging a unit that added `BookingRules.bookingPayment`,
+`pnpm prepush --all` failed nearly every int and int-rls shard with
+`PrismaClientValidationError` on the new field. Lint, types and the browser
+specs passed.
+**Root cause**: `@saroh/database`'s build runs `prisma generate`, but turbo
+caches only `dist/**`. The unit's worktree had built the same inputs, so the
+batch's build was a cache hit: `dist` was restored and the Prisma client in
+`node_modules` stayed the old one.
+**Fix**: the gate's int-build step runs `prisma generate` before the turbo
+build, every time (about a second).
+**Rule**: anything generated outside a task's turbo `outputs` must be
+regenerated before it is used; a cache hit won't do it.
+**Category**: gate · Prisma · `scripts/prepush.sh` (int-build)

@@ -37,7 +37,7 @@ import {
 } from "@/lib/services/service-editor";
 import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
-import type { StaffView } from "@/lib/staff/types";
+import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
 import { AtAGlance } from "./at-a-glance";
 import {
@@ -75,6 +75,7 @@ export function ServiceEditor({
     hasPage,
     hasStorefront = null,
     paymentsLock = null,
+    payment = null,
 }: {
     /** Null while creating. */
     service: Service | null;
@@ -101,6 +102,8 @@ export function ServiceEditor({
      * unknown or not enforced.
      */
     paymentsLock?: PlanLock | null;
+    /** How people pay when they book (DEC-088); null when unknown. */
+    payment?: BookingPaymentView | null;
 }) {
     const router = useRouter();
     const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
@@ -354,6 +357,7 @@ export function ServiceEditor({
                         currency={currency}
                         savedDeposit={saved.deposit}
                         paymentsLock={paymentsLock}
+                        payment={payment}
                     />
                     <WhoTakesIt
                         draft={draft}

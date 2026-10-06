@@ -468,6 +468,18 @@ describe("At booking, they pay (E8)", () => {
         );
     });
 
+    it("online only, nothing is left for the visit (DEC-088)", () => {
+        expect(depositNote("NONE", "1200", "INR", 1, "ONLINE")).toBe(
+            "They pay ₹1,200 online when booking: your booking rules take payment online only.",
+        );
+        expect(depositNote("NONE", "0", "INR", 1, "ONLINE")).toBe(
+            "No card needed to book. No-shows cost you the slot.",
+        );
+        expect(depositNote("NONE", "1200", "INR", 1, "DESK")).toBe(
+            "No card needed to book. No-shows cost you the slot.",
+        );
+    });
+
     it("refuses a deposit on a free service, as the API does", () => {
         expect(
             serviceProblems(

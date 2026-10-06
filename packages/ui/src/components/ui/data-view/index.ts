@@ -3,4 +3,9 @@
 // (admin console plan, D6).
 export * from "./data-view";
 export * from "./types";
-export { useViewMode } from "./use-view-mode";
+export {
+    TABLE_MIN_WIDTH,
+    phoneModeFor,
+    resolveViewMode,
+    useViewMode,
+} from "./use-view-mode";

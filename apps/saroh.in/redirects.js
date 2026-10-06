@@ -8,15 +8,22 @@
  *
  * - V1 (the "Saroh Marketing Site" pages, removed in U26): the five job pages,
  *   How it works and Coming soon. There is no V2 Website page, so `/website`
- *   goes Home; Coming soon's "what's planned" is closest to Pricing's
- *   "Coming soon" rows.
+ *   goes Home; Coming soon's "what's planned" is the waitlist's ask.
  * - Before V1: `/modules`, `/modules/<slug>`, `/about` and
  *   `/what-it-will-not-do`, repointed straight to where their V1 page now
  *   goes. Payments and messages had no page of their own: they lived on Sell
- *   and Contacts, so they follow those. Automations went to Coming soon.
+ *   and Contacts, so they follow those. Automations went to Coming soon, so
+ *   it follows it to the waitlist; What it will not do goes Home.
+ *
+ * `/pricing` is not published until the site's launch switch opens
+ * (`NEXT_PUBLIC_LAUNCH_MODE=open`, plan KTD-16; Gate W kept it unpublished),
+ * so until then it is a temporary (302) redirect to the waitlist, from
+ * `temporary()`: a browser or search engine must not remember it, because
+ * Pricing comes back at its own address. `next.config.js` passes the switch
+ * in at build, as it reads it.
  */
 
-/** @typedef {{ source: string; destination: string; statusCode: 301 }} Redirect */
+/** @typedef {{ source: string; destination: string; statusCode: 301 | 302 }} Redirect */
 
 /** V1 job slug → its V2 page. */
 const V1_JOBS = {
@@ -49,7 +56,7 @@ const moved = (source, destination) => ({
 const REDIRECTS = [
     ...Object.entries(V1_JOBS).map(([job, to]) => moved(`/${job}`, to)),
     moved("/how-it-works", "/"),
-    moved("/coming-soon", "/pricing"),
+    moved("/coming-soon", "/waitlist"),
     moved("/modules", "/"),
     ...Object.entries(MODULE_JOB).map(([slug, job]) =>
         moved(
@@ -57,10 +64,24 @@ const REDIRECTS = [
             V1_JOBS[/** @type {keyof typeof V1_JOBS} */ (job)],
         ),
     ),
-    moved("/modules/automations", "/pricing"),
+    moved("/modules/automations", "/waitlist"),
     moved("/modules/:slug", "/"),
     moved("/about", "/"),
-    moved("/what-it-will-not-do", "/pricing"),
+    moved("/what-it-will-not-do", "/"),
 ];
 
-module.exports = { REDIRECTS };
+/** Pages not published yet: temporary, so nothing caches them. */
+/** @type {Redirect[]} */
+/**
+ * The temporary redirects for the site's launch mode: Pricing to the
+ * waitlist until the switch is "open".
+ *
+ * @param {string | undefined} launchMode `NEXT_PUBLIC_LAUNCH_MODE`
+ * @returns {Redirect[]}
+ */
+const temporary = (launchMode) =>
+    launchMode === "open"
+        ? []
+        : [{ source: "/pricing", destination: "/waitlist", statusCode: 302 }];
+
+module.exports = { REDIRECTS, temporary };

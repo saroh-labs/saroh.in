@@ -41,6 +41,8 @@ jest.mock("@saroh/database", () => {
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
         businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
+        // No walk-in storefront: opening hours cut nothing (DEC-087).
+        store: { findMany: jest.fn().mockResolvedValue([]) },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
@@ -428,9 +430,17 @@ describe("a deposit at booking (E8)", () => {
         expect(db.booking.create).not.toHaveBeenCalled();
     });
 
-    it("books it at the desk, with no deposit, when no provider is connected", async () => {
+    it("says the deposit can't be taken when no provider is connected and the business takes payment online only (DEC-089)", async () => {
         db.service.findUnique.mockResolvedValue(half());
         db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        // Online only: no desk to fall back to, so "get in touch". With the
+        // desk allowed it books there instead (the blocks at the end).
+        db.bookingRules.findUnique.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: null,
+            bookingPayment: "ONLINE",
+        });
         await expect(
             new PublicBookingsService().bookOnline(
                 "svc_1",
@@ -441,18 +451,8 @@ describe("a deposit at booking (E8)", () => {
         ).rejects.toMatchObject({
             response: {
                 message:
-                    "This takes no deposit. Pay now or pay at the desk instead.",
+                    "This business can't take the deposit online right now. Get in touch with them to book.",
             },
-        });
-        await new PublicBookingsService().bookOnline(
-            "svc_1",
-            input({ pay: "DESK" }),
-            "iphash",
-            NOW,
-        );
-        expect(db.booking.create.mock.calls[0][0].data).toMatchObject({
-            status: "CONFIRMED",
-            paidWith: "DESK",
         });
     });
 
@@ -553,215 +553,140 @@ describe("a deposit at booking (E8)", () => {
     });
 });
 
-describe("a stored deposit when the business can't take money online for another reason", () => {
-    const half = () => service({ depositMode: "PERCENT_50" });
-    /** Payments switched off: its module row says so; every other row is on. */
-    const paymentsOff = () =>
-        db.organizationModule.findFirst.mockImplementation(
-            (args: { where?: { moduleKey?: string } }) =>
-                Promise.resolve(
-                    args.where?.moduleKey === "PAYMENTS"
-                        ? { id: "om_pay" }
-                        : null,
-                ),
-        );
-    const noProvider = () =>
-        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
-
-    it.each([
-        ["Payments is switched off", paymentsOff],
-        ["no provider is connected", noProvider],
-    ])(
-        "books it at the desk like a service with no deposit when %s",
-        async (_why, arrange) => {
-            arrange();
-            db.service.findUnique.mockResolvedValue(half());
-            const out = await new PublicBookingsService().bookOnline(
-                "svc_1",
-                input({ pay: "DESK" }),
-                "iphash",
-                NOW,
-            );
-            const data = db.booking.create.mock.calls[0][0].data;
-            expect(data).toMatchObject({
-                status: "CONFIRMED",
-                paidWith: "DESK",
-            });
-            expect(data.snapshot.service.depositMode).toBe("NONE");
-            expect(data.snapshot.deposit).toBeUndefined();
-            expect(db.invoice.create).not.toHaveBeenCalled();
-            expect(out.payToken).toBeNull();
-            // No deposit and no pay now are offered.
-            await expect(
-                new PublicBookingsService().bookOnline(
-                    "svc_1",
-                    input({ pay: "DEPOSIT", idempotencyKey: "key_2" }),
-                    "iphash",
-                    NOW,
-                ),
-            ).rejects.toBeInstanceOf(BadRequestException);
-            await expect(
-                new PublicBookingsService().bookOnline(
-                    "svc_1",
-                    input({ pay: "NOW", idempotencyKey: "key_3" }),
-                    "iphash",
-                    NOW,
-                ),
-            ).rejects.toBeInstanceOf(ConflictException);
-        },
-    );
-
-    it.each([
-        ["Payments is switched off", paymentsOff],
-        ["no provider is connected", noProvider],
-    ])(
-        "the page serves no deposit and no pay online when %s",
-        async (_why, arrange) => {
-            arrange();
-            db.site.findFirst.mockResolvedValue({
-                organizationId: "org_1",
-                organization: { name: "Kavi Dental" },
-            });
-            db.service.findMany.mockResolvedValue([
-                {
-                    id: "svc_1",
-                    name: "Root canal",
-                    description: null,
-                    durationMinutes: 60,
-                    capacity: 1,
-                    priceCents: 450_000,
-                    currency: "INR",
-                    locationType: "IN_PERSON",
-                    depositMode: "PERCENT_25",
-                    staffServices: [],
-                },
-            ]);
-            const page = await new PublicBookingsService().publicBookingPage(
-                "site_1",
-            );
-            expect(page.payOnline).toBe(false);
-            expect(page.services[0].depositCents).toBeNull();
-        },
-    );
-});
-
-describe("a stored deposit on a plan without online payments (6 Oct 2026)", () => {
-    const half = () => service({ depositMode: "PERCENT_50" });
-
-    function onPlan(plan: "free" | "grow") {
-        jest.spyOn(planMeter, "enforcedRow").mockImplementation(
-            (_org: string, moduleId: string) =>
-                // Only the Payments rows: every other row isn't enforced.
-                Promise.resolve(
-                    moduleId === "payments" || moduleId === "subscriptions"
-                        ? fakePaymentsRow(plan, moduleId)
-                        : null,
-                ),
-        );
-    }
-    afterEach(() => jest.restoreAllMocks());
-
-    it("books it to pay at the desk, like a service with no deposit, keeping the row", async () => {
-        onPlan("free");
-        db.service.findUnique.mockResolvedValue(half());
-        const out = await new PublicBookingsService().bookOnline(
+describe("how people pay when they book (DEC-088)", () => {
+    const rules = (bookingPayment: string) => ({
+        bookAheadDays: null,
+        latestBookingMinutes: null,
+        freeCancelHours: null,
+        refundInTimeCancels: true,
+        bookingPayment,
+    });
+    const book = (over: Partial<BookInput>) =>
+        new PublicBookingsService().bookOnline(
             "svc_1",
-            input({ pay: "DESK" }),
+            input(over),
             "iphash",
             NOW,
         );
-        const data = db.booking.create.mock.calls[0][0].data;
-        expect(data).toMatchObject({ status: "CONFIRMED", paidWith: "DESK" });
-        // Booked as it was offered: no deposit.
-        expect(data.snapshot.service.depositMode).toBe("NONE");
-        expect(data.snapshot.deposit).toBeUndefined();
-        expect(db.invoice.create).not.toHaveBeenCalled();
-        expect(out.payToken).toBeNull();
-        // The service itself is never written: its deposit returns on an upgrade.
-        expect(db.service.update).toBeUndefined();
+
+    it("Both, the default, takes pay now and the desk as before", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("BOTH"));
+        await book({ pay: "DESK" });
+        await book({ pay: "NOW", idempotencyKey: "key_2" });
+        expect(db.booking.create).toHaveBeenCalledTimes(2);
     });
 
-    it("offers no deposit, and no pay now", async () => {
-        onPlan("free");
-        db.service.findUnique.mockResolvedValue(half());
-        await expect(
-            new PublicBookingsService().bookOnline(
-                "svc_1",
-                input({ pay: "DEPOSIT" }),
-                "iphash",
-                NOW,
-            ),
-        ).rejects.toBeInstanceOf(BadRequestException);
-        await expect(
-            new PublicBookingsService().bookOnline(
-                "svc_1",
-                input({ pay: "NOW" }),
-                "iphash",
-                NOW,
-            ),
-        ).rejects.toMatchObject({
+    it("at the desk only: refuses pay now, holding nothing", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        await expect(book({ pay: "NOW" })).rejects.toMatchObject({
+            status: 409,
             response: {
                 message:
-                    "This business isn't taking payment online right now. Book it to pay at the desk.",
+                    "This business takes payment at the desk. Book it to pay at the desk.",
+                field: "pay",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+        expect(db.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it("at the desk only: a deposit can't be taken, so it says get in touch", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        db.service.findUnique.mockResolvedValue(
+            service({ depositMode: "PERCENT_50" }),
+        );
+        await expect(book({ pay: "DEPOSIT" })).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business can't take the deposit online right now. Get in touch with them to book.",
             },
         });
         expect(db.booking.create).not.toHaveBeenCalled();
     });
 
-    it("on a plan with online payments, the deposit is taken as before", async () => {
-        onPlan("grow");
-        db.service.findUnique.mockResolvedValue(half());
-        await expect(
-            new PublicBookingsService().bookOnline(
-                "svc_1",
-                input({ pay: "DESK" }),
-                "iphash",
-                NOW,
-            ),
-        ).rejects.toBeInstanceOf(BadRequestException);
-        await new PublicBookingsService().bookOnline(
-            "svc_1",
-            input({ pay: "DEPOSIT" }),
-            "iphash",
-            NOW,
-        );
-        expect(
-            db.booking.create.mock.calls[0][0].data.snapshot.deposit,
-        ).toEqual({ cents: 40_000 });
+    it("at the desk only: books it at the desk", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        await book({ pay: "DESK" });
+        expect(db.booking.create.mock.calls[0][0].data).toMatchObject({
+            status: "CONFIRMED",
+            paidWith: "DESK",
+        });
+    });
+
+    it("online only: refuses the desk, and no way given, for a priced service", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        for (const pay of ["DESK", undefined] as const) {
+            await expect(book({ pay })).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    message:
+                        "This business takes payment online when you book. Pay now to book it.",
+                    field: "pay",
+                },
+            });
+        }
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("online only: a service with no price books with nothing to pay", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.service.findUnique.mockResolvedValue(service({ priceCents: null }));
+        await book({ pay: "DESK" });
+        expect(db.booking.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("online only: pays now", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        const out = await book({ pay: "NOW" });
+        expect(out.payToken).toEqual(expect.any(String));
+    });
+
+    it("online only with no provider: says get in touch, not the desk", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        await expect(book({ pay: "NOW" })).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business can't take payment online right now. Get in touch with them to book.",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
     });
 
     it.each([
-        ["free", null, false],
-        ["grow", 112_500, true],
-    ] as const)(
-        "the page serves the deposit on %s as %p, paying online %p",
-        async (plan, deposit, payOnline) => {
-            onPlan(plan);
+        ["BOTH", true],
+        ["ONLINE", true],
+        ["DESK", false],
+    ])(
+        "the page offers pay now only when the business allows it: %s",
+        async (way, payOnline) => {
+            db.bookingRules.findUnique.mockResolvedValue(rules(way));
             db.site.findFirst.mockResolvedValue({
                 organizationId: "org_1",
                 organization: { name: "Kavi Dental" },
             });
-            db.service.findMany.mockResolvedValue([
-                {
-                    id: "svc_1",
-                    name: "Root canal",
-                    description: null,
-                    durationMinutes: 60,
-                    capacity: 1,
-                    priceCents: 450_000,
-                    currency: "INR",
-                    locationType: "IN_PERSON",
-                    depositMode: "PERCENT_25",
-                    staffServices: [],
-                },
-            ]);
+            db.service.findMany.mockResolvedValue([]);
             const page = await new PublicBookingsService().publicBookingPage(
                 "site_1",
             );
             expect(page.payOnline).toBe(payOnline);
-            expect(page.services[0].depositCents).toBe(deposit);
+            expect(page.rules.bookingPayment).toBe(way);
         },
     );
+
+    it("the page never offers pay now without a provider, whatever the rule", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        db.site.findFirst.mockResolvedValue({
+            organizationId: "org_1",
+            organization: { name: "Kavi Dental" },
+        });
+        db.service.findMany.mockResolvedValue([]);
+        const page = await new PublicBookingsService().publicBookingPage(
+            "site_1",
+        );
+        expect(page.payOnline).toBe(false);
+    });
 });
 
 describe("pay at the desk (U19)", () => {
@@ -930,6 +855,72 @@ describe("the next two weeks (U19)", () => {
             staffName: "Karan Mehta",
         });
         expect(JSON.stringify(out)).not.toMatch(/timeOff|reason|off/i);
+    });
+});
+
+describe("the next two weeks in opening hours (DEC-087)", () => {
+    const storeFindMany = prisma.store.findMany as jest.Mock;
+    // The shop opens 10:00–18:00 every day; the service's hours are 09:00–12:00.
+    beforeEach(() =>
+        storeFindMany.mockResolvedValue([
+            {
+                settings: {
+                    openingHours: [
+                        "MON",
+                        "TUE",
+                        "WED",
+                        "THU",
+                        "FRI",
+                        "SAT",
+                        "SUN",
+                    ].map((day) => ({
+                        day,
+                        open: "10:00",
+                        close: "18:00",
+                        closed: false,
+                    })),
+                },
+            },
+        ]),
+    );
+    afterEach(() => storeFindMany.mockResolvedValue([]));
+
+    const monday = (out: { days: { starts: unknown[] }[] }) =>
+        out.days[3]!.starts as { startAt: string; only?: string }[];
+
+    it("offers an in-person service only once the shop is open", async () => {
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(monday(out).map((s) => s.startAt.slice(11, 16))).toEqual([
+            "10:00",
+            "10:30",
+            "11:00",
+        ]);
+        expect(monday(out).every((s) => s.only === undefined)).toBe(true);
+    });
+
+    it("offers an online service its own hours, uncut", async () => {
+        db.service.findUnique.mockResolvedValue(
+            service({ locationType: "ONLINE" }),
+        );
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(monday(out)).toHaveLength(5);
+        expect(storeFindMany).not.toHaveBeenCalled();
+    });
+
+    it("lists either way's early starts as online only", async () => {
+        db.service.findUnique.mockResolvedValue(
+            service({ locationType: "EITHER" }),
+        );
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(
+            monday(out).map((s) => [s.startAt.slice(11, 16), s.only ?? null]),
+        ).toEqual([
+            ["09:00", "ONLINE"],
+            ["09:30", "ONLINE"],
+            ["10:00", null],
+            ["10:30", null],
+            ["11:00", null],
+        ]);
     });
 });
 
@@ -1168,4 +1159,215 @@ describe("the hold limits (#508)", () => {
             svc.publicHold("greedy", "office", at(61_000)),
         ).resolves.toMatchObject({ state: "HELD" });
     });
+});
+
+describe("a stored deposit when the business can't take money online for another reason", () => {
+    const half = () => service({ depositMode: "PERCENT_50" });
+    /** Payments switched off: its module row says so; every other row is on. */
+    const paymentsOff = () =>
+        db.organizationModule.findFirst.mockImplementation(
+            (args: { where?: { moduleKey?: string } }) =>
+                Promise.resolve(
+                    args.where?.moduleKey === "PAYMENTS"
+                        ? { id: "om_pay" }
+                        : null,
+                ),
+        );
+    const noProvider = () =>
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+
+    it.each([
+        ["Payments is switched off", paymentsOff],
+        ["no provider is connected", noProvider],
+    ])(
+        "books it at the desk like a service with no deposit when %s",
+        async (_why, arrange) => {
+            arrange();
+            db.service.findUnique.mockResolvedValue(half());
+            const out = await new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "DESK" }),
+                "iphash",
+                NOW,
+            );
+            const data = db.booking.create.mock.calls[0][0].data;
+            expect(data).toMatchObject({
+                status: "CONFIRMED",
+                paidWith: "DESK",
+            });
+            expect(data.snapshot.service.depositMode).toBe("NONE");
+            expect(data.snapshot.deposit).toBeUndefined();
+            expect(db.invoice.create).not.toHaveBeenCalled();
+            expect(out.payToken).toBeNull();
+            // No deposit and no pay now are offered.
+            await expect(
+                new PublicBookingsService().bookOnline(
+                    "svc_1",
+                    input({ pay: "DEPOSIT", idempotencyKey: "key_2" }),
+                    "iphash",
+                    NOW,
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                new PublicBookingsService().bookOnline(
+                    "svc_1",
+                    input({ pay: "NOW", idempotencyKey: "key_3" }),
+                    "iphash",
+                    NOW,
+                ),
+            ).rejects.toBeInstanceOf(ConflictException);
+        },
+    );
+
+    it.each([
+        ["Payments is switched off", paymentsOff],
+        ["no provider is connected", noProvider],
+    ])(
+        "the page serves no deposit and no pay online when %s",
+        async (_why, arrange) => {
+            arrange();
+            db.site.findFirst.mockResolvedValue({
+                organizationId: "org_1",
+                organization: { name: "Kavi Dental" },
+            });
+            db.service.findMany.mockResolvedValue([
+                {
+                    id: "svc_1",
+                    name: "Root canal",
+                    description: null,
+                    durationMinutes: 60,
+                    capacity: 1,
+                    priceCents: 450_000,
+                    currency: "INR",
+                    locationType: "IN_PERSON",
+                    depositMode: "PERCENT_25",
+                    staffServices: [],
+                },
+            ]);
+            const page = await new PublicBookingsService().publicBookingPage(
+                "site_1",
+            );
+            expect(page.payOnline).toBe(false);
+            expect(page.services[0].depositCents).toBeNull();
+        },
+    );
+});
+
+describe("a stored deposit on a plan without online payments (6 Oct 2026)", () => {
+    const half = () => service({ depositMode: "PERCENT_50" });
+
+    function onPlan(plan: "free" | "grow") {
+        jest.spyOn(planMeter, "enforcedRow").mockImplementation(
+            (_org: string, moduleId: string) =>
+                // Only the Payments rows: every other row isn't enforced.
+                Promise.resolve(
+                    moduleId === "payments" || moduleId === "subscriptions"
+                        ? fakePaymentsRow(plan, moduleId)
+                        : null,
+                ),
+        );
+    }
+    afterEach(() => jest.restoreAllMocks());
+
+    it("books it to pay at the desk, like a service with no deposit, keeping the row", async () => {
+        onPlan("free");
+        db.service.findUnique.mockResolvedValue(half());
+        const out = await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DESK" }),
+            "iphash",
+            NOW,
+        );
+        const data = db.booking.create.mock.calls[0][0].data;
+        expect(data).toMatchObject({ status: "CONFIRMED", paidWith: "DESK" });
+        // Booked as it was offered: no deposit.
+        expect(data.snapshot.service.depositMode).toBe("NONE");
+        expect(data.snapshot.deposit).toBeUndefined();
+        expect(db.invoice.create).not.toHaveBeenCalled();
+        expect(out.payToken).toBeNull();
+        // The service itself is never written: its deposit returns on an upgrade.
+        expect(db.service.update).toBeUndefined();
+    });
+
+    it("offers no deposit, and no pay now", async () => {
+        onPlan("free");
+        db.service.findUnique.mockResolvedValue(half());
+        await expect(
+            new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "DEPOSIT" }),
+                "iphash",
+                NOW,
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "NOW" }),
+                "iphash",
+                NOW,
+            ),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business isn't taking payment online right now. Book it to pay at the desk.",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("on a plan with online payments, the deposit is taken as before", async () => {
+        onPlan("grow");
+        db.service.findUnique.mockResolvedValue(half());
+        await expect(
+            new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "DESK" }),
+                "iphash",
+                NOW,
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DEPOSIT" }),
+            "iphash",
+            NOW,
+        );
+        expect(
+            db.booking.create.mock.calls[0][0].data.snapshot.deposit,
+        ).toEqual({ cents: 40_000 });
+    });
+
+    it.each([
+        ["free", null, false],
+        ["grow", 112_500, true],
+    ] as const)(
+        "the page serves the deposit on %s as %p, paying online %p",
+        async (plan, deposit, payOnline) => {
+            onPlan(plan);
+            db.site.findFirst.mockResolvedValue({
+                organizationId: "org_1",
+                organization: { name: "Kavi Dental" },
+            });
+            db.service.findMany.mockResolvedValue([
+                {
+                    id: "svc_1",
+                    name: "Root canal",
+                    description: null,
+                    durationMinutes: 60,
+                    capacity: 1,
+                    priceCents: 450_000,
+                    currency: "INR",
+                    locationType: "IN_PERSON",
+                    depositMode: "PERCENT_25",
+                    staffServices: [],
+                },
+            ]);
+            const page = await new PublicBookingsService().publicBookingPage(
+                "site_1",
+            );
+            expect(page.payOnline).toBe(payOnline);
+            expect(page.services[0].depositCents).toBe(deposit);
+        },
+    );
 });

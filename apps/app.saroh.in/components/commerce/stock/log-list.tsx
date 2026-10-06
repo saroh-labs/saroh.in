@@ -28,10 +28,24 @@ import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 import { chipClass, pillClass, TEXT_TONE } from "./tones";
 
 /**
+ * A log entry on a phone: a wrapping row whose `order`s put the time, the
+ * product and the change on line 1, then (after a full-width break) the
+ * storefront, the kind, "15 → 14" and who or the note on line 2.
+ */
+const PHONE_ENTRY =
+    "max-[759px]:flex max-[759px]:flex-wrap max-[759px]:items-baseline max-[759px]:gap-x-2 max-[759px]:gap-y-1";
+
+/**
  * The stock log (#521): every change to every shelf, newest first, grouped
  * by the business's day — by kind, storefront and product, a page at a
  * time. Names only for a role that reads the audit trail, order links only
  * for one that reads orders; the API leaves them out otherwise.
+ *
+ * On a phone (under 760px, T3) each entry is two wrapping lines, by CSS
+ * alone (no hydration flash, nothing rendered twice): the time, the product
+ * and its size, and the signed change; then the storefront, the kind, "15 →
+ * 14" and the note or who. Nothing scrolls sideways there. The two links
+ * reach 44px by an invisible hit area, so the lines stay close together.
  */
 export function LogList({
     log,
@@ -199,9 +213,10 @@ export function LogList({
         });
 
     // The design's columns; the two number columns grow for a business
-    // that counts in thousands, and every row of a day shares them.
+    // that counts in thousands, and every row of a day shares them. Desk
+    // only: a phone stacks each entry instead (`PHONE_*`).
     const grid =
-        "grid grid-cols-[42px_minmax(130px,1.4fr)_78px_minmax(34px,auto)_minmax(62px,auto)_minmax(120px,1fr)] gap-x-2";
+        "min-[760px]:grid min-[760px]:min-w-[540px] min-[760px]:grid-cols-[42px_minmax(130px,1.4fr)_78px_minmax(34px,auto)_minmax(62px,auto)_minmax(120px,1fr)] min-[760px]:gap-x-2";
 
     return (
         <div>
@@ -216,44 +231,50 @@ export function LogList({
                         <h3 className="pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                             {d.label}
                         </h3>
-                        <div className="overflow-x-auto rounded-xl border border-border bg-card">
-                            <div className={cn(grid, "min-w-[540px] px-4")}>
+                        <div className="rounded-xl border border-border bg-card min-[760px]:overflow-x-auto">
+                            <ul className={cn(grid, "px-4")}>
                                 {d.rows.map((e, i) => {
                                     const qty = entryQuantity(e.quantity);
                                     const who = entryWho(e);
+                                    const note = entryNote(e, pairOf(e));
                                     return (
-                                        <div
+                                        <li
                                             key={e.id}
                                             className={cn(
-                                                "col-span-full grid grid-cols-subgrid items-baseline py-2.5 text-[13px]",
+                                                "col-span-full py-2.5 text-[13px] min-[760px]:grid min-[760px]:grid-cols-subgrid min-[760px]:items-baseline",
+                                                PHONE_ENTRY,
                                                 i > 0 &&
                                                     "border-t border-border",
                                             )}
                                         >
-                                            <span className="text-[12px] tabular-nums text-muted-foreground">
+                                            <span className="text-[12px] tabular-nums text-muted-foreground max-[759px]:order-1 max-[759px]:shrink-0">
                                                 {entryTime(
                                                     e.createdAt,
                                                     timezone,
                                                 )}
                                             </span>
-                                            <span className="grid min-w-0 gap-px">
+                                            <span className="grid min-w-0 gap-px max-[759px]:contents">
                                                 <Link
                                                     href={productHref(
                                                         e.storeId,
                                                         e.productId,
                                                         "variants",
                                                     )}
-                                                    className="truncate font-semibold text-foreground hover:text-brand"
+                                                    className="font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
                                                 >
                                                     {e.variantTitle
                                                         ? `${e.productName} ${e.variantTitle}`
                                                         : e.productName}
                                                 </Link>
-                                                <span className="text-[11.5px] text-muted-foreground">
+                                                <span
+                                                    aria-hidden
+                                                    className="hidden max-[759px]:order-4 max-[759px]:block max-[759px]:basis-full"
+                                                />
+                                                <span className="text-[11.5px] text-muted-foreground max-[759px]:order-5">
                                                     {e.storeName}
                                                 </span>
                                             </span>
-                                            <span>
+                                            <span className="max-[759px]:order-6">
                                                 <span
                                                     className={pillClass(
                                                         entryTone(e),
@@ -266,20 +287,27 @@ export function LogList({
                                             </span>
                                             <span
                                                 className={cn(
-                                                    "text-right font-semibold tabular-nums",
+                                                    "text-right font-semibold tabular-nums max-[759px]:order-3 max-[759px]:shrink-0",
                                                     TEXT_TONE[qty.tone],
                                                 )}
                                             >
                                                 {qty.text}
                                             </span>
-                                            <span className="text-[12px] tabular-nums text-muted-foreground">
+                                            <span className="text-[12px] tabular-nums text-muted-foreground max-[759px]:order-7">
                                                 {`${e.before} → ${e.after}`}
                                             </span>
-                                            <span className="grid min-w-0 gap-px text-[12.5px]">
+                                            <span
+                                                className={cn(
+                                                    "grid min-w-0 gap-px text-[12.5px] max-[759px]:order-8 max-[759px]:flex max-[759px]:flex-wrap max-[759px]:items-baseline max-[759px]:gap-x-2",
+                                                    !who &&
+                                                        !note &&
+                                                        "max-[759px]:hidden",
+                                                )}
+                                            >
                                                 {e.order ? (
                                                     <Link
                                                         href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
-                                                        className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                                        className="text-brand transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
                                                     >
                                                         {who}
                                                     </Link>
@@ -288,14 +316,14 @@ export function LogList({
                                                         {who}
                                                     </span>
                                                 ) : null}
-                                                <span className="text-pretty text-[11.5px] text-muted-foreground">
-                                                    {entryNote(e, pairOf(e))}
+                                                <span className="text-pretty text-[11.5px] text-muted-foreground [overflow-wrap:anywhere]">
+                                                    {note}
                                                 </span>
                                             </span>
-                                        </div>
+                                        </li>
                                     );
                                 })}
-                            </div>
+                            </ul>
                         </div>
                     </section>
                 ))}

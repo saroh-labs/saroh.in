@@ -248,6 +248,10 @@ const NEVER: Record<string, string> = {
         "Saroh's own price list for saroh.in, not a tenant surface",
     "pricing/admin-pricing.controller.ts":
         "staff control plane (Plans & modules), not a tenant surface",
+    // Resources plan U2: saroh.in's free link preview tool, used before any
+    // account or business exists. Behind the signed visitor relay instead.
+    "link-preview/link-preview.controller.ts":
+        "saroh.in's public link preview tool, not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

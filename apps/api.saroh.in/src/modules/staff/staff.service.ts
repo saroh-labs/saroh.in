@@ -8,10 +8,14 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { AvailabilityRuleWindow } from "../bookings/availability";
 import { withinIntervals, workingIntervals } from "../bookings/availability";
 import { requireBookingPower } from "../bookings/booking-access";
+import type { BookingPaymentView } from "../bookings/booking-payment";
+import { bookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
-import { loadBookingRules } from "../bookings/booking-rules";
+import { bookingPaymentOf, loadBookingRules } from "../bookings/booking-rules";
+import { loadOpeningHours } from "../bookings/opening-hours";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
@@ -80,6 +84,12 @@ export interface StaffList {
     staff: StaffView[];
     /** Current and coming days the whole business is closed (E3). */
     closures: ClosureView[];
+    /**
+     * When the business is open, as weekly windows in `timezone`: every
+     * walk-in storefront's week together, or null with none set. In-person
+     * bookings keep to them (DEC-087).
+     */
+    openingHours: AvailabilityRuleWindow[] | null;
 }
 
 const staffInclude = (since: Date) =>
@@ -175,7 +185,7 @@ export class StaffService {
     async list(ctx: OrganizationContext, now = new Date()): Promise<StaffList> {
         requireBookingPower(ctx, "service:read");
         const since = new Date(now.getTime() - HISTORY_DAYS * DAY);
-        const [rows, timezone, closures] = await Promise.all([
+        const [rows, timezone, closures, opening] = await Promise.all([
             prisma.staffMember.findMany({
                 where: { organizationId: ctx.organizationId },
                 include: staffInclude(since),
@@ -183,8 +193,14 @@ export class StaffService {
             }),
             businessTimezone(prisma, ctx.organizationId),
             closureViews(ctx.organizationId, since),
+            loadOpeningHours(prisma, ctx.organizationId),
         ]);
-        return { timezone, staff: rows.map(toView), closures };
+        return {
+            timezone,
+            staff: rows.map(toView),
+            closures,
+            openingHours: opening?.windows ?? null,
+        };
     }
 
     async get(
@@ -551,6 +567,14 @@ export class StaffService {
         return loadBookingRules(prisma, ctx.organizationId);
     }
 
+    /** How people pay when they book, and whether online can be taken. */
+    async getBookingPayment(
+        ctx: OrganizationContext,
+    ): Promise<BookingPaymentView> {
+        requireBookingPower(ctx, "service:read");
+        return bookingPaymentView(ctx.organizationId);
+    }
+
     /** Set the business's rules; an absent field is left, `null` clears it. */
     async updateBookingRules(
         ctx: OrganizationContext,
@@ -570,6 +594,9 @@ export class StaffService {
             ...(dto.refundInTimeCancels !== undefined
                 ? { refundInTimeCancels: dto.refundInTimeCancels }
                 : {}),
+            ...(dto.bookingPayment !== undefined
+                ? { bookingPayment: dto.bookingPayment }
+                : {}),
         };
         const row = await prisma.bookingRules.upsert({
             where: { organizationId: ctx.organizationId },
@@ -580,9 +607,10 @@ export class StaffService {
                 latestBookingMinutes: true,
                 freeCancelHours: true,
                 refundInTimeCancels: true,
+                bookingPayment: true,
             },
         });
-        return row;
+        return { ...row, bookingPayment: bookingPaymentOf(row.bookingPayment) };
     }
 
     // ── Internals ──────────────────────────────────────────────────────────

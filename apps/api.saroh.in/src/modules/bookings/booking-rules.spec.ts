@@ -1,4 +1,7 @@
 import {
+    allowsDesk,
+    allowsOnline,
+    bookingPaymentOf,
     bookingWindowRefusal,
     freeCancelDeadline,
     isLateCancel,
@@ -106,5 +109,26 @@ describe("refundsAutomatically (E30, DEC-058)", () => {
         expect(
             refundsAutomatically(false, { refundInTimeCancels: false }),
         ).toBe(false);
+    });
+});
+
+describe("how people pay when they book (DEC-088)", () => {
+    it("is Both when never set, which allows online and the desk", () => {
+        expect(NO_BOOKING_RULES.bookingPayment).toBe("BOTH");
+        expect(allowsOnline(NO_BOOKING_RULES)).toBe(true);
+        expect(allowsDesk(NO_BOOKING_RULES)).toBe(true);
+    });
+
+    it("online only, or at the desk only", () => {
+        expect(allowsOnline({ bookingPayment: "ONLINE" })).toBe(true);
+        expect(allowsDesk({ bookingPayment: "ONLINE" })).toBe(false);
+        expect(allowsOnline({ bookingPayment: "DESK" })).toBe(false);
+        expect(allowsDesk({ bookingPayment: "DESK" })).toBe(true);
+    });
+
+    it("reads anything unknown as Both", () => {
+        expect(bookingPaymentOf("DESK")).toBe("DESK");
+        expect(bookingPaymentOf(undefined)).toBe("BOTH");
+        expect(bookingPaymentOf("desk")).toBe("BOTH");
     });
 });

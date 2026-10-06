@@ -15,6 +15,7 @@ import { cn } from "../../../lib/utils";
 import { Button } from "../button";
 import { Checkbox } from "../checkbox";
 import { Input } from "../input";
+import { ScrollX } from "../scroll-x";
 import { Skeleton } from "../skeleton";
 
 import type {
@@ -82,7 +83,11 @@ export function DataView<TRow>({
     bulkActions,
     emptyState,
 }: DataViewProps<TRow>) {
-    const { mode, choose } = useViewMode(viewId, modes, defaultMode);
+    const { mode, wide, deskMode, phoneMode, choose } = useViewMode(
+        viewId,
+        modes,
+        defaultMode,
+    );
     const showModes = modes.length > 1 && !hideModeToggle;
     /*
      * The parent holds only the SETTLED term.
@@ -229,6 +234,392 @@ export function DataView<TRow>({
     const listColumns = columns.filter((c) => c.priority !== "detail");
     const tableColumns = columns.filter((c) => !c.tableHidden);
 
+    /*
+     * One rendering of the rows in one density. DataView may draw two of
+     * these at once before hydration (see below), so nothing in here may
+     * own state.
+     */
+    const renderMode = (m: DataViewMode) =>
+        m === "table" ? (
+            // Horizontal scroll is on the wrapper, never the page: a table
+            // that widens the document breaks every other element on it.
+            <ScrollX
+                label={regionLabel}
+                className="rounded-[11px] border border-border bg-card"
+            >
+                <table className="w-full border-collapse text-[13.5px]">
+                    <thead>
+                        {/* A faint head fill and a stronger rule, as the
+                                applied Products screen draws it. */}
+                        <tr className="h-10 border-b border-border bg-foreground/[0.03]">
+                            {selectable ? (
+                                <th
+                                    scope="col"
+                                    /*
+                                     * `text-left` is load-bearing: a <th>
+                                     * centres its content by default and a
+                                     * <td> does not, so these two cells
+                                     * carried the same classes and put
+                                     * their checkboxes in different
+                                     * places — the header's sat ~4px right
+                                     * of every row's, and the column read
+                                     * as crooked.
+                                     */
+                                    className="w-[38px] pl-[14px] text-left"
+                                >
+                                    <Checkbox
+                                        checked={
+                                            allInView
+                                                ? true
+                                                : selectedInView > 0
+                                                  ? "indeterminate"
+                                                  : false
+                                        }
+                                        onCheckedChange={toggleAll}
+                                        aria-label={`Select every ${noun.one} in this view`}
+                                    />
+                                </th>
+                            ) : null}
+                            {tableColumns.map((col) => {
+                                const active = sort?.id === col.id;
+                                return (
+                                    <th
+                                        key={col.id}
+                                        scope="col"
+                                        aria-sort={
+                                            active
+                                                ? sort.desc
+                                                    ? "descending"
+                                                    : "ascending"
+                                                : undefined
+                                        }
+                                        style={
+                                            col.width
+                                                ? { width: col.width }
+                                                : undefined
+                                        }
+                                        className={cn(
+                                            "whitespace-nowrap px-[14px] text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
+                                            col.numeric && "text-right",
+                                        )}
+                                    >
+                                        {col.sortValue ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleSort(col)}
+                                                className={cn(
+                                                    // Sorting a column is a
+                                                    // real action, and on a
+                                                    // touch pointer a 20px
+                                                    // header is not a target
+                                                    // (#178). The browser
+                                                    // harness found these;
+                                                    // reading the filter row
+                                                    // by hand did not.
+                                                    "inline-flex items-center gap-1 rounded-sm uppercase hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
+                                                    active && "text-foreground",
+                                                )}
+                                            >
+                                                {col.header}
+                                                {active ? (
+                                                    sort.desc ? (
+                                                        <ArrowDown className="size-3" />
+                                                    ) : (
+                                                        <ArrowUp className="size-3" />
+                                                    )
+                                                ) : null}
+                                            </button>
+                                        ) : (
+                                            col.header
+                                        )}
+                                    </th>
+                                );
+                            })}
+                            {rowActions ? (
+                                <th scope="col" className="w-[44px] px-[14px]">
+                                    <span className="sr-only">Actions</span>
+                                </th>
+                            ) : null}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {/* `wk-item` staggers rows in (workspace.css caps
+                                it at six items, so no row waits). Hover is
+                                the translucent Ink wash (brand file §22), and
+                                transitions stay on colour only — a table that
+                                moves on hover is unreadable while scanning. */}
+                        {visible.map((row, rowIndex) => {
+                            const key = rowKey(row);
+                            const isSelected = selected.has(key);
+                            return (
+                                <tr
+                                    key={key}
+                                    style={
+                                        {
+                                            "--wk-i": rowIndex,
+                                        } as React.CSSProperties
+                                    }
+                                    data-state={
+                                        isSelected ? "selected" : undefined
+                                    }
+                                    // The row is the action (brand file §10):
+                                    // anywhere on it opens the item. Controls
+                                    // inside stop the click.
+                                    onClick={
+                                        onRowClick
+                                            ? () => onRowClick(row)
+                                            : undefined
+                                    }
+                                    className={cn(
+                                        "wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035] data-[state=selected]:bg-brand-subtle",
+                                        onRowClick &&
+                                            "cursor-pointer active:bg-foreground/[0.07]",
+                                    )}
+                                >
+                                    {selectable ? (
+                                        <td
+                                            className="w-[38px] pl-[14px] align-middle"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Checkbox
+                                                checked={isSelected}
+                                                onCheckedChange={() =>
+                                                    toggleRow(key)
+                                                }
+                                                aria-label={`Select ${noun.one}`}
+                                            />
+                                        </td>
+                                    ) : null}
+                                    {tableColumns.map((col, colIndex) => {
+                                        const href = rowHref?.(row);
+                                        return (
+                                            <td
+                                                key={col.id}
+                                                className={cn(
+                                                    "px-[14px] py-[11px] align-middle",
+                                                    col.numeric &&
+                                                        "text-right tabular-nums",
+                                                    // Money is the figure people
+                                                    // scan for: Space Grotesk.
+                                                    col.money &&
+                                                        "font-display font-semibold",
+                                                )}
+                                            >
+                                                {/*
+                                                 * The FIRST cell carries the
+                                                 * row link, not the row.
+                                                 *
+                                                 * List mode stretches an
+                                                 * overlay anchor across the
+                                                 * row, which a `tr` cannot
+                                                 * hold: `position: relative`
+                                                 * on a table row is not
+                                                 * reliable across browsers, so
+                                                 * the overlay would escape to
+                                                 * the table. Anchoring the
+                                                 * link to one cell keeps a
+                                                 * real, focusable target with
+                                                 * real text, and keeps it out
+                                                 * of the cells where callers
+                                                 * put their own links — a
+                                                 * booking's contact link would
+                                                 * otherwise nest inside it.
+                                                 */}
+                                                {href && colIndex === 0 ? (
+                                                    <Link
+                                                        href={href}
+                                                        className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                    >
+                                                        {col.cell(row)}
+                                                    </Link>
+                                                ) : onRowClick &&
+                                                  colIndex === 0 ? (
+                                                    // A real button, so the row
+                                                    // that opens on click also
+                                                    // opens from the keyboard.
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onRowClick(row);
+                                                        }}
+                                                        className="block w-full min-w-0 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                    >
+                                                        {col.cell(row)}
+                                                    </button>
+                                                ) : (
+                                                    col.cell(row)
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+                                    {rowActions ? (
+                                        <td
+                                            className="w-[44px] whitespace-nowrap px-[14px] text-right align-middle"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            {rowActions(row)}
+                                        </td>
+                                    ) : null}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </ScrollX>
+        ) : m === "grid" && renderCard ? (
+            // `[&>*]:h-full` reaches through whatever the caller returns —
+            // usually a Link wrapping a Card. Without it the card's own
+            // `h-full` resolves against a link that is only as tall as its
+            // text, so a row of cards with different amounts of content
+            // ends up ragged. Enforced here rather than asked of every
+            // caller, because it is a property of the grid, not the card.
+            <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {visible.map((row) => (
+                    <div key={rowKey(row)} className="[&>*]:h-full">
+                        {renderCard(row)}
+                    </div>
+                ))}
+            </div>
+        ) : (
+            // List: the whole row is the target, which is what one-handed
+            // and gloved use needs. Detail columns are dropped, not hidden
+            // behind a disclosure nobody taps.
+            <ul className="divide-y rounded-xl border border-border bg-card">
+                {visible.map((row, rowIndex) => {
+                    // `.at()` rather than a destructure: a caller could
+                    // declare only `detail` columns, leaving this empty,
+                    // and index access would type as always-present.
+                    const primary = listColumns.at(0);
+                    const rest = listColumns.slice(1);
+                    const href = rowHref?.(row);
+                    const body = (
+                        <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 px-4 py-3">
+                            <div className="min-w-0 space-y-1">
+                                <div className="truncate font-medium">
+                                    {!href && onRowClick ? (
+                                        // A real button, as in the table:
+                                        // the row's name and its one
+                                        // keyboard stop.
+                                        <button
+                                            type="button"
+                                            onClick={() => onRowClick(row)}
+                                            className="block w-full min-w-0 truncate rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            {primary?.cell(row)}
+                                        </button>
+                                    ) : (
+                                        primary?.cell(row)
+                                    )}
+                                </div>
+                                {rest.length ? (
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                        {rest.map((col) => (
+                                            <span
+                                                key={col.id}
+                                                className={cn(
+                                                    "inline-flex items-center gap-1",
+                                                    col.numeric &&
+                                                        "tabular-nums",
+                                                    col.money &&
+                                                        "font-display font-semibold text-foreground",
+                                                )}
+                                            >
+                                                {col.cell(row)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
+                    );
+                    return (
+                        <li
+                            key={rowKey(row)}
+                            style={
+                                {
+                                    "--wk-i": rowIndex,
+                                } as React.CSSProperties
+                            }
+                            className="wk-item relative flex items-center gap-2 pr-3 transition-colors hover:bg-accent/50 active:bg-accent"
+                        >
+                            {/*
+                             * An OVERLAY link, not a wrapper.
+                             *
+                             * Wrapping the row nested the caller's own cell
+                             * anchor inside it — invalid HTML, and React
+                             * reported it as a hydration error on every list
+                             * render. Callers put a link in the primary cell
+                             * because the TABLE needs one there, and a
+                             * primitive that silently forbids that would be
+                             * a trap.
+                             *
+                             * So the row's tap target is a sibling stretched
+                             * over the row, `aria-hidden` and out of the tab
+                             * order: the cell's real link stays the single
+                             * accessible name and the single focus stop,
+                             * while the whole row remains tappable, which is
+                             * what one-handed and gloved use needs.
+                             */}
+                            {href ? (
+                                <Link
+                                    href={href}
+                                    aria-hidden
+                                    tabIndex={-1}
+                                    className="absolute inset-0"
+                                />
+                            ) : onRowClick ? (
+                                // The same overlay for a row that opens
+                                // in place (a quick look) rather than at
+                                // an address. Without it a list row did
+                                // nothing when tapped, so a phone could
+                                // never open one.
+                                <button
+                                    type="button"
+                                    aria-hidden
+                                    tabIndex={-1}
+                                    onClick={() => onRowClick(row)}
+                                    className="absolute inset-0 cursor-pointer"
+                                />
+                            ) : null}
+                            {/* Clicks fall through to the overlay EXCEPT on
+                                    the caller's own interactive elements, which
+                                    keep theirs. */}
+                            <div className="pointer-events-none relative min-w-0 flex-1 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                                {body}
+                            </div>
+                            {rowActions ? (
+                                // Actions sit outside the overlay's reach: a
+                                // cancel tap must not also navigate.
+                                <div className="relative shrink-0">
+                                    {rowActions(row)}
+                                </div>
+                            ) : null}
+                        </li>
+                    );
+                })}
+            </ul>
+        );
+
+    /*
+     * Which rendering goes where (Phone Tables audit T8).
+     *
+     * Before hydration the mode is unknown (`mode` is null): the desk slot
+     * holds the view's default and the phone slot the list, and a CSS rule at
+     * the table boundary shows one. A phone paints the list first, with no
+     * table flashed before it. Once hydrated, the resolved mode stays in the
+     * slot that was already showing it, so the rows on screen are kept, not
+     * re-mounted, and the other slot empties.
+     */
+    const unsplit = deskMode === phoneMode;
+    const split = mode === null && !unsplit;
+    const inDesk = mode === null || unsplit || wide === true;
+    const deskSlot = mode === null ? deskMode : inDesk ? mode : null;
+    const phoneSlot =
+        mode === null ? (unsplit ? null : phoneMode) : inDesk ? null : mode;
+    const regionLabel =
+        noun.other.charAt(0).toUpperCase() + noun.other.slice(1);
+
     return (
         // 14px between tabs, toolbar and table, as the applied screens space them.
         <div className="space-y-[14px]">
@@ -350,11 +741,14 @@ export function DataView<TRow>({
                         <div
                             role="group"
                             aria-label="View density"
-                            className="flex items-center rounded-md border border-border p-0.5"
+                            // A desk's choice only (T8): below the table
+                            // boundary the phone always draws the list, so
+                            // a toggle there would change nothing.
+                            className="hidden items-center rounded-md border border-border p-0.5 min-[760px]:flex"
                         >
                             {modes.map((m) => {
                                 const Icon = MODE_META[m].icon;
-                                const on = m === mode;
+                                const on = m === (mode ?? deskMode);
                                 return (
                                     <Button
                                         key={m}
@@ -463,372 +857,23 @@ export function DataView<TRow>({
                         {typeof empty === "string" ? null : empty}
                     </EmptyPanel>
                 )
-            ) : mode === "table" ? (
-                // Horizontal scroll is on the wrapper, never the page: a table
-                // that widens the document breaks every other element on it.
-                <div className="overflow-x-auto rounded-[11px] border border-border bg-card">
-                    <table className="w-full border-collapse text-[13.5px]">
-                        <thead>
-                            {/* A faint head fill and a stronger rule, as the
-                                applied Products screen draws it. */}
-                            <tr className="h-10 border-b border-border bg-foreground/[0.03]">
-                                {selectable ? (
-                                    <th
-                                        scope="col"
-                                        /*
-                                         * `text-left` is load-bearing: a <th>
-                                         * centres its content by default and a
-                                         * <td> does not, so these two cells
-                                         * carried the same classes and put
-                                         * their checkboxes in different
-                                         * places — the header's sat ~4px right
-                                         * of every row's, and the column read
-                                         * as crooked.
-                                         */
-                                        className="w-[38px] pl-[14px] text-left"
-                                    >
-                                        <Checkbox
-                                            checked={
-                                                allInView
-                                                    ? true
-                                                    : selectedInView > 0
-                                                      ? "indeterminate"
-                                                      : false
-                                            }
-                                            onCheckedChange={toggleAll}
-                                            aria-label={`Select every ${noun.one} in this view`}
-                                        />
-                                    </th>
-                                ) : null}
-                                {tableColumns.map((col) => {
-                                    const active = sort?.id === col.id;
-                                    return (
-                                        <th
-                                            key={col.id}
-                                            scope="col"
-                                            aria-sort={
-                                                active
-                                                    ? sort.desc
-                                                        ? "descending"
-                                                        : "ascending"
-                                                    : undefined
-                                            }
-                                            style={
-                                                col.width
-                                                    ? { width: col.width }
-                                                    : undefined
-                                            }
-                                            className={cn(
-                                                "whitespace-nowrap px-[14px] text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
-                                                col.numeric && "text-right",
-                                            )}
-                                        >
-                                            {col.sortValue ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        toggleSort(col)
-                                                    }
-                                                    className={cn(
-                                                        // Sorting a column is a
-                                                        // real action, and on a
-                                                        // touch pointer a 20px
-                                                        // header is not a target
-                                                        // (#178). The browser
-                                                        // harness found these;
-                                                        // reading the filter row
-                                                        // by hand did not.
-                                                        "inline-flex items-center gap-1 rounded-sm uppercase hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
-                                                        active &&
-                                                            "text-foreground",
-                                                    )}
-                                                >
-                                                    {col.header}
-                                                    {active ? (
-                                                        sort.desc ? (
-                                                            <ArrowDown className="size-3" />
-                                                        ) : (
-                                                            <ArrowUp className="size-3" />
-                                                        )
-                                                    ) : null}
-                                                </button>
-                                            ) : (
-                                                col.header
-                                            )}
-                                        </th>
-                                    );
-                                })}
-                                {rowActions ? (
-                                    <th
-                                        scope="col"
-                                        className="w-[44px] px-[14px]"
-                                    >
-                                        <span className="sr-only">Actions</span>
-                                    </th>
-                                ) : null}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {/* `wk-item` staggers rows in (workspace.css caps
-                                it at six items, so no row waits). Hover is
-                                the translucent Ink wash (brand file §22), and
-                                transitions stay on colour only — a table that
-                                moves on hover is unreadable while scanning. */}
-                            {visible.map((row, rowIndex) => {
-                                const key = rowKey(row);
-                                const isSelected = selected.has(key);
-                                return (
-                                    <tr
-                                        key={key}
-                                        style={
-                                            {
-                                                "--wk-i": rowIndex,
-                                            } as React.CSSProperties
-                                        }
-                                        data-state={
-                                            isSelected ? "selected" : undefined
-                                        }
-                                        // The row is the action (brand file §10):
-                                        // anywhere on it opens the item. Controls
-                                        // inside stop the click.
-                                        onClick={
-                                            onRowClick
-                                                ? () => onRowClick(row)
-                                                : undefined
-                                        }
-                                        className={cn(
-                                            "wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035] data-[state=selected]:bg-brand-subtle",
-                                            onRowClick &&
-                                                "cursor-pointer active:bg-foreground/[0.07]",
-                                        )}
-                                    >
-                                        {selectable ? (
-                                            <td
-                                                className="w-[38px] pl-[14px] align-middle"
-                                                onClick={(e) =>
-                                                    e.stopPropagation()
-                                                }
-                                            >
-                                                <Checkbox
-                                                    checked={isSelected}
-                                                    onCheckedChange={() =>
-                                                        toggleRow(key)
-                                                    }
-                                                    aria-label={`Select ${noun.one}`}
-                                                />
-                                            </td>
-                                        ) : null}
-                                        {tableColumns.map((col, colIndex) => {
-                                            const href = rowHref?.(row);
-                                            return (
-                                                <td
-                                                    key={col.id}
-                                                    className={cn(
-                                                        "px-[14px] py-[11px] align-middle",
-                                                        col.numeric &&
-                                                            "text-right tabular-nums",
-                                                        // Money is the figure people
-                                                        // scan for: Space Grotesk.
-                                                        col.money &&
-                                                            "font-display font-semibold",
-                                                    )}
-                                                >
-                                                    {/*
-                                                     * The FIRST cell carries the
-                                                     * row link, not the row.
-                                                     *
-                                                     * List mode stretches an
-                                                     * overlay anchor across the
-                                                     * row, which a `tr` cannot
-                                                     * hold: `position: relative`
-                                                     * on a table row is not
-                                                     * reliable across browsers, so
-                                                     * the overlay would escape to
-                                                     * the table. Anchoring the
-                                                     * link to one cell keeps a
-                                                     * real, focusable target with
-                                                     * real text, and keeps it out
-                                                     * of the cells where callers
-                                                     * put their own links — a
-                                                     * booking's contact link would
-                                                     * otherwise nest inside it.
-                                                     */}
-                                                    {href && colIndex === 0 ? (
-                                                        <Link
-                                                            href={href}
-                                                            className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                                                        >
-                                                            {col.cell(row)}
-                                                        </Link>
-                                                    ) : onRowClick &&
-                                                      colIndex === 0 ? (
-                                                        // A real button, so the row
-                                                        // that opens on click also
-                                                        // opens from the keyboard.
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onRowClick(row);
-                                                            }}
-                                                            className="block w-full min-w-0 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                        >
-                                                            {col.cell(row)}
-                                                        </button>
-                                                    ) : (
-                                                        col.cell(row)
-                                                    )}
-                                                </td>
-                                            );
-                                        })}
-                                        {rowActions ? (
-                                            <td
-                                                className="w-[44px] whitespace-nowrap px-[14px] text-right align-middle"
-                                                onClick={(e) =>
-                                                    e.stopPropagation()
-                                                }
-                                            >
-                                                {rowActions(row)}
-                                            </td>
-                                        ) : null}
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            ) : mode === "grid" && renderCard ? (
-                // `[&>*]:h-full` reaches through whatever the caller returns —
-                // usually a Link wrapping a Card. Without it the card's own
-                // `h-full` resolves against a link that is only as tall as its
-                // text, so a row of cards with different amounts of content
-                // ends up ragged. Enforced here rather than asked of every
-                // caller, because it is a property of the grid, not the card.
-                <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {visible.map((row) => (
-                        <div key={rowKey(row)} className="[&>*]:h-full">
-                            {renderCard(row)}
-                        </div>
-                    ))}
-                </div>
             ) : (
-                // List: the whole row is the target, which is what one-handed
-                // and gloved use needs. Detail columns are dropped, not hidden
-                // behind a disclosure nobody taps.
-                <ul className="divide-y rounded-xl border border-border bg-card">
-                    {visible.map((row, rowIndex) => {
-                        // `.at()` rather than a destructure: a caller could
-                        // declare only `detail` columns, leaving this empty,
-                        // and index access would type as always-present.
-                        const primary = listColumns.at(0);
-                        const rest = listColumns.slice(1);
-                        const href = rowHref?.(row);
-                        const body = (
-                            <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 px-4 py-3">
-                                <div className="min-w-0 space-y-1">
-                                    <div className="truncate font-medium">
-                                        {!href && onRowClick ? (
-                                            // A real button, as in the table:
-                                            // the row's name and its one
-                                            // keyboard stop.
-                                            <button
-                                                type="button"
-                                                onClick={() => onRowClick(row)}
-                                                className="block w-full min-w-0 truncate rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                            >
-                                                {primary?.cell(row)}
-                                            </button>
-                                        ) : (
-                                            primary?.cell(row)
-                                        )}
-                                    </div>
-                                    {rest.length ? (
-                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                            {rest.map((col) => (
-                                                <span
-                                                    key={col.id}
-                                                    className={cn(
-                                                        "inline-flex items-center gap-1",
-                                                        col.numeric &&
-                                                            "tabular-nums",
-                                                        col.money &&
-                                                            "font-display font-semibold text-foreground",
-                                                    )}
-                                                >
-                                                    {col.cell(row)}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    ) : null}
-                                </div>
-                            </div>
-                        );
-                        return (
-                            <li
-                                key={rowKey(row)}
-                                style={
-                                    {
-                                        "--wk-i": rowIndex,
-                                    } as React.CSSProperties
-                                }
-                                className="wk-item relative flex items-center gap-2 pr-3 transition-colors hover:bg-accent/50 active:bg-accent"
-                            >
-                                {/*
-                                 * An OVERLAY link, not a wrapper.
-                                 *
-                                 * Wrapping the row nested the caller's own cell
-                                 * anchor inside it — invalid HTML, and React
-                                 * reported it as a hydration error on every list
-                                 * render. Callers put a link in the primary cell
-                                 * because the TABLE needs one there, and a
-                                 * primitive that silently forbids that would be
-                                 * a trap.
-                                 *
-                                 * So the row's tap target is a sibling stretched
-                                 * over the row, `aria-hidden` and out of the tab
-                                 * order: the cell's real link stays the single
-                                 * accessible name and the single focus stop,
-                                 * while the whole row remains tappable, which is
-                                 * what one-handed and gloved use needs.
-                                 */}
-                                {href ? (
-                                    <Link
-                                        href={href}
-                                        aria-hidden
-                                        tabIndex={-1}
-                                        className="absolute inset-0"
-                                    />
-                                ) : onRowClick ? (
-                                    // The same overlay for a row that opens
-                                    // in place (a quick look) rather than at
-                                    // an address. Without it a list row did
-                                    // nothing when tapped, so a phone could
-                                    // never open one.
-                                    <button
-                                        type="button"
-                                        aria-hidden
-                                        tabIndex={-1}
-                                        onClick={() => onRowClick(row)}
-                                        className="absolute inset-0 cursor-pointer"
-                                    />
-                                ) : null}
-                                {/* Clicks fall through to the overlay EXCEPT on
-                                    the caller's own interactive elements, which
-                                    keep theirs. */}
-                                <div className="pointer-events-none relative min-w-0 flex-1 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-                                    {body}
-                                </div>
-                                {rowActions ? (
-                                    // Actions sit outside the overlay's reach: a
-                                    // cancel tap must not also navigate.
-                                    <div className="relative shrink-0">
-                                        {rowActions(row)}
-                                    </div>
-                                ) : null}
-                            </li>
-                        );
-                    })}
-                </ul>
+                <div>
+                    <div
+                        data-view-slot="desk"
+                        className={
+                            split ? "hidden min-[760px]:block" : undefined
+                        }
+                    >
+                        {deskSlot ? renderMode(deskSlot) : null}
+                    </div>
+                    <div
+                        data-view-slot="phone"
+                        className={split ? "min-[760px]:hidden" : undefined}
+                    >
+                        {phoneSlot ? renderMode(phoneSlot) : null}
+                    </div>
+                </div>
             )}
 
             {/*

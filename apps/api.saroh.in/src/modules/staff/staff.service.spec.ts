@@ -28,10 +28,14 @@ jest.mock("@saroh/database", () => {
             deleteMany: jest.fn(),
         },
         bookingRules: { findUnique: jest.fn(), upsert: jest.fn() },
+        // Whether online payment can be taken (DEC-088).
+        organizationModule: { findFirst: jest.fn() },
+        merchantPaymentProvider: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         service: { findFirst: jest.fn(), count: jest.fn() },
         membership: { findFirst: jest.fn() },
         booking: { findMany: jest.fn() },
+        store: { findMany: jest.fn().mockResolvedValue([]) },
     };
     return {
         ...actual,
@@ -416,8 +420,90 @@ describe("StaffService — booking rules", () => {
             latestBookingMinutes: null,
             freeCancelHours: null,
             refundInTimeCancels: true,
+            bookingPayment: "BOTH",
         });
     });
+
+    it("reads how people pay as Both when it was never set (DEC-088)", async () => {
+        db.bookingRules!.findUnique!.mockResolvedValue({
+            bookAheadDays: 7,
+            latestBookingMinutes: null,
+            freeCancelHours: null,
+            refundInTimeCancels: true,
+        });
+        await expect(service.getBookingRules(member)).resolves.toMatchObject({
+            bookingPayment: "BOTH",
+        });
+        db.bookingRules!.findUnique!.mockResolvedValue({
+            bookAheadDays: 7,
+            latestBookingMinutes: null,
+            freeCancelHours: null,
+            refundInTimeCancels: true,
+            bookingPayment: "DESK",
+        });
+        await expect(service.getBookingRules(member)).resolves.toMatchObject({
+            bookingPayment: "DESK",
+        });
+    });
+
+    it("writes how people pay when sent, and leaves it when not (DEC-088)", async () => {
+        db.bookingRules!.upsert!.mockResolvedValue({
+            bookAheadDays: null,
+            latestBookingMinutes: null,
+            freeCancelHours: null,
+            refundInTimeCancels: true,
+            bookingPayment: "ONLINE",
+        });
+        await expect(
+            service.updateBookingRules(ctx(), { bookingPayment: "ONLINE" }),
+        ).resolves.toMatchObject({ bookingPayment: "ONLINE" });
+        expect(db.bookingRules!.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                create: { organizationId: "org_1", bookingPayment: "ONLINE" },
+                update: { bookingPayment: "ONLINE" },
+            }),
+        );
+        // An older app sends the other rules only: the way to pay stays.
+        await service.updateBookingRules(ctx(), { bookAheadDays: 14 });
+        expect(db.bookingRules!.upsert).toHaveBeenLastCalledWith(
+            expect.objectContaining({ update: { bookAheadDays: 14 } }),
+        );
+    });
+
+    it("refuses a Member changing how people pay", async () => {
+        await expect(
+            service.updateBookingRules(member, { bookingPayment: "DESK" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(db.bookingRules!.upsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["Payments on, a provider connected", null, { id: "mpp_1" }, null],
+        ["no provider connected", null, null, "NO_PROVIDER"],
+        [
+            "Payments switched off",
+            { id: "mod_1" },
+            { id: "mpp_1" },
+            "PAYMENTS_OFF",
+        ],
+    ])(
+        "says how people pay, and why online can't be taken: %s (DEC-088)",
+        async (_, off, provider, blocker) => {
+            db.bookingRules!.findUnique!.mockResolvedValue({
+                bookAheadDays: null,
+                latestBookingMinutes: null,
+                freeCancelHours: null,
+                refundInTimeCancels: true,
+                bookingPayment: "ONLINE",
+            });
+            db.organizationModule!.findFirst!.mockResolvedValue(off);
+            db.merchantPaymentProvider!.findFirst!.mockResolvedValue(provider);
+            await expect(service.getBookingPayment(member)).resolves.toEqual({
+                bookingPayment: "ONLINE",
+                onlineBlocker: blocker,
+            });
+        },
+    );
 
     it("writes the refund policy when sent, and leaves it when not (E30)", async () => {
         db.bookingRules!.upsert!.mockResolvedValue({

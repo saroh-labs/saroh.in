@@ -13,6 +13,8 @@ export interface AnalyticsEvents {
     waitlist_join: { kind: string; src: string; plan?: PlanId; ref?: boolean };
     referral_copy: Record<string, never>;
     pricing_toggle: { control: "yearly" | "gst"; value: boolean };
+    /** A Help article's "Did this help?": its slug, and yes or no. */
+    help_vote: { article: string; helpful: "yes" | "no" };
 }
 
 type Gtag = (command: "event", name: string, params: object) => void;

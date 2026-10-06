@@ -39,18 +39,32 @@ export const BUSINESSES = {
     northwind: {
         id: "seed_org",
         name: "Northwind Supply",
-        site: "northwind-supply",
+        site: "northwind",
+    },
+    /** Asha's first business, with nothing turned on yet (`founder.ts`). */
+    asha: {
+        id: "seed_org_first-run_business",
+        name: "Asha's Bakery",
+        site: "first-run-business",
     },
 } as const;
 
 export type Business = keyof typeof BUSINESSES;
 
-/** Who signs in. All shots are taken as the demo owner. */
+/**
+ * Who signs in. Most shots are taken as the demo owner. Help's "Create your
+ * business" also needs Asha, the seed's founder, whose first business has
+ * nothing turned on, and a newcomer: an account with no business at all,
+ * which the seed has none of. Make it by hand on the throwaway database
+ * before the capture (`content/help/README.md`). A `visitor` is signed out.
+ */
 export const ROLES = {
     owner: "demo@saroh.dev",
+    founder: "founder@saroh.dev",
+    newcomer: "new.owner@saroh.dev",
 } as const;
 
-export type Role = keyof typeof ROLES;
+export type Role = keyof typeof ROLES | "visitor";
 
 /** The width and height the page is laid out at, in CSS pixels. */
 export interface Viewport {
@@ -67,22 +81,37 @@ export type Step =
     /** Click something that only changes the page's own state. */
     | { click: string }
     /** Wait for something to be on screen. */
-    | { waitFor: string };
+    | { waitFor: string }
+    /**
+     * Type into a field, as a person filling a form would. Only on a form
+     * that is never submitted (the shot is taken before its button).
+     */
+    | { fill: string; value: string };
 
 /**
  * What part of the page is kept. Omitted: the viewport. `selector`: the box
  * of the last element it matches (the innermost, when matches nest), widened
  * by `pad` CSS pixels. It must end inside the viewport.
  */
-export type Clip = { selector: string; pad?: number };
+export type Clip = {
+    selector: string;
+    pad?: number;
+    /**
+     * Run the clip on down to the bottom of this element too: two sections
+     * one under the other, when their column runs on far past them.
+     */
+    until?: string;
+};
 
 export interface Shot {
     key: string;
-    business: Business;
+    /** The business opened first; none for sign-up and setup. */
+    business?: Business;
     role: Role;
     /**
-     * A workspace path (`/commerce/orders`), or `site:<path>` for the
-     * business's own site on the renderer. `{nextMonday}` is replaced with
+     * A workspace path (`/commerce/orders`), `site:<path>` for the
+     * business's own site on the renderer, or `accounts:<path>` for the
+     * accounts app (sign-up). `{nextMonday}` is replaced with
      * the coming Monday (YYYY-MM-DD), since the seed moves with the calendar.
      */
     route: string;
@@ -95,12 +124,934 @@ export interface Shot {
     caption: string;
     /** Where the real app cannot show what the caption says (U28 rewording). */
     gap?: string;
+    /**
+     * Help shots only: the control the article's step names. Its box (the
+     * last match, widened by 6px) is written to the manifest as `mark`, in
+     * fractions of the image, and the article draws a Saffron ring there.
+     * The image itself stays clean.
+     */
+    mark?: string;
 }
 
 /** Notices that would only be put away by a write. */
 const LATE_RULE_NOTICE: Step = {
     hide: '[role="note"]:has-text("count as late")',
 };
+
+/* ── Help articles (Resources plan U5) ─────────────────────────────────
+ *
+ * One shot per step, keyed `help-<article>-<step>`, written to
+ * `apps/saroh.in/public/shots/help/`. Taken at the size the article shows
+ * them (a 680px column, so a clip of about 700–1000 CSS px reads at close
+ * to its real size), light, at 2×. Each step's `caption` in the article's
+ * MDX says what the picture shows; `alt` here is the same.
+ *
+ * Read-only like every shot here: the forms are filled but never created
+ * or saved, and Rye & Co. is only looked at. `content/help/README.md` says
+ * how to add an article's shots.
+ */
+
+/** The workspace at a desk, for a whole-screen help shot. */
+const HELP_DESK: Viewport = { width: 1024, height: 560 };
+
+/** The form an "Add your first product" shot fills, never created. */
+const NEW_LOAF: Step[] = [
+    { waitFor: "#pe-name" },
+    { fill: "#pe-name", value: "Walnut and raisin loaf" },
+    { fill: "#pe-price", value: "260" },
+    // Out of the field, so no focus ring is in the picture.
+    { click: '[aria-labelledby="sec-basics"] h2' },
+];
+
+const RYE_NEW = "/commerce/products/new?storefront=seed_sc_rc_store";
+const RYE_SOURDOUGH =
+    "/commerce/products/seed_sc_rc_product_0/edit?storefront=seed_sc_rc_store";
+
+const HELP_SHOTS: Shot[] = [
+    {
+        key: "help-add-product-1",
+        business: "rye",
+        role: "owner",
+        route: "/commerce/products",
+        viewport: HELP_DESK,
+        steps: [
+            { click: 'main button:has-text("New product")' },
+            { waitFor: '[role="menu"]' },
+        ],
+        mark: 'main button:has-text("New product")',
+        alt: "Products at Rye & Co. (demo bakery), with New product open on its two locations, Online and Hill Road",
+        caption: "Products at Rye & Co., New product open on its locations",
+    },
+    {
+        key: "help-add-product-2",
+        business: "rye",
+        role: "owner",
+        route: RYE_NEW,
+        viewport: { width: 1280, height: 1000 },
+        steps: NEW_LOAF,
+        clip: { selector: 'section[aria-labelledby="sec-basics"]', pad: 12 },
+        mark: '[aria-labelledby="sec-basics"] :text-is("/products/") >> xpath=..',
+        alt: "Basics for a new product at Rye & Co. (demo bakery): the name, the address on the shop made from it, the price and the category",
+        caption:
+            "Basics for a new loaf: the name, its address on the shop, the price",
+    },
+    {
+        key: "help-add-product-3",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH,
+        viewport: { width: 1280, height: 3200 },
+        clip: { selector: 'section[aria-labelledby="sec-photos"]', pad: 12 },
+        mark: '[aria-labelledby="sec-photos"] :text-is("Cover") >> nth=0',
+        alt: "Photos and videos for the Sourdough loaf at Rye & Co. (demo bakery): two photos, the first marked Cover, each with what it shows",
+        caption: "The Sourdough loaf's photos: the first is the cover",
+    },
+    {
+        key: "help-add-product-4",
+        business: "rye",
+        role: "owner",
+        route: RYE_NEW,
+        viewport: HELP_DESK,
+        steps: NEW_LOAF,
+        mark: 'button:has-text("Create draft")',
+        alt: "A new product at Rye & Co. (demo bakery) with a name and a price, Visibility set to Draft and the Create draft button",
+        caption: "Visibility set to Draft, and Create draft at the top right",
+    },
+    {
+        key: "help-add-product-5",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH,
+        viewport: { width: 1280, height: 1200 },
+        clip: {
+            selector: 'section[aria-labelledby="sec-variants"]',
+            until: 'section[aria-labelledby="sec-stock"]',
+            pad: 12,
+        },
+        mark: '[aria-labelledby="sec-stock"] [role="switch"]',
+        alt: "Variants and Stock for the Sourdough loaf at Rye & Co. (demo bakery): 800g and 400g with their own SKU and price, and Track stock on with On hand and Warn at for each",
+        caption: "The Sourdough loaf's sizes and stock, with Track stock on",
+    },
+];
+
+/* "Set your team's hours": Pulse Fitness's Availability, looked at only.
+ * Picking a person, opening "+ Hours" and adding a range there are the
+ * page's own draft; nothing is saved (Save hours is never pressed). */
+const AVAILABILITY = "/bookings/availability";
+const PICK = (name: string): Step => ({
+    click: `[role="radiogroup"][aria-label="Team member"] [role="radio"]:has-text("${name}")`,
+});
+const SATURDAY_HOURS: Step[] = [
+    PICK("Ritu Kapoor"),
+    {
+        click: 'section[aria-labelledby="weekly-hours"] li:has-text("Saturday") button:has-text("Hours")',
+    },
+    {
+        waitFor:
+            'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
+    },
+];
+
+/* "Take a deposit when they book": Kavi Dental's root canal, looked at
+ * (a chip clicked, never saved); the booking page of Northwind, whose
+ * Warehouse walkthrough was set to a 50% deposit on the throwaway
+ * database, walked to its Paying step and never booked. */
+const KAVI_ROOT_CANAL = "/services/seed_sc_kavi_service_2";
+const KAVI_PRICE = 'section:has(h2:text-is("Price"))';
+
+/* "Set up a monthly plan": Rye & Co.'s plans and subscribers, looked at;
+ * the dialog is opened and closed unsent. The draft plan to publish is
+ * Northwind's ("Packing supplies, monthly", made on the throwaway
+ * database), opened from its card and never published. */
+const RYE_PLANS = "/billing/subscriptions?tab=plans";
+
+/* "Connect your own domain" and "Make your link look right when shared":
+ * Northwind's site settings. Its seeded domain, northwindsupply.in, waits
+ * for DNS; the domain box is typed into and never added. */
+const NW_SETTINGS = "/sites/seed_site_0/settings";
+const DOMAIN = 'section:has(h2:text-is("Your own domain"))';
+const SHARE = 'section:has(h2:text-is("Social share image"))';
+const SEARCH = 'section:has(h2:text-is("Search"))';
+
+const HELP_SHOTS_B: Shot[] = [
+    // ── Set your team's hours (Pulse Fitness) ──────────────────────────
+    {
+        key: "help-team-hours-1",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 720 },
+        steps: [PICK("Ritu Kapoor")],
+        mark: '[role="radiogroup"][aria-label="Team member"] [role="radio"]:has-text("Ritu Kapoor")',
+        alt: "Availability at Pulse Fitness (demo gym): the team across the top, Ritu Kapoor picked, her weekly hours, time off and the booking rules",
+        caption: "Availability at Pulse Fitness, with Ritu Kapoor picked",
+    },
+    {
+        key: "help-team-hours-2",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 1000 },
+        steps: SATURDAY_HOURS,
+        clip: { selector: 'section[aria-labelledby="weekly-hours"]', pad: 12 },
+        mark: 'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
+        alt: "Ritu Kapoor's weekly hours at Pulse Fitness (demo gym), a day at a time, with new hours being added on Saturday",
+        caption: "Ritu Kapoor's weekly hours, with + Hours open on Saturday",
+    },
+    {
+        key: "help-team-hours-3",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 720 },
+        steps: [
+            ...SATURDAY_HOURS,
+            {
+                click: 'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
+            },
+            { waitFor: 'button:has-text("Save hours")' },
+        ],
+        mark: 'button:has-text("Save hours")',
+        alt: "Availability at Pulse Fitness (demo gym) with a change not saved yet, and the bar with Discard and Save hours",
+        caption: "A change to Ritu Kapoor's hours, waiting for Save hours",
+    },
+    {
+        key: "help-team-hours-4",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 1000 },
+        steps: [PICK("Sameer Khan")],
+        clip: { selector: 'section:has(h2:text-is("Time off"))', pad: 12 },
+        mark: 'section:has(h2:text-is("Time off")) button:has-text("Add day off")',
+        alt: "Time off for Sameer Khan at Pulse Fitness (demo gym): his days off for a wedding, and the form to add more",
+        caption: "Sameer Khan's time off, and the form to add a day off",
+    },
+    {
+        key: "help-team-hours-5",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="booking-rules"]', pad: 12 },
+        mark: '[aria-label="How far ahead people can book"]',
+        alt: "Booking rules at Pulse Fitness (demo gym): how far ahead people can book, the latest they can book, free cancellation and refunds",
+        caption: "Pulse Fitness's booking rules, for the whole business",
+    },
+
+    // ── Take a deposit when they book (Kavi Dental, Northwind) ─────────
+    {
+        key: "help-take-deposit-1",
+        business: "kavi",
+        role: "owner",
+        route: "/services",
+        viewport: { width: 1024, height: 760 },
+        mark: 'a[aria-label="Edit Root canal treatment"]',
+        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button",
+        caption: "Services at Kavi Dental, with Edit on the root canal",
+    },
+    {
+        key: "help-take-deposit-2",
+        business: "kavi",
+        role: "owner",
+        route: KAVI_ROOT_CANAL,
+        viewport: { width: 1280, height: 1400 },
+        clip: { selector: KAVI_PRICE, pad: 12 },
+        mark: 'section:has(h2:text-is("Price")) [role="radio"][aria-checked="true"]',
+        alt: "The root canal's price at Kavi Dental (demo clinic), with At booking, they pay set to a 50% deposit and what that means",
+        caption: "The root canal's price, with a 50% deposit at booking",
+    },
+    {
+        key: "help-take-deposit-3",
+        business: "kavi",
+        role: "owner",
+        route: KAVI_ROOT_CANAL,
+        viewport: { width: 1024, height: 560 },
+        steps: [
+            {
+                click: 'section:has(h2:text-is("Price")) [role="radio"]:has-text("25% deposit")',
+            },
+        ],
+        mark: 'button:has-text("Save changes")',
+        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save changes at the top right",
+        caption: "A change to the root canal, waiting for Save changes",
+    },
+    {
+        key: "help-take-deposit-4",
+        business: "northwind",
+        role: "owner",
+        route: "site:/book?service=seed_service_1",
+        viewport: { width: 1280, height: 2000 },
+        steps: [
+            {
+                click: 'button:text-matches("^\\\\d\\\\d:\\\\d\\\\d$") >> nth=2',
+            },
+            { fill: 'input[autocomplete="name"]', value: "Meena Iyer" },
+            { waitFor: '[role="radiogroup"][aria-label="Paying"]' },
+        ],
+        clip: {
+            selector: 'div:has(> [role="radiogroup"][aria-label="Paying"])',
+            pad: 16,
+        },
+        mark: '[role="radiogroup"][aria-label="Paying"] [role="radio"] >> nth=0',
+        alt: "The booking page of Northwind Supply (demo store), at Paying: a deposit now and the rest at the visit, or the full price now",
+        caption:
+            "Paying on Northwind Supply's booking page: the deposit, or the full price",
+    },
+    {
+        key: "help-take-deposit-5",
+        business: "kavi",
+        role: "owner",
+        route: "site:/book?service=seed_sc_kavi_service_2",
+        viewport: { width: 1280, height: 900 },
+        clip: { selector: 'aside[aria-label="Your booking"]', pad: 12 },
+        mark: 'aside[aria-label="Your booking"] p[role="status"]',
+        alt: "The booking summary on the site of Kavi Dental (demo clinic), saying it can't take the deposit online right now",
+        caption:
+            "Kavi Dental's booking page, with no way to take the deposit online",
+    },
+
+    // ── Set up a monthly plan (Rye & Co., Northwind) ──────────────────
+    {
+        key: "help-monthly-plan-1",
+        business: "rye",
+        role: "owner",
+        route: RYE_PLANS,
+        viewport: { width: 1024, height: 560 },
+        mark: 'a:has-text("New plan")',
+        alt: "Plans at Rye & Co. (demo bakery): a weekly loaf and a monthly one, each with its subscribers, and the New plan button",
+        caption: "Plans at Rye & Co., with New plan",
+    },
+    {
+        key: "help-monthly-plan-2",
+        business: "rye",
+        role: "owner",
+        route: "/billing/plans/seed_sc_rc_plan_1/edit",
+        viewport: { width: 1280, height: 1000 },
+        clip: {
+            selector: 'section:has(h2:text-is("Details"))',
+            until: 'section:has(h2:text-is("Price and billing"))',
+            pad: 12,
+        },
+        mark: '[role="radio"]:has-text("Every month")',
+        alt: "The monthly sourdough plan at Rye & Co. (demo bakery): its name, what's included, the price and Charged every month",
+        caption:
+            "Rye & Co.'s monthly plan: name, what's included, price, charged every month",
+    },
+    {
+        key: "help-monthly-plan-3",
+        business: "northwind",
+        role: "owner",
+        route: "/billing/subscriptions?tab=plans",
+        viewport: { width: 1024, height: 560 },
+        steps: [
+            { click: 'a[aria-label="Edit Packing supplies, monthly"]' },
+            { waitFor: 'button:text-is("Publish")' },
+        ],
+        mark: 'button:text-is("Publish"):visible',
+        alt: "A new monthly plan at Northwind Supply (demo store), saved as a draft that nobody can join yet, with the Publish button",
+        caption: "A draft plan at Northwind Supply, waiting for Publish",
+    },
+    {
+        key: "help-monthly-plan-4",
+        business: "rye",
+        role: "owner",
+        route: "/billing/subscriptions?subscribe=1",
+        viewport: { width: 1024, height: 760 },
+        steps: [
+            { waitFor: '[role="dialog"]' },
+            {
+                click: '[role="dialog"] [role="combobox"]:has-text("Sourdough")',
+            },
+            { click: '[role="option"]:has-text("Sourdough, monthly")' },
+            // Out of the fields, so no focus ring is in the picture.
+            { click: '[role="dialog"] h2' },
+        ],
+        mark: '[role="dialog"] button:has-text("Subscribe")',
+        alt: "Subscribe someone at Rye & Co. (demo bakery): who, the plan and the start date, with when the first invoice is issued",
+        caption: "Subscribe someone at Rye & Co.",
+    },
+    {
+        key: "help-monthly-plan-5",
+        business: "rye",
+        role: "owner",
+        route: "/billing/subscriptions/seed_sc_rc_sub_sana",
+        viewport: { width: 1280, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="charges-title"]', pad: 12 },
+        mark: 'section[aria-labelledby="charges-title"] a[href^="/billing/invoices/"] >> nth=0',
+        alt: "Sana Qureshi's monthly plan at Rye & Co. (demo bakery): a paid invoice for each month",
+        caption:
+            "Sana Qureshi's charges at Rye & Co.: an invoice for each month",
+    },
+    {
+        key: "help-monthly-plan-6",
+        business: "rye",
+        role: "owner",
+        route: "/billing/subscriptions/seed_sc_rc_sub_arjun",
+        viewport: { width: 1024, height: 560 },
+        mark: 'button:has-text("Retry with a new pay link")',
+        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Retry with a new pay link",
+        caption: "Arjun Mehta's renewal at Rye & Co., not paid yet",
+    },
+
+    // ── Connect your own domain (Northwind) ───────────────────────────
+    {
+        key: "help-own-domain-1",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1024, height: 560 },
+        mark: 'nav[aria-label="Website"] a:has-text("Settings")',
+        alt: "The website of Northwind Supply (demo store) in Saroh, on its Settings tab",
+        caption: "Northwind Supply's website, on Settings",
+    },
+    {
+        key: "help-own-domain-2",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 1400 },
+        steps: [
+            {
+                fill: '[aria-label="Domain to add"]',
+                value: "www.northwindsupply.in",
+            },
+            { click: `${DOMAIN} h2` },
+        ],
+        clip: { selector: DOMAIN, pad: 12 },
+        mark: `${DOMAIN} button:has-text("Add domain")`,
+        alt: "Your own domain at Northwind Supply (demo store): a second domain typed in, ready for Add domain",
+        caption: "Your own domain at Northwind Supply, a domain typed in",
+    },
+    {
+        key: "help-own-domain-3",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 1400 },
+        clip: { selector: DOMAIN, pad: 12 },
+        mark: `${DOMAIN} code[title^="_saroh-verification"]`,
+        alt: "The TXT record Northwind Supply (demo store) is asked to add at its registrar: its type, name and value, each with Copy",
+        caption: "The record that proves Northwind Supply owns its domain",
+    },
+    {
+        key: "help-own-domain-4",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 1400 },
+        clip: { selector: DOMAIN, pad: 12 },
+        mark: `${DOMAIN} button:has-text("Check now")`,
+        alt: "Northwind Supply's (demo store) domain waiting for DNS, with Check now",
+        caption: "Northwind Supply's domain, waiting for DNS",
+    },
+    {
+        key: "help-own-domain-5",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 1400 },
+        clip: { selector: DOMAIN, pad: 12 },
+        mark: `${DOMAIN} code:text-is("CNAME")`,
+        alt: "A verified domain at Northwind Supply (demo store), with the CNAME record that sends visitors to the site",
+        caption:
+            "Northwind Supply's domain once verified, and the record that sends visitors",
+    },
+
+    // ── Make your link look right when shared (Northwind) ─────────────
+    {
+        key: "help-share-image-1",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 3000 },
+        clip: { selector: SHARE, pad: 12 },
+        mark: `${SHARE} button:text-is("Add")`,
+        alt: "Social share image at Northwind Supply (demo store): nothing set yet, and how the link looks on each app without one",
+        caption: "Social share image at Northwind Supply, nothing set yet",
+    },
+    {
+        key: "help-share-image-2",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 3000 },
+        steps: [{ click: `${SHARE} button:text-is("Add")` }],
+        clip: {
+            selector: `${SHARE} div.grid:has(> div:text-is("Image"))`,
+            pad: 12,
+        },
+        mark: `${SHARE} button:has-text("Choose a photo")`,
+        alt: "Adding a social share image at Northwind Supply (demo store): Choose a photo, or paste an image address, then Save",
+        caption: "Adding a share image at Northwind Supply",
+    },
+    {
+        key: "help-share-image-3",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 3000 },
+        steps: [
+            { click: `${SEARCH} button:text-is("Edit") >> nth=1` },
+            {
+                fill: '[aria-label="Search description"]',
+                value: "Packaging, cleaning and workshop supplies for small manufacturers in Peenya, Bengaluru. Order by phone or online.",
+            },
+            { click: `${SEARCH} h2` },
+        ],
+        clip: { selector: SEARCH, pad: 12 },
+        mark: '[aria-label="Search description"]',
+        alt: "Search at Northwind Supply (demo store): a description being written, and the preview of how it reads",
+        caption: "Writing Northwind Supply's description under Search",
+    },
+    {
+        key: "help-share-image-4",
+        business: "northwind",
+        role: "owner",
+        route: "/sites/seed_site_0/pages",
+        viewport: { width: 1024, height: 560 },
+        mark: 'a:has-text("Review and publish")',
+        alt: "The website of Northwind Supply (demo store), with changes waiting to be published and Review and publish",
+        caption: "Northwind Supply's changes, waiting to be published",
+    },
+];
+
+/* Create your business. */
+
+/** The setup form, answered as a florist would, never created. */
+const SETUP_FILLED: Step[] = [
+    { waitFor: 'text="What are you setting up?"' },
+    { click: '[role="radio"]:has-text("A business")' },
+    { fill: 'input[autocomplete="organization"]', value: "Tulsi Florist" },
+    { waitFor: 'text="Free — your website will live here."' },
+];
+
+/** A setup form item: the field's own block, label to description. */
+const setupItem = (label: string) =>
+    `form > div.space-y-2:has(label:text-is("${label}"))`;
+
+const CREATE_BUSINESS_SHOTS: Shot[] = [
+    {
+        key: "help-create-business-1",
+        role: "visitor",
+        route: "accounts:/signup",
+        viewport: { width: 1024, height: 820 },
+        steps: [
+            { fill: 'input[placeholder="Your name"]', value: "Kiran Desai" },
+            { fill: 'input[type="email"]', value: "kiran@tulsiflorist.in" },
+            { fill: 'input[type="password"]', value: "a-long-password" },
+            { click: "h1" },
+        ],
+        clip: { selector: "form", pad: 12 },
+        mark: 'button:has-text("Send the code")',
+        alt: "Make your account on Saroh: your name, email and password, and the Send the code button",
+        caption: "Make your account: name, email, password, then Send the code",
+    },
+    {
+        key: "help-create-business-2",
+        role: "newcomer",
+        route: "/onboarding",
+        viewport: { width: 1024, height: 760 },
+        steps: [{ waitFor: 'text="What are you setting up?"' }],
+        clip: { selector: "form", pad: 16 },
+        mark: '[role="radio"]:has-text("A business")',
+        alt: "Set up Saroh, asking what you are setting up: a business, just me, or a site for my work",
+        caption:
+            "What are you setting up? A business, Just me, or A site for my work",
+    },
+    {
+        key: "help-create-business-3",
+        role: "newcomer",
+        route: "/onboarding",
+        viewport: { width: 1024, height: 1000 },
+        steps: [...SETUP_FILLED, { click: "h1" }],
+        clip: {
+            selector: setupItem("What is it called?"),
+            until: setupItem("Its address on Saroh"),
+            pad: 16,
+        },
+        mark: `${setupItem("Its address on Saroh")} div.font-mono`,
+        alt: "Setting up Tulsi Florist (a demo florist): its name, and its address on Saroh, tulsi-florist.saroh.app, marked free",
+        caption: "The name, and the address on Saroh made from it",
+    },
+    {
+        key: "help-create-business-4",
+        role: "newcomer",
+        route: "/onboarding",
+        viewport: { width: 1024, height: 1400 },
+        steps: [
+            ...SETUP_FILLED,
+            { click: '[role="radio"]:has-text("Not registered")' },
+            { click: "h1" },
+        ],
+        clip: {
+            selector: setupItem("Is it registered as a company?"),
+            until: 'form button[type="submit"]',
+            pad: 16,
+        },
+        mark: 'button:has-text("Create the business")',
+        alt: "Setting up Tulsi Florist (a demo florist): Not registered chosen, India as where it trades, and the Create the business button",
+        caption: "Registered or not, where it trades, then Create the business",
+    },
+    {
+        key: "help-create-business-5",
+        business: "asha",
+        role: "founder",
+        route: "/",
+        viewport: HELP_DESK,
+        steps: [
+            { click: 'button:has-text("Sell things")' },
+            { waitFor: '[role="dialog"]' },
+        ],
+        mark: '[role="dialog"] button:text-is("Turn on")',
+        alt: "Home at Asha's Bakery (demo bakery), new and with nothing on yet: What will you do first?, with Turn on Sell open",
+        caption:
+            "What will you do first? at Asha's Bakery, with Turn on Sell open",
+    },
+];
+
+/* Add your GSTIN: Northwind, which isn't GST-registered in the seed. */
+
+const NW_TAX = "/settings/organization?section=tax";
+
+/** GST switched on and a GSTIN typed, never saved. */
+const GST_ON: Step[] = [
+    { click: '#business-panel button:text-is("Edit")' },
+    { click: '[role="switch"][aria-label="GST-registered"]' },
+    {
+        fill: '#business-panel input[placeholder="29ABCDE1234F1ZW"]',
+        value: "29AAGCN4821K1Z5",
+    },
+    { click: '[role="tab"]:text-is("Tax and invoices")' },
+];
+
+const GSTIN_SHOTS: Shot[] = [
+    {
+        key: "help-add-gstin-1",
+        business: "northwind",
+        role: "owner",
+        route: NW_TAX,
+        viewport: HELP_DESK,
+        mark: '#business-panel button:text-is("Edit")',
+        alt: "Settings, Business, Tax and invoices at Northwind Supply (demo shop): not GST-registered yet, with the Edit button",
+        caption: "Tax and invoices at Northwind Supply, not GST-registered yet",
+    },
+    {
+        key: "help-add-gstin-2",
+        business: "northwind",
+        role: "owner",
+        route: NW_TAX,
+        viewport: { width: 1280, height: 1100 },
+        steps: GST_ON,
+        clip: {
+            selector:
+                '#business-panel div.space-y-2:has(> div > button[role="switch"])',
+            until: '#business-panel div.space-y-2:has(> input[placeholder="29ABCDE1234F1ZW"])',
+            pad: 14,
+        },
+        mark: '#business-panel input[placeholder="29ABCDE1234F1ZW"]',
+        alt: "Northwind Supply (demo shop) with GST-registered switched on and a GSTIN typed, its state code, PAN, entity, Z and check character shown under it",
+        caption: "GST-registered on, and the GSTIN broken into its parts",
+    },
+    {
+        key: "help-add-gstin-3",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/organization?section=address",
+        viewport: HELP_DESK,
+        mark: '[role="tab"]:text-is("Registered address")',
+        alt: "The Registered address tab at Northwind Supply (demo shop): the address, city, PIN and state printed under the legal name",
+        caption:
+            "Northwind Supply's registered address, printed under its legal name",
+    },
+    {
+        key: "help-add-gstin-4",
+        business: "northwind",
+        role: "owner",
+        route: NW_TAX,
+        viewport: { width: 1440, height: 1000 },
+        steps: GST_ON,
+        clip: { selector: 'aside[aria-label="How it prints"]', pad: 12 },
+        mark: 'aside[aria-label="How it prints"] span:text-is("Tax invoice")',
+        alt: "How it prints at Northwind Supply (demo shop), showing the unsaved edit: a tax invoice with the GSTIN and Karnataka",
+        caption: "How it prints, now a tax invoice with the GSTIN",
+    },
+    {
+        key: "help-add-gstin-5",
+        business: "northwind",
+        role: "owner",
+        route: NW_TAX,
+        viewport: HELP_DESK,
+        clip: {
+            selector: 'section[aria-label="Ready to take payments"]',
+            pad: 12,
+        },
+        mark: 'section[aria-label="Ready to take payments"] :text-is("Choose type")',
+        alt: "Ready to take payments at Northwind Supply (demo shop): Choose your business type, with the Choose type button",
+        caption:
+            "Ready to take payments at Northwind Supply: Choose your business type",
+    },
+];
+
+/* Take your first order: Northwind's counter. */
+
+/** A counter order for Meera Iyer, never created. */
+const COUNTER_ORDER: Step[] = [
+    { waitFor: '[role="dialog"]' },
+    { click: '[role="dialog"] :text-is("Meera Iyer")' },
+    { click: '[role="dialog"] :text("Standard · ₹260")' },
+];
+
+const ORDER_SHOTS: Shot[] = [
+    {
+        key: "help-take-order-1",
+        business: "northwind",
+        role: "owner",
+        route: "/commerce/orders",
+        viewport: HELP_DESK,
+        steps: [LATE_RULE_NOTICE],
+        mark: 'main button:has-text("New order")',
+        alt: "Orders at Northwind Supply (demo shop), with the New order button",
+        caption: "Orders at Northwind Supply, with New order at the top right",
+    },
+    {
+        key: "help-take-order-2",
+        business: "northwind",
+        role: "owner",
+        route: "/commerce/orders?new=1",
+        viewport: { width: 1280, height: 900 },
+        steps: COUNTER_ORDER,
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] :text-is("Meera Iyer")',
+        alt: "New order at Northwind Supply (demo shop): taken at the store, Meera Iyer picked as the customer, and a hi-vis vest added",
+        caption: "New order: where it's taken, the customer, and the items",
+    },
+    {
+        key: "help-take-order-3",
+        business: "northwind",
+        role: "owner",
+        route: "/commerce/orders?new=1",
+        viewport: { width: 1280, height: 900 },
+        steps: [
+            ...COUNTER_ORDER,
+            {
+                fill: '[role="dialog"] input[placeholder="Delivery address"]',
+                value: "14 MG Road",
+            },
+            {
+                fill: '[role="dialog"] input[placeholder="Town or city"]',
+                value: "Bengaluru",
+            },
+            {
+                fill: '[role="dialog"] input[placeholder="State"]',
+                value: "Karnataka",
+            },
+            {
+                fill: '[role="dialog"] input[aria-label="PIN code"]',
+                value: "560001",
+            },
+            { click: '[role="dialog"] button:text-is("UPI at the counter")' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:has-text("UPI received · create")',
+        alt: "New order at Northwind Supply (demo shop): local delivery to an address, UPI at the counter, and the UPI received, create button",
+        caption:
+            "How it leaves and how it's paid, then the button that creates it",
+    },
+    {
+        key: "help-take-order-4",
+        business: "northwind",
+        role: "owner",
+        // #ORD-004: a paid pick-up order, ready.
+        route: "/commerce/orders/seed_order_3",
+        viewport: HELP_DESK,
+        mark: 'main button:has-text("Mark collected")',
+        alt: "Order #ORD-004 at Northwind Supply (demo shop): a pick-up order at Ready, with the Mark collected button",
+        caption:
+            "Order #ORD-004 at Ready, with Mark collected at the top right",
+    },
+    {
+        key: "help-take-order-5",
+        business: "northwind",
+        role: "owner",
+        // #ORD-002: a local delivery not paid yet.
+        route: "/commerce/orders/seed_order_1",
+        viewport: HELP_DESK,
+        mark: 'main button:has-text("Paid in cash")',
+        alt: "Order #ORD-002 at Northwind Supply (demo shop), not paid yet, with the Paid in cash button",
+        caption: "Order #ORD-002, not paid yet, with Paid in cash",
+    },
+    {
+        key: "help-take-order-6",
+        business: "northwind",
+        role: "owner",
+        route: "/commerce/orders",
+        viewport: HELP_DESK,
+        steps: [
+            LATE_RULE_NOTICE,
+            { click: 'main button:has-text("All locations")' },
+            { waitFor: '[role="listbox"], [role="menu"]' },
+        ],
+        mark: 'main button:has-text("All locations")',
+        alt: "Orders at Northwind Supply (demo shop), with All locations open on its two locations, Northwind Supply Store and Online",
+        caption: "Orders at Northwind Supply, filtered by location",
+    },
+];
+
+/* Connect Razorpay (Northwind) and Cashfree (Rye & Co.): filled, never connected. */
+
+/** The payments setup dialog's numbered step, by its heading's words. */
+const paySection = (words: string) =>
+    `[role="dialog"] section:has(h3:has-text("${words}"))`;
+
+const RAZORPAY_KEYS: Step[] = [
+    { click: 'button[aria-label="Connect Razorpay"]' },
+    { waitFor: '[role="dialog"]' },
+    { fill: '[role="dialog"] input >> nth=0', value: "rzp_test_Q4dMx9fA3fA9" },
+    {
+        fill: '[role="dialog"] input[type="password"] >> nth=0',
+        value: "a-key-secret",
+    },
+    // Out of the field, so no focus ring is in the picture.
+    { click: '[role="dialog"] h2:text-is("Payments")' },
+];
+
+const CASHFREE_KEYS: Step[] = [
+    { click: 'button[aria-label="Connect Cashfree"]' },
+    { waitFor: '[role="dialog"]' },
+    { fill: '[role="dialog"] input >> nth=0', value: "TEST10427c21" },
+    {
+        fill: '[role="dialog"] input[type="password"] >> nth=0',
+        value: "a-key-secret",
+    },
+    // Out of the field, so no focus ring is in the picture.
+    { click: '[role="dialog"] h2:text-is("Payments")' },
+];
+
+const PAYMENT_SHOTS: Shot[] = [
+    {
+        key: "help-connect-razorpay-1",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: HELP_DESK,
+        mark: 'button[aria-label="Connect Razorpay"]',
+        alt: "Settings, Providers at Northwind Supply (demo shop): Razorpay disconnected, with its Connect button",
+        caption: "Providers at Northwind Supply, Razorpay with Connect",
+    },
+    {
+        key: "help-connect-razorpay-2",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: RAZORPAY_KEYS,
+        clip: { selector: paySection("Your API keys"), pad: 12 },
+        mark: `${paySection("Your API keys")} input >> nth=0`,
+        alt: "Connecting Razorpay at Northwind Supply (demo shop): Key ID (public) and Key secret filled in",
+        caption: "Your API keys: the key id and the key secret",
+    },
+    {
+        key: "help-connect-razorpay-3",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: RAZORPAY_KEYS,
+        clip: {
+            selector: paySection("where to send payment updates"),
+            pad: 12,
+        },
+        mark: 'button[aria-label="Copy webhook URL"]',
+        alt: "Connecting Razorpay at Northwind Supply (demo shop): the webhook URL to copy, and the five events to tick",
+        caption: "The webhook URL to copy, and the events to tick",
+    },
+    {
+        key: "help-connect-razorpay-4",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: [
+            ...RAZORPAY_KEYS,
+            { click: 'button[aria-label="Generate a webhook signing secret"]' },
+        ],
+        clip: {
+            selector: paySection("Webhook signing secret"),
+            until: '[role="dialog"] button[type="submit"]',
+            pad: 12,
+        },
+        mark: '[role="dialog"] button[type="submit"]',
+        alt: "Connecting Razorpay at Northwind Supply (demo shop): a webhook signing secret generated, and the Connect Razorpay button",
+        caption: "The webhook signing secret, then Connect Razorpay",
+    },
+    {
+        key: "help-connect-cashfree-1",
+        business: "rye",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: HELP_DESK,
+        mark: 'button[aria-label="Connect Cashfree"]',
+        alt: "Settings, Providers at Rye & Co. (demo bakery): Cashfree under Available, with its Connect button",
+        caption: "Providers at Rye & Co., Cashfree with Connect",
+    },
+    {
+        key: "help-connect-cashfree-2",
+        business: "rye",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: CASHFREE_KEYS,
+        clip: { selector: paySection("Your API keys"), pad: 12 },
+        mark: `${paySection("Your API keys")} input >> nth=0`,
+        alt: "Connecting Cashfree at Rye & Co. (demo bakery): Key ID and Key secret filled in, and the optional Public key",
+        caption:
+            "Your API keys: Key ID, Key secret and the optional public key",
+    },
+    {
+        key: "help-connect-cashfree-3",
+        business: "rye",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: CASHFREE_KEYS,
+        clip: {
+            selector: paySection("where to send payment updates"),
+            pad: 12,
+        },
+        mark: 'button[aria-label="Copy webhook URL"]',
+        alt: "Connecting Cashfree at Rye & Co. (demo bakery): the webhook URL to copy, and the four events to tick",
+        caption: "The webhook URL to copy, and the events to tick",
+    },
+    {
+        key: "help-connect-cashfree-4",
+        business: "rye",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: { width: 1280, height: 1600 },
+        steps: CASHFREE_KEYS,
+        clip: {
+            selector:
+                '[role="dialog"] p:has-text("so there\'s no separate secret to add")',
+            until: '[role="dialog"] button[type="submit"]',
+            pad: 12,
+        },
+        mark: '[role="dialog"] button[type="submit"]',
+        alt: "Connecting Cashfree at Rye & Co. (demo bakery): no separate secret to add, and the Connect Cashfree button",
+        caption: "No separate secret for Cashfree, then Connect Cashfree",
+    },
+    {
+        key: "help-connect-cashfree-5",
+        business: "northwind",
+        role: "owner",
+        route: "/settings/providers",
+        viewport: HELP_DESK,
+        mark: 'main :text("No payment updates received yet")',
+        alt: "Settings, Providers at Northwind Supply (demo shop): Cashfree connected, with no payment updates received yet",
+        caption:
+            "Cashfree connected at Northwind Supply, waiting for its first payment update",
+    },
+];
 
 export const SHOTS: Shot[] = [
     // ── Rye & Co. ──────────────────────────────────────────────────────
@@ -494,4 +1445,10 @@ export const SHOTS: Shot[] = [
         caption:
             "Kavi Dental's own site on Saroh: free times today and Book an appointment",
     },
+    ...HELP_SHOTS,
+    ...HELP_SHOTS_B,
+    ...CREATE_BUSINESS_SHOTS,
+    ...GSTIN_SHOTS,
+    ...ORDER_SHOTS,
+    ...PAYMENT_SHOTS,
 ];

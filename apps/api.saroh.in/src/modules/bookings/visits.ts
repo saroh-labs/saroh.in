@@ -22,6 +22,8 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
+import type { BookingLocationType } from "./dto";
+import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type { BookInput, SignedInBooker } from "./reservation";
 import { loadBookableService, reserveInTx } from "./reservation";
 
@@ -385,6 +387,14 @@ export async function bookVisit(
         startAt.getTime() + service.durationMinutes * 60_000,
     );
     await refuseIfClosed(ctx.organizationId, startAt, endAt);
+    // The treatment's customer, as its first visit was booked — and where.
+    const first = order.bookings.length > 0 ? order.bookings[0] : null;
+    // In person, only while the business is open (DEC-087).
+    const opening = await openingFor(
+        service,
+        first?.locationType as BookingLocationType | null | undefined,
+    );
+    refuseOutsideOpening(opening, { startAt, endAt });
     const staffing = await loadStaffing(service);
     if (
         !staffing.perPerson &&
@@ -401,9 +411,9 @@ export async function bookVisit(
         startAt,
         dto.staffId,
         customer ? "public" : "team",
+        undefined,
+        opening,
     );
-    // The treatment's customer, as its first visit was booked.
-    const first = order.bookings.length > 0 ? order.bookings[0] : null;
     const booker: BookInput = {
         startAt: dto.startAt,
         bookerEmail: treatmentEmail(first?.bookerEmail),

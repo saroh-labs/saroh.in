@@ -48,6 +48,18 @@ import { z } from "zod";
  * else does): previews, local dev and the browser tests never load the tag,
  * even with the id in a local `.env`, so test runs never count as visitors
  * (they were most of GA's "visitors" until 5 Oct). `lib/ga.ts` decides.
+ * Even there, GA loads only once a visitor accepts the cookie notice
+ * (`app/google-analytics.tsx`).
+ *
+ * `RESOURCES_PREVIEW` (server-only, `1` or `true`) shows Resources pages and
+ * changelog entries before their `publishOn` date (plan KTD-2), so a preview
+ * deployment can be checked before the day. It is ignored on a production
+ * deployment (`VERCEL_ENV=production`), whatever it is set to
+ * (`lib/resources-context.ts`).
+ *
+ * `SAROH_BUILT_ROUTES` is not set by anyone: `next.config.js` writes the
+ * build's page routes into it (`routes.config.js`), so the Resources list links
+ * only pages this build has.
  */
 export const env = createEnv({
     client: {
@@ -65,6 +77,8 @@ export const env = createEnv({
         /** Set by Next itself: "phase-production-build" while building. */
         NEXT_PHASE: z.string().optional(),
         VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
+        RESOURCES_PREVIEW: z.string().optional(),
+        SAROH_BUILT_ROUTES: z.string().optional(),
     },
     shared: {
         NODE_ENV: z.enum(["development", "test", "production"]).optional(),
@@ -75,6 +89,8 @@ export const env = createEnv({
         PRICING_REVALIDATE_SECRET: process.env.PRICING_REVALIDATE_SECRET,
         NEXT_PHASE: process.env.NEXT_PHASE,
         VERCEL_ENV: process.env.VERCEL_ENV,
+        RESOURCES_PREVIEW: process.env.RESOURCES_PREVIEW,
+        SAROH_BUILT_ROUTES: process.env.SAROH_BUILT_ROUTES,
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,

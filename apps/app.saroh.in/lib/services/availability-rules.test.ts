@@ -6,6 +6,8 @@ import {
     copyMondayToWeekdays,
     draftFrom,
     outsideHours,
+    payWayHint,
+    payWayOf,
     rangeRefusal,
     refundsInTime,
     ruleChoices,
@@ -255,6 +257,53 @@ describe("ruleChoices", () => {
         ]);
         expect(latest.options.find((o) => o.value === "120")?.label).toBe(
             "2 hours before",
+        );
+    });
+});
+
+describe("how people pay when they book (DEC-088)", () => {
+    it("reads as Both when an older API leaves it out", () => {
+        expect(payWayOf(RULES)).toBe("BOTH");
+        expect(payWayOf({ ...RULES, bookingPayment: "DESK" })).toBe("DESK");
+    });
+
+    it("changing it is a rules write, with the old way for Undo", () => {
+        const staff = [person()];
+        const draft = draftFrom(staff, RULES);
+        expect(saveOps(staff, RULES, draft)).toEqual([]);
+        draft.rules.bookingPayment = "ONLINE";
+        expect(saveOps(staff, RULES, draft)).toEqual([
+            {
+                kind: "rules",
+                rules: { ...RULES, bookingPayment: "ONLINE" },
+                before: RULES,
+            },
+        ]);
+    });
+
+    it("Both, set or left out, is no change", () => {
+        const staff = [person()];
+        const draft = draftFrom(staff, RULES);
+        draft.rules.bookingPayment = "BOTH";
+        expect(saveOps(staff, RULES, draft)).toEqual([]);
+    });
+
+    it("says what each way means, and why online can't be taken when it matters", () => {
+        expect(payWayHint("BOTH", null)).toBe(
+            "People pay online when they book, or at the desk. A deposit is always paid online.",
+        );
+        expect(payWayHint("DESK", "NO_PROVIDER")).toBe(
+            "Nobody pays on the booking page; they pay when they come. A service that takes a deposit can't be booked online.",
+        );
+        expect(payWayHint("ONLINE", "NO_PROVIDER")).toBe(
+            "Everyone pays on the booking page when they book. Free services book with nothing to pay. Right now no payment provider is connected, so nobody can book a service with a price online.",
+        );
+        expect(payWayHint("BOTH", "PAYMENTS_OFF")).toBe(
+            "People pay online when they book, or at the desk. A deposit is always paid online. Right now Payments is switched off, so only services with no deposit can be booked online, to pay at the desk.",
+        );
+        // Couldn't tell: says nothing more.
+        expect(payWayHint("ONLINE", undefined)).toBe(
+            "Everyone pays on the booking page when they book. Free services book with nothing to pay.",
         );
     });
 });

@@ -4,10 +4,12 @@ import localFont from "next/font/local";
 import "./site.css";
 
 import { home } from "@/content/home";
+import { shownLegal } from "@/content/resources";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 import { env } from "@/env";
 import { gaMeasurementId } from "@/lib/ga";
+import { resourcesContext } from "@/lib/resources-context";
 
 import { GoogleAnalytics } from "./google-analytics";
 
@@ -79,6 +81,15 @@ export const metadata: Metadata = {
 };
 
 /**
+ * Every page is rendered again at most this often (ISR, seconds), so a
+ * Resources page, changelog entry or legal page dated today appears within
+ * five minutes of midnight in India, with no deploy (plan KTD-2,
+ * `PUBLISH_REVALIDATE_SECONDS`). A literal: Next reads it without running
+ * the file.
+ */
+export const revalidate = 300;
+
+/**
  * The shell every page shares: fonts, GA and the light-only scheme. Pages
  * bring their own chrome through route groups: `(v2)` the Marketing Site V2
  * pages, `(standalone)` the waitlist, `(preview)` the pricing draft.
@@ -91,6 +102,9 @@ export default function RootLayout({
 }: {
     children: React.ReactNode;
 }) {
+    const privacy = shownLegal(resourcesContext()).find(
+        (p) => p.id === "privacy",
+    );
     return (
         <html lang="en" style={{ colorScheme: "light" }}>
             <body
@@ -101,6 +115,7 @@ export default function RootLayout({
                         id: env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
                         vercelEnv: env.VERCEL_ENV,
                     })}
+                    privacyHref={privacy?.href}
                 />
                 <a
                     href="#main"

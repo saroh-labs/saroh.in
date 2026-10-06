@@ -1,7 +1,9 @@
 import type { Service } from "@saroh/database";
 
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
-import { takesOnlinePayment } from "./public-booking-page";
+import { onlinePaymentBlocker } from "./booking-payment";
+import type { BookingRulesValue } from "./booking-rules";
+import { allowsDesk } from "./booking-rules";
 
 /*
  * Deposits and the plan (6 Oct 2026: "Online needs a paid plan; Free takes
@@ -14,14 +16,15 @@ import { takesOnlinePayment } from "./public-booking-page";
  *   (NONE), or saving a service with the deposit it already has, never
  *   asks — a business that moved to a plan without online payments can
  *   still edit everything else about the service.
- * - **Booking** never becomes impossible: whenever the business can't take
- *   money online, for any reason — a plan without online payments,
- *   Payments switched off, or no provider connected that can open the
- *   checkout (`takesOnlinePayment`, the one predicate the booking page's
- *   `payOnline` and `depositCents` answer from too) — a service that keeps
- *   a stored deposit books exactly like one that takes none: pay at the
- *   desk, no deposit offered. The stored `depositMode` is kept, so it comes
- *   back the moment money can be taken online again.
+ * - **Booking** when the business can't take money online, for any reason
+ *   (`onlinePaymentBlocker`: a plan without online payments, Payments
+ *   switched off, or no provider that can open the checkout), follows the
+ *   business's "How people pay when they book" (DEC-088, DEC-089): Both or
+ *   At the desk — a service that keeps a stored deposit books exactly like
+ *   one that takes none, at the desk, no deposit offered; Online only —
+ *   the deposit stands and the booking page says to get in touch. The
+ *   stored `depositMode` is kept either way, so it comes back the moment
+ *   money can be taken online again.
  *
  * The plan is asked behind `PLAN_ENFORCEMENT` and fails open (a plan that
  * can't be read takes the deposit as today). Staff bookings never ask: the
@@ -40,13 +43,18 @@ export async function assertDepositOnPlan(
 }
 
 /**
- * The service as the booking page books it: its stored deposit while the
- * business can take money online, else none (the row is never changed).
+ * The service as the booking page books it (DEC-089): its stored deposit
+ * while the business can take money online; otherwise none when its rules
+ * allow paying at the desk, or the deposit as it is when they allow only
+ * online (the booking is then refused with "get in touch"). The row is
+ * never changed.
  */
 export async function asBookable<
     T extends Pick<Service, "organizationId" | "depositMode">,
->(service: T): Promise<T> {
+>(service: T, rules: Pick<BookingRulesValue, "bookingPayment">): Promise<T> {
     if (service.depositMode === "NONE") return service;
-    if (await takesOnlinePayment(service.organizationId)) return service;
-    return { ...service, depositMode: "NONE" };
+    if ((await onlinePaymentBlocker(service.organizationId)) === null) {
+        return service;
+    }
+    return allowsDesk(rules) ? { ...service, depositMode: "NONE" } : service;
 }

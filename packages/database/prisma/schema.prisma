@@ -4416,6 +4416,13 @@ model BookingRules {
   /// set it. Never more than was received; a late cancel is never refunded
   /// automatically.
   refundInTimeCancels Boolean @default(true)
+
+  /// How people pay when they book on the booking page (DEC-088, #821,
+  /// #822): ONLINE | DESK | BOTH, CHECKed. BOTH — the default, and what
+  /// every business had before — offers paying online (when a provider can
+  /// take it) and at the desk. A deposit or full price at booking is always
+  /// paid online, so DESK leaves a service that asks one unbookable online.
+  bookingPayment String @default("BOTH")
 }
 
 /// What has happened to a Booking, in order (#121).
@@ -5138,6 +5145,22 @@ model WaitlistSignup {
 
   ipHash String?
 
+  // The link preview tool (resources plan U2, KTD-5): an email given to
+  // unlock its report is kept here with source "link-preview", with the
+  // last address it checked and when. The retention sweep drops the link
+  // after 12 months, and a link-preview-only entry with it (Privacy).
+  checkedUrl       String?
+  checkedAt        DateTime?
+  // Marketing consent. Never set true by the link preview tool, which stopped
+  // asking (security review, 5 Oct 2026): an unverified address can't give
+  // it. False on its new entries; null on entries from forms that never asked.
+  newsConsent      Boolean?
+  // The link preview report emails this address was sent on one UTC day:
+  // the day and how many (at most 3). `reportEmailDay` also lets the gate
+  // count every report email sent today against its daily ceiling.
+  reportEmailDay   DateTime? @db.Date
+  reportEmailCount Int       @default(0)
+
   // Set when the batch containing this signup is opened, so "who is still
   // waiting" is a query rather than a spreadsheet.
   invitedAt DateTime?
@@ -5164,6 +5187,7 @@ model WaitlistSignup {
   @@index([createdAt])
   @@index([invitedAt])
   @@index([referredById])
+  @@index([reportEmailDay])
 }
 
 /// A record of a completed or in-flight idempotent operation.

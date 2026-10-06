@@ -11,6 +11,7 @@
 
 import { formatMoney } from "@/lib/format/money";
 import { rateOption } from "@/lib/invoices/gst";
+import type { BookingPayment } from "@/lib/staff/types";
 
 import type {
     CreateServiceInput,
@@ -421,14 +422,19 @@ export function depositNote(
     price: string,
     currency: string,
     visits = 1,
+    /** How the business takes payment when people book (DEC-088). */
+    way: BookingPayment = "BOTH",
 ): string {
-    if (deposit === "NONE") {
-        return "No card needed to book. No-shows cost you the slot.";
-    }
     const minor = toMinor(price);
     const cents = minor === null || Number.isNaN(minor) ? 0 : minor;
-    const now = Math.round((cents * DEPOSIT_PERCENT[deposit]) / 100);
     const money = (n: number) => formatMoney(n, currency) ?? "";
+    if (deposit === "NONE") {
+        // Online only: nothing at the visit, it is all paid when booking.
+        return way === "ONLINE" && cents > 0
+            ? `They pay ${money(cents)} online when booking: your booking rules take payment online only.`
+            : "No card needed to book. No-shows cost you the slot.";
+    }
+    const now = Math.round((cents * DEPOSIT_PERCENT[deposit]) / 100);
     const split =
         deposit === "FULL"
             ? `They pay ${money(now)} when booking.`

@@ -18,6 +18,9 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { BookingPayment } from "../bookings/booking-rules";
+import { BOOKING_PAYMENTS } from "../bookings/booking-rules";
+
 /** A person on the diary takes new bookings while ACTIVE (U3). */
 export const STAFF_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export type StaffStatus = (typeof STAFF_STATUSES)[number];
@@ -273,4 +276,13 @@ export class UpdateBookingRulesDto {
     @IsOptional()
     @IsBoolean()
     refundInTimeCancels?: boolean;
+
+    /**
+     * How people pay when they book on the booking page (DEC-088): ONLINE,
+     * DESK or BOTH. Absent: left as it is (BOTH for a business that never
+     * set it), so an app older than it saves the other rules unchanged.
+     */
+    @IsOptional()
+    @IsIn(BOOKING_PAYMENTS)
+    bookingPayment?: BookingPayment;
 }

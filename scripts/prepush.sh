@@ -299,18 +299,26 @@ e2e_stack() {
     export E2E_API_URL=http://localhost:3333
     export E2E_RENDERER_URL=http://localhost:3005
     # The marketing site (saroh.in, the `web` package), built and started
-    # only when a spec that opens it runs (marketing.spec.ts, plan U29), as
-    # CI does: its waitlist forwards to this stack's API, and pricing reads
-    # the catalogue there (the placeholder when there is none).
+    # only when a spec that opens it runs (marketing, link-preview, resources,
+    # help and privacy specs; plan U29), as CI does: its waitlist forwards to
+    # this stack's API, and pricing reads the catalogue there (the
+    # placeholder when there is none).
     export E2E_WEB_URL=http://localhost:3002
+    # Resources pages before their publish date, as CI: without it the Help
+    # and Privacy specs skip themselves and test nothing.
+    export RESOURCES_PREVIEW=1
     local web_filter=""
-    case " $(echo $specs) " in *marketing.spec.ts*) web_filter=--filter=web ;; esac
+    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
     # never production's saroh.app, which a redirect would otherwise leave for.
     export RENDERER_URL=http://localhost:3005
     export SITE_RELAY_SECRET=saroh-dev-insecure-site-relay-secret-not-for-production
     export SITE_ACCOUNTS_CODE_SECRET=ci-placeholder-site-code-secret-at-least-32-chars # gitleaks:allow (CI placeholder)
     export SITE_CODES_EMAIL_FAKE=log
+    # The link preview tool's spec serves its pages on this machine, which
+    # the API's SSRF guard refuses; this test-only list lets it reach them.
+    # The API won't boot with it under NODE_ENV=production.
+    export LINK_PREVIEW_TEST_HOSTS=127.0.0.1
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     # The run's database is a copy of a seeded template, "<name>-template",
@@ -624,7 +632,7 @@ e2e_start() {
     [ "$E2E_STATUS" = run ] && ports="3333 3000 3003 3005"
     # The marketing site, when its spec is in the run (e2e_stack).
     [ "$E2E_STATUS" = run ] && case " $(echo $specs) " in
-        *marketing.spec.ts*) ports="$ports 3002" ;; esac
+        *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
     [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
     trap stop_stack EXIT
     # In the background: the lock first (waiting on another run, if one is
@@ -1078,8 +1086,11 @@ if [ "$INT" = 1 ]; then
     if cached "$INT_STEP" int; then say "$INT_STEP" "PASS (cached)"; else INT_NEED=plain; fi
     if cached "$INT_RLS_STEP" int-rls; then say "$INT_RLS_STEP" "PASS (cached)"; else INT_NEED="$INT_NEED rls"; fi
     if [ -n "$INT_NEED" ]; then
-        # The api's workspace packages are consumed built, as in CI.
-        step int-build $TURBO build --filter='@saroh/api^...'
+        # The api's workspace packages are consumed built, as in CI. The
+        # Prisma client is generated into node_modules, outside turbo's
+        # cached outputs, so a cache hit after a schema merge left it stale
+        # (DEV_LEARNINGS, 6 Oct): generate it first, every time (~1s).
+        step int-build sh -c "pnpm --filter @saroh/database exec prisma generate >/dev/null && $TURBO build --filter='@saroh/api^...'"
         if [ "$INT_STEP" = int ] || int_select; then
             say int "$INT_WHY"
             # One mode after the other, never side by side (int_worker).

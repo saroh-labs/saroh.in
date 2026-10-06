@@ -1,4 +1,5 @@
-const { REDIRECTS } = require("./redirects");
+const { REDIRECTS, temporary } = require("./redirects");
+const { builtRoutes } = require("./routes.config");
 
 // A production deployment without API_URL drops every waitlist join, and
 // nothing on the page shows it: refuse to build instead (it went unseen for
@@ -38,6 +39,16 @@ const nextConfig = {
     // lives at api.saroh.in).
     reactStrictMode: false,
 
+    /**
+     * The pages this build has, read from `app/` as it is built
+     * (`routes.config.js`). The Resources list (`content/resources.ts`) shows a
+     * page in the nav, footer and sitemap only once its route is here, so a
+     * page listed ahead of its route never links to a 404.
+     */
+    env: {
+        SAROH_BUILT_ROUTES: JSON.stringify(builtRoutes()),
+    },
+
     /*
      * A pricing draft preview (plans catalogue U24, KTD-10) is never cached,
      * indexed or passed on as a referrer, whatever the page itself sends.
@@ -54,9 +65,15 @@ const nextConfig = {
         ];
     },
 
-    /** Old addresses to their V2 pages, one hop each (`redirects.js`). */
+    /**
+     * Old addresses to their V2 pages, one hop each, and, before launch,
+     * Pricing to the waitlist (`redirects.js`).
+     */
     async redirects() {
-        return REDIRECTS;
+        return [
+            ...REDIRECTS,
+            ...temporary(process.env.NEXT_PUBLIC_LAUNCH_MODE),
+        ];
     },
 
     images: {

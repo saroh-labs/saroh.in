@@ -32,6 +32,12 @@ import {
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { paidADeposit } from "./booking-money";
 import {
+    onlinePaymentBlocker,
+    onlineUnavailableMessage,
+    refuseDisallowedPay,
+} from "./booking-payment";
+import type { BookingRulesValue } from "./booking-rules";
+import {
     bookingWindowRefusal,
     loadBookingRules,
     withinBookingWindow,
@@ -47,6 +53,7 @@ import {
 } from "./booking-slots";
 import { asBookable } from "./deposit-plan";
 import type { BookPay } from "./dto";
+import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type {
     PublicBooking,
     PublicBookingPage,
@@ -57,7 +64,6 @@ import {
     publicBookingPage,
     publicDays,
     publicServices,
-    takesOnlinePayment,
     toPublicBooking,
 } from "./public-booking-page";
 import { FixedWindowRateLimiter } from "./rate-limiter";
@@ -328,10 +334,17 @@ export class PublicBookingsService {
             bookingPage: true,
         });
         const { rules } = loaded;
+        // How the business lets people pay when they book (DEC-088), read
+        // once: the deposit below and the pay check further down both follow it.
+        const bookingRules = await loadBookingRules(
+            prisma,
+            loaded.service.organizationId,
+        );
         // A stored deposit the business can't take online (its plan,
-        // Payments off, no provider) books as no deposit, at the desk — the
-        // row keeps it (`deposit-plan.ts`): a service never goes unbookable.
-        const service = await asBookable(loaded.service);
+        // Payments off, no provider) books at the desk when its rules allow
+        // the desk, or stands and is refused with "get in touch" when they
+        // allow only online (DEC-089, `deposit-plan.ts`). The row keeps it.
+        const service = await asBookable(loaded.service, bookingRules);
         // A signed-in customer books only their own business's services:
         // another business's service is as good as missing (A9).
         if (signedIn && service.organizationId !== signedIn.organizationId) {
@@ -358,6 +371,9 @@ export class PublicBookingsService {
                     ? askedPay
                     : payAtBooking(service, askedPay),
         };
+        // …and as the business allows it (DEC-088): online, at the desk, or
+        // both. Refused before anything is held.
+        refuseDisallowedPay(service, input.pay, bookingRules);
         // A treatment is sold as one order (E9, DEC-050): with nowhere to
         // sell it, or no email to bill, it is refused before anything is
         // held.
@@ -382,6 +398,18 @@ export class PublicBookingsService {
             startAt,
             new Date(startAt.getTime() + service.durationMinutes * 60_000),
         );
+        // In person, only while the business is open (DEC-087).
+        const opening = await openingFor(service, place);
+        refuseOutsideOpening(
+            opening,
+            {
+                startAt,
+                endAt: new Date(
+                    startAt.getTime() + service.durationMinutes * 60_000,
+                ),
+            },
+            service.locationType === "EITHER",
+        );
         const availService = toAvailabilityService(service);
         const staffing = await loadStaffing(service);
         if (
@@ -392,11 +420,7 @@ export class PublicBookingsService {
                 "startAt is not a bookable slot for this service",
             );
         }
-        const refusal = bookingWindowRefusal(
-            startAt,
-            now,
-            await loadBookingRules(prisma, service.organizationId),
-        );
+        const refusal = bookingWindowRefusal(startAt, now, bookingRules);
         if (refusal) throw new BadRequestException(refusal);
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
@@ -406,7 +430,7 @@ export class PublicBookingsService {
         // share of the price, worked out here — never the client's (E8).
         const price =
             input.pay === "NOW" || input.pay === "DEPOSIT"
-                ? await this.onlinePrice(service, input.pay)
+                ? await this.onlinePrice(service, input.pay, bookingRules)
                 : null;
 
         // 3. Rate-limit per (service, hashed IP). Cheap abuse guard. Before
@@ -472,6 +496,7 @@ export class PublicBookingsService {
                 input.staffId,
                 "public",
                 ownHold ?? undefined,
+                opening,
             );
         } catch (err) {
             const twin = await bookingByKey(serviceId, input);
@@ -744,6 +769,7 @@ export class PublicBookingsService {
     private async onlinePrice(
         service: Service,
         pay: "NOW" | "DEPOSIT",
+        rules: Pick<BookingRulesValue, "bookingPayment">,
     ): Promise<{ cents: number; currency: string }> {
         if (
             !service.priceCents ||
@@ -756,13 +782,12 @@ export class PublicBookingsService {
                 field: "pay",
             });
         }
-        // A deposit is only ever here when money can be taken online
-        // (`asBookable`), so every refusal points to the desk.
+        // A deposit is only here when money can be taken online, or when the
+        // rules allow only online (`asBookable`, DEC-089): then "get in touch".
         const deposit = depositCents(service.priceCents, service.depositMode);
-        if (!(await takesOnlinePayment(service.organizationId))) {
+        if ((await onlinePaymentBlocker(service.organizationId)) !== null) {
             throw new ConflictException({
-                message:
-                    "This business isn't taking payment online right now. Book it to pay at the desk.",
+                message: onlineUnavailableMessage(deposit !== null, rules),
                 field: "pay",
             });
         }

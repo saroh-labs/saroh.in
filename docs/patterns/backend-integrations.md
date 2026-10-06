@@ -32,6 +32,22 @@ a note saying so.
   decrypt throw and take Subscription Detail down
   (`mandate-setup.service.ts`, DEV_LEARNINGS "Subscription Detail could not be
   loaded").
+- **Current** — **An email a stranger can trigger carries only our words.**
+  When anyone on the internet can make Saroh send an email to an address
+  they type (a public tool, a "send me a copy" box), the email quotes
+  nothing they or a page they control chose: no titles, descriptions,
+  names, links or values from the request — not even a domain in the
+  subject. Say what happened in our own fixed text and link to our own
+  page, which shows the details. Its caps are durable (counted in the
+  database, per address and per day in all), the route is server-to-server
+  behind the signed relay, and no consent is taken from an unverified
+  address (`link-preview/report-email.ts`, DEV_LEARNINGS "a public tool
+  that emails stranger-supplied text is a relay").
+- **Current** — **A stranger's host name is resolved off the thread pool.**
+  Never `dns.lookup` (getaddrinfo on libuv's four threads) for an address a
+  visitor typed: use `dns.promises.Resolver` with a short timeout and one
+  try, cap how many such fetches run at once, and answer a typed "busy"
+  past it (`link-preview/ssrf-guard.ts`).
 - **Current** — **Merchant payments and Saroh billing never share** records,
   credentials, webhooks or contracts (DEC-010).
 - **Current** — **The Organization connects its own messaging provider** for real

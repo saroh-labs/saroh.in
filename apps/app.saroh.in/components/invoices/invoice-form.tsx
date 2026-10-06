@@ -169,6 +169,7 @@ export function InvoiceForm({
         gstin: useId(),
         state: useId(),
         address: useId(),
+        lines: useId(),
     };
     const [intent, setIntent] = useState<"issue" | "draft">("issue");
     const hasBuyerGst = Boolean(
@@ -210,6 +211,17 @@ export function InvoiceForm({
         control: form.control,
         name: "lines",
     });
+    // The last line empties rather than goes: an invoice has one.
+    const removeLine = (i: number) =>
+        fields.length > 1
+            ? remove(i)
+            : form.setValue(`lines.0`, {
+                  description: "",
+                  quantity: 1,
+                  unitPrice: "",
+                  gstRate: "",
+                  hsnSac: "",
+              });
     const { isSubmitting, errors } = form.formState;
     const lines = useWatch({ control: form.control, name: "lines" });
     const due = useWatch({ control: form.control, name: "due" });
@@ -360,7 +372,10 @@ export function InvoiceForm({
                 className="flex flex-wrap items-start gap-4"
                 noValidate
             >
-                <div className="grid min-w-0 flex-[3_1_440px] gap-3">
+                {/* One column that never grows past the form: an auto
+                    track took the picker's whole "name · email" as its
+                    least width, and a long email zoomed a phone out. */}
+                <div className="grid min-w-0 flex-[3_1_440px] grid-cols-[minmax(0,1fr)] gap-3">
                     <Card label="Billed to">
                         <Controller
                             control={form.control}
@@ -478,11 +493,20 @@ export function InvoiceForm({
                                 const lineErr = errors.lines?.[i];
                                 return (
                                     <li key={line.id} className="grid gap-1.5">
-                                        <div className="grid grid-cols-[minmax(0,3fr)_70px_100px_30px] gap-1.5">
+                                        {/* A phone stacks the line (T7):
+                                            what it's for beside its remove
+                                            button, then Quantity and Price
+                                            each, labelled, side by side.
+                                            The desk keeps one row. The
+                                            remove button is drawn twice
+                                            (one per layout, the other
+                                            display:none) so the tab order
+                                            follows what is seen. */}
+                                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-1.5 sm:grid-cols-[minmax(0,3fr)_70px_100px_30px]">
                                             <Input
                                                 aria-label={`Line ${i + 1}: what it's for`}
                                                 placeholder="What it's for"
-                                                className="h-9 rounded-[8px] text-[13px]"
+                                                className="col-span-2 h-9 rounded-[8px] text-[13px] sm:col-span-1"
                                                 disabled={isSubmitting}
                                                 aria-invalid={Boolean(
                                                     lineErr?.description,
@@ -491,60 +515,64 @@ export function InvoiceForm({
                                                     `lines.${i}.description`,
                                                 )}
                                             />
-                                            <Input
-                                                aria-label={`Line ${i + 1}: quantity`}
-                                                inputMode="numeric"
-                                                className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                            <RemoveLine
+                                                index={i}
+                                                className="grid size-11 sm:hidden"
                                                 disabled={isSubmitting}
-                                                aria-invalid={Boolean(
-                                                    lineErr?.quantity,
-                                                )}
-                                                {...form.register(
-                                                    `lines.${i}.quantity`,
-                                                    {
-                                                        valueAsNumber: true,
-                                                    },
-                                                )}
+                                                onRemove={() => removeLine(i)}
                                             />
-                                            <Input
-                                                aria-label={`Line ${i + 1}: price each, ${currency}`}
-                                                inputMode="decimal"
-                                                placeholder="₹ each"
-                                                className="h-9 rounded-[8px] text-[13px] tabular-nums"
-                                                disabled={isSubmitting}
-                                                aria-invalid={Boolean(
-                                                    lineErr?.unitPrice,
-                                                )}
-                                                {...form.register(
-                                                    `lines.${i}.unitPrice`,
-                                                )}
-                                            />
-                                            <button
-                                                type="button"
-                                                aria-label={`Remove line ${i + 1}`}
-                                                disabled={isSubmitting}
-                                                onClick={() =>
-                                                    fields.length > 1
-                                                        ? remove(i)
-                                                        : form.setValue(
-                                                              `lines.0`,
-                                                              {
-                                                                  description:
-                                                                      "",
-                                                                  quantity: 1,
-                                                                  unitPrice: "",
-                                                                  gstRate: "",
-                                                                  hsnSac: "",
-                                                              },
-                                                          )
-                                                }
-                                                className="grid place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground active:bg-accent-active"
-                                            >
-                                                <X
-                                                    aria-hidden
-                                                    className="size-4"
+                                            <div className="grid gap-1 sm:contents">
+                                                <Label
+                                                    htmlFor={`${ids.lines}-${i}-qty`}
+                                                    className="text-[12px] text-muted-foreground sm:hidden"
+                                                >
+                                                    Quantity
+                                                </Label>
+                                                <Input
+                                                    id={`${ids.lines}-${i}-qty`}
+                                                    aria-label={`Line ${i + 1}: quantity`}
+                                                    inputMode="numeric"
+                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                    disabled={isSubmitting}
+                                                    aria-invalid={Boolean(
+                                                        lineErr?.quantity,
+                                                    )}
+                                                    {...form.register(
+                                                        `lines.${i}.quantity`,
+                                                        {
+                                                            valueAsNumber: true,
+                                                        },
+                                                    )}
                                                 />
-                                            </button>
+                                            </div>
+                                            <div className="grid gap-1 sm:contents">
+                                                <Label
+                                                    htmlFor={`${ids.lines}-${i}-price`}
+                                                    className="text-[12px] text-muted-foreground sm:hidden"
+                                                >
+                                                    Price each
+                                                </Label>
+                                                <Input
+                                                    id={`${ids.lines}-${i}-price`}
+                                                    aria-label={`Line ${i + 1}: price each, ${currency}`}
+                                                    inputMode="decimal"
+                                                    placeholder="₹ each"
+                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                    disabled={isSubmitting}
+                                                    aria-invalid={Boolean(
+                                                        lineErr?.unitPrice,
+                                                    )}
+                                                    {...form.register(
+                                                        `lines.${i}.unitPrice`,
+                                                    )}
+                                                />
+                                            </div>
+                                            <RemoveLine
+                                                index={i}
+                                                className="hidden sm:grid"
+                                                disabled={isSubmitting}
+                                                onRemove={() => removeLine(i)}
+                                            />
                                         </div>
                                         {registered ? (
                                             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] gap-1.5 sm:grid-cols-[170px_140px_1fr]">
@@ -725,5 +753,33 @@ function Card({ label, children }: { label: string; children: ReactNode }) {
             </h2>
             {children}
         </section>
+    );
+}
+
+/** A line's remove button: 44px on a phone, the desk's 30px column. */
+function RemoveLine({
+    index,
+    className,
+    disabled,
+    onRemove,
+}: {
+    index: number;
+    className: string;
+    disabled: boolean;
+    onRemove: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            aria-label={`Remove line ${index + 1}`}
+            disabled={disabled}
+            onClick={onRemove}
+            className={cn(
+                "place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
+                className,
+            )}
+        >
+            <X aria-hidden className="size-4" />
+        </button>
     );
 }
