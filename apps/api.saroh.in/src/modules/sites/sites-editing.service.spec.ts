@@ -61,6 +61,7 @@ jest.mock("@saroh/database", () => {
 
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { starterTemplate } from "@saroh/templates";
 
 import { draftFingerprint } from "./review-route";
 
@@ -995,6 +996,49 @@ describe("SitesService.publishSite", () => {
         });
         expect(result.currentPublicationId).toBe("pub_1");
         expect(result.publicationId).toBe("pub_1");
+    });
+
+    it("stamps the Publication with the site's own template (KTD-7)", async () => {
+        siteFindFirst.mockResolvedValue({
+            ...siteWithRichText("<p>hello</p>"),
+            templateId: "personal",
+            templateVersion: 1,
+        });
+
+        await service.publishSite(ctx(), "site_1");
+
+        expect(publicationCreate.mock.calls[0][0].data).toMatchObject({
+            templateId: "personal",
+            templateVersion: 1,
+        });
+        // Loaded with the draft, never part of the snapshot.
+        const select = siteFindFirst.mock.calls[0][0].select as Record<
+            string,
+            unknown
+        >;
+        expect(select).toMatchObject({
+            templateId: true,
+            templateVersion: true,
+        });
+        const snapshot = publicationCreate.mock.calls[0][0].data.snapshot as {
+            site: Record<string, unknown>;
+        };
+        expect(snapshot.site).not.toHaveProperty("templateId");
+    });
+
+    it("stamps the starter for a site with no template recorded, as before", async () => {
+        siteFindFirst.mockResolvedValue({
+            ...siteWithRichText("<p>hello</p>"),
+            templateId: null,
+            templateVersion: null,
+        });
+
+        await service.publishSite(ctx(), "site_1");
+
+        expect(publicationCreate.mock.calls[0][0].data).toMatchObject({
+            templateId: starterTemplate.id,
+            templateVersion: starterTemplate.version,
+        });
     });
 
     it("publishes a text block's photo and its side (G7)", async () => {
