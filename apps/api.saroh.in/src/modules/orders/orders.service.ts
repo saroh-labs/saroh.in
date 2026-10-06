@@ -38,7 +38,7 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
-import { recordPaidByHandInTx } from "./hand-payments";
+import { markedPaidNote, recordPaidByHandInTx } from "./hand-payments";
 import {
     assertOneParty,
     assertStorefrontOffers,
@@ -603,10 +603,28 @@ export class OrdersService {
             const paymentChanging =
                 nextPayment != null && nextPayment !== order.paymentStatus;
             if (paymentChanging && nextPayment === "PAID") {
-                await recordPaidByHandInTx(tx, orderId);
+                const byHandCents = await recordPaidByHandInTx(tx, orderId);
+                // How it was paid (#834) is kept on the invoice, the
+                // payment's record (DEC-023); an app before it sends none.
                 await ensureOrderInvoice(tx, orderId, {
-                    method: "RECORDED",
+                    method: dto.paidHow ?? "RECORDED",
                 });
+                if (order.organizationId) {
+                    // On the timeline, with no amount in the note; the
+                    // step's amount says it to a money reader.
+                    await tx.orderEvent.create({
+                        data: {
+                            organizationId: order.organizationId,
+                            orderId,
+                            kind: "STATUS",
+                            actorUserId: userId,
+                            fromStatus: null,
+                            toStatus: null,
+                            note: markedPaidNote(dto.paidHow),
+                            amountCents: byHandCents,
+                        },
+                    });
+                }
             }
             if (paymentChanging && nextPayment === "REFUNDED") {
                 await creditRestOfOrder(tx, orderId, "Refunded", userId);

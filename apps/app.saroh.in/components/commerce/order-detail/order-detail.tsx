@@ -349,7 +349,13 @@ export function OrderDetail({
                         failed={order.paymentStatus === "FAILED"}
                         first={first}
                         canRecord={can.edit}
-                        onCash={() => setMenu({ kind: "payment", to: "PAID" })}
+                        onCash={() =>
+                            setMenu({
+                                kind: "payment",
+                                to: "PAID",
+                                how: "CASH",
+                            })
+                        }
                         onSendLink={
                             linkable && can.payOnline ? payLink.ask : undefined
                         }
