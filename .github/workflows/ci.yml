@@ -504,6 +504,10 @@ jobs:
       E2E_RENDERER_URL: http://localhost:3005
       # The marketing site, saroh.in (`web`), for marketing.spec.ts (plan U29).
       E2E_WEB_URL: http://localhost:3002
+      # Resources pages (Help, Privacy, …) before their publish date, so their
+      # specs run instead of skipping. Never production: the site ignores it
+      # there (plan KTD-2).
+      RESOURCES_PREVIEW: "1"
       # The API's links to the renderer (pay links, DEC-069 L6): this
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.

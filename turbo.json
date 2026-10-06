@@ -30,7 +30,12 @@
         "NEXT_PUBLIC_BETTER_AUTH_URL",
         "NEXT_PUBLIC_ROOT_DOMAIN",
         "NEXT_PUBLIC_VERCEL_ENV",
-        "NEXT_PUBLIC_VERCEL_URL"
+        "NEXT_PUBLIC_VERCEL_URL",
+        // saroh.in: shows Resources pages before their publish date on a
+        // preview deployment; ignored on production (plan KTD-2). Hashed, not
+        // passed through: a build without it pre-renders /help as a 404, and
+        // a cache hit reused that build with the flag on.
+        "RESOURCES_PREVIEW"
     ],
     "globalPassThroughEnv": [
         "PORT",
@@ -69,9 +74,6 @@
         "DEV_REDIRECT_ORIGIN",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
-        // saroh.in: shows Resources pages before their publish date on a
-        // preview deployment; ignored on production (plan KTD-2).
-        "RESOURCES_PREVIEW",
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.
         "SAROH_BUILT_ROUTES",
