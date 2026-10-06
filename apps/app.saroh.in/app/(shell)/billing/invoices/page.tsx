@@ -11,6 +11,7 @@ import { listInvoices, listInvoicesPaidSince } from "@/lib/invoices/service";
 import { chipFromQuery } from "@/lib/invoices/sources";
 import { tabFromView } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
+import { invoiceZone } from "@/lib/invoices/zone";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { sinceParam } from "@/lib/views/since";
@@ -84,6 +85,8 @@ export default async function InvoicesPage({
                 // From Home's "Last 24 hours" (F6): the invoices paid since.
                 paidSince={paidSince}
                 paidSinceInvoices={paid}
+                // Dates as the paper prints them: the business's zone (#836).
+                timeZone={invoiceZone(business)}
             />
         </PageContainer>
     );

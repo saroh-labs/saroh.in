@@ -14,6 +14,7 @@ import { printedSeller } from "@/lib/invoices/seller";
 import type { Invoice } from "@/lib/invoices/service";
 import { billedTo, spacedCode } from "@/lib/invoices/status";
 import type { InvoiceBusiness } from "@/lib/invoices/tax";
+import { invoiceZone } from "@/lib/invoices/zone";
 
 /**
  * Line rows: a phone (below `sm`) gives the item the row and the amount the
@@ -63,6 +64,9 @@ export function InvoicePaper({
         email: business?.email ?? null,
     });
     const businessName = seller.name;
+    // Its dates in the business's zone, as the customer's copy prints them
+    // (#836), never the viewer's.
+    const zone = invoiceZone(business);
     const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
     const who = billedTo(i);
     const gst = i.gst ?? null;
@@ -162,6 +166,7 @@ export function InvoicePaper({
                                 <ViewerDate
                                     iso={i.issuedAt}
                                     variant="dayMonth"
+                                    timeZone={zone}
                                 />
                                 {i.dueAt && !credit && !i.order ? (
                                     <>
@@ -169,6 +174,7 @@ export function InvoicePaper({
                                         <ViewerDate
                                             iso={i.dueAt}
                                             variant="dayMonth"
+                                            timeZone={zone}
                                         />
                                     </>
                                 ) : null}

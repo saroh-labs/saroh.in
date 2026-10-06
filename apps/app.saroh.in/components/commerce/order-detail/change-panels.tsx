@@ -1,6 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
+import { sentenceStart } from "@/lib/format/sentence";
 import { uncollectedHeading } from "@/lib/orders/pay-on-handover";
 
 import { actionClass, Panel, PanelTitle } from "./parts";
@@ -174,8 +175,8 @@ export function PaymentBanner({
                     </div>
                     <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-foreground">
                         {handover === "collection"
-                            ? `${first} chose to pay when they collect it and hasn't come for it.`
-                            : `${first} chose to pay on delivery and it hasn't been delivered.`}{" "}
+                            ? `${sentenceStart(first)} chose to pay when they collect it and hasn't come for it.`
+                            : `${sentenceStart(first)} chose to pay on delivery and it hasn't been delivered.`}{" "}
                         Cancel it to put the stock back, or keep waiting —
                         nothing cancels on its own.
                     </p>
@@ -219,8 +220,8 @@ export function PaymentBanner({
                     </div>
                     <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                         {handover === "collection"
-                            ? `${first} chose to pay when they collect it. Prepare it as usual, take the money at the counter, then mark it paid before marking it collected.`
-                            : `${first} chose to pay on delivery. Prepare and send it as usual, take the money at the door, then mark it paid before marking it delivered.`}
+                            ? `${sentenceStart(first)} chose to pay when they collect it. Prepare it as usual, take the money at the counter, then mark it paid before marking it collected.`
+                            : `${sentenceStart(first)} chose to pay on delivery. Prepare and send it as usual, take the money at the door, then mark it paid before marking it delivered.`}
                     </p>
                 </div>
                 {canRecord ? (

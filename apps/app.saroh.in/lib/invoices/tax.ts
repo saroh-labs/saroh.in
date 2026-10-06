@@ -25,6 +25,8 @@ export interface InvoiceBusiness {
     address: string | null;
     /** The logo printed at the top, as it is today. */
     logo: string | null;
+    /** The IANA zone the business keeps time in; null until it is set. */
+    timeZone: string | null;
 }
 
 export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
@@ -39,6 +41,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
             legalName: string | null;
             contactEmail: string | null;
             taxId: string | null;
+            timezone?: string | null;
         } | null;
         tax?: {
             registered: boolean;
@@ -60,6 +63,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
             : null,
         address: printedAddress(s.registeredAddress),
         logo: s.logo?.url ?? null,
+        timeZone: s.profile?.timezone ?? null,
     };
 }
 

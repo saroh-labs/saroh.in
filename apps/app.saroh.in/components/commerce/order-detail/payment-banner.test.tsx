@@ -49,3 +49,20 @@ describe("the pay-on-handover banner", () => {
         );
     });
 });
+
+describe("the pay-on-handover banner with no customer name (#837)", () => {
+    it("starts its sentence with a capital", () => {
+        const html = render({ first: "the customer", uncollectedDays: null });
+        expect(html).toContain(
+            "The customer chose to pay when they collect it.",
+        );
+        expect(html).not.toContain(">the customer chose");
+    });
+
+    it("starts the waited sentence with a capital too", () => {
+        const html = render({ first: "the customer", uncollectedDays: 4 });
+        expect(html).toContain(
+            "The customer chose to pay when they collect it and",
+        );
+    });
+});
