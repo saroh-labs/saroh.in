@@ -106,3 +106,10 @@ export {
     DEVELOPER_TEMPLATE_ID,
     developerTemplate,
 } from "./templates/developer";
+// The Dietician industry template (industry templates plan, U7).
+export {
+    DIETICIAN_GALLERY_SAMPLE,
+    DIETICIAN_TEMPLATE_ID,
+    dieticianServiceIds,
+    dieticianTemplate,
+} from "./templates/dietician";

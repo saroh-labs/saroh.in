@@ -3,6 +3,7 @@ import { bakeryTemplate } from "./templates/bakery";
 import { blogsTemplate } from "./templates/blogs";
 import { ceramicsTemplate } from "./templates/ceramics";
 import { developerTemplate } from "./templates/developer";
+import { dieticianTemplate } from "./templates/dietician";
 import { gymTemplate } from "./templates/gym";
 import { personalTemplate } from "./templates/personal";
 import { portfolioTemplate } from "./templates/portfolio";
@@ -39,6 +40,7 @@ const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
         bakeryTemplate,
         studioTemplate,
         developerTemplate,
+        dieticianTemplate,
     ].map((t) => [key(t.id, t.version), t]),
 );
 
