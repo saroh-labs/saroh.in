@@ -18,6 +18,13 @@ export {
     opensOverPhoto,
 } from "./section-renderer";
 export type { Section } from "./section-renderer";
+// Server-safe: which sections are known to draw nothing, for the menu.
+export {
+    FEED_BACKED_SECTIONS,
+    sectionRendersNothing,
+    withoutEmptyInPageEntries,
+} from "./section-empty";
+export type { FeedsFor, SectionFeeds } from "./section-empty";
 
 export {
     BlockFixturePreview,

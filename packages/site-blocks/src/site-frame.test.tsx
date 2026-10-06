@@ -128,8 +128,20 @@ describe("the header's in-page entries", () => {
         { label: "About", href: "/about" },
     ];
 
+    // jsdom is on "/", the home page: its sections are on the page.
+    const HOME = [
+        text({ anchor: "today", navLabel: "Today's bread" }),
+        text({ anchor: "visit", navLabel: "Visit" }),
+    ];
+    const home = () => (
+        <>
+            <SiteHeader name="Rye & Co." navigation={NAV} />
+            <PageSections sections={HOME} />
+        </>
+    );
+
     it("lists them as links to the home page's sections, never as the current page", () => {
-        render(<SiteHeader name="Rye & Co." navigation={NAV} />);
+        render(home());
         const row = screen.getByRole("navigation", { name: "Site" });
         const links = Array.from(row.querySelectorAll("a"));
         expect(links.map((a) => a.getAttribute("href"))).toEqual([
@@ -164,7 +176,7 @@ describe("the header's in-page entries", () => {
     });
 
     it("lists them in the phone menu too, which closes when one is chosen", () => {
-        render(<SiteHeader name="Rye & Co." navigation={NAV} />);
+        render(home());
         const button = screen.getByRole("button", { name: "Menu" });
         act(() => button.click());
         const list = document.getElementById(
@@ -176,6 +188,43 @@ describe("the header's in-page entries", () => {
         expect(visit).toHaveAttribute("href", "/#visit");
         act(() => visit?.click());
         expect(button).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("drops one a page entry names, unless that page's module is off", () => {
+        const nav = [
+            { label: "Membership", href: "/#membership" },
+            { label: "Visit", href: "/#visit" },
+            { label: "Membership", href: "/prices", kind: "PRICES" },
+        ];
+        const sections = [
+            text({ anchor: "membership", navLabel: "Membership" }),
+            text({ anchor: "visit", navLabel: "Visit" }),
+        ];
+        const hrefs = () =>
+            Array.from(
+                screen
+                    .getByRole("navigation", { name: "Site" })
+                    .querySelectorAll("a"),
+            ).map((a) => a.getAttribute("href"));
+        const { unmount } = render(
+            <>
+                <SiteHeader name="Iron & Oak" navigation={nav} />
+                <PageSections sections={sections} />
+            </>,
+        );
+        expect(hrefs()).toEqual(["/#visit", "/prices"]);
+        unmount();
+        render(
+            <>
+                <SiteHeader
+                    name="Iron & Oak"
+                    navigation={nav}
+                    modules={{ PRICES: "off" }}
+                />
+                <PageSections sections={sections} />
+            </>,
+        );
+        expect(hrefs()).toEqual(["/#membership", "/#visit"]);
     });
 
     it("puts Shop after them, not in front", () => {

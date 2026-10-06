@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { withoutShadowedInPageEntries } from "@saroh/block-contract";
+
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
 import { trimTrailingSlashes } from "./url-path";
@@ -385,12 +387,16 @@ export function SiteHeader({
         if (href.startsWith("/#")) return `${basePath}${href.slice(1)}`;
         return `${basePath}${href}`;
     };
-    const items = withShopLink(siteMenu(navigation, modules), shopServes).map(
-        (item) => ({
-            label: item.label,
-            href: to(item.href),
-        }),
-    );
+    // A section entry a page entry names leaves once the modules that are
+    // off have (`withoutShadowedInPageEntries`): it stands in for its module
+    // page only while that page is out of the menu.
+    const items = withShopLink(
+        withoutShadowedInPageEntries(siteMenu(navigation, modules)),
+        shopServes,
+    ).map((item) => ({
+        label: item.label,
+        href: to(item.href),
+    }));
     const main = action ? { label: action.label, href: to(action.href) } : null;
     const hasMenu = items.length > 0 || main !== null;
 

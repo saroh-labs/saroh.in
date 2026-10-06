@@ -10,6 +10,7 @@ import { cn, trimTrailingSlashes } from "../lib/utils";
 import type { ArchiveYear } from "./journal-archive";
 import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
 import { JournalLead } from "./journal-lead";
+import { JOURNAL_DEFAULT_COUNT, journalCardPosts } from "./journal-posts";
 import { cardLink, listCard, listPhoto } from "./list-layout";
 
 /**
@@ -60,8 +61,9 @@ export interface JournalFeed {
 /** What the section is called when the merchant left the title empty. */
 export const JOURNAL_TITLE = "Journal";
 
-/** How many posts the block shows when the count is not set. */
-export const JOURNAL_DEFAULT_COUNT = 3;
+// How many posts the block shows when the count is not set: kept beside
+// the rule for which posts it lists, a module the server can call.
+export { JOURNAL_DEFAULT_COUNT };
 
 /** A value with something in it, else null: an empty string says nothing. */
 function said(value: string | null | undefined): string | null {
@@ -527,14 +529,8 @@ function JournalCards({
     }
     // The archive look (U2): every post, dated, whatever the count says.
     const archive = look === "archive";
-    // Under a lead section, the newest is already on the page (polish).
-    const pool = content.afterLead ? feed.posts.slice(1) : feed.posts;
     const limit = archive ? content.archiveLimit : undefined;
-    const posts = archive
-        ? limit
-            ? pool.slice(0, limit)
-            : pool
-        : pool.slice(0, content.count ?? JOURNAL_DEFAULT_COUNT);
+    const posts = journalCardPosts(content, feed);
     if (posts.length === 0) return null;
     if (archive) {
         const index = trimTrailingSlashes(feed.basePath);

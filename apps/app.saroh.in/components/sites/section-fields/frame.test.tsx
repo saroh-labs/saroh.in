@@ -196,6 +196,31 @@ describe("the canvas's chrome", () => {
         ]);
     });
 
+    it("leaves out a section entry a page entry already names", () => {
+        const chrome = canvasChromeFor({
+            siteName: "Iron & Oak",
+            navigation: { items: [{ pageId: "p_tt" }] },
+            pages: [
+                {
+                    id: "p_tt",
+                    path: "/timetable",
+                    title: "Timetable",
+                    isHome: false,
+                    hidden: false,
+                },
+            ],
+            footer: null,
+            homeSections: [
+                textSection({ anchor: "first", navLabel: "First visit" }),
+                textSection({ anchor: "timetable", navLabel: "timetable" }),
+            ],
+        });
+        expect(chrome.navigation).toEqual([
+            { label: "First visit", href: "/#first" },
+            { label: "Timetable", href: "/timetable" },
+        ]);
+    });
+
     it("keeps a left footer's row with no line", () => {
         const footer = {
             format: "html" as const,

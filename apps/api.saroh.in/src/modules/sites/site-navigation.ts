@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { inPageNavigation } from "@saroh/database";
+import { inPageNavigation, mergeInPageNavigation } from "@saroh/database";
 
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_KINDS } from "./page-kinds";
@@ -183,13 +183,18 @@ export function resolveSiteNavigation(
  *
  * A section's label is the merchant's (or their template's) choice, made
  * in the section's own inspector, so there is no separate switch for this.
+ *
+ * A section entry with the same label as a page entry is left out: the
+ * page is the fuller version, and "Timetable · … · Timetable" reads as a
+ * mistake (`mergeInPageNavigation`). A module page shadows its section only
+ * in the header, at view time, since its entry leaves the menu while its
+ * module is off.
  */
 export function withInPageNavigation(
     menu: readonly PublishedNavigationItem[],
     homeSections: readonly { content: unknown }[],
 ): PublishedNavigationItem[] {
-    const inPage = inPageNavigation(homeSections);
-    if (inPage.length === 0) return [...menu];
-    const taken = new Set(inPage.map((item) => item.href));
-    return [...inPage, ...menu.filter((item) => !taken.has(item.href))];
+    return mergeInPageNavigation(inPageNavigation(homeSections), menu, {
+        shadowsOnlyAlways: true,
+    });
 }
