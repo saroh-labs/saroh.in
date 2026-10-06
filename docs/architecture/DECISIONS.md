@@ -1048,3 +1048,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: DEC-088 blocked a booking whose service asks a deposit (or the full price) at booking whenever online payment wasn't possible, with "‹business› can't take the deposit online right now. Get in touch with them to book." The pricing line (mkt/plan-deposits) took the opposite view: book it and pay at the desk.
 - Decision: the business's "How people pay when they book" decides. With Both or At the desk, a deposit that can't be taken online (desk only, Payments off, or no provider) is paid at the desk: the booking goes through as pay at the desk, and the summary shows that line. With Online only, the booking page says to get in touch and the booking can't be made, as before.
 - Consequences: the API accepts DESK for a deposit service whenever the business allows the desk and online isn't possible. The service editor's warning says what will happen (paid at the desk, or can't be booked online). Supersedes the blocking part of DEC-088 for Both and At the desk.
+
+## DEC-091 A business connects its own email and payment accounts on a paid plan
+
+**Status: Accepted — 2026-10-06** · user · from the DEC-086 email work and the plan checks on saroh.io
+
+- Context: the catalogue's `integrations` row ("Third-party connections") meters connected payment and messaging providers, but it was off on every plan. With plan rules on, no business could connect its own email provider or its Razorpay or Cashfree account, which contradicts DEC-086's "connect your own email" and Grow's online payments.
+- Decision: the row is now "Your own email and payment accounts". It is included with no cap on paid plans and locked on Free. Payment and messaging providers both count towards it. Free relies on Saroh's small booking-email allowance (DEC-086) and takes money offline, and upgrades to connect its own.
+- Consequences: the published catalogue needs a new version with the row on for paid plans before plan rules are switched on anywhere. Settings and the Saroh-email notices on Free offer an upgrade rather than "Connect your email". The sample catalogue (`seed.ts`) follows with no caps.
