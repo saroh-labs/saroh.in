@@ -5,6 +5,8 @@ import {
     webhookPath,
 } from "@saroh/integrations";
 
+import type { HelpFrontmatter } from "./help";
+import { HELP_AREAS, HELP_GROUPS, namesPriceOrLimit } from "./help";
 import type { IntegrationFrontmatter } from "./integrations";
 import { API_ORIGIN, PLACEHOLDER_BUSINESS_ID } from "./integrations";
 import type { FaqItem, Feature, Solution } from "./types";
@@ -176,4 +178,81 @@ function isPaymentWebhookProvider(
     value: string,
 ): value is PaymentWebhookProvider {
     return (PAYMENT_WEBHOOK_PROVIDERS as readonly string[]).includes(value);
+}
+
+/**
+ * Every way a Help article can be wrong (Resources plan U5, KTD-6, R17,
+ * DEC-078), as readable lines; empty means sound. `lib/help-docs.ts` throws
+ * on any, so the build fails; `help.test.ts` runs it on the real articles
+ * and on broken copies.
+ *
+ * - each step has its real screenshot: a key captured in
+ *   `shots.captured.ts`, with a `mark` there if the step names a marker;
+ * - an area and a group the design has;
+ * - a Next link names an article that exists, isn't itself, and is
+ *   published no later than this one (so it never links to a 404);
+ * - no text names a price, a plan limit or a plan (`namesPriceOrLimit`);
+ * - slugs are unique.
+ */
+export function helpErrors({
+    articles,
+    captured,
+}: {
+    articles: readonly HelpFrontmatter[];
+    captured: Partial<Record<string, { src: string; mark?: object }>>;
+}): string[] {
+    const errors: string[] = [];
+    const bySlug = new Map<string, HelpFrontmatter>();
+    for (const a of articles) {
+        if (bySlug.has(a.slug)) errors.push(`help ${a.slug}: two articles`);
+        bySlug.set(a.slug, a);
+    }
+    for (const a of articles) {
+        const at = `help ${a.slug}`;
+        if (!(HELP_AREAS as readonly string[]).includes(a.area)) {
+            errors.push(`${at}: unknown area ${a.area}`);
+        }
+        if (!(HELP_GROUPS as readonly string[]).includes(a.group)) {
+            errors.push(`${at}: unknown group ${a.group}`);
+        }
+        a.steps.forEach((step, i) => {
+            const shot = captured[step.shot];
+            if (!shot) {
+                errors.push(
+                    `${at}: step ${i + 1} has no screenshot (${step.shot} is not captured)`,
+                );
+            } else if (step.marker && !shot.mark) {
+                errors.push(
+                    `${at}: step ${i + 1} marks "${step.marker}" but ${step.shot} was captured without a mark`,
+                );
+            }
+        });
+        for (const slug of a.next) {
+            const target = bySlug.get(slug);
+            if (slug === a.slug) errors.push(`${at}: next links to itself`);
+            else if (!target) errors.push(`${at}: next ${slug} is missing`);
+            else if (target.publishOn > a.publishOn) {
+                errors.push(
+                    `${at}: next ${slug} publishes ${target.publishOn}, after this one`,
+                );
+            }
+        }
+        const texts = [
+            a.title,
+            a.intro,
+            a.description,
+            ...a.steps.flatMap((s) => [
+                s.title,
+                s.body,
+                s.caption,
+                s.tip ?? "",
+            ]),
+        ];
+        for (const t of texts) {
+            const found = namesPriceOrLimit(t);
+            if (found)
+                errors.push(`${at}: names a price or limit ("${found}")`);
+        }
+    }
+    return errors;
 }

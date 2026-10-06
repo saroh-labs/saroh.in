@@ -301,11 +301,12 @@ e2e_stack() {
     export E2E_API_URL=http://localhost:3333
     export E2E_RENDERER_URL=http://localhost:3005
     # The marketing site (saroh.in, the `web` package), built and started
-    # only when a spec that opens it runs (marketing.spec.ts, plan U29), as
+    # only when a spec that opens it runs (marketing, link-preview, resources,
+    # help and privacy specs; plan U29), as
     # CI does: its waitlist forwards to this stack's API.
     export E2E_WEB_URL=http://localhost:3002
     local web_filter=""
-    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts*) web_filter=--filter=web ;; esac
+    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
     # never production's saroh.app, which a redirect would otherwise leave for.
     export RENDERER_URL=http://localhost:3005
@@ -629,7 +630,7 @@ e2e_start() {
     [ "$E2E_STATUS" = run ] && ports="3333 3000 3003 3005"
     # The marketing site, when its spec is in the run (e2e_stack).
     [ "$E2E_STATUS" = run ] && case " $(echo $specs) " in
-        *marketing.spec.ts* | *link-preview.spec.ts*) ports="$ports 3002" ;; esac
+        *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
     [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
     trap stop_stack EXIT
     # In the background: the lock first (waiting on another run, if one is

@@ -1,9 +1,11 @@
 import { changelogHref, liveEntries } from "@/content/changelog";
 import { featureHref } from "@/content/features";
+import { helpHref, liveArticles, summarise } from "@/content/help";
 import type { PublishContext } from "@/content/resources";
 import { resourcePaths, routeExists } from "@/content/resources";
 import { solutionHref } from "@/content/solutions";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
+import { helpArticles } from "@/lib/help-docs";
 import type { LaunchMode } from "@/lib/links";
 
 /**
@@ -14,7 +16,8 @@ import type { LaunchMode } from "@/lib/links";
  * `redirects.js`).
  *
  * Given a publish context (plan U1), the Resources and legal pages that are
- * published and built, and the changelog's live entries, follow. Without
+ * published and built, the changelog's live entries and Help's live
+ * articles, follow. Without
  * one, only the fixed pages: what a redirect may always land on.
  */
 export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
@@ -25,6 +28,12 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
                   .map((e) => changelogHref(e.slug))
                   .filter((path) => routeExists(path, ctx.routes))
             : [];
+    const help =
+        ctx && resources.includes("/help")
+            ? liveArticles(helpArticles().map(summarise), ctx)
+                  .map((a) => helpHref(a.slug))
+                  .filter((path) => routeExists(path, ctx.routes))
+            : [];
     return [
         "/",
         ...FEATURE_SLUGS.map(featureHref),
@@ -32,6 +41,7 @@ export function indexedPaths(mode: LaunchMode, ctx?: PublishContext): string[] {
         ...(mode === "waitlist" ? ["/waitlist"] : []),
         ...resources,
         ...entries,
+        ...help,
     ];
 }
 
