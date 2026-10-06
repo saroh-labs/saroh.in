@@ -322,3 +322,88 @@ describe("servicesList: the price card", () => {
         ).toBe(false);
     });
 });
+
+describe("template round 2: columns, text labels and a display intro", () => {
+    it("saves three, four or five across for the bare cards, and refuses others", () => {
+        for (const columns of [3, 4, 5]) {
+            expect(
+                parseSectionContent("productGrid", 1, {
+                    cardStyle: "bare",
+                    columns,
+                }).success,
+            ).toBe(true);
+        }
+        for (const columns of [2, 6, 4.5]) {
+            expect(
+                parseSectionContent("productGrid", 1, { columns }).success,
+            ).toBe(false);
+        }
+    });
+
+    it("saves a text block's label, label headings and labelled facts", () => {
+        expect(
+            parseSectionContent("richText", 1, {
+                format: "html",
+                value: "<h2>The studio</h2>",
+                label: "The starter",
+                headingStyle: "label",
+                factsStyle: "labels",
+            }).success,
+        ).toBe(true);
+    });
+
+    it("refuses an unknown heading or facts style, and a label past its length", () => {
+        const base = { format: "html", value: "<p>x</p>" };
+        expect(
+            parseSectionContent("richText", 1, {
+                ...base,
+                headingStyle: "shout",
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("richText", 1, { ...base, factsStyle: "grid" })
+                .success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("richText", 1, {
+                ...base,
+                label: "x".repeat(61),
+            }).success,
+        ).toBe(false);
+    });
+
+    it("saves the features intro as a display line, and refuses other styles", () => {
+        const items = [{ title: "The clay" }];
+        expect(
+            parseSectionContent("features", 1, {
+                items,
+                intro: "One line.",
+                introStyle: "display",
+            }).success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("features", 1, { items, introStyle: "huge" })
+                .success,
+        ).toBe(false);
+    });
+
+    it("describes the new fields as published", () => {
+        expect(
+            parseRenderedContent("productGrid", { columns: 5 }).success,
+        ).toBe(true);
+        expect(
+            parseRenderedContent("features", {
+                items: [{ title: "x" }],
+                introStyle: "display",
+            }).success,
+        ).toBe(true);
+        expect(
+            parseRenderedContent("richText", {
+                value: "<p>x</p>",
+                label: "The starter",
+                headingStyle: "label",
+                factsStyle: "labels",
+            }).success,
+        ).toBe(true);
+    });
+});

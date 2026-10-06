@@ -232,7 +232,7 @@ export default function HoursSection({
                         aria-hidden="true"
                         className={cn(
                             "inline-block size-2 rounded-full",
-                            status.open ? "bg-site-accent" : "bg-site-muted",
+                            status.open ? "bg-site-status" : "bg-site-muted",
                         )}
                     />
                     {openStateText(status)}

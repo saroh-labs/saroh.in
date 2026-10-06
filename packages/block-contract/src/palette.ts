@@ -42,8 +42,24 @@ export const PALETTE_ROLES = [
 ] as const;
 export type PaletteRole = (typeof PALETTE_ROLES)[number];
 
+/**
+ * The status roles (template round 2): the colour of the "open now" dot on
+ * the page (`status`) and over the page's ink — a hero photo's wash, an
+ * inverse band (`statusInverse`). A bakery's green, rather than its accent.
+ *
+ * OPTIONAL and never filled in: a palette without one keeps today's dot,
+ * the accent wherever it is drawn, because the blocks read
+ * `--site-status` with the accent as the `var()` fallback. A dot is a
+ * graphic beside words that already say "Open now", so each is held to
+ * WCAG's 3:1 for graphics ({@link PALETTE_GRAPHIC_CONTRAST}) on the ground
+ * it is drawn on, not to text's 4.5:1.
+ */
+export const PALETTE_STATUS_ROLES = ["status", "statusInverse"] as const;
+export type PaletteStatusRole = (typeof PALETTE_STATUS_ROLES)[number];
+
 /** A complete palette: every role, each `#RRGGBB` in capitals. */
-export type SitePalette = Record<PaletteRole, string>;
+export type SitePalette = Record<PaletteRole, string> &
+    Partial<Record<PaletteStatusRole, string>>;
 
 /**
  * What a template writes. Four roles are required; the rest fall back as
@@ -95,6 +111,29 @@ export const PALETTE_VARIABLES: Record<PaletteRole, string> = {
     footerBg: "--site-footer-bg",
     footerFg: "--site-footer-fg",
 };
+
+/** The `--site-*` property each status role sets, when a palette has it. */
+export const PALETTE_STATUS_VARIABLES: Record<PaletteStatusRole, string> = {
+    status: "--site-status",
+    statusInverse: "--site-status-inverse",
+};
+
+/** WCAG 2.1's 1.4.11 for a graphic: what a status dot must reach. */
+export const PALETTE_GRAPHIC_CONTRAST = 3;
+
+/** Each status role, the ground it is drawn on, and what to call it. */
+const STATUS_CONTRAST_PAIRS: readonly {
+    role: PaletteStatusRole;
+    ground: PaletteRole;
+    label: string;
+}[] = [
+    { role: "status", ground: "bg", label: "The open dot on the page" },
+    {
+        role: "statusInverse",
+        ground: "fg",
+        label: "The open dot over a photo or a dark band",
+    },
+];
 
 /** WCAG AA for body text: what every text pairing must reach. */
 export const PALETTE_MIN_CONTRAST = 4.5;
@@ -205,7 +244,7 @@ export function parsePalette(input: unknown): PaletteResult {
     }
     const raw = input as Record<string, unknown>;
     const problems: PaletteProblem[] = [];
-    const known = new Set<string>(PALETTE_ROLES);
+    const known = new Set<string>([...PALETTE_ROLES, ...PALETTE_STATUS_ROLES]);
     for (const key of Object.keys(raw)) {
         if (!known.has(key)) {
             problems.push({
@@ -237,6 +276,20 @@ export function parsePalette(input: unknown): PaletteResult {
         }
         given[role] = hex;
     }
+    const status: Partial<Record<PaletteStatusRole, string>> = {};
+    for (const role of PALETTE_STATUS_ROLES) {
+        const value = raw[role];
+        if (value === undefined) continue;
+        const hex = normalizeHex(value);
+        if (!hex) {
+            problems.push({
+                field: `palette.${role}`,
+                message: `${role} must be a colour written #RRGGBB`,
+            });
+            continue;
+        }
+        status[role] = hex;
+    }
     if (problems.length > 0) return { ok: false, problems };
 
     const palette = { ...given } as SitePalette;
@@ -258,6 +311,18 @@ export function parsePalette(input: unknown): PaletteResult {
             });
         }
     }
+    for (const pair of STATUS_CONTRAST_PAIRS) {
+        const colour = status[pair.role];
+        if (!colour) continue;
+        const ratio = contrastRatio(colour, palette[pair.ground]);
+        if (ratio < PALETTE_GRAPHIC_CONTRAST) {
+            problems.push({
+                field: `palette.${pair.role}`,
+                message: `${pair.label} reads at ${ratio.toFixed(2)}:1; it needs ${PALETTE_GRAPHIC_CONTRAST}:1`,
+            });
+        }
+        palette[pair.role] = colour;
+    }
     return problems.length > 0
         ? { ok: false, problems }
         : { ok: true, palette };
@@ -265,7 +330,10 @@ export function parsePalette(input: unknown): PaletteResult {
 
 /** Whether two complete palettes are the same colours. */
 export function samePalette(a: SitePalette, b: SitePalette): boolean {
-    return PALETTE_ROLES.every((role) => a[role] === b[role]);
+    return (
+        PALETTE_ROLES.every((role) => a[role] === b[role]) &&
+        PALETTE_STATUS_ROLES.every((role) => a[role] === b[role])
+    );
 }
 
 const round = (n: number) => Number(n.toFixed(2)).toString();
@@ -296,10 +364,16 @@ export function hexToHslTriple(hex: string): string {
 
 /** A complete palette as `--site-*` custom properties. */
 export function paletteVariables(palette: SitePalette): Record<string, string> {
-    return Object.fromEntries(
+    const vars: Record<string, string> = Object.fromEntries(
         PALETTE_ROLES.map((role) => [
             PALETTE_VARIABLES[role],
             hexToHslTriple(palette[role]),
         ]),
     );
+    // Only a status the palette names: absent, the dot keeps the accent.
+    for (const role of PALETTE_STATUS_ROLES) {
+        const hex = palette[role];
+        if (hex) vars[PALETTE_STATUS_VARIABLES[role]] = hexToHslTriple(hex);
+    }
+    return vars;
 }

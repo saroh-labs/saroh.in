@@ -20,6 +20,7 @@ import { cn } from "../lib/utils";
  * figure per point (`value`, a rate or a span, the merchant's own words), two
  * columns for the list looks and a muted note under the points. Each is
  * absent by default, so a section without them draws exactly as before.
+ * Round 2 adds `introStyle: "display"`, the intro as a large line.
  *
  * Everything is drawn from the `--site-*` layer. Merchant sites must never
  * inherit Saroh's brand, and gate G2 fails the build if this file reaches for
@@ -49,11 +50,7 @@ export default function FeaturesSection({
                     {content.heading}
                 </h2>
             ) : null}
-            {content.intro ? (
-                <p className="text-site-body mt-3 max-w-2xl text-lg">
-                    {content.intro}
-                </p>
-            ) : null}
+            <FeaturesIntro content={content} />
 
             <List
                 className={
@@ -131,6 +128,23 @@ function said(value: string | undefined): string | null {
     return trimmed === undefined || trimmed === "" ? null : trimmed;
 }
 
+/**
+ * The line under the heading. `display` (template round 2) sets it as one
+ * large line in the heading face, in the text colour — the ceramics
+ * design's "Three variables, and not one of them behaves the same way
+ * twice." Absent, the quiet paragraph it has always been.
+ */
+function FeaturesIntro({ content }: { content: RenderedFeatures }) {
+    if (!content.intro) return null;
+    return content.introStyle === "display" ? (
+        <p className="font-site-heading text-site-fg mt-4 max-w-[40ch] text-pretty text-[calc(1.5625rem*var(--site-heading-scale))] font-normal leading-snug tracking-[-0.01em]">
+            {content.intro}
+        </p>
+    ) : (
+        <p className="text-site-body mt-3 max-w-2xl text-lg">{content.intro}</p>
+    );
+}
+
 /** The muted line under the points (template polish): a caveat, plain text. */
 function FeaturesNote({ text }: { text: string }) {
     return (
@@ -161,11 +175,7 @@ function FactsRow({ content }: { content: RenderedFeatures }) {
                     {content.heading}
                 </h2>
             ) : null}
-            {content.intro ? (
-                <p className="text-site-body mt-3 max-w-2xl text-lg">
-                    {content.intro}
-                </p>
-            ) : null}
+            <FeaturesIntro content={content} />
             <dl
                 className={cn(
                     "flex flex-wrap gap-x-12 gap-y-6",

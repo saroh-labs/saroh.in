@@ -53,7 +53,21 @@
   the chrome reads it as `max-w-site-content`, and while it is set `SiteTheme`
   sets the blocks' `max-w-screen-md/lg/xl` inside sections to it. The footer
   may be laid out `left` (`Site.footer.layout`), which a save of the line
-  alone keeps.
+  alone keeps. `left` is the designs' row (name, line, "Runs on Saroh" at
+  the end) with its margins inside `max-w-site-content`, as the header's.
+- **Current** — **Template round 2.** A palette may name two optional
+  status roles, `status` (the "open now" dot on the page) and
+  `statusInverse` (over a hero photo's wash or an inverse band), each held
+  to 3:1 (a graphic, WCAG 1.4.11) on its ground and never filled in: unset,
+  `bg-site-status`/`bg-site-status-inverse` fall back to the accent, so a
+  palette without them draws as before; an inverse band swaps them and an
+  accent band clears them. A text block may set its own `h2`/`h3` as the
+  site's section titles (`headingStyle: "label"`, `data-site-headings`),
+  its `dl` terms as quiet uppercase labels (`factsStyle: "labels"`,
+  `data-site-facts`) and carry a small `label` over it (`data-site-title`);
+  the rules are `SiteTheme`'s. `features.introStyle: "display"` sets the
+  intro as one large heading-face line; `productGrid.columns` (3–5) fixes
+  the bare cards' count across at the desk.
 
 ## Saroh tokens — Ink & Saffron
 

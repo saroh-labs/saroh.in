@@ -69,7 +69,9 @@ describe("SiteTheme with a template's palette and type scale", () => {
         expect(out).toContain("--site-display-size: 44px;");
         expect(out).toContain("--site-body-size: 18.5px;");
         expect(out).toContain("--site-measure: 64ch;");
-        expect(out).toContain(":root [data-site-title]");
+        expect(out).toContain(
+            ':root :is([data-site-title], [data-site-headings="label"] :is(h2, h3))',
+        );
         expect(out).toContain("text-transform: uppercase;");
         expect(out).toContain("color: hsl(var(--site-accent));");
         // The word chooses a rule; it is never itself a declaration.

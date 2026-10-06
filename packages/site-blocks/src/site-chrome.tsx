@@ -158,7 +158,9 @@ function RunsOnSaroh({ className = "" }: { className?: string }) {
 }
 
 /**
- * The `left` footer: one row on the page's column, wrapping on a phone —
+ * The `left` footer — the designs' row (Bakery, Ceramics, Blogs): one row
+ * on the page's column, its margins inside the column so it lines up with
+ * the header and the sections, wrapping on a phone —
  * the name in the heading face, the merchant's line (an address, the days
  * they open), and "Runs on Saroh" pushed to the far end. A footer richer
  * than a line keeps its own block above the row, left-aligned too. The same
@@ -173,8 +175,11 @@ function LeftFooter({
 }) {
     const line = written ? footerLine(written) : null;
     return (
-        <footer className="border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t px-5 pb-12 pt-6 sm:px-[var(--site-page-margin)]">
-            <div className="max-w-site-content mx-auto">
+        <footer className="border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t pb-12 pt-6">
+            {/* The margins inside the column, as the header and every
+                section have them, so the name lines up with the page's
+                left edge on a template's column (`--site-content-width`). */}
+            <div className="max-w-site-content mx-auto px-5 sm:px-[var(--site-page-margin)]">
                 {written && line === null ? (
                     written.format === "html" ? (
                         <div

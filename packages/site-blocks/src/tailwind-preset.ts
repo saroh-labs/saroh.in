@@ -37,6 +37,11 @@ export const siteColors = {
     "cta-fg": "hsl(var(--site-cta-fg))",
     "footer-bg": "hsl(var(--site-footer-bg))",
     "footer-fg": "hsl(var(--site-footer-fg))",
+    // The "open now" dot (template round 2), on the page and over the
+    // page's ink. A palette that names no status leaves both unset, and the
+    // dot is the accent where it is drawn, as it always was.
+    status: "hsl(var(--site-status, var(--site-accent)))",
+    "status-inverse": "hsl(var(--site-status-inverse, var(--site-accent)))",
 } as const;
 
 /**
