@@ -445,7 +445,7 @@ describe("the allowance for emails Saroh sends (DEC-086, U3, real database)", ()
         expect(await jobsOf(b.orgId, "message.send")).toHaveLength(0);
     });
 
-    it("the plan can't be read: not sent, plan_meter_unresolved logged", async () => {
+    it("the plan can't be read: not sent, the failed lookup logged", async () => {
         const b = await business();
         const warn = jest.spyOn(Logger.prototype, "warn");
         const resolve = jest
@@ -459,7 +459,9 @@ describe("the allowance for emails Saroh sends (DEC-086, U3, real database)", ()
         expect(await statuses(b.orgId)).toEqual([]);
         expect(
             warn.mock.calls.some((c) =>
-                String(c[0]).includes(`plan_meter_unresolved org=${b.orgId}`),
+                String(c[0]).includes(
+                    `saroh_email_lookup_failed org=${b.orgId}`,
+                ),
             ),
         ).toBe(true);
         warn.mockRestore();
@@ -548,5 +550,48 @@ describe("the allowance for emails Saroh sends (DEC-086, U3, real database)", ()
             }),
         ).toBe(1);
         expect(await jobsOf(b.orgId, PLAN_LIMIT_NOTICE_TYPE)).toHaveLength(1);
+    });
+
+    it("allowance 10: the 80% notice at 8 and the cap's at 10 are two, each told once", async () => {
+        const b = await business("ten");
+        const runNotices = async () => {
+            for (const job of await jobsOf(b.orgId, PLAN_LIMIT_NOTICE_TYPE)) {
+                await limitNotices.handle(job);
+            }
+        };
+        const told = () =>
+            prisma.notification.findMany({
+                where: {
+                    organizationId: b.orgId,
+                    type: PLAN_LIMIT_NOTIFICATION_TYPE,
+                },
+                orderBy: { createdAt: "asc" },
+                select: { title: true },
+            });
+        for (let i = 0; i < 8; i++) await bookAndTell(b);
+        await runNotices();
+        const warn = await told();
+        expect(warn).toHaveLength(1);
+        expect(warn[0].title).not.toMatch(/reached/);
+
+        // To the cap, then past it.
+        for (let i = 0; i < 3; i++) await bookAndTell(b);
+        await runNotices();
+        const both = await told();
+        expect(both).toHaveLength(2);
+        expect(both[1].title).toBe(
+            "You've reached your 10 emails Saroh sends for you a month on Plan F",
+        );
+
+        // More bookings, more runs: no repeat of either.
+        await bookAndTell(b);
+        await runNotices();
+        await runNotices();
+        expect(await told()).toHaveLength(2);
+        expect(await statuses(b.orgId)).toEqual([
+            ...Array<string>(10).fill("QUEUED"),
+            "ALLOWANCE_USED",
+            "ALLOWANCE_USED",
+        ]);
     });
 });

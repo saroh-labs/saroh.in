@@ -6,7 +6,7 @@ import { parseCatalog, planRows } from "@saroh/pricing-catalog";
  * A made-up catalogue for Saroh's booking emails (DEC-086) in the
  * integration specs. Nothing here is a real price, limit or plan: Plan A/B/C
  * with 3, 1 and no-number allowances, so a spec reaches each in a write or
- * two.
+ * two, and a few more below.
  *
  * - `free` (Plan A): 3 emails a month.
  * - `grow` (Plan B): 1 a month (the last-unit race).
@@ -14,6 +14,8 @@ import { parseCatalog, planRows } from "@saroh/pricing-catalog";
  * - `soft` (Plan D): 3 a month, but a soft cell — never refused, so Saroh
  *   never sends against it either.
  * - `max` (Plan E): 20 a month, room for the cap per booking.
+ * - `ten` (Plan F): 10 a month, so the 80% notice (at 8) and the cap's
+ *   (at 10) are two different sends.
  *
  * `withRow: false` is the same plans with no `saroh-emails` row at all.
  */
@@ -25,6 +27,7 @@ export function fakeSarohEmailsCatalog(withRow = true): Catalog {
             { id: "pro", name: "Plan C", pricePaise: 33_300 },
             { id: "soft", name: "Plan D", pricePaise: 44_400 },
             { id: "max", name: "Plan E", pricePaise: 55_500 },
+            { id: "ten", name: "Plan F", pricePaise: 66_600 },
         ],
         groups: [{ id: "g", name: "Group" }],
         modules: [
@@ -38,6 +41,7 @@ export function fakeSarohEmailsCatalog(withRow = true): Catalog {
                     pro: { inc: true, text: "One" },
                     soft: { inc: true, text: "One" },
                     max: { inc: true, text: "One" },
+                    ten: { inc: true, text: "One" },
                 },
             },
             ...(withRow
@@ -71,6 +75,12 @@ export function fakeSarohEmailsCatalog(withRow = true): Catalog {
                                   inc: true,
                                   text: "20",
                                   limit: 20,
+                                  per: "month" as const,
+                              },
+                              ten: {
+                                  inc: true,
+                                  text: "10",
+                                  limit: 10,
                                   per: "month" as const,
                               },
                           },
