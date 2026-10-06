@@ -2912,3 +2912,19 @@ build, every time (about a second).
 **Rule**: anything generated outside a task's turbo `outputs` must be
 regenerated before it is used; a cache hit won't do it.
 **Category**: gate · Prisma · `scripts/prepush.sh` (int-build)
+
+## Tests — a db spec passed in every local gate and failed in CI on PAYMENTS_ENC_KEY
+
+**Symptom**: `plan-limits.db.spec.ts` ("integrations … refuses a new
+connection past the cap") passed in every `pnpm prepush --int`/`--all` and
+failed in CI's integration shard with "PAYMENTS_ENC_KEY is not set".
+**Root cause**: connecting a provider encrypts its credentials. The local gate
+exports a test `PAYMENTS_ENC_KEY` for every step (`scripts/prepush.sh`); CI's
+integration job sets none. Specs that connect providers mock `../../env` with
+the test key; this one read the real env, so it only worked locally.
+**Fix**: the spec mocks `../../env`, keeping the real values and adding the
+test key, as the payments specs do.
+**Rule**: a db spec that encrypts or connects a provider brings its own test
+key (mock `../../env`); never rely on the gate's exported one. Check by running
+it with `env -u PAYMENTS_ENC_KEY`.
+**Category**: tests · CI vs local gate

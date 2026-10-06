@@ -20,6 +20,21 @@ jest.mock("../../common/email", () => ({
     ...jest.requireActual<object>("../../common/email"),
     sendOrganizationInvitationEmail: jest.fn(() => Promise.resolve()),
 }));
+// Connecting a provider encrypts its credentials: the test key the other
+// specs use, so CI (which sets no PAYMENTS_ENC_KEY) runs it too.
+jest.mock("../../env", () => {
+    const actual = jest.requireActual<{ env: Record<string, unknown> }>(
+        "../../env",
+    );
+    return {
+        ...actual,
+        env: {
+            ...actual.env,
+            PAYMENTS_ENC_KEY:
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        },
+    };
+});
 
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import type { Service } from "@saroh/database";
