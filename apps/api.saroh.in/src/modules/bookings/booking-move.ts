@@ -12,7 +12,9 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
+import type { BookingLocationType } from "./dto";
 import { seatsHeld } from "./held-seats";
+import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type { ReserveWith } from "./reservation";
 import { assertPersonFreeInTx } from "./reservation";
 import { useMembershipInTx } from "./use-membership";
@@ -84,6 +86,15 @@ export async function moveFoundBooking(
         startAt,
         new Date(startAt.getTime() + service.durationMinutes * 60_000),
     );
+    // Moved in person, only while the business is open (DEC-087).
+    const opening = await openingFor(
+        service,
+        booking.locationType as BookingLocationType | null,
+    );
+    refuseOutsideOpening(opening, {
+        startAt,
+        endAt: new Date(startAt.getTime() + service.durationMinutes * 60_000),
+    });
     const rules = await prisma.availabilityRule.findMany({
         where: { serviceId: service.id },
     });
@@ -105,6 +116,7 @@ export async function moveFoundBooking(
                 booking.staffId,
                 options.audience,
                 booking.id,
+                opening,
             );
         } catch (err) {
             throw taken(err);

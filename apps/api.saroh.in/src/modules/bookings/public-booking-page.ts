@@ -5,11 +5,12 @@ import { DateTime } from "luxon";
 import { paymentsOn } from "../invoices/payments-on";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
-import type { Slot } from "./availability";
+import type { OpeningHours, Slot } from "./availability";
 import {
     countOverlapping,
     enumerateSlots,
     guarded,
+    insideOpening,
     outsideClosures,
     staffSlots,
 } from "./availability";
@@ -21,7 +22,8 @@ import {
     loadStaffing,
     toAvailabilityService,
 } from "./booking-slots";
-import type { LocationType } from "./dto";
+import type { BookingLocationType, LocationType } from "./dto";
+import { openingFor } from "./opening-hours";
 import { loadBookableService } from "./reservation";
 import { depositCents } from "./service-fields";
 import {
@@ -56,6 +58,11 @@ export interface PublicStart {
     staffId: string | null;
     staffName: string | null;
     placesLeft: number | null;
+    /**
+     * A service offered either way (DEC-087): set when this start can be
+     * had only one way — online outside opening hours.
+     */
+    only?: BookingLocationType;
 }
 
 export interface PublicDay {
@@ -156,62 +163,75 @@ export async function publicDays(
     // A day the business is closed is closed on the page, not Full (E3):
     // closures are public, unlike a person's time off.
     const closed = await loadClosures(prisma, service.organizationId, from, to);
-    let hours: Slot[];
-    let starts: PublicStart[];
-    if (staffing.perPerson && staffing.zone) {
-        const people = await loadPeople(
-            prisma,
-            service.organizationId,
-            staffing.people.map((p) => p.id),
-            from,
-            to,
-        );
-        hours = outsideClosures(
-            staffSlots(
+    const people =
+        staffing.perPerson && staffing.zone
+            ? await loadPeople(
+                  prisma,
+                  service.organizationId,
+                  staffing.people.map((p) => p.id),
+                  from,
+                  to,
+              )
+            : [];
+    // The buffers' width beyond the range too (DEC-052).
+    const reach = guarded({ startAt: from, endAt: to }, availService);
+    const busy =
+        staffing.perPerson && staffing.zone
+            ? []
+            : await busyOverlapping(service.id, reach.startAt, reach.endAt);
+
+    /** The open-day hours and the starts, kept to `opening` when given. */
+    const offer = (
+        opening: OpeningHours | null,
+    ): { hours: Slot[]; starts: PublicStart[] } => {
+        if (staffing.perPerson && staffing.zone) {
+            const hours = outsideClosures(
+                staffSlots(
+                    availService,
+                    rules,
+                    people.map((p) => ({ ...p, busy: [], timeOff: [] })),
+                    staffing.zone,
+                    from,
+                    to,
+                    opening,
+                ),
+                closed,
+            );
+            const starts = staffSlots(
                 availService,
                 rules,
-                people.map((p) => ({ ...p, busy: [], timeOff: [] })),
+                people,
                 staffing.zone,
                 from,
                 to,
+                opening,
+            )
+                .filter((slot) => bookable(slot.startAt))
+                .map((slot) => {
+                    const staffId = slot.staffIds[0] ?? null;
+                    return {
+                        startAt: slot.startAt.toISOString(),
+                        endAt: slot.endAt.toISOString(),
+                        staffId,
+                        staffName: staffId
+                            ? (names.get(staffId) ?? null)
+                            : null,
+                        placesLeft: null,
+                    };
+                });
+            return { hours, starts };
+        }
+        const hours = insideOpening(
+            outsideClosures(
+                enumerateSlots(availService, rules, from, to),
+                closed,
             ),
-            closed,
-        );
-        starts = staffSlots(
-            availService,
-            rules,
-            people,
-            staffing.zone,
-            from,
-            to,
-        )
-            .filter((slot) => bookable(slot.startAt))
-            .map((slot) => {
-                const staffId = slot.staffIds[0] ?? null;
-                return {
-                    startAt: slot.startAt.toISOString(),
-                    endAt: slot.endAt.toISOString(),
-                    staffId,
-                    staffName: staffId ? (names.get(staffId) ?? null) : null,
-                    placesLeft: null,
-                };
-            });
-    } else {
-        hours = outsideClosures(
-            enumerateSlots(availService, rules, from, to),
-            closed,
-        );
-        // The buffers' width beyond the range too (DEC-052).
-        const reach = guarded({ startAt: from, endAt: to }, availService);
-        const busy = await busyOverlapping(
-            service.id,
-            reach.startAt,
-            reach.endAt,
+            opening,
         );
         const [instructor] = staffing.people as (
             Staffing["people"][number] | undefined
         )[];
-        starts = hours
+        const starts = hours
             .filter((slot) => bookable(slot.startAt))
             .map((slot) => {
                 const left =
@@ -229,7 +249,16 @@ export async function publicDays(
             // A one-to-one lists only what is free; a class, every session.
             .filter((start) => kind === "class" || start.free)
             .map(({ free: _free, ...start }) => start);
-    }
+        return { hours, starts };
+    };
+
+    // In person keeps to opening hours (DEC-087). A service offered either
+    // way lists both, and a start only one way can have says which.
+    const opening = await openingFor(service, "IN_PERSON");
+    const { hours, starts } =
+        service.locationType === "EITHER" && opening
+            ? eitherWay(offer(opening), offer(null))
+            : offer(opening);
 
     const aheadEnd =
         bookingRules.bookAheadDays === null
@@ -253,6 +282,36 @@ export async function publicDays(
         });
     }
     return { timezone: zone, kind, capacity: service.capacity, days };
+}
+
+/**
+ * A service offered either way (DEC-087): its starts in person (kept to
+ * opening hours) and online, as one list. A start both ways can have is
+ * listed once, as in person; one only one way can have says which, so the
+ * page asks Where no further.
+ */
+export function eitherWay(
+    inPerson: { hours: Slot[]; starts: PublicStart[] },
+    online: { hours: Slot[]; starts: PublicStart[] },
+): { hours: Slot[]; starts: PublicStart[] } {
+    const byStart = new Map<string, PublicStart>();
+    for (const start of online.starts) {
+        byStart.set(start.startAt, { ...start, only: "ONLINE" });
+    }
+    for (const start of inPerson.starts) {
+        byStart.set(
+            start.startAt,
+            byStart.has(start.startAt)
+                ? start
+                : { ...start, only: "IN_PERSON" },
+        );
+    }
+    return {
+        hours: [...online.hours, ...inPerson.hours],
+        starts: [...byStart.values()].sort((a, b) =>
+            a.startAt.localeCompare(b.startAt),
+        ),
+    };
 }
 
 /**

@@ -425,9 +425,13 @@ export default function BookingFlow({
         pay === "DEPOSIT" && service ? restAfterDeposit(service) : null;
 
     const asks = asksWhere(service);
+    // A time only one way can have (DEC-087: online outside opening hours)
+    // settles Where; any other leaves it to the booker.
+    const onlyWhere = asks ? (chosenStart?.only ?? null) : null;
+    const whereNow: BookingWhere = onlyWhere ?? where;
     /** What the booking page asks beyond the time, as the API takes it. */
     const extras = {
-        ...(asks ? { locationType: where } : {}),
+        ...(asks ? { locationType: whereNow } : {}),
         ...(note.trim() ? { intakeNote: note.trim() } : {}),
     };
 
@@ -1146,7 +1150,8 @@ export default function BookingFlow({
                                     onName={setName}
                                     onNotYou={() => void notYou()}
                                     asksWhere={asks}
-                                    where={where}
+                                    where={whereNow}
+                                    onlyWhere={onlyWhere}
                                     note={note}
                                     onWhere={pickWhere}
                                     onNote={setNote}

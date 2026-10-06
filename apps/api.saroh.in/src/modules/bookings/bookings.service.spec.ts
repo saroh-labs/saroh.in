@@ -43,7 +43,11 @@ jest.mock("@saroh/database", () => {
         site: { findUnique: jest.fn(), findFirst: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
         // A storefront to sell treatments from (E10) unless a test says not.
-        store: { findFirst: jest.fn().mockResolvedValue({ id: "store_1" }) },
+        store: {
+            findFirst: jest.fn().mockResolvedValue({ id: "store_1" }),
+            // No walk-in storefront: opening hours cut nothing (DEC-087).
+            findMany: jest.fn().mockResolvedValue([]),
+        },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },
         // The class waitlist (A12): nobody in line, no place held.
         classWaitlistEntry: {
@@ -1074,6 +1078,40 @@ describe("BookingsService.bookByHand — a booking the merchant makes (#384)", (
             }),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses an in-person time outside opening hours, as the booking page does (DEC-087)", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            locationType: "IN_PERSON",
+            availabilityRules: RULES,
+        });
+        const storeFindMany = prisma.store.findMany as jest.Mock;
+        // Open from 10:00 on Mondays; START is 09:00.
+        storeFindMany.mockResolvedValueOnce([
+            {
+                settings: {
+                    openingHours: [
+                        {
+                            day: "MON",
+                            open: "10:00",
+                            close: "18:00",
+                            closed: false,
+                        },
+                    ],
+                },
+            },
+        ]);
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                bookerEmail: "new@example.com",
+            }),
+        ).rejects.toThrow(
+            "That time is outside opening hours. Pick another time.",
+        );
+        expect(transaction).not.toHaveBeenCalled();
     });
 
     it("refuses a time that is not an open slot", async () => {

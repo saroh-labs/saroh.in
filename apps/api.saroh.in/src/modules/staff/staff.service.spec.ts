@@ -32,6 +32,7 @@ jest.mock("@saroh/database", () => {
         service: { findFirst: jest.fn(), count: jest.fn() },
         membership: { findFirst: jest.fn() },
         booking: { findMany: jest.fn() },
+        store: { findMany: jest.fn().mockResolvedValue([]) },
     };
     return {
         ...actual,

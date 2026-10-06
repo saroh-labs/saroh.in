@@ -846,6 +846,47 @@ describe("Where and anything we should know (E7)", () => {
         );
     });
 
+    it("settles Where on a time the clinic is closed: online only, and says why (DEC-087)", async () => {
+        const ONLINE_ONLY = {
+            ...KAVI_DAYS,
+            days: KAVI_DAYS.days.map((d) => ({
+                ...d,
+                starts: d.starts.map((s) => ({ ...s, only: "ONLINE" })),
+            })),
+        };
+        serve((url) =>
+            url.endsWith("/days")
+                ? json(ONLINE_ONLY)
+                : json(
+                      booked({
+                          serviceName: "Video consultation",
+                          online: true,
+                          meetingUrl: LINK,
+                      }),
+                      201,
+                  ),
+        );
+        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
+        await chooseAt(/Video consultation/);
+
+        const clinic = screen.getByRole("radio", { name: "At Kavi Dental" });
+        const video = screen.getByRole("radio", { name: "Video call" });
+        expect(video).toHaveAttribute("aria-checked", "true");
+        expect(clinic).toBeDisabled();
+        expect(
+            screen.getByText(
+                "Kavi Dental is closed then, so this time is online only.",
+            ),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
+        expect(bookBody()).toMatchObject({ locationType: "ONLINE" });
+    });
+
     it("never asks Where for an In person service, and says it's at the clinic", async () => {
         serve((url) =>
             url.endsWith("/days")

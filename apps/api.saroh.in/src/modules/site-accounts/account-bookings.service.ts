@@ -16,6 +16,7 @@ import {
 import { moveFoundBooking } from "../bookings/booking-move";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { isLateCancel, loadBookingRules } from "../bookings/booking-rules";
+import type { BookingLocationType } from "../bookings/dto";
 import { bookVisit, refuseClosedTreatment } from "../bookings/visits";
 import { PaymentsService } from "../payments/payments.service";
 import type { Ctx, Row } from "./account-booking-rules";
@@ -164,6 +165,7 @@ export class AccountBookingsService {
             rules,
             now,
             booking.staffId ?? undefined,
+            booking.locationType as BookingLocationType | null,
         );
         return {
             service: service.name,

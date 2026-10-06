@@ -41,6 +41,8 @@ jest.mock("@saroh/database", () => {
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
         businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
+        // No walk-in storefront: opening hours cut nothing (DEC-087).
+        store: { findMany: jest.fn().mockResolvedValue([]) },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
@@ -707,6 +709,72 @@ describe("the next two weeks (U19)", () => {
             staffName: "Karan Mehta",
         });
         expect(JSON.stringify(out)).not.toMatch(/timeOff|reason|off/i);
+    });
+});
+
+describe("the next two weeks in opening hours (DEC-087)", () => {
+    const storeFindMany = prisma.store.findMany as jest.Mock;
+    // The shop opens 10:00–18:00 every day; the service's hours are 09:00–12:00.
+    beforeEach(() =>
+        storeFindMany.mockResolvedValue([
+            {
+                settings: {
+                    openingHours: [
+                        "MON",
+                        "TUE",
+                        "WED",
+                        "THU",
+                        "FRI",
+                        "SAT",
+                        "SUN",
+                    ].map((day) => ({
+                        day,
+                        open: "10:00",
+                        close: "18:00",
+                        closed: false,
+                    })),
+                },
+            },
+        ]),
+    );
+    afterEach(() => storeFindMany.mockResolvedValue([]));
+
+    const monday = (out: { days: { starts: unknown[] }[] }) =>
+        out.days[3]!.starts as { startAt: string; only?: string }[];
+
+    it("offers an in-person service only once the shop is open", async () => {
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(monday(out).map((s) => s.startAt.slice(11, 16))).toEqual([
+            "10:00",
+            "10:30",
+            "11:00",
+        ]);
+        expect(monday(out).every((s) => s.only === undefined)).toBe(true);
+    });
+
+    it("offers an online service its own hours, uncut", async () => {
+        db.service.findUnique.mockResolvedValue(
+            service({ locationType: "ONLINE" }),
+        );
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(monday(out)).toHaveLength(5);
+        expect(storeFindMany).not.toHaveBeenCalled();
+    });
+
+    it("lists either way's early starts as online only", async () => {
+        db.service.findUnique.mockResolvedValue(
+            service({ locationType: "EITHER" }),
+        );
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(
+            monday(out).map((s) => [s.startAt.slice(11, 16), s.only ?? null]),
+        ).toEqual([
+            ["09:00", "ONLINE"],
+            ["09:30", "ONLINE"],
+            ["10:00", null],
+            ["10:30", null],
+            ["11:00", null],
+        ]);
     });
 });
 
