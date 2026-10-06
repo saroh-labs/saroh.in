@@ -22,9 +22,11 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             count: jest.fn(),
             create: jest.fn(),
+            // A template's other pages go in its menu.
+            update: jest.fn(),
         },
         page: {
-            create: jest.fn(),
+            create: jest.fn(async () => ({ id: "page_1" })),
         },
         // Addresses held after a change (DEC-069, L1): none here.
         addressReservation: {
