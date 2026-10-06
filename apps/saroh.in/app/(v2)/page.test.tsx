@@ -17,9 +17,11 @@ vi.mock("@/lib/pricing", () => ({
 }));
 
 /** The site's launch switch (plan KTD-16); the plan section shows once open. */
-const launch = vi.hoisted(() => ({ mode: "open" as "waitlist" | "open" }));
+const launch = vi.hoisted((): { mode: "waitlist" | "open" } => ({
+    mode: "open",
+}));
 vi.mock("@/lib/links", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("@/lib/links")>()),
+    ...(await importOriginal<Record<string, unknown>>()),
     get LAUNCH_MODE() {
         return launch.mode;
     },

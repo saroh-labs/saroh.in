@@ -7,6 +7,7 @@ import { PreviewBanner } from "@/components/v2/pricing/preview-banner";
 import { PricingPage } from "@/components/v2/pricing/pricing-page";
 import { SiteFooter } from "@/components/v2/site-footer";
 import { SiteNav } from "@/components/v2/site-nav";
+import { LAUNCH_MODE } from "@/lib/links";
 import { readPreviewPricing } from "@/lib/pricing";
 import { PREVIEW_COOKIE } from "@/lib/pricing-preview";
 import { pricingPageModel } from "@/lib/pricing-view";
@@ -60,12 +61,16 @@ export default async function PricingDraftRoute() {
                             ? "Preview links last a few minutes and show one saved draft. Open a new preview from Plans & modules in the console."
                             : "Saroh's pricing service didn't answer. Try again in a moment, or open a new preview from Plans & modules in the console."}
                     </p>
-                    <Link
-                        href="/pricing"
-                        className="rounded-sm text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
-                    >
-                        See the published pricing
-                    </Link>
+                    {/* Published pricing exists once the launch switch opens;
+                        before that /pricing waits at the waitlist (Gate W). */}
+                    {LAUNCH_MODE === "open" ? (
+                        <Link
+                            href="/pricing"
+                            className="rounded-sm text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
+                        >
+                            See the published pricing
+                        </Link>
+                    ) : null}
                 </Container>
             </Chrome>
         );

@@ -20,9 +20,11 @@ import { SiteNav } from "./site-nav";
 let pathname = "/";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 /** The site's launch switch (plan KTD-16): Pricing shows once it's open. */
-const launch = vi.hoisted(() => ({ mode: "waitlist" as "waitlist" | "open" }));
+const launch = vi.hoisted((): { mode: "waitlist" | "open" } => ({
+    mode: "waitlist",
+}));
 vi.mock("@/lib/links", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("@/lib/links")>()),
+    ...(await importOriginal<Record<string, unknown>>()),
     get LAUNCH_MODE() {
         return launch.mode;
     },
