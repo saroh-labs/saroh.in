@@ -14,8 +14,10 @@ import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
 import type { TeamAlertPayload } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
+import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
 
 export { TEAM_ALERT_TYPE } from "./team-alerts";
+export { ORDER_UNCOLLECTED_NOTIFICATION_TYPE } from "./uncollected-alert";
 
 /** The inbox notice types F14's alerts write (see `ALERT_NOTIFICATION_TYPES`). */
 export const ORDER_NEW_NOTIFICATION_TYPE = "order.new";
@@ -67,8 +69,10 @@ const BUILT_IN_LABEL: Partial<Record<string, string>> = {
 /**
  * Consumer for `team.alert` (round-2 F14): tells the business's team about
  * a new order, a booking the customer made, moved or cancelled, a failed
- * payment, someone joining, or a scheduled go-live of the website that ran
- * (DEC-071, T10), as each person chose in Settings › Your profile.
+ * payment, someone joining, a scheduled go-live of the website that ran
+ * (DEC-071, T10), or a website order to pay on handover nobody came for in
+ * three days (R34, on the New order row), as each person chose in
+ * Settings › Your profile.
  *
  * On one transaction, in the business's RLS context:
  *  1. What it is about is read again now, and worded. Something that no
@@ -102,10 +106,19 @@ export class TeamAlertHandler {
             return;
         }
         const organizationId = job.organizationId;
+        const now = new Date();
         await runInOrgContext(organizationId, () =>
-            prisma.$transaction((tx) =>
-                tellTeam(tx, this.comms, organizationId, payload),
-            ),
+            prisma.$transaction(async (tx) => {
+                // An uncollected order not due yet (its business moved its
+                // zone since) waits for its day rather than being dropped.
+                if (
+                    payload.event === "uncollected" &&
+                    (await putOffUntilDue(tx, organizationId, payload, now))
+                ) {
+                    return { told: false, emailed: 0 };
+                }
+                return tellTeam(tx, this.comms, organizationId, payload, now);
+            }),
         );
     };
 }
@@ -116,8 +129,9 @@ export async function tellTeam(
     comms: Pick<CommunicationsService, "emailConnected" | "queueTransactional">,
     organizationId: string,
     payload: TeamAlertPayload,
+    now: Date = new Date(),
 ): Promise<{ told: boolean; emailed: number }> {
-    const alert = await wordAlert(tx, organizationId, payload);
+    const alert = await wordAlert(tx, organizationId, payload, now);
     if (!alert) return { told: false, emailed: 0 };
 
     // Claimed first, skipping a duplicate: a Postgres transaction can't go
@@ -248,6 +262,7 @@ export async function wordAlert(
     tx: Tx,
     organizationId: string,
     payload: TeamAlertPayload,
+    now: Date = new Date(),
 ): Promise<WordedAlert | null> {
     switch (payload.event) {
         case "order":
@@ -260,6 +275,8 @@ export async function wordAlert(
             return wordBooking(tx, organizationId, payload);
         case "site":
             return wordSite(tx, organizationId, payload);
+        case "uncollected":
+            return wordUncollected(tx, organizationId, payload, now);
     }
 }
 
@@ -477,6 +494,8 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
                 : null;
         case "booking":
             return str("notificationId") ? (p as TeamAlertPayload) : null;
+        case "uncollected":
+            return str("orderId") ? (p as TeamAlertPayload) : null;
         case "site":
             return str("testReleaseId") &&
                 str("goLiveAt") &&

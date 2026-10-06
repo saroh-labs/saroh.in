@@ -10,6 +10,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { businessTimezone } from "../bookings/staff-availability";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
     correctOrderInvoiceForEdit,
@@ -83,6 +84,7 @@ import { markVisitAttended } from "./order-visit-attend";
 import { visitsForRead } from "./order-visits";
 import { assertNotPayingOnlineInTx } from "./payment-in-flight";
 import { LEDGER_PAYMENTS, withBookingPayments } from "./treatment-ledger";
+import { awaitsHandover, uncollectedDays } from "./uncollected";
 
 /**
  * The kitchen flow on one order (ADR-008, U6): the read Order Detail renders,
@@ -113,6 +115,27 @@ export class OrderKitchenService {
         // edit still stands, and says the money could not be moved.
         @Optional() private readonly payments?: PaymentsService,
     ) {}
+
+    /**
+     * How long a pay-on-handover order has waited uncollected (R34), in the
+     * business's zone; null when the rule doesn't apply, or when the zone
+     * couldn't be read (the banner then just leaves the count out).
+     */
+    private async uncollectedOf(
+        ctx: OrganizationContext,
+        order: Parameters<typeof uncollectedDays>[0],
+    ): Promise<number | null> {
+        if (!awaitsHandover(order)) return null;
+        try {
+            const zone = await businessTimezone(prisma, ctx.organizationId);
+            return uncollectedDays(order, new Date(), zone);
+        } catch (error) {
+            this.logger.warn(
+                `An order's uncollected days couldn't be read: ${String(error)}`,
+            );
+            return null;
+        }
+    }
 
     /**
      * The order as Order Detail renders it. `order:read` or `order:stage`.
@@ -203,6 +226,8 @@ export class OrderKitchenService {
         }
         const withNotice = {
             ...read,
+            // "Not collected for 4 days" in its pay-on-handover banner (R34).
+            uncollectedDays: await this.uncollectedOf(ctx, order),
             customerNotice: await this.noticeOf(ctx, order),
             // A treatment's visits (B14), in their own file.
             ...(await visitsForRead(order, this.logger)),

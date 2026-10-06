@@ -263,7 +263,9 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   once, and is invoiced when staff mark it paid (DEC-023). Its kitchen runs
   before the money; only the handover (collected, delivered) waits for it
   (`moveAwaitsPayment`). Nothing releases it on a timer: staff cancel it,
-  as a pay-later order. Offered always on a plan without online payments,
+  as a pay-later order. Three days on, still unpaid and not handed over,
+  Home shows it under Attention and the team is told once (R34,
+  `orders/uncollected.ts`; `backend-jobs.md` → Team alerts). Offered always on a plan without online payments,
   beside online where the storefront turns it on
   (`StoreSettings.offerPayOnHandover`, `checkoutReadiness`); never for a
   shipment. An online order holds only when paid: `reserveOnPayment` is

@@ -29,6 +29,10 @@ jest.mock("../notifications/team-alerts", () => ({
     enqueueTeamAlert: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("../notifications/uncollected-alert", () => ({
+    queueUncollectedAlert: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const tx = {
@@ -64,6 +68,7 @@ import { prisma } from "@saroh/database";
 
 import { planMeter } from "../billing/metering.service";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
+import { queueUncollectedAlert } from "../notifications/uncollected-alert";
 import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
 import type { QuotedLine } from "./checkout-quote";
@@ -130,6 +135,8 @@ function place(payOnHandover: boolean) {
     });
 }
 
+const PLACED = new Date("2026-10-06T09:00:00.000Z");
+
 let room: jest.SpyInstance;
 
 beforeEach(() => {
@@ -141,6 +148,7 @@ beforeEach(() => {
     db.order.count.mockResolvedValue(0);
     db.order.create.mockResolvedValue({
         id: "order_1",
+        createdAt: PLACED,
         items: [{ id: "item_1" }],
     });
 });
@@ -182,6 +190,17 @@ describe("an order paid at the handover", () => {
             expect.anything(),
             "org_1",
             { event: "order", orderId: "order_1", actorUserId: null },
+        );
+    });
+
+    it("queues the team's Not collected for its day, on the same transaction (R34)", async () => {
+        await place(true);
+
+        expect(queueUncollectedAlert).toHaveBeenCalledTimes(1);
+        expect(queueUncollectedAlert).toHaveBeenCalledWith(
+            expect.anything(),
+            "org_1",
+            expect.objectContaining({ id: "order_1", createdAt: PLACED }),
         );
     });
 
@@ -234,6 +253,7 @@ describe("an order paid online, beside it", () => {
         });
         expect(applyInventoryTransition).not.toHaveBeenCalled();
         expect(enqueueTeamAlert).not.toHaveBeenCalled();
+        expect(queueUncollectedAlert).not.toHaveBeenCalled();
         expect(db.job.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 type: CLOSE_ABANDONED_CHECKOUT_TYPE,

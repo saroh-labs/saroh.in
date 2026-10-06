@@ -32,12 +32,17 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   run's own finding, not data read back). Keyed to the release and the
  *   instant it was scheduled for, so each schedule is told of once. The
  *   person who scheduled it is always emailed, whatever they chose.
+ * - `uncollected`: a website order to pay on collection or delivery still
+ *   unpaid and not handed over three days after it was placed (R34,
+ *   `orders/uncollected.ts`). Queued with the order, for the instant it
+ *   becomes due; told on the New order row's choices, once per order.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
     | { event: "failed"; invoiceId: string; paymentIntentId: string }
     | { event: "team"; userId: string; invitationId: string }
     | { event: "booking"; notificationId: string }
+    | { event: "uncollected"; orderId: string }
     | {
           event: "site";
           testReleaseId: string;
@@ -49,17 +54,22 @@ export type TeamAlertPayload =
 
 type Tx = Pick<Prisma.TransactionClient, "job">;
 
-/** Queue one alert on the caller's transaction. */
+/**
+ * Queue one alert on the caller's transaction: now, or at `runAt` for one
+ * that is due later (an uncollected order's).
+ */
 export async function enqueueTeamAlert(
     tx: Tx,
     organizationId: string,
     payload: TeamAlertPayload,
+    runAt?: Date,
 ): Promise<void> {
     await tx.job.create({
         data: {
             organizationId,
             type: TEAM_ALERT_TYPE,
             payload,
+            ...(runAt ? { runAt } : {}),
         },
     });
 }

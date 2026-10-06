@@ -54,6 +54,41 @@ describe("needTitle", () => {
     });
 });
 
+/**
+ * R34: a website order to pay on handover nobody came for in three days is
+ * an Attention row naming the order and the customer, with its money on
+ * the line and the days in its tag, linking to the order.
+ */
+describe("an order nobody came for", () => {
+    const uncollected = need({
+        id: "COMMERCE_UNCOLLECTED_ORDERS:o7",
+        code: "COMMERCE_UNCOLLECTED_ORDERS",
+        severity: "ATTENTION",
+        title: "Anika Rao hasn't collected order #1042",
+        sub: "Placed 5 Oct to pay on collection, not paid yet. Cancel it to put the stock back, or keep waiting.",
+        amountMinor: 48000,
+        currency: "INR",
+        amountIn: "sub",
+        tag: "Not collected: 4 days",
+        href: "/commerce/orders/o7",
+    });
+
+    it("reads as the order and the customer, its money first on the line", () => {
+        expect(needTitle(uncollected)).toBe(
+            "Anika Rao hasn't collected order #1042",
+        );
+        expect(needLine(uncollected)).toBe(
+            "₹480 · Placed 5 Oct to pay on collection, not paid yet. Cancel it to put the stock back, or keep waiting.",
+        );
+    });
+
+    it("is drawn like any other row: it counts toward the list, in the API's order", () => {
+        const rows = [uncollected, need()];
+        expect(shownNeeds(rows, false).rows).toEqual(rows);
+        expect(needsState(rows, [])).toBe("list");
+    });
+});
+
 describe("needLine", () => {
     it("puts the money first on the line", () => {
         const order = need({

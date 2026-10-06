@@ -224,6 +224,8 @@ module.exports = {
         // order's write and the service's choice, with a mocked database.
         "<rootDir>/src/modules/orders/offline-checkout-order.spec.ts",
         "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
+        // R34: an order to pay on handover nobody came for, pure.
+        "<rootDir>/src/modules/orders/uncollected.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
