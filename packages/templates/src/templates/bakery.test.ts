@@ -106,6 +106,14 @@ describe("bakery@1 (industry templates U4)", () => {
             surface: "#E3E7EE",
             accent: "#732B58",
         });
+        // "Open now"'s green: the design's pale one over the photo and the
+        // dark band, a deeper leaf on the page, each at a graphic's 3:1.
+        for (const preset of bakeryTemplate.styles ?? []) {
+            expect(preset.style.palette).toMatchObject({
+                status: "#4E8A36",
+                statusInverse: "#9BD17B",
+            });
+        }
         for (const preset of bakeryTemplate.styles ?? []) {
             expect(parsePalette(preset.style.palette)).toMatchObject({
                 ok: true,
@@ -214,6 +222,7 @@ describe("bakery@1 (industry templates U4)", () => {
             source: "newest",
             count: 5,
             cardStyle: "bare",
+            columns: 5,
             showAvailability: true,
             note: "Baked this morning. Anything marked sold out has gone for today.",
         });
@@ -256,8 +265,11 @@ describe("bakery@1 (industry templates U4)", () => {
             format: "html",
             imageBrief: BAKERY_IMAGE_BRIEFS.story,
             imageSide: "right",
+            // The design's eyebrow, as a label over the text, not markup.
+            label: "The starter",
         });
         const html = (story?.content as { value: string }).value;
+        expect(html).not.toContain("The starter");
         expect(html).toContain(
             "<h2>Everything here begins in a clip-top jar</h2>",
         );

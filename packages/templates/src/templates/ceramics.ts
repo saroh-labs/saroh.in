@@ -216,6 +216,8 @@ export const ceramicsTemplate: TemplateManifest = {
                         navLabel: "Material",
                         heading: "Material",
                         intro: "The clay, the glaze and the firing, and not one of them behaves the same way twice.",
+                        // The design's one large line in the heading face.
+                        introStyle: "display",
                         items: [
                             {
                                 title: "The clay",
@@ -251,6 +253,10 @@ export const ceramicsTemplate: TemplateManifest = {
                         format: "html",
                         imageBrief: STUDIO_BRIEF,
                         imageSide: "left",
+                        // "The studio" as the page's other section titles
+                        // (small green capitals), the facts as labels.
+                        headingStyle: "label",
+                        factsStyle: "labels",
                         value:
                             `<h2>The studio</h2>` +
                             `<p>This is a placeholder for where the work of ` +
