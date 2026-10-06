@@ -1,5 +1,6 @@
 import { Badge } from "@saroh/ui/badge";
 
+import { messageStatusWords } from "@/lib/messages/message-status";
 import type { LeadMessage } from "@/lib/messages/service";
 
 /**
@@ -11,30 +12,10 @@ import type { LeadMessage } from "@/lib/messages/service";
  * delivery, and the job worker later drives it to SENT → DELIVERED or
  * FAILED/BOUNCED. This panel reflects whatever state exists NOW (a "queued…"
  * hint on the non-terminal states), never a faked terminal state. A SUPPRESSED
- * message was blocked by the consent gate and has no delivery.
+ * message was blocked by the consent gate and has no delivery. Statuses read
+ * in words (`messageStatusWords`), and mail that didn't go is "Recorded",
+ * never "Sent".
  */
-
-type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
-
-/** Map a delivery/message status to a badge variant. */
-function statusVariant(status: string): BadgeVariant {
-    switch (status) {
-        case "SENT":
-        case "DELIVERED":
-            return "default";
-        case "FAILED":
-        case "BOUNCED":
-        case "SUPPRESSED":
-        case "STOPPED": // Saroh's email was switched off before it went (DEC-086).
-        case "ALLOWANCE_USED": // Not emailed: Saroh's monthly allowance was used.
-        case "NO_ALLOWANCE": // Not emailed: the plan gave Saroh's emails none.
-        case "BOOKING_LIMIT": // Not emailed: that booking had its 3 from Saroh today.
-            return "destructive";
-        case "QUEUED":
-        default:
-            return "outline";
-    }
-}
 
 /** True while a message/delivery is still working toward a terminal state. */
 function isPending(status: string): boolean {
@@ -68,6 +49,7 @@ export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
         <ol className="space-y-3">
             {messages.map((message, index) => {
                 const { status, at } = displayStatus(message);
+                const words = messageStatusWords(status);
                 const latest = message.deliveries.at(-1);
                 return (
                     <li
@@ -85,8 +67,8 @@ export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
                                 </span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Badge variant={statusVariant(status)}>
-                                    {status}
+                                <Badge variant={words.variant}>
+                                    {words.label}
                                 </Badge>
                                 {isPending(status) && (
                                     <span className="text-xs text-muted-foreground">
@@ -112,7 +94,8 @@ export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
                         )}
 
                         <p className="text-xs text-muted-foreground">
-                            Sent {new Date(message.createdAt).toLocaleString()}
+                            {words.sent ? "Sent" : "Recorded"}{" "}
+                            {new Date(message.createdAt).toLocaleString()}
                             {status !== message.status ||
                             message.deliveries.length > 0
                                 ? ` · updated ${new Date(at).toLocaleString()}`
