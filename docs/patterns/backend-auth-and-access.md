@@ -273,6 +273,20 @@ orgId)` (`organizations/organization-kind.ts`).
   (`PLAN_LOCKS_ACTIONS_ONLY`), since it holds refunds, renewals and
   invoices; invoicing has no registry and needs none (DEC-070).
   `billing/online-payments-plan.db.spec.ts`.
+- **Current** (6 Oct 2026, "Online needs a paid plan; Free takes money
+  offline") — **Check an online-money feature where it is configured, never
+  at the customer's moment.** A feature that takes money online is set up
+  only on a plan with the `payments` row, and the check sits on the write
+  that sets it up (403 `MODULE_LOCKED`). Nothing a business set up may
+  become unbookable or unbuyable after a downgrade: the customer's side
+  quietly falls back to the offline way and keeps the stored setting for an
+  upgrade. Deposits are the first (`bookings/deposit-plan.ts`): setting a
+  service's `depositMode` to anything but NONE needs the row (NONE, or the
+  deposit it already has, never asks, so the editor's full-form save keeps
+  working); on a plan without it the booking page serves no
+  `depositCents` and books the service "pay at the desk", with the stored
+  deposit untouched. Staff bookings never ask. The app locks the control
+  with the way up (`depositLock`). `bookings/deposit-plan.db.spec.ts`.
 - **Current** (DEC-068) — **Turning a module on creates its minimum in the
   switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
   checks `module:manage` and then the action for each thing it creates

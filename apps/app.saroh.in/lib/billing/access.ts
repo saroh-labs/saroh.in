@@ -256,3 +256,32 @@ export function onlinePaymentsLock(
         href: lock.href,
     };
 }
+
+/**
+ * The plan's stop on deposits (6 Oct 2026), said in the Service Editor:
+ * a deposit is taken online, so setting one comes with the plan that takes
+ * payment online (`payments` row). Nothing a business set up stops being
+ * bookable: until then its services book "pay at the desk", and a service
+ * that already has a deposit keeps it, paused, for when the plan has it
+ * (`kept`). Plan names are the catalogue's; no price. Null when nothing is
+ * locked, or while nothing enforces it (`rowLock`).
+ */
+export function depositLock(
+    lock: PlanLock | null,
+    kept: boolean,
+): OnlinePaymentsLock | null {
+    if (!lock) return null;
+    const up = lock.upgradeTo;
+    const on = lock.plan ? `You're on ${lock.plan}. ` : "";
+    const until = up ? " until then" : "";
+    return {
+        title: up
+            ? `Deposits are taken online, which comes with ${up.name}`
+            : `Deposits are taken online, which isn't in your ${lock.plan || "current"} plan`,
+        body: kept
+            ? `${on}This service keeps its deposit, paused: it books "pay at the desk"${until}.`
+            : `${on}Services book "pay at the desk"${until}.`,
+        cta: up ? `See ${up.name}` : "See plans",
+        href: lock.href,
+    };
+}

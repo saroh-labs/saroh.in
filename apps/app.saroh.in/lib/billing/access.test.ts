@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    depositLock,
     onlinePaymentsLock,
     planLocks,
+    rowLock,
     rowNotice,
     upgradeHref,
     upgradeLine,
@@ -301,5 +303,64 @@ describe("onlinePaymentsLock", () => {
                 }),
             ),
         ).toEqual([]);
+    });
+});
+
+describe("depositLock", () => {
+    const payments = row({
+        moduleId: "payments",
+        name: "Online payments",
+        state: "locked",
+        limit: null,
+        usage: null,
+        menu: null,
+        child: null,
+    });
+
+    it("says deposits come with the plan that takes payment online, and services book at the desk", () => {
+        const lock = depositLock(
+            rowLock(access({ modules: [payments] }), "payments"),
+            false,
+        );
+        expect(lock).toEqual({
+            title: "Deposits are taken online, which comes with Plan B",
+            body: 'You\'re on Plan A. Services book "pay at the desk" until then.',
+            cta: "See Plan B",
+            href: "/settings/billing?plan=b#change-plan",
+        });
+        // Plan names only: never a price.
+        expect(JSON.stringify(lock)).not.toMatch(/111|₹/);
+    });
+
+    it("says a deposit the service already has is kept, paused", () => {
+        expect(
+            depositLock(
+                rowLock(access({ modules: [payments] }), "payments"),
+                true,
+            )?.body,
+        ).toBe(
+            'You\'re on Plan A. This service keeps its deposit, paused: it books "pay at the desk" until then.',
+        );
+    });
+
+    it("locks nothing when the plan takes payment online, or nothing enforces it", () => {
+        expect(
+            depositLock(
+                rowLock(
+                    access({ modules: [{ ...payments, state: "on" }] }),
+                    "payments",
+                ),
+                false,
+            ),
+        ).toBeNull();
+        expect(
+            depositLock(
+                rowLock(
+                    access({ enforced: false, modules: [payments] }),
+                    "payments",
+                ),
+                true,
+            ),
+        ).toBeNull();
     });
 });

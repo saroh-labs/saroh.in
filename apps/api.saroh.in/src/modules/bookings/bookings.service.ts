@@ -45,6 +45,7 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
+import { assertDepositOnPlan } from "./deposit-plan";
 import type { TakeDeskPaymentDto } from "./desk-pay.dto";
 import {
     BOOKING_PAPER,
@@ -263,6 +264,9 @@ export class BookingsService {
         );
         const depositMode = dto.depositMode ?? "NONE";
         assertDepositPriced(dto.priceCents ?? null, depositMode);
+        // A deposit is taken online, so it comes with a plan that takes
+        // money online — asked here, where it is set (`deposit-plan.ts`).
+        await assertDepositOnPlan(ctx.organizationId, depositMode);
         // A treatment needs a storefront to sell from (E10, DEC-050).
         await assertTreatmentSellable(
             { organizationId: ctx.organizationId, siteId: dto.siteId ?? null },
@@ -405,6 +409,13 @@ export class BookingsService {
             assertDepositPriced(
                 priceAfter,
                 dto.depositMode ?? service.depositMode,
+            );
+            // Setting a new deposit needs online payments on the plan;
+            // NONE, or the deposit it already has, never asks.
+            await assertDepositOnPlan(
+                ctx.organizationId,
+                dto.depositMode,
+                service.depositMode,
             );
             if (dto.depositMode !== undefined) {
                 data.depositMode = dto.depositMode;
