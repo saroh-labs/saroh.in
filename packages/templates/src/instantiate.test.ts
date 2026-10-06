@@ -68,6 +68,7 @@ describe("registry", () => {
             "personal@1",
             "portfolio@1",
             "writing@1",
+            "blogs@1",
         ]);
         for (const id of ["personal", "portfolio", "writing"]) {
             expect(getTemplate(id)?.id).toBe(id);

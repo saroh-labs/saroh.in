@@ -62,6 +62,9 @@ export {
 // Blog/writing (DEC-070, K13). Registered; no kind's default.
 export { WRITING_TEMPLATE_ID, writingTemplate } from "./templates/writing";
 
+// The Blogs industry template (Journal shape; industry templates U8).
+export { BLOGS_TEMPLATE_ID, blogsTemplate } from "./templates/blogs";
+
 // The Personal/consultant template (DEC-070, K14): the default for "Just me".
 export {
     PERSONAL_TEMPLATE_ID,
