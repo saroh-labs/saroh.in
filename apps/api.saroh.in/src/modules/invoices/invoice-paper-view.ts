@@ -1,3 +1,4 @@
+import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import { rateToBps } from "./gst";
 import { stateName } from "./gst-states";
 import type { InvoiceTitle } from "./invoice-title";
@@ -100,6 +101,12 @@ export interface PaperView {
     /** "Prices include GST." on a tax invoice. */
     inclusive: string | null;
     footer: string;
+    /**
+     * "How to pay us" (R32, #833) on an unpaid invoice: one line per way
+     * set — UPI, the bank transfer, the note. Null when nothing is owed on
+     * it or the business set none; absent from Saroh's own invoices.
+     */
+    howToPay?: string[] | null;
 }
 
 const MONTHS = [
@@ -239,6 +246,42 @@ export function paperFooter(i: InvoiceViewModel, businessName: string): string {
         : `${paid}${businessName} is not registered for GST, so no tax is charged.`;
 }
 
+/** "1234 5678 9012": an account number in fours, as the pay page groups it. */
+function groupedAccount(number: string): string {
+    return number.replace(/(\d{4})(?=\d)/g, "$1 ");
+}
+
+/**
+ * "How to pay us" as the paper prints it (#833): "UPI: asha@okhdfc", the
+ * transfer's name, account, IFSC and bank on one line, then the note. The
+ * app's `howToPayLines` (`lib/invoices/how-to-pay.ts`) says the same on the
+ * printed screen. Only an unpaid invoice — issued or overdue, never a
+ * credit note — asks to be paid; null otherwise, and when none is set.
+ */
+export function howToPayLines(
+    i: Pick<InvoiceViewModel, "standing" | "kind">,
+    pay: PayInstructionsView | null | undefined,
+): string[] | null {
+    const owed = i.standing === "ISSUED" || i.standing === "OVERDUE";
+    if (!owed || i.kind === "CREDIT_NOTE" || !pay) return null;
+    const lines: string[] = [];
+    if (pay.upiId) lines.push(`UPI: ${pay.upiId}`);
+    if (pay.bankAccountNumber && pay.bankIfsc && pay.bankAccountName) {
+        lines.push(
+            [
+                `Bank transfer: ${pay.bankAccountName}`,
+                `A/c ${groupedAccount(pay.bankAccountNumber)}`,
+                `IFSC ${pay.bankIfsc}`,
+                pay.bankName,
+            ]
+                .filter(Boolean)
+                .join(" · "),
+        );
+    }
+    if (pay.note?.trim()) lines.push(pay.note.trim());
+    return lines.length ? lines : null;
+}
+
 /**
  * The paper of an issued invoice read with its lines (`serializeInvoice`
  * with `detail`), in the business's zone. `today` is the business's current
@@ -248,6 +291,7 @@ export function paperView(
     i: InvoiceViewModel & { number: string },
     today: PaperBusiness,
     timeZone: string,
+    pay: PayInstructionsView | null = null,
 ): PaperView {
     const business = printedSeller(i, today);
     const money = (a: string) => paperMoney(a, i.currency);
@@ -346,5 +390,6 @@ export function paperView(
         total: money(i.total),
         inclusive: gstRows ? "Prices include GST." : null,
         footer: paperFooter(i, business.name),
+        howToPay: howToPayLines(i, pay),
     };
 }

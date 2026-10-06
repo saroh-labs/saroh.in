@@ -14,6 +14,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import { MediaService } from "../media/media.service";
@@ -126,6 +127,13 @@ export interface SetupFacts {
      * for even with nothing on that takes money (DEC-070, KTD-7).
      */
     invoices: number;
+    /**
+     * The plan takes new online payments (#835). False: the checklist's
+     * payments step says online payment comes with a paid plan rather
+     * than "Connect payments" — connecting a provider would change
+     * nothing. Fails open, as every plan check does.
+     */
+    onlinePaymentsInPlan: boolean;
 }
 
 /** What the settings read selects from the profile. */
@@ -610,27 +618,41 @@ export class OrganizationSettingsService {
     /** What the take-money checklist ticks, counted now. */
     private async setupFacts(organizationId: string): Promise<SetupFacts> {
         const site = { organizationId, deletedAt: null };
-        const [products, services, sites, sitesNotLive, invoices] =
-            await Promise.all([
-                prisma.product.count({
-                    where: { organizationId, status: { not: "ARCHIVED" } },
-                }),
-                prisma.service.count({
-                    where: {
-                        organizationId,
-                        deletedAt: null,
-                        status: { not: "ARCHIVED" },
-                    },
-                }),
-                prisma.site.count({ where: site }),
-                prisma.site.count({
-                    where: { ...site, currentPublicationId: null },
-                }),
-                prisma.invoice.count({
-                    where: { organizationId, status: { not: "VOID" } },
-                }),
-            ]);
-        return { products, services, sites, sitesNotLive, invoices };
+        const [
+            products,
+            services,
+            sites,
+            sitesNotLive,
+            invoices,
+            onlinePaymentsInPlan,
+        ] = await Promise.all([
+            prisma.product.count({
+                where: { organizationId, status: { not: "ARCHIVED" } },
+            }),
+            prisma.service.count({
+                where: {
+                    organizationId,
+                    deletedAt: null,
+                    status: { not: "ARCHIVED" },
+                },
+            }),
+            prisma.site.count({ where: site }),
+            prisma.site.count({
+                where: { ...site, currentPublicationId: null },
+            }),
+            prisma.invoice.count({
+                where: { organizationId, status: { not: "VOID" } },
+            }),
+            planTakesOnlinePayment(organizationId),
+        ]);
+        return {
+            products,
+            services,
+            sites,
+            sitesNotLive,
+            invoices,
+            onlinePaymentsInPlan,
+        };
     }
 
     /** The earliest order in the business, across every storefront. */

@@ -240,6 +240,77 @@ describe("readyChecklist", () => {
         expect(pay?.why).toMatch(/Turn on Payments/);
     });
 
+    it("on a plan without online payments, says it comes with a paid plan, not Connect payments (#835)", () => {
+        const facts = {
+            products: 0,
+            services: 0,
+            sites: 0,
+            sitesNotLive: 0,
+            onlinePaymentsInPlan: false,
+        };
+        const notConnected = mod("PAYMENTS", {
+            readiness: "SETUP_REQUIRED",
+            blockers: [
+                {
+                    code: "PAYMENTS_NO_PROVIDER",
+                    actionHref: "/settings/providers",
+                },
+            ],
+        });
+        const r = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [notConnected],
+        });
+        const pay = r.left.find((i) => i.key === "payments");
+        expect(pay).toMatchObject({
+            label: "Take payment online",
+            cta: "See plans",
+            href: "/settings/billing#change-plan",
+            broken: false,
+        });
+        expect(pay?.why).toMatch(/comes with a paid plan/);
+        expect(pay?.label).not.toMatch(/Connect/);
+
+        // Payments off and something sells: still the plan, not "Turn on".
+        const off = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+                mod("APPOINTMENTS"),
+            ],
+        });
+        expect(off.left.find((i) => i.key === "payments")?.href).toBe(
+            "/settings/billing#change-plan",
+        );
+        // Off with nothing that sells: no money to take, no step.
+        const quiet = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+            ],
+        });
+        expect(quiet.steps.map((s) => s.key)).not.toContain("payments");
+
+        // A plan with online payments keeps the provider step.
+        const paid = readyChecklist({
+            settings: {
+                ...settled,
+                setup: { ...facts, onlinePaymentsInPlan: true },
+            },
+            modules: [notConnected],
+        });
+        expect(paid.left.find((i) => i.key === "payments")).toMatchObject({
+            label: "Connect payments",
+            href: "/settings/providers",
+        });
+    });
+
     it("says a provider that stopped is broken", () => {
         const r = readyChecklist({
             settings: settled,

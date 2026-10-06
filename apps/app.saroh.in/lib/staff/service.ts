@@ -54,7 +54,12 @@ export async function readBookingPayment(): Promise<BookingPaymentView | null> {
 }
 
 const WAYS: readonly unknown[] = ["ONLINE", "DESK", "BOTH"];
-const BLOCKERS: readonly unknown[] = ["PAYMENTS_OFF", "NO_PROVIDER", null];
+const BLOCKERS: readonly unknown[] = [
+    "PLAN",
+    "PAYMENTS_OFF",
+    "NO_PROVIDER",
+    null,
+];
 
 function asBookingPayment(v: unknown): BookingPaymentView | null {
     if (typeof v !== "object" || v === null) return null;

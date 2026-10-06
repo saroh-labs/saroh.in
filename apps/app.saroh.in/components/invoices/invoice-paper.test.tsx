@@ -317,3 +317,36 @@ describe("InvoicePaper's lines on a phone (T6)", () => {
         expect(out).not.toContain("data-phone-line");
     });
 });
+
+describe("InvoicePaper's How to pay us (#833)", () => {
+    const pay = {
+        upiId: "rye@okhdfc",
+        bankAccountName: null,
+        bankAccountNumber: null,
+        bankIfsc: null,
+        bankName: null,
+        note: "Put the invoice number in the note.",
+    };
+
+    it("unpaid paper prints how to pay, so a printed copy carries it", () => {
+        const out = html(invoice({ payInstructions: pay }));
+        expect(out).toContain("How to pay us");
+        expect(out).toContain("UPI: rye@okhdfc");
+        expect(out).toContain("Put the invoice number in the note.");
+    });
+
+    it("paid paper, or none set, prints none", () => {
+        expect(
+            html(
+                invoice({
+                    status: "PAID",
+                    standing: "PAID",
+                    payInstructions: pay,
+                }),
+            ),
+        ).not.toContain("How to pay us");
+        expect(html(invoice({ payInstructions: null }))).not.toContain(
+            "How to pay us",
+        );
+    });
+});

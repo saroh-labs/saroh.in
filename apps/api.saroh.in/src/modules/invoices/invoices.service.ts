@@ -14,6 +14,7 @@ import {
     planTakesOnlinePayment,
 } from "../billing/online-payments-plan";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import { authorize } from "../organizations/organization-policy";
 import {
     autopayChargeInProgress,
@@ -52,6 +53,7 @@ import {
     numberFor,
     writeDocumentLines,
 } from "./order-invoicing";
+import { invoiceOnlineBlocker } from "./pay-online";
 import { mintPayToken } from "./pay-token";
 import { assertPaymentsOn } from "./payments-on";
 import type {
@@ -78,6 +80,7 @@ export interface LinkOptions {
     requireProvider: boolean;
 }
 const PAY_LINK: LinkOptions = { requireProvider: true };
+const VIEW_LINK: LinkOptions = { requireProvider: false };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 500;
@@ -183,9 +186,20 @@ export class InvoicesService {
     async get(ctx: OrganizationContext, id: string): Promise<InvoiceViewModel> {
         authorize(ctx, "invoice:read");
         const invoice = await this.read(ctx.organizationId, id);
+        const owed =
+            invoice.standing === "ISSUED" || invoice.standing === "OVERDUE";
+        const [online, payInstructions] = await Promise.all([
+            this.online(ctx.organizationId, id),
+            // "How to pay us" on the printed paper (#833), as on the PDF:
+            // only while something is owed on it.
+            owed && invoice.kind !== "CREDIT_NOTE"
+                ? businessPayInstructionsOf(ctx.organizationId)
+                : undefined,
+        ]);
         return {
             ...invoice,
-            online: await this.online(ctx.organizationId, id),
+            online,
+            ...(payInstructions !== undefined ? { payInstructions } : {}),
         };
     }
 
@@ -205,6 +219,22 @@ export class InvoicesService {
         id: string,
     ): Promise<{ token: string }> {
         return this.payLink(prisma, ctx, id, PAY_LINK);
+    }
+
+    /**
+     * A view link (#833, DEC-070): the same kind of token, for a business
+     * whose invoices can't be paid online — on a plan without online
+     * payments, with Payments off or no provider. It opens the invoice on
+     * the business's site with no Pay button and with "How to pay us", so
+     * a business without an email provider can still hand its customer
+     * the invoice and how to pay. Like a pay link, it replaces the one
+     * before. Asks nothing of Payments, the provider or the plan.
+     */
+    async createViewLink(
+        ctx: OrganizationContext,
+        id: string,
+    ): Promise<{ token: string }> {
+        return this.payLink(prisma, ctx, id, VIEW_LINK);
     }
 
     /**
@@ -998,7 +1028,7 @@ export class InvoicesService {
             }),
             prisma.invoice.findFirst({
                 where: { id: invoiceId, organizationId },
-                select: { payTokenHash: true },
+                select: { payTokenHash: true, subscriptionId: true },
             }),
             prisma.paymentIntent.findMany({
                 where: { organizationId, invoiceId, status: "SUCCEEDED" },
@@ -1019,8 +1049,17 @@ export class InvoicesService {
             }),
             chargeUnderWayOn(prisma, organizationId, invoiceId),
         ]);
+        // Why its link can't take payment (#835): the plan before the
+        // provider, so the panel never says "connect one" when the plan
+        // is what stands in the way.
+        const onlineBlocker = await invoiceOnlineBlocker(
+            prisma,
+            organizationId,
+            link,
+        );
         return {
             autopayCharge: charging ? { at: charging.at.toISOString() } : null,
+            onlineBlocker,
             providerConnected: connected > 0,
             payLinkActive: Boolean(link?.payTokenHash),
             payments: intents.map((i) => ({
