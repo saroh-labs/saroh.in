@@ -10,8 +10,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     SAMPLE_PLANS,
     SAMPLE_PRODUCTS,
+    SAMPLE_TIMETABLE,
     SAMPLE_VISIT,
 } from "../block-fixture-preview";
+import { fills, isWeekday, weekCounts } from "../lib/timetable-read";
 import FeaturesSection from "./features";
 import HoursSection, { groupedHoursRows, hoursRows } from "./hours";
 import PersonSection, { credentialsOf } from "./person";
@@ -21,6 +23,7 @@ import ProjectsSection from "./projects";
 import { rhythmGroups } from "./projects-rhythm";
 import { linkText, projectsCount } from "./projects-rows";
 import RichTextSection from "./rich-text";
+import TimetableSection from "./timetable";
 
 /**
  * The block extensions of the template polish. Every one is absent by
@@ -433,5 +436,91 @@ describe("person: portrait, team, credential rows, the page's title", () => {
             <PersonSection content={{ variant: "team", name: " " }} />,
         );
         expect(container.innerHTML).toBe("");
+    });
+});
+
+describe("timetable: the accent look, weekdays only, counts", () => {
+    it("counts sessions, the days that have one, and those that fill", () => {
+        const weekdays = SAMPLE_TIMETABLE.sessions.filter((s) =>
+            isWeekday(s.date),
+        );
+        expect(weekCounts(weekdays)).toEqual({
+            line: "6 sessions across 4 days",
+            filling: 2,
+        });
+        expect(weekCounts([])).toBeNull();
+        expect(fills({ placesLeft: 0, capacity: 12 })).toBe(true);
+        expect(fills({ placesLeft: 9, capacity: 12 })).toBe(false);
+    });
+
+    it("leaves the weekend off, opens with the counts and keys its accent cells", () => {
+        const { container } = render(
+            <TimetableSection
+                content={BLOCK_META.timetable.fixtures.accent}
+                timetable={SAMPLE_TIMETABLE}
+                bookHref="/book"
+            />,
+        );
+        expect(container.textContent).not.toContain("Open gym");
+        expect(container.textContent).toContain(
+            "6 sessions across 4 days. No contract.",
+        );
+        expect(
+            container.querySelector("[data-timetable-legend]")?.textContent,
+        ).toBe("2 of them fill fast");
+    });
+
+    it("sets the cells that fill on the accent, still saying Full or Fills fast", () => {
+        const { container } = render(
+            <TimetableSection
+                content={{
+                    ...BLOCK_META.timetable.fixtures.accent,
+                    showPlacesLeft: false,
+                }}
+                timetable={SAMPLE_TIMETABLE}
+            />,
+        );
+        const lit = Array.from(container.querySelectorAll(".bg-site-accent"))
+            .filter((el) => !el.hasAttribute("aria-hidden"))
+            .map((el) => el.textContent ?? "");
+        // Each lit cell, desk and phone alike, says why in words.
+        expect(lit.length).toBeGreaterThan(0);
+        for (const text of lit) {
+            expect(text).toMatch(/Full|Fills fast/);
+        }
+        // Times read off a clock, in the mono face.
+        expect(container.querySelector("th[scope=row]")?.className).toContain(
+            "font-site-mono",
+        );
+    });
+
+    it("renders nothing for a weekend-only week with weekdays only on", () => {
+        const weekend = {
+            ...SAMPLE_TIMETABLE,
+            sessions: SAMPLE_TIMETABLE.sessions.filter(
+                (s) => !isWeekday(s.date),
+            ),
+        };
+        const { container } = render(
+            <TimetableSection
+                content={BLOCK_META.timetable.fixtures.accent}
+                timetable={weekend}
+            />,
+        );
+        expect(container.innerHTML).toBe("");
+    });
+
+    it("keeps the grid's own times and no counts by default", () => {
+        const { container } = render(
+            <TimetableSection
+                content={BLOCK_META.timetable.fixtures.grid}
+                timetable={SAMPLE_TIMETABLE}
+            />,
+        );
+        expect(container.textContent).toContain("Open gym");
+        expect(container.querySelector("[data-timetable-legend]")).toBeNull();
+        expect(container.querySelector("th[scope=row]")?.className).toContain(
+            "font-site-heading",
+        );
     });
 });

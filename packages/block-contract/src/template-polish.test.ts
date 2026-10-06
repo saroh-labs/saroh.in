@@ -240,3 +240,22 @@ describe("person: portrait, team, credential rows, the page's title", () => {
         expect(resolveVariant("person", { name: "x" })).toBe("default");
     });
 });
+
+describe("timetable: the accent look, weekdays only, counts", () => {
+    it("saves weekdays only and counts, and knows the accent look", () => {
+        expect(
+            parseSectionContent("timetable", 1, {
+                variant: "accent",
+                weekdaysOnly: true,
+                showCounts: true,
+            }).success,
+        ).toBe(true);
+        expect(resolveVariant("timetable", { variant: "accent" })).toBe(
+            "accent",
+        );
+        expect(
+            parseSectionContent("timetable", 1, { weekdaysOnly: "yes" })
+                .success,
+        ).toBe(false);
+    });
+});

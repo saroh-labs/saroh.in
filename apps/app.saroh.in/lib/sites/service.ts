@@ -319,6 +319,10 @@ export interface TimetableContent {
     serviceIds?: string[];
     showTrainer?: boolean;
     showPlacesLeft?: boolean;
+    /** Monday to Friday only (template polish). */
+    weekdaysOnly?: boolean;
+    /** "13 sessions across 5 days" under the title. */
+    showCounts?: boolean;
 }
 
 /**

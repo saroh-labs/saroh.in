@@ -919,8 +919,10 @@ export const TIMETABLE_MAX_SERVICES = 24;
  * - The week is always seven days from today: a field for it would be a
  *   number with one right answer.
  *
- * Looks are `grid` (days across, times down; a list on a phone) and `list`
- * (day by day), in `BLOCK_META`. With no class sessions in the week the
+ * Looks are `grid` (days across, times down; a list on a phone), `list`
+ * (day by day) and the template polish's `accent` (the grid with the
+ * sessions that fill set on the accent, times in the mono face), in
+ * `BLOCK_META`. With no class sessions in the week the
  * block renders nothing on the site; the editor's canvas says why.
  */
 const timetableV1 = z.object({
@@ -938,6 +940,18 @@ const timetableV1 = z.object({
         .optional(),
     showTrainer: z.boolean().optional(),
     showPlacesLeft: z.boolean().optional(),
+    /**
+     * Monday to Friday only (template polish), for a business whose week is
+     * the working week; the weekend's sessions are left off. ABSENT, all
+     * seven days.
+     */
+    weekdaysOnly: z.boolean().optional(),
+    /**
+     * A line counted from the week shown — "13 sessions across 5 days" —
+     * before the intro, and in the accent look a key for its filled cells
+     * (template polish). Derived, never typed. ABSENT, not shown.
+     */
+    showCounts: z.boolean().optional(),
 });
 
 /**

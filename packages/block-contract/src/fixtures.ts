@@ -967,11 +967,24 @@ export const BLOCK_META = {
                 description:
                     "Each day in turn, its classes one per row. Better for a short week.",
             },
+            {
+                id: "accent",
+                label: "Bold week",
+                description:
+                    "The week grid with the classes that fill set on your accent colour, still saying Fills fast or Full, and times in a clock face. Day by day on a phone.",
+            },
         ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component a sample week.
             grid: { variant: "grid", title: "This week" },
             list: { variant: "list", title: "This week" },
+            accent: {
+                variant: "accent",
+                title: "This week",
+                intro: "No contract. Book from your phone on the way in.",
+                weekdaysOnly: true,
+                showCounts: true,
+            },
         },
     },
     hours: {

@@ -415,6 +415,8 @@ const renderedTimetable = z.object({
     serviceIds: z.array(z.string()).optional(),
     showTrainer: z.boolean().optional(),
     showPlacesLeft: z.boolean().optional(),
+    weekdaysOnly: z.boolean().optional(),
+    showCounts: z.boolean().optional(),
 });
 
 const renderedHours = z.object({
