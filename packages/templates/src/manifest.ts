@@ -119,6 +119,13 @@ export interface TemplatePage {
     isHome?: boolean;
     /** Ordered sections; array index becomes the persisted `order`. */
     sections: TemplateSection[];
+    /**
+     * Whether the page is laid down for this context. Absent means always.
+     * For a page whose every section is bound to one module (a gym's
+     * Timetable), so a business without it gets no page that would render
+     * empty. Never on the home page: a site always has one.
+     */
+    when?: (ctx: TemplateContext) => boolean;
 }
 
 /**
