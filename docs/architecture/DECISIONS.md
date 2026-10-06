@@ -1090,3 +1090,12 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the API sent identity mail and site sign-in codes through a Google Workspace account over SMTP. A personal mailbox is the wrong sender for a product's transactional mail (sending limits, one person's credentials).
 - Decision: the `SMTP_*` set points at Amazon SES in `ap-south-1`, next to the API's servers in India. `saroh.in` sends with SES's DKIM and a `mail.saroh.in` MAIL FROM domain; account-level suppression stops mail to addresses that bounced or complained. The credentials can only send, only from `@saroh.in`. Google Workspace stays the mailbox people write to. The code transport is pooled (two connections at most), so a burst of codes reuses an open connection. No code path changed: the switch was configuration.
 - Consequences: the privacy page lists Amazon Web Services (SES) for sending and Google Workspace for our mailboxes (dated 6 Oct). Bounce and complaint notices go to SES, not to a webhook: nothing in Saroh marks an address undeliverable yet, which is fine at today's volume and is the next step if bounces grow. Rolling back is a configuration change on the host.
+
+## DEC-086 Saroh sends a business's customer notifications until it connects its own email
+
+**Status: Accepted (direction) — 2026-10-06** · user · in conversation · not yet planned or built
+
+- Context: DEC-011 sends a business's messages to its customers only through a provider the business connects. Most new businesses connect none, so their customers get no booking confirmation or order update by email at all.
+- Decision: while a business has no connected email provider, Saroh's own email (Amazon SES, DEC-085) sends its customer notifications: booking confirmations and the other transactional messages the business would send through its provider. When the business connects a provider, its provider sends them and Saroh stops. Marketing and broadcasts never go through Saroh.
+- Open, for the plan: which messages count as notifications; the sending address and stream, kept apart from sign-in and code mail so complaints cannot hurt them; the business's name as sender and its email as reply-to; consent and suppression exactly as for provider sends; per-business caps; how it relates to plan limits (the owner's call, kept out of this repo). Review invitations (MARKETING_CLAIMS D11) are discussed separately.
+- Consequences: until built, DEC-011's rule stands in code: no provider, no customer email.
