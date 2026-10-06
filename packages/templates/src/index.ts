@@ -87,3 +87,9 @@ export {
 } from "./templates/ceramics";
 // The Gym industry template (industry templates plan, U6).
 export { GYM_TEMPLATE_ID, gymTemplate } from "./templates/gym";
+// The Bakery industry template (industry templates plan, U4).
+export {
+    BAKERY_IMAGE_BRIEFS,
+    BAKERY_TEMPLATE_ID,
+    bakeryTemplate,
+} from "./templates/bakery";
