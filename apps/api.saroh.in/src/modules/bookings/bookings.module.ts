@@ -26,6 +26,7 @@ import {
     PublicBookingsController,
 } from "./public-bookings.controller";
 import { PublicBookingsService } from "./public-bookings.service";
+import { PublicTimetableService } from "./public-timetable";
 import { PublicTodayService } from "./public-today";
 import {
     RELEASE_HOLDS_TYPE,
@@ -85,6 +86,7 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         BookingsService,
         PublicBookingsService,
         PublicTodayService,
+        PublicTimetableService,
         AccountBookingsService,
         ReleaseHoldsHandler,
         BookingNotifyHandler,
